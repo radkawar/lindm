@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/sha256"
+	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -81,7 +81,7 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	}
 	assertSecretAbsent(t, ctx, conn, secret)
 
-	key := p256Key(t)
+	key := ed25519Key(t)
 	csr := mustCSR(t, key, &x509.CertificateRequest{})
 	txID := uuid.NewString()
 	enrolled, err := svc.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{
@@ -105,7 +105,7 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 		t.Fatalf("different transaction: %v", err)
 	}
 	if _, err := svc.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{
-		GrantSecret: secret, TransactionId: txID, CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
+		GrantSecret: secret, TransactionId: txID, CsrPem: mustCSR(t, ed25519Key(t), &x509.CertificateRequest{}),
 	})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("different key: %v", err)
 	}
@@ -115,13 +115,10 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issued cert rejected before renewal: %v", err)
 	}
-	assertRenewalFence(t, ctx, conn, svc, principal)
+	acquireTestSession(t, ctx, svc, principal, key, 0)
+	assertRenewalFence(t, ctx, conn, svc, principal, key)
 	assertConcurrentRenewal(t, ctx, conn, svc, ownerCtx)
-	deviceCtx := withDevicePrincipal(ctx, devicePrincipal{
-		DeviceID:      uuid.MustParse(enrolled.Msg.GetDeviceId()),
-		GenerationID:  uuid.MustParse(enrolled.Msg.GetEnrollmentGeneration()),
-		CertificateID: certificateID(t, ctx, conn, leaf),
-	})
+	deviceCtx := withDevicePrincipal(ctx, principal)
 	boot := uuid.NewString()
 	generation := enrolled.Msg.GetEnrollmentGeneration()
 	deviceID := enrolled.Msg.GetDeviceId()
@@ -176,6 +173,7 @@ func inventory(generation, boot string, seq uint64, host string) *devicev1.Repor
 		EnrollmentGeneration: generation,
 		BootId:               boot,
 		Sequence:             seq,
+		SessionEpoch:         1,
 		Hostname:             host,
 		OsId:                 "debian",
 		OsVersion:            "12",
@@ -229,32 +227,23 @@ func deviceHostname(t *testing.T, ctx context.Context, conn *pgx.Conn, id string
 	return host
 }
 
-func certificateID(t *testing.T, ctx context.Context, conn *pgx.Conn, leaf *x509.Certificate) uuid.UUID {
+func assertRenewalFence(t *testing.T, ctx context.Context, conn *pgx.Conn, svc *Service, principal devicePrincipal, key ed25519.PrivateKey) {
 	t.Helper()
-	var id uuid.UUID
-	sum := sha256.Sum256(leaf.Raw)
-	if err := conn.QueryRow(ctx, `SELECT id FROM device_certificates WHERE fingerprint = $1`, sum[:]).Scan(&id); err != nil {
-		t.Fatal(err)
-	}
-	return id
-}
-
-func assertRenewalFence(t *testing.T, ctx context.Context, conn *pgx.Conn, svc *Service, principal devicePrincipal) {
-	t.Helper()
-	csrB := mustCSR(t, p256Key(t), &x509.CertificateRequest{})
+	csrB := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})
 	deviceCtx := withDevicePrincipal(ctx, principal)
-	renewed, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csrB}))
+	request := signedRenewalRequest(t, svc, principal, key, 1, csrB)
+	renewed, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
-	replay, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csrB}))
+	replay, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(renewed.Msg.GetCertificatePem(), replay.Msg.GetCertificatePem()) {
 		t.Fatal("overlapping certificate did not replay the issued renewal")
 	}
-	if _, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{})})); connect.CodeOf(err) != connect.CodePermissionDenied {
+	if _, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})))); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("overlapping certificate minted a new key: %v", err)
 	}
 	if got := activeCertificatePEM(t, ctx, conn, principal.DeviceID); !bytes.Equal(got, renewed.Msg.GetCertificatePem()) {
@@ -270,8 +259,9 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	key := ed25519Key(t)
 	enrolled, err := svc.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{
-		GrantSecret: created.Msg.GetSecret(), TransactionId: uuid.NewString(), CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
+		GrantSecret: created.Msg.GetSecret(), TransactionId: uuid.NewString(), CsrPem: mustCSR(t, key, &x509.CertificateRequest{}),
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -282,9 +272,14 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 		t.Fatal(err)
 	}
 	deviceCtx := withDevicePrincipal(ctx, principal)
+	acquireTestSession(t, ctx, svc, principal, key, 0)
 	csrs := [][]byte{
-		mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
-		mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
+		mustCSR(t, ed25519Key(t), &x509.CertificateRequest{}),
+		mustCSR(t, ed25519Key(t), &x509.CertificateRequest{}),
+	}
+	requests := make([]*devicev1.RenewIdentityRequest, len(csrs))
+	for i, csr := range csrs {
+		requests[i] = signedRenewalRequest(t, svc, principal, key, 1, csr)
 	}
 	results := make([]struct {
 		pem []byte
@@ -295,7 +290,7 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			resp, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csrs[i]}))
+			resp, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(requests[i]))
 			if err != nil {
 				results[i].err = err
 				return
@@ -323,14 +318,14 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 	if got := activeCertificatePEM(t, ctx, conn, principal.DeviceID); !bytes.Equal(got, results[winner].pem) {
 		t.Fatal("concurrent renewal displaced the winning certificate")
 	}
-	replay, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csrs[winner]}))
+	replay, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(requests[winner]))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(replay.Msg.GetCertificatePem(), results[winner].pem) {
 		t.Fatal("lost concurrent renewal response was not replayed")
 	}
-	if _, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{})})); connect.CodeOf(err) != connect.CodePermissionDenied {
+	if _, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})))); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("retired certificate minted another key after concurrent renewal: %v", err)
 	}
 }
@@ -360,7 +355,8 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				svc.clock = func() time.Time { return time.UnixMicro(clock.Load()) }
 				owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
 				ownerCtx := identity.WithPrincipal(ctx, owner)
-				_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, p256Key(t))
+				key := ed25519Key(t)
+				_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
 				deviceID := uuid.MustParse(enrolled.Msg.GetDeviceId())
 				leaf := parseCertPEM(t, enrolled.Msg.GetCertificatePem())
 				renewAt := start.Add(time.Minute)
@@ -374,14 +370,22 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				csr := mustCSR(t, p256Key(t), &x509.CertificateRequest{})
-				renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csr}))
+				acquireTestSession(t, ctx, svc, principal, key, 0)
+				nextKey := ed25519Key(t)
+				csr := mustCSR(t, nextKey, &x509.CertificateRequest{})
+				request := signedRenewalRequest(t, svc, principal, key, 1, csr)
+				renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(request))
 				if err != nil {
 					t.Fatal(err)
 				}
 				if status == "active" {
 					leaf = parseCertPEM(t, renewed.Msg.GetCertificatePem())
-					csr = mustCSR(t, p256Key(t), &x509.CertificateRequest{})
+					csr = mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})
+					principal, err = svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), leaf)
+					if err != nil {
+						t.Fatal(err)
+					}
+					request = signedRenewalRequest(t, svc, principal, nextKey, 1, csr)
 				}
 				// Keep an older overlapping row present so a rejected active
 				// renewal must not retire it, even though its window has elapsed.
@@ -427,7 +431,7 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 						results <- result{err: err}
 						return
 					}
-					response, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csr}))
+					response, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(request))
 					results <- result{response: response, err: err}
 				}()
 				// Advance the service clock only once PostgreSQL confirms the
@@ -549,20 +553,19 @@ func TestEnrollmentReplayAfterRenewal(t *testing.T) {
 
 func assertEnrollmentReplayAfterRenewal(t *testing.T, ctx context.Context, svc *Service, ownerCtx context.Context, sameKey bool) {
 	t.Helper()
-	key := p256Key(t)
+	key := ed25519Key(t)
 	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
 	leaf := parseCertPEM(t, enrolled.Msg.GetCertificatePem())
 	principal, err := svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), leaf)
 	if err != nil {
 		t.Fatal(err)
 	}
+	acquireTestSession(t, ctx, svc, principal, key, 0)
 	renewKey := key
 	if !sameKey {
-		renewKey = p256Key(t)
+		renewKey = ed25519Key(t)
 	}
-	renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{
-		CsrPem: mustCSR(t, renewKey, &x509.CertificateRequest{}),
-	}))
+	renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, renewKey, &x509.CertificateRequest{}))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,15 +591,16 @@ func assertEnrollmentReplayAfterRenewal(t *testing.T, ctx context.Context, svc *
 
 func assertRetiredEnrollmentReplayRejected(t *testing.T, ctx context.Context, conn *pgx.Conn, svc *Service, ownerCtx context.Context) {
 	t.Helper()
-	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, p256Key(t))
+	key := ed25519Key(t)
+	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, key)
 	leaf := parseCertPEM(t, enrolled.Msg.GetCertificatePem())
 	principal, err := svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), leaf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{
-		CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
-	}))
+	acquireTestSession(t, ctx, svc, principal, key, 0)
+	nextKey := ed25519Key(t)
+	renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(signedRenewalRequest(t, svc, principal, key, 1, mustCSR(t, nextKey, &x509.CertificateRequest{}))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,9 +609,7 @@ func assertRetiredEnrollmentReplayRejected(t *testing.T, ctx context.Context, co
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := svc.RenewIdentity(withDevicePrincipal(ctx, renewedPrincipal), connect.NewRequest(&devicev1.RenewIdentityRequest{
-		CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{}),
-	}))
+	second, err := svc.RenewIdentity(withDevicePrincipal(ctx, renewedPrincipal), connect.NewRequest(signedRenewalRequest(t, svc, renewedPrincipal, nextKey, 1, mustCSR(t, ed25519Key(t), &x509.CertificateRequest{}))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,7 +626,7 @@ func assertRetiredEnrollmentReplayRejected(t *testing.T, ctx context.Context, co
 
 func assertRevokedDeviceEnrollmentReplayRejected(t *testing.T, ctx context.Context, svc *Service, ownerCtx context.Context) {
 	t.Helper()
-	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, p256Key(t))
+	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, ed25519Key(t))
 	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{
 		RequestId: uuid.NewString(), DeviceId: enrolled.Msg.GetDeviceId(), Reason: "stolen",
 	})); err != nil {

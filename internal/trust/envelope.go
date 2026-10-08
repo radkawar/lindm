@@ -17,9 +17,9 @@ import (
 	"buf.build/go/protovalidate"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/protodata"
 )
 
 const (
@@ -87,7 +87,7 @@ func (a *Authority) Sign(ctx context.Context, message proto.Message, keys ...ed2
 	if err := a.validator.Validate(message); err != nil {
 		return nil, errors.New("invalid signed authority payload")
 	}
-	if unknownFields(message.ProtoReflect()) {
+	if err := protodata.ValidateClosed(message.ProtoReflect()); err != nil {
 		return nil, errors.New("unknown signed authority fields")
 	}
 	if len(keys) == 0 || len(keys) > maxSignatures {
@@ -180,7 +180,7 @@ func (a *Authority) Verify(ctx context.Context, encoded []byte, destination prot
 	if err := proto.Unmarshal(payload, candidate); err != nil {
 		return errors.New("invalid signed authority payload")
 	}
-	if unknownFields(candidate.ProtoReflect()) {
+	if err := protodata.ValidateClosed(candidate.ProtoReflect()); err != nil {
 		return errors.New("unknown signed authority fields")
 	}
 	if err := a.validator.Validate(candidate); err != nil {
@@ -189,37 +189,6 @@ func (a *Authority) Verify(ctx context.Context, encoded []byte, destination prot
 	proto.Reset(destination)
 	proto.Merge(destination, candidate)
 	return nil
-}
-
-// Authority schemas have nested timestamps but no maps. Walk present messages
-// so an unrecognized nested field cannot bypass strict signed-schema handling.
-func unknownFields(message protoreflect.Message) bool {
-	if len(message.GetUnknown()) != 0 {
-		return true
-	}
-	unknown := false
-	message.Range(func(field protoreflect.FieldDescriptor, value protoreflect.Value) bool {
-		if field.IsMap() {
-			unknown = true
-			return false
-		}
-		if field.Message() == nil {
-			return true
-		}
-		if field.IsList() {
-			list := value.List()
-			for i := range list.Len() {
-				if unknownFields(list.Get(i).Message()) {
-					unknown = true
-					return false
-				}
-			}
-		} else {
-			unknown = unknownFields(value.Message())
-		}
-		return !unknown
-	})
-	return unknown
 }
 
 type edVerifier struct {

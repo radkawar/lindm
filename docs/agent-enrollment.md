@@ -1,9 +1,11 @@
 # Packaged agent and native enrollment contract
 
-Status: G2 implementation design under review. G1 commits `19dce6d` and `2a33788`
-provide the authenticated control plane, not a shipped agent. This document refines
-[architecture](architecture.md) and [verification](verification.md); it does not
-reduce the confirmed launch matrix or replace its desktop/physical acceptance.
+Status: G2 implementation and qualification in progress. G1 commits `19dce6d` and
+`2a33788` provide the authenticated control plane; subsequent slices implement native
+inspection, trust verification and protected server authority, not a shipped enrolled
+agent. This document refines [architecture](architecture.md) and
+[verification](verification.md); it does not reduce the confirmed launch matrix or
+replace its desktop/physical acceptance.
 
 ## 1. Process and source boundaries
 
@@ -138,12 +140,19 @@ restart in the same boot resumes the existing epoch; reboot acquires its success
 Every mutation, including snapshots and renewal, rechecks the epoch under the device
 lock. Old in-flight messages cannot mutate current state.
 
-A different successor claim for an already-consumed predecessor indicates ambiguity
-and places the generation in recovery hold; an exact persisted retry does not.
+A different protected acquisition UUID for an already-consumed predecessor indicates
+ambiguity and places the generation in recovery hold; an exact persisted retry does
+not. Changed reuse of an existing request UUID is an idempotency conflict, not clone
+evidence: the unsigned outer DSSE encoding must not be a way to force recovery hold.
 Hold/revocation denies all ordinary mutations and requires approved generation
 replacement, not automatic last-writer-wins. The server retains acquisition receipts
 and predecessor fences for the active generation. An executor never signs a caller-
 selected incarnation/epoch; it derives them from its protected journal and boot.
+
+Retain up to 65,536 successful acquisitions and 4,096 renewal issuances per active
+generation. Resolve exact replay and request conflicts before these admission caps.
+Capacity exhaustion is explicit; no timer deletes active-generation receipts,
+resets the epoch or implicitly re-enrolls the device.
 
 Software credentials cannot distinguish a coordinated exact copy or a sequential
 clone using the same persisted state. This is an explicit assurance limit, not

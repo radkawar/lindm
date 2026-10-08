@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/enrollment/v1/enrollment.proto.
  */
 export const file_lindm_enrollment_v1_enrollment: GenFile = /*@__PURE__*/
-  fileDesc("CiRsaW5kbS9lbnJvbGxtZW50L3YxL2Vucm9sbG1lbnQucHJvdG8SE2xpbmRtLmVucm9sbG1lbnQudjEicQoNRW5yb2xsUmVxdWVzdBIgCgxncmFudF9zZWNyZXQYASABKAlCCrpIB3IFECAYgAISIAoOdHJhbnNhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEhwKB2Nzcl9wZW0YAyABKAxCC7pICHoGEEAYgIABIosBCg5FbnJvbGxSZXNwb25zZRIRCglkZXZpY2VfaWQYASABKAkSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEhcKD2NlcnRpZmljYXRlX3BlbRgDIAEoDBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDJmChFFbnJvbGxtZW50U2VydmljZRJRCgZFbnJvbGwSIi5saW5kbS5lbnJvbGxtZW50LnYxLkVucm9sbFJlcXVlc3QaIy5saW5kbS5lbnJvbGxtZW50LnYxLkVucm9sbFJlc3BvbnNlQixaKmxpbmRtL2dlbi9saW5kbS9lbnJvbGxtZW50L3YxO2Vucm9sbG1lbnR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiRsaW5kbS9lbnJvbGxtZW50L3YxL2Vucm9sbG1lbnQucHJvdG8SE2xpbmRtLmVucm9sbG1lbnQudjEicQoNRW5yb2xsUmVxdWVzdBIgCgxncmFudF9zZWNyZXQYASABKAlCCrpIB3IFECAYgAISIAoOdHJhbnNhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEhwKB2Nzcl9wZW0YAyABKAxCC7pICHoGEEAYgIABIosBCg5FbnJvbGxSZXNwb25zZRIRCglkZXZpY2VfaWQYASABKAkSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEhcKD2NlcnRpZmljYXRlX3BlbRgDIAEoDBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI/ChdSZXRyaWV2ZUlzc3VhbmNlUmVxdWVzdBIkCg9hdXRob3JpdHlfcHJvb2YYASABKAxCC7pICHoGEAEYgIABImMKGFJldHJpZXZlSXNzdWFuY2VSZXNwb25zZRIXCg9jZXJ0aWZpY2F0ZV9wZW0YASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAy1wEKEUVucm9sbG1lbnRTZXJ2aWNlElEKBkVucm9sbBIiLmxpbmRtLmVucm9sbG1lbnQudjEuRW5yb2xsUmVxdWVzdBojLmxpbmRtLmVucm9sbG1lbnQudjEuRW5yb2xsUmVzcG9uc2USbwoQUmV0cmlldmVJc3N1YW5jZRIsLmxpbmRtLmVucm9sbG1lbnQudjEuUmV0cmlldmVJc3N1YW5jZVJlcXVlc3QaLS5saW5kbS5lbnJvbGxtZW50LnYxLlJldHJpZXZlSXNzdWFuY2VSZXNwb25zZUIsWipsaW5kbS9nZW4vbGluZG0vZW5yb2xsbWVudC92MTtlbnJvbGxtZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message lindm.enrollment.v1.EnrollRequest
@@ -75,6 +75,45 @@ export const EnrollResponseSchema: GenMessage<EnrollResponse> = /*@__PURE__*/
   messageDesc(file_lindm_enrollment_v1_enrollment, 1);
 
 /**
+ * @generated from message lindm.enrollment.v1.RetrieveIssuanceRequest
+ */
+export type RetrieveIssuanceRequest = Message<"lindm.enrollment.v1.RetrieveIssuanceRequest"> & {
+  /**
+   * @generated from field: bytes authority_proof = 1;
+   */
+  authorityProof: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.RetrieveIssuanceRequest.
+ * Use `create(RetrieveIssuanceRequestSchema)` to create a new message.
+ */
+export const RetrieveIssuanceRequestSchema: GenMessage<RetrieveIssuanceRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 2);
+
+/**
+ * @generated from message lindm.enrollment.v1.RetrieveIssuanceResponse
+ */
+export type RetrieveIssuanceResponse = Message<"lindm.enrollment.v1.RetrieveIssuanceResponse"> & {
+  /**
+   * @generated from field: bytes certificate_pem = 1;
+   */
+  certificatePem: Uint8Array;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 2;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.RetrieveIssuanceResponse.
+ * Use `create(RetrieveIssuanceResponseSchema)` to create a new message.
+ */
+export const RetrieveIssuanceResponseSchema: GenMessage<RetrieveIssuanceResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 3);
+
+/**
  * @generated from service lindm.enrollment.v1.EnrollmentService
  */
 export const EnrollmentService: GenService<{
@@ -85,6 +124,14 @@ export const EnrollmentService: GenService<{
     methodKind: "unary";
     input: typeof EnrollRequestSchema;
     output: typeof EnrollResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.enrollment.v1.EnrollmentService.RetrieveIssuance
+   */
+  retrieveIssuance: {
+    methodKind: "unary";
+    input: typeof RetrieveIssuanceRequestSchema;
+    output: typeof RetrieveIssuanceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_lindm_enrollment_v1_enrollment, 0);

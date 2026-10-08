@@ -24,6 +24,230 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type AcquireSessionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthorityProof []byte                 `protobuf:"bytes,1,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AcquireSessionRequest) Reset() {
+	*x = AcquireSessionRequest{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcquireSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcquireSessionRequest) ProtoMessage() {}
+
+func (x *AcquireSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcquireSessionRequest.ProtoReflect.Descriptor instead.
+func (*AcquireSessionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *AcquireSessionRequest) GetAuthorityProof() []byte {
+	if x != nil {
+		return x.AuthorityProof
+	}
+	return nil
+}
+
+type AcquireSessionResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionEpoch    uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	HostSequence    uint64                 `protobuf:"varint,2,opt,name=host_sequence,json=hostSequence,proto3" json:"host_sequence,omitempty"`
+	PackageSequence uint64                 `protobuf:"varint,3,opt,name=package_sequence,json=packageSequence,proto3" json:"package_sequence,omitempty"`
+	ServerTime      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AcquireSessionResponse) Reset() {
+	*x = AcquireSessionResponse{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcquireSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcquireSessionResponse) ProtoMessage() {}
+
+func (x *AcquireSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcquireSessionResponse.ProtoReflect.Descriptor instead.
+func (*AcquireSessionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AcquireSessionResponse) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *AcquireSessionResponse) GetHostSequence() uint64 {
+	if x != nil {
+		return x.HostSequence
+	}
+	return 0
+}
+
+func (x *AcquireSessionResponse) GetPackageSequence() uint64 {
+	if x != nil {
+		return x.PackageSequence
+	}
+	return 0
+}
+
+func (x *AcquireSessionResponse) GetServerTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ServerTime
+	}
+	return nil
+}
+
+type GetSyncStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionEpoch  uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncStateRequest) Reset() {
+	*x = GetSyncStateRequest{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStateRequest) ProtoMessage() {}
+
+func (x *GetSyncStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStateRequest.ProtoReflect.Descriptor instead.
+func (*GetSyncStateRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetSyncStateRequest) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+type GetSyncStateResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionEpoch    uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	HostSequence    uint64                 `protobuf:"varint,2,opt,name=host_sequence,json=hostSequence,proto3" json:"host_sequence,omitempty"`
+	PackageSequence uint64                 `protobuf:"varint,3,opt,name=package_sequence,json=packageSequence,proto3" json:"package_sequence,omitempty"`
+	ServerTime      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetSyncStateResponse) Reset() {
+	*x = GetSyncStateResponse{}
+	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStateResponse) ProtoMessage() {}
+
+func (x *GetSyncStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStateResponse.ProtoReflect.Descriptor instead.
+func (*GetSyncStateResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSyncStateResponse) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *GetSyncStateResponse) GetHostSequence() uint64 {
+	if x != nil {
+		return x.HostSequence
+	}
+	return 0
+}
+
+func (x *GetSyncStateResponse) GetPackageSequence() uint64 {
+	if x != nil {
+		return x.PackageSequence
+	}
+	return 0
+}
+
+func (x *GetSyncStateResponse) GetServerTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ServerTime
+	}
+	return nil
+}
+
 type ReportInventoryRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	EnrollmentGeneration string                 `protobuf:"bytes,1,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
@@ -35,13 +259,14 @@ type ReportInventoryRequest struct {
 	Architecture         string                 `protobuf:"bytes,7,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	Packages             []*v1.Package          `protobuf:"bytes,8,rep,name=packages,proto3" json:"packages,omitempty"`
 	PackagesComplete     bool                   `protobuf:"varint,9,opt,name=packages_complete,json=packagesComplete,proto3" json:"packages_complete,omitempty"`
+	SessionEpoch         uint64                 `protobuf:"varint,10,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ReportInventoryRequest) Reset() {
 	*x = ReportInventoryRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +278,7 @@ func (x *ReportInventoryRequest) String() string {
 func (*ReportInventoryRequest) ProtoMessage() {}
 
 func (x *ReportInventoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +291,7 @@ func (x *ReportInventoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportInventoryRequest.ProtoReflect.Descriptor instead.
 func (*ReportInventoryRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{0}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ReportInventoryRequest) GetEnrollmentGeneration() string {
@@ -132,6 +357,13 @@ func (x *ReportInventoryRequest) GetPackagesComplete() bool {
 	return false
 }
 
+func (x *ReportInventoryRequest) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
 type ReportInventoryResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	AcceptedSequence uint64                 `protobuf:"varint,1,opt,name=accepted_sequence,json=acceptedSequence,proto3" json:"accepted_sequence,omitempty"`
@@ -142,7 +374,7 @@ type ReportInventoryResponse struct {
 
 func (x *ReportInventoryResponse) Reset() {
 	*x = ReportInventoryResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +386,7 @@ func (x *ReportInventoryResponse) String() string {
 func (*ReportInventoryResponse) ProtoMessage() {}
 
 func (x *ReportInventoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +399,7 @@ func (x *ReportInventoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportInventoryResponse.ProtoReflect.Descriptor instead.
 func (*ReportInventoryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{1}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ReportInventoryResponse) GetAcceptedSequence() uint64 {
@@ -185,15 +417,16 @@ func (x *ReportInventoryResponse) GetServerTime() *timestamppb.Timestamp {
 }
 
 type RenewIdentityRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CsrPem        []byte                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CsrPem         []byte                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
+	AuthorityProof []byte                 `protobuf:"bytes,2,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RenewIdentityRequest) Reset() {
 	*x = RenewIdentityRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -205,7 +438,7 @@ func (x *RenewIdentityRequest) String() string {
 func (*RenewIdentityRequest) ProtoMessage() {}
 
 func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -218,12 +451,19 @@ func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityRequest.ProtoReflect.Descriptor instead.
 func (*RenewIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{2}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RenewIdentityRequest) GetCsrPem() []byte {
 	if x != nil {
 		return x.CsrPem
+	}
+	return nil
+}
+
+func (x *RenewIdentityRequest) GetAuthorityProof() []byte {
+	if x != nil {
+		return x.AuthorityProof
 	}
 	return nil
 }
@@ -238,7 +478,7 @@ type RenewIdentityResponse struct {
 
 func (x *RenewIdentityResponse) Reset() {
 	*x = RenewIdentityResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +490,7 @@ func (x *RenewIdentityResponse) String() string {
 func (*RenewIdentityResponse) ProtoMessage() {}
 
 func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +503,7 @@ func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityResponse.ProtoReflect.Descriptor instead.
 func (*RenewIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{3}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RenewIdentityResponse) GetCertificatePem() []byte {
@@ -284,7 +524,23 @@ var File_lindm_device_v1_device_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/inventory/v1/observation.proto\"\xba\x03\n" +
+	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/inventory/v1/observation.proto\"M\n" +
+	"\x15AcquireSessionRequest\x124\n" +
+	"\x0fauthority_proof\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\"\xca\x01\n" +
+	"\x16AcquireSessionResponse\x12#\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04R\fsessionEpoch\x12#\n" +
+	"\rhost_sequence\x18\x02 \x01(\x04R\fhostSequence\x12)\n" +
+	"\x10package_sequence\x18\x03 \x01(\x04R\x0fpackageSequence\x12;\n" +
+	"\vserver_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"serverTime\"M\n" +
+	"\x13GetSyncStateRequest\x126\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"\xc8\x01\n" +
+	"\x14GetSyncStateResponse\x12#\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04R\fsessionEpoch\x12#\n" +
+	"\rhost_sequence\x18\x02 \x01(\x04R\fhostSequence\x12)\n" +
+	"\x10package_sequence\x18\x03 \x01(\x04R\x0fpackageSequence\x12;\n" +
+	"\vserver_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"serverTime\"\xf2\x03\n" +
 	"\x16ReportInventoryRequest\x12=\n" +
 	"\x15enrollment_generation\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12!\n" +
 	"\aboot_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12-\n" +
@@ -296,18 +552,23 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"os_version\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\tosVersion\x12-\n" +
 	"\farchitecture\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\farchitecture\x12B\n" +
 	"\bpackages\x18\b \x03(\v2\x1b.lindm.inventory.v1.PackageB\t\xbaH\x06\x92\x01\x03\x10\xf4\x03R\bpackages\x12+\n" +
-	"\x11packages_complete\x18\t \x01(\bR\x10packagesComplete\"\x83\x01\n" +
+	"\x11packages_complete\x18\t \x01(\bR\x10packagesComplete\x126\n" +
+	"\rsession_epoch\x18\n" +
+	" \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"\x83\x01\n" +
 	"\x17ReportInventoryResponse\x12+\n" +
 	"\x11accepted_sequence\x18\x01 \x01(\x04R\x10acceptedSequence\x12;\n" +
 	"\vserver_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"serverTime\"<\n" +
+	"serverTime\"r\n" +
 	"\x14RenewIdentityRequest\x12$\n" +
-	"\acsr_pem\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\"{\n" +
+	"\acsr_pem\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\x124\n" +
+	"\x0fauthority_proof\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\"{\n" +
 	"\x15RenewIdentityResponse\x12'\n" +
 	"\x0fcertificate_pem\x18\x01 \x01(\fR\x0ecertificatePem\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xd5\x01\n" +
-	"\rDeviceService\x12d\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x95\x03\n" +
+	"\rDeviceService\x12a\n" +
+	"\x0eAcquireSession\x12&.lindm.device.v1.AcquireSessionRequest\x1a'.lindm.device.v1.AcquireSessionResponse\x12[\n" +
+	"\fGetSyncState\x12$.lindm.device.v1.GetSyncStateRequest\x1a%.lindm.device.v1.GetSyncStateResponse\x12d\n" +
 	"\x0fReportInventory\x12'.lindm.device.v1.ReportInventoryRequest\x1a(.lindm.device.v1.ReportInventoryResponse\x12^\n" +
 	"\rRenewIdentity\x12%.lindm.device.v1.RenewIdentityRequest\x1a&.lindm.device.v1.RenewIdentityResponseB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
@@ -323,28 +584,38 @@ func file_lindm_device_v1_device_proto_rawDescGZIP() []byte {
 	return file_lindm_device_v1_device_proto_rawDescData
 }
 
-var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_device_v1_device_proto_goTypes = []any{
-	(*ReportInventoryRequest)(nil),  // 0: lindm.device.v1.ReportInventoryRequest
-	(*ReportInventoryResponse)(nil), // 1: lindm.device.v1.ReportInventoryResponse
-	(*RenewIdentityRequest)(nil),    // 2: lindm.device.v1.RenewIdentityRequest
-	(*RenewIdentityResponse)(nil),   // 3: lindm.device.v1.RenewIdentityResponse
-	(*v1.Package)(nil),              // 4: lindm.inventory.v1.Package
-	(*timestamppb.Timestamp)(nil),   // 5: google.protobuf.Timestamp
+	(*AcquireSessionRequest)(nil),   // 0: lindm.device.v1.AcquireSessionRequest
+	(*AcquireSessionResponse)(nil),  // 1: lindm.device.v1.AcquireSessionResponse
+	(*GetSyncStateRequest)(nil),     // 2: lindm.device.v1.GetSyncStateRequest
+	(*GetSyncStateResponse)(nil),    // 3: lindm.device.v1.GetSyncStateResponse
+	(*ReportInventoryRequest)(nil),  // 4: lindm.device.v1.ReportInventoryRequest
+	(*ReportInventoryResponse)(nil), // 5: lindm.device.v1.ReportInventoryResponse
+	(*RenewIdentityRequest)(nil),    // 6: lindm.device.v1.RenewIdentityRequest
+	(*RenewIdentityResponse)(nil),   // 7: lindm.device.v1.RenewIdentityResponse
+	(*timestamppb.Timestamp)(nil),   // 8: google.protobuf.Timestamp
+	(*v1.Package)(nil),              // 9: lindm.inventory.v1.Package
 }
 var file_lindm_device_v1_device_proto_depIdxs = []int32{
-	4, // 0: lindm.device.v1.ReportInventoryRequest.packages:type_name -> lindm.inventory.v1.Package
-	5, // 1: lindm.device.v1.ReportInventoryResponse.server_time:type_name -> google.protobuf.Timestamp
-	5, // 2: lindm.device.v1.RenewIdentityResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 3: lindm.device.v1.DeviceService.ReportInventory:input_type -> lindm.device.v1.ReportInventoryRequest
-	2, // 4: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
-	1, // 5: lindm.device.v1.DeviceService.ReportInventory:output_type -> lindm.device.v1.ReportInventoryResponse
-	3, // 6: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	8, // 0: lindm.device.v1.AcquireSessionResponse.server_time:type_name -> google.protobuf.Timestamp
+	8, // 1: lindm.device.v1.GetSyncStateResponse.server_time:type_name -> google.protobuf.Timestamp
+	9, // 2: lindm.device.v1.ReportInventoryRequest.packages:type_name -> lindm.inventory.v1.Package
+	8, // 3: lindm.device.v1.ReportInventoryResponse.server_time:type_name -> google.protobuf.Timestamp
+	8, // 4: lindm.device.v1.RenewIdentityResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0, // 5: lindm.device.v1.DeviceService.AcquireSession:input_type -> lindm.device.v1.AcquireSessionRequest
+	2, // 6: lindm.device.v1.DeviceService.GetSyncState:input_type -> lindm.device.v1.GetSyncStateRequest
+	4, // 7: lindm.device.v1.DeviceService.ReportInventory:input_type -> lindm.device.v1.ReportInventoryRequest
+	6, // 8: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
+	1, // 9: lindm.device.v1.DeviceService.AcquireSession:output_type -> lindm.device.v1.AcquireSessionResponse
+	3, // 10: lindm.device.v1.DeviceService.GetSyncState:output_type -> lindm.device.v1.GetSyncStateResponse
+	5, // 11: lindm.device.v1.DeviceService.ReportInventory:output_type -> lindm.device.v1.ReportInventoryResponse
+	7, // 12: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
+	9, // [9:13] is the sub-list for method output_type
+	5, // [5:9] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_lindm_device_v1_device_proto_init() }
@@ -358,7 +629,7 @@ func file_lindm_device_v1_device_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_device_proto_rawDesc), len(file_lindm_device_v1_device_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -24,6 +24,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type DeviceState int32
+
+const (
+	DeviceState_DEVICE_STATE_UNSPECIFIED   DeviceState = 0
+	DeviceState_DEVICE_STATE_PENDING       DeviceState = 1
+	DeviceState_DEVICE_STATE_ACTIVE        DeviceState = 2
+	DeviceState_DEVICE_STATE_REVOKED       DeviceState = 3
+	DeviceState_DEVICE_STATE_RECOVERY_HOLD DeviceState = 4
+)
+
+// Enum value maps for DeviceState.
+var (
+	DeviceState_name = map[int32]string{
+		0: "DEVICE_STATE_UNSPECIFIED",
+		1: "DEVICE_STATE_PENDING",
+		2: "DEVICE_STATE_ACTIVE",
+		3: "DEVICE_STATE_REVOKED",
+		4: "DEVICE_STATE_RECOVERY_HOLD",
+	}
+	DeviceState_value = map[string]int32{
+		"DEVICE_STATE_UNSPECIFIED":   0,
+		"DEVICE_STATE_PENDING":       1,
+		"DEVICE_STATE_ACTIVE":        2,
+		"DEVICE_STATE_REVOKED":       3,
+		"DEVICE_STATE_RECOVERY_HOLD": 4,
+	}
+)
+
+func (x DeviceState) Enum() *DeviceState {
+	p := new(DeviceState)
+	*p = x
+	return p
+}
+
+func (x DeviceState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeviceState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_admin_proto_enumTypes[0].Descriptor()
+}
+
+func (DeviceState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_admin_proto_enumTypes[0]
+}
+
+func (x DeviceState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeviceState.Descriptor instead.
+func (DeviceState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{0}
+}
+
 type Device struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -32,7 +87,7 @@ type Device struct {
 	OsId                 string                 `protobuf:"bytes,4,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
 	OsVersion            string                 `protobuf:"bytes,5,opt,name=os_version,json=osVersion,proto3" json:"os_version,omitempty"`
 	Architecture         string                 `protobuf:"bytes,6,opt,name=architecture,proto3" json:"architecture,omitempty"`
-	State                string                 `protobuf:"bytes,7,opt,name=state,proto3" json:"state,omitempty"`
+	LifecycleState       DeviceState            `protobuf:"varint,11,opt,name=lifecycle_state,json=lifecycleState,proto3,enum=lindm.admin.v1.DeviceState" json:"lifecycle_state,omitempty"`
 	EnrolledAt           *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=enrolled_at,json=enrolledAt,proto3" json:"enrolled_at,omitempty"`
 	LastSeenAt           *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
 	InventorySequence    uint64                 `protobuf:"varint,10,opt,name=inventory_sequence,json=inventorySequence,proto3" json:"inventory_sequence,omitempty"`
@@ -112,11 +167,11 @@ func (x *Device) GetArchitecture() string {
 	return ""
 }
 
-func (x *Device) GetState() string {
+func (x *Device) GetLifecycleState() DeviceState {
 	if x != nil {
-		return x.State
+		return x.LifecycleState
 	}
-	return ""
+	return DeviceState_DEVICE_STATE_UNSPECIFIED
 }
 
 func (x *Device) GetEnrolledAt() *timestamppb.Timestamp {
@@ -756,7 +811,7 @@ var File_lindm_admin_v1_admin_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\n" +
-	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/validation/v1/string_rules.proto\"\x81\x03\n" +
+	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/validation/v1/string_rules.proto\"\xbe\x03\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12\x1a\n" +
@@ -764,14 +819,14 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x05os_id\x18\x04 \x01(\tR\x04osId\x12\x1d\n" +
 	"\n" +
 	"os_version\x18\x05 \x01(\tR\tosVersion\x12\"\n" +
-	"\farchitecture\x18\x06 \x01(\tR\farchitecture\x12\x14\n" +
-	"\x05state\x18\a \x01(\tR\x05state\x12;\n" +
+	"\farchitecture\x18\x06 \x01(\tR\farchitecture\x12D\n" +
+	"\x0flifecycle_state\x18\v \x01(\x0e2\x1b.lindm.admin.v1.DeviceStateR\x0elifecycleState\x12;\n" +
 	"\venrolled_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"enrolledAt\x12<\n" +
 	"\flast_seen_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastSeenAt\x12-\n" +
 	"\x12inventory_sequence\x18\n" +
-	" \x01(\x04R\x11inventorySequence\"d\n" +
+	" \x01(\x04R\x11inventorySequenceJ\x04\b\a\x10\bR\x05state\"d\n" +
 	"\x12ListDevicesRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
@@ -819,7 +874,13 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"u\n" +
 	"\x17ListAuditEventsResponse\x122\n" +
 	"\x06events\x18\x01 \x03(\v2\x1a.lindm.admin.v1.AuditEventR\x06events\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x91\x04\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*\x98\x01\n" +
+	"\vDeviceState\x12\x1c\n" +
+	"\x18DEVICE_STATE_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14DEVICE_STATE_PENDING\x10\x01\x12\x17\n" +
+	"\x13DEVICE_STATE_ACTIVE\x10\x02\x12\x18\n" +
+	"\x14DEVICE_STATE_REVOKED\x10\x03\x12\x1e\n" +
+	"\x1aDEVICE_STATE_RECOVERY_HOLD\x10\x042\x91\x04\n" +
 	"\fAdminService\x12V\n" +
 	"\vListDevices\x12\".lindm.admin.v1.ListDevicesRequest\x1a#.lindm.admin.v1.ListDevicesResponse\x12t\n" +
 	"\x15CreateEnrollmentGrant\x12,.lindm.admin.v1.CreateEnrollmentGrantRequest\x1a-.lindm.admin.v1.CreateEnrollmentGrantResponse\x12t\n" +
@@ -839,44 +900,47 @@ func file_lindm_admin_v1_admin_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_admin_proto_rawDescData
 }
 
+var file_lindm_admin_v1_admin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_lindm_admin_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_lindm_admin_v1_admin_proto_goTypes = []any{
-	(*Device)(nil),                        // 0: lindm.admin.v1.Device
-	(*ListDevicesRequest)(nil),            // 1: lindm.admin.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),           // 2: lindm.admin.v1.ListDevicesResponse
-	(*CreateEnrollmentGrantRequest)(nil),  // 3: lindm.admin.v1.CreateEnrollmentGrantRequest
-	(*CreateEnrollmentGrantResponse)(nil), // 4: lindm.admin.v1.CreateEnrollmentGrantResponse
-	(*RevokeEnrollmentGrantRequest)(nil),  // 5: lindm.admin.v1.RevokeEnrollmentGrantRequest
-	(*RevokeEnrollmentGrantResponse)(nil), // 6: lindm.admin.v1.RevokeEnrollmentGrantResponse
-	(*RevokeDeviceRequest)(nil),           // 7: lindm.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),          // 8: lindm.admin.v1.RevokeDeviceResponse
-	(*AuditEvent)(nil),                    // 9: lindm.admin.v1.AuditEvent
-	(*ListAuditEventsRequest)(nil),        // 10: lindm.admin.v1.ListAuditEventsRequest
-	(*ListAuditEventsResponse)(nil),       // 11: lindm.admin.v1.ListAuditEventsResponse
-	(*timestamppb.Timestamp)(nil),         // 12: google.protobuf.Timestamp
+	(DeviceState)(0),                      // 0: lindm.admin.v1.DeviceState
+	(*Device)(nil),                        // 1: lindm.admin.v1.Device
+	(*ListDevicesRequest)(nil),            // 2: lindm.admin.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),           // 3: lindm.admin.v1.ListDevicesResponse
+	(*CreateEnrollmentGrantRequest)(nil),  // 4: lindm.admin.v1.CreateEnrollmentGrantRequest
+	(*CreateEnrollmentGrantResponse)(nil), // 5: lindm.admin.v1.CreateEnrollmentGrantResponse
+	(*RevokeEnrollmentGrantRequest)(nil),  // 6: lindm.admin.v1.RevokeEnrollmentGrantRequest
+	(*RevokeEnrollmentGrantResponse)(nil), // 7: lindm.admin.v1.RevokeEnrollmentGrantResponse
+	(*RevokeDeviceRequest)(nil),           // 8: lindm.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),          // 9: lindm.admin.v1.RevokeDeviceResponse
+	(*AuditEvent)(nil),                    // 10: lindm.admin.v1.AuditEvent
+	(*ListAuditEventsRequest)(nil),        // 11: lindm.admin.v1.ListAuditEventsRequest
+	(*ListAuditEventsResponse)(nil),       // 12: lindm.admin.v1.ListAuditEventsResponse
+	(*timestamppb.Timestamp)(nil),         // 13: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
-	12, // 0: lindm.admin.v1.Device.enrolled_at:type_name -> google.protobuf.Timestamp
-	12, // 1: lindm.admin.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: lindm.admin.v1.ListDevicesResponse.devices:type_name -> lindm.admin.v1.Device
-	12, // 3: lindm.admin.v1.CreateEnrollmentGrantResponse.expires_at:type_name -> google.protobuf.Timestamp
-	12, // 4: lindm.admin.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: lindm.admin.v1.ListAuditEventsResponse.events:type_name -> lindm.admin.v1.AuditEvent
-	1,  // 6: lindm.admin.v1.AdminService.ListDevices:input_type -> lindm.admin.v1.ListDevicesRequest
-	3,  // 7: lindm.admin.v1.AdminService.CreateEnrollmentGrant:input_type -> lindm.admin.v1.CreateEnrollmentGrantRequest
-	5,  // 8: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:input_type -> lindm.admin.v1.RevokeEnrollmentGrantRequest
-	7,  // 9: lindm.admin.v1.AdminService.RevokeDevice:input_type -> lindm.admin.v1.RevokeDeviceRequest
-	10, // 10: lindm.admin.v1.AdminService.ListAuditEvents:input_type -> lindm.admin.v1.ListAuditEventsRequest
-	2,  // 11: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
-	4,  // 12: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
-	6,  // 13: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
-	8,  // 14: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
-	11, // 15: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0,  // 0: lindm.admin.v1.Device.lifecycle_state:type_name -> lindm.admin.v1.DeviceState
+	13, // 1: lindm.admin.v1.Device.enrolled_at:type_name -> google.protobuf.Timestamp
+	13, // 2: lindm.admin.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
+	1,  // 3: lindm.admin.v1.ListDevicesResponse.devices:type_name -> lindm.admin.v1.Device
+	13, // 4: lindm.admin.v1.CreateEnrollmentGrantResponse.expires_at:type_name -> google.protobuf.Timestamp
+	13, // 5: lindm.admin.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	10, // 6: lindm.admin.v1.ListAuditEventsResponse.events:type_name -> lindm.admin.v1.AuditEvent
+	2,  // 7: lindm.admin.v1.AdminService.ListDevices:input_type -> lindm.admin.v1.ListDevicesRequest
+	4,  // 8: lindm.admin.v1.AdminService.CreateEnrollmentGrant:input_type -> lindm.admin.v1.CreateEnrollmentGrantRequest
+	6,  // 9: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:input_type -> lindm.admin.v1.RevokeEnrollmentGrantRequest
+	8,  // 10: lindm.admin.v1.AdminService.RevokeDevice:input_type -> lindm.admin.v1.RevokeDeviceRequest
+	11, // 11: lindm.admin.v1.AdminService.ListAuditEvents:input_type -> lindm.admin.v1.ListAuditEventsRequest
+	3,  // 12: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
+	5,  // 13: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
+	7,  // 14: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
+	9,  // 15: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
+	12, // 16: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_admin_proto_init() }
@@ -889,13 +953,14 @@ func file_lindm_admin_v1_admin_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_admin_proto_rawDesc), len(file_lindm_admin_v1_admin_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_lindm_admin_v1_admin_proto_goTypes,
 		DependencyIndexes: file_lindm_admin_v1_admin_proto_depIdxs,
+		EnumInfos:         file_lindm_admin_v1_admin_proto_enumTypes,
 		MessageInfos:      file_lindm_admin_v1_admin_proto_msgTypes,
 	}.Build()
 	File_lindm_admin_v1_admin_proto = out.File

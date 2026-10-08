@@ -9,8 +9,34 @@ import "lindm/inventory/v1/observation.proto";
 option go_package = "lindm/gen/lindm/device/v1;devicev1";
 
 service DeviceService {
+  rpc AcquireSession(AcquireSessionRequest) returns (AcquireSessionResponse);
+  rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
   rpc ReportInventory(ReportInventoryRequest) returns (ReportInventoryResponse);
   rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
+}
+message AcquireSessionRequest {
+  bytes authority_proof = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message AcquireSessionResponse {
+  uint64 session_epoch = 1;
+  uint64 host_sequence = 2;
+  uint64 package_sequence = 3;
+  google.protobuf.Timestamp server_time = 4;
+}
+message GetSyncStateRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+message GetSyncStateResponse {
+  uint64 session_epoch = 1;
+  uint64 host_sequence = 2;
+  uint64 package_sequence = 3;
+  google.protobuf.Timestamp server_time = 4;
 }
 message ReportInventoryRequest {
   string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
@@ -34,6 +60,10 @@ message ReportInventoryRequest {
   }];
   repeated lindm.inventory.v1.Package packages = 8 [(buf.validate.field).repeated.max_items = 500];
   bool packages_complete = 9;
+  uint64 session_epoch = 10 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
 }
 message ReportInventoryResponse {
   uint64 accepted_sequence = 1;
@@ -42,6 +72,10 @@ message ReportInventoryResponse {
 message RenewIdentityRequest {
   bytes csr_pem = 1 [(buf.validate.field).bytes = {
     min_len: 64
+    max_len: 16384
+  }];
+  bytes authority_proof = 2 [(buf.validate.field).bytes = {
+    min_len: 1
     max_len: 16384
   }];
 }

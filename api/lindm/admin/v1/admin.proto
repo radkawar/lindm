@@ -16,14 +16,24 @@ service AdminService {
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
 }
 
+enum DeviceState {
+  DEVICE_STATE_UNSPECIFIED = 0;
+  DEVICE_STATE_PENDING = 1;
+  DEVICE_STATE_ACTIVE = 2;
+  DEVICE_STATE_REVOKED = 3;
+  DEVICE_STATE_RECOVERY_HOLD = 4;
+}
+
 message Device {
+  reserved 7;
+  reserved "state";
   string id = 1;
   string enrollment_generation = 2;
   string hostname = 3;
   string os_id = 4;
   string os_version = 5;
   string architecture = 6;
-  string state = 7;
+  DeviceState lifecycle_state = 11;
   google.protobuf.Timestamp enrolled_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
   uint64 inventory_sequence = 10;

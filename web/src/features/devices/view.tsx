@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
+import { DeviceState, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,14 @@ import { devicesQueryOptions } from "./queries";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
 
+const deviceStateLabels: Record<DeviceState, string> = {
+  [DeviceState.UNSPECIFIED]: "Not reported",
+  [DeviceState.PENDING]: "Pending",
+  [DeviceState.ACTIVE]: "Active",
+  [DeviceState.REVOKED]: "Revoked",
+  [DeviceState.RECOVERY_HOLD]: "Recovery hold",
+};
+
 export function DevicesView({
   pageSize,
   pageToken,
@@ -57,8 +65,8 @@ export function DevicesView({
         <div>
           <h1 className="text-2xl font-semibold">Devices</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Last contact is the server time of the last accepted inventory report. It is not a live
-            presence claim. Revocation is enforced on the next request this server receives.
+            Last contact is a server receipt time, not live presence or inventory freshness.
+            Revocation is enforced on the next request this server receives.
           </p>
         </div>
         <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
@@ -124,8 +132,15 @@ export function DevicesView({
                 <TableRow key={device.id}>
                   <TableCell>{device.hostname.trim() || "Hostname not reported"}</TableCell>
                   <TableCell>
-                    <Badge variant={device.state === "revoked" ? "destructive" : "outline"}>
-                      {device.state.trim() || "Not reported"}
+                    <Badge
+                      variant={
+                        device.lifecycleState === DeviceState.REVOKED ||
+                        device.lifecycleState === DeviceState.RECOVERY_HOLD
+                          ? "destructive"
+                          : "outline"
+                      }
+                    >
+                      {deviceStateLabels[device.lifecycleState] ?? "Unknown state"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -134,7 +149,7 @@ export function DevicesView({
                         {seen.local} ({freshnessLabel(seen.date, now)})
                       </time>
                     ) : (
-                      "No accepted inventory"
+                      "No contact recorded"
                     )}
                   </TableCell>
                   <TableCell>

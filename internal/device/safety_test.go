@@ -21,12 +21,13 @@ import (
 
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/pki"
 )
 
 func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
 	t.Parallel()
-	if _, err := parseDeviceCSR(mustCSR(t, p256Key(t), &x509.CertificateRequest{})); err != nil {
-		t.Fatalf("valid P-256 CSR: %v", err)
+	if _, err := parseDeviceCSR(mustCSR(t, p256Key(t), &x509.CertificateRequest{})); !errors.Is(err, errCSRAlgorithm) {
+		t.Fatalf("P-256 identity CSR: %v", err)
 	}
 	ed := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{SignatureAlgorithm: x509.PureEd25519})
 	if _, err := parseDeviceCSR(ed); err != nil {
@@ -37,11 +38,11 @@ func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	withSAN := mustCSR(t, p256Key(t), &x509.CertificateRequest{URIs: []*url.URL{uri}})
+	withSAN := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{URIs: []*url.URL{uri}})
 	if _, err := parseDeviceCSR(withSAN); !errors.Is(err, errCSRIdentity) {
 		t.Fatalf("SAN CSR error = %v", err)
 	}
-	withSubject := mustCSR(t, p256Key(t), &x509.CertificateRequest{Subject: pkix.Name{CommonName: "chosen-by-client"}})
+	withSubject := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{Subject: pkix.Name{CommonName: "chosen-by-client"}})
 	if _, err := parseDeviceCSR(withSubject); !errors.Is(err, errCSRIdentity) {
 		t.Fatalf("subject CSR error = %v", err)
 	}
@@ -59,7 +60,7 @@ func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
 	if _, err := parseDeviceCSR(mustCSR(t, rsaKey, &x509.CertificateRequest{SignatureAlgorithm: x509.SHA256WithRSA})); !errors.Is(err, errCSRAlgorithm) {
 		t.Fatalf("RSA CSR error = %v", err)
 	}
-	valid := mustCSR(t, p256Key(t), &x509.CertificateRequest{})
+	valid := mustCSR(t, ed25519Key(t), &x509.CertificateRequest{})
 	valid[len(valid)-2] ^= 0xff
 	if _, err := parseDeviceCSR(valid); err == nil {
 		t.Fatal("tampered CSR was accepted")
@@ -71,7 +72,7 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, signer := testCA(t, now.Add(90*24*time.Hour))
 	deployment, deviceID, generation := uuid.New(), uuid.New(), uuid.New()
-	deviceKey := p256Key(t)
+	deviceKey := ed25519Key(t)
 	uri, err := url.Parse("urn:attacker:keep-me-out")
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +80,7 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 	if _, err := parseDeviceCSR(mustCSR(t, deviceKey, &x509.CertificateRequest{URIs: []*url.URL{uri}, Subject: pkix.Name{CommonName: "client"}})); err == nil {
 		t.Fatal("authority-bearing CSR must not reach issuance")
 	}
-	issued, err := issueCertificate(ca, signer, &deviceKey.PublicKey, deployment, deviceID, generation, now)
+	issued, err := issueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +88,7 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 		t.Fatal("issued PEM contains a private key")
 	}
 	cert := parseCertPEM(t, issued.PEM)
-	if err := issuedIdentityOK(cert, deployment, deviceID, generation); err != nil {
+	if err := pki.CheckDeviceCertificate(cert, deployment, deviceID, generation); err != nil {
 		t.Fatal(err)
 	}
 	if cert.Subject.CommonName == "client" || len(cert.URIs) != 1 || cert.URIs[0].String() == uri.String() {
@@ -99,7 +100,7 @@ func TestIssuedCertificateIsServerIdentityOnly(t *testing.T) {
 	if cert.SerialNumber.Sign() <= 0 || cert.SerialNumber.BitLen() > 128 {
 		t.Fatalf("serial = %s", cert.SerialNumber)
 	}
-	second, err := issueCertificate(ca, signer, &deviceKey.PublicKey, deployment, deviceID, generation, now)
+	second, err := issueCertificate(ca, signer, deviceKey.Public(), deployment, deviceID, generation, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,8 +114,8 @@ func TestCertificateLifetimeHonorsCAExpiry(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	caEnd := now.Add(10 * 24 * time.Hour)
 	ca, signer := testCA(t, caEnd)
-	deviceKey := p256Key(t)
-	issued, err := issueCertificate(ca, signer, &deviceKey.PublicKey, uuid.New(), uuid.New(), uuid.New(), now)
+	deviceKey := ed25519Key(t)
+	issued, err := issueCertificate(ca, signer, deviceKey.Public(), uuid.New(), uuid.New(), uuid.New(), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +143,7 @@ func TestInventoryDigestDetectsChangedContent(t *testing.T) {
 	t.Parallel()
 	base := &devicev1.ReportInventoryRequest{
 		EnrollmentGeneration: uuid.NewString(),
+		SessionEpoch:         1,
 		BootId:               uuid.NewString(),
 		Sequence:             2,
 		Hostname:             "host",
@@ -153,6 +155,7 @@ func TestInventoryDigestDetectsChangedContent(t *testing.T) {
 	}
 	same := &devicev1.ReportInventoryRequest{
 		EnrollmentGeneration: base.EnrollmentGeneration,
+		SessionEpoch:         base.SessionEpoch,
 		BootId:               base.BootId,
 		Sequence:             base.Sequence,
 		Hostname:             base.Hostname,
@@ -164,6 +167,7 @@ func TestInventoryDigestDetectsChangedContent(t *testing.T) {
 	}
 	changed := &devicev1.ReportInventoryRequest{
 		EnrollmentGeneration: base.EnrollmentGeneration,
+		SessionEpoch:         base.SessionEpoch,
 		BootId:               base.BootId,
 		Sequence:             base.Sequence,
 		Hostname:             "other",

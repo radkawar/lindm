@@ -132,6 +132,44 @@ tests pass; the corrected built inspector still matches all 2,440 native host pa
 records. The temporary duplicate image cache and isolated RPM database were removed.
 These checks do not qualify RPM VM installation or physical crash durability.
 
+Corrective commit `016cf38` received two independent follow-up reviews of the RPM
+sentinel and first-cache durability changes; neither found an actionable defect.
+
+### Native VM and protected-authority implementation checks
+
+The maintained VM lane exercised Ubuntu 24.04 and Fedora 44 native observations.
+A Fedora run exposed cloud-init's attempted hostname change as a degraded result.
+The inspection scenario does not need to rename the guest: it now preserves the
+vendor hostname and still compares that actual value independently. Degraded
+cloud-init remains a failure; it is not ignored or marked successful. Both guests
+passed after the correction and private VM resources were removed.
+
+A failing-before PostgreSQL regression exposed a session-fencing error: reformatting
+the unsigned outer DSSE JSON changed its byte digest and could create a clone hold.
+Changed reuse of an existing acquisition UUID now returns an idempotency conflict
+before clone detection; a different protected request consuming the same predecessor
+still creates a durable hold. The regression and the complete integration/race suite
+pass. HTTPS issuance retrieval also preserves the original certificate after overlap
+expiry and denies wrong-key, expired, held and revoked requests.
+
+After the provider's usage limit reset, independent protected-authority review found
+no actionable defect in session fencing, renewal/retrieval, certificate policy,
+typed admin state and their persistence/callers. Live mTLS and browser verification
+also exercised acquisition replay, unsigned-wrapper conflict without hold, successor
+fencing, durable clone hold, the console's recovery-hold badge and revocation.
+
+Independent review of VM implementation commit `219f676` found a cancellation/privacy
+defect: `cloud-localds` copied private seed material into inherited `TMPDIR`; killing
+its shell bypassed the cleanup trap and left the ISO-builder descendant running.
+A real-tool regression reproduced both failures. Host helpers now set `TMPDIR` to
+the owned private run directory and cancellation kills their process group.
+The regression passed ten repetitions; the corrected maintained runner then matched
+all 427 Fedora package records and native host facts and completed owned cleanup.
+That run used agent SHA-256
+`981ce2e080ac17e30747fc023e84ca03a7869e0f36d8dc40bb091b0acc4156fe`.
+Independent follow-up review found no additional actionable defect in the staging
+containment/process-group correction or its real-tool regression.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

@@ -151,6 +151,102 @@ func (x *EnrollResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type RetrieveIssuanceRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthorityProof []byte                 `protobuf:"bytes,1,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RetrieveIssuanceRequest) Reset() {
+	*x = RetrieveIssuanceRequest{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveIssuanceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveIssuanceRequest) ProtoMessage() {}
+
+func (x *RetrieveIssuanceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveIssuanceRequest.ProtoReflect.Descriptor instead.
+func (*RetrieveIssuanceRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RetrieveIssuanceRequest) GetAuthorityProof() []byte {
+	if x != nil {
+		return x.AuthorityProof
+	}
+	return nil
+}
+
+type RetrieveIssuanceResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CertificatePem []byte                 `protobuf:"bytes,1,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
+	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RetrieveIssuanceResponse) Reset() {
+	*x = RetrieveIssuanceResponse{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveIssuanceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveIssuanceResponse) ProtoMessage() {}
+
+func (x *RetrieveIssuanceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveIssuanceResponse.ProtoReflect.Descriptor instead.
+func (*RetrieveIssuanceResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RetrieveIssuanceResponse) GetCertificatePem() []byte {
+	if x != nil {
+		return x.CertificatePem
+	}
+	return nil
+}
+
+func (x *RetrieveIssuanceResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_lindm_enrollment_v1_enrollment_proto protoreflect.FileDescriptor
 
 const file_lindm_enrollment_v1_enrollment_proto_rawDesc = "" +
@@ -166,9 +262,16 @@ const file_lindm_enrollment_v1_enrollment_proto_rawDesc = "" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12'\n" +
 	"\x0fcertificate_pem\x18\x03 \x01(\fR\x0ecertificatePem\x129\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2f\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"O\n" +
+	"\x17RetrieveIssuanceRequest\x124\n" +
+	"\x0fauthority_proof\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\"~\n" +
+	"\x18RetrieveIssuanceResponse\x12'\n" +
+	"\x0fcertificate_pem\x18\x01 \x01(\fR\x0ecertificatePem\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xd7\x01\n" +
 	"\x11EnrollmentService\x12Q\n" +
-	"\x06Enroll\x12\".lindm.enrollment.v1.EnrollRequest\x1a#.lindm.enrollment.v1.EnrollResponseB,Z*lindm/gen/lindm/enrollment/v1;enrollmentv1b\x06proto3"
+	"\x06Enroll\x12\".lindm.enrollment.v1.EnrollRequest\x1a#.lindm.enrollment.v1.EnrollResponse\x12o\n" +
+	"\x10RetrieveIssuance\x12,.lindm.enrollment.v1.RetrieveIssuanceRequest\x1a-.lindm.enrollment.v1.RetrieveIssuanceResponseB,Z*lindm/gen/lindm/enrollment/v1;enrollmentv1b\x06proto3"
 
 var (
 	file_lindm_enrollment_v1_enrollment_proto_rawDescOnce sync.Once
@@ -182,21 +285,26 @@ func file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP() []byte {
 	return file_lindm_enrollment_v1_enrollment_proto_rawDescData
 }
 
-var file_lindm_enrollment_v1_enrollment_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_lindm_enrollment_v1_enrollment_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_lindm_enrollment_v1_enrollment_proto_goTypes = []any{
-	(*EnrollRequest)(nil),         // 0: lindm.enrollment.v1.EnrollRequest
-	(*EnrollResponse)(nil),        // 1: lindm.enrollment.v1.EnrollResponse
-	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
+	(*EnrollRequest)(nil),            // 0: lindm.enrollment.v1.EnrollRequest
+	(*EnrollResponse)(nil),           // 1: lindm.enrollment.v1.EnrollResponse
+	(*RetrieveIssuanceRequest)(nil),  // 2: lindm.enrollment.v1.RetrieveIssuanceRequest
+	(*RetrieveIssuanceResponse)(nil), // 3: lindm.enrollment.v1.RetrieveIssuanceResponse
+	(*timestamppb.Timestamp)(nil),    // 4: google.protobuf.Timestamp
 }
 var file_lindm_enrollment_v1_enrollment_proto_depIdxs = []int32{
-	2, // 0: lindm.enrollment.v1.EnrollResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 1: lindm.enrollment.v1.EnrollmentService.Enroll:input_type -> lindm.enrollment.v1.EnrollRequest
-	1, // 2: lindm.enrollment.v1.EnrollmentService.Enroll:output_type -> lindm.enrollment.v1.EnrollResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 0: lindm.enrollment.v1.EnrollResponse.expires_at:type_name -> google.protobuf.Timestamp
+	4, // 1: lindm.enrollment.v1.RetrieveIssuanceResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0, // 2: lindm.enrollment.v1.EnrollmentService.Enroll:input_type -> lindm.enrollment.v1.EnrollRequest
+	2, // 3: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:input_type -> lindm.enrollment.v1.RetrieveIssuanceRequest
+	1, // 4: lindm.enrollment.v1.EnrollmentService.Enroll:output_type -> lindm.enrollment.v1.EnrollResponse
+	3, // 5: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:output_type -> lindm.enrollment.v1.RetrieveIssuanceResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_lindm_enrollment_v1_enrollment_proto_init() }
@@ -210,7 +318,7 @@ func file_lindm_enrollment_v1_enrollment_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_enrollment_v1_enrollment_proto_rawDesc), len(file_lindm_enrollment_v1_enrollment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

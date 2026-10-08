@@ -2,9 +2,7 @@ package device
 
 import (
 	"crypto"
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -18,13 +16,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"lindm/internal/pki"
 )
 
 const (
 	certLifetime   = 30 * 24 * time.Hour
 	renewalOverlap = 15 * time.Minute
 	notBeforeSkew  = time.Minute
-	identityPrefix = "urn:lindm:device:"
 )
 
 var (
@@ -70,11 +69,6 @@ func parseDeviceCSR(pemBytes []byte) (*x509.CertificateRequest, error) {
 
 func validateCSR(csr *x509.CertificateRequest) error {
 	switch csr.SignatureAlgorithm {
-	case x509.ECDSAWithSHA256:
-		pub, ok := csr.PublicKey.(*ecdsa.PublicKey)
-		if !ok || pub == nil || pub.Curve != elliptic.P256() {
-			return errCSRAlgorithm
-		}
 	case x509.PureEd25519:
 		pub, ok := csr.PublicKey.(ed25519.PublicKey)
 		if !ok || len(pub) != ed25519.PublicKeySize {
@@ -127,7 +121,7 @@ func issueCertificate(ca *x509.Certificate, caKey crypto.Signer, pub crypto.Publ
 	if err != nil {
 		return nil, err
 	}
-	identity, err := deviceIdentityURL(deployment, deviceID, generation)
+	identity, err := pki.DeviceIdentityURL(deployment, deviceID, generation)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +144,7 @@ func issueCertificate(ca *x509.Certificate, caKey crypto.Signer, pub crypto.Publ
 	if err != nil {
 		return nil, err
 	}
-	if err := issuedIdentityOK(parsed, deployment, deviceID, generation); err != nil {
+	if err := pki.CheckDeviceCertificate(parsed, deployment, deviceID, generation); err != nil {
 		return nil, err
 	}
 	sum := sha256.Sum256(parsed.Raw)
@@ -202,56 +196,6 @@ func randomSerial() (*big.Int, error) {
 		buf[0] = 1
 	}
 	return new(big.Int).SetBytes(buf), nil
-}
-
-func deviceIdentityURL(deployment, deviceID, generation uuid.UUID) (*url.URL, error) {
-	raw := identityPrefix + deployment.String() + ":" + deviceID.String() + ":" + generation.String()
-	u, err := url.Parse(raw)
-	if err != nil || u.String() != raw {
-		return nil, errors.New("identity")
-	}
-	return u, nil
-}
-
-func parseIdentity(raw string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
-	rest, ok := strings.CutPrefix(raw, identityPrefix)
-	if !ok {
-		return uuid.Nil, uuid.Nil, uuid.Nil, errors.New("identity")
-	}
-	parts := strings.Split(rest, ":")
-	if len(parts) != 3 {
-		return uuid.Nil, uuid.Nil, uuid.Nil, errors.New("identity")
-	}
-	deployment, err := uuid.Parse(parts[0])
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
-	}
-	deviceID, err := uuid.Parse(parts[1])
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
-	}
-	generation, err := uuid.Parse(parts[2])
-	if err != nil || deployment == uuid.Nil || deviceID == uuid.Nil || generation == uuid.Nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, errors.New("identity")
-	}
-	return deployment, deviceID, generation, nil
-}
-
-func issuedIdentityOK(cert *x509.Certificate, deployment, deviceID, generation uuid.UUID) error {
-	if cert == nil || cert.KeyUsage != x509.KeyUsageDigitalSignature || len(cert.ExtKeyUsage) != 1 || cert.ExtKeyUsage[0] != x509.ExtKeyUsageClientAuth || len(cert.UnknownExtKeyUsage) != 0 || !cert.BasicConstraintsValid || cert.IsCA {
-		return errors.New("issued certificate authority")
-	}
-	if len(cert.DNSNames) != 0 || len(cert.EmailAddresses) != 0 || len(cert.IPAddresses) != 0 || len(cert.URIs) != 1 {
-		return errors.New("issued certificate name")
-	}
-	gotDeployment, gotDevice, gotGeneration, err := parseIdentity(cert.URIs[0].String())
-	if err != nil || gotDeployment != deployment || gotDevice != deviceID || gotGeneration != generation {
-		return errors.New("issued certificate identity")
-	}
-	if cert.Subject.CommonName != deviceID.String() || len(cert.Subject.ToRDNSequence()) != 1 {
-		return errors.New("issued certificate subject")
-	}
-	return nil
 }
 
 func bytesContainsNUL(b []byte) bool {

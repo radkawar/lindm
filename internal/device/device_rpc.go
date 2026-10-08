@@ -2,9 +2,9 @@ package device
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"math"
 	"net/http"
 	"time"
@@ -17,6 +17,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/pki"
 )
 
 type devicePrincipal struct {
@@ -24,6 +25,7 @@ type devicePrincipal struct {
 	GenerationID  uuid.UUID
 	CertificateID uuid.UUID
 	Fingerprint   []byte
+	PublicKey     ed25519.PublicKey
 }
 
 type devicePrincipalKey struct{}
@@ -55,11 +57,14 @@ func (s *Service) presentedIdentity(r *http.Request, now time.Time) (*x509.Certi
 	}); err != nil {
 		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
 	}
-	if leaf.KeyUsage != x509.KeyUsageDigitalSignature || len(leaf.ExtKeyUsage) != 1 || leaf.ExtKeyUsage[0] != x509.ExtKeyUsageClientAuth || len(leaf.UnknownExtKeyUsage) != 0 || !leaf.BasicConstraintsValid || leaf.IsCA || len(leaf.DNSNames) != 0 || len(leaf.EmailAddresses) != 0 || len(leaf.IPAddresses) != 0 || len(leaf.URIs) != 1 {
+	if len(leaf.URIs) != 1 || leaf.URIs[0] == nil {
 		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
 	}
-	deployment, deviceID, generationID, err := parseIdentity(leaf.URIs[0].String())
-	if err != nil || deployment != s.deploymentID {
+	deployment, deviceID, generationID, err := pki.ParseDeviceIdentity(leaf.URIs[0].String())
+	if err != nil || deployment != s.deploymentID || pki.CheckDeviceCertificate(leaf, deployment, deviceID, generationID) != nil {
+		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	if key, ok := leaf.PublicKey.(ed25519.PublicKey); !ok || len(key) != ed25519.PublicKeySize {
 		return nil, uuid.Nil, uuid.Nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
 	}
 	return leaf, deviceID, generationID, nil
@@ -74,7 +79,7 @@ func (s *Service) bindCertificate(ctx context.Context, leaf *x509.Certificate, d
 		}
 		return devicePrincipal{}, mapErr(err)
 	}
-	if row.DeviceID != deviceID || row.GenerationID != generationID || row.CurrentGenerationID == nil || *row.CurrentGenerationID != generationID || row.DeviceState == stateRevoked {
+	if row.DeviceID != deviceID || row.GenerationID != generationID || row.CurrentGenerationID == nil || *row.CurrentGenerationID != generationID || (row.DeviceState != statePending && row.DeviceState != stateActive) {
 		return devicePrincipal{}, errCertificateRejected
 	}
 	notBefore, ok := finiteTime(row.NotBefore)
@@ -95,7 +100,11 @@ func (s *Service) bindCertificate(ctx context.Context, leaf *x509.Certificate, d
 	default:
 		return devicePrincipal{}, errCertificateRejected
 	}
-	return devicePrincipal{DeviceID: row.DeviceID, GenerationID: row.GenerationID, CertificateID: row.ID, Fingerprint: append([]byte(nil), sum[:]...)}, nil
+	key, ok := leaf.PublicKey.(ed25519.PublicKey)
+	if !ok || len(key) != ed25519.PublicKeySize {
+		return devicePrincipal{}, errCertificateRejected
+	}
+	return devicePrincipal{DeviceID: row.DeviceID, GenerationID: row.GenerationID, CertificateID: row.ID, Fingerprint: sum[:], PublicKey: key}, nil
 }
 
 func (s *Service) ReportInventory(ctx context.Context, req *connect.Request[devicev1.ReportInventoryRequest]) (*connect.Response[devicev1.ReportInventoryResponse], error) {
@@ -119,6 +128,9 @@ func (s *Service) ReportInventory(ctx context.Context, req *connect.Request[devi
 	if req.Msg.GetSequence() == 0 || req.Msg.GetSequence() > uint64(math.MaxInt64) {
 		return nil, invalid("sequence")
 	}
+	if !validSessionEpoch(req.Msg.GetSessionEpoch()) {
+		return nil, invalid("session_epoch")
+	}
 	if hasNUL(req.Msg.GetHostname(), req.Msg.GetOsId(), req.Msg.GetOsVersion(), req.Msg.GetArchitecture()) {
 		return nil, invalid("invalid_text")
 	}
@@ -132,14 +144,14 @@ func (s *Service) ReportInventory(ctx context.Context, req *connect.Request[devi
 	var accepted uint64
 	var serverTime time.Time
 	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
-		row, err := q.GetDeviceForUpdate(ctx, principal.DeviceID)
+		authority, err := s.lockAuthority(ctx, q, principal)
 		if err != nil {
 			return err
 		}
-		if row.State == stateRevoked || row.CurrentGenerationID == nil || *row.CurrentGenerationID != principal.GenerationID {
-			return errDeviceRevoked
+		if uint64(authority.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
+			return errSessionFenced
 		}
-		now := s.now()
+		row, now := authority.device, authority.now
 		serverTime = now
 		switch {
 		case seq < row.InventorySequence:
@@ -218,113 +230,4 @@ func replacePackages(ctx context.Context, q *devicedb.Queries, deviceID uuid.UUI
 		}
 	}
 	return nil
-}
-
-func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[devicev1.RenewIdentityRequest]) (*connect.Response[devicev1.RenewIdentityResponse], error) {
-	ctx, cancel := bound(ctx)
-	defer cancel()
-	principal, ok := devicePrincipalFromContext(ctx)
-	if !ok {
-		return nil, rpcError(connect.CodeUnauthenticated, "unauthenticated")
-	}
-	if req.Msg == nil {
-		return nil, invalid("invalid_argument")
-	}
-	csr, err := parseDeviceCSR(req.Msg.GetCsrPem())
-	if err != nil {
-		return nil, invalid("csr_rejected")
-	}
-	pubHash, err := publicKeyFingerprint(csr.PublicKey)
-	if err != nil {
-		return nil, invalid("csr_rejected")
-	}
-	var pemBytes []byte
-	var expires time.Time
-	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
-		row, err := q.GetDeviceForUpdate(ctx, principal.DeviceID)
-		if err != nil {
-			return err
-		}
-		if row.State == stateRevoked || row.CurrentGenerationID == nil || *row.CurrentGenerationID != principal.GenerationID {
-			return errDeviceRevoked
-		}
-		presented, err := q.GetCertificateByFingerprint(ctx, principal.Fingerprint)
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				return errCertificateRejected
-			}
-			return err
-		}
-		if presented.ID != principal.CertificateID || presented.DeviceID != principal.DeviceID || presented.GenerationID != principal.GenerationID || presented.DeviceState == stateRevoked {
-			return errCertificateRejected
-		}
-		active, err := q.GetActiveCertificate(ctx, principal.GenerationID)
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				return errInternalState
-			}
-			return err
-		}
-		now := s.now()
-		if presented.Status != "active" {
-			if !renewalReplay(presented, active, pubHash, now) {
-				return errCertificateRejected
-			}
-			notAfter, ok := finiteTime(active.NotAfter)
-			if !ok {
-				return errInternalState
-			}
-			pemBytes = []byte(active.Pem)
-			expires = notAfter
-			return nil
-		}
-		if presented.ID != active.ID {
-			return errInternalState
-		}
-		notAfter, ok := finiteTime(active.NotAfter)
-		if !ok {
-			return errInternalState
-		}
-		if !now.Before(notAfter) {
-			return errCertificateRejected
-		}
-		if err := q.RetireOverlappingCertificates(ctx, devicedb.RetireOverlappingCertificatesParams{
-			RevokedAt:    timestamptz(now),
-			GenerationID: principal.GenerationID,
-		}); err != nil {
-			return err
-		}
-		if err := q.BeginCertificateOverlap(ctx, devicedb.BeginCertificateOverlapParams{
-			OverlapUntil: timestamptz(overlapUntil(now, notAfter)),
-			GenerationID: principal.GenerationID,
-		}); err != nil {
-			return err
-		}
-		issued, err := s.storeCertificate(ctx, q, principal.DeviceID, principal.GenerationID, csr.PublicKey, now)
-		if err != nil {
-			return err
-		}
-		if err := insertAudit(ctx, q, nil, actionDeviceRenew, principal.DeviceID.String(), hex.EncodeToString(issued.Fingerprint)); err != nil {
-			return err
-		}
-		pemBytes = issued.PEM
-		expires = issued.NotAfter
-		return nil
-	})
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return noStore(&devicev1.RenewIdentityResponse{
-		CertificatePem: pemBytes,
-		ExpiresAt:      timestamppb.New(expires),
-	}), nil
-}
-
-func renewalReplay(presented devicedb.GetCertificateByFingerprintRow, active devicedb.GetActiveCertificateRow, pubHash []byte, now time.Time) bool {
-	if presented.Status != "overlapping" || presented.ID == active.ID || !digestEqual(active.PublicKeyFingerprint, pubHash) {
-		return false
-	}
-	// OverlapUntil is capped at the presented certificate's NotAfter.
-	until, ok := finiteTime(presented.OverlapUntil)
-	return ok && now.Before(until)
 }

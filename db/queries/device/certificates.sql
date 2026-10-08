@@ -86,6 +86,7 @@ SELECT
     device_id,
     generation_id,
     status,
+    fingerprint,
     pem,
     not_before,
     not_after,

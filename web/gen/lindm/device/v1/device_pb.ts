@@ -15,7 +15,105 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/device/v1/device.proto.
  */
 export const file_lindm_device_v1_device: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEizQIKFlJlcG9ydEludmVudG9yeVJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIZCgdib290X2lkGAIgASgJQgi6SAVyA7ABARIjCghzZXF1ZW5jZRgDIAEoBEIRukgOMgwY//////////9/IAASHAoIaG9zdG5hbWUYBCABKAlCCrpIB3IFEAEY/QESGAoFb3NfaWQYBSABKAlCCbpIBnIEEAEYQBIcCgpvc192ZXJzaW9uGAYgASgJQgi6SAVyAxiAARIfCgxhcmNoaXRlY3R1cmUYByABKAlCCbpIBnIEEAEYQBI4CghwYWNrYWdlcxgIIAMoCzIbLmxpbmRtLmludmVudG9yeS52MS5QYWNrYWdlQgm6SAaSAQMQ9AMSGQoRcGFja2FnZXNfY29tcGxldGUYCSABKAgiZQoXUmVwb3J0SW52ZW50b3J5UmVzcG9uc2USGQoRYWNjZXB0ZWRfc2VxdWVuY2UYASABKAQSLwoLc2VydmVyX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjQKFFJlbmV3SWRlbnRpdHlSZXF1ZXN0EhwKB2Nzcl9wZW0YASABKAxCC7pICHoGEEAYgIABImAKFVJlbmV3SWRlbnRpdHlSZXNwb25zZRIXCg9jZXJ0aWZpY2F0ZV9wZW0YASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAy1QEKDURldmljZVNlcnZpY2USZAoPUmVwb3J0SW52ZW50b3J5EicubGluZG0uZGV2aWNlLnYxLlJlcG9ydEludmVudG9yeVJlcXVlc3QaKC5saW5kbS5kZXZpY2UudjEuUmVwb3J0SW52ZW50b3J5UmVzcG9uc2USXgoNUmVuZXdJZGVudGl0eRIlLmxpbmRtLmRldmljZS52MS5SZW5ld0lkZW50aXR5UmVxdWVzdBomLmxpbmRtLmRldmljZS52MS5SZW5ld0lkZW50aXR5UmVzcG9uc2VCJFoibGluZG0vZ2VuL2xpbmRtL2RldmljZS92MTtkZXZpY2V2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_inventory_v1_observation]);
+  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEiPQoVQWNxdWlyZVNlc3Npb25SZXF1ZXN0EiQKD2F1dGhvcml0eV9wcm9vZhgBIAEoDEILukgIegYQARiAgAEikQEKFkFjcXVpcmVTZXNzaW9uUmVzcG9uc2USFQoNc2Vzc2lvbl9lcG9jaBgBIAEoBBIVCg1ob3N0X3NlcXVlbmNlGAIgASgEEhgKEHBhY2thZ2Vfc2VxdWVuY2UYAyABKAQSLwoLc2VydmVyX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj8KE0dldFN5bmNTdGF0ZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAAijwEKFEdldFN5bmNTdGF0ZVJlc3BvbnNlEhUKDXNlc3Npb25fZXBvY2gYASABKAQSFQoNaG9zdF9zZXF1ZW5jZRgCIAEoBBIYChBwYWNrYWdlX3NlcXVlbmNlGAMgASgEEi8KC3NlcnZlcl90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCL3AgoWUmVwb3J0SW52ZW50b3J5UmVxdWVzdBInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YASABKAlCCLpIBXIDsAEBEhkKB2Jvb3RfaWQYAiABKAlCCLpIBXIDsAEBEiMKCHNlcXVlbmNlGAMgASgEQhG6SA4yDBj//////////38gABIcCghob3N0bmFtZRgEIAEoCUIKukgHcgUQARj9ARIYCgVvc19pZBgFIAEoCUIJukgGcgQQARhAEhwKCm9zX3ZlcnNpb24YBiABKAlCCLpIBXIDGIABEh8KDGFyY2hpdGVjdHVyZRgHIAEoCUIJukgGcgQQARhAEjgKCHBhY2thZ2VzGAggAygLMhsubGluZG0uaW52ZW50b3J5LnYxLlBhY2thZ2VCCbpIBpIBAxD0AxIZChFwYWNrYWdlc19jb21wbGV0ZRgJIAEoCBIoCg1zZXNzaW9uX2Vwb2NoGAogASgEQhG6SA4yDBj//////////38gACJlChdSZXBvcnRJbnZlbnRvcnlSZXNwb25zZRIZChFhY2NlcHRlZF9zZXF1ZW5jZRgBIAEoBBIvCgtzZXJ2ZXJfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiWgoUUmVuZXdJZGVudGl0eVJlcXVlc3QSHAoHY3NyX3BlbRgBIAEoDEILukgIegYQQBiAgAESJAoPYXV0aG9yaXR5X3Byb29mGAIgASgMQgu6SAh6BhABGICAASJgChVSZW5ld0lkZW50aXR5UmVzcG9uc2USFwoPY2VydGlmaWNhdGVfcGVtGAEgASgMEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMpUDCg1EZXZpY2VTZXJ2aWNlEmEKDkFjcXVpcmVTZXNzaW9uEiYubGluZG0uZGV2aWNlLnYxLkFjcXVpcmVTZXNzaW9uUmVxdWVzdBonLmxpbmRtLmRldmljZS52MS5BY3F1aXJlU2Vzc2lvblJlc3BvbnNlElsKDEdldFN5bmNTdGF0ZRIkLmxpbmRtLmRldmljZS52MS5HZXRTeW5jU3RhdGVSZXF1ZXN0GiUubGluZG0uZGV2aWNlLnYxLkdldFN5bmNTdGF0ZVJlc3BvbnNlEmQKD1JlcG9ydEludmVudG9yeRInLmxpbmRtLmRldmljZS52MS5SZXBvcnRJbnZlbnRvcnlSZXF1ZXN0GigubGluZG0uZGV2aWNlLnYxLlJlcG9ydEludmVudG9yeVJlc3BvbnNlEl4KDVJlbmV3SWRlbnRpdHkSJS5saW5kbS5kZXZpY2UudjEuUmVuZXdJZGVudGl0eVJlcXVlc3QaJi5saW5kbS5kZXZpY2UudjEuUmVuZXdJZGVudGl0eVJlc3BvbnNlQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_inventory_v1_observation]);
+
+/**
+ * @generated from message lindm.device.v1.AcquireSessionRequest
+ */
+export type AcquireSessionRequest = Message<"lindm.device.v1.AcquireSessionRequest"> & {
+  /**
+   * @generated from field: bytes authority_proof = 1;
+   */
+  authorityProof: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.device.v1.AcquireSessionRequest.
+ * Use `create(AcquireSessionRequestSchema)` to create a new message.
+ */
+export const AcquireSessionRequestSchema: GenMessage<AcquireSessionRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 0);
+
+/**
+ * @generated from message lindm.device.v1.AcquireSessionResponse
+ */
+export type AcquireSessionResponse = Message<"lindm.device.v1.AcquireSessionResponse"> & {
+  /**
+   * @generated from field: uint64 session_epoch = 1;
+   */
+  sessionEpoch: bigint;
+
+  /**
+   * @generated from field: uint64 host_sequence = 2;
+   */
+  hostSequence: bigint;
+
+  /**
+   * @generated from field: uint64 package_sequence = 3;
+   */
+  packageSequence: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp server_time = 4;
+   */
+  serverTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.device.v1.AcquireSessionResponse.
+ * Use `create(AcquireSessionResponseSchema)` to create a new message.
+ */
+export const AcquireSessionResponseSchema: GenMessage<AcquireSessionResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 1);
+
+/**
+ * @generated from message lindm.device.v1.GetSyncStateRequest
+ */
+export type GetSyncStateRequest = Message<"lindm.device.v1.GetSyncStateRequest"> & {
+  /**
+   * @generated from field: uint64 session_epoch = 1;
+   */
+  sessionEpoch: bigint;
+};
+
+/**
+ * Describes the message lindm.device.v1.GetSyncStateRequest.
+ * Use `create(GetSyncStateRequestSchema)` to create a new message.
+ */
+export const GetSyncStateRequestSchema: GenMessage<GetSyncStateRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 2);
+
+/**
+ * @generated from message lindm.device.v1.GetSyncStateResponse
+ */
+export type GetSyncStateResponse = Message<"lindm.device.v1.GetSyncStateResponse"> & {
+  /**
+   * @generated from field: uint64 session_epoch = 1;
+   */
+  sessionEpoch: bigint;
+
+  /**
+   * @generated from field: uint64 host_sequence = 2;
+   */
+  hostSequence: bigint;
+
+  /**
+   * @generated from field: uint64 package_sequence = 3;
+   */
+  packageSequence: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp server_time = 4;
+   */
+  serverTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.device.v1.GetSyncStateResponse.
+ * Use `create(GetSyncStateResponseSchema)` to create a new message.
+ */
+export const GetSyncStateResponseSchema: GenMessage<GetSyncStateResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 3);
 
 /**
  * @generated from message lindm.device.v1.ReportInventoryRequest
@@ -65,6 +163,11 @@ export type ReportInventoryRequest = Message<"lindm.device.v1.ReportInventoryReq
    * @generated from field: bool packages_complete = 9;
    */
   packagesComplete: boolean;
+
+  /**
+   * @generated from field: uint64 session_epoch = 10;
+   */
+  sessionEpoch: bigint;
 };
 
 /**
@@ -72,7 +175,7 @@ export type ReportInventoryRequest = Message<"lindm.device.v1.ReportInventoryReq
  * Use `create(ReportInventoryRequestSchema)` to create a new message.
  */
 export const ReportInventoryRequestSchema: GenMessage<ReportInventoryRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 0);
+  messageDesc(file_lindm_device_v1_device, 4);
 
 /**
  * @generated from message lindm.device.v1.ReportInventoryResponse
@@ -94,7 +197,7 @@ export type ReportInventoryResponse = Message<"lindm.device.v1.ReportInventoryRe
  * Use `create(ReportInventoryResponseSchema)` to create a new message.
  */
 export const ReportInventoryResponseSchema: GenMessage<ReportInventoryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 1);
+  messageDesc(file_lindm_device_v1_device, 5);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityRequest
@@ -104,6 +207,11 @@ export type RenewIdentityRequest = Message<"lindm.device.v1.RenewIdentityRequest
    * @generated from field: bytes csr_pem = 1;
    */
   csrPem: Uint8Array;
+
+  /**
+   * @generated from field: bytes authority_proof = 2;
+   */
+  authorityProof: Uint8Array;
 };
 
 /**
@@ -111,7 +219,7 @@ export type RenewIdentityRequest = Message<"lindm.device.v1.RenewIdentityRequest
  * Use `create(RenewIdentityRequestSchema)` to create a new message.
  */
 export const RenewIdentityRequestSchema: GenMessage<RenewIdentityRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 2);
+  messageDesc(file_lindm_device_v1_device, 6);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityResponse
@@ -133,12 +241,28 @@ export type RenewIdentityResponse = Message<"lindm.device.v1.RenewIdentityRespon
  * Use `create(RenewIdentityResponseSchema)` to create a new message.
  */
 export const RenewIdentityResponseSchema: GenMessage<RenewIdentityResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 3);
+  messageDesc(file_lindm_device_v1_device, 7);
 
 /**
  * @generated from service lindm.device.v1.DeviceService
  */
 export const DeviceService: GenService<{
+  /**
+   * @generated from rpc lindm.device.v1.DeviceService.AcquireSession
+   */
+  acquireSession: {
+    methodKind: "unary";
+    input: typeof AcquireSessionRequestSchema;
+    output: typeof AcquireSessionResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.device.v1.DeviceService.GetSyncState
+   */
+  getSyncState: {
+    methodKind: "unary";
+    input: typeof GetSyncStateRequestSchema;
+    output: typeof GetSyncStateResponseSchema;
+  },
   /**
    * @generated from rpc lindm.device.v1.DeviceService.ReportInventory
    */

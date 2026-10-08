@@ -94,6 +94,10 @@ func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1
 		if !ok || row.InventorySequence < 0 {
 			return nil, "", errInternalState
 		}
+		state, err := deviceState(row.State)
+		if err != nil {
+			return nil, "", err
+		}
 		item := &adminv1.Device{
 			Id:                   row.ID.String(),
 			EnrollmentGeneration: generationString(row.CurrentGenerationID),
@@ -101,7 +105,7 @@ func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1
 			OsId:                 row.OsID,
 			OsVersion:            row.OsVersion,
 			Architecture:         row.Architecture,
-			State:                row.State,
+			LifecycleState:       state,
 			EnrolledAt:           timestamppb.New(enrolled),
 			LastSeenAt:           protoTime(row.LastSeenAt),
 			InventorySequence:    uint64(row.InventorySequence),
@@ -109,6 +113,21 @@ func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1
 		devices = append(devices, item)
 	}
 	return devices, next, nil
+}
+
+func deviceState(state string) (adminv1.DeviceState, error) {
+	switch state {
+	case statePending:
+		return adminv1.DeviceState_DEVICE_STATE_PENDING, nil
+	case stateActive:
+		return adminv1.DeviceState_DEVICE_STATE_ACTIVE, nil
+	case stateRevoked:
+		return adminv1.DeviceState_DEVICE_STATE_REVOKED, nil
+	case stateRecoveryHold:
+		return adminv1.DeviceState_DEVICE_STATE_RECOVERY_HOLD, nil
+	default:
+		return adminv1.DeviceState_DEVICE_STATE_UNSPECIFIED, errInternalState
+	}
 }
 
 func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Request[adminv1.CreateEnrollmentGrantRequest]) (*connect.Response[adminv1.CreateEnrollmentGrantResponse], error) {

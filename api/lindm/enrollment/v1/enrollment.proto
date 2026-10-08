@@ -9,6 +9,7 @@ option go_package = "lindm/gen/lindm/enrollment/v1;enrollmentv1";
 
 service EnrollmentService {
   rpc Enroll(EnrollRequest) returns (EnrollResponse);
+  rpc RetrieveIssuance(RetrieveIssuanceRequest) returns (RetrieveIssuanceResponse);
 }
 message EnrollRequest {
   string grant_secret = 1 [(buf.validate.field).string = {
@@ -26,4 +27,14 @@ message EnrollResponse {
   string enrollment_generation = 2;
   bytes certificate_pem = 3;
   google.protobuf.Timestamp expires_at = 4;
+}
+message RetrieveIssuanceRequest {
+  bytes authority_proof = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message RetrieveIssuanceResponse {
+  bytes certificate_pem = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }

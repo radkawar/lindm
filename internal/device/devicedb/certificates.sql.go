@@ -118,6 +118,7 @@ SELECT
     device_id,
     generation_id,
     status,
+    fingerprint,
     pem,
     not_before,
     not_after,
@@ -132,6 +133,7 @@ type GetCertificateByIDRow struct {
 	DeviceID             uuid.UUID
 	GenerationID         uuid.UUID
 	Status               string
+	Fingerprint          []byte
 	Pem                  string
 	NotBefore            pgtype.Timestamptz
 	NotAfter             pgtype.Timestamptz
@@ -147,6 +149,7 @@ func (q *Queries) GetCertificateByID(ctx context.Context, id uuid.UUID) (GetCert
 		&i.DeviceID,
 		&i.GenerationID,
 		&i.Status,
+		&i.Fingerprint,
 		&i.Pem,
 		&i.NotBefore,
 		&i.NotAfter,

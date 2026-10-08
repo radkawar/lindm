@@ -33,6 +33,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// DeviceServiceAcquireSessionProcedure is the fully-qualified name of the DeviceService's
+	// AcquireSession RPC.
+	DeviceServiceAcquireSessionProcedure = "/lindm.device.v1.DeviceService/AcquireSession"
+	// DeviceServiceGetSyncStateProcedure is the fully-qualified name of the DeviceService's
+	// GetSyncState RPC.
+	DeviceServiceGetSyncStateProcedure = "/lindm.device.v1.DeviceService/GetSyncState"
 	// DeviceServiceReportInventoryProcedure is the fully-qualified name of the DeviceService's
 	// ReportInventory RPC.
 	DeviceServiceReportInventoryProcedure = "/lindm.device.v1.DeviceService/ReportInventory"
@@ -43,6 +49,8 @@ const (
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
 type DeviceServiceClient interface {
+	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
+	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
 	ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
 }
@@ -58,6 +66,18 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 	baseURL = strings.TrimRight(baseURL, "/")
 	deviceServiceMethods := v1.File_lindm_device_v1_device_proto.Services().ByName("DeviceService").Methods()
 	return &deviceServiceClient{
+		acquireSession: connect.NewClient[v1.AcquireSessionRequest, v1.AcquireSessionResponse](
+			httpClient,
+			baseURL+DeviceServiceAcquireSessionProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("AcquireSession")),
+			connect.WithClientOptions(opts...),
+		),
+		getSyncState: connect.NewClient[v1.GetSyncStateRequest, v1.GetSyncStateResponse](
+			httpClient,
+			baseURL+DeviceServiceGetSyncStateProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
+			connect.WithClientOptions(opts...),
+		),
 		reportInventory: connect.NewClient[v1.ReportInventoryRequest, v1.ReportInventoryResponse](
 			httpClient,
 			baseURL+DeviceServiceReportInventoryProcedure,
@@ -75,8 +95,20 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // deviceServiceClient implements DeviceServiceClient.
 type deviceServiceClient struct {
+	acquireSession  *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
+	getSyncState    *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
 	reportInventory *connect.Client[v1.ReportInventoryRequest, v1.ReportInventoryResponse]
 	renewIdentity   *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
+}
+
+// AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
+func (c *deviceServiceClient) AcquireSession(ctx context.Context, req *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error) {
+	return c.acquireSession.CallUnary(ctx, req)
+}
+
+// GetSyncState calls lindm.device.v1.DeviceService.GetSyncState.
+func (c *deviceServiceClient) GetSyncState(ctx context.Context, req *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error) {
+	return c.getSyncState.CallUnary(ctx, req)
 }
 
 // ReportInventory calls lindm.device.v1.DeviceService.ReportInventory.
@@ -91,6 +123,8 @@ func (c *deviceServiceClient) RenewIdentity(ctx context.Context, req *connect.Re
 
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
+	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
+	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
 	ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
 }
@@ -102,6 +136,18 @@ type DeviceServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	deviceServiceMethods := v1.File_lindm_device_v1_device_proto.Services().ByName("DeviceService").Methods()
+	deviceServiceAcquireSessionHandler := connect.NewUnaryHandler(
+		DeviceServiceAcquireSessionProcedure,
+		svc.AcquireSession,
+		connect.WithSchema(deviceServiceMethods.ByName("AcquireSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceGetSyncStateHandler := connect.NewUnaryHandler(
+		DeviceServiceGetSyncStateProcedure,
+		svc.GetSyncState,
+		connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	deviceServiceReportInventoryHandler := connect.NewUnaryHandler(
 		DeviceServiceReportInventoryProcedure,
 		svc.ReportInventory,
@@ -116,6 +162,10 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case DeviceServiceAcquireSessionProcedure:
+			deviceServiceAcquireSessionHandler.ServeHTTP(w, r)
+		case DeviceServiceGetSyncStateProcedure:
+			deviceServiceGetSyncStateHandler.ServeHTTP(w, r)
 		case DeviceServiceReportInventoryProcedure:
 			deviceServiceReportInventoryHandler.ServeHTTP(w, r)
 		case DeviceServiceRenewIdentityProcedure:
@@ -128,6 +178,14 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 
 // UnimplementedDeviceServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedDeviceServiceHandler struct{}
+
+func (UnimplementedDeviceServiceHandler) AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.AcquireSession is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetSyncState is not implemented"))
+}
 
 func (UnimplementedDeviceServiceHandler) ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ReportInventory is not implemented"))

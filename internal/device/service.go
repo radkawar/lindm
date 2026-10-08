@@ -24,6 +24,7 @@ import (
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/trust"
 )
 
 const (
@@ -34,20 +35,22 @@ const (
 	defaultPageSize    = 50
 	maxPageSize        = 200
 
-	statePending = "pending"
-	stateActive  = "active"
-	stateRevoked = "revoked"
+	statePending      = "pending"
+	stateActive       = "active"
+	stateRevoked      = "revoked"
+	stateRecoveryHold = "recovery_hold"
 
 	methodCreateGrant  = "CreateEnrollmentGrant"
 	methodRevokeGrant  = "RevokeEnrollmentGrant"
 	methodRevokeDevice = "RevokeDevice"
 
-	actionGrantCreate    = "enrollment_grant.create"
-	actionGrantRevoke    = "enrollment_grant.revoke"
-	actionDeviceRevoke   = "device.revoke"
-	actionDeviceEnroll   = "device.enroll"
-	actionDeviceRenew    = "device.renew"
-	actionDeviceActivate = "device.activate"
+	actionGrantCreate        = "enrollment_grant.create"
+	actionGrantRevoke        = "enrollment_grant.revoke"
+	actionDeviceRevoke       = "device.revoke"
+	actionDeviceEnroll       = "device.enroll"
+	actionDeviceRenew        = "device.renew"
+	actionDeviceActivate     = "device.activate"
+	actionDeviceRecoveryHold = "device.recovery_hold"
 )
 
 // Config holds resolved control-plane resources. It is not a serialized
@@ -67,6 +70,7 @@ type Service struct {
 	validator    *validate.Interceptor
 	slots        chan struct{}
 	clock        func() time.Time
+	authority    *trust.Authority
 }
 
 var (
@@ -97,11 +101,18 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.RevokeDeviceRequest{},
 			&adminv1.ListAuditEventsRequest{},
 			&enrollmentv1.EnrollRequest{},
+			&enrollmentv1.RetrieveIssuanceRequest{},
+			&devicev1.AcquireSessionRequest{},
+			&devicev1.GetSyncStateRequest{},
 			&devicev1.ReportInventoryRequest{},
 			&devicev1.RenewIdentityRequest{},
 		),
 		protovalidate.WithDisableLazy(),
 	)
+	if err != nil {
+		return nil, err
+	}
+	authority, err := trust.New()
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +124,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		validator:    validate.NewInterceptor(validate.WithValidator(compiled)),
 		slots:        make(chan struct{}, maxInFlight),
 		clock:        time.Now,
+		authority:    authority,
 	}, nil
 }
 

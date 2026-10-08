@@ -130,6 +130,9 @@ func (s *Service) resumeEnrollment(ctx context.Context, q *devicedb.Queries, gra
 	if row.State == stateRevoked || row.CurrentGenerationID == nil {
 		return nil, uuid.Nil, uuid.Nil, errDeviceRevoked
 	}
+	if row.State == stateRecoveryHold {
+		return nil, uuid.Nil, uuid.Nil, errRecoveryHold
+	}
 	if grant.CertificateID == nil {
 		return nil, uuid.Nil, uuid.Nil, errCertificateRejected
 	}
