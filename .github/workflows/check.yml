@@ -33,7 +33,7 @@ jobs:
       - run: make generate
       - name: Require committed generated contracts
         run: |
-          changes="$(git status --porcelain -- gen web/gen internal/identity/identitydb internal/device/devicedb)"
+          changes="$(git status --porcelain -- gen web/gen internal/identity/identitydb internal/device/devicedb internal/agent/journal/journaldb)"
           if [ -n "$changes" ]; then
             printf '%s\n' "$changes"
             exit 1

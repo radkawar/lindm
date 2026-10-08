@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Protected local persistence only. Never return this message from an RPC,
+// log it, or place it in the unprivileged transport spool.
+message ExecutorJournalState {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string installation_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes execution_root_json = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes bootstrap_envelope = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 524288
+  }];
+  google.protobuf.Timestamp bootstrap_verified_at = 5 [(buf.validate.field).required = true];
+  string enrollment_transaction_id = 6 [(buf.validate.field).string.uuid = true];
+  bytes identity_private_key = 7 [(buf.validate.field).bytes.len = 64];
+  bytes enrollment_csr_pem = 8 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  string pending_grant = 9 [(buf.validate.field).string.max_len = 256];
+  bytes certificate_pem = 10 [(buf.validate.field).bytes.max_len = 16384];
+  optional string device_id = 11 [(buf.validate.field).string.uuid = true];
+  optional string enrollment_generation = 12 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 13 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  optional string session_boot_id = 14 [(buf.validate.field).string.uuid = true];
+  SessionAcquisition pending_session = 15;
+  bytes pending_session_proof = 16 [(buf.validate.field).bytes.max_len = 16384];
+  PendingIdentityRenewal pending_renewal = 17;
+  PriorIdentityCredential prior_credential = 18;
+  google.protobuf.Timestamp renew_after = 19;
+
+  option (buf.validate.message).cel = {
+    id: "executor_journal.enrollment_shape"
+    message: "pending enrollment retains its grant; installed identity pins device/generation and removes the grant"
+    expression: "(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))"
+  };
+  option (buf.validate.message).cel = {
+    id: "executor_journal.session_shape"
+    message: "accepted sessions have a boot identity and pending acquisition remains at the protected predecessor"
+    expression: "(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))"
+  };
+}
+
+message PendingIdentityRenewal {
+  string issuance_request_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes private_key = 2 [(buf.validate.field).bytes.len = 64];
+  bytes csr_pem = 3 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  bytes authority_proof = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  bytes retrieval_proof = 5 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  uint64 session_epoch = 6 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+
+message PriorIdentityCredential {
+  bytes private_key = 1 [(buf.validate.field).bytes.len = 64];
+  bytes certificate_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  google.protobuf.Timestamp retain_until = 3 [(buf.validate.field).required = true];
+}

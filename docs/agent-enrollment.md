@@ -52,6 +52,10 @@ Use a root-owned runtime directory/socket, `SO_PEERCRED`, a fixed service UID an
 per-method root/service authorization. Enforce bounded requests, deadlines and
 concurrency. Reject symlink/nonregular/wrong-owner/writable trust or state resources;
 do not merely inspect a pathname and later open a different object.
+SQLite resolves proc-fd paths back to ordinary paths: a pinned final descriptor alone
+is insufficient. Walk and validate every ancestor before state access, rejecting
+untrusted owners and non-sticky group/world-writable directories. Trusted sticky
+ancestry is admissible only when each accepted child remains root/executor-owned.
 
 Initial provisioning is explicit and transactional. Persist the enrollment attempt
 UUID, generated private key, CSR, pinned trust and the pending bearer grant in

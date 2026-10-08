@@ -170,6 +170,29 @@ That run used agent SHA-256
 Independent follow-up review found no additional actionable defect in the staging
 containment/process-group correction or its real-tool regression.
 
+### Protected journal storage review
+
+The SQLite/sqlc journal library now persists closed protobuf authority state with
+full-synchronous WAL, a separately synced installation marker, exclusive directory
+ownership and revision CAS. A separate-process smoke recovered acknowledged revision
+2 after the writer exited without closing its database. This is not a physical
+power-loss test or a completed privileged executor.
+
+Two independent reviewers found and reviewed corrections to:
+
+- SQLite canonicalizes proc-fd paths, so final-directory checks alone accepted an
+  attacker-replaceable ancestor. A regression failed before correction. The library
+  now walks directory descriptors from the root, checking ownership, non-sticky
+  writability and symlink exclusion before any provisioning write.
+- Cancelled/deadline-expired reads, integrity checks and opens were incorrectly
+  reported as corrupt-state recovery hold. Both interruption modes failed before
+  correction; context errors now remain distinct and a healthy reopen still works.
+
+Focused race and lint checks pass; both reviewers' correction follow-ups found no
+additional actionable defect. Cryptographic state admission and lifecycle transition
+authorization remain responsibilities of the executor caller, not claims made by the
+storage library. Distinct-UID VM process isolation is still an integration gate.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
