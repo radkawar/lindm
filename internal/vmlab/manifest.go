@@ -1,5 +1,5 @@
-// Package vmlab acquires and verifies pinned official VM base images. It does
-// not launch VMs or claim native lifecycle certification.
+// Package vmlab verifies pinned official images and runs isolated native-agent
+// observations in disposable VMs. It does not certify complete native lifecycles.
 package vmlab
 
 import (

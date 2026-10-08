@@ -99,8 +99,23 @@ artifacts/bin/lab images verify -manifest lab/images/fedora-44-x86_64.json
 ```
 
 The dedicated `.cache/lab/images` cache is digest-addressed, locked and never silently
-repairs corrupt entries. Keep verified base images immutable; future VM scenarios
-must use disposable overlays. These commands do not boot VMs or qualify installations.
+repairs corrupt entries. The VM observation scenario rechecks and pins the immutable
+base image, boots a disposable overlay and compares the built agent against complete
+native package and host observations before and after collection:
+
+```sh
+artifacts/bin/lab vm inspect -manifest lab/images/ubuntu-noble-amd64.json -agent artifacts/bin/lindm-agent
+artifacts/bin/lab vm inspect -manifest lab/images/fedora-44-x86_64.json -agent artifacts/bin/lindm-agent
+```
+
+This lane requires `qemu-system-x86_64`, `qemu-img`, `cloud-localds` and accessible
+`/dev/kvm`; it does not change host permissions or use host sudo. Guest networking is
+restricted, SSH uses ephemeral credentials and a pinned host key, and cleanup kills
+and reaps the owned VM before removing its private overlay/seed. Add
+`-diagnostics EXISTING_DIRECTORY` only when needed: a cloud-init failure then saves a
+0600 diagnostic that can contain sensitive guest data and must be removed by its
+owner. These commands exercise native inspection, not package installation,
+enrollment, desktop qualification or physical recovery.
 
 Pre-commit checks the staged snapshot; pre-push runs `make check`. CI additionally
 checks generated-contract drift and real database regressions. Hooks are not a

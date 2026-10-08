@@ -24,8 +24,11 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "inspect" {
+		return runVMInspect(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab images {fetch|verify} -manifest FILE [-cache DIR]; verify also accepts -image FILE -checksum FILE -key FILE [-signature FILE]")
+		return errors.New("usage: lab vm inspect -manifest FILE -agent FILE [-cache DIR] [-work-dir DIR]; lab images {fetch|verify} -manifest FILE [-cache DIR]; verify also accepts -image FILE -checksum FILE -key FILE [-signature FILE]")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -80,5 +83,31 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	_, err = fmt.Fprintf(stdout, "verified %s\nsha256 %s\nbytes %d\nsigner %s\nprimary %s\nimage %q\n", manifest.Id, verified.SHA256, verified.Size, verified.SigningFingerprint, verified.PrimaryFingerprint, verified.Path)
+	return err
+}
+
+func runVMInspect(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("vm inspect", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	manifestPath := flags.String("manifest", "", "strict protobuf JSON image manifest")
+	agent := flags.String("agent", "", "built Linux amd64 lindm-agent executable")
+	cache := flags.String("cache", ".cache/lab/images", "dedicated verified image cache")
+	workDir := flags.String("work-dir", "", "existing parent for a disposable private run directory (default: OS temporary directory)")
+	diagnosticsDir := flags.String("diagnostics", "", "existing directory for opt-in private cloud-init failure JSON; may contain sensitive guest data")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *manifestPath == "" || *agent == "" || flags.NArg() != 0 {
+		return errors.New("-manifest FILE and -agent FILE are required; positional arguments are not accepted")
+	}
+	manifest, err := vmlab.LoadManifest(*manifestPath)
+	if err != nil {
+		return err
+	}
+	result, err := vmlab.InspectVM(ctx, manifest, vmlab.VMInspectOptions{Agent: *agent, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnosticsDir})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "native inspection matched: %s %s; %d complete package records; OS/kernel/boot/hostname matched\nimage %s\nimage_sha256 %s\nagent_sha256 %s\ncleanup complete; inspection only, not installation/enrollment or OS support certification\n", result.Distribution, result.Version, result.MatchedPackages, result.ImageID, result.ImageSHA256, result.AgentSHA256)
 	return err
 }

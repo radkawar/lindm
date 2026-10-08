@@ -131,7 +131,7 @@ semantics rather than relying on framework defaults.
 | `internal/provider/`                            | Native package/network/service/security adapters with narrow contracts                                                             |
 | `web/`                                          | Typed console and browser self-service surfaces                                                                                    |
 | `packaging/`, `deploy/`                         | DEB/RPM/Arch and Nix/OSTree delivery, systemd/SELinux/AppArmor, native/OCI/replicated server deployment and local assistance relay |
-| `cmd/lab/`, `internal/vmlab/`, `lab/`           | Maintained Go laboratory and declarative signed-image manifests; VM scenarios remain planned                                       |
+| `cmd/lab/`, `internal/vmlab/`, `lab/`           | Maintained Go laboratory, signed-image manifests and disposable native-observation VM scenarios                                    |
 
 Create a package when it owns working behavior. Do not create all directories,
 interfaces and empty tests up front merely to match this table.
@@ -143,8 +143,10 @@ observations), `internal/trust/` (DSSE/bootstrap/TLS authority) and `internal/pk
 For focused work, run `go test -race ./internal/agent/inventory ./internal/trust
 ./internal/vmlab` without rebuilding the console or starting databases. Signed-image
 tests require GnuPG tools and use isolated real keys plus local TLS servers, not
-vendor downloads. Actual pinned image acquisition is a separate maintained lab
-command; it is not hidden in unit tests or pre-commit hooks.
+vendor downloads. Actual pinned image acquisition and native-observation VM scenarios
+are separate maintained lab commands, not hidden in unit tests or pre-commit hooks.
+The VM lane requires accessible KVM, QEMU, `qemu-img` and `cloud-localds`; it neither
+changes host security nor substitutes container observations for a real guest.
 
 ## 2. Toolchain and quality gates
 
