@@ -72,7 +72,26 @@ that source inspection proves runtime behavior.
 
 These are verified corrections in an internal integration milestone, not a claim
 that all commercial features are implemented or an independent sign-off of every
-corrected line. A further independent review follows the implementation commit.
+corrected line.
+
+### Review of implementation commit `19dce6d`
+
+Three further independent reviewers examined console request lifetimes, transport
+configuration and identity/device authority. Four concrete findings were accepted:
+
+| Finding                                                                                       | Correction and exercised evidence                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A retry could remain in flight while “Start a different request” discarded its frozen payload | Disable replacement during pending mutations and synchronously guard reset handlers. Reproduced against the running server before correction. After correction, real issuance, grant-revoke and device-revoke requests each retained identical payloads through two dropped responses and a successful third attempt |
+| Active certificate could expire while renewal waited for its device row lock                  | Recheck expiration after acquiring the lock, before any certificate mutation. Real PostgreSQL lock-wait regressions advance the service clock across active and overlap boundaries and verify rejected requests leave certificates and audit unchanged                                                               |
+| Allowed `load_balance_hosts` was unsupported by the pinned driver                             | Reject the option rather than forwarding an invalid PostgreSQL startup parameter; configuration regression covers rejection                                                                                                                                                                                          |
+| Generic URL authority parsing rejected valid PostgreSQL failover lists                        | Preserve PostgreSQL host-list syntax while checking explicit identity/options and protected TLS resources. Mixed-port/IPv6 and unsafe-input regressions pass; actual `check-config` and `migrate` succeed with an unavailable first endpoint and the verified-TLS PostgreSQL fallback                                |
+
+The corrective quality run passed `make check test-integration build` and separate
+integration-tagged Go lint. Actual device-listener verification also enrolled a
+software key, reported native host OS metadata, renewed with a new key, replayed
+the original enrollment issuance, and rejected inventory on an existing TLS
+connection immediately after console revocation. This was a temporary protocol
+smoke client, not a packaged agent, complete inventory collector or VM qualification.
 
 ## Remaining external gates
 

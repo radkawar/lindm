@@ -66,6 +66,7 @@ type Service struct {
 	caKey        crypto.Signer
 	validator    *validate.Interceptor
 	slots        chan struct{}
+	clock        func() time.Time
 }
 
 var (
@@ -111,6 +112,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		caKey:        cfg.CAKey,
 		validator:    validate.NewInterceptor(validate.WithValidator(compiled)),
 		slots:        make(chan struct{}, maxInFlight),
+		clock:        time.Now,
 	}, nil
 }
 
@@ -203,7 +205,7 @@ func (s *Service) within(ctx context.Context, fn func(context.Context, *devicedb
 }
 
 func (s *Service) now() time.Time {
-	return time.Now().UTC().Truncate(time.Microsecond)
+	return s.clock().UTC().Truncate(time.Microsecond)
 }
 
 func bound(ctx context.Context) (context.Context, context.CancelFunc) {

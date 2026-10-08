@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -330,6 +331,185 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 	}
 	if _, err := svc.RenewIdentity(deviceCtx, connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: mustCSR(t, p256Key(t), &x509.CertificateRequest{})})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("retired certificate minted another key after concurrent renewal: %v", err)
+	}
+}
+
+func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
+	for _, status := range []string{"active", "overlapping"} {
+		for _, boundary := range []struct {
+			name   string
+			offset time.Duration
+		}{
+			{name: "before expiry", offset: -time.Microsecond},
+			{name: "at expiry"},
+			{name: "after expiry", offset: time.Microsecond},
+		} {
+			t.Run(status+"/"+boundary.name, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+				defer cancel()
+				pool, conn := testdb.Open(t)
+				start := time.Now().UTC().Truncate(time.Second)
+				ca, signer := testCA(t, start.Add(90*24*time.Hour))
+				svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var clock atomic.Int64
+				clock.Store(start.UnixMicro())
+				svc.clock = func() time.Time { return time.UnixMicro(clock.Load()) }
+				owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
+				ownerCtx := identity.WithPrincipal(ctx, owner)
+				_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, p256Key(t))
+				deviceID := uuid.MustParse(enrolled.Msg.GetDeviceId())
+				leaf := parseCertPEM(t, enrolled.Msg.GetCertificatePem())
+				renewAt := start.Add(time.Minute)
+				if status == "overlapping" {
+					// Exercise replay with overlap capped by certificate expiry,
+					// rather than the usual overlap deadline.
+					renewAt = leaf.NotAfter.Add(-time.Minute)
+				}
+				clock.Store(renewAt.UnixMicro())
+				principal, err := svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), leaf)
+				if err != nil {
+					t.Fatal(err)
+				}
+				csr := mustCSR(t, p256Key(t), &x509.CertificateRequest{})
+				renewed, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csr}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if status == "active" {
+					leaf = parseCertPEM(t, renewed.Msg.GetCertificatePem())
+					csr = mustCSR(t, p256Key(t), &x509.CertificateRequest{})
+				}
+				// Keep an older overlapping row present so a rejected active
+				// renewal must not retire it, even though its window has elapsed.
+				clock.Store(leaf.NotAfter.Add(-2 * time.Microsecond).UnixMicro())
+				snapshot := func() (string, string) {
+					t.Helper()
+					var certificates, audits string
+					if err := conn.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id)::text
+						FROM device_certificates c WHERE device_id = $1`, deviceID).Scan(&certificates); err != nil {
+						t.Fatal(err)
+					}
+					if err := conn.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id)::text
+						FROM audit_events a WHERE resource_id = $1`, deviceID.String()).Scan(&audits); err != nil {
+						t.Fatal(err)
+					}
+					return certificates, audits
+				}
+				beforeCertificates, beforeAudits := snapshot()
+				lock, err := conn.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+					defer stop()
+					if err := lock.Rollback(cleanup); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+						t.Error(err)
+					}
+				})
+				var lockedID uuid.UUID
+				if err := lock.QueryRow(ctx, `SELECT id FROM devices WHERE id = $1 FOR UPDATE`, deviceID).Scan(&lockedID); err != nil {
+					t.Fatal(err)
+				}
+				type result struct {
+					response *connect.Response[devicev1.RenewIdentityResponse]
+					err      error
+				}
+				results := make(chan result, 1)
+				go func() {
+					r := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
+					principal, err := svc.authenticateDeviceRequest(r, leaf)
+					if err != nil {
+						results <- result{err: err}
+						return
+					}
+					response, err := svc.RenewIdentity(withDevicePrincipal(ctx, principal), connect.NewRequest(&devicev1.RenewIdentityRequest{CsrPem: csr}))
+					results <- result{response: response, err: err}
+				}()
+				// Advance the service clock only once PostgreSQL confirms the
+				// authenticated renewal is waiting on this device row lock.
+				ticker := time.NewTicker(10 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					var waiting bool
+					err := pool.QueryRow(ctx, `SELECT EXISTS (
+						SELECT 1 FROM pg_stat_activity
+						WHERE $1::integer = ANY(pg_blocking_pids(pid))
+					)`, int32(conn.PgConn().PID())).Scan(&waiting)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if waiting {
+						break
+					}
+					select {
+					case got := <-results:
+						t.Fatalf("renewal completed before the device lock was released: %v", got.err)
+					case <-ticker.C:
+					case <-ctx.Done():
+						t.Fatal(ctx.Err())
+					}
+				}
+				clock.Store(leaf.NotAfter.Add(boundary.offset).UnixMicro())
+				if err := lock.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				var got result
+				select {
+				case got = <-results:
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				}
+				if boundary.offset >= 0 {
+					if got.response != nil || connect.CodeOf(got.err) != connect.CodePermissionDenied || rpcReason(got.err) != "certificate_rejected" {
+						t.Fatalf("expired %s renewal: response=%v error=%v", status, got.response != nil, got.err)
+					}
+				} else {
+					if got.err != nil {
+						t.Fatalf("valid %s renewal: %v", status, got.err)
+					}
+					if got.response == nil {
+						t.Fatal("valid renewal returned no response")
+					}
+					if status == "overlapping" && (!bytes.Equal(got.response.Msg.GetCertificatePem(), renewed.Msg.GetCertificatePem()) ||
+						!got.response.Msg.GetExpiresAt().AsTime().Equal(renewed.Msg.GetExpiresAt().AsTime())) {
+						t.Fatal("valid replay did not return the already-issued certificate")
+					}
+				}
+				afterCertificates, afterAudits := snapshot()
+				if boundary.offset >= 0 || status == "overlapping" {
+					if afterCertificates != beforeCertificates {
+						t.Fatal("rejected renewal or replay issued, retired, or modified a certificate")
+					}
+					if afterAudits != beforeAudits {
+						t.Fatal("rejected renewal or replay modified audit events")
+					}
+					return
+				}
+				if bytes.Equal(got.response.Msg.GetCertificatePem(), renewed.Msg.GetCertificatePem()) ||
+					!bytes.Equal(activeCertificatePEM(t, ctx, conn, deviceID), got.response.Msg.GetCertificatePem()) {
+					t.Fatal("valid active renewal did not issue and persist a new certificate")
+				}
+				var total, active, overlapping, revoked, audits int
+				if err := conn.QueryRow(ctx, `SELECT count(*),
+					count(*) FILTER (WHERE status = 'active'),
+					count(*) FILTER (WHERE status = 'overlapping'),
+					count(*) FILTER (WHERE status = 'revoked')
+					FROM device_certificates WHERE device_id = $1`, deviceID).Scan(&total, &active, &overlapping, &revoked); err != nil {
+					t.Fatal(err)
+				}
+				if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events
+					WHERE resource_id = $1 AND action = $2`, deviceID.String(), actionDeviceRenew).Scan(&audits); err != nil {
+					t.Fatal(err)
+				}
+				if total != 3 || active != 1 || overlapping != 1 || revoked != 1 || audits != 2 {
+					t.Fatalf("valid renewal: certificates=%d active=%d overlapping=%d revoked=%d renewal audits=%d", total, active, overlapping, revoked, audits)
+				}
+			})
+		}
 	}
 }
 

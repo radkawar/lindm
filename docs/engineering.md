@@ -68,8 +68,10 @@ Database credential files contain explicit PostgreSQL URLs (host, user and datab
 with `sslmode=verify-full`. Nonempty `PG*` environment settings, service/pass files,
 duplicate options and unknown URL options are rejected rather than silently changing
 the serialized deployment configuration. Supported options are `sslmode`, `sslrootcert`,
-`sslcert`, `sslkey`, `application_name`, `target_session_attrs`, `load_balance_hosts`,
-`channel_binding`, `require_auth` and `sslnegotiation`.
+`sslcert`, `sslkey`, `application_name`, `target_session_attrs`, `channel_binding`,
+`require_auth` and `sslnegotiation`. Host lists use PostgreSQL failover syntax,
+including individually specified ports and bracketed IPv6 addresses.
+`load_balance_hosts` is not supported by the pinned driver and is rejected.
 
 The checked loader reads database trust roots and client keys through the same owned,
 bounded regular-file descriptors as other resources; pgx does not reopen those paths

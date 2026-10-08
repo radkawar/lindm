@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -46,6 +47,153 @@ func TestDatabaseRejectsUnprotectedTLSResources(t *testing.T) {
 				t.Fatalf("accepted %s", test.name)
 			}
 		})
+	}
+}
+
+func TestDatabaseFailoverTLS(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		authority string
+		hosts     []string
+		ports     []uint16
+	}{
+		{name: "single host", authority: "db1:6543", hosts: []string{"db1"}, ports: []uint16{6543}},
+		{name: "default ports", authority: "db1,db2", hosts: []string{"db1", "db2"}, ports: []uint16{5432, 5432}},
+		{name: "mixed ports", authority: "db1:5432,db2", hosts: []string{"db1", "db2"}, ports: []uint16{5432, 5432}},
+		{name: "default and custom ports", authority: "db1,db2:6543,db3:", hosts: []string{"db1", "db2", "db3"}, ports: []uint16{5432, 6543, 5432}},
+		{name: "IPv6 list", authority: "[2001:db8::1]:6543,[2001:db8::2]", hosts: []string{"2001:db8::1", "2001:db8::2"}, ports: []uint16{6543, 5432}},
+		{name: "mixed IPv6 and DNS", authority: "db1:6543,[::1]:5433,db2", hosts: []string{"db1", "::1", "db2"}, ports: []uint16{6543, 5433, 5432}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := databaseFixture(t)
+			root := writeCertificate(t, dir, "root", true, nil, nil)
+			client := writeCertificate(t, dir, "client", false, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil)
+			connection := "postgresql://user%40name:p%40ss%2Fword@" + test.authority + "/db%2Fname?sslmode=verify-full&sslrootcert=root.crt&sslcert=client.crt&sslkey=client.key&application_name=failover%20test+client"
+			writeFixtureFile(t, dir, "database-url", []byte(connection))
+			cfg, err := (&Document{base: dir}).database("database-url")
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn := cfg.ConnConfig
+			if conn.User != "user@name" || conn.Password != "p@ss/word" || conn.Database != "db/name" {
+				t.Fatal("explicit URL credentials or database were changed")
+			}
+			if conn.RuntimeParams["application_name"] != "failover test+client" {
+				t.Fatalf("application name changed: %q", conn.RuntimeParams["application_name"])
+			}
+			if conn.ConnectTimeout != 10*time.Second || len(conn.Fallbacks) != len(test.hosts)-1 {
+				t.Fatalf("unexpected timeout or fallback count: %v, %d", conn.ConnectTimeout, len(conn.Fallbacks))
+			}
+			for i, expectedHost := range test.hosts {
+				host, port, tlsConfig := conn.Host, conn.Port, conn.TLSConfig
+				if i > 0 {
+					fallback := conn.Fallbacks[i-1]
+					host, port, tlsConfig = fallback.Host, fallback.Port, fallback.TLSConfig
+				}
+				if host != expectedHost || port != test.ports[i] {
+					t.Fatalf("endpoint %d: got %s:%d, want %s:%d", i, host, port, expectedHost, test.ports[i])
+				}
+				if tlsConfig == nil || tlsConfig.InsecureSkipVerify || tlsConfig.MinVersion != tls.VersionTLS13 || tlsConfig.ServerName != expectedHost {
+					t.Fatalf("endpoint %d lacks verified TLS 1.3 for %s", i, expectedHost)
+				}
+				if tlsConfig.RootCAs == nil {
+					t.Fatalf("endpoint %d lacks protected roots", i)
+				}
+				if _, err := root.Verify(x509.VerifyOptions{Roots: tlsConfig.RootCAs, DNSName: "localhost"}); err != nil {
+					t.Fatalf("endpoint %d cannot verify configured root: %v", i, err)
+				}
+				if len(tlsConfig.Certificates) != 1 || !tlsConfig.Certificates[0].Leaf.Equal(client) {
+					t.Fatalf("endpoint %d lacks the protected client certificate", i)
+				}
+			}
+		})
+	}
+}
+
+func TestDatabaseRejectsUnsafeFailoverURLs(t *testing.T) {
+	const base = "postgresql://user:fixture-secret@db1:5432,db2/database"
+	for _, test := range []struct {
+		name string
+		url  string
+	}{
+		{name: "unsupported balancing", url: base + "?sslmode=verify-full&load_balance_hosts=random"},
+		{name: "unsupported balancing disabled", url: base + "?sslmode=verify-full&load_balance_hosts=disable"},
+		{name: "duplicate TLS mode", url: base + "?sslmode=disable&sslmode=verify-full"},
+		{name: "encoded duplicate", url: base + "?sslmode=verify-full&%73slmode=verify-full"},
+		{name: "TLS disabled", url: base + "?sslmode=disable"},
+		{name: "unverified TLS", url: base + "?sslmode=require"},
+		{name: "query host override", url: base + "?sslmode=verify-full&host=db3"},
+		{name: "query user override", url: base + "?sslmode=verify-full&user=other"},
+		{name: "query database override", url: base + "?sslmode=verify-full&dbname=other"},
+		{name: "passfile", url: base + "?sslmode=verify-full&passfile=other"},
+		{name: "service file", url: base + "?sslmode=verify-full&servicefile=other"},
+		{name: "service", url: base + "?sslmode=verify-full&service=other"},
+		{name: "empty fragment", url: base + "?sslmode=verify-full#"},
+		{name: "fragment", url: base + "?sslmode=verify-full#fixture-secret"},
+		{name: "missing user", url: "postgresql://db1,db2/database?sslmode=verify-full"},
+		{name: "empty user", url: "postgresql://:fixture-secret@db1,db2/database?sslmode=verify-full"},
+		{name: "empty database", url: "postgresql://user:fixture-secret@db1,db2/?sslmode=verify-full"},
+		{name: "blank database", url: "postgresql://user:fixture-secret@db1,db2/ ?sslmode=verify-full"},
+		{name: "missing database", url: "postgresql://user:fixture-secret@db1,db2?sslmode=verify-full"},
+		{name: "empty primary", url: "postgresql://user:fixture-secret@,db2/database?sslmode=verify-full"},
+		{name: "empty fallback", url: "postgresql://user:fixture-secret@db1,/database?sslmode=verify-full"},
+		{name: "port only fallback", url: "postgresql://user:fixture-secret@db1,:5432/database?sslmode=verify-full"},
+		{name: "encoded empty fallback", url: "postgresql://user:fixture-secret@db1%2C/database?sslmode=verify-full"},
+		{name: "bracketed empty fallback", url: "postgresql://user:fixture-secret@[db1,]/database?sslmode=verify-full"},
+		{name: "empty IPv6 fallback", url: "postgresql://user:fixture-secret@db1,[]/database?sslmode=verify-full"},
+		{name: "malformed IPv6", url: "postgresql://user:fixture-secret@db1,[::1/database?sslmode=verify-full"},
+		{name: "invalid port", url: "postgresql://user:fixture-secret@db1,db2:fixture-secret/database?sslmode=verify-full"},
+		{name: "socket fallback", url: "postgresql://user:fixture-secret@db1,%2Ftmp/database?sslmode=verify-full"},
+		{name: "NUL database", url: base + "%00?sslmode=verify-full"},
+		{name: "malformed option escape", url: base + "?sslmode=verify-full&application_name=%zzfixture-secret"},
+		{name: "invalid driver option", url: base + "?sslmode=verify-full&target_session_attrs=fixture-secret"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := databaseFixture(t)
+			writeFixtureFile(t, dir, "database-url", []byte(test.url))
+			_, err := (&Document{base: dir}).database("database-url")
+			if err == nil {
+				t.Fatal("accepted unsafe database URL")
+			}
+			if strings.Contains(err.Error(), "fixture-secret") {
+				t.Fatal("database parse error exposed credential content")
+			}
+		})
+	}
+}
+
+func TestDatabaseFailoverIgnoresHomeCredentials(t *testing.T) {
+	dir := databaseFixture(t)
+	t.Setenv("HOME", dir)
+	if err := os.Mkdir(filepath.Join(dir, ".postgresql"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, dir, ".pgpass", []byte("*:*:*:*:home-secret\n"))
+	for _, name := range []string{"root.crt", "postgresql.crt", "postgresql.key"} {
+		writeFixtureFile(t, dir, filepath.Join(".postgresql", name), []byte("invalid implicit certificate"))
+	}
+	writeFixtureFile(t, dir, "database-url", []byte("postgresql://user@db1:5432,db2/database?sslmode=verify-full"))
+	cfg, err := (&Document{base: dir}).database("database-url")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ConnConfig.Password != "" {
+		t.Fatal("loaded an implicit password")
+	}
+	if len(cfg.ConnConfig.Fallbacks) != 1 {
+		t.Fatalf("expected one fallback, got %d", len(cfg.ConnConfig.Fallbacks))
+	}
+	for _, tlsConfig := range []*tls.Config{cfg.ConnConfig.TLSConfig, cfg.ConnConfig.Fallbacks[0].TLSConfig} {
+		if tlsConfig == nil {
+			t.Fatal("missing verified TLS")
+		}
+		if tlsConfig.RootCAs != nil || len(tlsConfig.Certificates) != 0 {
+			t.Fatal("loaded implicit home certificates")
+		}
+	}
+	t.Setenv("PGPASSWORD", "environment-secret")
+	if _, err := (&Document{base: dir}).database("database-url"); err == nil || strings.Contains(err.Error(), "environment-secret") {
+		t.Fatal("inherited PostgreSQL credentials were accepted or exposed")
 	}
 }
 
@@ -107,7 +255,7 @@ func databaseFixture(t *testing.T) string {
 	}
 	dir := t.TempDir()
 	options := url.Values{"sslmode": {"verify-full"}, "sslrootcert": {"root.crt"}, "sslcert": {"client.crt"}, "sslkey": {"client.key"}}
-	u := url.URL{Scheme: "postgresql", Host: "localhost:5432", Path: "/isolated_test", User: url.UserPassword("isolated_test", "not-a-deployed-credential"), RawQuery: options.Encode()}
+	u := url.URL{Scheme: "postgresql", Host: "localhost:5432,db2", Path: "/isolated_test", User: url.UserPassword("isolated_test", "not-a-deployed-credential"), RawQuery: options.Encode()}
 	writeFixtureFile(t, dir, "database-url", []byte(u.String()))
 	return dir
 }

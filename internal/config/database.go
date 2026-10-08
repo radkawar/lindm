@@ -26,20 +26,16 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 			return nil, errors.New("PostgreSQL environment variables are not supported; use database.url_file")
 		}
 	}
-	u, err := url.Parse(strings.TrimSpace(string(connection)))
-	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Host == "" || u.User == nil || u.User.Username() == "" || u.Path == "" || u.Path == "/" || u.Fragment != "" {
-		return nil, errors.New("database credential must be a PostgreSQL URL with explicit host, user and database")
-	}
-	options, err := url.ParseQuery(u.RawQuery)
+	connectionURL, options, err := parseDatabaseURL(strings.TrimSpace(string(connection)))
 	if err != nil {
-		return nil, errors.New("database URL has invalid connection options")
+		return nil, err
 	}
 	for key, values := range options {
 		if len(values) != 1 {
 			return nil, errors.New("database URL must not repeat connection options")
 		}
 		switch key {
-		case "sslmode", "sslrootcert", "sslcert", "sslkey", "application_name", "target_session_attrs", "load_balance_hosts", "channel_binding", "require_auth", "sslnegotiation":
+		case "sslmode", "sslrootcert", "sslcert", "sslkey", "application_name", "target_session_attrs", "channel_binding", "require_auth", "sslnegotiation":
 		default:
 			return nil, errors.New("database URL contains unsupported connection options")
 		}
@@ -78,8 +74,8 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 	for _, key := range []string{"sslrootcert", "sslcert", "sslkey", "passfile"} {
 		options.Set(key, "")
 	}
-	u.RawQuery = options.Encode()
-	cfg, err := pgxpool.ParseConfig(u.String())
+	// pgx uses PostgreSQL URI decoding, where '+' is literal, not a space.
+	cfg, err := pgxpool.ParseConfig(connectionURL + "?" + strings.ReplaceAll(options.Encode(), "+", "%20"))
 	if err != nil {
 		// Driver parse errors may contain the complete URL and password.
 		return nil, errors.New("database credential contains an invalid PostgreSQL connection configuration")
@@ -94,6 +90,69 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 	}
 	cfg.ConnConfig.ConnectTimeout = 10 * time.Second
 	return cfg, nil
+}
+
+func parseDatabaseURL(connection string) (string, url.Values, error) {
+	invalid := errors.New("database credential must be a PostgreSQL URL with explicit host, user and database")
+	if strings.Contains(connection, "#") {
+		return "", nil, invalid
+	}
+	base, query, _ := strings.Cut(connection, "?")
+	scheme, rest, ok := strings.Cut(base, "://")
+	if !ok || (scheme != "postgres" && scheme != "postgresql") {
+		return "", nil, invalid
+	}
+	authority, database, ok := strings.Cut(rest, "/")
+	if !ok || strings.Trim(database, " ") == "" {
+		return "", nil, invalid
+	}
+	userinfo, hosts, ok := strings.Cut(authority, "@")
+	if !ok {
+		return "", nil, invalid
+	}
+	// net/url cannot parse PostgreSQL's multihost authority. Validate the
+	// user and database with a placeholder host, retaining the actual authority
+	// verbatim for pgx's libpq-compatible host, port and IPv6 parser.
+	u, err := url.Parse(scheme + "://" + userinfo + "@localhost/" + database)
+	if err != nil || u.User == nil || u.User.Username() == "" {
+		return "", nil, invalid
+	}
+	// pgx substitutes defaults for empty hosts, including empty entries in a
+	// failover list. Check explicit hosts before that substitution; leave port
+	// and remaining authority syntax validation to pgx.
+	for {
+		host, remaining, more := strings.Cut(hosts, ",")
+		if strings.HasPrefix(hosts, "[") {
+			var closed bool
+			host, remaining, closed = strings.Cut(hosts[1:], "]")
+			if !closed {
+				return "", nil, invalid
+			}
+			_, remaining, more = strings.Cut(remaining, ",")
+		} else {
+			host, _, _ = strings.Cut(host, ":")
+		}
+		host, err = url.PathUnescape(strings.Trim(host, " "))
+		if err != nil {
+			return "", nil, invalid
+		}
+		// pgx decodes before splitting its final host list, so encoded commas
+		// must not introduce implicit hosts either.
+		for _, decodedHost := range strings.Split(host, ",") {
+			if decodedHost == "" {
+				return "", nil, invalid
+			}
+		}
+		if !more {
+			break
+		}
+		hosts = remaining
+	}
+	options, err := url.ParseQuery(strings.ReplaceAll(query, "+", "%2B"))
+	if err != nil {
+		return "", nil, errors.New("database URL has invalid connection options")
+	}
+	return base, options, nil
 }
 
 func configureDatabaseTLS(cfg *tls.Config, roots *x509.CertPool, certificates []tls.Certificate) error {

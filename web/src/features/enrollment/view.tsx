@@ -193,7 +193,9 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
               <Button
                 type="button"
                 variant="outline"
+                disabled={issue.isPending}
                 onClick={() => {
+                  if (inFlight.current) return;
                   submitted.current = null;
                   setRequestId(newRequestId());
                   setFailure(null);
@@ -421,7 +423,9 @@ function RevokeGrant({
               <Button
                 type="button"
                 variant="outline"
+                disabled={revoke.isPending}
                 onClick={() => {
+                  if (inFlight.current) return;
                   submitted.current = null;
                   setRequestId(newRequestId());
                   setFailure(null);

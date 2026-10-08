@@ -284,6 +284,9 @@ func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[device
 		if !ok {
 			return errInternalState
 		}
+		if !now.Before(notAfter) {
+			return errCertificateRejected
+		}
 		if err := q.RetireOverlappingCertificates(ctx, devicedb.RetireOverlappingCertificatesParams{
 			RevokedAt:    timestamptz(now),
 			GenerationID: principal.GenerationID,
@@ -320,6 +323,7 @@ func renewalReplay(presented devicedb.GetCertificateByFingerprintRow, active dev
 	if presented.Status != "overlapping" || presented.ID == active.ID || !digestEqual(active.PublicKeyFingerprint, pubHash) {
 		return false
 	}
+	// OverlapUntil is capped at the presented certificate's NotAfter.
 	until, ok := finiteTime(presented.OverlapUntil)
 	return ok && now.Before(until)
 }

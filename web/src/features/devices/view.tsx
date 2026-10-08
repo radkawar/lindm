@@ -300,7 +300,9 @@ function RevokeDeviceDialog({
               <Button
                 type="button"
                 variant="outline"
+                disabled={revoke.isPending}
                 onClick={() => {
+                  if (inFlight.current) return;
                   submitted.current = null;
                   setRequestId(newRequestId());
                   setFailure(null);
