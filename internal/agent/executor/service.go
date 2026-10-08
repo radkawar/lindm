@@ -164,6 +164,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
+		&agentv1.AttestServiceExecutionRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err

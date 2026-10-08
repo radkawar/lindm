@@ -28,6 +28,7 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent service-prepare -file FILE
        lindm-agent service-start -file FILE
        lindm-agent service-status -file FILE
+       lindm-agent service-attest -file FILE
        lindm-agent version
        lindm-agent help
 
@@ -42,10 +43,12 @@ run uses /etc/lindm/agent.json as the configured unprivileged network account.
 trust-update relays signed execution trust through the root-authenticated socket
 using /etc/lindm/agent.json. Only root or the configured network UID may submit it.
 It never changes TLS enrollment pins or starts an operation.
-service-prepare/start/status use the same socket and network configuration.
+service-prepare/start/status/attest use the same socket and network configuration.
 Prepare verifies signed intent and returns preflight evidence; start relays a
 separately signed short-lived grant. Start acceptance is not native completion:
-read service-status for the durable result. These commands cannot sign authority.
+read service-status for the durable result. service-attest returns a nonce-bound
+device-signed snapshot of that history, not a fresh native observation or current
+compliance. These commands cannot sign execution authority.
 version prints the packaging version and a newline.
 `
 
@@ -77,7 +80,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return statusCommand(ctx, args[1:], output)
 	case "trust-update":
 		return executionTrustCommand(ctx, args[1:], output)
-	case "service-prepare", "service-start", "service-status":
+	case "service-prepare", "service-start", "service-status", "service-attest":
 		return serviceExecutionCommand(ctx, args[0], args[1:], output)
 	case "version":
 		return versionCommand(args[1:], output)

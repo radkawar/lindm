@@ -15,6 +15,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/pki"
+	"lindm/internal/trust"
 )
 
 // ServiceExecutionProbeUnit belongs exclusively to a disposable lab guest.
@@ -90,6 +91,17 @@ func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *a
 	}
 	envelope, err := f.authority.Sign(ctx, grant, f.startKey)
 	return grant, envelope, err
+}
+
+// VerifyServiceAttestation uses the fixture's independently pinned device CA,
+// never trust supplied by the relay. Close removes signing keys but deliberately
+// retains this public verifier for the reboot/reinstall history checks.
+// A verified receipt authenticates retained history, not current compliance.
+func (f *ExecutionTrustExercise) VerifyServiceAttestation(ctx context.Context, envelope, certificatePEM []byte, expected *trust.ServiceAttestationBinding, now time.Time) (*agentv1.ServiceExecutionAttestation, error) {
+	if f == nil || f.authority == nil || expected == nil || expected.DeploymentID.String() != f.deploymentID {
+		return nil, errors.New("service attestation is outside the disposable verification fixture")
+	}
+	return f.authority.VerifyServiceAttestation(ctx, envelope, certificatePEM, f.deviceCA, expected, now)
 }
 
 func serviceExerciseCertificate(encoded []byte) (*x509.Certificate, error) {

@@ -118,10 +118,12 @@ pins. The native lifecycle lane's `-execution-trust` option exercises this comma
 and retained rollback fences across upgrade, reboot and reinstall.
 `service-prepare`, `service-start` and `service-status` relay typed signed work and
 read durable results. They cannot create authority or turn queue acceptance into
-completion. The [packaged signed service lane](docs/agent-enrollment.md#running-the-packaged-signed-service-lane)
+completion. `service-attest` returns device-signed, nonce-bound retained evidence,
+not a fresh native observation or compliance claim. The
+[packaged signed service lane](docs/agent-enrollment.md#running-the-packaged-signed-service-lane)
 uses `-service-execution` to exercise the installed root/network boundary, replay,
-expiry, revocation and crash reconciliation. Production dispatch and authenticated
-remote outcome reporting remain separate required integrations.
+expiry, revocation, crash reconciliation and authenticated history. Production
+dispatch and control-plane ingestion of these attestations remain required integrations.
 See the [agent contract](docs/agent-enrollment.md) for ownership, recovery and
 native laboratory commands.
 

@@ -288,25 +288,32 @@ func (s *Service) startServiceExecution(ctx context.Context, req *agentv1.StartS
 	return &agentv1.StartServiceExecutionResponse{Status: serviceStatus(next)}, nil
 }
 
-func (s *Service) currentServiceIntent(ctx context.Context, loaded *bound, envelope []byte) (*agentv1.ServiceExecutionIntent, error) {
+func (s *Service) serviceIdentitySession(loaded *bound) error {
 	if !certUsable(loaded.cert, s.now()) {
-		return nil, errIdentityExpired
+		return errIdentityExpired
 	}
 	if loaded.renewal != nil {
-		return nil, errRenewalPending
+		return errRenewalPending
 	}
 	if loaded.state.GetPendingSession() != nil {
-		return nil, errSessionPending
+		return errSessionPending
 	}
 	boot, err := s.bootID()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if _, err := canonicalUUID(boot); err != nil {
-		return nil, errInternal
+		return errInternal
 	}
 	if loaded.state.GetSessionEpoch() == 0 || loaded.state.GetSessionBootId() != boot {
-		return nil, errSessionRequired
+		return errSessionRequired
+	}
+	return nil
+}
+
+func (s *Service) currentServiceIntent(ctx context.Context, loaded *bound, envelope []byte) (*agentv1.ServiceExecutionIntent, error) {
+	if err := s.serviceIdentitySession(loaded); err != nil {
+		return nil, err
 	}
 	if loaded.execution.delegation == nil || s.now().Before(loaded.execution.state.GetAcceptedAt().AsTime()) {
 		return nil, errServiceRejected

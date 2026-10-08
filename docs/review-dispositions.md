@@ -401,6 +401,41 @@ error-handling convention. Production dispatch must still combine this API with
 current desired-head, device/generation, recovery and lease fences, and clip signed
 start expiry to the actor approval deadline. This is not whole-product certification.
 
+### Service-history attestation reviews
+
+Independent reviews covered the root signing/current-identity boundary and the
+maintained native proof. The first found a certificate-encoding mismatch: enrollment
+accepts an issuer preamble, whereas the attestation verifier requires exactly one
+canonical PEM leaf. A renewal regression failed before the correction and passed
+after root emitted PEM from its already authenticated parsed certificate. Stored
+enrollment and original execution evidence are unchanged.
+
+The proof review found that a one-minute readiness deadline could be shorter than
+legitimate transport recovery. It is now ten minutes, without accelerating product
+timers. The first native reboot run then failed with `session_required`: the lab
+had treated a usable committed epoch as proof of a current-boot session. Readiness
+now independently reads the guest boot ID and requires it to match the committed
+executor boot. Root's rejection was correct; no authority fence was weakened.
+Corrective reviews found no remaining actionable defects in their assigned scopes.
+
+Both corrected packaged lifecycles passed. Ubuntu and Fedora each verified ten
+device-signed retained actions in four phases: terminal, execution-trust revocation,
+reboot and reinstall. Every positive had schema-valid payload-tampering and
+wrong-nonce replay negatives. The reboot acquired epoch 2 on a distinct boot;
+terminal status and action revision remained identical in all later phases,
+including the actual SIGKILL outcome-unknown record. The schema-3→3 packages add
+attestation, not a new journal migration. Immutable build/run references are in
+the implementation evidence ledger.
+
+Protobuf generation, formatting/web checks, full Go lint/race tests, integration
+checks, dependency scans and builds passed, followed by the corrected native runs.
+Focused regressions also cover historical timestamps after clock rollback, no
+native reads/effects or journal mutation during attestation, certificate-expiry
+clipping, renewed-key signing, and pending/other-boot identity rejection. Current
+certificate/device revocation, desired-head/recovery policy and production receipt
+ingestion remain consumer responsibilities; this is not a compliance or release
+certification.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

@@ -65,6 +65,9 @@ service ExecutorService {
   rpc StartServiceExecution(StartServiceExecutionRequest) returns (StartServiceExecutionResponse);
   // Returns durable action state/evidence, not fresh compliance or authority.
   rpc GetServiceExecution(GetServiceExecutionRequest) returns (GetServiceExecutionResponse);
+  // Signs a nonce-bound snapshot of protected action history using the current
+  // device identity/session. Does not observe native state or authorize effects.
+  rpc AttestServiceExecution(AttestServiceExecutionRequest) returns (AttestServiceExecutionResponse);
   // Status reports durable lifecycle facts. It does not report transport
   // reachability or any secret, grant, private key, or signed envelope.
   rpc Status(StatusRequest) returns (StatusResponse);

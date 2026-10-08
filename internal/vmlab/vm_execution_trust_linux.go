@@ -185,7 +185,11 @@ func verifyRetainedVMExecutionTrust(ctx context.Context, vm *guestVM, evidence *
 	if err := verifyVMConnectionIdentity(ctx, vm, evidence.TLSIdentity); err != nil {
 		return err
 	}
-	return verifyRetainedVMServiceActions(ctx, vm, evidence.Services)
+	phase := "reboot"
+	if evidence.RebootRetained {
+		phase = "reinstall"
+	}
+	return verifyRetainedVMServiceActions(ctx, vm, evidence.Services, phase)
 }
 
 func readVMConnectionIdentity(ctx context.Context, vm *guestVM) (*labv1.ConnectionIdentityEvidence, error) {

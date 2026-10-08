@@ -1163,6 +1163,220 @@ func (x *ServiceExecutionStatus) GetVerification() *ServiceVerification {
 	return nil
 }
 
+// A fresh device-authenticated snapshot of protected history, not a fresh native
+// observation, current compliance, or permission to perform an effect.
+type ServiceExecutionAttestation struct {
+	state                protoimpl.MessageState  `protogen:"open.v1"`
+	DeploymentId         string                  `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	DeviceId             string                  `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	EnrollmentGeneration string                  `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
+	SessionEpoch         uint64                  `protobuf:"varint,4,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	ActionRevision       uint64                  `protobuf:"varint,5,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
+	Nonce                []byte                  `protobuf:"bytes,6,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	IssuedAt             *timestamppb.Timestamp  `protobuf:"bytes,7,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
+	ExpiresAt            *timestamppb.Timestamp  `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Status               *ServiceExecutionStatus `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ServiceExecutionAttestation) Reset() {
+	*x = ServiceExecutionAttestation{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServiceExecutionAttestation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServiceExecutionAttestation) ProtoMessage() {}
+
+func (x *ServiceExecutionAttestation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServiceExecutionAttestation.ProtoReflect.Descriptor instead.
+func (*ServiceExecutionAttestation) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ServiceExecutionAttestation) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *ServiceExecutionAttestation) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ServiceExecutionAttestation) GetEnrollmentGeneration() string {
+	if x != nil {
+		return x.EnrollmentGeneration
+	}
+	return ""
+}
+
+func (x *ServiceExecutionAttestation) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *ServiceExecutionAttestation) GetActionRevision() uint64 {
+	if x != nil {
+		return x.ActionRevision
+	}
+	return 0
+}
+
+func (x *ServiceExecutionAttestation) GetNonce() []byte {
+	if x != nil {
+		return x.Nonce
+	}
+	return nil
+}
+
+func (x *ServiceExecutionAttestation) GetIssuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.IssuedAt
+	}
+	return nil
+}
+
+func (x *ServiceExecutionAttestation) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *ServiceExecutionAttestation) GetStatus() *ServiceExecutionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type AttestServiceExecutionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Nonce         []byte                 `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttestServiceExecutionRequest) Reset() {
+	*x = AttestServiceExecutionRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttestServiceExecutionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttestServiceExecutionRequest) ProtoMessage() {}
+
+func (x *AttestServiceExecutionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttestServiceExecutionRequest.ProtoReflect.Descriptor instead.
+func (*AttestServiceExecutionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AttestServiceExecutionRequest) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *AttestServiceExecutionRequest) GetNonce() []byte {
+	if x != nil {
+		return x.Nonce
+	}
+	return nil
+}
+
+type AttestServiceExecutionResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	AttestationEnvelope []byte                 `protobuf:"bytes,1,opt,name=attestation_envelope,json=attestationEnvelope,proto3" json:"attestation_envelope,omitempty"`
+	CertificatePem      []byte                 `protobuf:"bytes,2,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AttestServiceExecutionResponse) Reset() {
+	*x = AttestServiceExecutionResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttestServiceExecutionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttestServiceExecutionResponse) ProtoMessage() {}
+
+func (x *AttestServiceExecutionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttestServiceExecutionResponse.ProtoReflect.Descriptor instead.
+func (*AttestServiceExecutionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AttestServiceExecutionResponse) GetAttestationEnvelope() []byte {
+	if x != nil {
+		return x.AttestationEnvelope
+	}
+	return nil
+}
+
+func (x *AttestServiceExecutionResponse) GetCertificatePem() []byte {
+	if x != nil {
+		return x.CertificatePem
+	}
+	return nil
+}
+
 var File_lindm_agent_v1_service_execution_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
@@ -1270,7 +1484,7 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x1aGetServiceExecutionRequest\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\"e\n" +
 	"\x1bGetServiceExecutionResponse\x12F\n" +
-	"\x06status\x18\x01 \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"\xd1\x04\n" +
+	"\x06status\x18\x01 \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"\x90\b\n" +
 	"\x16ServiceExecutionStatus\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12,\n" +
 	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12G\n" +
@@ -1284,7 +1498,27 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
 	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12B\n" +
 	"\x06before\x18\b \x01(\v2\".lindm.agent.v1.ServiceObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12G\n" +
-	"\fverification\x18\t \x01(\v2#.lindm.agent.v1.ServiceVerificationR\fverification*\xf4\x02\n" +
+	"\fverification\x18\t \x01(\v2#.lindm.agent.v1.ServiceVerificationR\fverification:\xbc\x03\xbaH\xb8\x03\x1a\xb8\x02\n" +
+	"\x18service_status.lifecycle\x12Apending work, effect start, completion and convergence must agree\x1a\xd8\x01((this.state <= 3) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.converged))\x1a{\n" +
+	"\x1cservice_status.failure_shape\x121successful or pending work cannot carry a failure\x1a((this.state <= 4) == (this.failure == 1)\"\xc0\x05\n" +
+	"\x1bServiceExecutionAttestation\x12-\n" +
+	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
+	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
+	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12,\n" +
+	"\rsession_epoch\x18\x04 \x01(\x04B\a\xbaH\x042\x02 \x00R\fsessionEpoch\x120\n" +
+	"\x0faction_revision\x18\x05 \x01(\x04B\a\xbaH\x042\x02 \x00R\x0eactionRevision\x12\x1d\n" +
+	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\x12?\n" +
+	"\tissued_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bissuedAt\x12A\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12F\n" +
+	"\x06status\x18\t \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status:\xc0\x01\xbaH\xbc\x01\x1a\xb9\x01\n" +
+	"\x1cservice_attestation.lifetime\x12@attestation lifetime must be positive and at most thirty seconds\x1aWthis.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')\"e\n" +
+	"\x1dAttestServiceExecutionRequest\x12%\n" +
+	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12\x1d\n" +
+	"\x05nonce\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\"\x96\x01\n" +
+	"\x1eAttestServiceExecutionResponse\x12>\n" +
+	"\x14attestation_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x04R\x13attestationEnvelope\x124\n" +
+	"\x0fcertificate_pem\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0ecertificatePem*\xf4\x02\n" +
 	"\x15ServiceExecutionState\x12'\n" +
 	"#SERVICE_EXECUTION_STATE_UNSPECIFIED\x10\x00\x12$\n" +
 	" SERVICE_EXECUTION_STATE_PREPARED\x10\x01\x12\"\n" +
@@ -1320,7 +1554,7 @@ func file_lindm_agent_v1_service_execution_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_service_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_agent_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_lindm_agent_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
 	(ServiceExecutionState)(0),              // 0: lindm.agent.v1.ServiceExecutionState
 	(ServiceExecutionFailure)(0),            // 1: lindm.agent.v1.ServiceExecutionFailure
@@ -1335,49 +1569,55 @@ var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
 	(*GetServiceExecutionRequest)(nil),      // 10: lindm.agent.v1.GetServiceExecutionRequest
 	(*GetServiceExecutionResponse)(nil),     // 11: lindm.agent.v1.GetServiceExecutionResponse
 	(*ServiceExecutionStatus)(nil),          // 12: lindm.agent.v1.ServiceExecutionStatus
-	(*timestamppb.Timestamp)(nil),           // 13: google.protobuf.Timestamp
-	(*ServiceDesiredState)(nil),             // 14: lindm.agent.v1.ServiceDesiredState
-	(*ServicePlan)(nil),                     // 15: lindm.agent.v1.ServicePlan
-	(*ExecutionRoot)(nil),                   // 16: lindm.agent.v1.ExecutionRoot
-	(*ServiceVerification)(nil),             // 17: lindm.agent.v1.ServiceVerification
-	(*ServiceObservation)(nil),              // 18: lindm.agent.v1.ServiceObservation
+	(*ServiceExecutionAttestation)(nil),     // 13: lindm.agent.v1.ServiceExecutionAttestation
+	(*AttestServiceExecutionRequest)(nil),   // 14: lindm.agent.v1.AttestServiceExecutionRequest
+	(*AttestServiceExecutionResponse)(nil),  // 15: lindm.agent.v1.AttestServiceExecutionResponse
+	(*timestamppb.Timestamp)(nil),           // 16: google.protobuf.Timestamp
+	(*ServiceDesiredState)(nil),             // 17: lindm.agent.v1.ServiceDesiredState
+	(*ServicePlan)(nil),                     // 18: lindm.agent.v1.ServicePlan
+	(*ExecutionRoot)(nil),                   // 19: lindm.agent.v1.ExecutionRoot
+	(*ServiceVerification)(nil),             // 20: lindm.agent.v1.ServiceVerification
+	(*ServiceObservation)(nil),              // 21: lindm.agent.v1.ServiceObservation
 }
 var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
-	13, // 0: lindm.agent.v1.ServiceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
-	13, // 1: lindm.agent.v1.ServiceExecutionIntent.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 2: lindm.agent.v1.ServiceExecutionIntent.desired:type_name -> lindm.agent.v1.ServiceDesiredState
-	13, // 3: lindm.agent.v1.ServiceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
-	13, // 4: lindm.agent.v1.ServiceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	16, // 0: lindm.agent.v1.ServiceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
+	16, // 1: lindm.agent.v1.ServiceExecutionIntent.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 2: lindm.agent.v1.ServiceExecutionIntent.desired:type_name -> lindm.agent.v1.ServiceDesiredState
+	16, // 3: lindm.agent.v1.ServiceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
+	16, // 4: lindm.agent.v1.ServiceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 5: lindm.agent.v1.ServiceExecutionStartGrant.challenge:type_name -> lindm.agent.v1.ServiceExecutionChallenge
-	13, // 6: lindm.agent.v1.ServiceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
-	13, // 7: lindm.agent.v1.ServiceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
+	16, // 6: lindm.agent.v1.ServiceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
+	16, // 7: lindm.agent.v1.ServiceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 8: lindm.agent.v1.ServiceExecutionRecord.intent:type_name -> lindm.agent.v1.ServiceExecutionIntent
-	15, // 9: lindm.agent.v1.ServiceExecutionRecord.native_plan:type_name -> lindm.agent.v1.ServicePlan
-	16, // 10: lindm.agent.v1.ServiceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	13, // 11: lindm.agent.v1.ServiceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
+	18, // 9: lindm.agent.v1.ServiceExecutionRecord.native_plan:type_name -> lindm.agent.v1.ServicePlan
+	19, // 10: lindm.agent.v1.ServiceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	16, // 11: lindm.agent.v1.ServiceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
 	0,  // 12: lindm.agent.v1.ServiceExecutionRecord.state:type_name -> lindm.agent.v1.ServiceExecutionState
 	1,  // 13: lindm.agent.v1.ServiceExecutionRecord.failure:type_name -> lindm.agent.v1.ServiceExecutionFailure
 	3,  // 14: lindm.agent.v1.ServiceExecutionRecord.challenge:type_name -> lindm.agent.v1.ServiceExecutionChallenge
-	13, // 15: lindm.agent.v1.ServiceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
-	13, // 16: lindm.agent.v1.ServiceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
-	17, // 17: lindm.agent.v1.ServiceExecutionRecord.verification:type_name -> lindm.agent.v1.ServiceVerification
-	13, // 18: lindm.agent.v1.ServiceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
+	16, // 15: lindm.agent.v1.ServiceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
+	16, // 16: lindm.agent.v1.ServiceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
+	20, // 17: lindm.agent.v1.ServiceExecutionRecord.verification:type_name -> lindm.agent.v1.ServiceVerification
+	16, // 18: lindm.agent.v1.ServiceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
 	12, // 19: lindm.agent.v1.PrepareServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
-	15, // 20: lindm.agent.v1.PrepareServiceExecutionResponse.native_plan:type_name -> lindm.agent.v1.ServicePlan
+	18, // 20: lindm.agent.v1.PrepareServiceExecutionResponse.native_plan:type_name -> lindm.agent.v1.ServicePlan
 	12, // 21: lindm.agent.v1.StartServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
 	12, // 22: lindm.agent.v1.GetServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
 	0,  // 23: lindm.agent.v1.ServiceExecutionStatus.state:type_name -> lindm.agent.v1.ServiceExecutionState
 	1,  // 24: lindm.agent.v1.ServiceExecutionStatus.failure:type_name -> lindm.agent.v1.ServiceExecutionFailure
-	13, // 25: lindm.agent.v1.ServiceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
-	13, // 26: lindm.agent.v1.ServiceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
-	13, // 27: lindm.agent.v1.ServiceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
-	18, // 28: lindm.agent.v1.ServiceExecutionStatus.before:type_name -> lindm.agent.v1.ServiceObservation
-	17, // 29: lindm.agent.v1.ServiceExecutionStatus.verification:type_name -> lindm.agent.v1.ServiceVerification
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	16, // 25: lindm.agent.v1.ServiceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
+	16, // 26: lindm.agent.v1.ServiceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
+	16, // 27: lindm.agent.v1.ServiceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
+	21, // 28: lindm.agent.v1.ServiceExecutionStatus.before:type_name -> lindm.agent.v1.ServiceObservation
+	20, // 29: lindm.agent.v1.ServiceExecutionStatus.verification:type_name -> lindm.agent.v1.ServiceVerification
+	16, // 30: lindm.agent.v1.ServiceExecutionAttestation.issued_at:type_name -> google.protobuf.Timestamp
+	16, // 31: lindm.agent.v1.ServiceExecutionAttestation.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 32: lindm.agent.v1.ServiceExecutionAttestation.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_service_execution_proto_init() }
@@ -1393,7 +1633,7 @@ func file_lindm_agent_v1_service_execution_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_service_execution_proto_rawDesc), len(file_lindm_agent_v1_service_execution_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   11,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

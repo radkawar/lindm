@@ -23,17 +23,18 @@ import (
 )
 
 const (
-	BootstrapType        = "application/vnd.lindm.bootstrap.v1+protobuf"
-	RenewalType          = "application/vnd.lindm.renewal-intent.v1+protobuf"
-	RetrievalType        = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
-	SessionType          = "application/vnd.lindm.session-acquisition.v1+protobuf"
-	ExecutionRootType    = "application/vnd.lindm.execution-root.v1+protobuf"
-	DelegationType       = "application/vnd.lindm.execution-delegation.v1+protobuf"
-	ServiceIntentType    = "application/vnd.lindm.service-intent.v1+protobuf"
-	ServiceChallengeType = "application/vnd.lindm.service-challenge.v1+protobuf"
-	ServiceStartType     = "application/vnd.lindm.service-start.v1+protobuf"
-	maxEnvelopeBytes     = 512 << 10
-	maxSignatures        = 16
+	BootstrapType          = "application/vnd.lindm.bootstrap.v1+protobuf"
+	RenewalType            = "application/vnd.lindm.renewal-intent.v1+protobuf"
+	RetrievalType          = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
+	SessionType            = "application/vnd.lindm.session-acquisition.v1+protobuf"
+	ExecutionRootType      = "application/vnd.lindm.execution-root.v1+protobuf"
+	DelegationType         = "application/vnd.lindm.execution-delegation.v1+protobuf"
+	ServiceIntentType      = "application/vnd.lindm.service-intent.v1+protobuf"
+	ServiceChallengeType   = "application/vnd.lindm.service-challenge.v1+protobuf"
+	ServiceStartType       = "application/vnd.lindm.service-start.v1+protobuf"
+	ServiceAttestationType = "application/vnd.lindm.service-attestation.v1+protobuf"
+	maxEnvelopeBytes       = 512 << 10
+	maxSignatures          = 16
 )
 
 // Authority compiles the finite set of signed payload schemas before use.
@@ -46,6 +47,7 @@ func New() (*Authority, error) {
 		&agentv1.RenewalIntent{}, &agentv1.IssuanceRetrieval{}, &agentv1.SessionAcquisition{},
 		&agentv1.ExecutionRootTransition{}, &agentv1.ExecutionDelegation{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{}, &agentv1.ServiceExecutionStartGrant{},
+		&agentv1.ServiceExecutionAttestation{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile agent authority schema: %w", err)
@@ -89,6 +91,8 @@ func payloadType(message proto.Message) (string, error) {
 		return ServiceChallengeType, nil
 	case *agentv1.ServiceExecutionStartGrant:
 		return ServiceStartType, nil
+	case *agentv1.ServiceExecutionAttestation:
+		return ServiceAttestationType, nil
 	default:
 		return "", errors.New("unsupported signed authority payload")
 	}

@@ -245,4 +245,49 @@ message ServiceExecutionStatus {
   google.protobuf.Timestamp completed_at = 7;
   ServiceObservation before = 8 [(buf.validate.field).required = true];
   ServiceVerification verification = 9;
+  option (buf.validate.message).cel = {
+    id: "service_status.lifecycle"
+    message: "pending work, effect start, completion and convergence must agree"
+    expression: "((this.state <= 3) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.converged))"
+  };
+  option (buf.validate.message).cel = {
+    id: "service_status.failure_shape"
+    message: "successful or pending work cannot carry a failure"
+    expression: "(this.state <= 4) == (this.failure == 1)"
+  };
+}
+
+// A fresh device-authenticated snapshot of protected history, not a fresh native
+// observation, current compliance, or permission to perform an effect.
+message ServiceExecutionAttestation {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 4 [(buf.validate.field).uint64.gt = 0];
+  uint64 action_revision = 5 [(buf.validate.field).uint64.gt = 0];
+  bytes nonce = 6 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp issued_at = 7 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 8 [(buf.validate.field).required = true];
+  ServiceExecutionStatus status = 9 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "service_attestation.lifetime"
+    message: "attestation lifetime must be positive and at most thirty seconds"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
+  };
+}
+
+message AttestServiceExecutionRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+message AttestServiceExecutionResponse {
+  bytes attestation_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
 }

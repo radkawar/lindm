@@ -2003,8 +2003,7 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x17HOLD_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10HOLD_REASON_NONE\x10\x01\x12%\n" +
 	"!HOLD_REASON_INCOMPLETE_OR_CORRUPT\x10\x02\x12 \n" +
-	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xcf\n" +
-	"\n" +
+	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xc8\v\n" +
 	"\x0fExecutorService\x12e\n" +
 	"\x10PrepareBootstrap\x12'.lindm.agent.v1.PrepareBootstrapRequest\x1a(.lindm.agent.v1.PrepareBootstrapResponse\x12h\n" +
 	"\x11InstallEnrollment\x12(.lindm.agent.v1.InstallEnrollmentRequest\x1a).lindm.agent.v1.InstallEnrollmentResponse\x12\\\n" +
@@ -2017,7 +2016,8 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x14UpdateExecutionTrust\x12+.lindm.agent.v1.UpdateExecutionTrustRequest\x1a,.lindm.agent.v1.UpdateExecutionTrustResponse\x12z\n" +
 	"\x17PrepareServiceExecution\x12..lindm.agent.v1.PrepareServiceExecutionRequest\x1a/.lindm.agent.v1.PrepareServiceExecutionResponse\x12t\n" +
 	"\x15StartServiceExecution\x12,.lindm.agent.v1.StartServiceExecutionRequest\x1a-.lindm.agent.v1.StartServiceExecutionResponse\x12n\n" +
-	"\x13GetServiceExecution\x12*.lindm.agent.v1.GetServiceExecutionRequest\x1a+.lindm.agent.v1.GetServiceExecutionResponse\x12G\n" +
+	"\x13GetServiceExecution\x12*.lindm.agent.v1.GetServiceExecutionRequest\x1a+.lindm.agent.v1.GetServiceExecutionResponse\x12w\n" +
+	"\x16AttestServiceExecution\x12-.lindm.agent.v1.AttestServiceExecutionRequest\x1a..lindm.agent.v1.AttestServiceExecutionResponse\x12G\n" +
 	"\x06Status\x12\x1d.lindm.agent.v1.StatusRequest\x1a\x1e.lindm.agent.v1.StatusResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
@@ -2065,10 +2065,12 @@ var file_lindm_agent_v1_executor_proto_goTypes = []any{
 	(*PrepareServiceExecutionRequest)(nil),  // 27: lindm.agent.v1.PrepareServiceExecutionRequest
 	(*StartServiceExecutionRequest)(nil),    // 28: lindm.agent.v1.StartServiceExecutionRequest
 	(*GetServiceExecutionRequest)(nil),      // 29: lindm.agent.v1.GetServiceExecutionRequest
-	(*UpdateExecutionTrustResponse)(nil),    // 30: lindm.agent.v1.UpdateExecutionTrustResponse
-	(*PrepareServiceExecutionResponse)(nil), // 31: lindm.agent.v1.PrepareServiceExecutionResponse
-	(*StartServiceExecutionResponse)(nil),   // 32: lindm.agent.v1.StartServiceExecutionResponse
-	(*GetServiceExecutionResponse)(nil),     // 33: lindm.agent.v1.GetServiceExecutionResponse
+	(*AttestServiceExecutionRequest)(nil),   // 30: lindm.agent.v1.AttestServiceExecutionRequest
+	(*UpdateExecutionTrustResponse)(nil),    // 31: lindm.agent.v1.UpdateExecutionTrustResponse
+	(*PrepareServiceExecutionResponse)(nil), // 32: lindm.agent.v1.PrepareServiceExecutionResponse
+	(*StartServiceExecutionResponse)(nil),   // 33: lindm.agent.v1.StartServiceExecutionResponse
+	(*GetServiceExecutionResponse)(nil),     // 34: lindm.agent.v1.GetServiceExecutionResponse
+	(*AttestServiceExecutionResponse)(nil),  // 35: lindm.agent.v1.AttestServiceExecutionResponse
 }
 var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	25, // 0: lindm.agent.v1.InstallEnrollmentResponse.not_after:type_name -> google.protobuf.Timestamp
@@ -2102,22 +2104,24 @@ var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	27, // 28: lindm.agent.v1.ExecutorService.PrepareServiceExecution:input_type -> lindm.agent.v1.PrepareServiceExecutionRequest
 	28, // 29: lindm.agent.v1.ExecutorService.StartServiceExecution:input_type -> lindm.agent.v1.StartServiceExecutionRequest
 	29, // 30: lindm.agent.v1.ExecutorService.GetServiceExecution:input_type -> lindm.agent.v1.GetServiceExecutionRequest
-	23, // 31: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
-	4,  // 32: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
-	6,  // 33: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
-	8,  // 34: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
-	12, // 35: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
-	14, // 36: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
-	18, // 37: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
-	20, // 38: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
-	22, // 39: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
-	30, // 40: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
-	31, // 41: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
-	32, // 42: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
-	33, // 43: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
-	24, // 44: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
-	32, // [32:45] is the sub-list for method output_type
-	19, // [19:32] is the sub-list for method input_type
+	30, // 31: lindm.agent.v1.ExecutorService.AttestServiceExecution:input_type -> lindm.agent.v1.AttestServiceExecutionRequest
+	23, // 32: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
+	4,  // 33: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
+	6,  // 34: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
+	8,  // 35: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
+	12, // 36: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
+	14, // 37: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
+	18, // 38: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
+	20, // 39: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
+	22, // 40: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
+	31, // 41: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
+	32, // 42: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
+	33, // 43: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
+	34, // 44: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
+	35, // 45: lindm.agent.v1.ExecutorService.AttestServiceExecution:output_type -> lindm.agent.v1.AttestServiceExecutionResponse
+	24, // 46: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
+	33, // [33:47] is the sub-list for method output_type
+	19, // [19:33] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
 	19, // [19:19] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name

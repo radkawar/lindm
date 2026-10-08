@@ -63,6 +63,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.PrepareServiceExecutionRequest{},
 		&agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{},
+		&agentv1.AttestServiceExecutionRequest{},
 		&agentv1.StatusRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
@@ -144,6 +145,7 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServicePrepareServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceStartServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetServiceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServiceAttestServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceStatusProcedure
 	if !known || uid != 0 && (uid != networkUID || rootOnly) {
 		return errors.New("permission denied")

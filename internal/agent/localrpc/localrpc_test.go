@@ -85,6 +85,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		agentv1connect.ExecutorServicePrepareServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,
+		agentv1connect.ExecutorServiceAttestServiceExecutionProcedure,
 	} {
 		for _, uid := range []uint32{0, 40} {
 			if err := authorize(procedure, uid, 40); err != nil {
@@ -145,6 +146,9 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	}
 	if _, err := client.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: "not-a-uuid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("service lookup request bypassed eager schema: %v", err)
+	}
+	if _, err := client.AttestServiceExecution(t.Context(), connect.NewRequest(&agentv1.AttestServiceExecutionRequest{ActionId: "5a7df67f-8c0c-4404-95a0-828d7e3a1989", Nonce: make([]byte, 31)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("service attestation accepted a truncated nonce: %v", err)
 	}
 	if os.Geteuid() != 0 {
 		if _, err := client.PrepareBootstrap(t.Context(), connect.NewRequest(&agentv1.PrepareBootstrapRequest{Resume: true})); connect.CodeOf(err) != connect.CodePermissionDenied {

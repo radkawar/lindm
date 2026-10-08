@@ -11,8 +11,8 @@ replace its desktop/physical acceptance.
 
 Build `cmd/lindm-agent` separately from `cmd/lindmd`. The agent executable has
 `executor`, `run`, `bootstrap`, `resume`, `status`, `trust-update` and typed
-`service-prepare`, `service-start`, `service-status` commands, plus standalone
-inspection/verification. Real per-user session behavior belongs to G4.
+`service-prepare`, `service-start`, `service-status`, `service-attest` commands, plus
+standalone inspection/verification. Real per-user session behavior belongs to G4.
 
 - `executor`: root-owned Unix listener; owns sensitive identity keys, execution
   trust and journal. No TCP listener and no general command/file/signing RPC.
@@ -34,8 +34,13 @@ inspection/verification. Real per-user session behavior belongs to G4.
 - `service-start -file FILE`: relays a `StartServiceExecutionRequest` containing
   separate signed start authority. Acknowledged queueing is not completion.
 - `service-status -file FILE`: sends a `GetServiceExecutionRequest` for retained
-  action evidence, not a fresh compliance scan. All three use `/etc/lindm/agent.json`
-  and the same root/network-UID socket ACL; none can sign execution authority.
+  action evidence, not a fresh compliance scan.
+- `service-attest -file FILE`: sends an `AttestServiceExecutionRequest` containing
+  an action UUID and caller-generated 32-byte nonce. Root signs its retained
+  evidence with the current device key; callers cannot supply the signed facts.
+
+All four service commands use `/etc/lindm/agent.json` and the same root/network-UID
+socket ACL; none can sign execution authority.
 
 Keep implementation under cohesive `internal/agent` packages for local journal,
 executor, transport and native observation. Shared certificate/trust contracts belong
@@ -192,10 +197,39 @@ Malformed protected records, inconsistent floors/accounting or missing current
 schema enter recovery hold, never reconstruction from untrusted input.
 
 This is a protected local execution boundary, not the complete remote policy system.
-Production dispatch, fresh directory reauthorization, profile targeting/ownership,
-offline reconciliation and root-authenticated remote outcome receipts remain open.
-Local status is authenticated by the root Unix peer; a network relay's unsigned
-server report must not be treated as proof of root execution or fresh compliance.
+Production dispatch, integration of fresh actor authorization, profile
+targeting/ownership and offline reconciliation remain open. Local status is
+authenticated by the root Unix peer; a network relay's unsigned server report
+must not be treated as proof of root execution or fresh compliance.
+
+### Authenticated retained service evidence
+
+`ServiceExecutionAttestation` has a separate typed DSSE domain. Root authenticates
+the stored execution record and constructs deployment/device/generation, committed
+session epoch, action revision, caller nonce, issuance/expiry and the exact retained
+status. Signing requires current enrolled identity and certificate, a committed
+current-boot session, and no pending renewal/session transaction. The envelope lives
+at most thirty seconds and never beyond its signing certificate's expiry.
+
+Attestation performs no native observation, effect, expiry transition or journal
+mutation. Execution-delegation revocation does not erase authenticated history.
+Retained timestamps and outcomes remain unchanged even after native drift or
+wall-clock rollback; issuance is not a new verification time for the resource.
+A renewed current device key can attest older evidence without replacing its
+original acceptance certificate or signatures. The public response encodes the
+authenticated current leaf as canonical PEM, without rewriting stored enrollment.
+
+`Authority.VerifyServiceAttestation` requires an independently pinned device CA,
+expected deployment/device/generation/session, action UUID, exact intent digest,
+caller nonce and admission time. It verifies the certificate, typed signature,
+closed schema, identity/bindings and bounded validity. The consumer must generate
+an unpredictable nonce and enforce current certificate eligibility/revocation,
+device, desired-head, recovery and authorization policy independently. A CA-valid
+historical receipt alone establishes none of those current conditions.
+
+The verifier and local RPC are implemented; production control-plane receipt
+ingestion is not. Neither unsigned local status nor a fresh signature over old
+status establishes present native compliance.
 
 ## 3. Device key use and renewal
 
@@ -564,10 +598,20 @@ A slow sacrificial native job exposes `RUNNING`; the lab sends SIGKILL to the
 executor, not the target service. Read-only restart reconciliation preserves unknown
 outcome or verified convergence, while the target's stable native invocation ID
 proves the job survived without a new invocation. Replaying the accepted grant
-cannot repeat it. The full lifecycle compares terminal records after authority
-revocation, host reboot and remove/reinstall, then cleans fixtures and the VM.
-Development signing is not production dispatch authorization; these are VM results,
-not hardware attestation, destructive qualification or a complete G3 claim.
+cannot repeat it. For each terminal action, the network-UID CLI obtains a fresh
+nonce-bound attestation and the lab independently verifies its certificate,
+signature, target, session, intent digest and retained status. A schema-valid
+payload alteration with the original signature and a wrong-nonce replay must fail.
+
+The full lifecycle repeats this proof after execution-authority revocation, host
+reboot and remove/reinstall, preserving terminal status and action revision.
+Before attesting, readiness compares the executor's committed boot ID with the
+guest's actual `/proc/sys/kernel/random/boot_id`; `session_epoch_usable` alone is
+not current-boot proof. A bounded ten-minute readiness wait accommodates normal
+transport recovery without changing product inventory timers. Fixtures and the
+VM are then cleaned. Development signing is not production dispatch authorization;
+these are VM results, not hardware attestation, destructive qualification or a
+complete G3 claim.
 
 ## 6. Required G2 failure boundaries
 

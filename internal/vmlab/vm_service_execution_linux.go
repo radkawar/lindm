@@ -5,6 +5,8 @@ package vmlab
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -25,6 +27,7 @@ import (
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 	"lindm/internal/protodata"
+	"lindm/internal/trust"
 )
 
 type vmServiceExecutionEvidence struct {
@@ -38,6 +41,30 @@ type vmServiceExecutionEvidence struct {
 	StalePlanRejected         bool                              `json:"stale_plan_rejected"`
 	RevokedGrantRejected      bool                              `json:"revoked_grant_rejected"`
 	RunningCrashReconciled    bool                              `json:"running_crash_reconciled"`
+	// These signatures authenticate terminal history, not a fresh observation
+	// or a current authorization/compliance decision.
+	Attestations []vmServiceAttestationPhase `json:"authenticated_history_attestations"`
+
+	packages *nativeGuestPackages
+	verifier *devlab.ExecutionTrustExercise
+	identity *labv1.ConnectionIdentityEvidence
+	bindings map[string]trust.ServiceAttestationBinding
+}
+
+type vmServiceAttestationPhase struct {
+	Phase                    string                         `json:"phase"`
+	RootSession              *agentv1.StatusResponse        `json:"root_session"`
+	Actions                  []vmServiceAttestationEvidence `json:"actions"`
+	TerminalHistoryUnchanged bool                           `json:"terminal_history_unchanged"`
+}
+
+type vmServiceAttestationEvidence struct {
+	Attestation              *agentv1.ServiceExecutionAttestation `json:"attestation"`
+	Envelope                 []byte                               `json:"attestation_envelope"`
+	CertificatePEM           []byte                               `json:"certificate_pem"`
+	VerifiedAt               time.Time                            `json:"verified_at"`
+	TamperedPayloadRejected  bool                                 `json:"tampered_payload_rejected"`
+	WrongNonceReplayRejected bool                                 `json:"wrong_nonce_replay_rejected"`
 }
 
 type vmPreparedService struct {
@@ -83,11 +110,38 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
 		return nil, err
 	}
-	result := new(vmServiceExecutionEvidence)
+	deployment, err := uuid.Parse(identity.GetDeploymentId())
+	if err != nil {
+		return nil, err
+	}
+	device, err := uuid.Parse(identity.GetDeviceId())
+	if err != nil {
+		return nil, err
+	}
+	generation, err := uuid.Parse(identity.GetEnrollmentGeneration())
+	if err != nil {
+		return nil, err
+	}
+	result := &vmServiceExecutionEvidence{
+		packages: packages, verifier: signer, identity: proto.CloneOf(identity),
+		bindings: make(map[string]trust.ServiceAttestationBinding),
+	}
 	var sequence uint64
 	prepare := func(runtime agentv1.ServiceRuntimeState, enablement agentv1.ServiceEnablement) (*vmPreparedService, error) {
 		sequence++
-		return vmPrepareService(ctx, packages, signer, identity, sequence, runtime, enablement)
+		action, err := vmPrepareService(ctx, packages, signer, identity, sequence, runtime, enablement)
+		if err != nil {
+			return nil, err
+		}
+		id, err := uuid.Parse(action.intent.GetActionId())
+		if err != nil {
+			return nil, err
+		}
+		result.bindings[action.intent.GetActionId()] = trust.ServiceAttestationBinding{
+			DeploymentID: deployment, DeviceID: device, EnrollmentGeneration: generation,
+			ActionID: id, IntentSHA256: sha256.Sum256(action.envelope),
+		}
+		return action, nil
 	}
 	active, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
@@ -295,6 +349,11 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	}
 	result.Completed = append(result.Completed, crashEvidence...)
 	result.RunningCrashReconciled = true
+	// Capture every independently established terminal result before trust
+	// revocation, without spending a prepared start challenge's time window.
+	if err := vmAttestServiceActions(ctx, result, "terminal", false); err != nil {
+		return nil, err
+	}
 	revoked, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
 		return nil, err
@@ -309,7 +368,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		return nil, err
 	}
 	result.RevokedGrantRejected = true
-	if err := verifyRetainedVMServiceActions(ctx, vm, result); err != nil {
+	if err := verifyRetainedVMServiceActions(ctx, vm, result, "execution_trust_revoked"); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -454,7 +513,7 @@ func vmServiceNative(ctx context.Context, vm *guestVM, active, enablement string
 	}
 	return nil
 }
-func verifyRetainedVMServiceActions(ctx context.Context, vm *guestVM, evidence *vmServiceExecutionEvidence) error {
+func verifyRetainedVMServiceActions(ctx context.Context, vm *guestVM, evidence *vmServiceExecutionEvidence, phase string) error {
 	if evidence == nil {
 		return nil
 	}
@@ -467,5 +526,132 @@ func verifyRetainedVMServiceActions(ctx context.Context, vm *guestVM, evidence *
 			return errors.New("execution evidence changed after restart, revocation or package lifecycle")
 		}
 	}
+	return vmAttestServiceActions(ctx, evidence, phase, true)
+}
+
+func vmAttestServiceActions(ctx context.Context, evidence *vmServiceExecutionEvidence, phase string, retained bool) error {
+	if evidence.packages == nil || evidence.verifier == nil || evidence.identity == nil || len(evidence.Completed) == 0 {
+		return errors.New("missing independently established service evidence")
+	}
+	if retained && (len(evidence.Attestations) == 0 || len(evidence.Attestations[0].Actions) != len(evidence.Completed)) {
+		return errors.New("missing terminal service attestation baseline")
+	}
+	session, err := vmServiceAttestationSession(ctx, evidence.packages.vm, evidence.identity)
+	if err != nil {
+		return err
+	}
+	result := vmServiceAttestationPhase{
+		Phase: phase, RootSession: session, TerminalHistoryUnchanged: retained,
+		Actions: make([]vmServiceAttestationEvidence, 0, len(evidence.Completed)),
+	}
+	for i, previous := range evidence.Completed {
+		binding, ok := evidence.bindings[previous.GetActionId()]
+		if !ok {
+			return errors.New("terminal action has no independently signed intent binding")
+		}
+		binding.SessionEpoch = session.GetCommittedSessionEpoch()
+		if _, err := rand.Read(binding.Nonce[:]); err != nil {
+			return err
+		}
+		response := new(agentv1.AttestServiceExecutionResponse)
+		request := &agentv1.AttestServiceExecutionRequest{ActionId: binding.ActionID.String(), Nonce: binding.Nonce[:]}
+		if err := vmServiceRPC(ctx, evidence.packages, "service-attest", previous.GetActionId(), request, response); err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		verified, err := evidence.verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &binding, now)
+		if err != nil {
+			return fmt.Errorf("%s terminal service attestation: %w", phase, err)
+		}
+		if !proto.Equal(previous, verified.GetStatus()) {
+			return errors.New("attested service history differs from independently established root/native evidence")
+		}
+		if retained {
+			baseline := evidence.Attestations[0].Actions[i].Attestation
+			if baseline.GetActionRevision() != verified.GetActionRevision() || !proto.Equal(baseline.GetStatus(), verified.GetStatus()) {
+				return errors.New("terminal action revision or status changed after revocation, reboot or reinstall")
+			}
+		}
+		if err := vmRejectForgedServiceAttestation(ctx, evidence.verifier, response, verified, &binding, now); err != nil {
+			return err
+		}
+		result.Actions = append(result.Actions, vmServiceAttestationEvidence{
+			Attestation: verified, Envelope: response.GetAttestationEnvelope(), CertificatePEM: response.GetCertificatePem(),
+			VerifiedAt: now, TamperedPayloadRejected: true, WrongNonceReplayRejected: true,
+		})
+	}
+	evidence.Attestations = append(evidence.Attestations, result)
 	return nil
+}
+
+func vmServiceAttestationSession(ctx context.Context, vm *guestVM, identity *labv1.ConnectionIdentityEvidence) (*agentv1.StatusResponse, error) {
+	// Reboot/reinstall readiness precedes the network process committing its
+	// current-boot session. Allow an in-flight failed acquisition, the existing
+	// jittered retry, native collection and a new acquisition without shortening
+	// product timers. Wait for this prerequisite, not an arbitrary attestation
+	// error, and never obtain the expected epoch from the envelope.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	boot, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id", nil, 128, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	currentBoot := strings.TrimSpace(string(boot))
+	bootID, err := uuid.Parse(currentBoot)
+	if err != nil || bootID == uuid.Nil || bootID.String() != currentBoot {
+		return nil, errors.New("invalid independent guest boot identity")
+	}
+	for {
+		status, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED)
+		if err != nil {
+			return nil, err
+		}
+		if status.GetDeploymentId() != identity.GetDeploymentId() || status.GetDeviceId() != identity.GetDeviceId() || status.GetEnrollmentGeneration() != identity.GetEnrollmentGeneration() || status.GetIdentityExpired() {
+			return nil, errors.New("root session does not match the pinned service identity")
+		}
+		if status.GetSessionEpochUsable() && status.GetCommittedSessionEpoch() > 0 && status.GetCommittedBootId() == currentBoot && !status.GetSessionPending() && !status.GetRenewalPending() {
+			return status, nil
+		}
+		if err := vmServicePause(ctx); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func vmRejectForgedServiceAttestation(ctx context.Context, verifier *devlab.ExecutionTrustExercise, response *agentv1.AttestServiceExecutionResponse, verified *agentv1.ServiceExecutionAttestation, expected *trust.ServiceAttestationBinding, now time.Time) error {
+	// Preserve the valid envelope's domain, certificate and signature while
+	// altering a schema-valid revision. This is result forgery, not malformed JSON.
+	forged := proto.CloneOf(verified)
+	forged.ActionRevision++
+	if forged.GetActionRevision() == 0 {
+		return errors.New("cannot construct a schema-valid forged action revision")
+	}
+	if err := protovalidate.Validate(forged); err != nil {
+		return err
+	}
+	payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(forged)
+	if err != nil {
+		return err
+	}
+	var envelope dsse.Envelope
+	if err := json.Unmarshal(response.GetAttestationEnvelope(), &envelope); err != nil {
+		return err
+	}
+	envelope.Payload = base64.StdEncoding.EncodeToString(payload)
+	tampered, err := json.Marshal(&envelope)
+	if err != nil {
+		return err
+	}
+	if _, err := verifier.VerifyServiceAttestation(ctx, tampered, response.GetCertificatePem(), expected, now); err == nil {
+		return errors.New("relay-tampered service attestation was accepted")
+	}
+	wrongNonce := *expected
+	wrongNonce.Nonce[0] ^= 1
+	if _, err := verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &wrongNonce, now); err == nil {
+		return errors.New("service attestation replay was accepted for a different nonce")
+	}
+	// Recheck the positive control with exactly the same inputs and time. A
+	// cancelled context or broken verifier cannot masquerade as either rejection.
+	_, err = verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), expected, now)
+	return err
 }

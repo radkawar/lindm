@@ -69,6 +69,9 @@ const (
 	// ExecutorServiceGetServiceExecutionProcedure is the fully-qualified name of the ExecutorService's
 	// GetServiceExecution RPC.
 	ExecutorServiceGetServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/GetServiceExecution"
+	// ExecutorServiceAttestServiceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's AttestServiceExecution RPC.
+	ExecutorServiceAttestServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/AttestServiceExecution"
 	// ExecutorServiceStatusProcedure is the fully-qualified name of the ExecutorService's Status RPC.
 	ExecutorServiceStatusProcedure = "/lindm.agent.v1.ExecutorService/Status"
 )
@@ -118,6 +121,9 @@ type ExecutorServiceClient interface {
 	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
 	// Returns durable action state/evidence, not fresh compliance or authority.
 	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
+	// Signs a nonce-bound snapshot of protected action history using the current
+	// device identity/session. Does not observe native state or authorize effects.
+	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -206,6 +212,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
 			connect.WithClientOptions(opts...),
 		),
+		attestServiceExecution: connect.NewClient[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse](
+			httpClient,
+			baseURL+ExecutorServiceAttestServiceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1.StatusRequest, v1.StatusResponse](
 			httpClient,
 			baseURL+ExecutorServiceStatusProcedure,
@@ -229,6 +241,7 @@ type executorServiceClient struct {
 	prepareServiceExecution *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
 	startServiceExecution   *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
 	getServiceExecution     *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
+	attestServiceExecution  *connect.Client[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse]
 	status                  *connect.Client[v1.StatusRequest, v1.StatusResponse]
 }
 
@@ -292,6 +305,11 @@ func (c *executorServiceClient) GetServiceExecution(ctx context.Context, req *co
 	return c.getServiceExecution.CallUnary(ctx, req)
 }
 
+// AttestServiceExecution calls lindm.agent.v1.ExecutorService.AttestServiceExecution.
+func (c *executorServiceClient) AttestServiceExecution(ctx context.Context, req *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error) {
+	return c.attestServiceExecution.CallUnary(ctx, req)
+}
+
 // Status calls lindm.agent.v1.ExecutorService.Status.
 func (c *executorServiceClient) Status(ctx context.Context, req *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -342,6 +360,9 @@ type ExecutorServiceHandler interface {
 	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
 	// Returns durable action state/evidence, not fresh compliance or authority.
 	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
+	// Signs a nonce-bound snapshot of protected action history using the current
+	// device identity/session. Does not observe native state or authorize effects.
+	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -426,6 +447,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceAttestServiceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceAttestServiceExecutionProcedure,
+		svc.AttestServiceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServiceStatusHandler := connect.NewUnaryHandler(
 		ExecutorServiceStatusProcedure,
 		svc.Status,
@@ -458,6 +485,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceStartServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetServiceExecutionProcedure:
 			executorServiceGetServiceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceAttestServiceExecutionProcedure:
+			executorServiceAttestServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStatusProcedure:
 			executorServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -515,6 +544,10 @@ func (UnimplementedExecutorServiceHandler) StartServiceExecution(context.Context
 
 func (UnimplementedExecutorServiceHandler) GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetServiceExecution is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestServiceExecution is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {

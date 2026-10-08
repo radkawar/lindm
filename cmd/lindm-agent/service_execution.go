@@ -43,6 +43,8 @@ func serviceExecutionCommand(ctx context.Context, command string, args []string,
 		request = new(agentv1.StartServiceExecutionRequest)
 	case "service-status":
 		request = new(agentv1.GetServiceExecutionRequest)
+	case "service-attest":
+		request = new(agentv1.AttestServiceExecutionRequest)
 	default:
 		return errors.New("invalid service execution command")
 	}
@@ -79,6 +81,12 @@ func serviceExecutionCommand(ctx context.Context, command string, args []string,
 		result = response.Msg
 	case *agentv1.GetServiceExecutionRequest:
 		response, callErr := client.GetServiceExecution(call, connect.NewRequest(request))
+		if callErr != nil {
+			return callErr
+		}
+		result = response.Msg
+	case *agentv1.AttestServiceExecutionRequest:
+		response, callErr := client.AttestServiceExecution(call, connect.NewRequest(request))
 		if callErr != nil {
 			return callErr
 		}
