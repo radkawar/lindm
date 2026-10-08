@@ -214,8 +214,15 @@ func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 	default:
 		return nil, errInvalid
 	}
-	if len(name) > 512 || !packageName.MatchString(name) || !validVersion(version) || len(arch) > 64 || !architecture.MatchString(arch) {
+	// RPM renders an absent header tag as "(none)", notably ARCH on imported
+	// signing-key records. Preserve absence without inventing an architecture;
+	// empty or malformed native fields remain invalid.
+	absentArchitecture := manager == "rpm" && arch == "(none)"
+	if len(name) > 512 || !packageName.MatchString(name) || !validVersion(version) || len(arch) > 64 || (!absentArchitecture && !architecture.MatchString(arch)) {
 		return nil, errInvalid
+	}
+	if absentArchitecture {
+		arch = ""
 	}
 	return &inventoryv1.Package{Name: name, Version: version, Architecture: arch, Manager: manager}, nil
 }

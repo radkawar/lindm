@@ -216,12 +216,20 @@ func openCache(ctx context.Context, directory string, create bool) (_ *os.Root, 
 		if len(entries) != 0 {
 			return nil, errors.New("refusing to initialize an unmarked nonempty image cache")
 		}
+		// Publish the marker only after the hierarchy created by MkdirAll is
+		// durable. The initialization flock also covers concurrent creators.
+		if err := syncCacheParents(ctx, absolute); err != nil {
+			return nil, err
+		}
 		file, openErr := root.OpenFile(".lindm-images", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if openErr != nil {
 			return nil, openErr
 		}
 		_, writeErr := file.WriteString(cacheMarker)
 		if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+			return nil, err
+		}
+		if err := dir.Sync(); err != nil {
 			return nil, err
 		}
 		marker = []byte(cacheMarker)
@@ -234,6 +242,26 @@ func openCache(ctx context.Context, directory string, create bool) (_ *os.Root, 
 		return nil, errors.New("image cache ownership marker is invalid")
 	}
 	return root, nil
+}
+
+// A directory fsync persists entries inside it, not its own entry in its parent.
+// This runs once before the initialized marker, not on every image/cache read.
+func syncCacheParents(ctx context.Context, directory string) error {
+	for parent := filepath.Dir(directory); ; parent = filepath.Dir(parent) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		dir, err := os.OpenFile(parent, os.O_RDONLY|syscall.O_DIRECTORY, 0)
+		if err != nil {
+			return fmt.Errorf("open image cache parent for durability: %w", err)
+		}
+		if err := errors.Join(dir.Sync(), dir.Close()); err != nil {
+			return fmt.Errorf("sync image cache parent: %w", err)
+		}
+		if filepath.Dir(parent) == parent {
+			return nil
+		}
+	}
 }
 
 func readCacheFile(root *os.Root, name string, limit int64) (_ []byte, err error) {

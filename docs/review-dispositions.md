@@ -114,6 +114,24 @@ implementation. [The refined contract](agent-enrollment.md) now specifies:
 
 These are design dispositions, not implemented or certified G2 behavior.
 
+### G2 prerequisite implementation review
+
+Implementation commit `051d213` contains native observation collection, DSSE/TUF
+bootstrap verification, restricted TLS message signing and verified vendor-image
+acquisition—not the complete enrolled agent. Three independent code reviewers
+examined native collection, trust/PKI and image acquisition. The trust/PKI reviewer
+reported no actionable defect in its assigned scope. Two findings were corrected:
+
+| Finding                                                                                          | Correction and exercised evidence                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RPM 4.x imported signing-key records lack an architecture tag and invalidated the whole snapshot | Reproduced native `gpg-pubkey` output using an isolated RPM database and vendor key; the regression failed before correction. Interpret RPM's documented absent-tag sentinel as an absent architecture, preserving key/version identity without a package-name exception. Empty/malformed native fields remain rejected; focused race regressions pass      |
+| First-time image-cache creation synced contents but not newly created ancestor entries           | Sync the parent hierarchy under the initialization lock before publishing the marker, then sync the marker's directory. Existing marked caches avoid repeated ancestor syncs. Concurrency/offline/cache race tests pass; the built CLI acquired and reverified the full Ubuntu image in a new nested cache. Physical power-loss injection was not performed |
+
+Corrective Go lint reports zero issues. Native inventory, image-cache and trust race
+tests pass; the corrected built inspector still matches all 2,440 native host package
+records. The temporary duplicate image cache and isolated RPM database were removed.
+These checks do not qualify RPM VM installation or physical crash durability.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

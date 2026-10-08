@@ -46,6 +46,21 @@ func TestRPMEpochAndMultipleVersions(t *testing.T) {
 	}
 }
 
+func TestRPMImportedSigningKeyPreservesCompleteInventory(t *testing.T) {
+	// Native RPM 4.x output after importing the pinned Ubuntu cloud-image key
+	// into an isolated RPM database. Signing-key headers have no ARCH tag.
+	input := "gpg-pubkey\t0\t7db87c81\t4ab02935\t(none)\n" +
+		"kernel-core\t0\t6.9.3\t200.fc40\tx86_64\n"
+	rows, status := parsePackages(t.Context(), strings.NewReader(input), "rpm", parseLimits{maxRecords, maxOutputBytes})
+	if status != success || len(rows) != 2 {
+		t.Fatalf("native signing-key metadata invalidated complete inventory: status=%s rows=%v", status, rows)
+	}
+	if rows[0].Name != "gpg-pubkey" || rows[0].Version != "0:7db87c81-4ab02935" || rows[0].Architecture != "" || rows[0].Manager != "rpm" ||
+		rows[1].Name != "kernel-core" || rows[1].Architecture != "x86_64" {
+		t.Fatalf("native package identity changed: %v", rows)
+	}
+}
+
 func TestInvalidPackageOutputNeverPublishesPartialRows(t *testing.T) {
 	for _, tc := range []struct {
 		name, manager, valid, bad string
@@ -59,6 +74,9 @@ func TestInvalidPackageOutputNeverPublishesPartialRows(t *testing.T) {
 		{"invalid-utf8", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t\xff\tamd64\n"},
 		{"rpm-epoch", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t(none)\t1\t1\tx86_64\n"},
 		{"rpm-release", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t\tx86_64\n"},
+		{"rpm-empty-architecture", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t1\t\n"},
+		{"rpm-malformed-architecture", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t1\t(broken)\n"},
+		{"dpkg-absent-architecture", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t1\t(none)\n"},
 		{"blank", "rpm", "good\t0\t1\t1\tx86_64\n", "\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
