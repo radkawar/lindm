@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Both envelopes carry the same ExecutionRoot under the execution-root DSSE
+// domain. Separate envelopes permit disjoint old/new quorums of sixteen keys.
+message ExecutionRootTransition {
+  bytes previous_quorum_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  bytes next_quorum_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+enum ExecutionSignerRole {
+  EXECUTION_SIGNER_ROLE_UNSPECIFIED = 0;
+  EXECUTION_SIGNER_ROLE_PLAN = 1;
+  EXECUTION_SIGNER_ROLE_START = 2;
+}
+
+message ExecutionDelegate {
+  ExecutionKey key = 1 [(buf.validate.field).required = true];
+  ExecutionSignerRole role = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Exact, versioned provider capability IDs; no wildcard or prefix authority.
+  // Schema validity does not establish that an executor implements a capability.
+  repeated string capabilities = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+    unique: true
+    items: {
+      string: {pattern: "^[a-z][a-z0-9.-]{1,119}\\.v[1-9][0-9]{0,5}$"}
+    }
+  }];
+}
+
+// DSSE payload type application/vnd.lindm.execution-delegation.v1+protobuf.
+// Signed by the current root quorum. Version is deployment-global, including
+// across root replacements. An empty delegate set revokes all online signers.
+message ExecutionDelegation {
+  string deployment_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 root_version = 2 [(buf.validate.field).uint64.gt = 0];
+  uint64 version = 3 [(buf.validate.field).uint64.gt = 0];
+  uint64 minimum_recovery_epoch = 4;
+  google.protobuf.Timestamp not_before = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 6 [(buf.validate.field).required = true];
+  repeated ExecutionDelegate delegates = 7 [(buf.validate.field).repeated.max_items = 16];
+  option (buf.validate.message).cel = {
+    id: "execution_delegation.validity"
+    message: "delegation validity must be increasing"
+    expression: "this.expires_at > this.not_before"
+  };
+  option (buf.validate.message).cel = {
+    id: "execution_delegation.unique_keys"
+    message: "each delegated key must have exactly one role"
+    expression: "this.delegates.all(d, this.delegates.filter(other, other.key.key_id == d.key.key_id).size() == 1)"
+  };
+}
+
+// Network callers relay signed documents; they cannot choose trusted keys.
+message UpdateExecutionTrustRequest {
+  repeated ExecutionRootTransition root_transitions = 1 [(buf.validate.field).repeated.max_items = 8];
+  bytes delegation_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+message UpdateExecutionTrustResponse {
+  uint64 root_version = 1 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 2 [(buf.validate.field).uint64.gt = 0];
+  uint64 minimum_recovery_epoch = 3;
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+}
+
+// Protected journal record, not network-provided state. An initial record has no
+// online execution authority. Installation binding distinguishes it from a
+// missing/truncated record; configured state can never transition back to empty.
+message ExecutionTrustState {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string installation_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  ExecutionRoot root = 3;
+  bytes delegation_envelope = 4 [(buf.validate.field).bytes.max_len = 16384];
+  google.protobuf.Timestamp accepted_at = 5;
+  bytes request_sha256 = 6 [(buf.validate.field).bytes.max_len = 32];
+  uint64 delegation_version = 7;
+  uint64 minimum_recovery_epoch = 8;
+  option (buf.validate.message).cel = {
+    id: "execution_trust_state.complete"
+    message: "execution trust is either unconfigured or a complete accepted authority record"
+    expression: "(has(this.root) && has(this.accepted_at) && this.delegation_envelope.size() > 0 && this.request_sha256.size() == 32 && this.delegation_version > 0u) || (!has(this.root) && !has(this.accepted_at) && this.delegation_envelope.size() == 0 && this.request_sha256.size() == 0 && this.delegation_version == 0u && this.minimum_recovery_epoch == 0u)"
+  };
+}

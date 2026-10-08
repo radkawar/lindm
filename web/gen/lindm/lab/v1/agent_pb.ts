@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/lab/v1/agent.proto.
  */
 export const file_lindm_lab_v1_agent: GenFile = /*@__PURE__*/
-  fileDesc("ChhsaW5kbS9sYWIvdjEvYWdlbnQucHJvdG8SDGxpbmRtLmxhYi52MSLrAgocSW50ZXJydXB0ZWRCb290c3RyYXBFdmlkZW5jZRJBCglkZXZpY2VfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESTQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiMKEmNlcnRpZmljYXRlX3NoYTI1NhgDIAEoDEIHukgEegJoIBJRChllbnJvbGxtZW50X3RyYW5zYWN0aW9uX2lkGAQgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKFWNlcnRpZmljYXRlX25vdF9hZnRlchgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBASKhAgoXTmV0d29ya0JvdW5kYXJ5RXZpZGVuY2USQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEk0KFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIjChJjZXJ0aWZpY2F0ZV9zaGEyNTYYAyABKAxCB7pIBHoCaCASTwoRcGFzc2VkX2JvdW5kYXJpZXMYBCADKA4yHS5saW5kbS5sYWIudjEuTmV0d29ya0JvdW5kYXJ5QhW6SBKSAQ8ICxALGAEiB4IBBBABIAAqvgQKD05ldHdvcmtCb3VuZGFyeRIgChxORVRXT1JLX0JPVU5EQVJZX1VOU1BFQ0lGSUVEEAASLworTkVUV09SS19CT1VOREFSWV9FWEVDVVRPUl9TVEFURV9SRUFEX0RFTklFRBABEjEKLU5FVFdPUktfQk9VTkRBUllfRVhFQ1VUT1JfQ09ORklHX1dSSVRFX0RFTklFRBACEjAKLE5FVFdPUktfQk9VTkRBUllfTkVUV09SS19DT05GSUdfV1JJVEVfREVOSUVEEAMSLworTkVUV09SS19CT1VOREFSWV9DT05GSUdfUEFSRU5UX1dSSVRFX0RFTklFRBAEEjMKL05FVFdPUktfQk9VTkRBUllfUlVOVElNRV9ESVJFQ1RPUllfV1JJVEVfREVOSUVEEAUSMAosTkVUV09SS19CT1VOREFSWV9SVU5USU1FX1BBUkVOVF9XUklURV9ERU5JRUQQBhItCilORVRXT1JLX0JPVU5EQVJZX1BSRVBBUkVfQk9PVFNUUkFQX0RFTklFRBAHEi4KKk5FVFdPUktfQk9VTkRBUllfSU5TVEFMTF9FTlJPTExNRU5UX0RFTklFRBAIEikKJU5FVFdPUktfQk9VTkRBUllfVExTX0NPTlRFWFRfUkVKRUNURUQQCRIoCiRORVRXT1JLX0JPVU5EQVJZX0NBTExFUl9DU1JfUkVKRUNURUQQChInCiNORVRXT1JLX0JPVU5EQVJZX0lERU5USVRZX1VOQ0hBTkdFRBALQh5aHGxpbmRtL2dlbi9saW5kbS9sYWIvdjE7bGFidjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("ChhsaW5kbS9sYWIvdjEvYWdlbnQucHJvdG8SDGxpbmRtLmxhYi52MSLrAgocSW50ZXJydXB0ZWRCb290c3RyYXBFdmlkZW5jZRJBCglkZXZpY2VfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESTQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiMKEmNlcnRpZmljYXRlX3NoYTI1NhgDIAEoDEIHukgEegJoIBJRChllbnJvbGxtZW50X3RyYW5zYWN0aW9uX2lkGAQgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKFWNlcnRpZmljYXRlX25vdF9hZnRlchgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBASKhAgoXTmV0d29ya0JvdW5kYXJ5RXZpZGVuY2USQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEk0KFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIjChJjZXJ0aWZpY2F0ZV9zaGEyNTYYAyABKAxCB7pIBHoCaCASTwoRcGFzc2VkX2JvdW5kYXJpZXMYBCADKA4yHS5saW5kbS5sYWIudjEuTmV0d29ya0JvdW5kYXJ5QhW6SBKSAQ8ICxALGAEiB4IBBBABIAAiwQIKGkNvbm5lY3Rpb25JZGVudGl0eUV2aWRlbmNlEh8KDWRlcGxveW1lbnRfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRldmljZV9pZBgCIAEoCUIIukgFcgOwAQESJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAMgASgJQgi6SAVyA7ABARImChFlbnJvbGxtZW50X29yaWdpbhgEIAEoCUILukgIcgYYgBCIAQESIgoNZGV2aWNlX29yaWdpbhgFIAEoCUILukgIcgYYgBCIAQESJAoTdHJhbnNwb3J0X2NhX3NoYTI1NhgGIAEoDEIHukgEegJoIBIjChJjZXJ0aWZpY2F0ZV9zaGEyNTYYByABKAxCB7pIBHoCaCASJQoGa2V5X2lkGAggASgJQhW6SBJyEDIOXlswLTlhLWZdezY0fSQqvgQKD05ldHdvcmtCb3VuZGFyeRIgChxORVRXT1JLX0JPVU5EQVJZX1VOU1BFQ0lGSUVEEAASLworTkVUV09SS19CT1VOREFSWV9FWEVDVVRPUl9TVEFURV9SRUFEX0RFTklFRBABEjEKLU5FVFdPUktfQk9VTkRBUllfRVhFQ1VUT1JfQ09ORklHX1dSSVRFX0RFTklFRBACEjAKLE5FVFdPUktfQk9VTkRBUllfTkVUV09SS19DT05GSUdfV1JJVEVfREVOSUVEEAMSLworTkVUV09SS19CT1VOREFSWV9DT05GSUdfUEFSRU5UX1dSSVRFX0RFTklFRBAEEjMKL05FVFdPUktfQk9VTkRBUllfUlVOVElNRV9ESVJFQ1RPUllfV1JJVEVfREVOSUVEEAUSMAosTkVUV09SS19CT1VOREFSWV9SVU5USU1FX1BBUkVOVF9XUklURV9ERU5JRUQQBhItCilORVRXT1JLX0JPVU5EQVJZX1BSRVBBUkVfQk9PVFNUUkFQX0RFTklFRBAHEi4KKk5FVFdPUktfQk9VTkRBUllfSU5TVEFMTF9FTlJPTExNRU5UX0RFTklFRBAIEikKJU5FVFdPUktfQk9VTkRBUllfVExTX0NPTlRFWFRfUkVKRUNURUQQCRIoCiRORVRXT1JLX0JPVU5EQVJZX0NBTExFUl9DU1JfUkVKRUNURUQQChInCiNORVRXT1JLX0JPVU5EQVJZX0lERU5USVRZX1VOQ0hBTkdFRBALQh5aHGxpbmRtL2dlbi9saW5kbS9sYWIvdjE7bGFidjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * Public issuance evidence from a real enrollment deliberately not installed
@@ -86,6 +86,61 @@ export type NetworkBoundaryEvidence = Message<"lindm.lab.v1.NetworkBoundaryEvide
  */
 export const NetworkBoundaryEvidenceSchema: GenMessage<NetworkBoundaryEvidence> = /*@__PURE__*/
   messageDesc(file_lindm_lab_v1_agent, 1);
+
+/**
+ * Public TLS identity and pin hashes, excluding changing session/boot fields and
+ * all retrieval proofs. Used to compare native trust-update non-interference.
+ *
+ * @generated from message lindm.lab.v1.ConnectionIdentityEvidence
+ */
+export type ConnectionIdentityEvidence = Message<"lindm.lab.v1.ConnectionIdentityEvidence"> & {
+  /**
+   * @generated from field: string deployment_id = 1;
+   */
+  deploymentId: string;
+
+  /**
+   * @generated from field: string device_id = 2;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string enrollment_generation = 3;
+   */
+  enrollmentGeneration: string;
+
+  /**
+   * @generated from field: string enrollment_origin = 4;
+   */
+  enrollmentOrigin: string;
+
+  /**
+   * @generated from field: string device_origin = 5;
+   */
+  deviceOrigin: string;
+
+  /**
+   * @generated from field: bytes transport_ca_sha256 = 6;
+   */
+  transportCaSha256: Uint8Array;
+
+  /**
+   * @generated from field: bytes certificate_sha256 = 7;
+   */
+  certificateSha256: Uint8Array;
+
+  /**
+   * @generated from field: string key_id = 8;
+   */
+  keyId: string;
+};
+
+/**
+ * Describes the message lindm.lab.v1.ConnectionIdentityEvidence.
+ * Use `create(ConnectionIdentityEvidenceSchema)` to create a new message.
+ */
+export const ConnectionIdentityEvidenceSchema: GenMessage<ConnectionIdentityEvidence> = /*@__PURE__*/
+  messageDesc(file_lindm_lab_v1_agent, 2);
 
 /**
  * Each boundary is recorded only after an operation by the real network UID

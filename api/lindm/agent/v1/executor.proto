@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/execution_trust.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
@@ -51,6 +52,10 @@ service ExecutorService {
   // CommitRenewal installs a certificate that matches the pending next key
   // and pinned identity before acknowledgment.
   rpc CommitRenewal(CommitRenewalRequest) returns (CommitRenewalResponse);
+  // UpdateExecutionTrust verifies both rotation quorums and root-signed online
+  // delegation, then durably commits rollback fences before acknowledgment.
+  // This never starts work or accepts caller-selected verification keys.
+  rpc UpdateExecutionTrust(UpdateExecutionTrustRequest) returns (UpdateExecutionTrustResponse);
   // Status reports durable lifecycle facts. It does not report transport
   // reachability or any secret, grant, private key, or signed envelope.
   rpc Status(StatusRequest) returns (StatusResponse);

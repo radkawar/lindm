@@ -23,12 +23,14 @@ import (
 )
 
 const (
-	BootstrapType    = "application/vnd.lindm.bootstrap.v1+protobuf"
-	RenewalType      = "application/vnd.lindm.renewal-intent.v1+protobuf"
-	RetrievalType    = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
-	SessionType      = "application/vnd.lindm.session-acquisition.v1+protobuf"
-	maxEnvelopeBytes = 512 << 10
-	maxSignatures    = 16
+	BootstrapType     = "application/vnd.lindm.bootstrap.v1+protobuf"
+	RenewalType       = "application/vnd.lindm.renewal-intent.v1+protobuf"
+	RetrievalType     = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
+	SessionType       = "application/vnd.lindm.session-acquisition.v1+protobuf"
+	ExecutionRootType = "application/vnd.lindm.execution-root.v1+protobuf"
+	DelegationType    = "application/vnd.lindm.execution-delegation.v1+protobuf"
+	maxEnvelopeBytes  = 512 << 10
+	maxSignatures     = 16
 )
 
 // Authority compiles the finite set of signed payload schemas before use.
@@ -39,6 +41,7 @@ func New() (*Authority, error) {
 	validator, err := protovalidate.New(protovalidate.WithMessages(
 		&agentv1.ExecutionRoot{}, &agentv1.BootstrapBundle{},
 		&agentv1.RenewalIntent{}, &agentv1.IssuanceRetrieval{}, &agentv1.SessionAcquisition{},
+		&agentv1.ExecutionRootTransition{}, &agentv1.ExecutionDelegation{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile agent authority schema: %w", err)
@@ -64,6 +67,10 @@ func payloadType(message proto.Message) (string, error) {
 		return "", errors.New("missing signed authority payload")
 	}
 	switch message.(type) {
+	case *agentv1.ExecutionRoot:
+		return ExecutionRootType, nil
+	case *agentv1.ExecutionDelegation:
+		return DelegationType, nil
 	case *agentv1.BootstrapBundle:
 		return BootstrapType, nil
 	case *agentv1.RenewalIntent:

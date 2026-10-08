@@ -40,7 +40,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return runVMInspect(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready}")
+		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)

@@ -40,6 +40,7 @@ type bound struct {
 	cert           *x509.Certificate
 	renewal        *boundRenewal
 	prior          *boundPrior
+	execution      boundExecutionTrust
 }
 
 type boundRenewal struct {

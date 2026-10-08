@@ -29,6 +29,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	diagnostics := flags.String("diagnostics", "", "existing directory for opt-in private failure diagnostics")
 	probe := flags.String("lab", "", "built lab probe binary (defaults to this executable)")
 	observe := flags.Duration("observe-for", 0, "optional console inspection interval after first two publications (at most ten minutes)")
+	executionTrust := flags.Bool("execution-trust", false, "exercise signed execution trust rotation, revocation and retained rollback fences after upgrade")
 	record := flags.String("record", "", "write successful lifecycle evidence to a new private file")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -69,7 +70,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, LabBinary: *probe, First: first, Second: second, APT: apt, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr})
+	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, LabBinary: *probe, First: first, Second: second, APT: apt, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust})
 	if err != nil {
 		return err
 	}

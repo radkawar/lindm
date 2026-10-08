@@ -39,7 +39,7 @@ import (
 // Bootstrap material is accepted only on stdin; errors never echo RPC bodies.
 func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) error {
 	if len(args) != 1 {
-		return errors.New("guest requires bootstrap-interrupted, network-boundaries, or executor-ready, without flags")
+		return errors.New("guest requires bootstrap-interrupted, network-boundaries, executor-ready, or connection-identity, without flags")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -50,6 +50,8 @@ func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) erro
 		return guestNetworkBoundaries(ctx, stdout)
 	case "executor-ready":
 		return guestExecutorReady(ctx, stdout)
+	case "connection-identity":
+		return guestConnectionIdentity(ctx, stdout)
 	default:
 		return errors.New("unknown guest probe")
 	}

@@ -34,25 +34,26 @@ var (
 	// ErrBusy means another process holds the executor state lock.
 	ErrBusy = errors.New("executor state already has an owner")
 
-	errRecoveryHold        = errors.New("recovery_hold")
-	errUnprovisioned       = errors.New("unprovisioned")
-	errPendingEnrollment   = errors.New("pending_enrollment")
-	errAlreadyEnrolled     = errors.New("already_enrolled")
-	errTrustReplacement    = errors.New("trust_replacement_rejected")
-	errGrantMismatch       = errors.New("grant_mismatch")
-	errBootstrapRejected   = errors.New("bootstrap_rejected")
-	errIdentityExpired     = errors.New("identity_expired")
-	errRenewalNotDue       = errors.New("renewal_not_due")
-	errRenewalPending      = errors.New("renewal_pending")
-	errSessionPending      = errors.New("session_pending")
-	errSessionRequired     = errors.New("session_required")
-	errEpochRejected       = errors.New("epoch_rejected")
-	errCertificateRejected = errors.New("certificate_rejected")
-	errSigningRejected     = errors.New("signing_rejected")
-	errIdempotencyConflict = errors.New("idempotency_conflict")
-	errNotPending          = errors.New("not_pending")
-	errInvalid             = errors.New("invalid_request")
-	errInternal            = errors.New("internal")
+	errRecoveryHold           = errors.New("recovery_hold")
+	errUnprovisioned          = errors.New("unprovisioned")
+	errPendingEnrollment      = errors.New("pending_enrollment")
+	errAlreadyEnrolled        = errors.New("already_enrolled")
+	errTrustReplacement       = errors.New("trust_replacement_rejected")
+	errExecutionTrustRejected = errors.New("execution_trust_rejected")
+	errGrantMismatch          = errors.New("grant_mismatch")
+	errBootstrapRejected      = errors.New("bootstrap_rejected")
+	errIdentityExpired        = errors.New("identity_expired")
+	errRenewalNotDue          = errors.New("renewal_not_due")
+	errRenewalPending         = errors.New("renewal_pending")
+	errSessionPending         = errors.New("session_pending")
+	errSessionRequired        = errors.New("session_required")
+	errEpochRejected          = errors.New("epoch_rejected")
+	errCertificateRejected    = errors.New("certificate_rejected")
+	errSigningRejected        = errors.New("signing_rejected")
+	errIdempotencyConflict    = errors.New("idempotency_conflict")
+	errNotPending             = errors.New("not_pending")
+	errInvalid                = errors.New("invalid_request")
+	errInternal               = errors.New("internal")
 )
 
 // Option configures process-local test seams. RPC callers cannot set them.
@@ -144,7 +145,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.GetConnectionRequest{}, &agentv1.SignTLSClientMessageRequest{},
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
-		&agentv1.StatusRequest{},
+		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.StatusRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err
@@ -249,6 +250,12 @@ func (s *Service) load(ctx context.Context) (*bound, error) {
 		s.hold = true
 		s.holdReason = agentv1.HoldReason_HOLD_REASON_IDENTITY_BINDING
 		return nil, errRecoveryHold
+	}
+	if err := bindExecutionTrust(ctx, s.authority, s.store, loaded); err != nil {
+		if errors.Is(err, errRecoveryHold) {
+			s.noteTrustDamage()
+		}
+		return nil, err
 	}
 	if loaded.prior != nil && !now.Before(loaded.prior.retain) {
 		// Validate all bindings before retirement, then durably remove the old
@@ -391,6 +398,8 @@ func mapError(err error) error {
 		code, reason = connect.CodeFailedPrecondition, "trust_replacement_rejected"
 	case errors.Is(err, errGrantMismatch), errors.Is(err, errInvalid), errors.Is(err, errBootstrapRejected), errors.Is(err, errCertificateRejected):
 		code, reason = connect.CodeInvalidArgument, reasonOf(err)
+	case errors.Is(err, errExecutionTrustRejected):
+		code, reason = connect.CodePermissionDenied, "execution_trust_rejected"
 	case errors.Is(err, errIdentityExpired), errors.Is(err, errRenewalNotDue), errors.Is(err, errRenewalPending), errors.Is(err, errSessionPending), errors.Is(err, errSessionRequired), errors.Is(err, errEpochRejected), errors.Is(err, errNotPending):
 		code, reason = connect.CodeFailedPrecondition, reasonOf(err)
 	case errors.Is(err, errSigningRejected):
@@ -411,6 +420,8 @@ func reasonOf(err error) string {
 		return "bootstrap_rejected"
 	case errors.Is(err, errCertificateRejected):
 		return "certificate_rejected"
+	case errors.Is(err, errExecutionTrustRejected):
+		return "execution_trust_rejected"
 	case errors.Is(err, errIdentityExpired):
 		return "identity_expired"
 	case errors.Is(err, errRenewalNotDue):

@@ -28,12 +28,13 @@ import (
 )
 
 type fixture struct {
-	root   []byte
-	bundle []byte
-	ca     *x509.Certificate
-	caKey  ed25519.PrivateKey
-	now    time.Time
-	deploy uuid.UUID
+	root    []byte
+	bundle  []byte
+	ca      *x509.Certificate
+	caKey   ed25519.PrivateKey
+	rootKey ed25519.PrivateKey
+	now     time.Time
+	deploy  uuid.UUID
 }
 
 func newFixture(t *testing.T, now time.Time) fixture {
@@ -71,7 +72,7 @@ func newFixture(t *testing.T, now time.Time) fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fixture{root: rootJSON, bundle: envelope, ca: ca, caKey: caKey, now: now, deploy: deployment}
+	return fixture{root: rootJSON, bundle: envelope, ca: ca, caKey: caKey, rootKey: key, now: now, deploy: deployment}
 }
 
 func (f fixture) leaf(t *testing.T, pub ed25519.PublicKey, device, generation uuid.UUID, notBefore, notAfter time.Time) []byte {

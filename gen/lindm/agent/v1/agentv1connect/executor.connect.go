@@ -57,6 +57,9 @@ const (
 	// ExecutorServiceCommitRenewalProcedure is the fully-qualified name of the ExecutorService's
 	// CommitRenewal RPC.
 	ExecutorServiceCommitRenewalProcedure = "/lindm.agent.v1.ExecutorService/CommitRenewal"
+	// ExecutorServiceUpdateExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
+	// UpdateExecutionTrust RPC.
+	ExecutorServiceUpdateExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/UpdateExecutionTrust"
 	// ExecutorServiceStatusProcedure is the fully-qualified name of the ExecutorService's Status RPC.
 	ExecutorServiceStatusProcedure = "/lindm.agent.v1.ExecutorService/Status"
 )
@@ -94,6 +97,10 @@ type ExecutorServiceClient interface {
 	// CommitRenewal installs a certificate that matches the pending next key
 	// and pinned identity before acknowledgment.
 	CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error)
+	// UpdateExecutionTrust verifies both rotation quorums and root-signed online
+	// delegation, then durably commits rollback fences before acknowledgment.
+	// This never starts work or accepts caller-selected verification keys.
+	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -158,6 +165,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("CommitRenewal")),
 			connect.WithClientOptions(opts...),
 		),
+		updateExecutionTrust: connect.NewClient[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse](
+			httpClient,
+			baseURL+ExecutorServiceUpdateExecutionTrustProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1.StatusRequest, v1.StatusResponse](
 			httpClient,
 			baseURL+ExecutorServiceStatusProcedure,
@@ -177,6 +190,7 @@ type executorServiceClient struct {
 	commitSession        *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
 	prepareRenewal       *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
 	commitRenewal        *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
+	updateExecutionTrust *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
 	status               *connect.Client[v1.StatusRequest, v1.StatusResponse]
 }
 
@@ -220,6 +234,11 @@ func (c *executorServiceClient) CommitRenewal(ctx context.Context, req *connect.
 	return c.commitRenewal.CallUnary(ctx, req)
 }
 
+// UpdateExecutionTrust calls lindm.agent.v1.ExecutorService.UpdateExecutionTrust.
+func (c *executorServiceClient) UpdateExecutionTrust(ctx context.Context, req *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {
+	return c.updateExecutionTrust.CallUnary(ctx, req)
+}
+
 // Status calls lindm.agent.v1.ExecutorService.Status.
 func (c *executorServiceClient) Status(ctx context.Context, req *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -258,6 +277,10 @@ type ExecutorServiceHandler interface {
 	// CommitRenewal installs a certificate that matches the pending next key
 	// and pinned identity before acknowledgment.
 	CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error)
+	// UpdateExecutionTrust verifies both rotation quorums and root-signed online
+	// delegation, then durably commits rollback fences before acknowledgment.
+	// This never starts work or accepts caller-selected verification keys.
+	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -318,6 +341,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("CommitRenewal")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceUpdateExecutionTrustHandler := connect.NewUnaryHandler(
+		ExecutorServiceUpdateExecutionTrustProcedure,
+		svc.UpdateExecutionTrust,
+		connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServiceStatusHandler := connect.NewUnaryHandler(
 		ExecutorServiceStatusProcedure,
 		svc.Status,
@@ -342,6 +371,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServicePrepareRenewalHandler.ServeHTTP(w, r)
 		case ExecutorServiceCommitRenewalProcedure:
 			executorServiceCommitRenewalHandler.ServeHTTP(w, r)
+		case ExecutorServiceUpdateExecutionTrustProcedure:
+			executorServiceUpdateExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServiceStatusProcedure:
 			executorServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -383,6 +414,10 @@ func (UnimplementedExecutorServiceHandler) PrepareRenewal(context.Context, *conn
 
 func (UnimplementedExecutorServiceHandler) CommitRenewal(context.Context, *connect.Request[v1.CommitRenewalRequest]) (*connect.Response[v1.CommitRenewalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.CommitRenewal is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.UpdateExecutionTrust is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {

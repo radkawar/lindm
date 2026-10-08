@@ -247,6 +247,108 @@ func (x *NetworkBoundaryEvidence) GetPassedBoundaries() []NetworkBoundary {
 	return nil
 }
 
+// Public TLS identity and pin hashes, excluding changing session/boot fields and
+// all retrieval proofs. Used to compare native trust-update non-interference.
+type ConnectionIdentityEvidence struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId         string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	DeviceId             string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	EnrollmentGeneration string                 `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
+	EnrollmentOrigin     string                 `protobuf:"bytes,4,opt,name=enrollment_origin,json=enrollmentOrigin,proto3" json:"enrollment_origin,omitempty"`
+	DeviceOrigin         string                 `protobuf:"bytes,5,opt,name=device_origin,json=deviceOrigin,proto3" json:"device_origin,omitempty"`
+	TransportCaSha256    []byte                 `protobuf:"bytes,6,opt,name=transport_ca_sha256,json=transportCaSha256,proto3" json:"transport_ca_sha256,omitempty"`
+	CertificateSha256    []byte                 `protobuf:"bytes,7,opt,name=certificate_sha256,json=certificateSha256,proto3" json:"certificate_sha256,omitempty"`
+	KeyId                string                 `protobuf:"bytes,8,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ConnectionIdentityEvidence) Reset() {
+	*x = ConnectionIdentityEvidence{}
+	mi := &file_lindm_lab_v1_agent_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectionIdentityEvidence) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectionIdentityEvidence) ProtoMessage() {}
+
+func (x *ConnectionIdentityEvidence) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_lab_v1_agent_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectionIdentityEvidence.ProtoReflect.Descriptor instead.
+func (*ConnectionIdentityEvidence) Descriptor() ([]byte, []int) {
+	return file_lindm_lab_v1_agent_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConnectionIdentityEvidence) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *ConnectionIdentityEvidence) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ConnectionIdentityEvidence) GetEnrollmentGeneration() string {
+	if x != nil {
+		return x.EnrollmentGeneration
+	}
+	return ""
+}
+
+func (x *ConnectionIdentityEvidence) GetEnrollmentOrigin() string {
+	if x != nil {
+		return x.EnrollmentOrigin
+	}
+	return ""
+}
+
+func (x *ConnectionIdentityEvidence) GetDeviceOrigin() string {
+	if x != nil {
+		return x.DeviceOrigin
+	}
+	return ""
+}
+
+func (x *ConnectionIdentityEvidence) GetTransportCaSha256() []byte {
+	if x != nil {
+		return x.TransportCaSha256
+	}
+	return nil
+}
+
+func (x *ConnectionIdentityEvidence) GetCertificateSha256() []byte {
+	if x != nil {
+		return x.CertificateSha256
+	}
+	return nil
+}
+
+func (x *ConnectionIdentityEvidence) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_agent_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_agent_proto_rawDesc = "" +
@@ -262,7 +364,16 @@ const file_lindm_lab_v1_agent_proto_rawDesc = "" +
 	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\x12c\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x14enrollmentGeneration\x126\n" +
 	"\x12certificate_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\x12a\n" +
-	"\x11passed_boundaries\x18\x04 \x03(\x0e2\x1d.lindm.lab.v1.NetworkBoundaryB\x15\xbaH\x12\x92\x01\x0f\b\v\x10\v\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x10passedBoundaries*\xbe\x04\n" +
+	"\x11passed_boundaries\x18\x04 \x03(\x0e2\x1d.lindm.lab.v1.NetworkBoundaryB\x15\xbaH\x12\x92\x01\x0f\b\v\x10\v\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x10passedBoundaries\"\xbc\x03\n" +
+	"\x1aConnectionIdentityEvidence\x12-\n" +
+	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
+	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
+	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x128\n" +
+	"\x11enrollment_origin\x18\x04 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\x10enrollmentOrigin\x120\n" +
+	"\rdevice_origin\x18\x05 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\fdeviceOrigin\x127\n" +
+	"\x13transport_ca_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x11transportCaSha256\x126\n" +
+	"\x12certificate_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\x12,\n" +
+	"\x06key_id\x18\b \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x05keyId*\xbe\x04\n" +
 	"\x0fNetworkBoundary\x12 \n" +
 	"\x1cNETWORK_BOUNDARY_UNSPECIFIED\x10\x00\x12/\n" +
 	"+NETWORK_BOUNDARY_EXECUTOR_STATE_READ_DENIED\x10\x01\x121\n" +
@@ -291,15 +402,16 @@ func file_lindm_lab_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_lab_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_lab_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_lindm_lab_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lindm_lab_v1_agent_proto_goTypes = []any{
 	(NetworkBoundary)(0),                 // 0: lindm.lab.v1.NetworkBoundary
 	(*InterruptedBootstrapEvidence)(nil), // 1: lindm.lab.v1.InterruptedBootstrapEvidence
 	(*NetworkBoundaryEvidence)(nil),      // 2: lindm.lab.v1.NetworkBoundaryEvidence
-	(*timestamppb.Timestamp)(nil),        // 3: google.protobuf.Timestamp
+	(*ConnectionIdentityEvidence)(nil),   // 3: lindm.lab.v1.ConnectionIdentityEvidence
+	(*timestamppb.Timestamp)(nil),        // 4: google.protobuf.Timestamp
 }
 var file_lindm_lab_v1_agent_proto_depIdxs = []int32{
-	3, // 0: lindm.lab.v1.InterruptedBootstrapEvidence.certificate_not_after:type_name -> google.protobuf.Timestamp
+	4, // 0: lindm.lab.v1.InterruptedBootstrapEvidence.certificate_not_after:type_name -> google.protobuf.Timestamp
 	0, // 1: lindm.lab.v1.NetworkBoundaryEvidence.passed_boundaries:type_name -> lindm.lab.v1.NetworkBoundary
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
@@ -319,7 +431,7 @@ func file_lindm_lab_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_lab_v1_agent_proto_rawDesc), len(file_lindm_lab_v1_agent_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

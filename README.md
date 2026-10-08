@@ -105,6 +105,10 @@ and a separate `lindm` network service. Root-only `bootstrap` and `resume` use
 network account. `status` combines protected executor state with explicitly
 unprivileged transport diagnostics; it does not assert online presence or
 compliance. Removal and purge retain identity and inventory state, never reset it.
+`trust-update -file FILE` relays signed execution-root rotations and online
+delegations through the protected executor; it never starts work or replaces TLS
+pins. The native lifecycle lane's `-execution-trust` option exercises this command
+and retained rollback fences across upgrade, reboot and reinstall.
 See the [agent contract](docs/agent-enrollment.md) for ownership, recovery and
 native laboratory commands.
 

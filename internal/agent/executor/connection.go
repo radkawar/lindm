@@ -200,5 +200,11 @@ func Inspect(ctx context.Context, directory string) (*agentv1.StatusResponse, er
 		}
 		return describe(nil, time.Now(), true, agentv1.HoldReason_HOLD_REASON_IDENTITY_BINDING), nil
 	}
+	if err := bindExecutionTrust(ctx, authority, store, loaded); err != nil {
+		if errors.Is(err, errRecoveryHold) {
+			return describe(nil, time.Now(), true, agentv1.HoldReason_HOLD_REASON_INCOMPLETE_OR_CORRUPT), nil
+		}
+		return nil, err
+	}
 	return describe(loaded, time.Now().UTC(), false, agentv1.HoldReason_HOLD_REASON_NONE), nil
 }

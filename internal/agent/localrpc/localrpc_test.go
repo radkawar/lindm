@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
@@ -47,6 +48,10 @@ func (h *recordingHandler) PrepareRenewal(context.Context, *connect.Request[agen
 func (h *recordingHandler) CommitRenewal(context.Context, *connect.Request[agentv1.CommitRenewalRequest]) (*connect.Response[agentv1.CommitRenewalResponse], error) {
 	return connect.NewResponse(&agentv1.CommitRenewalResponse{}), nil
 }
+func (h *recordingHandler) UpdateExecutionTrust(ctx context.Context, _ *connect.Request[agentv1.UpdateExecutionTrustRequest]) (*connect.Response[agentv1.UpdateExecutionTrustResponse], error) {
+	h.capture(ctx)
+	return connect.NewResponse(&agentv1.UpdateExecutionTrustResponse{RootVersion: 1, DelegationVersion: 1, ExpiresAt: timestamppb.New(time.Unix(1, 0).UTC())}), nil
+}
 func (h *recordingHandler) Status(ctx context.Context, _ *connect.Request[agentv1.StatusRequest]) (*connect.Response[agentv1.StatusResponse], error) {
 	h.capture(ctx)
 	return connect.NewResponse(&agentv1.StatusResponse{}), nil
@@ -65,6 +70,21 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	}
 	if err := authorize(agentv1connect.ExecutorServicePrepareBootstrapProcedure, 0, 40); err != nil {
 		t.Fatalf("root was denied: %v", err)
+	}
+	if err := authorize(agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure, 40, 40); err != nil {
+		t.Fatal(err)
+	}
+	if err := authorize(agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure, 0, 40); err != nil {
+		t.Fatalf("root was denied execution trust relay: %v", err)
+	}
+	if err := authorize(agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure, 50, 40); err == nil {
+		t.Fatal("wrong local UID was authorized to relay execution trust")
+	}
+	if err := authorize(agentv1connect.ExecutorServiceInstallEnrollmentProcedure, 40, 40); err == nil {
+		t.Fatal("network UID was authorized for enrollment")
+	}
+	if err := authorize("/lindm.agent.v1.ExecutorService/NotAMethod", 0, 40); err == nil {
+		t.Fatal("unknown procedure was authorized")
 	}
 }
 
@@ -98,6 +118,9 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	}
 	if !handler.ok || handler.uid != uint32(os.Getuid()) {
 		t.Fatalf("SO_PEERCRED uid = %d ok=%v, want %d", handler.uid, handler.ok, os.Getuid())
+	}
+	if _, err := client.UpdateExecutionTrust(t.Context(), connect.NewRequest(&agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: []byte{1}})); err != nil {
+		t.Fatalf("admitted UID was denied execution trust relay: %v", err)
 	}
 	if os.Geteuid() != 0 {
 		if _, err := client.PrepareBootstrap(t.Context(), connect.NewRequest(&agentv1.PrepareBootstrapRequest{Resume: true})); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -161,6 +184,9 @@ func TestWrongUIDIsDeniedOnSocket(t *testing.T) {
 	defer func() { _ = cleanup() }()
 	if _, err := client.Status(t.Context(), connect.NewRequest(&agentv1.StatusRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("wrong local UID was accepted: %v", err)
+	}
+	if _, err := client.UpdateExecutionTrust(t.Context(), connect.NewRequest(&agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: []byte{1}})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("wrong local UID relayed execution trust: %v", err)
 	}
 }
 

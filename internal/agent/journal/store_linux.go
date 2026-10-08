@@ -1,5 +1,6 @@
-// Package journal owns the executor's protected, single-writer authority state.
-// Opening a damaged or incomplete installation never recreates it.
+// Package journal owns the executor's protected, single-writer authority state
+// and execution-trust record. Opening a damaged or incomplete installation
+// never recreates it.
 package journal
 
 import (
@@ -28,10 +29,13 @@ import (
 )
 
 const (
-	markerName        = "installation"
-	databaseName      = "journal.sqlite"
-	maximumStateBytes = 1 << 20
-	applicationID     = 1279872580
+	markerName         = "installation"
+	databaseName       = "journal.sqlite"
+	maximumStateBytes  = 1 << 20
+	maximumTrustBytes  = 128 << 10
+	applicationID      = 1279872580
+	priorSchemaVersion = 1
+	schemaVersion      = 2
 )
 
 var (
@@ -39,6 +43,9 @@ var (
 	ErrRecoveryHold  = errors.New("executor state requires recovery")
 	ErrAlreadyOpen   = errors.New("executor state already has an owner")
 	ErrConflict      = errors.New("executor journal revision changed")
+	// ErrTrustRejected is a caller fence or proposed-state rejection. The stored
+	// trust row is unchanged and this is not device damage.
+	ErrTrustRejected = errors.New("execution trust transition rejected")
 	ErrClosed        = errors.New("executor journal is closed")
 )
 
@@ -47,8 +54,10 @@ var schema string
 
 // Store retains its directory lock until Close. Locked entrypoints share the
 // caller's lock ownership, so closing the Store does not release that caller's
-// descriptor. Callers enforce root-only initialization and cryptographic/transition
-// validation before Update. No method includes serialized state in an error.
+// descriptor. Callers enforce root-only initialization and cryptographic
+// validation before Update. UpdateExecutionTrust enforces trust-row rollback
+// fences; cryptographic verification still belongs to the executor. No method
+// includes serialized state in an error.
 type Store struct {
 	mu             sync.Mutex
 	dir            *os.File
@@ -110,9 +119,9 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}), protovalidate.WithDisableLazy())
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}), protovalidate.WithDisableLazy())
 	if err != nil {
-		return nil, fmt.Errorf("compile executor state schema: %w", err)
+		return nil, fmt.Errorf("compile executor journal schema: %w", err)
 	}
 	fd, err := openDirectory(directory, locked)
 	if err != nil {
@@ -153,6 +162,10 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err != nil {
 			return nil, err
 		}
+		trustEncoded, err := s.encodeTrust(unconfiguredExecutionTrust(s.installationID))
+		if err != nil {
+			return nil, err
+		}
 		if err := s.createFile(markerName, []byte(s.installationID+"\n")); err != nil {
 			return nil, err
 		}
@@ -178,6 +191,9 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err := s.queries.WithTx(tx).InitializeState(ctx, encoded); err != nil {
 			return nil, errors.New("initialize executor state failed")
 		}
+		if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, trustEncoded); err != nil {
+			return nil, errors.New("initialize execution trust failed")
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, errors.New("commit executor initialization failed")
 		}
@@ -199,7 +215,13 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := s.verifyDatabase(ctx); err != nil {
 		return nil, err
 	}
+	if err := s.migrateSchema(ctx); err != nil {
+		return nil, err
+	}
 	if _, _, err := s.Load(ctx); err != nil {
+		return nil, err
+	}
+	if _, _, err := s.LoadExecutionTrust(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -246,8 +268,8 @@ func (s *Store) connect(ctx context.Context) error {
 		return err
 	}
 	s.queries = journaldb.New(db)
-	// sqlc does not emit PRAGMA statements. These fixed connection/database
-	// metadata checks are the only handwritten queries; state DML is generated.
+	// sqlc does not emit PRAGMA statements. Connection metadata and migration
+	// DDL are the only handwritten SQL; state DML is generated.
 	var journalMode string
 	var synchronous int
 	if err := db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journalMode); err != nil {
@@ -274,7 +296,7 @@ func (s *Store) verifyDatabase(ctx context.Context) error {
 	if err := s.db.QueryRowContext(ctx, "PRAGMA quick_check(1)").Scan(&integrity); err != nil {
 		return stateReadError(ctx)
 	}
-	if version != 1 || id != applicationID || integrity != "ok" {
+	if (version != priorSchemaVersion && version != schemaVersion) || id != applicationID || integrity != "ok" {
 		return ErrRecoveryHold
 	}
 	return nil
@@ -291,17 +313,25 @@ func (s *Store) Load(ctx context.Context) (*agentv1.ExecutorJournalState, int64,
 	if err != nil {
 		return nil, 0, stateReadError(ctx)
 	}
-	if row.Revision < 1 || len(row.State) > maximumStateBytes {
-		return nil, 0, ErrRecoveryHold
-	}
-	state := new(agentv1.ExecutorJournalState)
-	if err := proto.Unmarshal(row.State, state); err != nil {
-		return nil, 0, ErrRecoveryHold
-	}
-	if err := s.validate(state); err != nil {
-		return nil, 0, ErrRecoveryHold
+	state, err := s.decodeAuthority(row.Revision, row.State)
+	if err != nil {
+		return nil, 0, err
 	}
 	return state, row.Revision, nil
+}
+
+func (s *Store) decodeAuthority(revision int64, encoded []byte) (*agentv1.ExecutorJournalState, error) {
+	if revision < 1 || len(encoded) == 0 || len(encoded) > maximumStateBytes {
+		return nil, ErrRecoveryHold
+	}
+	state := new(agentv1.ExecutorJournalState)
+	if err := proto.Unmarshal(encoded, state); err != nil {
+		return nil, ErrRecoveryHold
+	}
+	if err := s.validate(state); err != nil {
+		return nil, ErrRecoveryHold
+	}
+	return state, nil
 }
 
 // Update commits a complete validated state at the caller's expected revision.

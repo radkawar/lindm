@@ -45,6 +45,7 @@ export const ExecutionKeySchema: GenMessage<ExecutionKey> = /*@__PURE__*/
 /**
  * The initial root is supplied through an authenticated out-of-band channel.
  * It is not accepted because it was served by the enrollment endpoint.
+ * Rotations sign this message using the execution-root DSSE domain.
  *
  * @generated from message lindm.agent.v1.ExecutionRoot
  */

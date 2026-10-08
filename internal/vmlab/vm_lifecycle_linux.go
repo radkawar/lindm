@@ -34,6 +34,9 @@ type VMLifecycleOptions struct {
 	PublicKey         string
 	SignerFingerprint string
 	Rejections        []packaging.RejectionCase
+	// Exercises real signed trust installation/rotation after upgrade. The
+	// second package must implement execution trust; the first may use journal v1.
+	ExecutionTrust bool
 	// Optional bounded observation time after the first two publications lets
 	// a human inspect the actual console without changing product timers.
 	ObserveFor time.Duration
@@ -59,6 +62,7 @@ type VMLifecycleResult struct {
 	FailedAttempt            *vmInventoryEvidence           `json:"failed_attempt"`
 	RejectedArtifacts        []string                       `json:"rejected_artifacts"`
 	PrivilegeEvidence        *labv1.NetworkBoundaryEvidence `json:"privilege_evidence"`
+	ExecutionTrust           *vmExecutionTrustEvidence      `json:"execution_trust,omitempty"`
 	LostIssuanceRecovered    bool                           `json:"lost_issuance_recovered"`
 	PurgeRetainedIdentity    bool                           `json:"purge_retained_identity"`
 	SpoolCorruptionRecovered bool                           `json:"spool_corruption_recovered"`
@@ -256,6 +260,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := lifecycleProgress(ctx, options, "upgraded", upgraded, true); err != nil {
 		return nil, err
 	}
+	if options.ExecutionTrust {
+		result.ExecutionTrust, err = exerciseVMExecutionTrust(ctx, packages, options.Repository)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if err := closeLifecycleForwards(forwards); err != nil {
 		return nil, err
@@ -281,6 +291,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
+	}
+	if result.ExecutionTrust != nil {
+		if err := verifyRetainedVMExecutionTrust(ctx, vm, result.ExecutionTrust); err != nil {
+			return nil, err
+		}
+		result.ExecutionTrust.RebootRetained = true
 	}
 	if err := lifecycleCommand(ctx, vm, "synchronize after reboot", "systemctl restart lindm-agent.service"); err != nil {
 		return nil, err
@@ -317,6 +333,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
+	}
+	if result.ExecutionTrust != nil {
+		if err := verifyRetainedVMExecutionTrust(ctx, vm, result.ExecutionTrust); err != nil {
+			return nil, err
+		}
+		result.ExecutionTrust.ReinstallRetained = true
 	}
 	reinstalled, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, rebooted)
 	if err != nil {

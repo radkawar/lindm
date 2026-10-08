@@ -264,6 +264,39 @@ pauses. Executor, spool, snapshot, console and native-signing corrective reviews
 additional actionable findings in their assigned scopes. These are scoped reviews,
 not whole-product security certification.
 
+### Signed execution-trust integration reviews
+
+Independent reviews covered dual-quorum cryptography, journal migration, executor
+acceptance and native proof. Corrections addressed the following observed failures:
+
+- Journal migration assertions initially unpacked the stored revision/blob in the
+  wrong order. The integration run also exposed invalid unsigned/integer CEL
+  comparisons in the new trust-state completeness rule. Corrected generation and
+  journal/executor race suites pass.
+- Schema-valid damage to a stored delegation counter was detected only on trust
+  update. A failing-before regression showed live/offline status and restarted
+  credential access incorrectly returning to enrolled state. Shared historical
+  reconstruction now runs before status, credential access and mutations, including
+  startup and offline inspection. The corrected regression also preserves ordinary
+  expired-trust status without treating expiry as corruption.
+- Native negatives now isolate delegation-version and recovery-epoch fences using
+  current-root signatures, rather than failing old-root authentication first.
+  Retention checks also reject the exact preceding accepted rotation before
+  replaying the final revocation receipt, preventing silent repair from passing as
+  persistence. Public TLS identity and transport pins are compared independently.
+- Both initial native runs rejected the positive trust fixture. A real-fixture
+  verifier smoke reproduced rejection when the checking clock lagged generation
+  by one second. Fixture signatures now deliberately overlap by one minute within
+  root validity; executor time checks are unchanged. Earlier guest clocks were not
+  recorded, so clock skew is not retrospectively proven as their cause. The
+  corrected Ubuntu and Fedora runs passed the complete lifecycle and record
+  guest/host UTC. Both retained the final trust revocation and unchanged TLS pins
+  across reboot and reinstall.
+
+The four scoped reviews, including corrective follow-ups, returned no remaining
+actionable findings. `make check` and `make test-integration build` passed.
+Both native execution-trust lanes passed; broader G3 policy execution remains open.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

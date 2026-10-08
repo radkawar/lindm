@@ -65,3 +65,22 @@ message NetworkBoundaryEvidence {
     }
   }];
 }
+
+// Public TLS identity and pin hashes, excluding changing session/boot fields and
+// all retrieval proofs. Used to compare native trust-update non-interference.
+message ConnectionIdentityEvidence {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string enrollment_origin = 4 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+  }];
+  string device_origin = 5 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+  }];
+  bytes transport_ca_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  bytes certificate_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  string key_id = 8 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+}

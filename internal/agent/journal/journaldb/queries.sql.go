@@ -9,6 +9,15 @@ import (
 	"context"
 )
 
+const initializeExecutionTrust = `-- name: InitializeExecutionTrust :exec
+INSERT INTO execution_trust (id, revision, state) VALUES (1, 1, ?)
+`
+
+func (q *Queries) InitializeExecutionTrust(ctx context.Context, state []byte) error {
+	_, err := q.db.ExecContext(ctx, initializeExecutionTrust, state)
+	return err
+}
+
 const initializeState = `-- name: InitializeState :exec
 INSERT INTO executor_state (id, revision, state) VALUES (1, 1, ?)
 `
@@ -16,6 +25,22 @@ INSERT INTO executor_state (id, revision, state) VALUES (1, 1, ?)
 func (q *Queries) InitializeState(ctx context.Context, state []byte) error {
 	_, err := q.db.ExecContext(ctx, initializeState, state)
 	return err
+}
+
+const readExecutionTrust = `-- name: ReadExecutionTrust :one
+SELECT revision, state FROM execution_trust WHERE id = 1
+`
+
+type ReadExecutionTrustRow struct {
+	Revision int64
+	State    []byte
+}
+
+func (q *Queries) ReadExecutionTrust(ctx context.Context) (ReadExecutionTrustRow, error) {
+	row := q.db.QueryRowContext(ctx, readExecutionTrust)
+	var i ReadExecutionTrustRow
+	err := row.Scan(&i.Revision, &i.State)
+	return i, err
 }
 
 const readState = `-- name: ReadState :one
@@ -32,6 +57,23 @@ func (q *Queries) ReadState(ctx context.Context) (ReadStateRow, error) {
 	var i ReadStateRow
 	err := row.Scan(&i.Revision, &i.State)
 	return i, err
+}
+
+const replaceExecutionTrust = `-- name: ReplaceExecutionTrust :execrows
+UPDATE execution_trust SET revision = revision + 1, state = ? WHERE id = 1 AND revision = ?
+`
+
+type ReplaceExecutionTrustParams struct {
+	State    []byte
+	Revision int64
+}
+
+func (q *Queries) ReplaceExecutionTrust(ctx context.Context, arg ReplaceExecutionTrustParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceExecutionTrust, arg.State, arg.Revision)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const replaceState = `-- name: ReplaceState :execrows

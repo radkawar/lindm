@@ -24,6 +24,7 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent bootstrap -root FILE -bundle FILE -grant FILE
        lindm-agent resume
        lindm-agent status
+       lindm-agent trust-update -file FILE
        lindm-agent version
        lindm-agent help
 
@@ -35,6 +36,9 @@ returns a nonzero exit code. No enrollment, service, or lifecycle claim is made.
 verify-bootstrap validates bootstrap trust material without enrolling a device.
 executor, bootstrap, resume, and status use /etc/lindm/executor.json.
 run uses /etc/lindm/agent.json as the configured unprivileged network account.
+trust-update relays signed execution trust through the root-authenticated socket
+using /etc/lindm/agent.json. Only root or the configured network UID may submit it.
+It never changes TLS enrollment pins or starts an operation.
 version prints the packaging version and a newline.
 `
 
@@ -64,6 +68,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return resumeCommand(ctx, args[1:])
 	case "status":
 		return statusCommand(ctx, args[1:], output)
+	case "trust-update":
+		return executionTrustCommand(ctx, args[1:], output)
 	case "version":
 		return versionCommand(args[1:], output)
 	case "help", "--help", "-h":

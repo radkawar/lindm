@@ -80,6 +80,7 @@ func (x *ExecutionKey) GetPublicKey() []byte {
 
 // The initial root is supplied through an authenticated out-of-band channel.
 // It is not accepted because it was served by the enrollment endpoint.
+// Rotations sign this message using the execution-root DSSE domain.
 type ExecutionRoot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId  string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`

@@ -1,17 +1,17 @@
 # Packaged agent and native enrollment contract
 
-Status: G2 implementation and qualification in progress. G1 commits `19dce6d` and
-`2a33788` provide the authenticated control plane; subsequent slices implement native
-inspection, trust verification and protected server authority, not a shipped enrolled
-agent. This document refines [architecture](architecture.md) and
+Status: G2 internal qualification is complete (`cb97712`); G3 execution-trust
+installation and rotation extend that packaged agent. The evidence ledger records
+the exercised native runs and remaining gates. This is not a production-release
+claim. This document refines [architecture](architecture.md) and
 [verification](verification.md); it does not reduce the confirmed launch matrix or
 replace its desktop/physical acceptance.
 
 ## 1. Process and source boundaries
 
 Build `cmd/lindm-agent` separately from `cmd/lindmd`. The agent executable has
-`executor`, `run`, `bootstrap` and `status` commands. Do not add an unimplemented
-session command; real per-user session behavior belongs to G4.
+`executor`, `run`, `bootstrap`, `resume`, `status` and `trust-update` commands, plus
+standalone inspection/verification. Real per-user session behavior belongs to G4.
 
 - `executor`: root-owned Unix listener; owns sensitive identity keys, execution
   trust and journal. No TCP listener and no general command/file/signing RPC.
@@ -23,6 +23,11 @@ session command; real per-user session behavior belongs to G4.
   local RPC. The bearer grant is not handed to the long-running network process.
 - `status`: reports durable lifecycle state and reasons, not secrets. Separate
   enrollment state, transport reachability and observation freshness.
+- `trust-update -file FILE`: relays a bounded protobuf-JSON
+  `UpdateExecutionTrustRequest` through the root-authenticated socket using
+  `/etc/lindm/agent.json`. Root or the configured network UID may relay signed
+  documents, not select trusted keys. This command never starts policy work or
+  changes TLS enrollment pins.
 
 Keep implementation under cohesive `internal/agent` packages for local journal,
 executor, transport and native observation. Shared certificate/trust contracts belong
@@ -82,12 +87,49 @@ SQLite initialization and pending enrollment with full durability. Certificate
 installation commits before acknowledgment; marker finalization is an idempotent
 later step. Marker-only, database-only, mismatched UUIDs or corrupt state enter
 recovery hold. An explicit root-only provisioning-resume path may finish a known
-interrupted initialization; the network UID has no initialize/reset/trust-import
-method. Both absent means unprovisioned, not permission for the daemon to enroll.
+interrupted initialization; the network UID has no initialize/reset/unsigned
+trust-import method. Both absent means unprovisioned, not permission for the daemon
+to enroll.
 
 Software keys are reported as software keys. No TPM assurance is inferred from a
 machine having `/dev/tpm*`; TPM/non-exportability claims require their separate
 provider and physical qualification.
+
+### Execution-trust updates
+
+`execution_trust.proto` defines separate old/new quorum envelopes for each
+consecutive execution-root replacement and a current-root-signed online delegation.
+The independent envelopes support disjoint sixteen-key quorums. Delegations bind
+deployment/root version, deployment-global delegation version, validity, minimum
+recovery epoch and exact versioned capabilities for separate plan/start roles.
+Empty delegates revoke all online execution signers. Current root, TLS-CA and
+release keys cannot become online execution delegates.
+
+The protected SQLite schema migrates from version 1 to 2 transactionally after
+validating the existing authority. It preserves the original identity blob and
+revision and adds a separately revisioned execution-trust singleton. Missing or
+damaged version-2 trust is recovery hold, not an empty replacement. The executor
+verifies complete root/delegation proposals before one durable commit and
+acknowledgment. Wrong quorum, delegation rollback and recovery-floor regression
+return `permission_denied` with `Lindm-Reason: execution_trust_rejected`, without
+changing accepted authority or putting a healthy installation in recovery hold.
+
+Only an exact retry of the last accepted request returns its original receipt.
+It cannot extend expiry or reset counters. Startup, runtime loading and offline
+inspection reconstruct accepted trust at its recorded acceptance time: ordinary
+expiration is not corruption, but a signed-payload/counter mismatch remains held
+across restart. A local clock regression blocks new acceptance, not reconstruction
+of a historical receipt.
+
+The maintained `lab vm lifecycle -execution-trust` lane exercises the installed
+CLI as the network UID after upgrade. Use a genuine schema-version-1 first package
+and the new second package to qualify migration. It rejects a wrong quorum and
+independently root-signed delegation/recovery rollback proposals, rotates roots,
+revokes delegates and compares public TLS identity/pins. After reboot and
+remove/reinstall it first rejects the previously accepted rotation, then replays
+the final receipt; this detects lost revocation instead of silently reinstalling
+it. Disposable fixture signatures have a one-minute validity overlap, clamped to
+the root's validity. Product time checks remain strict.
 
 ## 3. Device key use and renewal
 
