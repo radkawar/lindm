@@ -5,10 +5,10 @@ single-tenant, connected and air-gapped.
 
 **Internal control-plane gate verified; not a production-ready MDM.** The Go
 server and authenticated React console run against real PostgreSQL and Keycloak.
-The separate root executor and unprivileged network agent implement packaged
-enrollment and inventory. Native management and commercial release gates remain
-open. No distro, capacity or destructive capability is certified. The full
-specification remains the delivery contract.
+The root executor and unprivileged agent implement packaged enrollment/inventory
+and signed local service execution. Declarative control-plane integration and
+commercial release gates remain open. No distro, capacity or destructive capability
+is certified. The full specification remains the delivery contract.
 
 ## Read the specification
 
@@ -109,6 +109,12 @@ compliance. Removal and purge retain identity and inventory state, never reset i
 delegations through the protected executor; it never starts work or replaces TLS
 pins. The native lifecycle lane's `-execution-trust` option exercises this command
 and retained rollback fences across upgrade, reboot and reinstall.
+`service-prepare`, `service-start` and `service-status` relay typed signed work and
+read durable results. They cannot create authority or turn queue acceptance into
+completion. The [packaged signed service lane](docs/agent-enrollment.md#running-the-packaged-signed-service-lane)
+uses `-service-execution` to exercise the installed root/network boundary, replay,
+expiry, revocation and crash reconciliation. Production dispatch and authenticated
+remote outcome reporting remain separate required integrations.
 See the [agent contract](docs/agent-enrollment.md) for ownership, recovery and
 native laboratory commands.
 

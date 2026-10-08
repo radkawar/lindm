@@ -2,7 +2,7 @@
 
 // Package serviceprovider manages existing canonical system services over a
 // private native systemd connection. A plan is evidence, not execution authority:
-// callers must hold their resource lock and durably authorize a start themselves.
+// callers hold their resource fence and consume authority in Apply's callback.
 // External systemd administrators can race observations and effects; this API is
 // not a global systemd transaction or compare-and-swap operation.
 // Enable/disable follows systemd's [Install] semantics, which can affect related
@@ -252,7 +252,7 @@ func (p *Provider) Plan(ctx context.Context, desired *agentv1.ServiceDesiredStat
 }
 
 func (p *Provider) Verify(ctx context.Context, plan *agentv1.ServicePlan) (*agentv1.ServiceVerification, error) {
-	if err := validatePlan(plan); err != nil {
+	if err := ValidatePlan(plan); err != nil {
 		return nil, err
 	}
 	ctx, finish, err := p.begin(ctx)

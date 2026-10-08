@@ -148,7 +148,9 @@ func planFor(desired *agentv1.ServiceDesiredState, before *agentv1.ServiceObserv
 	}, nil
 }
 
-func validatePlan(plan *agentv1.ServicePlan) error {
+// ValidatePlan checks closed schema, native support, observation fingerprint and
+// recomputed drift. It establishes evidence consistency, not execution authority.
+func ValidatePlan(plan *agentv1.ServicePlan) error {
 	if err := validateMessage(plan); err != nil {
 		return err
 	}
@@ -161,6 +163,25 @@ func validatePlan(plan *agentv1.ServicePlan) error {
 	}
 	if plan.GetChangeRuntime() != runtime || plan.GetChangeEnablement() != enablement {
 		return fmt.Errorf("%w: fabricated plan drift", ErrConflict)
+	}
+	return nil
+}
+
+// ValidateVerification checks retained native evidence without reading the host.
+// A consistent nonconverged result is valid evidence, not a successful operation.
+func ValidateVerification(plan *agentv1.ServicePlan, result *agentv1.ServiceVerification) error {
+	if err := ValidatePlan(plan); err != nil {
+		return err
+	}
+	if err := validateMessage(result); err != nil {
+		return err
+	}
+	after := result.GetObservation()
+	if after.GetUnit() != plan.GetDesired().GetUnit() || !bytes.Equal(fingerprint(after), after.GetFingerprintSha256()) {
+		return fmt.Errorf("%w: invalid verification observation", ErrConflict)
+	}
+	if !proto.Equal(verification(plan, after), result) {
+		return fmt.Errorf("%w: fabricated verification result", ErrConflict)
 	}
 	return nil
 }

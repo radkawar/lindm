@@ -170,7 +170,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if before.ActiveState != "inactive" || before.UnitFileState != "enabled" {
 		return nil, errors.New("independent stale-plan mutation did not stop without disabling")
 	}
-	if _, err := provider.Apply(ctx, stale); !errors.Is(err, serviceprovider.ErrConflict) {
+	if _, err := provider.Apply(ctx, stale, serviceProofAuthorize); !errors.Is(err, serviceprovider.ErrConflict) {
 		return nil, fmt.Errorf("stale service plan must fail with conflict: %w", err)
 	}
 	after, err := provider.Observe(ctx, serviceProofUnit)
@@ -208,7 +208,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := provider.Apply(canceled, plan); !errors.Is(err, context.Canceled) {
+	if _, err := provider.Apply(canceled, plan, serviceProofAuthorize); !errors.Is(err, context.Canceled) {
 		return nil, fmt.Errorf("pre-start canceled service apply must fail with cancellation: %w", err)
 	}
 	after, err = provider.Observe(ctx, serviceProofUnit)
@@ -272,6 +272,15 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	return evidence, nil
 }
 
+// Only the disposable-root fixture calls this library directly. Product effects
+// use the executor's signed, journal-consuming admission callback instead.
+func serviceProofAuthorize(ctx context.Context) error {
+	if os.Geteuid() != 0 {
+		return errors.New("disposable service fixture lost root authority")
+	}
+	return ctx.Err()
+}
+
 func serviceProofConverge(ctx context.Context, provider *serviceprovider.Provider, name string, desired *agentv1.ServiceDesiredState, changeRuntime, changeEnablement bool) (*vmlab.VMServiceStep, error) {
 	plan, err := provider.Plan(ctx, desired)
 	if err != nil {
@@ -284,7 +293,7 @@ func serviceProofConverge(ctx context.Context, provider *serviceprovider.Provide
 	if plan.ChangeRuntime != changeRuntime || plan.ChangeEnablement != changeEnablement || plan.Before.ActiveState != nativeBefore.ActiveState || plan.Before.UnitFileState != nativeBefore.UnitFileState {
 		return nil, fmt.Errorf("%s: provider plan disagrees with expected drift or native state", name)
 	}
-	applied, err := provider.Apply(ctx, plan)
+	applied, err := provider.Apply(ctx, plan, serviceProofAuthorize)
 	if err != nil {
 		return nil, fmt.Errorf("%s apply: %w", name, err)
 	}

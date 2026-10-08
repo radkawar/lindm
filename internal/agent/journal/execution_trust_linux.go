@@ -2,9 +2,7 @@ package journal
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"fmt"
 	"math"
 
 	"github.com/google/uuid"
@@ -16,94 +14,14 @@ import (
 	"lindm/internal/protodata"
 )
 
-// executionTrustDDL matches the execution_trust table in schema.sql. Fresh
-// installations execute schema.sql; this statement is only the v1 migration.
+// executionTrustDDL also serves genuine-v1 migration fixtures. The reviewed
+// table definition has one source for fresh initialization and migration.
 func executionTrustDDL() string {
-	return fmt.Sprintf(`CREATE TABLE execution_trust (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    revision INTEGER NOT NULL CHECK (revision > 0),
-    state BLOB NOT NULL CHECK (length(state) BETWEEN 1 AND %d)
-) STRICT`, maximumTrustBytes)
+	return journalTableDDL("execution_trust")
 }
 
 func unconfiguredExecutionTrust(installationID string) *agentv1.ExecutionTrustState {
 	return &agentv1.ExecutionTrustState{FormatVersion: 1, InstallationId: installationID}
-}
-
-// migrateSchema advances a validated v1 journal to v2 without rewriting the
-// authority record. A v2 database is never repaired here.
-func (s *Store) migrateSchema(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	var version int
-	if err := s.db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version); err != nil {
-		return stateReadError(ctx)
-	}
-	switch version {
-	case priorSchemaVersion:
-		return s.migrateV1(ctx)
-	case schemaVersion:
-		return nil
-	default:
-		return ErrRecoveryHold
-	}
-}
-
-func (s *Store) migrateV1(ctx context.Context) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		return ErrRecoveryHold
-	}
-	defer func() { _ = tx.Rollback() }()
-	exists, err := executionTrustTableExists(ctx, tx)
-	if err != nil {
-		return stateReadError(ctx)
-	}
-	// A v1 stamp on a database that already has the trust table is damage.
-	// Do not replace that row or bless a new one.
-	if exists {
-		return ErrRecoveryHold
-	}
-	row, err := s.queries.WithTx(tx).ReadState(ctx)
-	if err != nil {
-		return stateReadError(ctx)
-	}
-	if _, err := s.decodeAuthority(row.Revision, row.State); err != nil {
-		return err
-	}
-	encoded, err := s.encodeTrust(unconfiguredExecutionTrust(s.installationID))
-	if err != nil {
-		return errors.New("initialize execution trust failed")
-	}
-	if _, err := tx.ExecContext(ctx, executionTrustDDL()); err != nil {
-		return stateReadError(ctx)
-	}
-	if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, encoded); err != nil {
-		return stateReadError(ctx)
-	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", schemaVersion)); err != nil {
-		return stateReadError(ctx)
-	}
-	if err := tx.Commit(); err != nil {
-		return stateReadError(ctx)
-	}
-	return nil
-}
-
-func executionTrustTableExists(ctx context.Context, q journaldb.DBTX) (bool, error) {
-	var present int
-	err := q.QueryRowContext(ctx, `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'execution_trust'`).Scan(&present)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // LoadExecutionTrust returns a separately decoded execution-trust record and

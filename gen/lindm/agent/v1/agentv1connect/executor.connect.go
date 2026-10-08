@@ -60,6 +60,15 @@ const (
 	// ExecutorServiceUpdateExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
 	// UpdateExecutionTrust RPC.
 	ExecutorServiceUpdateExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/UpdateExecutionTrust"
+	// ExecutorServicePrepareServiceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's PrepareServiceExecution RPC.
+	ExecutorServicePrepareServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareServiceExecution"
+	// ExecutorServiceStartServiceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's StartServiceExecution RPC.
+	ExecutorServiceStartServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/StartServiceExecution"
+	// ExecutorServiceGetServiceExecutionProcedure is the fully-qualified name of the ExecutorService's
+	// GetServiceExecution RPC.
+	ExecutorServiceGetServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/GetServiceExecution"
 	// ExecutorServiceStatusProcedure is the fully-qualified name of the ExecutorService's Status RPC.
 	ExecutorServiceStatusProcedure = "/lindm.agent.v1.ExecutorService/Status"
 )
@@ -101,6 +110,14 @@ type ExecutorServiceClient interface {
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
+	// Verifies signed desired intent and records native preflight/challenge before
+	// replying. No native effect; callers cannot supply a plan or challenge.
+	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
+	// Accepts a separately signed start grant. Native work runs durably outside
+	// the RPC; acceptance is not completion. Exact retries never repeat effects.
+	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
+	// Returns durable action state/evidence, not fresh compliance or authority.
+	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -171,6 +188,24 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
 			connect.WithClientOptions(opts...),
 		),
+		prepareServiceExecution: connect.NewClient[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse](
+			httpClient,
+			baseURL+ExecutorServicePrepareServiceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("PrepareServiceExecution")),
+			connect.WithClientOptions(opts...),
+		),
+		startServiceExecution: connect.NewClient[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse](
+			httpClient,
+			baseURL+ExecutorServiceStartServiceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("StartServiceExecution")),
+			connect.WithClientOptions(opts...),
+		),
+		getServiceExecution: connect.NewClient[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetServiceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1.StatusRequest, v1.StatusResponse](
 			httpClient,
 			baseURL+ExecutorServiceStatusProcedure,
@@ -182,16 +217,19 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // executorServiceClient implements ExecutorServiceClient.
 type executorServiceClient struct {
-	prepareBootstrap     *connect.Client[v1.PrepareBootstrapRequest, v1.PrepareBootstrapResponse]
-	installEnrollment    *connect.Client[v1.InstallEnrollmentRequest, v1.InstallEnrollmentResponse]
-	getConnection        *connect.Client[v1.GetConnectionRequest, v1.GetConnectionResponse]
-	signTLSClientMessage *connect.Client[v1.SignTLSClientMessageRequest, v1.SignTLSClientMessageResponse]
-	prepareSession       *connect.Client[v1.PrepareSessionRequest, v1.PrepareSessionResponse]
-	commitSession        *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
-	prepareRenewal       *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
-	commitRenewal        *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
-	updateExecutionTrust *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
-	status               *connect.Client[v1.StatusRequest, v1.StatusResponse]
+	prepareBootstrap        *connect.Client[v1.PrepareBootstrapRequest, v1.PrepareBootstrapResponse]
+	installEnrollment       *connect.Client[v1.InstallEnrollmentRequest, v1.InstallEnrollmentResponse]
+	getConnection           *connect.Client[v1.GetConnectionRequest, v1.GetConnectionResponse]
+	signTLSClientMessage    *connect.Client[v1.SignTLSClientMessageRequest, v1.SignTLSClientMessageResponse]
+	prepareSession          *connect.Client[v1.PrepareSessionRequest, v1.PrepareSessionResponse]
+	commitSession           *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
+	prepareRenewal          *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
+	commitRenewal           *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
+	updateExecutionTrust    *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
+	prepareServiceExecution *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
+	startServiceExecution   *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
+	getServiceExecution     *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
+	status                  *connect.Client[v1.StatusRequest, v1.StatusResponse]
 }
 
 // PrepareBootstrap calls lindm.agent.v1.ExecutorService.PrepareBootstrap.
@@ -239,6 +277,21 @@ func (c *executorServiceClient) UpdateExecutionTrust(ctx context.Context, req *c
 	return c.updateExecutionTrust.CallUnary(ctx, req)
 }
 
+// PrepareServiceExecution calls lindm.agent.v1.ExecutorService.PrepareServiceExecution.
+func (c *executorServiceClient) PrepareServiceExecution(ctx context.Context, req *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
+	return c.prepareServiceExecution.CallUnary(ctx, req)
+}
+
+// StartServiceExecution calls lindm.agent.v1.ExecutorService.StartServiceExecution.
+func (c *executorServiceClient) StartServiceExecution(ctx context.Context, req *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error) {
+	return c.startServiceExecution.CallUnary(ctx, req)
+}
+
+// GetServiceExecution calls lindm.agent.v1.ExecutorService.GetServiceExecution.
+func (c *executorServiceClient) GetServiceExecution(ctx context.Context, req *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error) {
+	return c.getServiceExecution.CallUnary(ctx, req)
+}
+
 // Status calls lindm.agent.v1.ExecutorService.Status.
 func (c *executorServiceClient) Status(ctx context.Context, req *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -281,6 +334,14 @@ type ExecutorServiceHandler interface {
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
+	// Verifies signed desired intent and records native preflight/challenge before
+	// replying. No native effect; callers cannot supply a plan or challenge.
+	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
+	// Accepts a separately signed start grant. Native work runs durably outside
+	// the RPC; acceptance is not completion. Exact retries never repeat effects.
+	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
+	// Returns durable action state/evidence, not fresh compliance or authority.
+	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -347,6 +408,24 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServicePrepareServiceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServicePrepareServiceExecutionProcedure,
+		svc.PrepareServiceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("PrepareServiceExecution")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceStartServiceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceStartServiceExecutionProcedure,
+		svc.StartServiceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("StartServiceExecution")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetServiceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetServiceExecutionProcedure,
+		svc.GetServiceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServiceStatusHandler := connect.NewUnaryHandler(
 		ExecutorServiceStatusProcedure,
 		svc.Status,
@@ -373,6 +452,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceCommitRenewalHandler.ServeHTTP(w, r)
 		case ExecutorServiceUpdateExecutionTrustProcedure:
 			executorServiceUpdateExecutionTrustHandler.ServeHTTP(w, r)
+		case ExecutorServicePrepareServiceExecutionProcedure:
+			executorServicePrepareServiceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceStartServiceExecutionProcedure:
+			executorServiceStartServiceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetServiceExecutionProcedure:
+			executorServiceGetServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStatusProcedure:
 			executorServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -418,6 +503,18 @@ func (UnimplementedExecutorServiceHandler) CommitRenewal(context.Context, *conne
 
 func (UnimplementedExecutorServiceHandler) UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.UpdateExecutionTrust is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareServiceExecution is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.StartServiceExecution is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetServiceExecution is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {

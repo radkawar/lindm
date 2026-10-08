@@ -1,8 +1,8 @@
 # Packaged agent and native enrollment contract
 
 Status: G2 internal qualification is complete (`cb97712`); G3 execution-trust
-installation and rotation extend that packaged agent. The evidence ledger records
-the exercised native runs and remaining gates. This is not a production-release
+rotation and signed durable service execution extend that packaged agent.
+The evidence ledger records exercised native runs and remaining gates, not a release
 claim. This document refines [architecture](architecture.md) and
 [verification](verification.md); it does not reduce the confirmed launch matrix or
 replace its desktop/physical acceptance.
@@ -10,8 +10,9 @@ replace its desktop/physical acceptance.
 ## 1. Process and source boundaries
 
 Build `cmd/lindm-agent` separately from `cmd/lindmd`. The agent executable has
-`executor`, `run`, `bootstrap`, `resume`, `status` and `trust-update` commands, plus
-standalone inspection/verification. Real per-user session behavior belongs to G4.
+`executor`, `run`, `bootstrap`, `resume`, `status`, `trust-update` and typed
+`service-prepare`, `service-start`, `service-status` commands, plus standalone
+inspection/verification. Real per-user session behavior belongs to G4.
 
 - `executor`: root-owned Unix listener; owns sensitive identity keys, execution
   trust and journal. No TCP listener and no general command/file/signing RPC.
@@ -28,6 +29,13 @@ standalone inspection/verification. Real per-user session behavior belongs to G4
   `/etc/lindm/agent.json`. Root or the configured network UID may relay signed
   documents, not select trusted keys. This command never starts policy work or
   changes TLS enrollment pins.
+- `service-prepare -file FILE`: relays a `PrepareServiceExecutionRequest` containing
+  a signed desired intent. Root constructs the native plan and device challenge.
+- `service-start -file FILE`: relays a `StartServiceExecutionRequest` containing
+  separate signed start authority. Acknowledged queueing is not completion.
+- `service-status -file FILE`: sends a `GetServiceExecutionRequest` for retained
+  action evidence, not a fresh compliance scan. All three use `/etc/lindm/agent.json`
+  and the same root/network-UID socket ACL; none can sign execution authority.
 
 Keep implementation under cohesive `internal/agent` packages for local journal,
 executor, transport and native observation. Shared certificate/trust contracts belong
@@ -105,10 +113,11 @@ recovery epoch and exact versioned capabilities for separate plan/start roles.
 Empty delegates revoke all online execution signers. Current root, TLS-CA and
 release keys cannot become online execution delegates.
 
-The protected SQLite schema migrates from version 1 to 2 transactionally after
-validating the existing authority. It preserves the original identity blob and
-revision and adds a separately revisioned execution-trust singleton. Missing or
-damaged version-2 trust is recovery hold, not an empty replacement. The executor
+The current protected SQLite schema is version 3. Genuine version-1 and version-2
+databases migrate transactionally after validating existing authority; original
+identity/trust bytes and independent revisions are preserved. The version-1 path
+adds the separately revisioned execution-trust singleton. Missing or damaged
+current-schema trust is recovery hold, not an empty replacement. The executor
 verifies complete root/delegation proposals before one durable commit and
 acknowledgment. Wrong quorum, delegation rollback and recovery-floor regression
 return `permission_denied` with `Lindm-Reason: execution_trust_rejected`, without
@@ -130,6 +139,63 @@ remove/reinstall it first rejects the previously accepted rotation, then replays
 the final receipt; this detects lost revocation instead of silently reinstalling
 it. Disposable fixture signatures have a one-minute validity overlap, clamped to
 the root's validity. Product time checks remain strict.
+
+### Signed durable service execution
+
+`service_execution.proto` separates three DSSE payload domains: a plan-role desired
+intent, a device-key preflight challenge, and a start-role grant. Online keys require
+the exact `systemd.service.v1` capability. A TLS key, offline root key, plan signature
+or caller's Unix identity cannot substitute for the start role.
+
+Intent binds deployment/device/generation, action UUID, desired revision, resource
+sequence, recovery floor, root/delegation versions, actor and authorization version.
+Its validity is at most fifteen minutes and contained in current delegation/root
+validity. Root performs native preflight; callers cannot submit a native plan.
+New work requires a current enrolled certificate, a committed current-boot session,
+no unresolved session/renewal, and configured authenticated execution delegation.
+
+For drift, root persists the exact intent bytes, native plan, historical trust,
+random challenge, device proof and public signing certificate before replying.
+The challenge binds both intent and plan digests, boot and process incarnation.
+Its maximum thirty-second deadline uses `CLOCK_BOOTTIME`, including suspend, in
+addition to wall-clock validity. A process restart invalidates unused challenges
+even on the same boot. No-drift work instead verifies actual state and records
+success without a start grant or native mutation.
+
+Start acceptance commits `QUEUED`; an executor-owned worker runs independently of
+RPC cancellation. After native preconditions and job subscription are ready, the
+provider invokes an internal callback immediately before its first effect. Root
+revalidates current authority, identity, challenge, clocks and resource fences,
+then commits one-use consumption and `RUNNING`. A postcommit deadline check prevents
+slow storage from extending the grant. Durable commit and native submission are
+not OS-atomic: a scheduling interval remains between the final check and send.
+Started multi-effect work can outlive the grant; cancellation is not rollback.
+
+Actions retain verified success, failure, expiry, supersession or outcome unknown.
+Exact intent/grant retries return historical evidence without extending authority
+or repeating effects; conflicting reuse of an action UUID is rejected. Resource
+sequences only advance. Higher sequences can supersede prepared/queued work, never
+running work. Restart only observes previously running work: exact native convergence
+can establish success; otherwise uncertainty remains persistent. It never replays
+the old effect. Historical signatures are checked at their recorded acceptance
+times; current revocation blocks new effects without erasing old evidence.
+
+Schema 3 normalizes actions, resource floors and capacity accounting alongside the
+unchanged identity/trust records. Admission and transitions compare all relevant
+revisions transactionally. Limits are 65,536 actions, 128 KiB per encoded record and
+a 256 MiB record budget. Each unfinished action reserves its entire 128 KiB allowance,
+including across restart; terminal records consume their actual size. New work is
+rejected at capacity, rather than accepting an effect whose outcome cannot fit.
+These reservations do not guarantee physical disk availability. I/O failure holds
+execution and preserves the durable checkpoint; history is not silently evicted.
+Malformed protected records, inconsistent floors/accounting or missing current
+schema enter recovery hold, never reconstruction from untrusted input.
+
+This is a protected local execution boundary, not the complete remote policy system.
+Production dispatch, fresh directory reauthorization, profile targeting/ownership,
+offline reconciliation and root-authenticated remote outcome receipts remain open.
+Local status is authenticated by the root Unix peer; a network relay's unsigned
+server report must not be treated as proof of root execution or fresh compliance.
 
 ## 3. Device key use and renewal
 
@@ -472,10 +538,36 @@ effects. Native `[Install]` semantics can affect related links/units, and an
 enabled/disabled result does not establish link ownership. Ownership-safe profile
 removal still requires journal integration.
 
-These runs qualify the provider in disposable guests, not signed remote policy
-execution, executor-sandbox integration, application health, reboot persistence,
-all distro cells or complete G3. No product RPC calls `Apply` directly. Durable
-action acceptance, resource ownership and start-authority integration remain open.
+The standalone runs qualify the provider, not remote policy execution, application
+health, reboot persistence, all distro cells or complete G3. Product effects now
+reach `Apply` only through the signed durable executor's first-effect callback.
+Ownership-safe removal remains a separate required contract.
+
+### Running the packaged signed service lane
+
+Add `-service-execution` to the maintained `lab vm lifecycle` commands above. It
+implies `-execution-trust` and requires an upgraded package implementing the typed
+service RPCs. To qualify migration, retain a genuine old schema-1 or schema-2 first
+package; rebuilding the current source with an older version label is not migration
+evidence. Keep the actual control plane/Keycloak/PostgreSQL running and product
+inventory timers unchanged.
+
+The lab signs narrowly scoped disposable authority, authenticates the root challenge
+against its separately pinned device CA, and relays through the installed agent as
+the network UID. The installed sandboxed root service performs enable/start,
+runtime-only stop/start, no-op verification and enablement-only changes. Independent
+native queries check outcomes and absence of effects after forged signature,
+plan-domain start, stale precondition, expired grant, same-boot restart and revoked
+delegation. Exact replay preserves terminal evidence.
+
+A slow sacrificial native job exposes `RUNNING`; the lab sends SIGKILL to the
+executor, not the target service. Read-only restart reconciliation preserves unknown
+outcome or verified convergence, while the target's stable native invocation ID
+proves the job survived without a new invocation. Replaying the accepted grant
+cannot repeat it. The full lifecycle compares terminal records after authority
+revocation, host reboot and remove/reinstall, then cleans fixtures and the VM.
+Development signing is not production dispatch authorization; these are VM results,
+not hardware attestation, destructive qualification or a complete G3 claim.
 
 ## 6. Required G2 failure boundaries
 

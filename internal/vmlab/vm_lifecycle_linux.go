@@ -37,6 +37,8 @@ type VMLifecycleOptions struct {
 	// Exercises real signed trust installation/rotation after upgrade. The
 	// second package must implement execution trust; the first may use journal v1.
 	ExecutionTrust bool
+	// Requires the upgraded executor's signed durable service execution API.
+	ServiceExecution bool
 	// Optional bounded observation time after the first two publications lets
 	// a human inspect the actual console without changing product timers.
 	ObserveFor time.Duration
@@ -260,8 +262,8 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := lifecycleProgress(ctx, options, "upgraded", upgraded, true); err != nil {
 		return nil, err
 	}
-	if options.ExecutionTrust {
-		result.ExecutionTrust, err = exerciseVMExecutionTrust(ctx, packages, options.Repository)
+	if options.ExecutionTrust || options.ServiceExecution {
+		result.ExecutionTrust, err = exerciseVMExecutionTrust(ctx, packages, options.Repository, options.ServiceExecution)
 		if err != nil {
 			return nil, err
 		}

@@ -35,13 +35,15 @@ type vmExecutionTrustEvidence struct {
 	ReinstallRetained          bool                                  `json:"reinstall_retained"`
 	HostUTC                    time.Time                             `json:"host_utc"`
 	GuestUTC                   time.Time                             `json:"guest_utc"`
+	Services                   *vmServiceExecutionEvidence           `json:"services,omitempty"`
 }
 
-func exerciseVMExecutionTrust(ctx context.Context, packages *nativeGuestPackages, repository string) (*vmExecutionTrustEvidence, error) {
+func exerciseVMExecutionTrust(ctx context.Context, packages *nativeGuestPackages, repository string, services bool) (*vmExecutionTrustEvidence, error) {
 	fixture, err := devlab.CreateExecutionTrustExercise(ctx, repository)
 	if err != nil {
 		return nil, err
 	}
+	defer fixture.Close()
 	for _, item := range []struct {
 		name    string
 		request *agentv1.UpdateExecutionTrustRequest
@@ -100,6 +102,12 @@ func exerciseVMExecutionTrust(ctx context.Context, packages *nativeGuestPackages
 		return nil, errors.Join(err, errors.New("rejected rollback changed the installed execution authority"))
 	}
 	result.DelegationRollbackRejected, result.EpochRollbackRejected = true, true
+	if services {
+		result.Services, err = exerciseVMSignedServices(ctx, packages, fixture, result.TLSIdentity)
+		if err != nil {
+			return nil, err
+		}
+	}
 	result.Revoked, err = vmApplyExecutionTrust(ctx, packages.vm, "revoked")
 	if err != nil {
 		return nil, err
@@ -174,7 +182,10 @@ func verifyRetainedVMExecutionTrust(ctx context.Context, vm *guestVM, evidence *
 	if !proto.Equal(receipt, evidence.Revoked) {
 		return errors.New("native lifecycle replaced execution trust or extended its receipt")
 	}
-	return verifyVMConnectionIdentity(ctx, vm, evidence.TLSIdentity)
+	if err := verifyVMConnectionIdentity(ctx, vm, evidence.TLSIdentity); err != nil {
+		return err
+	}
+	return verifyRetainedVMServiceActions(ctx, vm, evidence.Services)
 }
 
 func readVMConnectionIdentity(ctx context.Context, vm *guestVM) (*labv1.ConnectionIdentityEvidence, error) {

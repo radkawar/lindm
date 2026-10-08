@@ -1848,7 +1848,7 @@ var File_lindm_agent_v1_executor_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\n" +
-	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/execution_trust.proto\"\x82\x06\n" +
+	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/agent/v1/service_execution.proto\"\x82\x06\n" +
 	"\x17PrepareBootstrapRequest\x129\n" +
 	"\x13execution_root_json\x18\x01 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x11executionRootJson\x128\n" +
 	"\x12bootstrap_envelope\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80 R\x11bootstrapEnvelope\x12-\n" +
@@ -2003,7 +2003,8 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x17HOLD_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10HOLD_REASON_NONE\x10\x01\x12%\n" +
 	"!HOLD_REASON_INCOMPLETE_OR_CORRUPT\x10\x02\x12 \n" +
-	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xed\a\n" +
+	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xcf\n" +
+	"\n" +
 	"\x0fExecutorService\x12e\n" +
 	"\x10PrepareBootstrap\x12'.lindm.agent.v1.PrepareBootstrapRequest\x1a(.lindm.agent.v1.PrepareBootstrapResponse\x12h\n" +
 	"\x11InstallEnrollment\x12(.lindm.agent.v1.InstallEnrollmentRequest\x1a).lindm.agent.v1.InstallEnrollmentResponse\x12\\\n" +
@@ -2013,7 +2014,10 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\rCommitSession\x12$.lindm.agent.v1.CommitSessionRequest\x1a%.lindm.agent.v1.CommitSessionResponse\x12_\n" +
 	"\x0ePrepareRenewal\x12%.lindm.agent.v1.PrepareRenewalRequest\x1a&.lindm.agent.v1.PrepareRenewalResponse\x12\\\n" +
 	"\rCommitRenewal\x12$.lindm.agent.v1.CommitRenewalRequest\x1a%.lindm.agent.v1.CommitRenewalResponse\x12q\n" +
-	"\x14UpdateExecutionTrust\x12+.lindm.agent.v1.UpdateExecutionTrustRequest\x1a,.lindm.agent.v1.UpdateExecutionTrustResponse\x12G\n" +
+	"\x14UpdateExecutionTrust\x12+.lindm.agent.v1.UpdateExecutionTrustRequest\x1a,.lindm.agent.v1.UpdateExecutionTrustResponse\x12z\n" +
+	"\x17PrepareServiceExecution\x12..lindm.agent.v1.PrepareServiceExecutionRequest\x1a/.lindm.agent.v1.PrepareServiceExecutionResponse\x12t\n" +
+	"\x15StartServiceExecution\x12,.lindm.agent.v1.StartServiceExecutionRequest\x1a-.lindm.agent.v1.StartServiceExecutionResponse\x12n\n" +
+	"\x13GetServiceExecution\x12*.lindm.agent.v1.GetServiceExecutionRequest\x1a+.lindm.agent.v1.GetServiceExecutionResponse\x12G\n" +
 	"\x06Status\x12\x1d.lindm.agent.v1.StatusRequest\x1a\x1e.lindm.agent.v1.StatusResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
@@ -2031,34 +2035,40 @@ func file_lindm_agent_v1_executor_proto_rawDescGZIP() []byte {
 var file_lindm_agent_v1_executor_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_lindm_agent_v1_executor_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_lindm_agent_v1_executor_proto_goTypes = []any{
-	(TLSCredentialKind)(0),               // 0: lindm.agent.v1.TLSCredentialKind
-	(Lifecycle)(0),                       // 1: lindm.agent.v1.Lifecycle
-	(HoldReason)(0),                      // 2: lindm.agent.v1.HoldReason
-	(*PrepareBootstrapRequest)(nil),      // 3: lindm.agent.v1.PrepareBootstrapRequest
-	(*PrepareBootstrapResponse)(nil),     // 4: lindm.agent.v1.PrepareBootstrapResponse
-	(*InstallEnrollmentRequest)(nil),     // 5: lindm.agent.v1.InstallEnrollmentRequest
-	(*InstallEnrollmentResponse)(nil),    // 6: lindm.agent.v1.InstallEnrollmentResponse
-	(*GetConnectionRequest)(nil),         // 7: lindm.agent.v1.GetConnectionRequest
-	(*GetConnectionResponse)(nil),        // 8: lindm.agent.v1.GetConnectionResponse
-	(*RetrievalPublicData)(nil),          // 9: lindm.agent.v1.RetrievalPublicData
-	(*PriorTLSCredential)(nil),           // 10: lindm.agent.v1.PriorTLSCredential
-	(*SignTLSClientMessageRequest)(nil),  // 11: lindm.agent.v1.SignTLSClientMessageRequest
-	(*SignTLSClientMessageResponse)(nil), // 12: lindm.agent.v1.SignTLSClientMessageResponse
-	(*PrepareSessionRequest)(nil),        // 13: lindm.agent.v1.PrepareSessionRequest
-	(*PrepareSessionResponse)(nil),       // 14: lindm.agent.v1.PrepareSessionResponse
-	(*AcceptedSession)(nil),              // 15: lindm.agent.v1.AcceptedSession
-	(*PendingSessionClaim)(nil),          // 16: lindm.agent.v1.PendingSessionClaim
-	(*CommitSessionRequest)(nil),         // 17: lindm.agent.v1.CommitSessionRequest
-	(*CommitSessionResponse)(nil),        // 18: lindm.agent.v1.CommitSessionResponse
-	(*PrepareRenewalRequest)(nil),        // 19: lindm.agent.v1.PrepareRenewalRequest
-	(*PrepareRenewalResponse)(nil),       // 20: lindm.agent.v1.PrepareRenewalResponse
-	(*CommitRenewalRequest)(nil),         // 21: lindm.agent.v1.CommitRenewalRequest
-	(*CommitRenewalResponse)(nil),        // 22: lindm.agent.v1.CommitRenewalResponse
-	(*StatusRequest)(nil),                // 23: lindm.agent.v1.StatusRequest
-	(*StatusResponse)(nil),               // 24: lindm.agent.v1.StatusResponse
-	(*timestamppb.Timestamp)(nil),        // 25: google.protobuf.Timestamp
-	(*UpdateExecutionTrustRequest)(nil),  // 26: lindm.agent.v1.UpdateExecutionTrustRequest
-	(*UpdateExecutionTrustResponse)(nil), // 27: lindm.agent.v1.UpdateExecutionTrustResponse
+	(TLSCredentialKind)(0),                  // 0: lindm.agent.v1.TLSCredentialKind
+	(Lifecycle)(0),                          // 1: lindm.agent.v1.Lifecycle
+	(HoldReason)(0),                         // 2: lindm.agent.v1.HoldReason
+	(*PrepareBootstrapRequest)(nil),         // 3: lindm.agent.v1.PrepareBootstrapRequest
+	(*PrepareBootstrapResponse)(nil),        // 4: lindm.agent.v1.PrepareBootstrapResponse
+	(*InstallEnrollmentRequest)(nil),        // 5: lindm.agent.v1.InstallEnrollmentRequest
+	(*InstallEnrollmentResponse)(nil),       // 6: lindm.agent.v1.InstallEnrollmentResponse
+	(*GetConnectionRequest)(nil),            // 7: lindm.agent.v1.GetConnectionRequest
+	(*GetConnectionResponse)(nil),           // 8: lindm.agent.v1.GetConnectionResponse
+	(*RetrievalPublicData)(nil),             // 9: lindm.agent.v1.RetrievalPublicData
+	(*PriorTLSCredential)(nil),              // 10: lindm.agent.v1.PriorTLSCredential
+	(*SignTLSClientMessageRequest)(nil),     // 11: lindm.agent.v1.SignTLSClientMessageRequest
+	(*SignTLSClientMessageResponse)(nil),    // 12: lindm.agent.v1.SignTLSClientMessageResponse
+	(*PrepareSessionRequest)(nil),           // 13: lindm.agent.v1.PrepareSessionRequest
+	(*PrepareSessionResponse)(nil),          // 14: lindm.agent.v1.PrepareSessionResponse
+	(*AcceptedSession)(nil),                 // 15: lindm.agent.v1.AcceptedSession
+	(*PendingSessionClaim)(nil),             // 16: lindm.agent.v1.PendingSessionClaim
+	(*CommitSessionRequest)(nil),            // 17: lindm.agent.v1.CommitSessionRequest
+	(*CommitSessionResponse)(nil),           // 18: lindm.agent.v1.CommitSessionResponse
+	(*PrepareRenewalRequest)(nil),           // 19: lindm.agent.v1.PrepareRenewalRequest
+	(*PrepareRenewalResponse)(nil),          // 20: lindm.agent.v1.PrepareRenewalResponse
+	(*CommitRenewalRequest)(nil),            // 21: lindm.agent.v1.CommitRenewalRequest
+	(*CommitRenewalResponse)(nil),           // 22: lindm.agent.v1.CommitRenewalResponse
+	(*StatusRequest)(nil),                   // 23: lindm.agent.v1.StatusRequest
+	(*StatusResponse)(nil),                  // 24: lindm.agent.v1.StatusResponse
+	(*timestamppb.Timestamp)(nil),           // 25: google.protobuf.Timestamp
+	(*UpdateExecutionTrustRequest)(nil),     // 26: lindm.agent.v1.UpdateExecutionTrustRequest
+	(*PrepareServiceExecutionRequest)(nil),  // 27: lindm.agent.v1.PrepareServiceExecutionRequest
+	(*StartServiceExecutionRequest)(nil),    // 28: lindm.agent.v1.StartServiceExecutionRequest
+	(*GetServiceExecutionRequest)(nil),      // 29: lindm.agent.v1.GetServiceExecutionRequest
+	(*UpdateExecutionTrustResponse)(nil),    // 30: lindm.agent.v1.UpdateExecutionTrustResponse
+	(*PrepareServiceExecutionResponse)(nil), // 31: lindm.agent.v1.PrepareServiceExecutionResponse
+	(*StartServiceExecutionResponse)(nil),   // 32: lindm.agent.v1.StartServiceExecutionResponse
+	(*GetServiceExecutionResponse)(nil),     // 33: lindm.agent.v1.GetServiceExecutionResponse
 }
 var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	25, // 0: lindm.agent.v1.InstallEnrollmentResponse.not_after:type_name -> google.protobuf.Timestamp
@@ -2089,19 +2099,25 @@ var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	19, // 25: lindm.agent.v1.ExecutorService.PrepareRenewal:input_type -> lindm.agent.v1.PrepareRenewalRequest
 	21, // 26: lindm.agent.v1.ExecutorService.CommitRenewal:input_type -> lindm.agent.v1.CommitRenewalRequest
 	26, // 27: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:input_type -> lindm.agent.v1.UpdateExecutionTrustRequest
-	23, // 28: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
-	4,  // 29: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
-	6,  // 30: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
-	8,  // 31: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
-	12, // 32: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
-	14, // 33: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
-	18, // 34: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
-	20, // 35: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
-	22, // 36: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
-	27, // 37: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
-	24, // 38: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
-	29, // [29:39] is the sub-list for method output_type
-	19, // [19:29] is the sub-list for method input_type
+	27, // 28: lindm.agent.v1.ExecutorService.PrepareServiceExecution:input_type -> lindm.agent.v1.PrepareServiceExecutionRequest
+	28, // 29: lindm.agent.v1.ExecutorService.StartServiceExecution:input_type -> lindm.agent.v1.StartServiceExecutionRequest
+	29, // 30: lindm.agent.v1.ExecutorService.GetServiceExecution:input_type -> lindm.agent.v1.GetServiceExecutionRequest
+	23, // 31: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
+	4,  // 32: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
+	6,  // 33: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
+	8,  // 34: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
+	12, // 35: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
+	14, // 36: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
+	18, // 37: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
+	20, // 38: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
+	22, // 39: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
+	30, // 40: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
+	31, // 41: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
+	32, // 42: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
+	33, // 43: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
+	24, // 44: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
+	32, // [32:45] is the sub-list for method output_type
+	19, // [19:32] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
 	19, // [19:19] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name
@@ -2113,6 +2129,7 @@ func file_lindm_agent_v1_executor_proto_init() {
 		return
 	}
 	file_lindm_agent_v1_execution_trust_proto_init()
+	file_lindm_agent_v1_service_execution_proto_init()
 	file_lindm_agent_v1_executor_proto_msgTypes[11].OneofWrappers = []any{
 		(*PrepareSessionResponse_Accepted)(nil),
 		(*PrepareSessionResponse_Pending)(nil),

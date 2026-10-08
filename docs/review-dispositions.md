@@ -324,6 +324,56 @@ reviewed statically; the native lane exercises cancellation before `Apply`.
 lanes on the same recorded lab build. These scoped reviews do not qualify signed
 remote policy execution or whole-product security.
 
+### Signed durable service-execution reviews
+
+Four independent read-only reviews covered the action journal, cryptographic/native
+authority boundary, executor/local RPC lifecycle, and maintained packaged proof.
+The journal review found that accounting only for a pending record's current size
+could admit an effect but reject its later completion at capacity. Unfinished
+records now reserve their full 128 KiB allowance; terminal transitions release
+unused space. The actual 2,048-record saturation regression covers rejection and
+rollback of new work, queue/start/completion, expiry, supersession and reopen.
+Logical reservations do not promise physical disk availability.
+
+The laboratory review identified two proof defects before native execution:
+
+- An empty JSON envelope was a malformed request, not the claimed signature denial.
+  The negative now uses a well-formed intent with a fresh action ID, higher sequence
+  and forged signature. Each negative requires its explicit Connect denial code;
+  transport errors cannot count as authority rejection.
+- An inactive unit can lack an invocation ID while asynchronous work is still
+  queued. Bounded polling now permits that state and requires a valid nonzero ID
+  when native activation is observed.
+
+Corrective reviews found no remaining actionable defects in their assigned scopes.
+The quality run also required an explicit protobuf `UNSPECIFIED` zero failure value
+with nonzero `NONE`, and deferred row cleanup in migration fixtures. Native preflight
+unsupported/conflict outcomes now return stable failed-precondition codes rather
+than accidental internal errors. `make fmt check test-integration build` passed,
+including race tests and real PostgreSQL/Keycloak integration. The dependency scan
+reported no reachable Go vulnerabilities, not absence of every required-module
+advisory.
+
+Both maintained packaged lanes then passed with the same lab build: Ubuntu
+upgraded genuine schema 1 and Fedora genuine schema 2 to schema 3. The sandboxed
+executor performed native effects through network-UID RPC relay; independent native
+observations verified the positive and denial cases. Each run recorded ten terminal
+actions, including actual persistent `OUTCOME_UNKNOWN` after executor SIGKILL.
+The native service invocation survived and was not repeated by an exact grant retry.
+Terminal evidence stayed identical after revocation, reboot and remove/reinstall.
+The full lifecycle also retained inventory, identity and trust fences, rejected
+revoked device access, and held a missing journal. Build/run identifiers are in the
+implementation evidence ledger. No product timers or Fedora enforcement policy
+were relaxed.
+
+The first-effect callback verifies current authority and consumes the challenge
+durably, then rechecks expiry after the commit. Wall-clock completion timestamps
+remain actual observations even after clock rollback; `CLOCK_BOOTTIME` separately
+bounds start authority. Restart reconciliation never reapplies a running action.
+These are scoped reviews, not whole-product certification; production dispatch,
+fresh directory reauthorization and root-authenticated remote result reporting
+remain required integrations.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

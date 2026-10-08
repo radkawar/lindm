@@ -3,3 +3,24 @@
 //   sqlc v1.31.1
 
 package journaldb
+
+type ServiceAction struct {
+	ActionID             string
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Unit                 string
+	ResourceSequence     int64
+	Revision             int64
+	State                int64
+	Record               []byte
+}
+
+type ServiceResourceFloor struct {
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Unit                 string
+	ResourceSequence     int64
+	ActionID             string
+}

@@ -151,11 +151,17 @@ func bootID() (string, error) {
 }
 
 // Apply rejects invalid/fabricated/stale plans before sending a native mutation.
+// A drifting plan requires authorizeStart, called once after native preflight
+// and job-subscription setup, immediately before its first mutation. The callback
+// must durably authorize and consume the start; a plan alone is not authority.
 // Once a mutation is submitted, cancellation/transport failure is uncertain; it
 // never means systemd canceled the job, and no automatic retry is attempted.
-func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan) (*agentv1.ServiceVerification, error) {
-	if err := validatePlan(plan); err != nil {
+func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authorizeStart func(context.Context) error) (*agentv1.ServiceVerification, error) {
+	if err := ValidatePlan(plan); err != nil {
 		return nil, err
+	}
+	if (plan.GetChangeEnablement() || plan.GetChangeRuntime()) && authorizeStart == nil {
+		return nil, fmt.Errorf("%w: missing start authorization", ErrUnsupported)
 	}
 	ctx, finish, err := p.begin(ctx)
 	if err != nil {
@@ -174,7 +180,7 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan) (*agent
 	}
 	effected := false
 	if plan.GetChangeEnablement() {
-		if err := p.changeEnablement(ctx, plan.GetDesired()); err != nil {
+		if err := p.changeEnablement(ctx, plan.GetDesired(), authorizeStart); err != nil {
 			return nil, err
 		}
 		effected = true
@@ -201,7 +207,11 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan) (*agent
 			}
 			return nil, err
 		}
-		err = p.changeRuntime(ctx, plan.GetDesired())
+		start := authorizeStart
+		if effected {
+			start = nil // The enablement effect already consumed this start.
+		}
+		err = p.changeRuntime(ctx, plan.GetDesired(), start)
 		if err != nil {
 			if errors.Is(err, ErrNotConverged) {
 				result, observeErr := p.verify(ctx, plan)
@@ -224,7 +234,13 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan) (*agent
 	return result, err
 }
 
-func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.ServiceDesiredState) error {
+func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.ServiceDesiredState, authorizeStart func(context.Context) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := authorizeStart(ctx); err != nil {
+		return err
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -252,7 +268,7 @@ func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.Servic
 	return nil
 }
 
-func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDesiredState) (resultErr error) {
+func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDesiredState, authorizeStart func(context.Context) error) (resultErr error) {
 	signals := make(chan *dbus.Signal, 32)
 	p.conn.Signal(signals)
 	defer p.conn.RemoveSignal(signals)
@@ -288,6 +304,14 @@ func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDe
 	method := "StartUnit"
 	if desired.GetRuntime() == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE {
 		method = "StopUnit"
+	}
+	if authorizeStart != nil {
+		if err := authorizeStart(ctx); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	var job dbus.ObjectPath
 	submitted = true

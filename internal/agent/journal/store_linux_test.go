@@ -138,8 +138,8 @@ func TestJournalRejectsPartialCorruptOrReplacedState(t *testing.T) {
 			case "corrupt protobuf":
 				_, err = store.db.ExecContext(ctx, `UPDATE executor_state SET state=? WHERE id=1`, []byte{0xff})
 			case "wrong schema":
-				// Version 2 is the execution-trust schema. A later version stays hold.
-				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 3`)
+				// Schema3 has service actions; an unrecognized later schema holds.
+				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 4`)
 			case "unknown fields", "invalid state":
 				state, _, loadErr := store.Load(ctx)
 				if loadErr != nil {

@@ -23,6 +23,7 @@ import (
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/statefs"
 	"lindm/internal/protodata"
 	"lindm/internal/trust"
@@ -54,6 +55,9 @@ var (
 	errNotPending             = errors.New("not_pending")
 	errInvalid                = errors.New("invalid_request")
 	errInternal               = errors.New("internal")
+	errClosed                 = errors.New("executor_closed")
+	errServiceRejected        = errors.New("service_execution_rejected")
+	errServiceExpired         = errors.New("service_execution_expired")
 )
 
 // Option configures process-local test seams. RPC callers cannot set them.
@@ -89,17 +93,28 @@ func WithEntropy(r io.Reader) Option {
 // Service is the protected executor state machine. It implements the local
 // ExecutorService handler. Private keys never leave its methods.
 type Service struct {
-	mu         sync.Mutex
-	directory  string
-	stateLock  *os.File
-	store      *journal.Store
-	authority  *trust.Authority
-	validator  protovalidate.Validator
-	clock      func() time.Time
-	bootID     func() (string, error)
-	entropy    io.Reader
-	hold       bool
-	holdReason agentv1.HoldReason
+	mu            sync.Mutex
+	directory     string
+	stateLock     *os.File
+	store         *journal.Store
+	authority     *trust.Authority
+	validator     protovalidate.Validator
+	clock         func() time.Time
+	bootID        func() (string, error)
+	entropy       io.Reader
+	hold          bool
+	holdReason    agentv1.HoldReason
+	closed        bool
+	closeDone     chan struct{}
+	closeErr      error
+	operations    sync.WaitGroup
+	worker        sync.WaitGroup
+	workerContext context.Context
+	workerCancel  context.CancelFunc
+	workerWake    chan struct{}
+	incarnation   string
+	boottime      func() (uint64, error)
+	openService   func(context.Context) (nativeService, error)
 }
 
 var _ agentv1connect.ExecutorServiceHandler = (*Service)(nil)
@@ -146,6 +161,9 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.StatusRequest{},
+		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
+		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
+		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err
@@ -162,16 +180,26 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		return nil, err
 	}
 	svc := &Service{
-		directory: directory,
-		stateLock: os.NewFile(uintptr(fd), "executor-state-lock"),
-		authority: authority,
-		validator: validator,
-		clock:     time.Now,
-		bootID:    readBootID,
-		entropy:   rand.Reader,
+		directory:   directory,
+		stateLock:   os.NewFile(uintptr(fd), "executor-state-lock"),
+		authority:   authority,
+		validator:   validator,
+		clock:       time.Now,
+		bootID:      readBootID,
+		entropy:     rand.Reader,
+		closeDone:   make(chan struct{}),
+		workerWake:  make(chan struct{}, 1),
+		boottime:    readBoottime,
+		openService: openNativeService,
 	}
 	for _, opt := range opts {
 		opt(svc)
+	}
+	svc.workerContext, svc.workerCancel = context.WithCancel(context.Background())
+	svc.incarnation, err = newID()
+	if err != nil {
+		_ = svc.Close()
+		return nil, err
 	}
 	store, err := journal.OpenLocked(ctx, directory, svc.stateLock)
 	switch {
@@ -192,23 +220,44 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		_ = svc.Close()
 		return nil, err
 	}
+	if err := svc.recoverServiceActions(ctx); err != nil && !errors.Is(err, errRecoveryHold) {
+		_ = svc.Close()
+		return nil, err
+	}
+	svc.worker.Add(1)
+	go svc.serviceWorker()
 	return svc, nil
 }
 
-// Close releases the journal and directory lock.
+// Close prevents admission, cancels native work and joins outside the authority
+// mutex. Completion evidence is persisted before storage or its lock is closed.
 func (s *Service) Close() error {
 	s.mu.Lock()
+	if s.closed {
+		done := s.closeDone
+		s.mu.Unlock()
+		<-done
+		return s.closeErr
+	}
+	s.closed = true
+	if s.workerCancel != nil {
+		s.workerCancel()
+	}
+	s.mu.Unlock()
+	s.operations.Wait()
+	s.worker.Wait()
+	s.mu.Lock()
 	defer s.mu.Unlock()
-	var err error
 	if s.store != nil {
-		err = s.store.Close()
+		s.closeErr = s.store.Close()
 		s.store = nil
 	}
 	if s.stateLock != nil {
-		err = errors.Join(err, s.stateLock.Close())
+		s.closeErr = errors.Join(s.closeErr, s.stateLock.Close())
 		s.stateLock = nil
 	}
-	return err
+	close(s.closeDone)
+	return s.closeErr
 }
 
 func (s *Service) now() time.Time { return s.clock().UTC() }
@@ -218,6 +267,10 @@ func (s *Service) lock(ctx context.Context) error {
 		return err
 	}
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return errClosed
+	}
 	if err := ctx.Err(); err != nil {
 		s.mu.Unlock()
 		return err
@@ -386,6 +439,22 @@ func mapError(err error) error {
 		code, reason = connect.CodeCanceled, "canceled"
 	case errors.Is(err, context.DeadlineExceeded):
 		code, reason = connect.CodeDeadlineExceeded, "deadline_exceeded"
+	case errors.Is(err, errClosed):
+		code, reason = connect.CodeUnavailable, "executor_closed"
+	case errors.Is(err, errServiceRejected):
+		code, reason = connect.CodePermissionDenied, "service_execution_rejected"
+	case errors.Is(err, errServiceExpired):
+		code, reason = connect.CodeFailedPrecondition, "service_execution_expired"
+	case errors.Is(err, journal.ErrServiceActionNotFound):
+		code, reason = connect.CodeNotFound, "service_execution_not_found"
+	case errors.Is(err, journal.ErrServiceActionCapacity):
+		code, reason = connect.CodeResourceExhausted, "service_execution_capacity"
+	case errors.Is(err, journal.ErrServiceActionBusy), errors.Is(err, journal.ErrServiceActionRejected), errors.Is(err, journal.ErrConflict):
+		code, reason = connect.CodeFailedPrecondition, "service_execution_conflict"
+	case errors.Is(err, serviceprovider.ErrUnsupported):
+		code, reason = connect.CodeFailedPrecondition, "service_provider_unsupported"
+	case errors.Is(err, serviceprovider.ErrConflict), errors.Is(err, serviceprovider.ErrNotConverged):
+		code, reason = connect.CodeFailedPrecondition, "service_provider_precondition"
 	case errors.Is(err, errRecoveryHold):
 		code, reason = connect.CodeFailedPrecondition, "recovery_hold"
 	case errors.Is(err, errUnprovisioned):

@@ -86,7 +86,7 @@ func TestFabricatedPlansBeforeNativeAccess(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			plan := testPlan(t)
 			change(plan)
-			_, err := (&Provider{}).Apply(context.Background(), plan)
+			_, err := (&Provider{}).Apply(context.Background(), plan, nil)
 			if !errors.Is(err, ErrConflict) && !errors.Is(err, ErrUnsupported) {
 				t.Fatalf("fabricated plan reached native boundary: %v", err)
 			}
@@ -97,8 +97,52 @@ func TestFabricatedPlansBeforeNativeAccess(t *testing.T) {
 func TestCanceledBeforeNativeAccess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := (&Provider{}).Apply(ctx, testPlan(t)); !errors.Is(err, context.Canceled) || errors.Is(err, ErrOutcomeUnknown) {
+	if _, err := (&Provider{}).Apply(ctx, testPlan(t), func(ctx context.Context) error { return ctx.Err() }); !errors.Is(err, context.Canceled) || errors.Is(err, ErrOutcomeUnknown) {
 		t.Fatalf("canceled pre-start apply: %v", err)
+	}
+}
+
+func TestDriftingPlanCannotApplyWithoutStartAuthority(t *testing.T) {
+	if _, err := (&Provider{}).Apply(t.Context(), testPlan(t), nil); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("drifting plan reached native access without start authority: %v", err)
+	}
+}
+
+func TestRetainedVerificationRejectsFabricatedCompliance(t *testing.T) {
+	plan := testPlan(t)
+	after := testObservation()
+	after.ActiveState, after.SubState, after.UnitFileState = "active", "running", "enabled"
+	after.FingerprintSha256 = fingerprint(after)
+	result := &agentv1.ServiceVerification{Observation: after, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true}
+	if err := ValidateVerification(plan, result); err != nil {
+		t.Fatalf("consistent convergence rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(*agentv1.ServiceVerification){
+		"unbound observation": func(v *agentv1.ServiceVerification) { v.Observation.ActiveState = "inactive" },
+		"false runtime": func(v *agentv1.ServiceVerification) {
+			v.Observation.ActiveState, v.Observation.SubState = "inactive", "dead"
+			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		},
+		"foreign unit": func(v *agentv1.ServiceVerification) {
+			v.Observation.Unit = "other.service"
+			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		},
+		"false definition": func(v *agentv1.ServiceVerification) {
+			v.Observation.DefinitionSha256[0] ^= 1
+			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		},
+		"false boot": func(v *agentv1.ServiceVerification) {
+			v.Observation.BootId = "22222222-2222-4333-8444-555555555555"
+			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := proto.CloneOf(result)
+			mutate(candidate)
+			if err := ValidateVerification(plan, candidate); !errors.Is(err, ErrConflict) {
+				t.Fatalf("fabricated retained compliance accepted: %v", err)
+			}
+		})
 	}
 }
 

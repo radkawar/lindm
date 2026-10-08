@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"os"
@@ -18,9 +19,10 @@ import (
 	"lindm/internal/trust"
 )
 
-// ExecutionTrustExercise contains only public signed requests for a disposable
-// guest. Its successor root keys are discarded: never apply it to a retained
-// installation. It neither replaces the development root nor publishes authority.
+// ExecutionTrustExercise holds public signed trust requests and private,
+// short-lived online keys for disposable guest proofs. Close discards those keys.
+// Successor offline root keys are discarded before return. Never apply these
+// requests to a retained installation or publish them as production authority.
 type ExecutionTrustExercise struct {
 	Initial            *agentv1.UpdateExecutionTrustRequest
 	WrongQuorum        *agentv1.UpdateExecutionTrustRequest
@@ -28,9 +30,22 @@ type ExecutionTrustExercise struct {
 	Revoked            *agentv1.UpdateExecutionTrustRequest
 	DelegationRollback *agentv1.UpdateExecutionTrustRequest
 	EpochRollback      *agentv1.UpdateExecutionTrustRequest
+	authority          *trust.Authority
+	deploymentID       string
+	planKey            ed25519.PrivateKey
+	startKey           ed25519.PrivateKey
+	deviceCA           *x509.Certificate
 }
 
 func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result *ExecutionTrustExercise, err error) {
+	var onlineKeys []ed25519.PrivateKey
+	defer func() {
+		if err != nil {
+			for _, key := range onlineKeys {
+				clear(key)
+			}
+		}
+	}()
 	err = locked(ctx, repoRoot, func(root string) error {
 		fixture := FixturePath(root)
 		if err := validateFixture(fixture); err != nil {
@@ -106,7 +121,7 @@ func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result 
 			if err != nil {
 				return err
 			}
-			clear(private)
+			onlineKeys = append(onlineKeys, private)
 			id, err := trust.KeyID(public)
 			if err != nil {
 				return err
@@ -151,7 +166,17 @@ func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result 
 		if err != nil {
 			return err
 		}
+		caBytes, err := os.ReadFile(filepath.Join(fixture, "device-ca.crt"))
+		if err != nil {
+			return err
+		}
+		deviceCA, err := serviceExerciseCertificate(caBytes)
+		if err != nil {
+			return err
+		}
 		result = &ExecutionTrustExercise{
+			authority: authority, deploymentID: current.GetDeploymentId(),
+			planKey: onlineKeys[0], startKey: onlineKeys[1], deviceCA: deviceCA,
 			Initial:            &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: initial},
 			WrongQuorum:        &agentv1.UpdateExecutionTrustRequest{RootTransitions: []*agentv1.ExecutionRootTransition{{PreviousQuorumEnvelope: newEndorsement, NextQuorumEnvelope: newEndorsement}}, DelegationEnvelope: rotated},
 			Rotated:            &agentv1.UpdateExecutionTrustRequest{RootTransitions: []*agentv1.ExecutionRootTransition{{PreviousQuorumEnvelope: oldEndorsement, NextQuorumEnvelope: newEndorsement}}, DelegationEnvelope: rotated},

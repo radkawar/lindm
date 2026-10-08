@@ -19,6 +19,7 @@ import (
 )
 
 type recordingHandler struct {
+	agentv1connect.UnimplementedExecutorServiceHandler
 	uid uint32
 	ok  bool
 }
@@ -80,6 +81,20 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	if err := authorize(agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure, 50, 40); err == nil {
 		t.Fatal("wrong local UID was authorized to relay execution trust")
 	}
+	for _, procedure := range []string{
+		agentv1connect.ExecutorServicePrepareServiceExecutionProcedure,
+		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
+		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,
+	} {
+		for _, uid := range []uint32{0, 40} {
+			if err := authorize(procedure, uid, 40); err != nil {
+				t.Fatalf("authorized peer %d denied %s: %v", uid, procedure, err)
+			}
+		}
+		if err := authorize(procedure, 50, 40); err == nil {
+			t.Fatalf("wrong UID authorized %s", procedure)
+		}
+	}
 	if err := authorize(agentv1connect.ExecutorServiceInstallEnrollmentProcedure, 40, 40); err == nil {
 		t.Fatal("network UID was authorized for enrollment")
 	}
@@ -121,6 +136,15 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	}
 	if _, err := client.UpdateExecutionTrust(t.Context(), connect.NewRequest(&agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: []byte{1}})); err != nil {
 		t.Fatalf("admitted UID was denied execution trust relay: %v", err)
+	}
+	if _, err := client.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("service intent request bypassed eager schema: %v", err)
+	}
+	if _, err := client.StartServiceExecution(t.Context(), connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: "not-a-uuid", StartGrantEnvelope: []byte{1}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("service start request bypassed eager schema: %v", err)
+	}
+	if _, err := client.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: "not-a-uuid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("service lookup request bypassed eager schema: %v", err)
 	}
 	if os.Geteuid() != 0 {
 		if _, err := client.PrepareBootstrap(t.Context(), connect.NewRequest(&agentv1.PrepareBootstrapRequest{Resume: true})); connect.CodeOf(err) != connect.CodePermissionDenied {

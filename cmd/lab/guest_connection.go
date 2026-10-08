@@ -49,3 +49,29 @@ func guestConnectionIdentity(ctx context.Context, output io.Writer) (err error) 
 		TransportCaSha256: pins[:], CertificateSha256: connection.GetCertificateSha256(), KeyId: connection.GetKeyId(),
 	})
 }
+
+// Public leaf only, used by the host to authenticate a device challenge against
+// its separately pinned development CA before issuing a disposable start grant.
+func guestConnectionCertificate(ctx context.Context, output io.Writer) (err error) {
+	document, err := config.Load(config.NetworkConfigPath)
+	if err != nil {
+		return err
+	}
+	if uint32(os.Geteuid()) != document.NetworkUID {
+		return errors.New("connection certificate requires the configured network UID")
+	}
+	client, cleanup, err := localrpc.Dial(document.SocketPath)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, cleanup()) }()
+	response, err := client.GetConnection(ctx, connect.NewRequest(&agentv1.GetConnectionRequest{}))
+	if err != nil {
+		return err
+	}
+	if err := guestConnection(response.Msg); err != nil {
+		return err
+	}
+	_, err = output.Write(response.Msg.GetCertificatePem())
+	return err
+}

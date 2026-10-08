@@ -1,6 +1,6 @@
-// Package journal owns the executor's protected, single-writer authority state
-// and execution-trust record. Opening a damaged or incomplete installation
-// never recreates it.
+// Package journal owns the executor's protected authority, execution trust and
+// durable service actions. Opening a damaged or incomplete installation never
+// recreates it.
 package journal
 
 import (
@@ -35,7 +35,8 @@ const (
 	maximumTrustBytes  = 128 << 10
 	applicationID      = 1279872580
 	priorSchemaVersion = 1
-	schemaVersion      = 2
+	trustSchemaVersion = 2
+	schemaVersion      = 3
 )
 
 var (
@@ -119,7 +120,7 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}), protovalidate.WithDisableLazy())
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ServiceExecutionRecord{}), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile executor journal schema: %w", err)
 	}
@@ -194,6 +195,9 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, trustEncoded); err != nil {
 			return nil, errors.New("initialize execution trust failed")
 		}
+		if err := s.queries.WithTx(tx).InitializeServiceActionUsage(ctx); err != nil {
+			return nil, errors.New("initialize service action accounting failed")
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, errors.New("commit executor initialization failed")
 		}
@@ -222,6 +226,9 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		return nil, err
 	}
 	if _, _, err := s.LoadExecutionTrust(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.validateServiceActions(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -296,7 +303,7 @@ func (s *Store) verifyDatabase(ctx context.Context) error {
 	if err := s.db.QueryRowContext(ctx, "PRAGMA quick_check(1)").Scan(&integrity); err != nil {
 		return stateReadError(ctx)
 	}
-	if (version != priorSchemaVersion && version != schemaVersion) || id != applicationID || integrity != "ok" {
+	if (version != priorSchemaVersion && version != trustSchemaVersion && version != schemaVersion) || id != applicationID || integrity != "ok" {
 		return ErrRecoveryHold
 	}
 	return nil
