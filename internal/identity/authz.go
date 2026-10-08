@@ -32,19 +32,21 @@ type accessDecision struct {
 // process successfully read the authoritative directory, not a token timestamp
 // and not a broker import read.
 type directorySnapshot struct {
-	PrincipalID        uuid.UUID
-	Issuer             string
-	Subject            string
-	DisplayName        string
-	PinnedRole         string
-	Enabled            bool
-	Deactivated        bool
-	DeactivationSource string
-	Observed           bool
-	ObservedAt         time.Time
-	Qualified          bool
-	Groups             []string
-	RefreshFailed      bool
+	PrincipalID          uuid.UUID
+	Issuer               string
+	Subject              string
+	DisplayName          string
+	PinnedRole           string
+	Enabled              bool
+	Deactivated          bool
+	DeactivationSource   string
+	Observed             bool
+	ObservedAt           time.Time
+	Qualified            bool
+	Groups               []string
+	RefreshFailed        bool
+	AuthorizationVersion int64
+	AuthorizationRole    string
 }
 
 func needsRefresh(now time.Time, snap directorySnapshot) bool {

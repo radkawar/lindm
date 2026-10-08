@@ -374,6 +374,33 @@ These are scoped reviews, not whole-product certification; production dispatch,
 fresh directory reauthorization and root-authenticated remote result reporting
 remain required integrations.
 
+### Fresh actor-authorization reviews
+
+Independent reviews covered the authority/version/transaction boundary and the
+isolated live-Keycloak proof with its shared schema-lifecycle extraction. Neither
+found remaining actionable defects in its assigned scope. The regression author
+identified that browser future-clock tolerance must not apply to the current
+snapshot in a dispatch fence: an actual PostgreSQL test first committed the gated
+effect incorrectly, then passed after explicit future-observation rejection.
+Opaque approvals also bind the required operation permission and retain a
+process-monotonic deadline; wall-clock rollback cannot extend a signed start window.
+
+The maintained real-Keycloak check passed through both `cmd/dev test-integration`
+and `lab auth check-fresh`. Unchanged/display-only observations retained authority
+version 2; observed group removal, regrant, disable and re-enable advanced it through
+versions 3–6. Old approvals remained rejected after restored membership, and only
+the two allowed private-schema writes persisted. Temporary users, groups and
+database schemas were removed without changing shared fixture identities or
+application tables. These observations qualify this actor API, not job dispatch
+or device compliance.
+
+Formatting, protobuf/web checks, full Go lint/race tests, dependency checks, real
+PostgreSQL integration tests and builds passed. The quality run also corrected
+unchecked response-body closure in the fixture adapter using the existing joined
+error-handling convention. Production dispatch must still combine this API with
+current desired-head, device/generation, recovery and lease fences, and clip signed
+start expiry to the actor approval deadline. This is not whole-product certification.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

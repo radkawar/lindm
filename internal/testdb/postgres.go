@@ -1,14 +1,13 @@
-//go:build integration
-
 // Package testdb isolates PostgreSQL integration cases in disposable schemas.
 // Tests use the application's migration runner, not a second SQL-file parser.
 package testdb
 
 import (
 	"context"
-	"os"
+	"errors"
+	"fmt"
 	"strings"
-	"testing"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,63 +17,97 @@ import (
 	"lindm/db"
 )
 
-// Open creates a private schema for this test, applies the real migrations and
-// removes only that schema during cleanup. The supplied role needs CREATE SCHEMA,
-// not superuser or CREATE DATABASE privileges. Never modify the public schema.
-func Open(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
-	t.Helper()
-	dsn := os.Getenv("LINDM_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Fatal("integration tests require LINDM_TEST_DATABASE_URL; use make test-integration")
-	}
+// Database owns one disposable schema, its pool and an independent test
+// connection. All application connections have a schema-only search_path.
+type Database struct {
+	Pool *pgxpool.Pool
+	Conn *pgx.Conn
+
+	schema  string
+	config  *pgx.ConnConfig
+	created bool
+	once    sync.Once
+	err     error
+}
+
+// New creates a private schema and applies the application's real migrations.
+// The supplied role needs CREATE SCHEMA, not superuser or CREATE DATABASE.
+// Close must be called even when the caller's context has been cancelled.
+func New(ctx context.Context, dsn string) (_ *Database, resultErr error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		t.Fatal("invalid integration database connection configuration")
+		return nil, errors.New("invalid integration database connection configuration")
 	}
-	ctx := t.Context()
-	admin, err := pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
-	if err != nil {
-		t.Fatal(err)
+	database := &Database{
+		schema: "lindm_test_" + strings.ReplaceAll(uuid.NewString(), "-", ""),
+		config: cfg.ConnConfig.Copy(),
 	}
-	schema := "lindm_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	identifier := pgx.Identifier{schema}.Sanitize()
-	created := false
-	t.Cleanup(func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if created {
-			if _, err := admin.Exec(cleanup, "DROP SCHEMA "+identifier+" CASCADE"); err != nil {
-				t.Errorf("remove isolated schema: %v", err)
-			}
+	defer func() {
+		if resultErr != nil {
+			resultErr = errors.Join(resultErr, database.Close())
 		}
-		if err := admin.Close(cleanup); err != nil {
-			t.Errorf("close schema administration connection: %v", err)
-		}
-	})
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+identifier); err != nil {
-		t.Fatal(err)
-	}
-	created = true
-	cfg.ConnConfig.RuntimeParams["search_path"] = schema
-	cfg.MaxConns = 4
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	}()
+	admin, err := pgx.ConnectConfig(ctx, database.config.Copy())
 	if err != nil {
-		t.Fatal(err)
+		return nil, errors.New("connect isolated schema administration failed")
 	}
-	t.Cleanup(pool.Close)
-	if err := db.Migrate(ctx, pool); err != nil {
-		t.Fatal(err)
-	}
-	conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
+	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := conn.Close(cleanup); err != nil {
-			t.Errorf("close test connection: %v", err)
+		resultErr = errors.Join(resultErr, admin.Close(cleanup))
+	}()
+	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+pgx.Identifier{database.schema}.Sanitize()); err != nil {
+		return nil, fmt.Errorf("create isolated schema %s: %w", database.schema, err)
+	}
+	database.created = true
+	cfg.ConnConfig.RuntimeParams["search_path"] = database.schema
+	cfg.MaxConns = 4
+	database.Pool, err = pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, errors.New("create isolated schema pool failed")
+	}
+	if err := db.Migrate(ctx, database.Pool); err != nil {
+		return nil, err
+	}
+	database.Conn, err = pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
+	if err != nil {
+		return nil, errors.New("connect isolated test connection failed")
+	}
+	return database, nil
+}
+
+// Schema returns the exact owned name for bounded cleanup diagnostics.
+func (d *Database) Schema() string { return d.schema }
+
+// Close releases connections before dropping only the owned schema. Cleanup
+// reconnects independently, so an aborted test connection cannot prevent it.
+// Each network cleanup has its own bounded, uncancelled context.
+func (d *Database) Close() error {
+	d.once.Do(func() {
+		if d.Conn != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			d.err = errors.Join(d.err, d.Conn.Close(ctx))
+			cancel()
 		}
+		if d.Pool != nil {
+			d.Pool.Close()
+		}
+		if !d.created {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		admin, err := pgx.ConnectConfig(ctx, d.config.Copy())
+		if err != nil {
+			d.err = errors.Join(d.err, fmt.Errorf("cleanup isolated schema %s: administration connection failed", d.schema))
+			return
+		}
+		if _, err := admin.Exec(ctx, "DROP SCHEMA "+pgx.Identifier{d.schema}.Sanitize()+" CASCADE"); err != nil {
+			d.err = errors.Join(d.err, fmt.Errorf("remove isolated schema %s: %w", d.schema, err))
+		}
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		d.err = errors.Join(d.err, admin.Close(closeCtx))
 	})
-	return pool, conn
+	return d.err
 }

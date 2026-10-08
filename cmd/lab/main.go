@@ -33,6 +33,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) >= 2 && args[0] == "auth" && args[1] == "check" {
 		return runAuthCheck(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "auth" && args[1] == "check-fresh" {
+		return runAuthCheckFresh(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "lifecycle" {
 		return runVMLifecycle(ctx, args[2:], stdout, stderr)
 	}
@@ -43,7 +46,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return runVMServices(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle|services} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
+		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth {check|check-fresh} [-repo DIR]; lab vm {inspect|lifecycle|services} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)

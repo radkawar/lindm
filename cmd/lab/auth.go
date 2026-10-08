@@ -42,3 +42,16 @@ func runAuthCheck(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	_, err = fmt.Fprintf(stdout, "real owner authorization-code/S256-PKCE login and authenticated admin read accepted (%d devices in bounded page); revoking session on exit\n", len(response.Msg.GetDevices()))
 	return err
 }
+
+func runAuthCheckFresh(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("auth check-fresh", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	root := flags.String("repo", ".", "checkout owning the protected development fixture")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("auth check-fresh accepts only -repo DIR")
+	}
+	return devlab.CheckFreshAuthorization(ctx, *root, stdout)
+}

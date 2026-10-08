@@ -8,8 +8,9 @@ import (
 	"strings"
 )
 
-// TestIntegration runs PostgreSQL regressions against private per-test schemas.
-// Credentials are passed only in the child environment, never command arguments.
+// TestIntegration runs the real Keycloak fresh-authorization smoke followed by
+// PostgreSQL regressions against private per-test schemas. Credentials are passed
+// only in-process or in the child environment, never command arguments.
 func TestIntegration(ctx context.Context, repoRoot string) error {
 	return locked(ctx, repoRoot, func(root string) error {
 		dir := FixturePath(root)
@@ -18,6 +19,9 @@ func TestIntegration(ctx context.Context, repoRoot string) error {
 		}
 		if err := databaseReady(ctx, dir); err != nil {
 			return fmt.Errorf("integration database is not ready; run make dev-up: %w", err)
+		}
+		if err := checkFreshAuthorization(ctx, root, os.Stdout); err != nil {
+			return fmt.Errorf("real fresh-authorization smoke: %w", err)
 		}
 		dsn, err := os.ReadFile(filepath.Join(dir, "migration-database-url"))
 		if err != nil {

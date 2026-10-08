@@ -155,6 +155,28 @@ against the fixed development fixture. The reusable development-session helper k
 passwords/cookies in memory, restricts TLS destinations and credential form actions,
 and revokes its console session. It is not an alternate production authentication API.
 
+`go run ./cmd/lab auth check-fresh -repo .` exercises the worker-authorization API
+with real Keycloak lifecycle changes and PostgreSQL transaction fences. It creates
+unique test-owned user/group objects and a private migrated PostgreSQL schema;
+only the immutable actor binding is seeded, never authoritative group observations.
+The identity service uses read-only directory credentials; the fixture adapter alone
+uses the protected lab-admin client to mutate and delete its temporary objects.
+The check covers unchanged/display-only refresh, immediate group removal and
+disable denials, regrant/re-enable versions, stale approvals, committed writes and
+rollback. It reports nonsecret owned identifiers and bounded cleanup results.
+An unavailable or invalid supplied fixture fails; it never falls back to cached
+authority or changes shared users, groups, realm settings or application tables.
+
+`go run ./cmd/dev test-integration -root .` runs that same live check before the
+real-PostgreSQL integration tests. It requires already-running development
+dependencies and does not start or migrate the public application schema.
+Unlike `make test-integration`, it does not invoke `dev-up`; use the direct command
+when an independent native lane must retain its running control-plane environment.
+`internal/testdb.New` owns reusable isolated-schema creation/cleanup; integration
+tests retain the `testdb.Open(t)` wrapper. This is schema isolation, not a separate
+PostgreSQL database. The fresh-authorization proof does not qualify job dispatch,
+device execution or finer commercial authorization scopes.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node

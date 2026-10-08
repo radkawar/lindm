@@ -16,16 +16,18 @@ type DeploymentIdentity struct {
 }
 
 type Principal struct {
-	ID                  uuid.UUID
-	Issuer              string
-	Subject             string
-	DisplayName         string
-	PinnedRole          string
-	CreatedAt           pgtype.Timestamptz
-	DeactivatedAt       pgtype.Timestamptz
-	DeactivationSource  string
-	DirectoryEnabled    bool
-	DirectoryObservedAt pgtype.Timestamptz
+	ID                   uuid.UUID
+	Issuer               string
+	Subject              string
+	DisplayName          string
+	PinnedRole           string
+	CreatedAt            pgtype.Timestamptz
+	DeactivatedAt        pgtype.Timestamptz
+	DeactivationSource   string
+	DirectoryEnabled     bool
+	DirectoryObservedAt  pgtype.Timestamptz
+	AuthorizationVersion int64
+	AuthorizationRole    string
 }
 
 type PrincipalLineage struct {

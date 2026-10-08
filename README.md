@@ -81,6 +81,13 @@ owner credential and an in-memory cookie jar; no direct password grant, producti
 authentication bypass, exported browser cookie or password argument is involved.
 Lifecycle scenarios can reuse this helper rather than exporting browser cookies.
 
+`go run ./cmd/lab auth check-fresh -repo .` exercises uncached worker authorization
+against real Keycloak and PostgreSQL using a temporary user, group and database
+schema. It proves immediate observed membership/disable denials, durable authority
+versions, stale transaction-fence rejection and cleanup without changing the shared
+owner or application schema. The integration command runs the same check.
+This verifies the actor-authorization API, not production job dispatch.
+
 These standalone agent commands observe native state and verify bootstrap
 authority without enrolling or modifying the host:
 

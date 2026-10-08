@@ -234,6 +234,26 @@ exports, search/counts and workers. Actor authorization changes invalidate pendi
 privileged approvals. Two distinct authorized humans must approve a destructive plan;
 service accounts cannot constitute the second person.
 
+The implemented Keycloak worker boundary is `identity.Service.AuthorizeFresh`,
+followed by `LockAuthorization(ctx, tx, authorization, requiredPermission)` in the
+mutation transaction. The first performs a new authoritative read without using the
+browser cache or an earlier in-flight refresh; no transaction spans directory HTTP.
+An observed denial still commits revocation, audit and the effective authority
+version. `principals.authorization_version` advances on effective role changes,
+including disable/re-enable and owner pinning, not unchanged observations, display
+names or unrelated groups. A restored role does not revive an old approval.
+
+The opaque, process-local approval binds its issuing service, actor, permission and
+version. The transaction locks the principal before device/action rows and rechecks
+current qualified authority, exact required permission, version and database time.
+Database and process-monotonic deadlines bound it to thirty seconds; future
+observations and clock rollback fail closed or shorten the exposed deadline.
+A start signer must clip its grant expiry to `Authorization.ExpiresAt()` as well as
+the root/delegation/challenge limits. This API does not itself enforce device,
+desired-head, recovery or worker-lease fences, and production dispatch integration
+remains open. Finer roles/scopes and future lifecycle adapters must participate in
+the same durable version transitions; replicas must use consistent authority policy.
+
 Break-glass is a documented local-console recovery procedure using separately held
 recovery material. It is disabled during normal operation, time-bounded, unmistakably
 audited, revokes affected sessions and requires a post-incident review. No universal

@@ -48,17 +48,20 @@ VALUES (
 ON CONFLICT (issuer, subject) DO UPDATE
 SET display_name = EXCLUDED.display_name
 RETURNING id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at;
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role;
 
 -- name: GetPrincipalByID :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE id = sqlc.arg(id);
 
 -- name: GetPrincipalForUpdate :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE id = sqlc.arg(id)
 FOR UPDATE;
@@ -74,7 +77,8 @@ WHERE id = sqlc.arg(id);
 
 -- name: GetPrincipalByIssuerSubject :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
 
@@ -183,7 +187,9 @@ WHERE id = true AND owner_principal_id IS NULL;
 
 -- name: PinOwnerRole :execrows
 UPDATE principals
-SET pinned_role = 'owner'
+SET pinned_role = 'owner',
+  authorization_version = authorization_version + CASE WHEN authorization_role = 'owner' THEN 0 ELSE 1 END,
+  authorization_role = 'owner'
 WHERE id = sqlc.arg(id) AND pinned_role = '';
 
 -- name: InsertAuditEvent :exec
@@ -195,3 +201,15 @@ VALUES (
   sqlc.arg(resource_id),
   sqlc.arg(reason)
 );
+
+-- name: SetPrincipalAuthorization :one
+UPDATE principals
+SET authorization_role = sqlc.arg(authorization_role),
+  authorization_version = authorization_version + 1
+WHERE id = sqlc.arg(id)
+  AND authorization_version = sqlc.arg(expected_version)
+  AND authorization_role <> sqlc.arg(authorization_role)
+RETURNING authorization_version;
+
+-- name: ReadAuthorizationClock :one
+SELECT clock_timestamp()::timestamptz;

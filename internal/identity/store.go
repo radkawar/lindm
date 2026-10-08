@@ -234,10 +234,6 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	if err := s.persistLineage(ctx, q, row.ID, missing, existing, w); err != nil {
 		return directorySnapshot{}, err
 	}
-	prevGroups, err := q.ListPrincipalGroupPaths(ctx, row.ID)
-	if err != nil {
-		return directorySnapshot{}, s.dbErr(err)
-	}
 	if err := q.DeletePrincipalGroups(ctx, row.ID); err != nil {
 		return directorySnapshot{}, s.dbErr(err)
 	}
@@ -254,7 +250,12 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	} else {
 		w.groups = nil
 	}
-	if err := s.auditAuthorizationChange(ctx, q, row, existing, prevGroups, w, qualified); err != nil {
+	nextRole := ""
+	if w.enabled && !w.deactivated && qualified {
+		nextRole = effectiveRole(row.PinnedRole, w.groups, s.adminGroups)
+	}
+	authorizationVersion, err := s.persistAuthorization(ctx, q, row, nextRole)
+	if err != nil {
 		return directorySnapshot{}, err
 	}
 	revoked := int64(0)
@@ -274,18 +275,20 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		}
 	}
 	return directorySnapshot{
-		PrincipalID:        row.ID,
-		Issuer:             row.Issuer,
-		Subject:            row.Subject,
-		DisplayName:        w.display,
-		PinnedRole:         row.PinnedRole,
-		Enabled:            w.enabled && !w.conflict,
-		Deactivated:        w.deactivated,
-		DeactivationSource: w.source,
-		Observed:           w.observed,
-		ObservedAt:         w.observedAt,
-		Qualified:          qualified,
-		Groups:             w.groups,
+		PrincipalID:          row.ID,
+		Issuer:               row.Issuer,
+		Subject:              row.Subject,
+		DisplayName:          w.display,
+		PinnedRole:           row.PinnedRole,
+		Enabled:              w.enabled && !w.conflict,
+		Deactivated:          w.deactivated,
+		DeactivationSource:   w.source,
+		Observed:             w.observed,
+		ObservedAt:           w.observedAt,
+		Qualified:            qualified,
+		Groups:               w.groups,
+		AuthorizationVersion: authorizationVersion,
+		AuthorizationRole:    nextRole,
 	}, nil
 }
 
@@ -466,18 +469,20 @@ func snapshotFrom(row identitydb.Principal, lin identitydb.PrincipalLineage, gro
 	observedAt, observed := timeFrom(lin.UpstreamObservedAt)
 	_, deactivated := timeFrom(row.DeactivatedAt)
 	return directorySnapshot{
-		PrincipalID:        row.ID,
-		Issuer:             row.Issuer,
-		Subject:            row.Subject,
-		DisplayName:        row.DisplayName,
-		PinnedRole:         row.PinnedRole,
-		Enabled:            row.DirectoryEnabled,
-		Deactivated:        deactivated,
-		DeactivationSource: row.DeactivationSource,
-		Observed:           observed,
-		ObservedAt:         observedAt,
-		Qualified:          observed && qualifiedLineage(row.Issuer, row.Subject, lin.DirectoryConnector, lin.UpstreamProvider, lin.UpstreamSubject, lin.BrokerIssuer, lin.BrokerSubject),
-		Groups:             groups,
+		PrincipalID:          row.ID,
+		Issuer:               row.Issuer,
+		Subject:              row.Subject,
+		DisplayName:          row.DisplayName,
+		PinnedRole:           row.PinnedRole,
+		Enabled:              row.DirectoryEnabled,
+		Deactivated:          deactivated,
+		DeactivationSource:   row.DeactivationSource,
+		Observed:             observed,
+		ObservedAt:           observedAt,
+		Qualified:            observed && qualifiedLineage(row.Issuer, row.Subject, lin.DirectoryConnector, lin.UpstreamProvider, lin.UpstreamSubject, lin.BrokerIssuer, lin.BrokerSubject),
+		Groups:               groups,
+		AuthorizationVersion: row.AuthorizationVersion,
+		AuthorizationRole:    row.AuthorizationRole,
 	}
 }
 
@@ -572,20 +577,20 @@ func (s *Service) observeDirectory(ctx context.Context, subject uuid.UUID) (dire
 	return obs, nil
 }
 
-func (s *Service) auditAuthorizationChange(ctx context.Context, q *identitydb.Queries, row identitydb.Principal, existing identitydb.PrincipalLineage, prevGroups []string, w authWrite, qualified bool) error {
-	prevActive := row.DirectoryEnabled && !row.DeactivatedAt.Valid && qualifiedLineage(row.Issuer, row.Subject, existing.DirectoryConnector, existing.UpstreamProvider, existing.UpstreamSubject, existing.BrokerIssuer, existing.BrokerSubject) && existing.UpstreamObservedAt.Valid
-	prevRole := ""
-	if prevActive {
-		prevRole = effectiveRole(row.PinnedRole, prevGroups, s.adminGroups)
+func (s *Service) persistAuthorization(ctx context.Context, q *identitydb.Queries, row identitydb.Principal, nextRole string) (int64, error) {
+	if row.AuthorizationRole == nextRole {
+		return row.AuthorizationVersion, nil
 	}
-	nextRole := ""
-	if w.enabled && !w.deactivated && qualified {
-		nextRole = effectiveRole(row.PinnedRole, w.groups, s.adminGroups)
+	version, err := q.SetPrincipalAuthorization(ctx, identitydb.SetPrincipalAuthorizationParams{
+		ID: row.ID, ExpectedVersion: row.AuthorizationVersion, AuthorizationRole: nextRole,
+	})
+	if err != nil {
+		return 0, s.dbErr(err)
 	}
-	if prevRole == nextRole {
-		return nil
+	if err := s.insertAudit(ctx, q, &row.ID, auditAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(row.AuthorizationRole, nextRole)); err != nil {
+		return 0, err
 	}
-	return s.insertAudit(ctx, q, &row.ID, auditAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(prevRole, nextRole))
+	return version, nil
 }
 
 func authorizationChangeReason(prev, next string) string {

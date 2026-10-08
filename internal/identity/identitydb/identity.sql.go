@@ -139,7 +139,8 @@ func (q *Queries) GetLineageForUpdate(ctx context.Context, principalID uuid.UUID
 
 const getPrincipalByID = `-- name: GetPrincipalByID :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE id = $1
 `
@@ -158,13 +159,16 @@ func (q *Queries) GetPrincipalByID(ctx context.Context, id uuid.UUID) (Principal
 		&i.DeactivationSource,
 		&i.DirectoryEnabled,
 		&i.DirectoryObservedAt,
+		&i.AuthorizationVersion,
+		&i.AuthorizationRole,
 	)
 	return i, err
 }
 
 const getPrincipalByIssuerSubject = `-- name: GetPrincipalByIssuerSubject :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE issuer = $1 AND subject = $2
 `
@@ -188,13 +192,16 @@ func (q *Queries) GetPrincipalByIssuerSubject(ctx context.Context, arg GetPrinci
 		&i.DeactivationSource,
 		&i.DirectoryEnabled,
 		&i.DirectoryObservedAt,
+		&i.AuthorizationVersion,
+		&i.AuthorizationRole,
 	)
 	return i, err
 }
 
 const getPrincipalForUpdate = `-- name: GetPrincipalForUpdate :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 FROM principals
 WHERE id = $1
 FOR UPDATE
@@ -214,6 +221,8 @@ func (q *Queries) GetPrincipalForUpdate(ctx context.Context, id uuid.UUID) (Prin
 		&i.DeactivationSource,
 		&i.DirectoryEnabled,
 		&i.DirectoryObservedAt,
+		&i.AuthorizationVersion,
+		&i.AuthorizationRole,
 	)
 	return i, err
 }
@@ -435,7 +444,9 @@ func (q *Queries) MarkDeploymentInitialized(ctx context.Context, ownerPrincipalI
 
 const pinOwnerRole = `-- name: PinOwnerRole :execrows
 UPDATE principals
-SET pinned_role = 'owner'
+SET pinned_role = 'owner',
+  authorization_version = authorization_version + CASE WHEN authorization_role = 'owner' THEN 0 ELSE 1 END,
+  authorization_role = 'owner'
 WHERE id = $1 AND pinned_role = ''
 `
 
@@ -456,6 +467,17 @@ WHERE consumed_at IS NOT NULL AND code_verifier <> ''
 func (q *Queries) PurgeConsumedVerifiers(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, purgeConsumedVerifiers)
 	return err
+}
+
+const readAuthorizationClock = `-- name: ReadAuthorizationClock :one
+SELECT clock_timestamp()::timestamptz
+`
+
+func (q *Queries) ReadAuthorizationClock(ctx context.Context) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, readAuthorizationClock)
+	var column_1 pgtype.Timestamptz
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const revokePrincipalSessions = `-- name: RevokePrincipalSessions :execrows
@@ -484,6 +506,29 @@ func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash []byte
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setPrincipalAuthorization = `-- name: SetPrincipalAuthorization :one
+UPDATE principals
+SET authorization_role = $1,
+  authorization_version = authorization_version + 1
+WHERE id = $2
+  AND authorization_version = $3
+  AND authorization_role <> $1
+RETURNING authorization_version
+`
+
+type SetPrincipalAuthorizationParams struct {
+	AuthorizationRole string
+	ID                uuid.UUID
+	ExpectedVersion   int64
+}
+
+func (q *Queries) SetPrincipalAuthorization(ctx context.Context, arg SetPrincipalAuthorizationParams) (int64, error) {
+	row := q.db.QueryRow(ctx, setPrincipalAuthorization, arg.AuthorizationRole, arg.ID, arg.ExpectedVersion)
+	var authorization_version int64
+	err := row.Scan(&authorization_version)
+	return authorization_version, err
 }
 
 const touchSession = `-- name: TouchSession :one
@@ -589,7 +634,8 @@ VALUES (
 ON CONFLICT (issuer, subject) DO UPDATE
 SET display_name = EXCLUDED.display_name
 RETURNING id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
-  deactivation_source, directory_enabled, directory_observed_at
+  deactivation_source, directory_enabled, directory_observed_at,
+  authorization_version, authorization_role
 `
 
 type UpsertPrincipalParams struct {
@@ -618,6 +664,8 @@ func (q *Queries) UpsertPrincipal(ctx context.Context, arg UpsertPrincipalParams
 		&i.DeactivationSource,
 		&i.DirectoryEnabled,
 		&i.DirectoryObservedAt,
+		&i.AuthorizationVersion,
+		&i.AuthorizationRole,
 	)
 	return i, err
 }
