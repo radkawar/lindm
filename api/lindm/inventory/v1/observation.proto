@@ -87,6 +87,21 @@ message PackageObservation {
   };
 }
 
+// PackageBatch is encoded once and uploaded as opaque bytes. Digest and size
+// cover that encoding; a server must not hash a reserialization.
+message PackageBatch {
+  repeated Package packages = 1 [(buf.validate.field).repeated.max_items = 500];
+}
+
+// SnapshotState is the server admission state of one staged package snapshot.
+enum SnapshotState {
+  SNAPSHOT_STATE_UNSPECIFIED = 0;
+  SNAPSHOT_STATE_STAGING = 1;
+  SNAPSHOT_STATE_COMMITTED = 2;
+  SNAPSHOT_STATE_SUPERSEDED = 3;
+  SNAPSHOT_STATE_EXPIRED = 4;
+}
+
 // NativeObservation is local evidence, not an enrollment or compliance claim.
 message NativeObservation {
   HostObservation host = 1 [(buf.validate.field).required = true];

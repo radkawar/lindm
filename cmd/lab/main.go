@@ -24,11 +24,23 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) >= 1 && args[0] == "guest" {
+		return runGuestProbe(ctx, args[1:], stdout, stderr)
+	}
+	if len(args) >= 1 && args[0] == "packages" {
+		return runPackages(ctx, args[1:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "auth" && args[1] == "check" {
+		return runAuthCheck(ctx, args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "lifecycle" {
+		return runVMLifecycle(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "inspect" {
 		return runVMInspect(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab vm inspect -manifest FILE -agent FILE [-cache DIR] [-work-dir DIR]; lab images {fetch|verify} -manifest FILE [-cache DIR]; verify also accepts -image FILE -checksum FILE -key FILE [-signature FILE]")
+		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -94,6 +106,7 @@ func runVMInspect(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	cache := flags.String("cache", ".cache/lab/images", "dedicated verified image cache")
 	workDir := flags.String("work-dir", "", "existing parent for a disposable private run directory (default: OS temporary directory)")
 	diagnosticsDir := flags.String("diagnostics", "", "existing directory for opt-in private cloud-init failure JSON; may contain sensitive guest data")
+	record := flags.String("record", "", "write complete inspection and runtime evidence to a new private JSON file")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -108,6 +121,5 @@ func runVMInspect(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(stdout, "native inspection matched: %s %s; %d complete package records; OS/kernel/boot/hostname matched\nimage %s\nimage_sha256 %s\nagent_sha256 %s\ncleanup complete; inspection only, not installation/enrollment or OS support certification\n", result.Distribution, result.Version, result.MatchedPackages, result.ImageID, result.ImageSHA256, result.AgentSHA256)
-	return err
+	return writeLabEvidence(stdout, *record, result)
 }

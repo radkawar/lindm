@@ -36,17 +36,32 @@ func (q *Queries) CountRenewalIssuance(ctx context.Context, id uuid.UUID) error 
 }
 
 const getGenerationAuthority = `-- name: GetGenerationAuthority :one
-SELECT id, device_id, state, session_epoch, renewal_issuance_count
+SELECT
+    id,
+    device_id,
+    state,
+    session_epoch,
+    renewal_issuance_count,
+    host_sequence,
+    package_sequence,
+    last_host_admission_at,
+    last_package_admission_at,
+    current_snapshot_id
 FROM enrollment_generations
 WHERE id = $1
 `
 
 type GetGenerationAuthorityRow struct {
-	ID                   uuid.UUID
-	DeviceID             uuid.UUID
-	State                string
-	SessionEpoch         int64
-	RenewalIssuanceCount int32
+	ID                     uuid.UUID
+	DeviceID               uuid.UUID
+	State                  string
+	SessionEpoch           int64
+	RenewalIssuanceCount   int32
+	HostSequence           int64
+	PackageSequence        int64
+	LastHostAdmissionAt    pgtype.Timestamptz
+	LastPackageAdmissionAt pgtype.Timestamptz
+	CurrentSnapshotID      *uuid.UUID
 }
 
 // All authority reads/writes below are performed after GetDeviceForUpdate.
@@ -59,6 +74,11 @@ func (q *Queries) GetGenerationAuthority(ctx context.Context, id uuid.UUID) (Get
 		&i.State,
 		&i.SessionEpoch,
 		&i.RenewalIssuanceCount,
+		&i.HostSequence,
+		&i.PackageSequence,
+		&i.LastHostAdmissionAt,
+		&i.LastPackageAdmissionAt,
+		&i.CurrentSnapshotID,
 	)
 	return i, err
 }

@@ -7,6 +7,8 @@ import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { CollectionStatus, HostObservation, SnapshotState } from "../../inventory/v1/observation_pb.js";
+import { file_lindm_inventory_v1_observation } from "../../inventory/v1/observation_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -14,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/admin.proto.
  */
 export const file_lindm_admin_v1_admin: GenFile = /*@__PURE__*/
-  fileDesc("ChpsaW5kbS9hZG1pbi92MS9hZG1pbi5wcm90bxIObGluZG0uYWRtaW4udjEiwAIKBkRldmljZRIKCgJpZBgBIAEoCRIdChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAiABKAkSEAoIaG9zdG5hbWUYAyABKAkSDQoFb3NfaWQYBCABKAkSEgoKb3NfdmVyc2lvbhgFIAEoCRIUCgxhcmNoaXRlY3R1cmUYBiABKAkSNAoPbGlmZWN5Y2xlX3N0YXRlGAsgASgOMhsubGluZG0uYWRtaW4udjEuRGV2aWNlU3RhdGUSLwoLZW5yb2xsZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3Rfc2Vlbl9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGgoSaW52ZW50b3J5X3NlcXVlbmNlGAogASgESgQIBxAIUgVzdGF0ZSJPChJMaXN0RGV2aWNlc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiABCJXChNMaXN0RGV2aWNlc1Jlc3BvbnNlEicKB2RldmljZXMYASADKAsyFi5saW5kbS5hZG1pbi52MS5EZXZpY2USFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIn0KHENyZWF0ZUVucm9sbG1lbnRHcmFudFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESJAoQbGlmZXRpbWVfc2Vjb25kcxgCIAEoDUIKukgHKgUYhAcoPBIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASKSAQodQ3JlYXRlRW5yb2xsbWVudEdyYW50UmVzcG9uc2USEAoIZ3JhbnRfaWQYASABKAkSDgoGc2VjcmV0GAIgASgJEi4KCmV4cGlyZXNfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEh8KF3NlY3JldF9kZWxpdmVyeV91bmtub3duGAQgASgIInMKHFJldm9rZUVucm9sbG1lbnRHcmFudFJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGgoIZ3JhbnRfaWQYAiABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgDIAEoCUIJukgGcgSYtRgBIh8KHVJldm9rZUVucm9sbG1lbnRHcmFudFJlc3BvbnNlImsKE1Jldm9rZURldmljZVJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASIWChRSZXZva2VEZXZpY2VSZXNwb25zZSKQAQoKQXVkaXRFdmVudBIKCgJpZBgBIAEoCRIvCgtvY2N1cnJlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEAoIYWN0b3JfaWQYAyABKAkSDgoGYWN0aW9uGAQgASgJEhMKC3Jlc291cmNlX2lkGAUgASgJEg4KBnJlYXNvbhgGIAEoCSJTChZMaXN0QXVkaXRFdmVudHNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoDUIIukgFKgMYyAESHAoKcGFnZV90b2tlbhgCIAEoCUIIukgFcgMYgAQiXgoXTGlzdEF1ZGl0RXZlbnRzUmVzcG9uc2USKgoGZXZlbnRzGAEgAygLMhoubGluZG0uYWRtaW4udjEuQXVkaXRFdmVudBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkqmAEKC0RldmljZVN0YXRlEhwKGERFVklDRV9TVEFURV9VTlNQRUNJRklFRBAAEhgKFERFVklDRV9TVEFURV9QRU5ESU5HEAESFwoTREVWSUNFX1NUQVRFX0FDVElWRRACEhgKFERFVklDRV9TVEFURV9SRVZPS0VEEAMSHgoaREVWSUNFX1NUQVRFX1JFQ09WRVJZX0hPTEQQBDKRBAoMQWRtaW5TZXJ2aWNlElYKC0xpc3REZXZpY2VzEiIubGluZG0uYWRtaW4udjEuTGlzdERldmljZXNSZXF1ZXN0GiMubGluZG0uYWRtaW4udjEuTGlzdERldmljZXNSZXNwb25zZRJ0ChVDcmVhdGVFbnJvbGxtZW50R3JhbnQSLC5saW5kbS5hZG1pbi52MS5DcmVhdGVFbnJvbGxtZW50R3JhbnRSZXF1ZXN0Gi0ubGluZG0uYWRtaW4udjEuQ3JlYXRlRW5yb2xsbWVudEdyYW50UmVzcG9uc2USdAoVUmV2b2tlRW5yb2xsbWVudEdyYW50EiwubGluZG0uYWRtaW4udjEuUmV2b2tlRW5yb2xsbWVudEdyYW50UmVxdWVzdBotLmxpbmRtLmFkbWluLnYxLlJldm9rZUVucm9sbG1lbnRHcmFudFJlc3BvbnNlElkKDFJldm9rZURldmljZRIjLmxpbmRtLmFkbWluLnYxLlJldm9rZURldmljZVJlcXVlc3QaJC5saW5kbS5hZG1pbi52MS5SZXZva2VEZXZpY2VSZXNwb25zZRJiCg9MaXN0QXVkaXRFdmVudHMSJi5saW5kbS5hZG1pbi52MS5MaXN0QXVkaXRFdmVudHNSZXF1ZXN0GicubGluZG0uYWRtaW4udjEuTGlzdEF1ZGl0RXZlbnRzUmVzcG9uc2VCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChpsaW5kbS9hZG1pbi92MS9hZG1pbi5wcm90bxIObGluZG0uYWRtaW4udjEixQQKBkRldmljZRIKCgJpZBgBIAEoCRIdChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAiABKAkSEAoIaG9zdG5hbWUYAyABKAkSDQoFb3NfaWQYBCABKAkSEgoKb3NfdmVyc2lvbhgFIAEoCRIUCgxhcmNoaXRlY3R1cmUYBiABKAkSNAoPbGlmZWN5Y2xlX3N0YXRlGAsgASgOMhsubGluZG0uYWRtaW4udjEuRGV2aWNlU3RhdGUSLwoLZW5yb2xsZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGxhc3Rfc2Vlbl9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFQoNaG9zdF9zZXF1ZW5jZRgMIAEoBBIYChBwYWNrYWdlX3NlcXVlbmNlGA0gASgEEjQKEGhvc3RfcmVjZWl2ZWRfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj8KG3BhY2thZ2VfYXR0ZW1wdF9yZWNlaXZlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOAoUc25hcHNob3RfcmVjZWl2ZWRfYXQYECABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiMKG3B1Ymxpc2hlZF9zbmFwc2hvdF9zZXF1ZW5jZRgRIAEoBEoECAcQCEoECAoQC1IFc3RhdGVSEmludmVudG9yeV9zZXF1ZW5jZSJPChJMaXN0RGV2aWNlc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiABCJXChNMaXN0RGV2aWNlc1Jlc3BvbnNlEicKB2RldmljZXMYASADKAsyFi5saW5kbS5hZG1pbi52MS5EZXZpY2USFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIi8KEEdldERldmljZVJlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABASKUAQoVSG9zdE9ic2VydmF0aW9uRGV0YWlsEhAKCHNlcXVlbmNlGAEgASgEEjgKC29ic2VydmF0aW9uGAIgASgLMiMubGluZG0uaW52ZW50b3J5LnYxLkhvc3RPYnNlcnZhdGlvbhIvCgtyZWNlaXZlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAilgIKFFBhY2thZ2VBdHRlbXB0RGV0YWlsEhAKCHNlcXVlbmNlGAEgASgEEi4KCnN0YXJ0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2ZpbmlzaGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtyZWNlaXZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNAoGc3RhdHVzGAUgASgOMiQubGluZG0uaW52ZW50b3J5LnYxLkNvbGxlY3Rpb25TdGF0dXMSDwoHYmFja2VuZBgGIAEoCRITCgtzbmFwc2hvdF9pZBgHIAEoCSKHBAoVUGFja2FnZVNuYXBzaG90RGV0YWlsEhMKC3NuYXBzaG90X2lkGAEgASgJEhAKCHNlcXVlbmNlGAIgASgEEjAKBXN0YXRlGAMgASgOMiEubGluZG0uaW52ZW50b3J5LnYxLlNuYXBzaG90U3RhdGUSLgoKY3JlYXRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKc3RhcnRlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLZmluaXNoZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC3JlY2VpdmVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb21taXR0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjEKDXN1cGVyc2VkZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2JhY2tlbmQYCiABKAkSFQoNcGFja2FnZV9jb3VudBgLIAEoDRITCgtiYXRjaF9jb3VudBgMIAEoDRIVCg1lbmNvZGVkX2J5dGVzGA0gASgEEhoKEnBhY2thZ2VzX2F2YWlsYWJsZRgOIAEoCCKxAgoRR2V0RGV2aWNlUmVzcG9uc2USJgoGZGV2aWNlGAEgASgLMhYubGluZG0uYWRtaW4udjEuRGV2aWNlEjMKBGhvc3QYAiABKAsyJS5saW5kbS5hZG1pbi52MS5Ib3N0T2JzZXJ2YXRpb25EZXRhaWwSPQoPcGFja2FnZV9hdHRlbXB0GAMgASgLMiQubGluZG0uYWRtaW4udjEuUGFja2FnZUF0dGVtcHREZXRhaWwSPwoQY3VycmVudF9zbmFwc2hvdBgEIAEoCzIlLmxpbmRtLmFkbWluLnYxLlBhY2thZ2VTbmFwc2hvdERldGFpbBI/ChBzdGFnaW5nX3NuYXBzaG90GAUgASgLMiUubGluZG0uYWRtaW4udjEuUGFja2FnZVNuYXBzaG90RGV0YWlsIqwBChlMaXN0RGV2aWNlUGFja2FnZXNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJcGFnZV9zaXplGAIgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiABBIYCgdtYW5hZ2VyGAQgASgJQge6SARyAhhAEh0KC25hbWVfcHJlZml4GAUgASgJQgi6SAVyAxiABCJnCg1EZXZpY2VQYWNrYWdlEhAKCHBvc2l0aW9uGAEgASgNEgwKBG5hbWUYAiABKAkSDwoHdmVyc2lvbhgDIAEoCRIUCgxhcmNoaXRlY3R1cmUYBCABKAkSDwoHbWFuYWdlchgFIAEoCSLYAQoaTGlzdERldmljZVBhY2thZ2VzUmVzcG9uc2USEwoLc25hcHNob3RfaWQYASABKAkSEAoIc2VxdWVuY2UYAiABKAQSLwoIcGFja2FnZXMYAyADKAsyHS5saW5kbS5hZG1pbi52MS5EZXZpY2VQYWNrYWdlEhcKD25leHRfcGFnZV90b2tlbhgEIAEoCRI1ChFjdXJzb3JfZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEgoKcGFnZV90b2tlbhgGIAEoCSJ9ChxDcmVhdGVFbnJvbGxtZW50R3JhbnRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEiQKEGxpZmV0aW1lX3NlY29uZHMYAiABKA1CCrpIByoFGIQHKDwSGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEikgEKHUNyZWF0ZUVucm9sbG1lbnRHcmFudFJlc3BvbnNlEhAKCGdyYW50X2lkGAEgASgJEg4KBnNlY3JldBgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIfChdzZWNyZXRfZGVsaXZlcnlfdW5rbm93bhgEIAEoCCJzChxSZXZva2VFbnJvbGxtZW50R3JhbnRSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhoKCGdyYW50X2lkGAIgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYASIfCh1SZXZva2VFbnJvbGxtZW50R3JhbnRSZXNwb25zZSJrChNSZXZva2VEZXZpY2VSZXF1ZXN0EhwKCnJlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEhsKCWRldmljZV9pZBgCIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEiFgoUUmV2b2tlRGV2aWNlUmVzcG9uc2UikAEKCkF1ZGl0RXZlbnQSCgoCaWQYASABKAkSLwoLb2NjdXJyZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhAKCGFjdG9yX2lkGAMgASgJEg4KBmFjdGlvbhgEIAEoCRITCgtyZXNvdXJjZV9pZBgFIAEoCRIOCgZyZWFzb24YBiABKAkiUwoWTGlzdEF1ZGl0RXZlbnRzUmVxdWVzdBIbCglwYWdlX3NpemUYASABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEIl4KF0xpc3RBdWRpdEV2ZW50c1Jlc3BvbnNlEioKBmV2ZW50cxgBIAMoCzIaLmxpbmRtLmFkbWluLnYxLkF1ZGl0RXZlbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJKpgBCgtEZXZpY2VTdGF0ZRIcChhERVZJQ0VfU1RBVEVfVU5TUEVDSUZJRUQQABIYChRERVZJQ0VfU1RBVEVfUEVORElORxABEhcKE0RFVklDRV9TVEFURV9BQ1RJVkUQAhIYChRERVZJQ0VfU1RBVEVfUkVWT0tFRBADEh4KGkRFVklDRV9TVEFURV9SRUNPVkVSWV9IT0xEEAQy0AUKDEFkbWluU2VydmljZRJWCgtMaXN0RGV2aWNlcxIiLmxpbmRtLmFkbWluLnYxLkxpc3REZXZpY2VzUmVxdWVzdBojLmxpbmRtLmFkbWluLnYxLkxpc3REZXZpY2VzUmVzcG9uc2USUAoJR2V0RGV2aWNlEiAubGluZG0uYWRtaW4udjEuR2V0RGV2aWNlUmVxdWVzdBohLmxpbmRtLmFkbWluLnYxLkdldERldmljZVJlc3BvbnNlEmsKEkxpc3REZXZpY2VQYWNrYWdlcxIpLmxpbmRtLmFkbWluLnYxLkxpc3REZXZpY2VQYWNrYWdlc1JlcXVlc3QaKi5saW5kbS5hZG1pbi52MS5MaXN0RGV2aWNlUGFja2FnZXNSZXNwb25zZRJ0ChVDcmVhdGVFbnJvbGxtZW50R3JhbnQSLC5saW5kbS5hZG1pbi52MS5DcmVhdGVFbnJvbGxtZW50R3JhbnRSZXF1ZXN0Gi0ubGluZG0uYWRtaW4udjEuQ3JlYXRlRW5yb2xsbWVudEdyYW50UmVzcG9uc2USdAoVUmV2b2tlRW5yb2xsbWVudEdyYW50EiwubGluZG0uYWRtaW4udjEuUmV2b2tlRW5yb2xsbWVudEdyYW50UmVxdWVzdBotLmxpbmRtLmFkbWluLnYxLlJldm9rZUVucm9sbG1lbnRHcmFudFJlc3BvbnNlElkKDFJldm9rZURldmljZRIjLmxpbmRtLmFkbWluLnYxLlJldm9rZURldmljZVJlcXVlc3QaJC5saW5kbS5hZG1pbi52MS5SZXZva2VEZXZpY2VSZXNwb25zZRJiCg9MaXN0QXVkaXRFdmVudHMSJi5saW5kbS5hZG1pbi52MS5MaXN0QXVkaXRFdmVudHNSZXF1ZXN0GicubGluZG0uYWRtaW4udjEuTGlzdEF1ZGl0RXZlbnRzUmVzcG9uc2VCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_inventory_v1_observation, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.Device
@@ -66,9 +68,38 @@ export type Device = Message<"lindm.admin.v1.Device"> & {
   lastSeenAt?: Timestamp | undefined;
 
   /**
-   * @generated from field: uint64 inventory_sequence = 10;
+   * Latest successful field values only. Failures do not clear them.
+   *
+   * @generated from field: uint64 host_sequence = 12;
    */
-  inventorySequence: bigint;
+  hostSequence: bigint;
+
+  /**
+   * @generated from field: uint64 package_sequence = 13;
+   */
+  packageSequence: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp host_received_at = 14;
+   */
+  hostReceivedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp package_attempt_received_at = 15;
+   */
+  packageAttemptReceivedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp snapshot_received_at = 16;
+   */
+  snapshotReceivedAt?: Timestamp | undefined;
+
+  /**
+   * Sequence of the current published snapshot. Zero means none has been published.
+   *
+   * @generated from field: uint64 published_snapshot_sequence = 17;
+   */
+  publishedSnapshotSequence: bigint;
 };
 
 /**
@@ -123,6 +154,349 @@ export const ListDevicesResponseSchema: GenMessage<ListDevicesResponse> = /*@__P
   messageDesc(file_lindm_admin_v1_admin, 2);
 
 /**
+ * @generated from message lindm.admin.v1.GetDeviceRequest
+ */
+export type GetDeviceRequest = Message<"lindm.admin.v1.GetDeviceRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetDeviceRequest.
+ * Use `create(GetDeviceRequestSchema)` to create a new message.
+ */
+export const GetDeviceRequestSchema: GenMessage<GetDeviceRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 3);
+
+/**
+ * @generated from message lindm.admin.v1.HostObservationDetail
+ */
+export type HostObservationDetail = Message<"lindm.admin.v1.HostObservationDetail"> & {
+  /**
+   * @generated from field: uint64 sequence = 1;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: lindm.inventory.v1.HostObservation observation = 2;
+   */
+  observation?: HostObservation | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp received_at = 3;
+   */
+  receivedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.HostObservationDetail.
+ * Use `create(HostObservationDetailSchema)` to create a new message.
+ */
+export const HostObservationDetailSchema: GenMessage<HostObservationDetail> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 4);
+
+/**
+ * @generated from message lindm.admin.v1.PackageAttemptDetail
+ */
+export type PackageAttemptDetail = Message<"lindm.admin.v1.PackageAttemptDetail"> & {
+  /**
+   * @generated from field: uint64 sequence = 1;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 2;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp finished_at = 3;
+   */
+  finishedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp received_at = 4;
+   */
+  receivedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 5;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: string backend = 6;
+   */
+  backend: string;
+
+  /**
+   * @generated from field: string snapshot_id = 7;
+   */
+  snapshotId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PackageAttemptDetail.
+ * Use `create(PackageAttemptDetailSchema)` to create a new message.
+ */
+export const PackageAttemptDetailSchema: GenMessage<PackageAttemptDetail> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 5);
+
+/**
+ * @generated from message lindm.admin.v1.PackageSnapshotDetail
+ */
+export type PackageSnapshotDetail = Message<"lindm.admin.v1.PackageSnapshotDetail"> & {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId: string;
+
+  /**
+   * @generated from field: uint64 sequence = 2;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: lindm.inventory.v1.SnapshotState state = 3;
+   */
+  state: SnapshotState;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 4;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 5;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp finished_at = 6;
+   */
+  finishedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp received_at = 7;
+   */
+  receivedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp committed_at = 8;
+   */
+  committedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp superseded_at = 9;
+   */
+  supersededAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string backend = 10;
+   */
+  backend: string;
+
+  /**
+   * @generated from field: uint32 package_count = 11;
+   */
+  packageCount: number;
+
+  /**
+   * @generated from field: uint32 batch_count = 12;
+   */
+  batchCount: number;
+
+  /**
+   * @generated from field: uint64 encoded_bytes = 13;
+   */
+  encodedBytes: bigint;
+
+  /**
+   * False means retained package rows are gone. package_count remains the
+   * manifest count and must not be read as a successful empty collection.
+   *
+   * @generated from field: bool packages_available = 14;
+   */
+  packagesAvailable: boolean;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PackageSnapshotDetail.
+ * Use `create(PackageSnapshotDetailSchema)` to create a new message.
+ */
+export const PackageSnapshotDetailSchema: GenMessage<PackageSnapshotDetail> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 6);
+
+/**
+ * @generated from message lindm.admin.v1.GetDeviceResponse
+ */
+export type GetDeviceResponse = Message<"lindm.admin.v1.GetDeviceResponse"> & {
+  /**
+   * @generated from field: lindm.admin.v1.Device device = 1;
+   */
+  device?: Device | undefined;
+
+  /**
+   * Absent when no host observation has been accepted.
+   *
+   * @generated from field: lindm.admin.v1.HostObservationDetail host = 2;
+   */
+  host?: HostObservationDetail | undefined;
+
+  /**
+   * Absent when no package attempt has been completed.
+   *
+   * @generated from field: lindm.admin.v1.PackageAttemptDetail package_attempt = 3;
+   */
+  packageAttempt?: PackageAttemptDetail | undefined;
+
+  /**
+   * Absent when no snapshot has been published.
+   *
+   * @generated from field: lindm.admin.v1.PackageSnapshotDetail current_snapshot = 4;
+   */
+  currentSnapshot?: PackageSnapshotDetail | undefined;
+
+  /**
+   * Open upload, if one is still staging. Not a published inventory.
+   *
+   * @generated from field: lindm.admin.v1.PackageSnapshotDetail staging_snapshot = 5;
+   */
+  stagingSnapshot?: PackageSnapshotDetail | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetDeviceResponse.
+ * Use `create(GetDeviceResponseSchema)` to create a new message.
+ */
+export const GetDeviceResponseSchema: GenMessage<GetDeviceResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 7);
+
+/**
+ * @generated from message lindm.admin.v1.ListDevicePackagesRequest
+ */
+export type ListDevicePackagesRequest = Message<"lindm.admin.v1.ListDevicePackagesRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: uint32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * Empty selects the current snapshot and mints a cursor. An echoed token
+   * revisits that page and must not rebind to a newer snapshot.
+   *
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+
+  /**
+   * @generated from field: string manager = 4;
+   */
+  manager: string;
+
+  /**
+   * @generated from field: string name_prefix = 5;
+   */
+  namePrefix: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListDevicePackagesRequest.
+ * Use `create(ListDevicePackagesRequestSchema)` to create a new message.
+ */
+export const ListDevicePackagesRequestSchema: GenMessage<ListDevicePackagesRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 8);
+
+/**
+ * @generated from message lindm.admin.v1.DevicePackage
+ */
+export type DevicePackage = Message<"lindm.admin.v1.DevicePackage"> & {
+  /**
+   * @generated from field: uint32 position = 1;
+   */
+  position: number;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string architecture = 4;
+   */
+  architecture: string;
+
+  /**
+   * @generated from field: string manager = 5;
+   */
+  manager: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DevicePackage.
+ * Use `create(DevicePackageSchema)` to create a new message.
+ */
+export const DevicePackageSchema: GenMessage<DevicePackage> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 9);
+
+/**
+ * @generated from message lindm.admin.v1.ListDevicePackagesResponse
+ */
+export type ListDevicePackagesResponse = Message<"lindm.admin.v1.ListDevicePackagesResponse"> & {
+  /**
+   * @generated from field: string snapshot_id = 1;
+   */
+  snapshotId: string;
+
+  /**
+   * @generated from field: uint64 sequence = 2;
+   */
+  sequence: bigint;
+
+  /**
+   * @generated from field: repeated lindm.admin.v1.DevicePackage packages = 3;
+   */
+  packages: DevicePackage[];
+
+  /**
+   * @generated from field: string next_page_token = 4;
+   */
+  nextPageToken: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp cursor_expires_at = 5;
+   */
+  cursorExpiresAt?: Timestamp | undefined;
+
+  /**
+   * Cursor for the start of this page, including the first page. Echo it to
+   * revisit the same immutable snapshot. Expiry is fixed at mint.
+   *
+   * @generated from field: string page_token = 6;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListDevicePackagesResponse.
+ * Use `create(ListDevicePackagesResponseSchema)` to create a new message.
+ */
+export const ListDevicePackagesResponseSchema: GenMessage<ListDevicePackagesResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_admin, 10);
+
+/**
  * @generated from message lindm.admin.v1.CreateEnrollmentGrantRequest
  */
 export type CreateEnrollmentGrantRequest = Message<"lindm.admin.v1.CreateEnrollmentGrantRequest"> & {
@@ -147,7 +521,7 @@ export type CreateEnrollmentGrantRequest = Message<"lindm.admin.v1.CreateEnrollm
  * Use `create(CreateEnrollmentGrantRequestSchema)` to create a new message.
  */
 export const CreateEnrollmentGrantRequestSchema: GenMessage<CreateEnrollmentGrantRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 3);
+  messageDesc(file_lindm_admin_v1_admin, 11);
 
 /**
  * @generated from message lindm.admin.v1.CreateEnrollmentGrantResponse
@@ -179,7 +553,7 @@ export type CreateEnrollmentGrantResponse = Message<"lindm.admin.v1.CreateEnroll
  * Use `create(CreateEnrollmentGrantResponseSchema)` to create a new message.
  */
 export const CreateEnrollmentGrantResponseSchema: GenMessage<CreateEnrollmentGrantResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 4);
+  messageDesc(file_lindm_admin_v1_admin, 12);
 
 /**
  * @generated from message lindm.admin.v1.RevokeEnrollmentGrantRequest
@@ -206,7 +580,7 @@ export type RevokeEnrollmentGrantRequest = Message<"lindm.admin.v1.RevokeEnrollm
  * Use `create(RevokeEnrollmentGrantRequestSchema)` to create a new message.
  */
 export const RevokeEnrollmentGrantRequestSchema: GenMessage<RevokeEnrollmentGrantRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 5);
+  messageDesc(file_lindm_admin_v1_admin, 13);
 
 /**
  * @generated from message lindm.admin.v1.RevokeEnrollmentGrantResponse
@@ -219,7 +593,7 @@ export type RevokeEnrollmentGrantResponse = Message<"lindm.admin.v1.RevokeEnroll
  * Use `create(RevokeEnrollmentGrantResponseSchema)` to create a new message.
  */
 export const RevokeEnrollmentGrantResponseSchema: GenMessage<RevokeEnrollmentGrantResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 6);
+  messageDesc(file_lindm_admin_v1_admin, 14);
 
 /**
  * @generated from message lindm.admin.v1.RevokeDeviceRequest
@@ -246,7 +620,7 @@ export type RevokeDeviceRequest = Message<"lindm.admin.v1.RevokeDeviceRequest"> 
  * Use `create(RevokeDeviceRequestSchema)` to create a new message.
  */
 export const RevokeDeviceRequestSchema: GenMessage<RevokeDeviceRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 7);
+  messageDesc(file_lindm_admin_v1_admin, 15);
 
 /**
  * @generated from message lindm.admin.v1.RevokeDeviceResponse
@@ -259,7 +633,7 @@ export type RevokeDeviceResponse = Message<"lindm.admin.v1.RevokeDeviceResponse"
  * Use `create(RevokeDeviceResponseSchema)` to create a new message.
  */
 export const RevokeDeviceResponseSchema: GenMessage<RevokeDeviceResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 8);
+  messageDesc(file_lindm_admin_v1_admin, 16);
 
 /**
  * @generated from message lindm.admin.v1.AuditEvent
@@ -301,7 +675,7 @@ export type AuditEvent = Message<"lindm.admin.v1.AuditEvent"> & {
  * Use `create(AuditEventSchema)` to create a new message.
  */
 export const AuditEventSchema: GenMessage<AuditEvent> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 9);
+  messageDesc(file_lindm_admin_v1_admin, 17);
 
 /**
  * @generated from message lindm.admin.v1.ListAuditEventsRequest
@@ -323,7 +697,7 @@ export type ListAuditEventsRequest = Message<"lindm.admin.v1.ListAuditEventsRequ
  * Use `create(ListAuditEventsRequestSchema)` to create a new message.
  */
 export const ListAuditEventsRequestSchema: GenMessage<ListAuditEventsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 10);
+  messageDesc(file_lindm_admin_v1_admin, 18);
 
 /**
  * @generated from message lindm.admin.v1.ListAuditEventsResponse
@@ -345,7 +719,7 @@ export type ListAuditEventsResponse = Message<"lindm.admin.v1.ListAuditEventsRes
  * Use `create(ListAuditEventsResponseSchema)` to create a new message.
  */
 export const ListAuditEventsResponseSchema: GenMessage<ListAuditEventsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_admin, 11);
+  messageDesc(file_lindm_admin_v1_admin, 19);
 
 /**
  * @generated from enum lindm.admin.v1.DeviceState
@@ -394,6 +768,22 @@ export const AdminService: GenService<{
     methodKind: "unary";
     input: typeof ListDevicesRequestSchema;
     output: typeof ListDevicesResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.admin.v1.AdminService.GetDevice
+   */
+  getDevice: {
+    methodKind: "unary";
+    input: typeof GetDeviceRequestSchema;
+    output: typeof GetDeviceResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.admin.v1.AdminService.ListDevicePackages
+   */
+  listDevicePackages: {
+    methodKind: "unary";
+    input: typeof ListDevicePackagesRequestSchema;
+    output: typeof ListDevicePackagesResponseSchema;
   },
   /**
    * @generated from rpc lindm.admin.v1.AdminService.CreateEnrollmentGrant

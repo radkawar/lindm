@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
@@ -119,25 +120,26 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	assertRenewalFence(t, ctx, conn, svc, principal, key)
 	assertConcurrentRenewal(t, ctx, conn, svc, ownerCtx)
 	deviceCtx := withDevicePrincipal(ctx, principal)
-	boot := uuid.NewString()
 	generation := enrolled.Msg.GetEnrollmentGeneration()
 	deviceID := enrolled.Msg.GetDeviceId()
-	if _, err := svc.ReportInventory(deviceCtx, connect.NewRequest(inventory(generation, boot, 1, "alpha"))); err != nil {
+	alpha := hostObservation(generation, 1, "alpha")
+	if _, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(alpha)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.ReportInventory(deviceCtx, connect.NewRequest(inventory(generation, boot, 1, "alpha"))); err != nil {
+	if _, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(alpha)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.ReportInventory(deviceCtx, connect.NewRequest(inventory(generation, boot, 1, "beta"))); connect.CodeOf(err) != connect.CodeAborted {
+	if _, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(hostObservation(generation, 1, "beta"))); connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("changed sequence content: %v", err)
 	}
 	if got := deviceHostname(t, ctx, conn, deviceID); got != "alpha" {
 		t.Fatalf("conflict overwrote hostname %q", got)
 	}
-	if _, err := svc.ReportInventory(deviceCtx, connect.NewRequest(inventory(generation, boot, 2, "beta"))); err != nil {
+	svc.clock = func() time.Time { return time.Now().Add(snapshotAttemptInterval) }
+	if _, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(hostObservation(generation, 2, "beta"))); err != nil {
 		t.Fatal(err)
 	}
-	old, err := svc.ReportInventory(deviceCtx, connect.NewRequest(inventory(generation, boot, 1, "alpha")))
+	old, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(hostObservation(generation, 1, "alpha")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,18 +170,24 @@ func (s *Service) authenticateDeviceRequest(r *http.Request, leaf *x509.Certific
 	return s.bindCertificate(r.Context(), got, deviceID, generationID, now)
 }
 
-func inventory(generation, boot string, seq uint64, host string) *devicev1.ReportInventoryRequest {
-	return &devicev1.ReportInventoryRequest{
+func hostObservation(generation string, seq uint64, host string) *devicev1.ReportHostObservationRequest {
+	when := time.Now().UTC()
+	return &devicev1.ReportHostObservationRequest{
 		EnrollmentGeneration: generation,
-		BootId:               boot,
-		Sequence:             seq,
 		SessionEpoch:         1,
-		Hostname:             host,
-		OsId:                 "debian",
-		OsVersion:            "12",
-		Architecture:         "amd64",
-		PackagesComplete:     true,
-		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+		Sequence:             seq,
+		Observation: &inventoryv1.HostObservation{
+			StartedAt: timestamppb.New(when), FinishedAt: timestamppb.New(when),
+			BootId:         observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, uuid.NewString()),
+			Hostname:       observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, host),
+			OsId:           observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "debian"),
+			OsVersion:      observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "12"),
+			Architecture:   observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "amd64"),
+			KernelRelease:  observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "6.8.0"),
+			HardwareVendor: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
+			HardwareModel:  observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
+			HardwareSerial: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
+		},
 	}
 }
 

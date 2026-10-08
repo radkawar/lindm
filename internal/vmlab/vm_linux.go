@@ -34,14 +34,46 @@ const maxGuestOutput = 64 << 20
 // Its SSH transport is pinned to the host key injected through private NoCloud.
 // It never changes host networking or exposes a management port off loopback.
 type guestVM struct {
-	dir     string
-	cmd     *exec.Cmd
-	done    chan struct{}
-	waitErr error
-	log     *vmLog
-	address string
-	config  *ssh.ClientConfig
-	client  *ssh.Client
+	dir                string
+	cmd                *exec.Cmd
+	done               chan struct{}
+	waitErr            error
+	log                *vmLog
+	address            string
+	config             *ssh.ClientConfig
+	client             *ssh.Client
+	captureDiagnostics bool
+	lastOperation      *guestOperationDiagnostic
+}
+
+type vmRuntimeEvidence struct {
+	Accelerator     string `json:"accelerator"`
+	QEMUVersion     string `json:"qemu_version"`
+	FirmwareVendor  string `json:"firmware_vendor"`
+	FirmwareVersion string `json:"firmware_version"`
+}
+
+func (v *guestVM) runtimeEvidence(ctx context.Context) (*vmRuntimeEvidence, error) {
+	if err := v.processError(); err != nil {
+		return nil, err
+	}
+	// Query the running executable, not a PATH entry which could have changed
+	// after launch. Firmware is observed inside this guest.
+	version, err := hostCommand(ctx, v.dir, fmt.Sprintf("/proc/%d/exe", v.cmd.Process.Pid), nil, "--version")
+	if err != nil {
+		return nil, err
+	}
+	qemu, _, _ := strings.Cut(string(version), "\n")
+	firmware, err := v.run(ctx, "cat /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/bios_version", nil, 4096, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("read guest firmware evidence: %w", err)
+	}
+	fields := strings.Split(strings.TrimSuffix(string(firmware), "\n"), "\n")
+	if strings.TrimSpace(qemu) == "" || len(fields) != 2 || strings.TrimSpace(fields[0]) == "" || strings.TrimSpace(fields[1]) == "" {
+		return nil, errors.New("incomplete hypervisor or guest firmware evidence")
+	}
+	// The launch requires accel=kvm and has no emulation fallback.
+	return &vmRuntimeEvidence{Accelerator: "kvm", QEMUVersion: qemu, FirmwareVendor: fields[0], FirmwareVersion: fields[1]}, nil
 }
 
 // vmLog retains only bounded process diagnostics, never guest serial output.
@@ -110,7 +142,7 @@ func hostCommand(ctx context.Context, dir, name string, files []*os.File, args .
 	return out.data, nil
 }
 
-func newGuestVM(ctx context.Context, base *os.File, workDir string) (_ *guestVM, err error) {
+func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool) (_ *guestVM, err error) {
 	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
 	if err != nil {
 		return nil, fmt.Errorf("KVM access is required (no software fallback): %w", err)
@@ -229,8 +261,11 @@ func newGuestVM(ctx context.Context, base *os.File, workDir string) (_ *guestVM,
 		return nil, err
 	}
 	args := []string{
-		"-no-user-config", "-nodefaults", "-display", "none", "-serial", "none", "-monitor", "none", "-no-reboot",
+		"-no-user-config", "-nodefaults", "-display", "none", "-serial", "none", "-monitor", "none",
 		"-machine", "q35,accel=kvm", "-cpu", "host", "-m", "2048", "-smp", "2",
+	}
+	if !allowReboot {
+		args = append(args, "-no-reboot")
 	}
 	for _, block := range []map[string]any{
 		{"driver": "file", "node-name": "base-file", "filename": "/proc/self/fd/3", "read-only": true},
@@ -375,11 +410,47 @@ func (w *limitedOutput) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// guestCommandResult keeps bounded diagnostics private to the lab caller.
+// ExitCode is meaningful only when runResult returns a nil transport error.
+type guestCommandResult struct {
+	Stdout   []byte
+	Stderr   []byte
+	ExitCode int
+}
+
+type guestOperationDiagnostic struct {
+	Command         string
+	ExitCode        int
+	Completed       bool
+	Stdout          string
+	Stderr          string
+	StdoutTruncated bool
+	StderrTruncated bool
+}
+
 func (v *guestVM) run(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) ([]byte, error) {
+	result, err := v.runResult(ctx, command, input, limit, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if result.ExitCode != 0 {
+		return result.Stdout, fmt.Errorf("guest operation exited with status %d (stderr bytes %d)", result.ExitCode, len(result.Stderr))
+	}
+	if len(bytes.TrimSpace(result.Stderr)) != 0 {
+		return nil, errors.New("guest operation emitted unexpected stderr")
+	}
+	return result.Stdout, nil
+}
+
+func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+	var result guestCommandResult
+	if v.client == nil {
+		return result, errors.New("guest SSH is not connected")
+	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := v.processError(); err != nil {
-		return nil, err
+		return result, err
 	}
 	// Closing the transport interrupts channel creation, requests and stream I/O.
 	// A timeout ends the scenario; a possibly ambiguous session is never reused.
@@ -387,32 +458,44 @@ func (v *guestVM) run(ctx context.Context, command string, input io.Reader, limi
 	defer stop()
 	session, err := v.client.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("open pinned SSH session: %w", err)
+		return result, fmt.Errorf("open pinned SSH session: %w", err)
 	}
 	defer func() { _ = session.Close() }() // Run already checked remote completion.
 	stdout := &limitedOutput{limit: limit}
-	stderr := &limitedOutput{limit: 8192}
+	stderr := &limitedOutput{limit: limit}
 	session.Stdin, session.Stdout, session.Stderr = input, stdout, stderr
 	err = session.Run(command)
+	if v.captureDiagnostics {
+		defer func() {
+			var exit *ssh.ExitError
+			v.lastOperation = &guestOperationDiagnostic{
+				Command: command, ExitCode: result.ExitCode,
+				Completed:       ctx.Err() == nil && (err == nil || errors.As(err, &exit)),
+				Stdout:          string(stdout.data[:min(len(stdout.data), 16<<10)]),
+				Stderr:          string(stderr.data[:min(len(stderr.data), 16<<10)]),
+				StdoutTruncated: len(stdout.data) > 16<<10 || stdout.exceeded,
+				StderrTruncated: len(stderr.data) > 16<<10 || stderr.exceeded,
+			}
+		}()
+	}
 	if processErr := v.processError(); processErr != nil {
-		return nil, processErr
+		return result, processErr
 	}
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("guest operation deadline: %w", ctx.Err())
+		return result, fmt.Errorf("guest operation deadline: %w", ctx.Err())
 	}
 	if stdout.exceeded || stderr.exceeded {
-		return nil, errors.New("guest operation output exceeds capacity")
+		return result, errors.New("guest operation output exceeds capacity")
 	}
+	result.Stdout, result.Stderr = stdout.data, stderr.data
 	// Do not print guest-controlled stderr: it may contain host facts or seed keys.
 	if err != nil {
 		var exit *ssh.ExitError
 		if errors.As(err, &exit) {
-			return stdout.data, fmt.Errorf("guest operation exited with status %d (stderr bytes %d)", exit.ExitStatus(), len(stderr.data))
+			result.ExitCode = exit.ExitStatus()
+			return result, nil
 		}
-		return nil, errors.New("guest operation transport failed")
+		return result, errors.New("guest operation transport failed")
 	}
-	if len(bytes.TrimSpace(stderr.data)) != 0 {
-		return nil, errors.New("guest operation emitted unexpected stderr")
-	}
-	return stdout.data, nil
+	return result, nil
 }

@@ -1,6 +1,16 @@
 -- All authority reads/writes below are performed after GetDeviceForUpdate.
 -- name: GetGenerationAuthority :one
-SELECT id, device_id, state, session_epoch, renewal_issuance_count
+SELECT
+    id,
+    device_id,
+    state,
+    session_epoch,
+    renewal_issuance_count,
+    host_sequence,
+    package_sequence,
+    last_host_admission_at,
+    last_package_admission_at,
+    current_snapshot_id
 FROM enrollment_generations
 WHERE id = sqlc.arg('id');
 

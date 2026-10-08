@@ -43,6 +43,7 @@ type VMInspectResult struct {
 	ImageSHA256     string
 	AgentSHA256     string
 	MatchedPackages int
+	Runtime         *vmRuntimeEvidence
 }
 
 // InspectVM fetches/reverifies the pinned image, boots a disposable KVM overlay,
@@ -69,34 +70,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if binary.Machine != elf.EM_X86_64 || binary.Class != elf.ELFCLASS64 || (binary.Type != elf.ET_EXEC && binary.Type != elf.ET_DYN) {
 		return nil, errors.New("agent must be an executable amd64 ELF binary")
 	}
-	// Check local execution prerequisites before downloading a large image.
-	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
-	if err != nil {
-		return nil, fmt.Errorf("KVM access is required (no software fallback): %w", err)
-	}
-	if err := kvm.Close(); err != nil {
-		return nil, err
-	}
-	verified, err := (Fetcher{}).Fetch(ctx, manifest, options.CacheDir)
-	if err != nil {
-		return nil, err
-	}
-	base, err := openRegular(verified.Path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { err = errors.Join(err, base.Close()) }()
-	// Pin the verified bytes to the descriptor inherited by QEMU, rather than
-	// reopening a pathname after verification. QEMU opens that base read-only.
-	hash := sha256.New()
-	count, err := copyVMBytes(ctx, hash, base, verified.Size)
-	if err != nil {
-		return nil, fmt.Errorf("pin verified image: %w", err)
-	}
-	if count != verified.Size || hex.EncodeToString(hash.Sum(nil)) != verified.SHA256 {
-		return nil, errors.New("verified image changed before VM launch")
-	}
-	vm, err := newGuestVM(ctx, base, options.WorkDir)
+	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, false)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +86,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if _, err := agent.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	hash.Reset()
+	hash := sha256.New()
 	if _, err := copyVMBytes(ctx, io.MultiWriter(snapshot, hash), agent, 256<<20); err != nil {
 		return nil, fmt.Errorf("snapshot agent: %w", err)
 	}
@@ -121,6 +95,10 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 		return nil, err
 	}
 	if err := vm.connect(ctx); err != nil {
+		return nil, err
+	}
+	runtimeEvidence, err := vm.runtimeEvidence(ctx)
+	if err != nil {
 		return nil, err
 	}
 	if status, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
@@ -177,7 +155,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if err := compareVMObservation(before, observation); err != nil {
 		return nil, err
 	}
-	return &VMInspectResult{Distribution: manifest.Distribution, Version: manifest.Version, ImageID: manifest.Id, ImageSHA256: verified.SHA256, AgentSHA256: agentDigest, MatchedPackages: len(observation.Packages.Packages)}, nil
+	return &VMInspectResult{Distribution: manifest.Distribution, Version: manifest.Version, ImageID: manifest.Id, ImageSHA256: verified.SHA256, AgentSHA256: agentDigest, MatchedPackages: len(observation.Packages.Packages), Runtime: runtimeEvidence}, nil
 }
 
 func copyVMBytes(ctx context.Context, dst io.Writer, src io.Reader, limit int64) (int64, error) {

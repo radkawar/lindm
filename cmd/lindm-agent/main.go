@@ -19,6 +19,12 @@ import (
 
 const usage = `Usage: lindm-agent inspect
        lindm-agent verify-bootstrap -root FILE -bundle FILE
+       lindm-agent executor
+       lindm-agent run
+       lindm-agent bootstrap -root FILE -bundle FILE -grant FILE
+       lindm-agent resume
+       lindm-agent status
+       lindm-agent version
        lindm-agent help
 
 inspect collects bounded local host evidence and a complete native package
@@ -27,6 +33,9 @@ Unavailable or failed package collection is printed with its typed status and
 returns a nonzero exit code. No enrollment, service, or lifecycle claim is made.
 
 verify-bootstrap validates bootstrap trust material without enrolling a device.
+executor, bootstrap, resume, and status use /etc/lindm/executor.json.
+run uses /etc/lindm/agent.json as the configured unprivileged network account.
+version prints the packaging version and a newline.
 `
 
 func main() {
@@ -39,17 +48,38 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, output io.Writer) error {
-	if len(args) > 0 && args[0] == "verify-bootstrap" {
-		return verifyBootstrap(ctx, args[1:])
+	if len(args) == 0 {
+		return errors.New("expected a command; run lindm-agent help")
 	}
-	if len(args) == 1 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") ||
-		len(args) == 2 && args[0] == "inspect" && (args[1] == "--help" || args[1] == "-h") {
+	switch args[0] {
+	case "verify-bootstrap":
+		return verifyBootstrap(ctx, args[1:])
+	case "executor":
+		return serveExecutor(ctx, args[1:])
+	case "run":
+		return serveNetwork(ctx, args[1:])
+	case "bootstrap":
+		return bootstrapCommand(ctx, args[1:])
+	case "resume":
+		return resumeCommand(ctx, args[1:])
+	case "status":
+		return statusCommand(ctx, args[1:], output)
+	case "version":
+		return versionCommand(args[1:], output)
+	case "help", "--help", "-h":
 		_, err := io.WriteString(output, usage)
 		return err
+	case "inspect":
+		if len(args) != 1 {
+			return errors.New("inspect accepts no flags or paths")
+		}
+		return inspect(ctx, output)
+	default:
+		return fmt.Errorf("unknown command %q", args[0])
 	}
-	if len(args) != 1 || args[0] != "inspect" {
-		return errors.New("expected inspect, verify-bootstrap, or help; inspect accepts no flags or paths")
-	}
+}
+
+func inspect(ctx context.Context, output io.Writer) error {
 	observation, err := inventory.Collect(ctx)
 	if err != nil {
 		return err

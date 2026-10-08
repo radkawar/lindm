@@ -304,6 +304,95 @@ manifests and scenario runner across the confirmed matrix; do not add one-off di
 scripts. Out-of-band SSH is an oracle/control channel, not a substitute for agent
 work. No tests of hook wiring, copied config or command strings.
 
+### Running the native lifecycle lane
+
+Run `make build dev-up dev-trust`, then keep `lindmd serve` running with the
+development configuration described in the README. Use a private build directory
+under trusted ancestry, not a group-writable checkout. The tools reject unsafe
+ownership, symlinks and accidental reuse of signing homes. They never change host
+package trust or install the agent on the host.
+
+```sh
+work="$HOME/.cache/lindm-native"
+mkdir -m 700 "$work"
+artifacts/bin/lab packages keygen -output "$work/key"
+```
+
+Set `FINGERPRINT` to the full fingerprint printed by `keygen`; independently retain
+it as the expected package signer. This key is development-only and is separate
+from execution, transport, device and TUF authority. Build two actual versions:
+
+```sh
+for version in 0.1.0 0.1.1; do
+  artifacts/bin/lab packages build -repo . -version "$version" \
+    -revision development -output "$work/$version" \
+    -signer-home "$work/key/package-signing-gnupg" \
+    -fingerprint "$FINGERPRINT" -development-key \
+    -record "$work/$version/build.json"
+done
+artifacts/bin/lab packages apt -output "$work/repository" \
+  -signer-home "$work/key/package-signing-gnupg" \
+  -fingerprint "$FINGERPRINT" -development-key \
+  -record "$work/repository/repository.json" \
+  "$work/0.1.0/lindm-agent_0.1.0_amd64.deb" \
+  "$work/0.1.1/lindm-agent_0.1.1_amd64.deb"
+artifacts/bin/lab packages rejection-fixtures \
+  -build "$work/0.1.0/build.json" \
+  -apt-repository "$work/repository/repository.json" \
+  -output "$work/rejections" \
+  -signer-home "$work/key/package-signing-gnupg" \
+  -fingerprint "$FINGERPRINT" -record "$work/rejections/fixtures.json"
+```
+
+The rejection fixtures contain real unsigned, tampered and wrong-signer inputs,
+not mocked installer responses. The lifecycle runner requires native authentication
+failure and checks that no package, account or service state was installed.
+
+```sh
+artifacts/bin/lab vm lifecycle \
+  -manifest lab/images/ubuntu-noble-amd64.json \
+  -first-build "$work/0.1.0/build.json" \
+  -second-build "$work/0.1.1/build.json" \
+  -apt-repository "$work/repository/repository.json" \
+  -rejections "$work/rejections/fixtures.json" \
+  -public-key "$work/0.1.0/lindm-package-signing.asc" \
+  -fingerprint "$FINGERPRINT" -record "$work/ubuntu-lifecycle.json"
+artifacts/bin/lab vm lifecycle \
+  -manifest lab/images/fedora-44-x86_64.json \
+  -first-build "$work/0.1.0/build.json" \
+  -second-build "$work/0.1.1/build.json" \
+  -rejections "$work/rejections/fixtures.json" \
+  -public-key "$work/0.1.0/lindm-package-signing.asc" \
+  -fingerprint "$FINGERPRINT" -record "$work/fedora-lifecycle.json"
+```
+
+Use fresh output/record paths for another run; records are not overwritten. Each
+successful result follows native installation, lost-issuance recovery, distinct-UID
+privilege probes, complete public-API inventory comparison, upgrade, reboot,
+removal/purge/reinstallation, corrupt-spool recovery, failed collection preserving
+the last snapshot, revocation and missing-journal recovery hold. Cleanup revokes
+owned server authority and removes the disposable guest. Optional `-observe-for 3m`
+pauses after the first two publications for console inspection (maximum ten minutes
+per pause). Before upgrade, the lab selects a freshly compared current snapshot;
+retained-cursor assertions use this baseline, not the potentially older initial
+publication. The result records it as `upgrade_baseline`. While that baseline
+remains current, the lab may refresh its comparison cursor; supersession freezes
+the cursor and its expiry. This never extends a server cursor's lifetime.
+
+A native query can fail while an upgrade finishes. The lab allows eighteen minutes
+for normal ten-minute recollection, five-minute server admission and heartbeat
+jitter; it does not change production timers or turn failed collection into success.
+The complete lane is bounded at sixty minutes plus twice the observation pause.
+
+Executables and package lifecycle helpers live in `/usr/libexec/lindm`. Fedora
+runtime assertions require SELinux Enforcing, vendor-matching executable labels
+and service domains outside `init_t`. This is compatibility with vendor policy,
+not a custom SELinux confinement claim. No relabeling or policy override is used.
+Transport diagnostics use a descriptor-relative, no-symlink open: systemd's
+`RestrictSUIDSGID=yes` blocks `openat2` even for read-only requests. Root may read
+the network-owned final spool directory for diagnostics; mutable state and all
+ancestor checks retain their original ownership requirements.
+
 ## 6. Required G2 failure boundaries
 
 - Real SSO grant issuance, secret redaction/hash-only persistence and lost issuance.
@@ -335,10 +424,12 @@ not imply G3 policy execution, G4 sessions or any unrun release/hardware gate.
 - [APT authenticated repository chain](https://manpages.debian.org/trixie/apt/apt-secure.8.en.html).
 - [DNF package-signature controls](https://dnf.readthedocs.io/en/latest/conf_ref.html#localpkg-gpgcheck-label).
 - [Fedora image/signing-key verification](https://fedoraproject.org/security/).
+- [systemd RestrictSUIDSGID and indirect syscall arguments](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#RestrictSUIDSGID=).
 
 Local prerequisite inspection found QEMU/qemu-img 8.2.2, readable/writable KVM,
 `dpkg-deb`, `dpkg-scanpackages`, `rpm`, `rpmsign`, `gpgv` and `cloud-localds`.
-That is tool availability, not a VM installation result. DSSE v0.11.1 and
-go-tuf/v2 v2.4.2 are now pinned and exercised by the bootstrap verifier and real
-development fixtures. Modernc SQLite v1.60.1 and nFPM v2.47.0 remain researched
-compatible candidates, not adopted or qualified dependencies.
+These are prerequisites, not proof of native installation. DSSE v0.11.1 and
+go-tuf/v2 v2.4.2 are pinned and exercised by the bootstrap verifier and real
+development fixtures. Modernc SQLite v1.60.1 backs the protected journal and
+unprivileged spool through sqlc. Native packages use the host DEB/RPM tools;
+nFPM remains a researched candidate, not an adopted dependency.

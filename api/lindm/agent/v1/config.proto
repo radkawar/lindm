@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AgentConfig is the serialized configuration for the privileged executor and
+// the unprivileged network process. It contains paths and the portable network
+// account name, never secrets, numeric UIDs, or grants.
+//
+// The executor resolves network_user once through the OS user database at
+// process start and freezes that nonzero UID for SO_PEERCRED. Packaging writes
+// the account name (lindm); it does not patch a numeric UID into this file.
+// Heartbeat, collection, and local RPC deadlines are fixed in the network
+// driver, not configuration knobs.
+message AgentConfig {
+  // Protected executor state directory. Production packaging creates it mode
+  // 0700 and root-owned. This is not the runtime socket directory.
+  string state_directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Root-owned runtime directory that the network account can traverse. It is
+  // not a 0700 private state directory.
+  string runtime_directory = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Socket file name inside runtime_directory. Not a path.
+  string socket_name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9._-]+$"
+  }];
+  // Canonical portable account name. Numeric UIDs and root are rejected.
+  string network_user = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-z_][a-z0-9_-]{0,31}$"
+    not_in: "root"
+  }];
+  // Private unprivileged observation spool, production /var/lib/lindm/agent.
+  // The executor does not open it. It must be canonical and distinct from the
+  // state and runtime directories.
+  string spool_directory = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}

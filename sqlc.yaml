@@ -51,3 +51,12 @@ sql:
         out: internal/agent/journal/journaldb
         emit_empty_slices: true
         omit_unused_structs: true
+  - engine: sqlite
+    schema: internal/agent/spool/schema.sql
+    queries: internal/agent/spool/queries.sql
+    gen:
+      go:
+        package: spooldb
+        out: internal/agent/spool/spooldb
+        emit_empty_slices: true
+        omit_unused_structs: true

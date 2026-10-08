@@ -46,7 +46,9 @@ export function ConsoleShell({
   children: ReactNode;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const title = NAV.find((item) => item.to === pathname)?.label ?? "Control plane";
+  const title =
+    NAV.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))?.label ??
+    "Control plane";
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
@@ -103,7 +105,7 @@ function NavigationMenu({ pathname }: { pathname: string }) {
       {NAV.map((item) => (
         <SidebarMenuItem key={item.to}>
           <SidebarMenuButton
-            isActive={pathname === item.to}
+            isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}
             tooltip={item.label}
             render={<Link to={item.to} onClick={() => setOpenMobile(false)} />}
           >

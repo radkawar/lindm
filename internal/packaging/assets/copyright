@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: lindm-agent
+
+Files: *
+Copyright: Lindm
+License: UNLICENSED
+ No public software license has been selected for this internal
+ development package. It is not licensed for redistribution.

@@ -193,6 +193,77 @@ additional actionable defect. Cryptographic state admission and lifecycle transi
 authorization remain responsibilities of the executor caller, not claims made by the
 storage library. Distinct-UID VM process isolation is still an integration gate.
 
+### Packaged executor, inventory and native lifecycle reviews
+
+Independent implementation reviews found boundary defects before native
+qualification. Corrections were exercised against the actual failing paths:
+
+- Executor startup reacquired its own directory lock; socket permission changes
+  targeted the socket descriptor instead of its filesystem inode; expired prior
+  private credentials remained in the journal. Shared lock ownership, pinned
+  pathname-inode operations and durable key retirement replaced those paths.
+- Spool recovery lost valid queued empty inventories, mishandled orphan ownership
+  rows, underestimated allocated blocks, retained cancelled payloads and classified
+  cancellation as corruption. Regression failures preceded the fixes; the
+  corrected spool suite passed under the race detector.
+- Snapshot admission had PostgreSQL timestamp-type inference errors; pagination
+  exceeded encoded response bounds, mishandled literal prefixes and could admit a
+  cursor that expired while waiting for its lock. Device detail could mix database
+  snapshots, and a maximum-size valid JSON batch exceeded the transport allowance.
+  Real PostgreSQL and Connect regressions reproduced these failures and passed
+  after correction.
+- Packaging truncated large tool output, mishandled RPM payload paths, overwrote
+  dynamic account IDs in shell helpers and let a contending signer terminate the
+  lock owner's GnuPG agent. Actual package/signing checks cover streaming,
+  authenticated payloads, retained ownership and exclusive signing cleanup.
+  Duplicate packaging assets and source-text assertions were removed.
+- Chromium reproduced cached “Latest snapshot” selection, lost backward navigation
+  after a page-size change and incorrect “newer snapshot” notices when the table
+  preceded the detail refresh. Corrected navigation was exercised on published VM
+  inventory. Desktop/mobile views retained 665 package records and their original
+  freshness after a permission-denied attempt, then displayed revocation.
+
+Both Ubuntu 24.04 and Fedora 44 subsequently completed the full corrected
+`/usr/libexec/lindm` packaged-agent lifecycle: native signature rejection,
+installation, upgrade, reboot, removal/reinstall, interrupted-enrollment recovery,
+distinct-UID privilege probes, spool recovery, failed collection preserving the
+last snapshot, revocation and missing-journal recovery hold. Exact package hashes
+and run identities are recorded in the implementation evidence ledger.
+
+Fedora enforcing-policy execution exposed two independent defects. The old
+`/usr/lib/lindm` executable received `lib_t`, leaving services in `init_t` and
+denying network access. The standard libexec location now passes vendor-label,
+Enforcing and non-`init_t` process assertions and published 429 native package
+records through mTLS. Separately, `RestrictSUIDSGID=yes` denied `openat2` for
+transport diagnostics. Descriptor-relative `openat` preserves no-symlink and
+inode validation without weakening the unit. Root diagnostics accept only the
+configured final spool owner; mutable-state and ancestor ownership remain strict.
+Root and ordinary-user filesystem regressions passed; independent supplemental
+reviews found no additional actionable defect in these two corrections.
+
+That Fedora run then reported a native RPM collection failure during upgrade,
+preserving its previous snapshot. The laboratory's seven-minute wait was shorter
+than the agent's normal ten-minute recollection interval. The bounded oracle now
+allows recollection, server admission and heartbeat jitter without changing product
+timers or treating a failed attempt as success. The corrected Fedora run observed
+successful recollection and completed the remaining lifecycle.
+
+The integration suite also exposed a test observation race: `/proc/PID/status`
+returned ESRCH when an already-killed ISO helper was reaped. The seed-cancellation
+regression now pins the paused helper with a pidfd, observes actual exit with
+bounded polling and avoids signalling a reused PID during cleanup. Its real-tool
+focused run passed; private-staging and descendant-exit assertions remain intact.
+
+Review also found that observation pauses could age the original comparison
+cursor out before upgrade. The lab now selects and records a fully compared
+current baseline immediately before upgrade, refreshes its comparison cursor only
+while that snapshot remains current and preserves the fixed cursor after
+supersession. Independent corrective review found no remaining defect in this
+change; maximum-pause runtime verification is still in progress. Executor, spool,
+snapshot, console and native-signing corrective reviews likewise returned no
+additional actionable findings in their assigned scopes. These are scoped reviews,
+not whole-product security certification.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

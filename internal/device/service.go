@@ -22,6 +22,7 @@ import (
 	"lindm/gen/lindm/device/v1/devicev1connect"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/trust"
@@ -34,6 +35,10 @@ const (
 	rpcTimeout         = 15 * time.Second
 	defaultPageSize    = 50
 	maxPageSize        = 200
+
+	// JSON base64 expands the maximum decoded batch to 1 MiB. Allow a
+	// bounded envelope only for PutPackageBatch; response limits stay fixed.
+	maxBatchRequestBytes = ((maxBatchBytes + 2) / 3 * 4) + (1 << 10)
 
 	statePending      = "pending"
 	stateActive       = "active"
@@ -56,21 +61,24 @@ const (
 // Config holds resolved control-plane resources. It is not a serialized
 // configuration document; lindm.config.v1.ServerConfig is that contract.
 type Config struct {
-	DeploymentID  string
-	CACertificate *x509.Certificate
-	CAKey         crypto.Signer
+	DeploymentID         string
+	CACertificate        *x509.Certificate
+	CAKey                crypto.Signer
+	InventoryBudgetBytes int64
 }
 
 // Service implements the admin, enrollment, and device RPC surfaces.
 type Service struct {
-	pool         *pgxpool.Pool
-	deploymentID uuid.UUID
-	ca           *x509.Certificate
-	caKey        crypto.Signer
-	validator    *validate.Interceptor
-	slots        chan struct{}
-	clock        func() time.Time
-	authority    *trust.Authority
+	pool            *pgxpool.Pool
+	deploymentID    uuid.UUID
+	ca              *x509.Certificate
+	caKey           crypto.Signer
+	validator       *validate.Interceptor
+	rules           protovalidate.Validator
+	slots           chan struct{}
+	clock           func() time.Time
+	authority       *trust.Authority
+	inventoryBudget int64
 }
 
 var (
@@ -93,9 +101,18 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if err := samePublicKey(cfg.CACertificate.PublicKey, cfg.CAKey.Public()); err != nil {
 		return nil, err
 	}
+	budget := cfg.InventoryBudgetBytes
+	if budget == 0 {
+		budget = defaultInventoryBudget
+	}
+	if budget < minInventoryBudget || budget > maxInventoryBudget {
+		return nil, errors.New("device: inventory budget is outside the admitted range")
+	}
 	compiled, err := protovalidate.New(
 		protovalidate.WithMessages(
 			&adminv1.ListDevicesRequest{},
+			&adminv1.GetDeviceRequest{},
+			&adminv1.ListDevicePackagesRequest{},
 			&adminv1.CreateEnrollmentGrantRequest{},
 			&adminv1.RevokeEnrollmentGrantRequest{},
 			&adminv1.RevokeDeviceRequest{},
@@ -104,8 +121,13 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&enrollmentv1.RetrieveIssuanceRequest{},
 			&devicev1.AcquireSessionRequest{},
 			&devicev1.GetSyncStateRequest{},
-			&devicev1.ReportInventoryRequest{},
+			&devicev1.ReportHostObservationRequest{},
+			&devicev1.ReportPackageAttemptRequest{},
+			&devicev1.BeginPackageSnapshotRequest{},
+			&devicev1.PutPackageBatchRequest{},
+			&devicev1.CommitPackageSnapshotRequest{},
 			&devicev1.RenewIdentityRequest{},
+			&inventoryv1.PackageBatch{},
 		),
 		protovalidate.WithDisableLazy(),
 	)
@@ -117,14 +139,16 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		return nil, err
 	}
 	return &Service{
-		pool:         pool,
-		deploymentID: deploymentID,
-		ca:           cfg.CACertificate,
-		caKey:        cfg.CAKey,
-		validator:    validate.NewInterceptor(validate.WithValidator(compiled)),
-		slots:        make(chan struct{}, maxInFlight),
-		clock:        time.Now,
-		authority:    authority,
+		pool:            pool,
+		deploymentID:    deploymentID,
+		ca:              cfg.CACertificate,
+		caKey:           cfg.CAKey,
+		validator:       validate.NewInterceptor(validate.WithValidator(compiled)),
+		rules:           compiled,
+		slots:           make(chan struct{}, maxInFlight),
+		clock:           time.Now,
+		authority:       authority,
+		inventoryBudget: budget,
 	}, nil
 }
 
@@ -139,7 +163,13 @@ func (s *Service) EnrollmentHandler() (string, http.Handler) {
 }
 
 func (s *Service) DeviceHandler() (string, http.Handler) {
-	path, rpc := devicev1connect.NewDeviceServiceHandler(s, s.handlerOptions()...)
+	options := append(s.handlerOptions(), connect.WithConditionalHandlerOptions(func(spec connect.Spec) []connect.HandlerOption {
+		if spec.Procedure == devicev1connect.DeviceServicePutPackageBatchProcedure {
+			return []connect.HandlerOption{connect.WithReadMaxBytes(maxBatchRequestBytes)}
+		}
+		return nil
+	}))
+	path, rpc := devicev1connect.NewDeviceServiceHandler(s, options...)
 	limited := http.MaxBytesHandler(rpc, maxMessageBytes+maxMessageOverhead)
 	return path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := bound(r.Context())

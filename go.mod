@@ -15,6 +15,7 @@ require (
 	github.com/sigstore/sigstore v1.10.6
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	golang.org/x/crypto v0.56.0
+	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.48.0
 	google.golang.org/protobuf v1.36.12

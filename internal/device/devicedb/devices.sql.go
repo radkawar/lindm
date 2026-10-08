@@ -24,6 +24,130 @@ func (q *Queries) ActivateGeneration(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const admitHostSequence = `-- name: AdmitHostSequence :exec
+UPDATE enrollment_generations
+SET
+    host_sequence = $1,
+    last_host_admission_at = $2
+WHERE id = $3
+`
+
+type AdmitHostSequenceParams struct {
+	HostSequence int64
+	AdmittedAt   pgtype.Timestamptz
+	ID           uuid.UUID
+}
+
+func (q *Queries) AdmitHostSequence(ctx context.Context, arg AdmitHostSequenceParams) error {
+	_, err := q.db.Exec(ctx, admitHostSequence, arg.HostSequence, arg.AdmittedAt, arg.ID)
+	return err
+}
+
+const admitPackageSequence = `-- name: AdmitPackageSequence :exec
+UPDATE enrollment_generations
+SET
+    package_sequence = $1,
+    last_package_admission_at = $2
+WHERE id = $3
+`
+
+type AdmitPackageSequenceParams struct {
+	PackageSequence int64
+	AdmittedAt      pgtype.Timestamptz
+	ID              uuid.UUID
+}
+
+func (q *Queries) AdmitPackageSequence(ctx context.Context, arg AdmitPackageSequenceParams) error {
+	_, err := q.db.Exec(ctx, admitPackageSequence, arg.PackageSequence, arg.AdmittedAt, arg.ID)
+	return err
+}
+
+const clearOpenSnapshot = `-- name: ClearOpenSnapshot :exec
+UPDATE devices
+SET open_snapshot_id = NULL
+WHERE id = $1
+  AND open_snapshot_id IS NOT DISTINCT FROM $2
+`
+
+type ClearOpenSnapshotParams struct {
+	ID             uuid.UUID
+	OpenSnapshotID *uuid.UUID
+}
+
+func (q *Queries) ClearOpenSnapshot(ctx context.Context, arg ClearOpenSnapshotParams) error {
+	_, err := q.db.Exec(ctx, clearOpenSnapshot, arg.ID, arg.OpenSnapshotID)
+	return err
+}
+
+const getDeviceDetail = `-- name: GetDeviceDetail :one
+SELECT
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    d.open_snapshot_id,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at,
+    g.current_snapshot_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+WHERE d.id = $1
+`
+
+type GetDeviceDetailRow struct {
+	ID                       uuid.UUID
+	CurrentGenerationID      *uuid.UUID
+	Hostname                 string
+	OsID                     string
+	OsVersion                string
+	Architecture             string
+	State                    string
+	EnrolledAt               pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	PublishedSequence        int64
+	OpenSnapshotID           *uuid.UUID
+	HostSequence             int64
+	PackageSequence          int64
+	HostReceivedAt           pgtype.Timestamptz
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	SnapshotReceivedAt       pgtype.Timestamptz
+	CurrentSnapshotID        *uuid.UUID
+}
+
+func (q *Queries) GetDeviceDetail(ctx context.Context, id uuid.UUID) (GetDeviceDetailRow, error) {
+	row := q.db.QueryRow(ctx, getDeviceDetail, id)
+	var i GetDeviceDetailRow
+	err := row.Scan(
+		&i.ID,
+		&i.CurrentGenerationID,
+		&i.Hostname,
+		&i.OsID,
+		&i.OsVersion,
+		&i.Architecture,
+		&i.State,
+		&i.EnrolledAt,
+		&i.LastSeenAt,
+		&i.PublishedSequence,
+		&i.OpenSnapshotID,
+		&i.HostSequence,
+		&i.PackageSequence,
+		&i.HostReceivedAt,
+		&i.PackageAttemptReceivedAt,
+		&i.SnapshotReceivedAt,
+		&i.CurrentSnapshotID,
+	)
+	return i, err
+}
+
 const getDeviceForUpdate = `-- name: GetDeviceForUpdate :one
 SELECT
     id,
@@ -35,33 +159,35 @@ SELECT
     architecture,
     enrolled_at,
     last_seen_at,
-    inventory_sequence,
-    inventory_digest,
-    boot_id,
-    package_snapshot_sequence,
-    package_snapshot_complete,
-    revoked_at
+    revoked_at,
+    open_snapshot_id,
+    reserved_inventory_bytes,
+    published_sequence,
+    host_received_at,
+    package_attempt_received_at,
+    snapshot_received_at
 FROM devices
 WHERE id = $1
 FOR UPDATE
 `
 
 type GetDeviceForUpdateRow struct {
-	ID                      uuid.UUID
-	State                   string
-	CurrentGenerationID     *uuid.UUID
-	Hostname                string
-	OsID                    string
-	OsVersion               string
-	Architecture            string
-	EnrolledAt              pgtype.Timestamptz
-	LastSeenAt              pgtype.Timestamptz
-	InventorySequence       int64
-	InventoryDigest         []byte
-	BootID                  *uuid.UUID
-	PackageSnapshotSequence int64
-	PackageSnapshotComplete bool
-	RevokedAt               pgtype.Timestamptz
+	ID                       uuid.UUID
+	State                    string
+	CurrentGenerationID      *uuid.UUID
+	Hostname                 string
+	OsID                     string
+	OsVersion                string
+	Architecture             string
+	EnrolledAt               pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	RevokedAt                pgtype.Timestamptz
+	OpenSnapshotID           *uuid.UUID
+	ReservedInventoryBytes   int64
+	PublishedSequence        int64
+	HostReceivedAt           pgtype.Timestamptz
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	SnapshotReceivedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) GetDeviceForUpdate(ctx context.Context, id uuid.UUID) (GetDeviceForUpdateRow, error) {
@@ -77,12 +203,13 @@ func (q *Queries) GetDeviceForUpdate(ctx context.Context, id uuid.UUID) (GetDevi
 		&i.Architecture,
 		&i.EnrolledAt,
 		&i.LastSeenAt,
-		&i.InventorySequence,
-		&i.InventoryDigest,
-		&i.BootID,
-		&i.PackageSnapshotSequence,
-		&i.PackageSnapshotComplete,
 		&i.RevokedAt,
+		&i.OpenSnapshotID,
+		&i.ReservedInventoryBytes,
+		&i.PublishedSequence,
+		&i.HostReceivedAt,
+		&i.PackageAttemptReceivedAt,
+		&i.SnapshotReceivedAt,
 	)
 	return i, err
 }
@@ -120,19 +247,25 @@ func (q *Queries) InsertEnrollmentGeneration(ctx context.Context, arg InsertEnro
 
 const listDevicesAfter = `-- name: ListDevicesAfter :many
 SELECT
-    id,
-    current_generation_id,
-    hostname,
-    os_id,
-    os_version,
-    architecture,
-    state,
-    enrolled_at,
-    last_seen_at,
-    inventory_sequence
-FROM devices
-WHERE (enrolled_at, id) < ($1::timestamptz, $2::uuid)
-ORDER BY enrolled_at DESC, id DESC
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+WHERE (d.enrolled_at, d.id) < ($1::timestamptz, $2::uuid)
+ORDER BY d.enrolled_at DESC, d.id DESC
 LIMIT $3::int
 `
 
@@ -143,16 +276,21 @@ type ListDevicesAfterParams struct {
 }
 
 type ListDevicesAfterRow struct {
-	ID                  uuid.UUID
-	CurrentGenerationID *uuid.UUID
-	Hostname            string
-	OsID                string
-	OsVersion           string
-	Architecture        string
-	State               string
-	EnrolledAt          pgtype.Timestamptz
-	LastSeenAt          pgtype.Timestamptz
-	InventorySequence   int64
+	ID                       uuid.UUID
+	CurrentGenerationID      *uuid.UUID
+	Hostname                 string
+	OsID                     string
+	OsVersion                string
+	Architecture             string
+	State                    string
+	EnrolledAt               pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	PublishedSequence        int64
+	HostSequence             int64
+	PackageSequence          int64
+	HostReceivedAt           pgtype.Timestamptz
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	SnapshotReceivedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) ListDevicesAfter(ctx context.Context, arg ListDevicesAfterParams) ([]ListDevicesAfterRow, error) {
@@ -174,7 +312,12 @@ func (q *Queries) ListDevicesAfter(ctx context.Context, arg ListDevicesAfterPara
 			&i.State,
 			&i.EnrolledAt,
 			&i.LastSeenAt,
-			&i.InventorySequence,
+			&i.PublishedSequence,
+			&i.HostSequence,
+			&i.PackageSequence,
+			&i.HostReceivedAt,
+			&i.PackageAttemptReceivedAt,
+			&i.SnapshotReceivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -188,32 +331,43 @@ func (q *Queries) ListDevicesAfter(ctx context.Context, arg ListDevicesAfterPara
 
 const listDevicesFirst = `-- name: ListDevicesFirst :many
 SELECT
-    id,
-    current_generation_id,
-    hostname,
-    os_id,
-    os_version,
-    architecture,
-    state,
-    enrolled_at,
-    last_seen_at,
-    inventory_sequence
-FROM devices
-ORDER BY enrolled_at DESC, id DESC
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+ORDER BY d.enrolled_at DESC, d.id DESC
 LIMIT $1::int
 `
 
 type ListDevicesFirstRow struct {
-	ID                  uuid.UUID
-	CurrentGenerationID *uuid.UUID
-	Hostname            string
-	OsID                string
-	OsVersion           string
-	Architecture        string
-	State               string
-	EnrolledAt          pgtype.Timestamptz
-	LastSeenAt          pgtype.Timestamptz
-	InventorySequence   int64
+	ID                       uuid.UUID
+	CurrentGenerationID      *uuid.UUID
+	Hostname                 string
+	OsID                     string
+	OsVersion                string
+	Architecture             string
+	State                    string
+	EnrolledAt               pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	PublishedSequence        int64
+	HostSequence             int64
+	PackageSequence          int64
+	HostReceivedAt           pgtype.Timestamptz
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	SnapshotReceivedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) ListDevicesFirst(ctx context.Context, rowLimit int32) ([]ListDevicesFirstRow, error) {
@@ -235,7 +389,12 @@ func (q *Queries) ListDevicesFirst(ctx context.Context, rowLimit int32) ([]ListD
 			&i.State,
 			&i.EnrolledAt,
 			&i.LastSeenAt,
-			&i.InventorySequence,
+			&i.PublishedSequence,
+			&i.HostSequence,
+			&i.PackageSequence,
+			&i.HostReceivedAt,
+			&i.PackageAttemptReceivedAt,
+			&i.SnapshotReceivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -245,6 +404,39 @@ func (q *Queries) ListDevicesFirst(ctx context.Context, rowLimit int32) ([]ListD
 		return nil, err
 	}
 	return items, nil
+}
+
+const publishDeviceSnapshot = `-- name: PublishDeviceSnapshot :exec
+UPDATE devices
+SET
+    published_sequence = $1,
+    snapshot_received_at = $2,
+    package_attempt_received_at = $3,
+    open_snapshot_id = NULL,
+    last_seen_at = $4,
+    state = $5
+WHERE id = $6
+`
+
+type PublishDeviceSnapshotParams struct {
+	PublishedSequence        int64
+	SnapshotReceivedAt       pgtype.Timestamptz
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	State                    string
+	ID                       uuid.UUID
+}
+
+func (q *Queries) PublishDeviceSnapshot(ctx context.Context, arg PublishDeviceSnapshotParams) error {
+	_, err := q.db.Exec(ctx, publishDeviceSnapshot,
+		arg.PublishedSequence,
+		arg.SnapshotReceivedAt,
+		arg.PackageAttemptReceivedAt,
+		arg.LastSeenAt,
+		arg.State,
+		arg.ID,
+	)
+	return err
 }
 
 const revokeDeviceRecord = `-- name: RevokeDeviceRecord :execrows
@@ -306,6 +498,48 @@ func (q *Queries) SetDeviceGeneration(ctx context.Context, arg SetDeviceGenerati
 	return err
 }
 
+const setGenerationSnapshot = `-- name: SetGenerationSnapshot :exec
+UPDATE enrollment_generations
+SET current_snapshot_id = $1
+WHERE id = $2
+`
+
+type SetGenerationSnapshotParams struct {
+	CurrentSnapshotID *uuid.UUID
+	ID                uuid.UUID
+}
+
+func (q *Queries) SetGenerationSnapshot(ctx context.Context, arg SetGenerationSnapshotParams) error {
+	_, err := q.db.Exec(ctx, setGenerationSnapshot, arg.CurrentSnapshotID, arg.ID)
+	return err
+}
+
+const setOpenSnapshot = `-- name: SetOpenSnapshot :exec
+UPDATE devices
+SET
+    open_snapshot_id = $1,
+    last_seen_at = $2,
+    state = $3
+WHERE id = $4
+`
+
+type SetOpenSnapshotParams struct {
+	OpenSnapshotID *uuid.UUID
+	LastSeenAt     pgtype.Timestamptz
+	State          string
+	ID             uuid.UUID
+}
+
+func (q *Queries) SetOpenSnapshot(ctx context.Context, arg SetOpenSnapshotParams) error {
+	_, err := q.db.Exec(ctx, setOpenSnapshot,
+		arg.OpenSnapshotID,
+		arg.LastSeenAt,
+		arg.State,
+		arg.ID,
+	)
+	return err
+}
+
 const touchDeviceLastSeen = `-- name: TouchDeviceLastSeen :exec
 UPDATE devices
 SET last_seen_at = $1
@@ -322,51 +556,73 @@ func (q *Queries) TouchDeviceLastSeen(ctx context.Context, arg TouchDeviceLastSe
 	return err
 }
 
-const updateDeviceInventory = `-- name: UpdateDeviceInventory :exec
+const touchPackageAttempt = `-- name: TouchPackageAttempt :exec
 UPDATE devices
 SET
-    hostname = $1,
-    os_id = $2,
-    os_version = $3,
-    architecture = $4,
-    last_seen_at = $5,
-    inventory_sequence = $6,
-    inventory_digest = $7,
-    boot_id = $8,
-    state = $9,
-    package_snapshot_sequence = $10,
-    package_snapshot_complete = $11
+    package_attempt_received_at = $1,
+    last_seen_at = $2,
+    state = $3
+WHERE id = $4
+`
+
+type TouchPackageAttemptParams struct {
+	PackageAttemptReceivedAt pgtype.Timestamptz
+	LastSeenAt               pgtype.Timestamptz
+	State                    string
+	ID                       uuid.UUID
+}
+
+func (q *Queries) TouchPackageAttempt(ctx context.Context, arg TouchPackageAttemptParams) error {
+	_, err := q.db.Exec(ctx, touchPackageAttempt,
+		arg.PackageAttemptReceivedAt,
+		arg.LastSeenAt,
+		arg.State,
+		arg.ID,
+	)
+	return err
+}
+
+const updateHostProjection = `-- name: UpdateHostProjection :exec
+UPDATE devices
+SET
+    hostname = CASE WHEN $1::boolean THEN $2::text ELSE hostname END,
+    os_id = CASE WHEN $3::boolean THEN $4::text ELSE os_id END,
+    os_version = CASE WHEN $5::boolean THEN $6::text ELSE os_version END,
+    architecture = CASE WHEN $7::boolean THEN $8::text ELSE architecture END,
+    host_received_at = $9,
+    last_seen_at = $10,
+    state = $11
 WHERE id = $12
 `
 
-type UpdateDeviceInventoryParams struct {
-	Hostname                string
-	OsID                    string
-	OsVersion               string
-	Architecture            string
-	LastSeenAt              pgtype.Timestamptz
-	InventorySequence       int64
-	InventoryDigest         []byte
-	BootID                  *uuid.UUID
-	State                   string
-	PackageSnapshotSequence int64
-	PackageSnapshotComplete bool
-	ID                      uuid.UUID
+type UpdateHostProjectionParams struct {
+	SetHostname     bool
+	Hostname        string
+	SetOsID         bool
+	OsID            string
+	SetOsVersion    bool
+	OsVersion       string
+	SetArchitecture bool
+	Architecture    string
+	HostReceivedAt  pgtype.Timestamptz
+	LastSeenAt      pgtype.Timestamptz
+	State           string
+	ID              uuid.UUID
 }
 
-func (q *Queries) UpdateDeviceInventory(ctx context.Context, arg UpdateDeviceInventoryParams) error {
-	_, err := q.db.Exec(ctx, updateDeviceInventory,
+func (q *Queries) UpdateHostProjection(ctx context.Context, arg UpdateHostProjectionParams) error {
+	_, err := q.db.Exec(ctx, updateHostProjection,
+		arg.SetHostname,
 		arg.Hostname,
+		arg.SetOsID,
 		arg.OsID,
+		arg.SetOsVersion,
 		arg.OsVersion,
+		arg.SetArchitecture,
 		arg.Architecture,
+		arg.HostReceivedAt,
 		arg.LastSeenAt,
-		arg.InventorySequence,
-		arg.InventoryDigest,
-		arg.BootID,
 		arg.State,
-		arg.PackageSnapshotSequence,
-		arg.PackageSnapshotComplete,
 		arg.ID,
 	)
 	return err

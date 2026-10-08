@@ -22,12 +22,13 @@ SELECT
     architecture,
     enrolled_at,
     last_seen_at,
-    inventory_sequence,
-    inventory_digest,
-    boot_id,
-    package_snapshot_sequence,
-    package_snapshot_complete,
-    revoked_at
+    revoked_at,
+    open_snapshot_id,
+    reserved_inventory_bytes,
+    published_sequence,
+    host_received_at,
+    package_attempt_received_at,
+    snapshot_received_at
 FROM devices
 WHERE id = sqlc.arg('id')
 FOR UPDATE;
@@ -37,20 +38,68 @@ UPDATE devices
 SET last_seen_at = sqlc.arg('last_seen_at')
 WHERE id = sqlc.arg('id');
 
--- name: UpdateDeviceInventory :exec
+-- name: UpdateHostProjection :exec
 UPDATE devices
 SET
-    hostname = sqlc.arg('hostname'),
-    os_id = sqlc.arg('os_id'),
-    os_version = sqlc.arg('os_version'),
-    architecture = sqlc.arg('architecture'),
+    hostname = CASE WHEN sqlc.arg('set_hostname')::boolean THEN sqlc.arg('hostname')::text ELSE hostname END,
+    os_id = CASE WHEN sqlc.arg('set_os_id')::boolean THEN sqlc.arg('os_id')::text ELSE os_id END,
+    os_version = CASE WHEN sqlc.arg('set_os_version')::boolean THEN sqlc.arg('os_version')::text ELSE os_version END,
+    architecture = CASE WHEN sqlc.arg('set_architecture')::boolean THEN sqlc.arg('architecture')::text ELSE architecture END,
+    host_received_at = sqlc.arg('host_received_at'),
     last_seen_at = sqlc.arg('last_seen_at'),
-    inventory_sequence = sqlc.arg('inventory_sequence'),
-    inventory_digest = sqlc.arg('inventory_digest'),
-    boot_id = sqlc.arg('boot_id'),
-    state = sqlc.arg('state'),
-    package_snapshot_sequence = sqlc.arg('package_snapshot_sequence'),
-    package_snapshot_complete = sqlc.arg('package_snapshot_complete')
+    state = sqlc.arg('state')
+WHERE id = sqlc.arg('id');
+
+-- name: SetOpenSnapshot :exec
+UPDATE devices
+SET
+    open_snapshot_id = sqlc.arg('open_snapshot_id'),
+    last_seen_at = sqlc.arg('last_seen_at'),
+    state = sqlc.arg('state')
+WHERE id = sqlc.arg('id');
+
+-- name: ClearOpenSnapshot :exec
+UPDATE devices
+SET open_snapshot_id = NULL
+WHERE id = sqlc.arg('id')
+  AND open_snapshot_id IS NOT DISTINCT FROM sqlc.arg('open_snapshot_id');
+
+-- name: PublishDeviceSnapshot :exec
+UPDATE devices
+SET
+    published_sequence = sqlc.arg('published_sequence'),
+    snapshot_received_at = sqlc.arg('snapshot_received_at'),
+    package_attempt_received_at = sqlc.arg('package_attempt_received_at'),
+    open_snapshot_id = NULL,
+    last_seen_at = sqlc.arg('last_seen_at'),
+    state = sqlc.arg('state')
+WHERE id = sqlc.arg('id');
+
+-- name: TouchPackageAttempt :exec
+UPDATE devices
+SET
+    package_attempt_received_at = sqlc.arg('package_attempt_received_at'),
+    last_seen_at = sqlc.arg('last_seen_at'),
+    state = sqlc.arg('state')
+WHERE id = sqlc.arg('id');
+
+-- name: AdmitHostSequence :exec
+UPDATE enrollment_generations
+SET
+    host_sequence = sqlc.arg('host_sequence'),
+    last_host_admission_at = sqlc.arg('admitted_at')
+WHERE id = sqlc.arg('id');
+
+-- name: AdmitPackageSequence :exec
+UPDATE enrollment_generations
+SET
+    package_sequence = sqlc.arg('package_sequence'),
+    last_package_admission_at = sqlc.arg('admitted_at')
+WHERE id = sqlc.arg('id');
+
+-- name: SetGenerationSnapshot :exec
+UPDATE enrollment_generations
+SET current_snapshot_id = sqlc.arg('current_snapshot_id')
 WHERE id = sqlc.arg('id');
 
 -- name: RevokeDeviceRecord :execrows
@@ -77,33 +126,68 @@ WHERE id = sqlc.arg('id')
 
 -- name: ListDevicesFirst :many
 SELECT
-    id,
-    current_generation_id,
-    hostname,
-    os_id,
-    os_version,
-    architecture,
-    state,
-    enrolled_at,
-    last_seen_at,
-    inventory_sequence
-FROM devices
-ORDER BY enrolled_at DESC, id DESC
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+ORDER BY d.enrolled_at DESC, d.id DESC
 LIMIT sqlc.arg('row_limit')::int;
 
 -- name: ListDevicesAfter :many
 SELECT
-    id,
-    current_generation_id,
-    hostname,
-    os_id,
-    os_version,
-    architecture,
-    state,
-    enrolled_at,
-    last_seen_at,
-    inventory_sequence
-FROM devices
-WHERE (enrolled_at, id) < (sqlc.arg('cursor_enrolled_at')::timestamptz, sqlc.arg('cursor_id')::uuid)
-ORDER BY enrolled_at DESC, id DESC
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+WHERE (d.enrolled_at, d.id) < (sqlc.arg('cursor_enrolled_at')::timestamptz, sqlc.arg('cursor_id')::uuid)
+ORDER BY d.enrolled_at DESC, d.id DESC
 LIMIT sqlc.arg('row_limit')::int;
+
+-- name: GetDeviceDetail :one
+SELECT
+    d.id,
+    d.current_generation_id,
+    d.hostname,
+    d.os_id,
+    d.os_version,
+    d.architecture,
+    d.state,
+    d.enrolled_at,
+    d.last_seen_at,
+    d.published_sequence,
+    d.open_snapshot_id,
+    coalesce(g.host_sequence, 0) AS host_sequence,
+    coalesce(g.package_sequence, 0) AS package_sequence,
+    d.host_received_at,
+    d.package_attempt_received_at,
+    d.snapshot_received_at,
+    g.current_snapshot_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+WHERE d.id = sqlc.arg('id');

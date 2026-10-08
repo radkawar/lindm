@@ -5,9 +5,10 @@ single-tenant, connected and air-gapped.
 
 **Internal control-plane gate verified; not a production-ready MDM.** The Go
 server and authenticated React console run against real PostgreSQL and Keycloak.
-The separate agent is in development; native management and commercial release
-gates remain to be implemented and qualified. No distro, capacity or destructive capability is
-certified. The full specification remains the delivery contract.
+The separate root executor and unprivileged network agent implement packaged
+enrollment and inventory. Native management and commercial release gates remain
+open. No distro, capacity or destructive capability is certified. The full
+specification remains the delivery contract.
 
 ## Read the specification
 
@@ -29,12 +30,13 @@ physical wipe/recovery validation.
 ## Current development commands
 
 Use the Node LTS version in `.node-version`, Go from `go.mod`, npm, Git and Make.
-Native inventory requires Linux. Signed-image verification and its behavioral tests
-require `gpg`, `gpgv` and `gpgconf` (the distribution's GnuPG tools). The development
-lab additionally requires Docker with Compose v2 and a local daemon. The integration
-lane requires `cloud-localds` (`cloud-image-utils`) for real seed-cancellation cleanup
-coverage without booting a VM. Dependencies and build tools are pinned; global npm
-packages are not required.
+Native inventory requires Linux. Verification and native packaging require `gpg`,
+`gpgv`, `gpgconf`, `dpkg-deb`, `dpkg-scanpackages`, `apt-ftparchive`, `rpm`,
+`rpmbuild`, `rpmsign`, `rpm2cpio` and `cpio`. `createrepo_c` enables signed RPM
+repository publication. The development lab requires Docker with Compose v2 and a
+local daemon. The integration lane requires `cloud-localds` (`cloud-image-utils`)
+for real seed-cancellation cleanup without booting a VM. Dependencies and build
+tools are pinned; global npm packages are not required.
 
 ```sh
 make bootstrap
@@ -72,8 +74,15 @@ changed or expired fixtures fail explicitly instead of silently rotating credent
 beneath persisted data. Destructive reset is a separate, explicitly confirmed command:
 see `go run ./cmd/dev help`. Fixed ports allow one running checkout at a time.
 
-The current agent commands observe native state and verify bootstrap authority;
-they do not install services, import trust, enroll or modify the host:
+With the real server running, `go run ./cmd/lab auth check` exercises its normal
+authorization-code/S256-PKCE login against the fixed Keycloak fixture, reads a bounded
+admin device page, then revokes the console session. It uses the protected fixture
+owner credential and an in-memory cookie jar; no direct password grant, production
+authentication bypass, exported browser cookie or password argument is involved.
+Lifecycle scenarios can reuse this helper rather than exporting browser cookies.
+
+These standalone agent commands observe native state and verify bootstrap
+authority without enrolling or modifying the host:
 
 ```sh
 make build dev-trust
@@ -89,6 +98,15 @@ contain hardware identifiers: treat saved observations as device data.
 Development trust is a protected 30-day fixture, not a production signing service.
 Repeated `dev-trust` verifies existing files; expiry or modification fails rather
 than silently replacing trusted keys.
+
+Native packages install `/usr/libexec/lindm/lindm-agent`, a root executor service,
+and a separate `lindm` network service. Root-only `bootstrap` and `resume` use
+`/etc/lindm/executor.json`; `run` uses `/etc/lindm/agent.json` as the configured
+network account. `status` combines protected executor state with explicitly
+unprivileged transport diagnostics; it does not assert online presence or
+compliance. Removal and purge retain identity and inventory state, never reset it.
+See the [agent contract](docs/agent-enrollment.md) for ownership, recovery and
+native laboratory commands.
 
 The maintained laboratory command authenticates vendor metadata before downloading
 large images, then checks every image byte. `verify` uses only local cached artifacts:

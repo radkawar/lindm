@@ -37,8 +37,12 @@ type ServerConfig struct {
 	Oidc           *OIDCConfig            `protobuf:"bytes,8,opt,name=oidc,proto3" json:"oidc,omitempty"`
 	// Additional outbound trust roots; empty uses the system trust store.
 	TrustedCaFile string `protobuf:"bytes,9,opt,name=trusted_ca_file,json=trustedCaFile,proto3" json:"trusted_ca_file,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Deployment cap on retained package-snapshot bytes, including opaque batch
+	// payloads and finite manifest/receipt metadata. Absent selects the initial
+	// 10 GiB budget. A present value is at least one maximum snapshot (64 MiB).
+	InventoryBudgetBytes *uint64 `protobuf:"varint,10,opt,name=inventory_budget_bytes,json=inventoryBudgetBytes,proto3,oneof" json:"inventory_budget_bytes,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -132,6 +136,13 @@ func (x *ServerConfig) GetTrustedCaFile() string {
 		return x.TrustedCaFile
 	}
 	return ""
+}
+
+func (x *ServerConfig) GetInventoryBudgetBytes() uint64 {
+	if x != nil && x.InventoryBudgetBytes != nil {
+		return *x.InventoryBudgetBytes
+	}
+	return 0
 }
 
 // Binding uses an explicit IP address and port rather than a second address
@@ -442,7 +453,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\x9a\x06\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\x86\a\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -453,8 +464,11 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x03tls\x18\x06 \x01(\v2\x1a.lindm.config.v1.TLSConfigB\x06\xbaH\x03\xc8\x01\x01R\x03tls\x12D\n" +
 	"\tdevice_ca\x18\a \x01(\v2\x1f.lindm.config.v1.DeviceCAConfigB\x06\xbaH\x03\xc8\x01\x01R\bdeviceCa\x127\n" +
 	"\x04oidc\x18\b \x01(\v2\x1b.lindm.config.v1.OIDCConfigB\x06\xbaH\x03\xc8\x01\x01R\x04oidc\x120\n" +
-	"\x0ftrusted_ca_file\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\rtrustedCaFile:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +
-	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\"T\n" +
+	"\x0ftrusted_ca_file\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\rtrustedCaFile\x12O\n" +
+	"\x16inventory_budget_bytes\x18\n" +
+	" \x01(\x04B\x14\xbaH\x112\x0f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f(\x80\x80\x80 H\x00R\x14inventoryBudgetBytes\x88\x01\x01:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +
+	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listenerB\x19\n" +
+	"\x17_inventory_budget_bytes\"T\n" +
 	"\x0eListenerConfig\x12!\n" +
 	"\aaddress\x18\x01 \x01(\tB\a\xbaH\x04r\x02p\x01R\aaddress\x12\x1f\n" +
 	"\x04port\x18\x02 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\x03(\x01R\x04port\"\xc0\x01\n" +
@@ -523,6 +537,7 @@ func file_lindm_config_v1_config_proto_init() {
 	if File_lindm_config_v1_config_proto != nil {
 		return
 	}
+	file_lindm_config_v1_config_proto_msgTypes[0].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

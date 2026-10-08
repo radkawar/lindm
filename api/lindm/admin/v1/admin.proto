@@ -4,12 +4,15 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/inventory/v1/observation.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 service AdminService {
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse);
+  rpc ListDevicePackages(ListDevicePackagesRequest) returns (ListDevicePackagesResponse);
   rpc CreateEnrollmentGrant(CreateEnrollmentGrantRequest) returns (CreateEnrollmentGrantResponse);
   rpc RevokeEnrollmentGrant(RevokeEnrollmentGrantRequest) returns (RevokeEnrollmentGrantResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
@@ -25,8 +28,8 @@ enum DeviceState {
 }
 
 message Device {
-  reserved 7;
-  reserved "state";
+  reserved 7, 10;
+  reserved "state", "inventory_sequence";
   string id = 1;
   string enrollment_generation = 2;
   string hostname = 3;
@@ -36,7 +39,14 @@ message Device {
   DeviceState lifecycle_state = 11;
   google.protobuf.Timestamp enrolled_at = 8;
   google.protobuf.Timestamp last_seen_at = 9;
-  uint64 inventory_sequence = 10;
+  // Latest successful field values only. Failures do not clear them.
+  uint64 host_sequence = 12;
+  uint64 package_sequence = 13;
+  google.protobuf.Timestamp host_received_at = 14;
+  google.protobuf.Timestamp package_attempt_received_at = 15;
+  google.protobuf.Timestamp snapshot_received_at = 16;
+  // Sequence of the current published snapshot. Zero means none has been published.
+  uint64 published_snapshot_sequence = 17;
 }
 
 message ListDevicesRequest {
@@ -47,6 +57,87 @@ message ListDevicesResponse {
   repeated Device devices = 1;
   string next_page_token = 2;
 }
+
+message GetDeviceRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message HostObservationDetail {
+  uint64 sequence = 1;
+  lindm.inventory.v1.HostObservation observation = 2;
+  google.protobuf.Timestamp received_at = 3;
+}
+
+message PackageAttemptDetail {
+  uint64 sequence = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  google.protobuf.Timestamp received_at = 4;
+  lindm.inventory.v1.CollectionStatus status = 5;
+  string backend = 6;
+  string snapshot_id = 7;
+}
+
+message PackageSnapshotDetail {
+  string snapshot_id = 1;
+  uint64 sequence = 2;
+  lindm.inventory.v1.SnapshotState state = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp finished_at = 6;
+  google.protobuf.Timestamp received_at = 7;
+  google.protobuf.Timestamp committed_at = 8;
+  google.protobuf.Timestamp superseded_at = 9;
+  string backend = 10;
+  uint32 package_count = 11;
+  uint32 batch_count = 12;
+  uint64 encoded_bytes = 13;
+  // False means retained package rows are gone. package_count remains the
+  // manifest count and must not be read as a successful empty collection.
+  bool packages_available = 14;
+}
+
+message GetDeviceResponse {
+  Device device = 1;
+  // Absent when no host observation has been accepted.
+  HostObservationDetail host = 2;
+  // Absent when no package attempt has been completed.
+  PackageAttemptDetail package_attempt = 3;
+  // Absent when no snapshot has been published.
+  PackageSnapshotDetail current_snapshot = 4;
+  // Open upload, if one is still staging. Not a published inventory.
+  PackageSnapshotDetail staging_snapshot = 5;
+}
+
+message ListDevicePackagesRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  // Empty selects the current snapshot and mints a cursor. An echoed token
+  // revisits that page and must not rebind to a newer snapshot.
+  string page_token = 3 [(buf.validate.field).string.max_len = 512];
+  string manager = 4 [(buf.validate.field).string.max_len = 64];
+  string name_prefix = 5 [(buf.validate.field).string.max_len = 512];
+}
+
+message DevicePackage {
+  uint32 position = 1;
+  string name = 2;
+  string version = 3;
+  string architecture = 4;
+  string manager = 5;
+}
+
+message ListDevicePackagesResponse {
+  string snapshot_id = 1;
+  uint64 sequence = 2;
+  repeated DevicePackage packages = 3;
+  string next_page_token = 4;
+  google.protobuf.Timestamp cursor_expires_at = 5;
+  // Cursor for the start of this page, including the first page. Echo it to
+  // revisit the same immutable snapshot. Expiry is fixed at mint.
+  string page_token = 6;
+}
+
 message CreateEnrollmentGrantRequest {
   string request_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 lifetime_seconds = 2 [(buf.validate.field).uint32 = {

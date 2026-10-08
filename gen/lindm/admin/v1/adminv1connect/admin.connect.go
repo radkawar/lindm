@@ -36,6 +36,11 @@ const (
 	// AdminServiceListDevicesProcedure is the fully-qualified name of the AdminService's ListDevices
 	// RPC.
 	AdminServiceListDevicesProcedure = "/lindm.admin.v1.AdminService/ListDevices"
+	// AdminServiceGetDeviceProcedure is the fully-qualified name of the AdminService's GetDevice RPC.
+	AdminServiceGetDeviceProcedure = "/lindm.admin.v1.AdminService/GetDevice"
+	// AdminServiceListDevicePackagesProcedure is the fully-qualified name of the AdminService's
+	// ListDevicePackages RPC.
+	AdminServiceListDevicePackagesProcedure = "/lindm.admin.v1.AdminService/ListDevicePackages"
 	// AdminServiceCreateEnrollmentGrantProcedure is the fully-qualified name of the AdminService's
 	// CreateEnrollmentGrant RPC.
 	AdminServiceCreateEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/CreateEnrollmentGrant"
@@ -53,6 +58,8 @@ const (
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
 type AdminServiceClient interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
+	ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -74,6 +81,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceListDevicesProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("ListDevices")),
+			connect.WithClientOptions(opts...),
+		),
+		getDevice: connect.NewClient[v1.GetDeviceRequest, v1.GetDeviceResponse](
+			httpClient,
+			baseURL+AdminServiceGetDeviceProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDevice")),
+			connect.WithClientOptions(opts...),
+		),
+		listDevicePackages: connect.NewClient[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse](
+			httpClient,
+			baseURL+AdminServiceListDevicePackagesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDevicePackages")),
 			connect.WithClientOptions(opts...),
 		),
 		createEnrollmentGrant: connect.NewClient[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse](
@@ -106,6 +125,8 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
 	listDevices           *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	getDevice             *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
+	listDevicePackages    *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
 	createEnrollmentGrant *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
 	revokeEnrollmentGrant *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
 	revokeDevice          *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
@@ -115,6 +136,16 @@ type adminServiceClient struct {
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
 func (c *adminServiceClient) ListDevices(ctx context.Context, req *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
 	return c.listDevices.CallUnary(ctx, req)
+}
+
+// GetDevice calls lindm.admin.v1.AdminService.GetDevice.
+func (c *adminServiceClient) GetDevice(ctx context.Context, req *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error) {
+	return c.getDevice.CallUnary(ctx, req)
+}
+
+// ListDevicePackages calls lindm.admin.v1.AdminService.ListDevicePackages.
+func (c *adminServiceClient) ListDevicePackages(ctx context.Context, req *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error) {
+	return c.listDevicePackages.CallUnary(ctx, req)
 }
 
 // CreateEnrollmentGrant calls lindm.admin.v1.AdminService.CreateEnrollmentGrant.
@@ -140,6 +171,8 @@ func (c *adminServiceClient) ListAuditEvents(ctx context.Context, req *connect.R
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
+	ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
@@ -157,6 +190,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceListDevicesProcedure,
 		svc.ListDevices,
 		connect.WithSchema(adminServiceMethods.ByName("ListDevices")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDeviceHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceProcedure,
+		svc.GetDevice,
+		connect.WithSchema(adminServiceMethods.ByName("GetDevice")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListDevicePackagesHandler := connect.NewUnaryHandler(
+		AdminServiceListDevicePackagesProcedure,
+		svc.ListDevicePackages,
+		connect.WithSchema(adminServiceMethods.ByName("ListDevicePackages")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceCreateEnrollmentGrantHandler := connect.NewUnaryHandler(
@@ -187,6 +232,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		switch r.URL.Path {
 		case AdminServiceListDevicesProcedure:
 			adminServiceListDevicesHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceProcedure:
+			adminServiceGetDeviceHandler.ServeHTTP(w, r)
+		case AdminServiceListDevicePackagesProcedure:
+			adminServiceListDevicePackagesHandler.ServeHTTP(w, r)
 		case AdminServiceCreateEnrollmentGrantProcedure:
 			adminServiceCreateEnrollmentGrantHandler.ServeHTTP(w, r)
 		case AdminServiceRevokeEnrollmentGrantProcedure:
@@ -206,6 +255,14 @@ type UnimplementedAdminServiceHandler struct{}
 
 func (UnimplementedAdminServiceHandler) ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDevices is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDevice is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDevicePackages is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error) {

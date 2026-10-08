@@ -1,0 +1,57 @@
+[Unit]
+Description=Lindm agent network
+After=network-online.target lindm-executor.service systemd-tmpfiles-setup.service
+Wants=network-online.target
+Requires=lindm-executor.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Configuration: /etc/lindm/agent.json
+# No arguments. The process reads that fixed path.
+ExecStart=/usr/libexec/lindm/lindm-agent run
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/lindm.conf
+DynamicUser=no
+User=lindm
+Group=lindm
+# CapabilityBoundingSet= and AmbientCapabilities= leave this process with no
+# capabilities. That is the permanent boundary for the network unit. Privileged
+# provider work belongs in lindm-executor.service.
+# AF_NETLINK is local resolver support for TLS name lookup, not egress.
+# UMask=0077. This process connects to the executor socket; it does not bind it.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+WorkingDirectory=/var/lib/lindm/agent
+ReadOnlyPaths=/var
+ReadWritePaths=/var/lib/lindm/agent
+InaccessiblePaths=/var/lib/lindm/executor /run/lock
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+SyslogIdentifier=lindm-agent
+
+[Install]
+WantedBy=multi-user.target

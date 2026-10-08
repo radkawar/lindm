@@ -150,6 +150,10 @@ changes host security nor substitutes container observations for a real guest.
 The integration lane also exercises real `cloud-localds` cancellation: staging stays
 inside the owned private run directory and helper descendants stop before cleanup.
 It requires `cloud-image-utils`, but not KVM or a booted guest.
+`go run ./cmd/lab auth check` exercises the running server's normal SSO/CSRF path
+against the fixed development fixture. The reusable development-session helper keeps
+passwords/cookies in memory, restricts TLS destinations and credential form actions,
+and revokes its console session. It is not an alternate production authentication API.
 
 ## 2. Toolchain and quality gates
 

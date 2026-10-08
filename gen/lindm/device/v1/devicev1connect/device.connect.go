@@ -39,9 +39,21 @@ const (
 	// DeviceServiceGetSyncStateProcedure is the fully-qualified name of the DeviceService's
 	// GetSyncState RPC.
 	DeviceServiceGetSyncStateProcedure = "/lindm.device.v1.DeviceService/GetSyncState"
-	// DeviceServiceReportInventoryProcedure is the fully-qualified name of the DeviceService's
-	// ReportInventory RPC.
-	DeviceServiceReportInventoryProcedure = "/lindm.device.v1.DeviceService/ReportInventory"
+	// DeviceServiceReportHostObservationProcedure is the fully-qualified name of the DeviceService's
+	// ReportHostObservation RPC.
+	DeviceServiceReportHostObservationProcedure = "/lindm.device.v1.DeviceService/ReportHostObservation"
+	// DeviceServiceReportPackageAttemptProcedure is the fully-qualified name of the DeviceService's
+	// ReportPackageAttempt RPC.
+	DeviceServiceReportPackageAttemptProcedure = "/lindm.device.v1.DeviceService/ReportPackageAttempt"
+	// DeviceServiceBeginPackageSnapshotProcedure is the fully-qualified name of the DeviceService's
+	// BeginPackageSnapshot RPC.
+	DeviceServiceBeginPackageSnapshotProcedure = "/lindm.device.v1.DeviceService/BeginPackageSnapshot"
+	// DeviceServicePutPackageBatchProcedure is the fully-qualified name of the DeviceService's
+	// PutPackageBatch RPC.
+	DeviceServicePutPackageBatchProcedure = "/lindm.device.v1.DeviceService/PutPackageBatch"
+	// DeviceServiceCommitPackageSnapshotProcedure is the fully-qualified name of the DeviceService's
+	// CommitPackageSnapshot RPC.
+	DeviceServiceCommitPackageSnapshotProcedure = "/lindm.device.v1.DeviceService/CommitPackageSnapshot"
 	// DeviceServiceRenewIdentityProcedure is the fully-qualified name of the DeviceService's
 	// RenewIdentity RPC.
 	DeviceServiceRenewIdentityProcedure = "/lindm.device.v1.DeviceService/RenewIdentity"
@@ -51,7 +63,11 @@ const (
 type DeviceServiceClient interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
 	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
-	ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error)
+	ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error)
+	ReportPackageAttempt(context.Context, *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error)
+	BeginPackageSnapshot(context.Context, *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error)
+	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
+	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
 }
 
@@ -78,10 +94,34 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
 			connect.WithClientOptions(opts...),
 		),
-		reportInventory: connect.NewClient[v1.ReportInventoryRequest, v1.ReportInventoryResponse](
+		reportHostObservation: connect.NewClient[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse](
 			httpClient,
-			baseURL+DeviceServiceReportInventoryProcedure,
-			connect.WithSchema(deviceServiceMethods.ByName("ReportInventory")),
+			baseURL+DeviceServiceReportHostObservationProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("ReportHostObservation")),
+			connect.WithClientOptions(opts...),
+		),
+		reportPackageAttempt: connect.NewClient[v1.ReportPackageAttemptRequest, v1.ReportPackageAttemptResponse](
+			httpClient,
+			baseURL+DeviceServiceReportPackageAttemptProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("ReportPackageAttempt")),
+			connect.WithClientOptions(opts...),
+		),
+		beginPackageSnapshot: connect.NewClient[v1.BeginPackageSnapshotRequest, v1.BeginPackageSnapshotResponse](
+			httpClient,
+			baseURL+DeviceServiceBeginPackageSnapshotProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("BeginPackageSnapshot")),
+			connect.WithClientOptions(opts...),
+		),
+		putPackageBatch: connect.NewClient[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse](
+			httpClient,
+			baseURL+DeviceServicePutPackageBatchProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("PutPackageBatch")),
+			connect.WithClientOptions(opts...),
+		),
+		commitPackageSnapshot: connect.NewClient[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse](
+			httpClient,
+			baseURL+DeviceServiceCommitPackageSnapshotProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("CommitPackageSnapshot")),
 			connect.WithClientOptions(opts...),
 		),
 		renewIdentity: connect.NewClient[v1.RenewIdentityRequest, v1.RenewIdentityResponse](
@@ -95,10 +135,14 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // deviceServiceClient implements DeviceServiceClient.
 type deviceServiceClient struct {
-	acquireSession  *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
-	getSyncState    *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
-	reportInventory *connect.Client[v1.ReportInventoryRequest, v1.ReportInventoryResponse]
-	renewIdentity   *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
+	acquireSession        *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
+	getSyncState          *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
+	reportHostObservation *connect.Client[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse]
+	reportPackageAttempt  *connect.Client[v1.ReportPackageAttemptRequest, v1.ReportPackageAttemptResponse]
+	beginPackageSnapshot  *connect.Client[v1.BeginPackageSnapshotRequest, v1.BeginPackageSnapshotResponse]
+	putPackageBatch       *connect.Client[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse]
+	commitPackageSnapshot *connect.Client[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse]
+	renewIdentity         *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -111,9 +155,29 @@ func (c *deviceServiceClient) GetSyncState(ctx context.Context, req *connect.Req
 	return c.getSyncState.CallUnary(ctx, req)
 }
 
-// ReportInventory calls lindm.device.v1.DeviceService.ReportInventory.
-func (c *deviceServiceClient) ReportInventory(ctx context.Context, req *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error) {
-	return c.reportInventory.CallUnary(ctx, req)
+// ReportHostObservation calls lindm.device.v1.DeviceService.ReportHostObservation.
+func (c *deviceServiceClient) ReportHostObservation(ctx context.Context, req *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error) {
+	return c.reportHostObservation.CallUnary(ctx, req)
+}
+
+// ReportPackageAttempt calls lindm.device.v1.DeviceService.ReportPackageAttempt.
+func (c *deviceServiceClient) ReportPackageAttempt(ctx context.Context, req *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error) {
+	return c.reportPackageAttempt.CallUnary(ctx, req)
+}
+
+// BeginPackageSnapshot calls lindm.device.v1.DeviceService.BeginPackageSnapshot.
+func (c *deviceServiceClient) BeginPackageSnapshot(ctx context.Context, req *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error) {
+	return c.beginPackageSnapshot.CallUnary(ctx, req)
+}
+
+// PutPackageBatch calls lindm.device.v1.DeviceService.PutPackageBatch.
+func (c *deviceServiceClient) PutPackageBatch(ctx context.Context, req *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error) {
+	return c.putPackageBatch.CallUnary(ctx, req)
+}
+
+// CommitPackageSnapshot calls lindm.device.v1.DeviceService.CommitPackageSnapshot.
+func (c *deviceServiceClient) CommitPackageSnapshot(ctx context.Context, req *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error) {
+	return c.commitPackageSnapshot.CallUnary(ctx, req)
 }
 
 // RenewIdentity calls lindm.device.v1.DeviceService.RenewIdentity.
@@ -125,7 +189,11 @@ func (c *deviceServiceClient) RenewIdentity(ctx context.Context, req *connect.Re
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
 	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
-	ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error)
+	ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error)
+	ReportPackageAttempt(context.Context, *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error)
+	BeginPackageSnapshot(context.Context, *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error)
+	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
+	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
 }
 
@@ -148,10 +216,34 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
 		connect.WithHandlerOptions(opts...),
 	)
-	deviceServiceReportInventoryHandler := connect.NewUnaryHandler(
-		DeviceServiceReportInventoryProcedure,
-		svc.ReportInventory,
-		connect.WithSchema(deviceServiceMethods.ByName("ReportInventory")),
+	deviceServiceReportHostObservationHandler := connect.NewUnaryHandler(
+		DeviceServiceReportHostObservationProcedure,
+		svc.ReportHostObservation,
+		connect.WithSchema(deviceServiceMethods.ByName("ReportHostObservation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceReportPackageAttemptHandler := connect.NewUnaryHandler(
+		DeviceServiceReportPackageAttemptProcedure,
+		svc.ReportPackageAttempt,
+		connect.WithSchema(deviceServiceMethods.ByName("ReportPackageAttempt")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceBeginPackageSnapshotHandler := connect.NewUnaryHandler(
+		DeviceServiceBeginPackageSnapshotProcedure,
+		svc.BeginPackageSnapshot,
+		connect.WithSchema(deviceServiceMethods.ByName("BeginPackageSnapshot")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServicePutPackageBatchHandler := connect.NewUnaryHandler(
+		DeviceServicePutPackageBatchProcedure,
+		svc.PutPackageBatch,
+		connect.WithSchema(deviceServiceMethods.ByName("PutPackageBatch")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceCommitPackageSnapshotHandler := connect.NewUnaryHandler(
+		DeviceServiceCommitPackageSnapshotProcedure,
+		svc.CommitPackageSnapshot,
+		connect.WithSchema(deviceServiceMethods.ByName("CommitPackageSnapshot")),
 		connect.WithHandlerOptions(opts...),
 	)
 	deviceServiceRenewIdentityHandler := connect.NewUnaryHandler(
@@ -166,8 +258,16 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceAcquireSessionHandler.ServeHTTP(w, r)
 		case DeviceServiceGetSyncStateProcedure:
 			deviceServiceGetSyncStateHandler.ServeHTTP(w, r)
-		case DeviceServiceReportInventoryProcedure:
-			deviceServiceReportInventoryHandler.ServeHTTP(w, r)
+		case DeviceServiceReportHostObservationProcedure:
+			deviceServiceReportHostObservationHandler.ServeHTTP(w, r)
+		case DeviceServiceReportPackageAttemptProcedure:
+			deviceServiceReportPackageAttemptHandler.ServeHTTP(w, r)
+		case DeviceServiceBeginPackageSnapshotProcedure:
+			deviceServiceBeginPackageSnapshotHandler.ServeHTTP(w, r)
+		case DeviceServicePutPackageBatchProcedure:
+			deviceServicePutPackageBatchHandler.ServeHTTP(w, r)
+		case DeviceServiceCommitPackageSnapshotProcedure:
+			deviceServiceCommitPackageSnapshotHandler.ServeHTTP(w, r)
 		case DeviceServiceRenewIdentityProcedure:
 			deviceServiceRenewIdentityHandler.ServeHTTP(w, r)
 		default:
@@ -187,8 +287,24 @@ func (UnimplementedDeviceServiceHandler) GetSyncState(context.Context, *connect.
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetSyncState is not implemented"))
 }
 
-func (UnimplementedDeviceServiceHandler) ReportInventory(context.Context, *connect.Request[v1.ReportInventoryRequest]) (*connect.Response[v1.ReportInventoryResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ReportInventory is not implemented"))
+func (UnimplementedDeviceServiceHandler) ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ReportHostObservation is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) ReportPackageAttempt(context.Context, *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ReportPackageAttempt is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) BeginPackageSnapshot(context.Context, *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.BeginPackageSnapshot is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.PutPackageBatch is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.CommitPackageSnapshot is not implemented"))
 }
 
 func (UnimplementedDeviceServiceHandler) RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error) {

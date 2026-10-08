@@ -9,38 +9,603 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const deleteDevicePackages = `-- name: DeleteDevicePackages :exec
-DELETE FROM device_packages
-WHERE device_id = $1
+const addDeviceReservation = `-- name: AddDeviceReservation :exec
+UPDATE devices
+SET reserved_inventory_bytes = reserved_inventory_bytes + $1
+WHERE id = $2
 `
 
-func (q *Queries) DeleteDevicePackages(ctx context.Context, deviceID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteDevicePackages, deviceID)
+type AddDeviceReservationParams struct {
+	Delta int64
+	ID    uuid.UUID
+}
+
+func (q *Queries) AddDeviceReservation(ctx context.Context, arg AddDeviceReservationParams) error {
+	_, err := q.db.Exec(ctx, addDeviceReservation, arg.Delta, arg.ID)
 	return err
 }
 
-const insertDevicePackage = `-- name: InsertDevicePackage :exec
-INSERT INTO device_packages (
+const addInventoryReservation = `-- name: AddInventoryReservation :exec
+UPDATE inventory_reservation
+SET reserved_bytes = reserved_bytes + $1
+WHERE singleton
+`
+
+func (q *Queries) AddInventoryReservation(ctx context.Context, delta int64) error {
+	_, err := q.db.Exec(ctx, addInventoryReservation, delta)
+	return err
+}
+
+const advancePackageCursor = `-- name: AdvancePackageCursor :exec
+UPDATE package_page_cursors
+SET next_position = $1
+WHERE id = $2
+`
+
+type AdvancePackageCursorParams struct {
+	NextPosition int32
+	ID           uuid.UUID
+}
+
+func (q *Queries) AdvancePackageCursor(ctx context.Context, arg AdvancePackageCursorParams) error {
+	_, err := q.db.Exec(ctx, advancePackageCursor, arg.NextPosition, arg.ID)
+	return err
+}
+
+const commitPackageSnapshot = `-- name: CommitPackageSnapshot :exec
+UPDATE package_snapshots
+SET state = 'committed',
+    committed_at = $1
+WHERE id = $2
+  AND state = 'staging'
+`
+
+type CommitPackageSnapshotParams struct {
+	CommittedAt pgtype.Timestamptz
+	ID          uuid.UUID
+}
+
+func (q *Queries) CommitPackageSnapshot(ctx context.Context, arg CommitPackageSnapshotParams) error {
+	_, err := q.db.Exec(ctx, commitPackageSnapshot, arg.CommittedAt, arg.ID)
+	return err
+}
+
+const countUnstoredBatches = `-- name: CountUnstoredBatches :one
+SELECT count(*) AS remaining
+FROM snapshot_batches
+WHERE snapshot_id = $1
+  AND NOT stored
+`
+
+func (q *Queries) CountUnstoredBatches(ctx context.Context, snapshotID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnstoredBatches, snapshotID)
+	var remaining int64
+	err := row.Scan(&remaining)
+	return remaining, err
+}
+
+const deleteExpiredPackageCursors = `-- name: DeleteExpiredPackageCursors :exec
+DELETE FROM package_page_cursors
+WHERE expires_at <= $1
+`
+
+func (q *Queries) DeleteExpiredPackageCursors(ctx context.Context, now pgtype.Timestamptz) error {
+	_, err := q.db.Exec(ctx, deleteExpiredPackageCursors, now)
+	return err
+}
+
+const deletePackageSnapshot = `-- name: DeletePackageSnapshot :exec
+DELETE FROM package_snapshots
+WHERE id = $1
+`
+
+func (q *Queries) DeletePackageSnapshot(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePackageSnapshot, id)
+	return err
+}
+
+const deleteSnapshotBatches = `-- name: DeleteSnapshotBatches :exec
+DELETE FROM snapshot_batches
+WHERE snapshot_id = $1
+`
+
+func (q *Queries) DeleteSnapshotBatches(ctx context.Context, snapshotID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSnapshotBatches, snapshotID)
+	return err
+}
+
+const deleteSnapshotCursors = `-- name: DeleteSnapshotCursors :exec
+DELETE FROM package_page_cursors
+WHERE snapshot_id = $1
+  AND expires_at <= $2
+`
+
+type DeleteSnapshotCursorsParams struct {
+	SnapshotID uuid.UUID
+	Now        pgtype.Timestamptz
+}
+
+func (q *Queries) DeleteSnapshotCursors(ctx context.Context, arg DeleteSnapshotCursorsParams) error {
+	_, err := q.db.Exec(ctx, deleteSnapshotCursors, arg.SnapshotID, arg.Now)
+	return err
+}
+
+const deleteSnapshotPackages = `-- name: DeleteSnapshotPackages :exec
+DELETE FROM snapshot_packages
+WHERE snapshot_id = $1
+`
+
+func (q *Queries) DeleteSnapshotPackages(ctx context.Context, snapshotID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSnapshotPackages, snapshotID)
+	return err
+}
+
+const expireStagingSnapshot = `-- name: ExpireStagingSnapshot :exec
+UPDATE package_snapshots
+SET state = 'expired',
+    bulk_retained = false,
+    reserved_bytes = $1
+WHERE id = $2
+  AND state = 'staging'
+`
+
+type ExpireStagingSnapshotParams struct {
+	ReservedBytes int64
+	ID            uuid.UUID
+}
+
+func (q *Queries) ExpireStagingSnapshot(ctx context.Context, arg ExpireStagingSnapshotParams) error {
+	_, err := q.db.Exec(ctx, expireStagingSnapshot, arg.ReservedBytes, arg.ID)
+	return err
+}
+
+const getHostObservation = `-- name: GetHostObservation :one
+SELECT
+    sequence,
+    started_at,
+    finished_at,
+    received_at,
+    digest,
+    boot_id_status,
+    boot_id_value,
+    hostname_status,
+    hostname_value,
+    os_id_status,
+    os_id_value,
+    os_version_status,
+    os_version_value,
+    architecture_status,
+    architecture_value,
+    kernel_release_status,
+    kernel_release_value,
+    hardware_vendor_status,
+    hardware_vendor_value,
+    hardware_model_status,
+    hardware_model_value,
+    hardware_serial_status,
+    hardware_serial_value
+FROM host_observations
+WHERE generation_id = $1
+`
+
+type GetHostObservationRow struct {
+	Sequence             int64
+	StartedAt            pgtype.Timestamptz
+	FinishedAt           pgtype.Timestamptz
+	ReceivedAt           pgtype.Timestamptz
+	Digest               []byte
+	BootIDStatus         int16
+	BootIDValue          string
+	HostnameStatus       int16
+	HostnameValue        string
+	OsIDStatus           int16
+	OsIDValue            string
+	OsVersionStatus      int16
+	OsVersionValue       string
+	ArchitectureStatus   int16
+	ArchitectureValue    string
+	KernelReleaseStatus  int16
+	KernelReleaseValue   string
+	HardwareVendorStatus int16
+	HardwareVendorValue  string
+	HardwareModelStatus  int16
+	HardwareModelValue   string
+	HardwareSerialStatus int16
+	HardwareSerialValue  string
+}
+
+func (q *Queries) GetHostObservation(ctx context.Context, generationID uuid.UUID) (GetHostObservationRow, error) {
+	row := q.db.QueryRow(ctx, getHostObservation, generationID)
+	var i GetHostObservationRow
+	err := row.Scan(
+		&i.Sequence,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.ReceivedAt,
+		&i.Digest,
+		&i.BootIDStatus,
+		&i.BootIDValue,
+		&i.HostnameStatus,
+		&i.HostnameValue,
+		&i.OsIDStatus,
+		&i.OsIDValue,
+		&i.OsVersionStatus,
+		&i.OsVersionValue,
+		&i.ArchitectureStatus,
+		&i.ArchitectureValue,
+		&i.KernelReleaseStatus,
+		&i.KernelReleaseValue,
+		&i.HardwareVendorStatus,
+		&i.HardwareVendorValue,
+		&i.HardwareModelStatus,
+		&i.HardwareModelValue,
+		&i.HardwareSerialStatus,
+		&i.HardwareSerialValue,
+	)
+	return i, err
+}
+
+const getPackageAttempt = `-- name: GetPackageAttempt :one
+SELECT sequence, started_at, finished_at, received_at, status, backend, snapshot_id, digest
+FROM package_attempts
+WHERE generation_id = $1
+`
+
+type GetPackageAttemptRow struct {
+	Sequence   int64
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+	ReceivedAt pgtype.Timestamptz
+	Status     int16
+	Backend    string
+	SnapshotID *uuid.UUID
+	Digest     []byte
+}
+
+func (q *Queries) GetPackageAttempt(ctx context.Context, generationID uuid.UUID) (GetPackageAttemptRow, error) {
+	row := q.db.QueryRow(ctx, getPackageAttempt, generationID)
+	var i GetPackageAttemptRow
+	err := row.Scan(
+		&i.Sequence,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.ReceivedAt,
+		&i.Status,
+		&i.Backend,
+		&i.SnapshotID,
+		&i.Digest,
+	)
+	return i, err
+}
+
+const getPackageCursorForUpdate = `-- name: GetPackageCursorForUpdate :one
+SELECT
+    id,
+    actor_id,
     device_id,
-    position,
-    name,
-    version,
-    architecture,
-    manager
+    generation_id,
+    snapshot_id,
+    manager,
+    name_prefix,
+    next_position,
+    created_at,
+    expires_at
+FROM package_page_cursors
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetPackageCursorForUpdate(ctx context.Context, id uuid.UUID) (PackagePageCursor, error) {
+	row := q.db.QueryRow(ctx, getPackageCursorForUpdate, id)
+	var i PackagePageCursor
+	err := row.Scan(
+		&i.ID,
+		&i.ActorID,
+		&i.DeviceID,
+		&i.GenerationID,
+		&i.SnapshotID,
+		&i.Manager,
+		&i.NamePrefix,
+		&i.NextPosition,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getPackageSnapshot = `-- name: GetPackageSnapshot :one
+SELECT
+    id,
+    device_id,
+    generation_id,
+    sequence,
+    state,
+    manifest_digest,
+    created_at,
+    started_at,
+    finished_at,
+    accepted_at,
+    open_until,
+    receipt_expires_at,
+    committed_at,
+    superseded_at,
+    backend,
+    package_count,
+    batch_count,
+    encoded_bytes,
+    metadata_bytes,
+    reserved_bytes,
+    bulk_retained
+FROM package_snapshots
+WHERE id = $1
+`
+
+type GetPackageSnapshotRow struct {
+	ID               uuid.UUID
+	DeviceID         uuid.UUID
+	GenerationID     uuid.UUID
+	Sequence         int64
+	State            string
+	ManifestDigest   []byte
+	CreatedAt        pgtype.Timestamptz
+	StartedAt        pgtype.Timestamptz
+	FinishedAt       pgtype.Timestamptz
+	AcceptedAt       pgtype.Timestamptz
+	OpenUntil        pgtype.Timestamptz
+	ReceiptExpiresAt pgtype.Timestamptz
+	CommittedAt      pgtype.Timestamptz
+	SupersededAt     pgtype.Timestamptz
+	Backend          string
+	PackageCount     int32
+	BatchCount       int32
+	EncodedBytes     int64
+	MetadataBytes    int64
+	ReservedBytes    int64
+	BulkRetained     bool
+}
+
+func (q *Queries) GetPackageSnapshot(ctx context.Context, id uuid.UUID) (GetPackageSnapshotRow, error) {
+	row := q.db.QueryRow(ctx, getPackageSnapshot, id)
+	var i GetPackageSnapshotRow
+	err := row.Scan(
+		&i.ID,
+		&i.DeviceID,
+		&i.GenerationID,
+		&i.Sequence,
+		&i.State,
+		&i.ManifestDigest,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.AcceptedAt,
+		&i.OpenUntil,
+		&i.ReceiptExpiresAt,
+		&i.CommittedAt,
+		&i.SupersededAt,
+		&i.Backend,
+		&i.PackageCount,
+		&i.BatchCount,
+		&i.EncodedBytes,
+		&i.MetadataBytes,
+		&i.ReservedBytes,
+		&i.BulkRetained,
+	)
+	return i, err
+}
+
+const getPackageSnapshotBySequence = `-- name: GetPackageSnapshotBySequence :one
+SELECT id, state, manifest_digest
+FROM package_snapshots
+WHERE generation_id = $1
+  AND sequence = $2
+`
+
+type GetPackageSnapshotBySequenceParams struct {
+	GenerationID uuid.UUID
+	Sequence     int64
+}
+
+type GetPackageSnapshotBySequenceRow struct {
+	ID             uuid.UUID
+	State          string
+	ManifestDigest []byte
+}
+
+func (q *Queries) GetPackageSnapshotBySequence(ctx context.Context, arg GetPackageSnapshotBySequenceParams) (GetPackageSnapshotBySequenceRow, error) {
+	row := q.db.QueryRow(ctx, getPackageSnapshotBySequence, arg.GenerationID, arg.Sequence)
+	var i GetPackageSnapshotBySequenceRow
+	err := row.Scan(&i.ID, &i.State, &i.ManifestDigest)
+	return i, err
+}
+
+const getSnapshotBatch = `-- name: GetSnapshotBatch :one
+SELECT digest, record_count, encoded_size, first_position, stored
+FROM snapshot_batches
+WHERE snapshot_id = $1
+  AND batch_index = $2
+`
+
+type GetSnapshotBatchParams struct {
+	SnapshotID uuid.UUID
+	BatchIndex int32
+}
+
+type GetSnapshotBatchRow struct {
+	Digest        []byte
+	RecordCount   int32
+	EncodedSize   int32
+	FirstPosition int32
+	Stored        bool
+}
+
+func (q *Queries) GetSnapshotBatch(ctx context.Context, arg GetSnapshotBatchParams) (GetSnapshotBatchRow, error) {
+	row := q.db.QueryRow(ctx, getSnapshotBatch, arg.SnapshotID, arg.BatchIndex)
+	var i GetSnapshotBatchRow
+	err := row.Scan(
+		&i.Digest,
+		&i.RecordCount,
+		&i.EncodedSize,
+		&i.FirstPosition,
+		&i.Stored,
+	)
+	return i, err
+}
+
+const insertPackageCursor = `-- name: InsertPackageCursor :exec
+INSERT INTO package_page_cursors (
+    id,
+    actor_id,
+    device_id,
+    generation_id,
+    snapshot_id,
+    manager,
+    name_prefix,
+    next_position,
+    created_at,
+    expires_at
 ) VALUES (
     $1,
     $2,
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7,
+    $8,
+    $9::timestamptz,
+    $9::timestamptz + interval '15 minutes'
 )
 `
 
-type InsertDevicePackageParams struct {
+type InsertPackageCursorParams struct {
+	ID           uuid.UUID
+	ActorID      uuid.UUID
 	DeviceID     uuid.UUID
+	GenerationID uuid.UUID
+	SnapshotID   uuid.UUID
+	Manager      string
+	NamePrefix   string
+	NextPosition int32
+	CreatedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) InsertPackageCursor(ctx context.Context, arg InsertPackageCursorParams) error {
+	_, err := q.db.Exec(ctx, insertPackageCursor,
+		arg.ID,
+		arg.ActorID,
+		arg.DeviceID,
+		arg.GenerationID,
+		arg.SnapshotID,
+		arg.Manager,
+		arg.NamePrefix,
+		arg.NextPosition,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const insertPackageSnapshot = `-- name: InsertPackageSnapshot :exec
+INSERT INTO package_snapshots (
+    id,
+    device_id,
+    generation_id,
+    sequence,
+    state,
+    manifest_digest,
+    manifest_bytes,
+    created_at,
+    started_at,
+    finished_at,
+    accepted_at,
+    open_until,
+    receipt_expires_at,
+    backend,
+    package_count,
+    batch_count,
+    encoded_bytes,
+    metadata_bytes,
+    reserved_bytes,
+    bulk_retained
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    'staging',
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10::timestamptz,
+    $10::timestamptz + interval '24 hours',
+    $10::timestamptz + interval '2160 hours',
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    true
+)
+`
+
+type InsertPackageSnapshotParams struct {
+	ID             uuid.UUID
+	DeviceID       uuid.UUID
+	GenerationID   uuid.UUID
+	Sequence       int64
+	ManifestDigest []byte
+	ManifestBytes  []byte
+	CreatedAt      pgtype.Timestamptz
+	StartedAt      pgtype.Timestamptz
+	FinishedAt     pgtype.Timestamptz
+	AcceptedAt     pgtype.Timestamptz
+	Backend        string
+	PackageCount   int32
+	BatchCount     int32
+	EncodedBytes   int64
+	MetadataBytes  int64
+	ReservedBytes  int64
+}
+
+func (q *Queries) InsertPackageSnapshot(ctx context.Context, arg InsertPackageSnapshotParams) error {
+	_, err := q.db.Exec(ctx, insertPackageSnapshot,
+		arg.ID,
+		arg.DeviceID,
+		arg.GenerationID,
+		arg.Sequence,
+		arg.ManifestDigest,
+		arg.ManifestBytes,
+		arg.CreatedAt,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.AcceptedAt,
+		arg.Backend,
+		arg.PackageCount,
+		arg.BatchCount,
+		arg.EncodedBytes,
+		arg.MetadataBytes,
+		arg.ReservedBytes,
+	)
+	return err
+}
+
+type InsertSnapshotBatchesParams struct {
+	SnapshotID    uuid.UUID
+	BatchIndex    int32
+	Digest        []byte
+	RecordCount   int32
+	EncodedSize   int32
+	FirstPosition int32
+	Stored        bool
+}
+
+type InsertSnapshotPackagesParams struct {
+	SnapshotID   uuid.UUID
 	Position     int32
 	Name         string
 	Version      string
@@ -48,14 +613,505 @@ type InsertDevicePackageParams struct {
 	Manager      string
 }
 
-func (q *Queries) InsertDevicePackage(ctx context.Context, arg InsertDevicePackageParams) error {
-	_, err := q.db.Exec(ctx, insertDevicePackage,
-		arg.DeviceID,
-		arg.Position,
-		arg.Name,
-		arg.Version,
-		arg.Architecture,
+const listExpiredOpenSnapshots = `-- name: ListExpiredOpenSnapshots :many
+SELECT id, encoded_bytes, reserved_bytes, metadata_bytes
+FROM package_snapshots
+WHERE device_id = $1
+  AND state = 'staging'
+  AND open_until <= $2
+`
+
+type ListExpiredOpenSnapshotsParams struct {
+	DeviceID uuid.UUID
+	Now      pgtype.Timestamptz
+}
+
+type ListExpiredOpenSnapshotsRow struct {
+	ID            uuid.UUID
+	EncodedBytes  int64
+	ReservedBytes int64
+	MetadataBytes int64
+}
+
+func (q *Queries) ListExpiredOpenSnapshots(ctx context.Context, arg ListExpiredOpenSnapshotsParams) ([]ListExpiredOpenSnapshotsRow, error) {
+	rows, err := q.db.Query(ctx, listExpiredOpenSnapshots, arg.DeviceID, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExpiredOpenSnapshotsRow{}
+	for rows.Next() {
+		var i ListExpiredOpenSnapshotsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EncodedBytes,
+			&i.ReservedBytes,
+			&i.MetadataBytes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listExpiredSnapshotReceipts = `-- name: ListExpiredSnapshotReceipts :many
+SELECT s.id, s.reserved_bytes
+FROM package_snapshots s
+WHERE s.device_id = $1
+  AND s.receipt_expires_at <= $2
+  AND s.state IN ('superseded', 'expired')
+  AND NOT s.bulk_retained
+  AND NOT EXISTS (
+    SELECT 1 FROM package_page_cursors c
+    WHERE c.snapshot_id = s.id AND c.expires_at > $2
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM package_attempts a WHERE a.snapshot_id = s.id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM enrollment_generations g WHERE g.current_snapshot_id = s.id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM devices d WHERE d.open_snapshot_id = s.id
+  )
+`
+
+type ListExpiredSnapshotReceiptsParams struct {
+	DeviceID uuid.UUID
+	Now      pgtype.Timestamptz
+}
+
+type ListExpiredSnapshotReceiptsRow struct {
+	ID            uuid.UUID
+	ReservedBytes int64
+}
+
+func (q *Queries) ListExpiredSnapshotReceipts(ctx context.Context, arg ListExpiredSnapshotReceiptsParams) ([]ListExpiredSnapshotReceiptsRow, error) {
+	rows, err := q.db.Query(ctx, listExpiredSnapshotReceipts, arg.DeviceID, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExpiredSnapshotReceiptsRow{}
+	for rows.Next() {
+		var i ListExpiredSnapshotReceiptsRow
+		if err := rows.Scan(&i.ID, &i.ReservedBytes); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInventoryCleanupDevices = `-- name: ListInventoryCleanupDevices :many
+SELECT id
+FROM devices
+WHERE open_snapshot_id IS NOT NULL
+   OR reserved_inventory_bytes > 0
+ORDER BY id
+`
+
+func (q *Queries) ListInventoryCleanupDevices(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listInventoryCleanupDevices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReleasableSnapshotBulk = `-- name: ListReleasableSnapshotBulk :many
+SELECT id, encoded_bytes, reserved_bytes, metadata_bytes
+FROM package_snapshots s
+WHERE s.device_id = $1
+  AND s.bulk_retained
+  AND s.state = 'superseded'
+  AND s.superseded_at <= $2
+  AND NOT EXISTS (
+    SELECT 1 FROM package_page_cursors c
+    WHERE c.snapshot_id = s.id
+      AND c.expires_at > $3
+  )
+`
+
+type ListReleasableSnapshotBulkParams struct {
+	DeviceID uuid.UUID
+	Cutoff   pgtype.Timestamptz
+	Now      pgtype.Timestamptz
+}
+
+type ListReleasableSnapshotBulkRow struct {
+	ID            uuid.UUID
+	EncodedBytes  int64
+	ReservedBytes int64
+	MetadataBytes int64
+}
+
+func (q *Queries) ListReleasableSnapshotBulk(ctx context.Context, arg ListReleasableSnapshotBulkParams) ([]ListReleasableSnapshotBulkRow, error) {
+	rows, err := q.db.Query(ctx, listReleasableSnapshotBulk, arg.DeviceID, arg.Cutoff, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReleasableSnapshotBulkRow{}
+	for rows.Next() {
+		var i ListReleasableSnapshotBulkRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EncodedBytes,
+			&i.ReservedBytes,
+			&i.MetadataBytes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSnapshotPackages = `-- name: ListSnapshotPackages :many
+SELECT position, name, version, architecture, manager
+FROM snapshot_packages
+WHERE snapshot_id = $1
+  AND position >= $2
+  AND ($3::text = '' OR manager = $3::text)
+  AND (
+    $4::text = ''
+    OR name LIKE $5::text ESCAPE E'\\'
+  )
+ORDER BY position
+LIMIT $6::int
+`
+
+type ListSnapshotPackagesParams struct {
+	SnapshotID   uuid.UUID
+	NextPosition int32
+	Manager      string
+	NamePrefix   string
+	NamePattern  string
+	RowLimit     int32
+}
+
+type ListSnapshotPackagesRow struct {
+	Position     int32
+	Name         string
+	Version      string
+	Architecture string
+	Manager      string
+}
+
+func (q *Queries) ListSnapshotPackages(ctx context.Context, arg ListSnapshotPackagesParams) ([]ListSnapshotPackagesRow, error) {
+	rows, err := q.db.Query(ctx, listSnapshotPackages,
+		arg.SnapshotID,
+		arg.NextPosition,
 		arg.Manager,
+		arg.NamePrefix,
+		arg.NamePattern,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSnapshotPackagesRow{}
+	for rows.Next() {
+		var i ListSnapshotPackagesRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.Name,
+			&i.Version,
+			&i.Architecture,
+			&i.Manager,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockInventoryReservation = `-- name: LockInventoryReservation :one
+SELECT reserved_bytes
+FROM inventory_reservation
+WHERE singleton
+FOR UPDATE
+`
+
+func (q *Queries) LockInventoryReservation(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, lockInventoryReservation)
+	var reserved_bytes int64
+	err := row.Scan(&reserved_bytes)
+	return reserved_bytes, err
+}
+
+const markBatchStored = `-- name: MarkBatchStored :exec
+UPDATE snapshot_batches
+SET stored = true
+WHERE snapshot_id = $1
+  AND batch_index = $2
+`
+
+type MarkBatchStoredParams struct {
+	SnapshotID uuid.UUID
+	BatchIndex int32
+}
+
+func (q *Queries) MarkBatchStored(ctx context.Context, arg MarkBatchStoredParams) error {
+	_, err := q.db.Exec(ctx, markBatchStored, arg.SnapshotID, arg.BatchIndex)
+	return err
+}
+
+const releaseSnapshotBulk = `-- name: ReleaseSnapshotBulk :exec
+UPDATE package_snapshots
+SET bulk_retained = false,
+    reserved_bytes = $1
+WHERE id = $2
+  AND bulk_retained
+`
+
+type ReleaseSnapshotBulkParams struct {
+	ReservedBytes int64
+	ID            uuid.UUID
+}
+
+func (q *Queries) ReleaseSnapshotBulk(ctx context.Context, arg ReleaseSnapshotBulkParams) error {
+	_, err := q.db.Exec(ctx, releaseSnapshotBulk, arg.ReservedBytes, arg.ID)
+	return err
+}
+
+const supersedePackageSnapshot = `-- name: SupersedePackageSnapshot :exec
+UPDATE package_snapshots
+SET state = 'superseded',
+    superseded_at = $1
+WHERE id = $2
+  AND state IN ('staging', 'committed')
+`
+
+type SupersedePackageSnapshotParams struct {
+	SupersededAt pgtype.Timestamptz
+	ID           uuid.UUID
+}
+
+func (q *Queries) SupersedePackageSnapshot(ctx context.Context, arg SupersedePackageSnapshotParams) error {
+	_, err := q.db.Exec(ctx, supersedePackageSnapshot, arg.SupersededAt, arg.ID)
+	return err
+}
+
+const upsertHostObservation = `-- name: UpsertHostObservation :exec
+INSERT INTO host_observations (
+    generation_id,
+    sequence,
+    started_at,
+    finished_at,
+    received_at,
+    digest,
+    boot_id_status,
+    boot_id_value,
+    hostname_status,
+    hostname_value,
+    os_id_status,
+    os_id_value,
+    os_version_status,
+    os_version_value,
+    architecture_status,
+    architecture_value,
+    kernel_release_status,
+    kernel_release_value,
+    hardware_vendor_status,
+    hardware_vendor_value,
+    hardware_model_status,
+    hardware_model_value,
+    hardware_serial_status,
+    hardware_serial_value
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21,
+    $22,
+    $23,
+    $24
+)
+ON CONFLICT (generation_id) DO UPDATE SET
+    sequence = EXCLUDED.sequence,
+    started_at = EXCLUDED.started_at,
+    finished_at = EXCLUDED.finished_at,
+    received_at = EXCLUDED.received_at,
+    digest = EXCLUDED.digest,
+    boot_id_status = EXCLUDED.boot_id_status,
+    boot_id_value = EXCLUDED.boot_id_value,
+    hostname_status = EXCLUDED.hostname_status,
+    hostname_value = EXCLUDED.hostname_value,
+    os_id_status = EXCLUDED.os_id_status,
+    os_id_value = EXCLUDED.os_id_value,
+    os_version_status = EXCLUDED.os_version_status,
+    os_version_value = EXCLUDED.os_version_value,
+    architecture_status = EXCLUDED.architecture_status,
+    architecture_value = EXCLUDED.architecture_value,
+    kernel_release_status = EXCLUDED.kernel_release_status,
+    kernel_release_value = EXCLUDED.kernel_release_value,
+    hardware_vendor_status = EXCLUDED.hardware_vendor_status,
+    hardware_vendor_value = EXCLUDED.hardware_vendor_value,
+    hardware_model_status = EXCLUDED.hardware_model_status,
+    hardware_model_value = EXCLUDED.hardware_model_value,
+    hardware_serial_status = EXCLUDED.hardware_serial_status,
+    hardware_serial_value = EXCLUDED.hardware_serial_value
+`
+
+type UpsertHostObservationParams struct {
+	GenerationID         uuid.UUID
+	Sequence             int64
+	StartedAt            pgtype.Timestamptz
+	FinishedAt           pgtype.Timestamptz
+	ReceivedAt           pgtype.Timestamptz
+	Digest               []byte
+	BootIDStatus         int16
+	BootIDValue          string
+	HostnameStatus       int16
+	HostnameValue        string
+	OsIDStatus           int16
+	OsIDValue            string
+	OsVersionStatus      int16
+	OsVersionValue       string
+	ArchitectureStatus   int16
+	ArchitectureValue    string
+	KernelReleaseStatus  int16
+	KernelReleaseValue   string
+	HardwareVendorStatus int16
+	HardwareVendorValue  string
+	HardwareModelStatus  int16
+	HardwareModelValue   string
+	HardwareSerialStatus int16
+	HardwareSerialValue  string
+}
+
+func (q *Queries) UpsertHostObservation(ctx context.Context, arg UpsertHostObservationParams) error {
+	_, err := q.db.Exec(ctx, upsertHostObservation,
+		arg.GenerationID,
+		arg.Sequence,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.ReceivedAt,
+		arg.Digest,
+		arg.BootIDStatus,
+		arg.BootIDValue,
+		arg.HostnameStatus,
+		arg.HostnameValue,
+		arg.OsIDStatus,
+		arg.OsIDValue,
+		arg.OsVersionStatus,
+		arg.OsVersionValue,
+		arg.ArchitectureStatus,
+		arg.ArchitectureValue,
+		arg.KernelReleaseStatus,
+		arg.KernelReleaseValue,
+		arg.HardwareVendorStatus,
+		arg.HardwareVendorValue,
+		arg.HardwareModelStatus,
+		arg.HardwareModelValue,
+		arg.HardwareSerialStatus,
+		arg.HardwareSerialValue,
+	)
+	return err
+}
+
+const upsertPackageAttempt = `-- name: UpsertPackageAttempt :exec
+INSERT INTO package_attempts (
+    generation_id,
+    sequence,
+    started_at,
+    finished_at,
+    received_at,
+    status,
+    backend,
+    snapshot_id,
+    digest
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+)
+ON CONFLICT (generation_id) DO UPDATE SET
+    sequence = EXCLUDED.sequence,
+    started_at = EXCLUDED.started_at,
+    finished_at = EXCLUDED.finished_at,
+    received_at = EXCLUDED.received_at,
+    status = EXCLUDED.status,
+    backend = EXCLUDED.backend,
+    snapshot_id = EXCLUDED.snapshot_id,
+    digest = EXCLUDED.digest
+`
+
+type UpsertPackageAttemptParams struct {
+	GenerationID uuid.UUID
+	Sequence     int64
+	StartedAt    pgtype.Timestamptz
+	FinishedAt   pgtype.Timestamptz
+	ReceivedAt   pgtype.Timestamptz
+	Status       int16
+	Backend      string
+	SnapshotID   *uuid.UUID
+	Digest       []byte
+}
+
+func (q *Queries) UpsertPackageAttempt(ctx context.Context, arg UpsertPackageAttemptParams) error {
+	_, err := q.db.Exec(ctx, upsertPackageAttempt,
+		arg.GenerationID,
+		arg.Sequence,
+		arg.StartedAt,
+		arg.FinishedAt,
+		arg.ReceivedAt,
+		arg.Status,
+		arg.Backend,
+		arg.SnapshotID,
+		arg.Digest,
 	)
 	return err
 }

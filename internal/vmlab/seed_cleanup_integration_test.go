@@ -9,10 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
-	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestCancelledSeedCreationContainsSecretsAndStopsDescendants(t *testing.T) {
@@ -41,11 +41,6 @@ func TestCancelledSeedCreationContainsSecretsAndStopsDescendants(t *testing.T) {
 		done <- err
 	}()
 	var helperPID int
-	t.Cleanup(func() {
-		if helperPID > 0 {
-			_ = syscall.Kill(helperPID, syscall.SIGKILL)
-		}
-	})
 	deadline := time.NewTimer(10 * time.Second)
 	defer deadline.Stop()
 	ticker := time.NewTicker(10 * time.Millisecond)
@@ -70,6 +65,16 @@ func TestCancelledSeedCreationContainsSecretsAndStopsDescendants(t *testing.T) {
 			}
 		}
 	}
+	// Pin the helper identity while it is paused. Reading /proc after exit
+	// races reaping (ENOENT or ESRCH), and a bare PID can be reused.
+	helperFD, err := unix.PidfdOpen(helperPID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = unix.PidfdSendSignal(helperFD, unix.SIGKILL, nil, 0)
+		_ = unix.Close(helperFD)
+	})
 	cancel()
 	select {
 	case err := <-done:
@@ -92,13 +97,13 @@ func TestCancelledSeedCreationContainsSecretsAndStopsDescendants(t *testing.T) {
 	if _, err := os.Stat(runDir); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("owned seed directory survived cleanup: %v", err)
 	}
-	// A killed orphan may briefly remain as a zombie until its adopter reaps
-	// it; a running/sleeping helper can still write after directory cleanup.
-	status, err := os.ReadFile("/proc/" + strconv.Itoa(helperPID) + "/status")
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	// Readability proves exit, including an orphan awaiting its adopter's
+	// reap. A live descendant must not outlast this cancellation bound.
+	exited := []unix.PollFd{{Fd: int32(helperFD), Events: unix.POLLIN}}
+	if _, err := unix.Poll(exited, 1000); err != nil {
 		t.Fatal(err)
 	}
-	if err == nil && !strings.Contains(string(status), "State:\tZ") && !strings.Contains(string(status), "State:\tX") {
+	if exited[0].Revents&unix.POLLIN == 0 {
 		t.Error("seed helper descendant remained alive after cancellation")
 	}
 }

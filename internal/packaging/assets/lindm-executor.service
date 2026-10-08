@@ -1,0 +1,61 @@
+[Unit]
+Description=Lindm protected executor
+After=systemd-tmpfiles-setup.service systemd-sysusers.service
+Before=lindm-agent.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Configuration: /etc/lindm/executor.json
+# No arguments. The process reads that fixed path.
+ExecStart=/usr/libexec/lindm/lindm-agent executor
+ExecStartPre=/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/lindm.conf
+DynamicUser=no
+User=root
+Group=root
+# G2 scope: CapabilityBoundingSet and AmbientCapabilities are intentionally
+# unset. This process is root. A reduced bounding set would misrepresent G2
+# and can break later native providers whose privileges are not enumerated.
+# NoNewPrivileges=yes still blocks setuid helpers from raising privileges.
+# ProtectSystem=strict makes /usr, /boot, and /etc read-only. A later provider
+# that installs packages or edits /etc needs a reviewed unit exception.
+# ProtectHome=yes excludes /home, /root, and /run/user. A later provider that
+# must manage home directories needs a reviewed exception.
+# RestrictAddressFamilies=AF_UNIX. Outbound TLS belongs to lindm-agent.service.
+# PrivateDevices=yes hides TPM and disk devices. Software keys do not use
+# them. A TPM provider needs a reviewed DeviceAllow, not a blanket removal.
+# UMask=0077. The executor must chmod the socket to 0660 after bind.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+WorkingDirectory=/var/lib/lindm/executor
+ReadOnlyPaths=/var
+ReadWritePaths=/var/lib/lindm/executor /run/lindm
+InaccessiblePaths=/var/lib/lindm/agent
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+SyslogIdentifier=lindm-executor
+
+[Install]
+WantedBy=multi-user.target

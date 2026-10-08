@@ -57,13 +57,24 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		return fmt.Errorf("initialize identity service: %w", err)
 	}
 	devices, err := device.New(pool, device.Config{
-		DeploymentID:  resources.Proto.GetDeploymentId(),
-		CACertificate: resources.DeviceCACertificate,
-		CAKey:         resources.DeviceCAKey,
+		DeploymentID:         resources.Proto.GetDeploymentId(),
+		CACertificate:        resources.DeviceCACertificate,
+		CAKey:                resources.DeviceCAKey,
+		InventoryBudgetBytes: resources.InventoryBudgetBytes,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)
 	}
+	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
+	cleanupDone := make(chan struct{})
+	go func() {
+		defer close(cleanupDone)
+		devices.RunSnapshotCleanup(cleanupCtx)
+	}()
+	defer func() {
+		cancelCleanup()
+		<-cleanupDone
+	}()
 	console, err := web.Handler()
 	if err != nil {
 		return err

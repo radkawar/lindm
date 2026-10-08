@@ -39,16 +39,23 @@ message ExecutorJournalState {
   PendingIdentityRenewal pending_renewal = 17;
   PriorIdentityCredential prior_credential = 18;
   google.protobuf.Timestamp renew_after = 19;
+  RenewalCommitReceipt renewal_receipt = 20;
+  SessionCommitReceipt session_receipt = 21;
 
   option (buf.validate.message).cel = {
     id: "executor_journal.enrollment_shape"
     message: "pending enrollment retains its grant; installed identity pins device/generation and removes the grant"
-    expression: "(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))"
+    expression: "(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))"
   };
   option (buf.validate.message).cel = {
     id: "executor_journal.session_shape"
     message: "accepted sessions have a boot identity and pending acquisition remains at the protected predecessor"
     expression: "(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "executor_journal.session_receipt"
+    message: "the retained acknowledgment binds the committed session epoch"
+    expression: "!has(this.session_receipt) || (this.session_epoch > 0u && has(this.session_boot_id) && this.session_receipt.session_epoch == this.session_epoch)"
   };
 }
 
@@ -80,4 +87,19 @@ message PriorIdentityCredential {
     max_len: 16384
   }];
   google.protobuf.Timestamp retain_until = 3 [(buf.validate.field).required = true];
+}
+
+// Atomically replaces the preceding receipt with the installed credential.
+// It permits an exact acknowledgment retry after executor/process restart.
+message RenewalCommitReceipt {
+  string issuance_request_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes certificate_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+message SessionCommitReceipt {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
 }

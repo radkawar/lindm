@@ -11,7 +11,11 @@ option go_package = "lindm/gen/lindm/device/v1;devicev1";
 service DeviceService {
   rpc AcquireSession(AcquireSessionRequest) returns (AcquireSessionResponse);
   rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
-  rpc ReportInventory(ReportInventoryRequest) returns (ReportInventoryResponse);
+  rpc ReportHostObservation(ReportHostObservationRequest) returns (ReportHostObservationResponse);
+  rpc ReportPackageAttempt(ReportPackageAttemptRequest) returns (ReportPackageAttemptResponse);
+  rpc BeginPackageSnapshot(BeginPackageSnapshotRequest) returns (BeginPackageSnapshotResponse);
+  rpc PutPackageBatch(PutPackageBatchRequest) returns (PutPackageBatchResponse);
+  rpc CommitPackageSnapshot(CommitPackageSnapshotRequest) returns (CommitPackageSnapshotResponse);
   rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
 }
 message AcquireSessionRequest {
@@ -38,37 +42,150 @@ message GetSyncStateResponse {
   uint64 package_sequence = 3;
   google.protobuf.Timestamp server_time = 4;
 }
-message ReportInventoryRequest {
+
+// PackageBatchDescriptor binds one opaque inventory.v1.PackageBatch. SHA-256 and
+// encoded_size cover those exact bytes, not a server reserialization.
+message PackageBatchDescriptor {
+  uint32 index = 1 [(buf.validate.field).uint32.lte = 511];
+  bytes sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  uint32 count = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 500
+  }];
+  uint32 encoded_size = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 786432
+  }];
+}
+
+// PackageSnapshotManifest is immutable for the life of the attempt. Session epoch
+// is intentionally absent: a later acquisition must resume these exact bytes.
+// Field 5 is reserved so epoch cannot be added without a new manifest version.
+message PackageSnapshotManifest {
+  reserved 5;
+  reserved "session_epoch";
+
+  string snapshot_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp created_at = 2 [(buf.validate.field).required = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  uint64 sequence = 4 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  google.protobuf.Timestamp started_at = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 7 [(buf.validate.field).required = true];
+  string backend = 8 [(buf.validate.field).string.max_len = 64];
+  repeated PackageBatchDescriptor batches = 9 [(buf.validate.field).repeated.max_items = 512];
+  option (buf.validate.message).cel = {
+    id: "snapshot.time_order"
+    message: "collection finish must not precede its start"
+    expression: "this.finished_at >= this.started_at"
+  };
+}
+
+message ReportHostObservationRequest {
   string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
-  string boot_id = 2 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
   uint64 sequence = 3 [(buf.validate.field).uint64 = {
     gt: 0
     lte: 9223372036854775807
   }];
-  string hostname = 4 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 253
-  }];
-  string os_id = 5 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 64
-  }];
-  string os_version = 6 [(buf.validate.field).string.max_len = 128];
-  string architecture = 7 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 64
-  }];
-  repeated lindm.inventory.v1.Package packages = 8 [(buf.validate.field).repeated.max_items = 500];
-  bool packages_complete = 9;
-  uint64 session_epoch = 10 [(buf.validate.field).uint64 = {
-    gt: 0
-    lte: 9223372036854775807
-  }];
+  lindm.inventory.v1.HostObservation observation = 4 [(buf.validate.field).required = true];
 }
-message ReportInventoryResponse {
+message ReportHostObservationResponse {
   uint64 accepted_sequence = 1;
   google.protobuf.Timestamp server_time = 2;
 }
+
+message ReportPackageAttemptRequest {
+  string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 sequence = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  google.protobuf.Timestamp started_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 5 [(buf.validate.field).required = true];
+  // Success is published only by CommitPackageSnapshot.
+  lindm.inventory.v1.CollectionStatus status = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [
+      0,
+      1
+    ]
+  }];
+  string backend = 7 [(buf.validate.field).string.max_len = 64];
+  option (buf.validate.message).cel = {
+    id: "attempt.time_order"
+    message: "collection finish must not precede its start"
+    expression: "this.finished_at >= this.started_at"
+  };
+}
+message ReportPackageAttemptResponse {
+  uint64 accepted_sequence = 1;
+  google.protobuf.Timestamp server_time = 2;
+}
+
+message BeginPackageSnapshotRequest {
+  string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  PackageSnapshotManifest manifest = 3 [(buf.validate.field).required = true];
+}
+message BeginPackageSnapshotResponse {
+  lindm.inventory.v1.SnapshotState state = 1;
+  uint64 package_sequence = 2;
+  google.protobuf.Timestamp accepted_at = 3;
+  google.protobuf.Timestamp open_until = 4;
+  google.protobuf.Timestamp receipt_expires_at = 5;
+  google.protobuf.Timestamp server_time = 6;
+}
+
+message PutPackageBatchRequest {
+  string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string snapshot_id = 3 [(buf.validate.field).string.uuid = true];
+  uint32 batch_index = 4 [(buf.validate.field).uint32.lte = 511];
+  // Opaque inventory.v1.PackageBatch, at most 768 KiB.
+  bytes batch = 5 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 786432
+  }];
+}
+message PutPackageBatchResponse {
+  lindm.inventory.v1.SnapshotState state = 1;
+  google.protobuf.Timestamp accepted_at = 2;
+  google.protobuf.Timestamp server_time = 3;
+}
+
+message CommitPackageSnapshotRequest {
+  string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  PackageSnapshotManifest manifest = 3 [(buf.validate.field).required = true];
+}
+message CommitPackageSnapshotResponse {
+  lindm.inventory.v1.SnapshotState state = 1;
+  uint64 package_sequence = 2;
+  uint64 published_sequence = 3;
+  google.protobuf.Timestamp accepted_at = 4;
+  google.protobuf.Timestamp receipt_expires_at = 5;
+  google.protobuf.Timestamp server_time = 6;
+}
+
 message RenewIdentityRequest {
   bytes csr_pem = 1 [(buf.validate.field).bytes = {
     min_len: 64

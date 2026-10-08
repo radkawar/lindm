@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -31,6 +32,7 @@ type Resources struct {
 	HTTPClient            *http.Client
 	ClientSecret          string
 	DirectoryClientSecret string
+	InventoryBudgetBytes  int64
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -38,11 +40,33 @@ func Address(listener *configv1.ListenerConfig) string {
 	return net.JoinHostPort(listener.GetAddress(), strconv.FormatUint(uint64(listener.GetPort()), 10))
 }
 
+const (
+	DefaultInventoryBudgetBytes int64 = 10 << 30
+	MinInventoryBudgetBytes     int64 = 64 << 20
+)
+
+// InventoryBudget returns the deployment package-snapshot byte cap. An absent
+// field selects the initial 10 GiB budget.
+func InventoryBudget(cfg *configv1.ServerConfig) (int64, error) {
+	if cfg == nil || cfg.InventoryBudgetBytes == nil {
+		return DefaultInventoryBudgetBytes, nil
+	}
+	value := cfg.GetInventoryBudgetBytes()
+	if value < uint64(MinInventoryBudgetBytes) || value > uint64(math.MaxInt64) {
+		return 0, errors.New("inventory_budget_bytes is outside the admitted range")
+	}
+	return int64(value), nil
+}
+
 // Resolve loads the runtime dependencies needed by a control-plane process.
 func (d *Document) Resolve() (*Resources, error) {
 	cfg, base := d.Proto, d.base
 	result := &Resources{Proto: cfg}
 	var err error
+	result.InventoryBudgetBytes, err = InventoryBudget(cfg)
+	if err != nil {
+		return nil, err
+	}
 	result.Database, err = d.Database()
 	if err != nil {
 		return nil, err

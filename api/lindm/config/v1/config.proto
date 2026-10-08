@@ -32,6 +32,13 @@ message ServerConfig {
   OIDCConfig oidc = 8 [(buf.validate.field).required = true];
   // Additional outbound trust roots; empty uses the system trust store.
   string trusted_ca_file = 9 [(buf.validate.field).string.max_len = 4096];
+  // Deployment cap on retained package-snapshot bytes, including opaque batch
+  // payloads and finite manifest/receipt metadata. Absent selects the initial
+  // 10 GiB budget. A present value is at least one maximum snapshot (64 MiB).
+  optional uint64 inventory_budget_bytes = 10 [(buf.validate.field).uint64 = {
+    gte: 67108864
+    lte: 9223372036854775807
+  }];
 }
 
 // Binding uses an explicit IP address and port rather than a second address

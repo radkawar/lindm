@@ -90,8 +90,8 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 		next := current + 1
 		if err := q.InsertSessionReceipt(ctx, devicedb.InsertSessionReceiptParams{
 			GenerationID: principal.GenerationID, RequestID: requestID, RequestDigest: digest[:],
-			SessionEpoch: next, HostSequence: authority.device.InventorySequence,
-			PackageSequence: authority.device.PackageSnapshotSequence, AcceptedAt: timestamptz(authority.now),
+			SessionEpoch: next, HostSequence: authority.generation.HostSequence,
+			PackageSequence: authority.generation.PackageSequence, AcceptedAt: timestamptz(authority.now),
 		}); err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 		if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(authority.now), ID: principal.DeviceID}); err != nil {
 			return err
 		}
-		response = &devicev1.AcquireSessionResponse{SessionEpoch: uint64(next), HostSequence: uint64(authority.device.InventorySequence), PackageSequence: uint64(authority.device.PackageSnapshotSequence), ServerTime: timestamppb.New(authority.now)}
+		response = &devicev1.AcquireSessionResponse{SessionEpoch: uint64(next), HostSequence: uint64(authority.generation.HostSequence), PackageSequence: uint64(authority.generation.PackageSequence), ServerTime: timestamppb.New(authority.now)}
 		return nil
 	})
 	if err != nil {
@@ -135,7 +135,7 @@ func (s *Service) GetSyncState(ctx context.Context, req *connect.Request[devicev
 		if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(authority.now), ID: principal.DeviceID}); err != nil {
 			return err
 		}
-		response = &devicev1.GetSyncStateResponse{SessionEpoch: req.Msg.GetSessionEpoch(), HostSequence: uint64(authority.device.InventorySequence), PackageSequence: uint64(authority.device.PackageSnapshotSequence), ServerTime: timestamppb.New(authority.now)}
+		response = &devicev1.GetSyncStateResponse{SessionEpoch: req.Msg.GetSessionEpoch(), HostSequence: uint64(authority.generation.HostSequence), PackageSequence: uint64(authority.generation.PackageSequence), ServerTime: timestamppb.New(authority.now)}
 		return nil
 	})
 	if err != nil {

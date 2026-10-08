@@ -101,13 +101,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, S
 	}
 	cfg := &configv1.ServerConfig{
 		DeploymentId: uuid.NewString(), PublicUrl: "https://localhost:18444",
-		AdminListener:  &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444},
-		DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
-		Database:       &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("migration-database-url"), MaxConnections: 16},
-		Tls:            &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
-		DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"},
-		Oidc:           &configv1.OIDCConfig{Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret", AdministratorGroups: []string{"/mdm-admins"}},
-		TrustedCaFile:  "transport-ca.crt",
+		AdminListener:        &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444},
+		DeviceListener:       &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
+		Database:             &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("migration-database-url"), MaxConnections: 16},
+		Tls:                  &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
+		DeviceCa:             &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"},
+		Oidc:                 &configv1.OIDCConfig{Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret", AdministratorGroups: []string{"/mdm-admins"}},
+		TrustedCaFile:        "transport-ca.crt",
+		InventoryBudgetBytes: proto.Uint64(10 << 30),
 	}
 	files["server.json"], err = (protojson.MarshalOptions{Indent: "  "}).Marshal(cfg)
 	if err != nil {

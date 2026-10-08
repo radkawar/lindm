@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/executor.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// A network-process observation, not protected executor authority, live presence,
+// compliance or proof of a currently running process. Never contains credentials.
+message TransportStatus {
+  option (buf.validate.message).cel = {
+    id: "transport_status.identity"
+    message: "contact observations bind a complete deployment/device/generation"
+    expression: "(has(this.deployment_id) == has(this.device_id)) && (has(this.device_id) == has(this.enrollment_generation)) && (!has(this.last_server_contact_at) || has(this.device_id))"
+  };
+  optional string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  optional string device_id = 2 [(buf.validate.field).string.uuid = true];
+  optional string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp recorded_at = 4 [(buf.validate.field).required = true];
+  TransportOutcome last_attempt = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  google.protobuf.Timestamp last_server_contact_at = 6;
+  google.protobuf.Timestamp last_collection_finished_at = 7;
+  uint64 host_high_water = 8 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  uint64 package_high_water = 9 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  bool spool_needs_sync = 10;
+  string spool_recovery_reason = 11 [(buf.validate.field).string.max_len = 64];
+  // True after payload loss may have left a server-side staging upload. The
+  // server's fixed 24-hour admission TTL is not reset by local recovery.
+  bool lost_upload_may_remain = 12;
+}
+
+enum TransportOutcome {
+  TRANSPORT_OUTCOME_UNSPECIFIED = 0;
+  TRANSPORT_OUTCOME_STARTING = 1;
+  TRANSPORT_OUTCOME_SYNCHRONIZED = 2;
+  TRANSPORT_OUTCOME_UNREACHABLE = 3;
+  TRANSPORT_OUTCOME_AUTHORITY_REJECTED = 4;
+  TRANSPORT_OUTCOME_IDENTITY_EXPIRED = 5;
+  TRANSPORT_OUTCOME_LOCAL_RECOVERY_REQUIRED = 6;
+  TRANSPORT_OUTCOME_SERVER_ADMISSION_DEFERRED = 7;
+  TRANSPORT_OUTCOME_LOCAL_FAILURE = 8;
+  TRANSPORT_OUTCOME_STOPPED = 9;
+  TRANSPORT_OUTCOME_WAITING_FOR_ENROLLMENT = 10;
+}
+
+message AgentStatus {
+  StatusResponse executor = 1 [(buf.validate.field).required = true];
+  // Unprivileged-process evidence; absence is not successful contact.
+  TransportStatus transport = 2;
+  TransportReportState transport_report_state = 3;
+}
+
+enum TransportReportState {
+  TRANSPORT_REPORT_STATE_UNSPECIFIED = 0;
+  TRANSPORT_REPORT_STATE_NOT_RECORDED = 1;
+  TRANSPORT_REPORT_STATE_RECORDED = 2;
+  TRANSPORT_REPORT_STATE_UNREADABLE = 3;
+  TRANSPORT_REPORT_STATE_IDENTITY_MISMATCH = 4;
+}

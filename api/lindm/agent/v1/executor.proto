@@ -1,0 +1,308 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// ExecutorService is the root-owned Unix Connect API. It is not a general
+// file, command, or signing service. Private keys are never returned.
+//
+// SO_PEERCRED ACL: UID 0 may call every method. The frozen network UID may
+// call every method except PrepareBootstrap and InstallEnrollment. Every
+// other UID is denied. Transport uses only the network-UID methods.
+//
+// Mutation epoch: put session_epoch on mutating device requests only when
+// session_epoch_usable is true. That value exists only after CommitSession
+// and is withheld while a renewal is unresolved. Snapshot manifests must not
+// bind the epoch; the transport adds the current epoch on the mutating
+// request. Callers cannot select an epoch, incarnation, or boot ID.
+service ExecutorService {
+  // PrepareBootstrap validates supplied trust, or returns the existing pending
+  // attempt. Root only. The response may include the pending grant and never
+  // includes a private key. resume never generates another identity.
+  rpc PrepareBootstrap(PrepareBootstrapRequest) returns (PrepareBootstrapResponse);
+  // InstallEnrollment verifies the server certificate against the protected
+  // pending key and deployment, then commits and removes the grant before
+  // acknowledgment. Root only.
+  rpc InstallEnrollment(InstallEnrollmentRequest) returns (InstallEnrollmentResponse);
+  // GetConnection returns public connection material. An expired active
+  // certificate is not a TLS credential. Pending retrieval public data is
+  // still returned. session_epoch is usable only after CommitSession and
+  // while no renewal is pending.
+  rpc GetConnection(GetConnectionRequest) returns (GetConnectionResponse);
+  // SignTLSClientMessage signs one complete TLS 1.3 client CertificateVerify
+  // message for the current certificate or the bounded prior certificate.
+  // It is not a digest, renewal, or payload oracle.
+  rpc SignTLSClientMessage(SignTLSClientMessageRequest) returns (SignTLSClientMessageResponse);
+  // PrepareSession returns the committed epoch for this boot, or the exact
+  // persisted acquisition proof. It refuses while a renewal is unresolved.
+  rpc PrepareSession(PrepareSessionRequest) returns (PrepareSessionResponse);
+  // CommitSession accepts only the protected pending request UUID and
+  // predecessor+1. The exact acknowledgment retry is idempotent. It refuses
+  // while a renewal is unresolved.
+  rpc CommitSession(CommitSessionRequest) returns (CommitSessionResponse);
+  // PrepareRenewal returns the executor-generated CSR and proofs. An existing
+  // pending intent is returned unchanged, including when the old certificate
+  // can no longer authenticate. It does not renew before the stored time.
+  rpc PrepareRenewal(PrepareRenewalRequest) returns (PrepareRenewalResponse);
+  // CommitRenewal installs a certificate that matches the pending next key
+  // and pinned identity before acknowledgment.
+  rpc CommitRenewal(CommitRenewalRequest) returns (CommitRenewalResponse);
+  // Status reports durable lifecycle facts. It does not report transport
+  // reachability or any secret, grant, private key, or signed envelope.
+  rpc Status(StatusRequest) returns (StatusResponse);
+}
+
+message PrepareBootstrapRequest {
+  bytes execution_root_json = 1 [(buf.validate.field).bytes.max_len = 65536];
+  bytes bootstrap_envelope = 2 [(buf.validate.field).bytes.max_len = 524288];
+  // Fresh provisioning requires 32..256 characters. Explicit resume may omit
+  // it and then receives the stored grant; a provided value must match and
+  // never replaces the stored grant.
+  string pending_grant = 3 [(buf.validate.field).string.max_len = 256];
+  // Explicit resume returns the stored attempt only. It never initializes.
+  bool resume = 4;
+  option (buf.validate.message).cel = {
+    id: "prepare_bootstrap.material"
+    message: "new provisioning requires both trust documents; resume may omit both but not one"
+    expression: "(this.execution_root_json.size() == 0) == (this.bootstrap_envelope.size() == 0) && (this.resume || this.execution_root_json.size() > 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "prepare_bootstrap.grant"
+    message: "fresh provisioning requires a grant; resume may omit it"
+    expression: "(!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256)))"
+  };
+}
+
+message PrepareBootstrapResponse {
+  string installation_id = 1 [(buf.validate.field).string.uuid = true];
+  string enrollment_transaction_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes csr_pem = 3 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  // Root-only. The network UID cannot call this method.
+  string pending_grant = 4 [(buf.validate.field).string = {
+    min_len: 32
+    max_len: 256
+  }];
+  string deployment_id = 5 [(buf.validate.field).string.uuid = true];
+  string enrollment_origin = 6;
+  string device_origin = 7;
+  bytes transport_ca_pem = 8 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 65536
+  }];
+  bool resumed = 9;
+}
+
+message InstallEnrollmentRequest {
+  string device_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string enrollment_generation = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  bytes certificate_pem = 3 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+}
+
+message InstallEnrollmentResponse {
+  string device_id = 1;
+  string enrollment_generation = 2;
+  // SHA-256 of the certificate DER, not the PEM encoding and not the SPKI.
+  bytes certificate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp not_after = 4;
+  google.protobuf.Timestamp renew_after = 5;
+  bool replayed = 6;
+}
+
+message GetConnectionRequest {}
+
+enum TLSCredentialKind {
+  TLS_CREDENTIAL_KIND_UNSPECIFIED = 0;
+  TLS_CREDENTIAL_KIND_ED25519 = 1;
+}
+
+message GetConnectionResponse {
+  string deployment_id = 1;
+  string device_id = 2;
+  string enrollment_generation = 3;
+  string enrollment_origin = 4;
+  string device_origin = 5;
+  bytes transport_ca_pem = 6;
+  // Pure Ed25519 TLS 1.3 client credentials. Unspecified is not usable.
+  TLSCredentialKind credential_kind = 7;
+  // Empty unless the active certificate is currently valid for new TLS.
+  bytes certificate_pem = 8;
+  bytes certificate_sha256 = 9;
+  // Lowercase hex SHA-256 of the PKIX SubjectPublicKeyInfo.
+  string key_id = 10;
+  // Committed fence. Zero unless session_epoch_usable is true. Not safe to
+  // copy into a snapshot manifest; transport attaches it to mutating requests.
+  uint64 session_epoch = 11;
+  bool session_epoch_usable = 12;
+  bool renewal_pending = 13;
+  bool identity_expired = 14;
+  google.protobuf.Timestamp certificate_not_after = 15;
+  google.protobuf.Timestamp renew_after = 16;
+  RetrievalPublicData retrieval = 17;
+  PriorTLSCredential prior = 18;
+  // Actual /proc boot ID when readable. Not an authority input.
+  string observed_boot_id = 19;
+}
+
+message RetrievalPublicData {
+  string issuance_request_id = 1;
+  bytes retrieval_proof = 2;
+  string next_key_id = 3;
+}
+
+message PriorTLSCredential {
+  bytes certificate_pem = 1;
+  bytes certificate_sha256 = 2;
+  string key_id = 3;
+  google.protobuf.Timestamp retain_until = 4;
+}
+
+message SignTLSClientMessageRequest {
+  // SHA-256 of the selected certificate DER.
+  bytes certificate_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  // Complete TLS 1.3 client CertificateVerify message, including the 64-space
+  // prefix and either a SHA-256 or SHA-384 transcript hash.
+  bytes message = 2 [(buf.validate.field).bytes = {
+    min_len: 130
+    max_len: 146
+  }];
+  option (buf.validate.message).cel = {
+    id: "sign_tls.message_length"
+    message: "CertificateVerify message must bind a SHA-256 or SHA-384 transcript"
+    expression: "this.message.size() == 130 || this.message.size() == 146"
+  };
+}
+
+message SignTLSClientMessageResponse {
+  bytes signature = 1 [(buf.validate.field).bytes.len = 64];
+}
+
+message PrepareSessionRequest {}
+
+message PrepareSessionResponse {
+  oneof result {
+    AcceptedSession accepted = 1;
+    PendingSessionClaim pending = 2;
+  }
+}
+
+message AcceptedSession {
+  // Committed by a previous CommitSession for the current boot.
+  uint64 session_epoch = 1;
+  string boot_id = 2;
+}
+
+message PendingSessionClaim {
+  // Exact persisted DSSE bytes. Suitable for AcquireSession as authority_proof.
+  bytes authority_proof = 1;
+  string request_id = 2;
+  uint64 predecessor_epoch = 3;
+  string incarnation = 4;
+  string boot_id = 5;
+  string deployment_id = 6;
+  string device_id = 7;
+  string enrollment_generation = 8;
+}
+
+message CommitSessionRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 server_epoch = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+
+message CommitSessionResponse {
+  uint64 session_epoch = 1;
+  string boot_id = 2;
+  bool replayed = 3;
+}
+
+message PrepareRenewalRequest {}
+
+message PrepareRenewalResponse {
+  string issuance_request_id = 1;
+  bytes csr_pem = 2;
+  bytes authority_proof = 3;
+  bytes retrieval_proof = 4;
+  bytes presented_certificate_sha256 = 5;
+  // Already-committed fence bound into the renewal proof. Not a mutation grant
+  // while this renewal remains pending; GetConnection.session_epoch_usable is
+  // false until CommitRenewal.
+  uint64 fenced_session_epoch = 6;
+  string next_key_id = 7;
+  bool resumed = 8;
+}
+
+message CommitRenewalRequest {
+  string issuance_request_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes certificate_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+}
+
+message CommitRenewalResponse {
+  string issuance_request_id = 1;
+  bytes certificate_sha256 = 2;
+  google.protobuf.Timestamp not_after = 3;
+  google.protobuf.Timestamp renew_after = 4;
+  google.protobuf.Timestamp prior_retain_until = 5;
+  bool replayed = 6;
+}
+
+message StatusRequest {}
+
+enum Lifecycle {
+  LIFECYCLE_UNSPECIFIED = 0;
+  LIFECYCLE_UNPROVISIONED = 1;
+  LIFECYCLE_PENDING_ENROLLMENT = 2;
+  LIFECYCLE_ENROLLED = 3;
+  LIFECYCLE_RECOVERY_HOLD = 4;
+}
+
+enum HoldReason {
+  HOLD_REASON_UNSPECIFIED = 0;
+  HOLD_REASON_NONE = 1;
+  HOLD_REASON_INCOMPLETE_OR_CORRUPT = 2;
+  HOLD_REASON_IDENTITY_BINDING = 3;
+}
+
+message StatusResponse {
+  Lifecycle lifecycle = 1;
+  HoldReason hold_reason = 2;
+  string installation_id = 3;
+  string deployment_id = 4;
+  string device_id = 5;
+  string enrollment_generation = 6;
+  // Diagnostic committed fence. Zero when unknown. Not contact freshness.
+  uint64 committed_session_epoch = 7;
+  bool session_epoch_usable = 8;
+  string committed_boot_id = 9;
+  bool session_pending = 10;
+  bool renewal_pending = 11;
+  string pending_issuance_request_id = 12;
+  google.protobuf.Timestamp certificate_not_after = 13;
+  google.protobuf.Timestamp renew_after = 14;
+  bool identity_expired = 15;
+  bool tls_usable = 16;
+  google.protobuf.Timestamp prior_retain_until = 17;
+  google.protobuf.Timestamp bootstrap_verified_at = 18;
+  // Always false. The executor does not observe transport reachability.
+  bool transport_reachability_known = 19;
+}

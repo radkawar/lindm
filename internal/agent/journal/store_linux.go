@@ -12,9 +12,7 @@ import (
 	"math"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"buf.build/go/protovalidate"
@@ -25,6 +23,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal/journaldb"
+	"lindm/internal/agent/statefs"
 	"lindm/internal/protodata"
 )
 
@@ -46,9 +45,10 @@ var (
 //go:embed schema.sql
 var schema string
 
-// Store holds the directory lock until Close. Its caller must enforce root-only
-// initialization and perform cryptographic/transition validation before Update.
-// No method logs or includes serialized state in an error.
+// Store retains its directory lock until Close. Locked entrypoints share the
+// caller's lock ownership, so closing the Store does not release that caller's
+// descriptor. Callers enforce root-only initialization and cryptographic/transition
+// validation before Update. No method includes serialized state in an error.
 type Store struct {
 	mu             sync.Mutex
 	dir            *os.File
@@ -62,7 +62,7 @@ type Store struct {
 // exist, be owned by this process's effective UID and have exactly mode 0700.
 // Production executor startup separately requires effective UID zero.
 func Open(ctx context.Context, directory string) (*Store, error) {
-	return open(ctx, directory, nil)
+	return open(ctx, directory, nil, nil)
 }
 
 // Initialize durably records the provisioning intent before creating the journal.
@@ -72,10 +72,41 @@ func Initialize(ctx context.Context, directory string, initial *agentv1.Executor
 	if initial == nil {
 		return nil, errors.New("missing initial executor state")
 	}
-	return open(ctx, directory, initial)
+	return open(ctx, directory, nil, initial)
 }
 
-func open(ctx context.Context, directory string, initial *agentv1.ExecutorJournalState) (_ *Store, resultErr error) {
+// OpenLocked opens an existing installation using the caller's directory lock.
+// The directory pathname is independently checked for protected ancestry and
+// must identify locked's inode. The caller must hold an exclusive flock and keep
+// locked open until after Store.Close. The Store owns only a CLOEXEC duplicate
+// sharing that open-file description; neither error cleanup nor Close unlocks
+// the caller's descriptor.
+func OpenLocked(ctx context.Context, directory string, locked *os.File) (*Store, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if locked == nil {
+		return nil, ErrRecoveryHold
+	}
+	return open(ctx, directory, locked, nil)
+}
+
+// InitializeLocked records provisioning under the same lock and lifetime contract
+// as OpenLocked, preserving exclusivity before an installation exists.
+func InitializeLocked(ctx context.Context, directory string, locked *os.File, initial *agentv1.ExecutorJournalState) (*Store, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if locked == nil {
+		return nil, ErrRecoveryHold
+	}
+	if initial == nil {
+		return nil, errors.New("missing initial executor state")
+	}
+	return open(ctx, directory, locked, initial)
+}
+
+func open(ctx context.Context, directory string, locked *os.File, initial *agentv1.ExecutorJournalState) (_ *Store, resultErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -83,8 +114,11 @@ func open(ctx context.Context, directory string, initial *agentv1.ExecutorJourna
 	if err != nil {
 		return nil, fmt.Errorf("compile executor state schema: %w", err)
 	}
-	fd, err := openProtectedDirectory(directory)
+	fd, err := openDirectory(directory, locked)
 	if err != nil {
+		if errors.Is(err, statefs.ErrUnsafe) {
+			return nil, ErrRecoveryHold
+		}
 		return nil, fmt.Errorf("open protected executor directory: %w", err)
 	}
 	s := &Store{dir: os.NewFile(uintptr(fd), "executor-directory"), validator: validator}
@@ -93,13 +127,6 @@ func open(ctx context.Context, directory string, initial *agentv1.ExecutorJourna
 			_ = s.Close()
 		}
 	}()
-	var info unix.Stat_t
-	if err := unix.Fstat(fd, &info); err != nil {
-		return nil, err
-	}
-	if info.Uid != uint32(os.Geteuid()) || info.Mode&07777 != 0700 {
-		return nil, ErrRecoveryHold
-	}
 	if err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		if errors.Is(err, unix.EWOULDBLOCK) {
 			return nil, ErrAlreadyOpen
@@ -178,9 +205,31 @@ func open(ctx context.Context, directory string, initial *agentv1.ExecutorJourna
 	return s, nil
 }
 
+func openDirectory(directory string, locked *os.File) (int, error) {
+	fd, err := statefs.OpenDirectory(directory)
+	if err != nil {
+		return -1, err
+	}
+	if locked == nil {
+		return fd, nil
+	}
+	defer func() { _ = unix.Close(fd) }()
+	var checked, supplied unix.Stat_t
+	if err := unix.Fstat(fd, &checked); err != nil {
+		return -1, err
+	}
+	if err := unix.Fstat(int(locked.Fd()), &supplied); err != nil {
+		return -1, err
+	}
+	if supplied.Dev != checked.Dev || supplied.Ino != checked.Ino || supplied.Mode&unix.S_IFMT != unix.S_IFDIR || supplied.Mode&07777 != 0700 || supplied.Uid != uint32(os.Geteuid()) {
+		return -1, statefs.ErrUnsafe
+	}
+	return unix.FcntlInt(locked.Fd(), unix.F_DUPFD_CLOEXEC, 0)
+}
+
 func (s *Store) connect(ctx context.Context) error {
 	// SQLite canonicalizes proc-fd paths back to ordinary paths. The descriptor
-	// alone is NOT a filesystem boundary: openProtectedDirectory also proves
+	// alone is NOT a filesystem boundary: statefs.OpenDirectory also proves
 	// that an unprivileged actor cannot rename any component of this ancestry.
 	// SQLite must open an existing file, never silently create one.
 	uri := url.URL{Scheme: "file", Path: "/proc/self/fd/" + strconv.Itoa(int(s.dir.Fd())) + "/" + databaseName}
@@ -319,18 +368,11 @@ func (s *Store) encode(state *agentv1.ExecutorJournalState) ([]byte, error) {
 }
 
 func (s *Store) checkFile(name string) (bool, error) {
-	var stat unix.Stat_t
-	err := unix.Fstatat(int(s.dir.Fd()), name, &stat, unix.AT_SYMLINK_NOFOLLOW)
-	if errors.Is(err, unix.ENOENT) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&07777 != 0600 || stat.Uid != uint32(os.Geteuid()) || stat.Nlink != 1 {
+	exists, err := statefs.CheckFile(int(s.dir.Fd()), name)
+	if errors.Is(err, statefs.ErrUnsafe) {
 		return false, ErrRecoveryHold
 	}
-	return true, nil
+	return exists, err
 }
 
 func (s *Store) readMarker() (string, error) {
@@ -385,44 +427,6 @@ func (s *Store) Close() error {
 		s.dir = nil
 	}
 	return result
-}
-
-func openProtectedDirectory(directory string) (int, error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return -1, err
-	}
-	fd, err := unix.Open("/", unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY, 0)
-	if err != nil {
-		return -1, err
-	}
-	for _, component := range strings.Split(strings.TrimPrefix(absolute, "/"), "/") {
-		var info unix.Stat_t
-		if err := unix.Fstat(fd, &info); err != nil {
-			_ = unix.Close(fd)
-			return -1, err
-		}
-		// Trusted sticky directories (notably /tmp) cannot rename an entry
-		// owned by this UID/root. Every next component must itself have a
-		// trusted owner, so sticky ancestry does not admit another UID's tree.
-		if info.Uid != 0 && info.Uid != uint32(os.Geteuid()) ||
-			info.Mode&0022 != 0 && info.Mode&unix.S_ISVTX == 0 {
-			_ = unix.Close(fd)
-			return -1, ErrRecoveryHold
-		}
-		if component == "" {
-			continue
-		}
-		next, err := unix.Openat(fd, component, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
-		_ = unix.Close(fd)
-		if err != nil {
-			return -1, err
-		}
-		fd = next
-	}
-	// The caller separately requires the final directory to be current-UID
-	// owned with exactly 0700 before locking it or accessing any state.
-	return fd, nil
 }
 
 func stateReadError(ctx context.Context) error {

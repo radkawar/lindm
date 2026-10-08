@@ -18,8 +18,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/pki"
 )
@@ -139,48 +140,41 @@ func TestOverlapIsBounded(t *testing.T) {
 	}
 }
 
-func TestInventoryDigestDetectsChangedContent(t *testing.T) {
+func TestHostDigestDetectsChangedContent(t *testing.T) {
 	t.Parallel()
-	base := &devicev1.ReportInventoryRequest{
-		EnrollmentGeneration: uuid.NewString(),
-		SessionEpoch:         1,
-		BootId:               uuid.NewString(),
-		Sequence:             2,
-		Hostname:             "host",
-		OsId:                 "debian",
-		OsVersion:            "12",
-		Architecture:         "amd64",
-		PackagesComplete:     true,
-		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+	when := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	base := &inventoryv1.HostObservation{
+		StartedAt: timestamppb.New(when), FinishedAt: timestamppb.New(when),
+		BootId:         observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, uuid.NewString()),
+		Hostname:       observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "host"),
+		OsId:           observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "debian"),
+		OsVersion:      observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "12"),
+		Architecture:   observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "amd64"),
+		KernelRelease:  observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "6.8.0"),
+		HardwareVendor: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
+		HardwareModel:  observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
+		HardwareSerial: observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, ""),
 	}
-	same := &devicev1.ReportInventoryRequest{
-		EnrollmentGeneration: base.EnrollmentGeneration,
-		SessionEpoch:         base.SessionEpoch,
-		BootId:               base.BootId,
-		Sequence:             base.Sequence,
-		Hostname:             base.Hostname,
-		OsId:                 base.OsId,
-		OsVersion:            base.OsVersion,
-		Architecture:         base.Architecture,
-		PackagesComplete:     true,
-		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+	same := proto.CloneOf(base)
+	changed := proto.CloneOf(base)
+	changed.Hostname = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, "other")
+	generation := uuid.NewString()
+	baseDigest, err := hostDigest(generation, 2, base)
+	if err != nil {
+		t.Fatal(err)
 	}
-	changed := &devicev1.ReportInventoryRequest{
-		EnrollmentGeneration: base.EnrollmentGeneration,
-		SessionEpoch:         base.SessionEpoch,
-		BootId:               base.BootId,
-		Sequence:             base.Sequence,
-		Hostname:             "other",
-		OsId:                 base.OsId,
-		OsVersion:            base.OsVersion,
-		Architecture:         base.Architecture,
-		PackagesComplete:     true,
-		Packages:             same.Packages,
+	sameDigest, err := hostDigest(generation, 2, same)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !bytes.Equal(inventoryDigest(base), inventoryDigest(same)) {
+	changedDigest, err := hostDigest(generation, 2, changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(baseDigest, sameDigest) {
 		t.Fatal("identical observations produced different digests")
 	}
-	if bytes.Equal(inventoryDigest(base), inventoryDigest(changed)) {
+	if bytes.Equal(baseDigest, changedDigest) {
 		t.Fatal("changed hostname did not change digest")
 	}
 }
@@ -277,4 +271,7 @@ func parseCertPEM(t *testing.T, raw []byte) *x509.Certificate {
 		t.Fatal(err)
 	}
 	return cert
+}
+func observed(status inventoryv1.CollectionStatus, value string) *inventoryv1.ObservedString {
+	return &inventoryv1.ObservedString{Status: status, Value: value}
 }

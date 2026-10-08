@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// Public issuance evidence from a real enrollment deliberately not installed
+// locally. This development-only probe never emits bootstrap or key material.
+message InterruptedBootstrapEvidence {
+  string device_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string enrollment_generation = 2 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  bytes certificate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  string enrollment_transaction_id = 4 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  google.protobuf.Timestamp certificate_not_after = 5 [(buf.validate.field).required = true];
+}
+
+// Each boundary is recorded only after an operation by the real network UID
+// observes the expected denial or unchanged executor public identity.
+enum NetworkBoundary {
+  NETWORK_BOUNDARY_UNSPECIFIED = 0;
+  NETWORK_BOUNDARY_EXECUTOR_STATE_READ_DENIED = 1;
+  NETWORK_BOUNDARY_EXECUTOR_CONFIG_WRITE_DENIED = 2;
+  NETWORK_BOUNDARY_NETWORK_CONFIG_WRITE_DENIED = 3;
+  NETWORK_BOUNDARY_CONFIG_PARENT_WRITE_DENIED = 4;
+  NETWORK_BOUNDARY_RUNTIME_DIRECTORY_WRITE_DENIED = 5;
+  NETWORK_BOUNDARY_RUNTIME_PARENT_WRITE_DENIED = 6;
+  NETWORK_BOUNDARY_PREPARE_BOOTSTRAP_DENIED = 7;
+  NETWORK_BOUNDARY_INSTALL_ENROLLMENT_DENIED = 8;
+  NETWORK_BOUNDARY_TLS_CONTEXT_REJECTED = 9;
+  NETWORK_BOUNDARY_CALLER_CSR_REJECTED = 10;
+  NETWORK_BOUNDARY_IDENTITY_UNCHANGED = 11;
+}
+
+message NetworkBoundaryEvidence {
+  string device_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string enrollment_generation = 2 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  bytes certificate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  repeated NetworkBoundary passed_boundaries = 4 [(buf.validate.field).repeated = {
+    min_items: 11
+    max_items: 11
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+}

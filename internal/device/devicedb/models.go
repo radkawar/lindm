@@ -17,3 +17,16 @@ type AuditEvent struct {
 	ResourceID string
 	Reason     string
 }
+
+type PackagePageCursor struct {
+	ID           uuid.UUID
+	ActorID      uuid.UUID
+	DeviceID     uuid.UUID
+	GenerationID uuid.UUID
+	SnapshotID   uuid.UUID
+	Manager      string
+	NamePrefix   string
+	NextPosition int32
+	CreatedAt    pgtype.Timestamptz
+	ExpiresAt    pgtype.Timestamptz
+}

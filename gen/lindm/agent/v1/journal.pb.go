@@ -46,6 +46,8 @@ type ExecutorJournalState struct {
 	PendingRenewal          *PendingIdentityRenewal  `protobuf:"bytes,17,opt,name=pending_renewal,json=pendingRenewal,proto3" json:"pending_renewal,omitempty"`
 	PriorCredential         *PriorIdentityCredential `protobuf:"bytes,18,opt,name=prior_credential,json=priorCredential,proto3" json:"prior_credential,omitempty"`
 	RenewAfter              *timestamppb.Timestamp   `protobuf:"bytes,19,opt,name=renew_after,json=renewAfter,proto3" json:"renew_after,omitempty"`
+	RenewalReceipt          *RenewalCommitReceipt    `protobuf:"bytes,20,opt,name=renewal_receipt,json=renewalReceipt,proto3" json:"renewal_receipt,omitempty"`
+	SessionReceipt          *SessionCommitReceipt    `protobuf:"bytes,21,opt,name=session_receipt,json=sessionReceipt,proto3" json:"session_receipt,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -213,6 +215,20 @@ func (x *ExecutorJournalState) GetRenewAfter() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *ExecutorJournalState) GetRenewalReceipt() *RenewalCommitReceipt {
+	if x != nil {
+		return x.RenewalReceipt
+	}
+	return nil
+}
+
+func (x *ExecutorJournalState) GetSessionReceipt() *SessionCommitReceipt {
+	if x != nil {
+		return x.SessionReceipt
+	}
+	return nil
+}
+
 type PendingIdentityRenewal struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IssuanceRequestId string                 `protobuf:"bytes,1,opt,name=issuance_request_id,json=issuanceRequestId,proto3" json:"issuance_request_id,omitempty"`
@@ -357,11 +373,117 @@ func (x *PriorIdentityCredential) GetRetainUntil() *timestamppb.Timestamp {
 	return nil
 }
 
+// Atomically replaces the preceding receipt with the installed credential.
+// It permits an exact acknowledgment retry after executor/process restart.
+type RenewalCommitReceipt struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	IssuanceRequestId string                 `protobuf:"bytes,1,opt,name=issuance_request_id,json=issuanceRequestId,proto3" json:"issuance_request_id,omitempty"`
+	CertificateSha256 []byte                 `protobuf:"bytes,2,opt,name=certificate_sha256,json=certificateSha256,proto3" json:"certificate_sha256,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RenewalCommitReceipt) Reset() {
+	*x = RenewalCommitReceipt{}
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenewalCommitReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenewalCommitReceipt) ProtoMessage() {}
+
+func (x *RenewalCommitReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenewalCommitReceipt.ProtoReflect.Descriptor instead.
+func (*RenewalCommitReceipt) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RenewalCommitReceipt) GetIssuanceRequestId() string {
+	if x != nil {
+		return x.IssuanceRequestId
+	}
+	return ""
+}
+
+func (x *RenewalCommitReceipt) GetCertificateSha256() []byte {
+	if x != nil {
+		return x.CertificateSha256
+	}
+	return nil
+}
+
+type SessionCommitReceipt struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionEpoch  uint64                 `protobuf:"varint,2,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionCommitReceipt) Reset() {
+	*x = SessionCommitReceipt{}
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionCommitReceipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionCommitReceipt) ProtoMessage() {}
+
+func (x *SessionCommitReceipt) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionCommitReceipt.ProtoReflect.Descriptor instead.
+func (*SessionCommitReceipt) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SessionCommitReceipt) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *SessionCommitReceipt) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
 var File_lindm_agent_v1_journal_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1alindm/agent/v1/trust.proto\"\xda\x11\n" +
+	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1alindm/agent/v1/trust.proto\"\xab\x15\n" +
 	"\x14ExecutorJournalState\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12;\n" +
@@ -384,9 +506,14 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\x0fpending_renewal\x18\x11 \x01(\v2&.lindm.agent.v1.PendingIdentityRenewalR\x0ependingRenewal\x12R\n" +
 	"\x10prior_credential\x18\x12 \x01(\v2'.lindm.agent.v1.PriorIdentityCredentialR\x0fpriorCredential\x12;\n" +
 	"\vrenew_after\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"renewAfter:\xe7\a\xbaH\xe3\a\x1a\xd3\x04\n" +
-	"!executor_journal.enrollment_shape\x12epending enrollment retains its grant; installed identity pins device/generation and removes the grant\x1a\xc6\x03(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))\x1a\x8a\x03\n" +
-	"\x1eexecutor_journal.session_shape\x12caccepted sessions have a boot identity and pending acquisition remains at the protected predecessor\x1a\x82\x02(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))B\f\n" +
+	"renewAfter\x12M\n" +
+	"\x0frenewal_receipt\x18\x14 \x01(\v2$.lindm.agent.v1.RenewalCommitReceiptR\x0erenewalReceipt\x12M\n" +
+	"\x0fsession_receipt\x18\x15 \x01(\v2$.lindm.agent.v1.SessionCommitReceiptR\x0esessionReceipt:\x9a\n" +
+	"\xbaH\x96\n" +
+	"\x1a\x8f\x05\n" +
+	"!executor_journal.enrollment_shape\x12epending enrollment retains its grant; installed identity pins device/generation and removes the grant\x1a\x82\x04(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))\x1a\x8a\x03\n" +
+	"\x1eexecutor_journal.session_shape\x12caccepted sessions have a boot identity and pending acquisition remains at the protected predecessor\x1a\x82\x02(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))\x1a\xf4\x01\n" +
+	" executor_journal.session_receipt\x12=the retained acknowledgment binds the committed session epoch\x1a\x90\x01!has(this.session_receipt) || (this.session_epoch > 0u && has(this.session_boot_id) && this.session_receipt.session_epoch == this.session_epoch)B\f\n" +
 	"\n" +
 	"_device_idB\x18\n" +
 	"\x16_enrollment_generationB\x12\n" +
@@ -403,7 +530,14 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\vprivate_key\x18\x01 \x01(\fB\a\xbaH\x04z\x02h@R\n" +
 	"privateKey\x124\n" +
 	"\x0fcertificate_pem\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x0ecertificatePem\x12E\n" +
-	"\fretain_until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vretainUntilB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\fretain_until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vretainUntil\"\x88\x01\n" +
+	"\x14RenewalCommitReceipt\x128\n" +
+	"\x13issuance_request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\x126\n" +
+	"\x12certificate_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\"w\n" +
+	"\x14SessionCommitReceipt\x12'\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x126\n" +
+	"\rsession_epoch\x18\x02 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpochB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_journal_proto_rawDescOnce sync.Once
@@ -417,26 +551,30 @@ func file_lindm_agent_v1_journal_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_journal_proto_rawDescData
 }
 
-var file_lindm_agent_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_lindm_agent_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_lindm_agent_v1_journal_proto_goTypes = []any{
 	(*ExecutorJournalState)(nil),    // 0: lindm.agent.v1.ExecutorJournalState
 	(*PendingIdentityRenewal)(nil),  // 1: lindm.agent.v1.PendingIdentityRenewal
 	(*PriorIdentityCredential)(nil), // 2: lindm.agent.v1.PriorIdentityCredential
-	(*timestamppb.Timestamp)(nil),   // 3: google.protobuf.Timestamp
-	(*SessionAcquisition)(nil),      // 4: lindm.agent.v1.SessionAcquisition
+	(*RenewalCommitReceipt)(nil),    // 3: lindm.agent.v1.RenewalCommitReceipt
+	(*SessionCommitReceipt)(nil),    // 4: lindm.agent.v1.SessionCommitReceipt
+	(*timestamppb.Timestamp)(nil),   // 5: google.protobuf.Timestamp
+	(*SessionAcquisition)(nil),      // 6: lindm.agent.v1.SessionAcquisition
 }
 var file_lindm_agent_v1_journal_proto_depIdxs = []int32{
-	3, // 0: lindm.agent.v1.ExecutorJournalState.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	4, // 1: lindm.agent.v1.ExecutorJournalState.pending_session:type_name -> lindm.agent.v1.SessionAcquisition
+	5, // 0: lindm.agent.v1.ExecutorJournalState.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	6, // 1: lindm.agent.v1.ExecutorJournalState.pending_session:type_name -> lindm.agent.v1.SessionAcquisition
 	1, // 2: lindm.agent.v1.ExecutorJournalState.pending_renewal:type_name -> lindm.agent.v1.PendingIdentityRenewal
 	2, // 3: lindm.agent.v1.ExecutorJournalState.prior_credential:type_name -> lindm.agent.v1.PriorIdentityCredential
-	3, // 4: lindm.agent.v1.ExecutorJournalState.renew_after:type_name -> google.protobuf.Timestamp
-	3, // 5: lindm.agent.v1.PriorIdentityCredential.retain_until:type_name -> google.protobuf.Timestamp
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	5, // 4: lindm.agent.v1.ExecutorJournalState.renew_after:type_name -> google.protobuf.Timestamp
+	3, // 5: lindm.agent.v1.ExecutorJournalState.renewal_receipt:type_name -> lindm.agent.v1.RenewalCommitReceipt
+	4, // 6: lindm.agent.v1.ExecutorJournalState.session_receipt:type_name -> lindm.agent.v1.SessionCommitReceipt
+	5, // 7: lindm.agent.v1.PriorIdentityCredential.retain_until:type_name -> google.protobuf.Timestamp
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_journal_proto_init() }
@@ -452,7 +590,7 @@ func file_lindm_agent_v1_journal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_journal_proto_rawDesc), len(file_lindm_agent_v1_journal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

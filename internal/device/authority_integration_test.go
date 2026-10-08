@@ -93,10 +93,10 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	if _, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 1})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("old heartbeat epoch: %v", err)
 	}
-	old := inventory(principal.GenerationID.String(), uuid.NewString(), 1, "old")
+	old := hostObservation(principal.GenerationID.String(), 1, "old")
 	old.SessionEpoch = 1
-	if _, err := svc.ReportInventory(deviceCtx, connect.NewRequest(old)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("old inventory epoch: %v", err)
+	if _, err := svc.ReportHostObservation(deviceCtx, connect.NewRequest(old)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("old observation epoch: %v", err)
 	}
 	current, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 2}))
 	if err != nil || current.Msg.GetHostSequence() != 0 || current.Msg.GetPackageSequence() != 0 {

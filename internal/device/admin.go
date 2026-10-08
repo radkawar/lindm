@@ -74,24 +74,14 @@ func (s *Service) listDevicesAfter(ctx context.Context, q *devicedb.Queries, tok
 }
 
 func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1.Device, string, error) {
-	next := ""
-	if int32(len(rows)) > limit {
-		last := rows[limit-1]
-		enrolled, ok := finiteTime(last.EnrolledAt)
-		if !ok {
-			return nil, "", errInternalState
-		}
-		token, err := encodeCursor(enrolled, last.ID)
-		if err != nil {
-			return nil, "", err
-		}
-		next = token
-		rows = rows[:limit]
-	}
-	devices := make([]*adminv1.Device, 0, len(rows))
+	var budget inventoryPageBudget
+	devices := make([]*adminv1.Device, 0, min(len(rows), int(limit)))
 	for _, row := range rows {
+		if int32(len(devices)) == limit {
+			break
+		}
 		enrolled, ok := finiteTime(row.EnrolledAt)
-		if !ok || row.InventorySequence < 0 {
+		if !ok || row.PublishedSequence < 0 || row.HostSequence < 0 || row.PackageSequence < 0 {
 			return nil, "", errInternalState
 		}
 		state, err := deviceState(row.State)
@@ -99,18 +89,42 @@ func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1
 			return nil, "", err
 		}
 		item := &adminv1.Device{
-			Id:                   row.ID.String(),
-			EnrollmentGeneration: generationString(row.CurrentGenerationID),
-			Hostname:             row.Hostname,
-			OsId:                 row.OsID,
-			OsVersion:            row.OsVersion,
-			Architecture:         row.Architecture,
-			LifecycleState:       state,
-			EnrolledAt:           timestamppb.New(enrolled),
-			LastSeenAt:           protoTime(row.LastSeenAt),
-			InventorySequence:    uint64(row.InventorySequence),
+			Id:                        row.ID.String(),
+			EnrollmentGeneration:      generationString(row.CurrentGenerationID),
+			Hostname:                  row.Hostname,
+			OsId:                      row.OsID,
+			OsVersion:                 row.OsVersion,
+			Architecture:              row.Architecture,
+			LifecycleState:            state,
+			EnrolledAt:                timestamppb.New(enrolled),
+			LastSeenAt:                protoTime(row.LastSeenAt),
+			HostSequence:              uint64(row.HostSequence),
+			PackageSequence:           uint64(row.PackageSequence),
+			HostReceivedAt:            protoTime(row.HostReceivedAt),
+			PackageAttemptReceivedAt:  protoTime(row.PackageAttemptReceivedAt),
+			SnapshotReceivedAt:        protoTime(row.SnapshotReceivedAt),
+			PublishedSnapshotSequence: uint64(row.PublishedSequence),
+		}
+		fits, err := budget.take(item)
+		if err != nil {
+			return nil, "", err
+		}
+		if !fits {
+			if len(devices) == 0 {
+				return nil, "", errInternalState
+			}
+			break
 		}
 		devices = append(devices, item)
+	}
+	next := ""
+	if len(devices) < len(rows) {
+		last := rows[len(devices)-1]
+		var err error
+		next, err = encodeCursor(devices[len(devices)-1].EnrolledAt.AsTime(), last.ID)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 	return devices, next, nil
 }

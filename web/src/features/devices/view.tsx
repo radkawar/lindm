@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { DeviceState, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
+import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,14 +32,7 @@ import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { devicesQueryOptions } from "./queries";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
-
-const deviceStateLabels: Record<DeviceState, string> = {
-  [DeviceState.UNSPECIFIED]: "Not reported",
-  [DeviceState.PENDING]: "Pending",
-  [DeviceState.ACTIVE]: "Active",
-  [DeviceState.REVOKED]: "Revoked",
-  [DeviceState.RECOVERY_HOLD]: "Recovery hold",
-};
+import { DeviceLifecycleBadge } from "./lifecycle-badge";
 
 export function DevicesView({
   pageSize,
@@ -120,7 +113,7 @@ export function DevicesView({
               <TableHead>State</TableHead>
               <TableHead>Last contact</TableHead>
               <TableHead>OS</TableHead>
-              <TableHead>Sequence</TableHead>
+              <TableHead>Published snapshot</TableHead>
               <TableHead>Device ID</TableHead>
               <TableHead>Action</TableHead>
             </TableRow>
@@ -130,18 +123,18 @@ export function DevicesView({
               const seen = formatTimestamp(device.lastSeenAt);
               return (
                 <TableRow key={device.id}>
-                  <TableCell>{device.hostname.trim() || "Hostname not reported"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        device.lifecycleState === DeviceState.REVOKED ||
-                        device.lifecycleState === DeviceState.RECOVERY_HOLD
-                          ? "destructive"
-                          : "outline"
-                      }
+                    <Link
+                      to="/devices/$deviceId"
+                      params={{ deviceId: device.id }}
+                      search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
+                      className="font-medium underline underline-offset-4"
                     >
-                      {deviceStateLabels[device.lifecycleState] ?? "Unknown state"}
-                    </Badge>
+                      {device.hostname.trim() || "Hostname not reported"}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <DeviceLifecycleBadge state={device.lifecycleState} />
                   </TableCell>
                   <TableCell>
                     {seen.date ? (
@@ -157,7 +150,7 @@ export function DevicesView({
                       .filter((part) => part.trim() !== "")
                       .join(" ") || "Not reported"}
                   </TableCell>
-                  <TableCell>{device.inventorySequence.toString()}</TableCell>
+                  <TableCell>{device.publishedSnapshotSequence.toString()}</TableCell>
                   <TableCell className="font-mono text-xs">{device.id}</TableCell>
                   <TableCell>
                     <Button

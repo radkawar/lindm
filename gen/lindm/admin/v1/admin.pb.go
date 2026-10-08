@@ -11,6 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	v1 "lindm/gen/lindm/inventory/v1"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
 	sync "sync"
@@ -90,9 +91,16 @@ type Device struct {
 	LifecycleState       DeviceState            `protobuf:"varint,11,opt,name=lifecycle_state,json=lifecycleState,proto3,enum=lindm.admin.v1.DeviceState" json:"lifecycle_state,omitempty"`
 	EnrolledAt           *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=enrolled_at,json=enrolledAt,proto3" json:"enrolled_at,omitempty"`
 	LastSeenAt           *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
-	InventorySequence    uint64                 `protobuf:"varint,10,opt,name=inventory_sequence,json=inventorySequence,proto3" json:"inventory_sequence,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Latest successful field values only. Failures do not clear them.
+	HostSequence             uint64                 `protobuf:"varint,12,opt,name=host_sequence,json=hostSequence,proto3" json:"host_sequence,omitempty"`
+	PackageSequence          uint64                 `protobuf:"varint,13,opt,name=package_sequence,json=packageSequence,proto3" json:"package_sequence,omitempty"`
+	HostReceivedAt           *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=host_received_at,json=hostReceivedAt,proto3" json:"host_received_at,omitempty"`
+	PackageAttemptReceivedAt *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=package_attempt_received_at,json=packageAttemptReceivedAt,proto3" json:"package_attempt_received_at,omitempty"`
+	SnapshotReceivedAt       *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=snapshot_received_at,json=snapshotReceivedAt,proto3" json:"snapshot_received_at,omitempty"`
+	// Sequence of the current published snapshot. Zero means none has been published.
+	PublishedSnapshotSequence uint64 `protobuf:"varint,17,opt,name=published_snapshot_sequence,json=publishedSnapshotSequence,proto3" json:"published_snapshot_sequence,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -188,9 +196,44 @@ func (x *Device) GetLastSeenAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Device) GetInventorySequence() uint64 {
+func (x *Device) GetHostSequence() uint64 {
 	if x != nil {
-		return x.InventorySequence
+		return x.HostSequence
+	}
+	return 0
+}
+
+func (x *Device) GetPackageSequence() uint64 {
+	if x != nil {
+		return x.PackageSequence
+	}
+	return 0
+}
+
+func (x *Device) GetHostReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.HostReceivedAt
+	}
+	return nil
+}
+
+func (x *Device) GetPackageAttemptReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PackageAttemptReceivedAt
+	}
+	return nil
+}
+
+func (x *Device) GetSnapshotReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SnapshotReceivedAt
+	}
+	return nil
+}
+
+func (x *Device) GetPublishedSnapshotSequence() uint64 {
+	if x != nil {
+		return x.PublishedSnapshotSequence
 	}
 	return 0
 }
@@ -299,6 +342,672 @@ func (x *ListDevicesResponse) GetNextPageToken() string {
 	return ""
 }
 
+type GetDeviceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDeviceRequest) Reset() {
+	*x = GetDeviceRequest{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDeviceRequest) ProtoMessage() {}
+
+func (x *GetDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDeviceRequest.ProtoReflect.Descriptor instead.
+func (*GetDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetDeviceRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+type HostObservationDetail struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Observation   *v1.HostObservation    `protobuf:"bytes,2,opt,name=observation,proto3" json:"observation,omitempty"`
+	ReceivedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HostObservationDetail) Reset() {
+	*x = HostObservationDetail{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HostObservationDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HostObservationDetail) ProtoMessage() {}
+
+func (x *HostObservationDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HostObservationDetail.ProtoReflect.Descriptor instead.
+func (*HostObservationDetail) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *HostObservationDetail) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *HostObservationDetail) GetObservation() *v1.HostObservation {
+	if x != nil {
+		return x.Observation
+	}
+	return nil
+}
+
+func (x *HostObservationDetail) GetReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReceivedAt
+	}
+	return nil
+}
+
+type PackageAttemptDetail struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	ReceivedAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
+	Status        v1.CollectionStatus    `protobuf:"varint,5,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
+	Backend       string                 `protobuf:"bytes,6,opt,name=backend,proto3" json:"backend,omitempty"`
+	SnapshotId    string                 `protobuf:"bytes,7,opt,name=snapshot_id,json=snapshotId,proto3" json:"snapshot_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PackageAttemptDetail) Reset() {
+	*x = PackageAttemptDetail{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackageAttemptDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackageAttemptDetail) ProtoMessage() {}
+
+func (x *PackageAttemptDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackageAttemptDetail.ProtoReflect.Descriptor instead.
+func (*PackageAttemptDetail) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *PackageAttemptDetail) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *PackageAttemptDetail) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *PackageAttemptDetail) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *PackageAttemptDetail) GetReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReceivedAt
+	}
+	return nil
+}
+
+func (x *PackageAttemptDetail) GetStatus() v1.CollectionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v1.CollectionStatus(0)
+}
+
+func (x *PackageAttemptDetail) GetBackend() string {
+	if x != nil {
+		return x.Backend
+	}
+	return ""
+}
+
+func (x *PackageAttemptDetail) GetSnapshotId() string {
+	if x != nil {
+		return x.SnapshotId
+	}
+	return ""
+}
+
+type PackageSnapshotDetail struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	SnapshotId   string                 `protobuf:"bytes,1,opt,name=snapshot_id,json=snapshotId,proto3" json:"snapshot_id,omitempty"`
+	Sequence     uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	State        v1.SnapshotState       `protobuf:"varint,3,opt,name=state,proto3,enum=lindm.inventory.v1.SnapshotState" json:"state,omitempty"`
+	CreatedAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	StartedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	ReceivedAt   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
+	CommittedAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=committed_at,json=committedAt,proto3" json:"committed_at,omitempty"`
+	SupersededAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=superseded_at,json=supersededAt,proto3" json:"superseded_at,omitempty"`
+	Backend      string                 `protobuf:"bytes,10,opt,name=backend,proto3" json:"backend,omitempty"`
+	PackageCount uint32                 `protobuf:"varint,11,opt,name=package_count,json=packageCount,proto3" json:"package_count,omitempty"`
+	BatchCount   uint32                 `protobuf:"varint,12,opt,name=batch_count,json=batchCount,proto3" json:"batch_count,omitempty"`
+	EncodedBytes uint64                 `protobuf:"varint,13,opt,name=encoded_bytes,json=encodedBytes,proto3" json:"encoded_bytes,omitempty"`
+	// False means retained package rows are gone. package_count remains the
+	// manifest count and must not be read as a successful empty collection.
+	PackagesAvailable bool `protobuf:"varint,14,opt,name=packages_available,json=packagesAvailable,proto3" json:"packages_available,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *PackageSnapshotDetail) Reset() {
+	*x = PackageSnapshotDetail{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackageSnapshotDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackageSnapshotDetail) ProtoMessage() {}
+
+func (x *PackageSnapshotDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackageSnapshotDetail.ProtoReflect.Descriptor instead.
+func (*PackageSnapshotDetail) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PackageSnapshotDetail) GetSnapshotId() string {
+	if x != nil {
+		return x.SnapshotId
+	}
+	return ""
+}
+
+func (x *PackageSnapshotDetail) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *PackageSnapshotDetail) GetState() v1.SnapshotState {
+	if x != nil {
+		return x.State
+	}
+	return v1.SnapshotState(0)
+}
+
+func (x *PackageSnapshotDetail) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetReceivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReceivedAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetCommittedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CommittedAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetSupersededAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SupersededAt
+	}
+	return nil
+}
+
+func (x *PackageSnapshotDetail) GetBackend() string {
+	if x != nil {
+		return x.Backend
+	}
+	return ""
+}
+
+func (x *PackageSnapshotDetail) GetPackageCount() uint32 {
+	if x != nil {
+		return x.PackageCount
+	}
+	return 0
+}
+
+func (x *PackageSnapshotDetail) GetBatchCount() uint32 {
+	if x != nil {
+		return x.BatchCount
+	}
+	return 0
+}
+
+func (x *PackageSnapshotDetail) GetEncodedBytes() uint64 {
+	if x != nil {
+		return x.EncodedBytes
+	}
+	return 0
+}
+
+func (x *PackageSnapshotDetail) GetPackagesAvailable() bool {
+	if x != nil {
+		return x.PackagesAvailable
+	}
+	return false
+}
+
+type GetDeviceResponse struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Device *Device                `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
+	// Absent when no host observation has been accepted.
+	Host *HostObservationDetail `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	// Absent when no package attempt has been completed.
+	PackageAttempt *PackageAttemptDetail `protobuf:"bytes,3,opt,name=package_attempt,json=packageAttempt,proto3" json:"package_attempt,omitempty"`
+	// Absent when no snapshot has been published.
+	CurrentSnapshot *PackageSnapshotDetail `protobuf:"bytes,4,opt,name=current_snapshot,json=currentSnapshot,proto3" json:"current_snapshot,omitempty"`
+	// Open upload, if one is still staging. Not a published inventory.
+	StagingSnapshot *PackageSnapshotDetail `protobuf:"bytes,5,opt,name=staging_snapshot,json=stagingSnapshot,proto3" json:"staging_snapshot,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetDeviceResponse) Reset() {
+	*x = GetDeviceResponse{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDeviceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDeviceResponse) ProtoMessage() {}
+
+func (x *GetDeviceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDeviceResponse.ProtoReflect.Descriptor instead.
+func (*GetDeviceResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetDeviceResponse) GetDevice() *Device {
+	if x != nil {
+		return x.Device
+	}
+	return nil
+}
+
+func (x *GetDeviceResponse) GetHost() *HostObservationDetail {
+	if x != nil {
+		return x.Host
+	}
+	return nil
+}
+
+func (x *GetDeviceResponse) GetPackageAttempt() *PackageAttemptDetail {
+	if x != nil {
+		return x.PackageAttempt
+	}
+	return nil
+}
+
+func (x *GetDeviceResponse) GetCurrentSnapshot() *PackageSnapshotDetail {
+	if x != nil {
+		return x.CurrentSnapshot
+	}
+	return nil
+}
+
+func (x *GetDeviceResponse) GetStagingSnapshot() *PackageSnapshotDetail {
+	if x != nil {
+		return x.StagingSnapshot
+	}
+	return nil
+}
+
+type ListDevicePackagesRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	PageSize uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// Empty selects the current snapshot and mints a cursor. An echoed token
+	// revisits that page and must not rebind to a newer snapshot.
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	Manager       string `protobuf:"bytes,4,opt,name=manager,proto3" json:"manager,omitempty"`
+	NamePrefix    string `protobuf:"bytes,5,opt,name=name_prefix,json=namePrefix,proto3" json:"name_prefix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevicePackagesRequest) Reset() {
+	*x = ListDevicePackagesRequest{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevicePackagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevicePackagesRequest) ProtoMessage() {}
+
+func (x *ListDevicePackagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevicePackagesRequest.ProtoReflect.Descriptor instead.
+func (*ListDevicePackagesRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListDevicePackagesRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ListDevicePackagesRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListDevicePackagesRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListDevicePackagesRequest) GetManager() string {
+	if x != nil {
+		return x.Manager
+	}
+	return ""
+}
+
+func (x *ListDevicePackagesRequest) GetNamePrefix() string {
+	if x != nil {
+		return x.NamePrefix
+	}
+	return ""
+}
+
+type DevicePackage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Position      uint32                 `protobuf:"varint,1,opt,name=position,proto3" json:"position,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	Architecture  string                 `protobuf:"bytes,4,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	Manager       string                 `protobuf:"bytes,5,opt,name=manager,proto3" json:"manager,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DevicePackage) Reset() {
+	*x = DevicePackage{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DevicePackage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DevicePackage) ProtoMessage() {}
+
+func (x *DevicePackage) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DevicePackage.ProtoReflect.Descriptor instead.
+func (*DevicePackage) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DevicePackage) GetPosition() uint32 {
+	if x != nil {
+		return x.Position
+	}
+	return 0
+}
+
+func (x *DevicePackage) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DevicePackage) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *DevicePackage) GetArchitecture() string {
+	if x != nil {
+		return x.Architecture
+	}
+	return ""
+}
+
+func (x *DevicePackage) GetManager() string {
+	if x != nil {
+		return x.Manager
+	}
+	return ""
+}
+
+type ListDevicePackagesResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SnapshotId      string                 `protobuf:"bytes,1,opt,name=snapshot_id,json=snapshotId,proto3" json:"snapshot_id,omitempty"`
+	Sequence        uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	Packages        []*DevicePackage       `protobuf:"bytes,3,rep,name=packages,proto3" json:"packages,omitempty"`
+	NextPageToken   string                 `protobuf:"bytes,4,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	CursorExpiresAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=cursor_expires_at,json=cursorExpiresAt,proto3" json:"cursor_expires_at,omitempty"`
+	// Cursor for the start of this page, including the first page. Echo it to
+	// revisit the same immutable snapshot. Expiry is fixed at mint.
+	PageToken     string `protobuf:"bytes,6,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevicePackagesResponse) Reset() {
+	*x = ListDevicePackagesResponse{}
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevicePackagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevicePackagesResponse) ProtoMessage() {}
+
+func (x *ListDevicePackagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevicePackagesResponse.ProtoReflect.Descriptor instead.
+func (*ListDevicePackagesResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListDevicePackagesResponse) GetSnapshotId() string {
+	if x != nil {
+		return x.SnapshotId
+	}
+	return ""
+}
+
+func (x *ListDevicePackagesResponse) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *ListDevicePackagesResponse) GetPackages() []*DevicePackage {
+	if x != nil {
+		return x.Packages
+	}
+	return nil
+}
+
+func (x *ListDevicePackagesResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+func (x *ListDevicePackagesResponse) GetCursorExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CursorExpiresAt
+	}
+	return nil
+}
+
+func (x *ListDevicePackagesResponse) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
 type CreateEnrollmentGrantRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -310,7 +1019,7 @@ type CreateEnrollmentGrantRequest struct {
 
 func (x *CreateEnrollmentGrantRequest) Reset() {
 	*x = CreateEnrollmentGrantRequest{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -322,7 +1031,7 @@ func (x *CreateEnrollmentGrantRequest) String() string {
 func (*CreateEnrollmentGrantRequest) ProtoMessage() {}
 
 func (x *CreateEnrollmentGrantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[3]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -335,7 +1044,7 @@ func (x *CreateEnrollmentGrantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEnrollmentGrantRequest.ProtoReflect.Descriptor instead.
 func (*CreateEnrollmentGrantRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{3}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateEnrollmentGrantRequest) GetRequestId() string {
@@ -371,7 +1080,7 @@ type CreateEnrollmentGrantResponse struct {
 
 func (x *CreateEnrollmentGrantResponse) Reset() {
 	*x = CreateEnrollmentGrantResponse{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -383,7 +1092,7 @@ func (x *CreateEnrollmentGrantResponse) String() string {
 func (*CreateEnrollmentGrantResponse) ProtoMessage() {}
 
 func (x *CreateEnrollmentGrantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,7 +1105,7 @@ func (x *CreateEnrollmentGrantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEnrollmentGrantResponse.ProtoReflect.Descriptor instead.
 func (*CreateEnrollmentGrantResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{4}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CreateEnrollmentGrantResponse) GetGrantId() string {
@@ -438,7 +1147,7 @@ type RevokeEnrollmentGrantRequest struct {
 
 func (x *RevokeEnrollmentGrantRequest) Reset() {
 	*x = RevokeEnrollmentGrantRequest{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +1159,7 @@ func (x *RevokeEnrollmentGrantRequest) String() string {
 func (*RevokeEnrollmentGrantRequest) ProtoMessage() {}
 
 func (x *RevokeEnrollmentGrantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +1172,7 @@ func (x *RevokeEnrollmentGrantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeEnrollmentGrantRequest.ProtoReflect.Descriptor instead.
 func (*RevokeEnrollmentGrantRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{5}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RevokeEnrollmentGrantRequest) GetRequestId() string {
@@ -495,7 +1204,7 @@ type RevokeEnrollmentGrantResponse struct {
 
 func (x *RevokeEnrollmentGrantResponse) Reset() {
 	*x = RevokeEnrollmentGrantResponse{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +1216,7 @@ func (x *RevokeEnrollmentGrantResponse) String() string {
 func (*RevokeEnrollmentGrantResponse) ProtoMessage() {}
 
 func (x *RevokeEnrollmentGrantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +1229,7 @@ func (x *RevokeEnrollmentGrantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeEnrollmentGrantResponse.ProtoReflect.Descriptor instead.
 func (*RevokeEnrollmentGrantResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{6}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{14}
 }
 
 type RevokeDeviceRequest struct {
@@ -534,7 +1243,7 @@ type RevokeDeviceRequest struct {
 
 func (x *RevokeDeviceRequest) Reset() {
 	*x = RevokeDeviceRequest{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +1255,7 @@ func (x *RevokeDeviceRequest) String() string {
 func (*RevokeDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[7]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -559,7 +1268,7 @@ func (x *RevokeDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{7}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RevokeDeviceRequest) GetRequestId() string {
@@ -591,7 +1300,7 @@ type RevokeDeviceResponse struct {
 
 func (x *RevokeDeviceResponse) Reset() {
 	*x = RevokeDeviceResponse{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +1312,7 @@ func (x *RevokeDeviceResponse) String() string {
 func (*RevokeDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[8]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +1325,7 @@ func (x *RevokeDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{8}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{16}
 }
 
 type AuditEvent struct {
@@ -633,7 +1342,7 @@ type AuditEvent struct {
 
 func (x *AuditEvent) Reset() {
 	*x = AuditEvent{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -645,7 +1354,7 @@ func (x *AuditEvent) String() string {
 func (*AuditEvent) ProtoMessage() {}
 
 func (x *AuditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[9]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -658,7 +1367,7 @@ func (x *AuditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuditEvent.ProtoReflect.Descriptor instead.
 func (*AuditEvent) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{9}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AuditEvent) GetId() string {
@@ -713,7 +1422,7 @@ type ListAuditEventsRequest struct {
 
 func (x *ListAuditEventsRequest) Reset() {
 	*x = ListAuditEventsRequest{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +1434,7 @@ func (x *ListAuditEventsRequest) String() string {
 func (*ListAuditEventsRequest) ProtoMessage() {}
 
 func (x *ListAuditEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +1447,7 @@ func (x *ListAuditEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuditEventsRequest.ProtoReflect.Descriptor instead.
 func (*ListAuditEventsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{10}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListAuditEventsRequest) GetPageSize() uint32 {
@@ -765,7 +1474,7 @@ type ListAuditEventsResponse struct {
 
 func (x *ListAuditEventsResponse) Reset() {
 	*x = ListAuditEventsResponse{}
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +1486,7 @@ func (x *ListAuditEventsResponse) String() string {
 func (*ListAuditEventsResponse) ProtoMessage() {}
 
 func (x *ListAuditEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_admin_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_admin_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +1499,7 @@ func (x *ListAuditEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuditEventsResponse.ProtoReflect.Descriptor instead.
 func (*ListAuditEventsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{11}
+	return file_lindm_admin_v1_admin_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListAuditEventsResponse) GetEvents() []*AuditEvent {
@@ -811,7 +1520,7 @@ var File_lindm_admin_v1_admin_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\n" +
-	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/validation/v1/string_rules.proto\"\xbe\x03\n" +
+	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/inventory/v1/observation.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa8\x06\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12\x1a\n" +
@@ -824,16 +1533,91 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\venrolled_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"enrolledAt\x12<\n" +
 	"\flast_seen_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastSeenAt\x12-\n" +
-	"\x12inventory_sequence\x18\n" +
-	" \x01(\x04R\x11inventorySequenceJ\x04\b\a\x10\bR\x05state\"d\n" +
+	"lastSeenAt\x12#\n" +
+	"\rhost_sequence\x18\f \x01(\x04R\fhostSequence\x12)\n" +
+	"\x10package_sequence\x18\r \x01(\x04R\x0fpackageSequence\x12D\n" +
+	"\x10host_received_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0ehostReceivedAt\x12Y\n" +
+	"\x1bpackage_attempt_received_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x18packageAttemptReceivedAt\x12L\n" +
+	"\x14snapshot_received_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x12snapshotReceivedAt\x12>\n" +
+	"\x1bpublished_snapshot_sequence\x18\x11 \x01(\x04R\x19publishedSnapshotSequenceJ\x04\b\a\x10\bJ\x04\b\n" +
+	"\x10\vR\x05stateR\x12inventory_sequence\"d\n" +
 	"\x12ListDevicesRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"o\n" +
 	"\x13ListDevicesResponse\x120\n" +
 	"\adevices\x18\x01 \x03(\v2\x16.lindm.admin.v1.DeviceR\adevices\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xa1\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"9\n" +
+	"\x10GetDeviceRequest\x12%\n" +
+	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\"\xb7\x01\n" +
+	"\x15HostObservationDetail\x12\x1a\n" +
+	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12E\n" +
+	"\vobservation\x18\x02 \x01(\v2#.lindm.inventory.v1.HostObservationR\vobservation\x12;\n" +
+	"\vreceived_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"receivedAt\"\xe0\x02\n" +
+	"\x14PackageAttemptDetail\x12\x1a\n" +
+	"\bsequence\x18\x01 \x01(\x04R\bsequence\x129\n" +
+	"\n" +
+	"started_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
+	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\x12;\n" +
+	"\vreceived_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"receivedAt\x12<\n" +
+	"\x06status\x18\x05 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusR\x06status\x12\x18\n" +
+	"\abackend\x18\x06 \x01(\tR\abackend\x12\x1f\n" +
+	"\vsnapshot_id\x18\a \x01(\tR\n" +
+	"snapshotId\"\xb1\x05\n" +
+	"\x15PackageSnapshotDetail\x12\x1f\n" +
+	"\vsnapshot_id\x18\x01 \x01(\tR\n" +
+	"snapshotId\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x127\n" +
+	"\x05state\x18\x03 \x01(\x0e2!.lindm.inventory.v1.SnapshotStateR\x05state\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"started_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
+	"\vfinished_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\x12;\n" +
+	"\vreceived_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"receivedAt\x12=\n" +
+	"\fcommitted_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcommittedAt\x12?\n" +
+	"\rsuperseded_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\fsupersededAt\x12\x18\n" +
+	"\abackend\x18\n" +
+	" \x01(\tR\abackend\x12#\n" +
+	"\rpackage_count\x18\v \x01(\rR\fpackageCount\x12\x1f\n" +
+	"\vbatch_count\x18\f \x01(\rR\n" +
+	"batchCount\x12#\n" +
+	"\rencoded_bytes\x18\r \x01(\x04R\fencodedBytes\x12-\n" +
+	"\x12packages_available\x18\x0e \x01(\bR\x11packagesAvailable\"\xf1\x02\n" +
+	"\x11GetDeviceResponse\x12.\n" +
+	"\x06device\x18\x01 \x01(\v2\x16.lindm.admin.v1.DeviceR\x06device\x129\n" +
+	"\x04host\x18\x02 \x01(\v2%.lindm.admin.v1.HostObservationDetailR\x04host\x12M\n" +
+	"\x0fpackage_attempt\x18\x03 \x01(\v2$.lindm.admin.v1.PackageAttemptDetailR\x0epackageAttempt\x12P\n" +
+	"\x10current_snapshot\x18\x04 \x01(\v2%.lindm.admin.v1.PackageSnapshotDetailR\x0fcurrentSnapshot\x12P\n" +
+	"\x10staging_snapshot\x18\x05 \x01(\v2%.lindm.admin.v1.PackageSnapshotDetailR\x0fstagingSnapshot\"\xe0\x01\n" +
+	"\x19ListDevicePackagesRequest\x12%\n" +
+	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12%\n" +
+	"\tpage_size\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12!\n" +
+	"\amanager\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18@R\amanager\x12)\n" +
+	"\vname_prefix\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\n" +
+	"namePrefix\"\x97\x01\n" +
+	"\rDevicePackage\x12\x1a\n" +
+	"\bposition\x18\x01 \x01(\rR\bposition\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\tR\aversion\x12\"\n" +
+	"\farchitecture\x18\x04 \x01(\tR\farchitecture\x12\x18\n" +
+	"\amanager\x18\x05 \x01(\tR\amanager\"\xa3\x02\n" +
+	"\x1aListDevicePackagesResponse\x12\x1f\n" +
+	"\vsnapshot_id\x18\x01 \x01(\tR\n" +
+	"snapshotId\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x129\n" +
+	"\bpackages\x18\x03 \x03(\v2\x1d.lindm.admin.v1.DevicePackageR\bpackages\x12&\n" +
+	"\x0fnext_page_token\x18\x04 \x01(\tR\rnextPageToken\x12F\n" +
+	"\x11cursor_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x0fcursorExpiresAt\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x06 \x01(\tR\tpageToken\"\xa1\x01\n" +
 	"\x1cCreateEnrollmentGrantRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x125\n" +
@@ -880,9 +1664,11 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x14DEVICE_STATE_PENDING\x10\x01\x12\x17\n" +
 	"\x13DEVICE_STATE_ACTIVE\x10\x02\x12\x18\n" +
 	"\x14DEVICE_STATE_REVOKED\x10\x03\x12\x1e\n" +
-	"\x1aDEVICE_STATE_RECOVERY_HOLD\x10\x042\x91\x04\n" +
+	"\x1aDEVICE_STATE_RECOVERY_HOLD\x10\x042\xd0\x05\n" +
 	"\fAdminService\x12V\n" +
-	"\vListDevices\x12\".lindm.admin.v1.ListDevicesRequest\x1a#.lindm.admin.v1.ListDevicesResponse\x12t\n" +
+	"\vListDevices\x12\".lindm.admin.v1.ListDevicesRequest\x1a#.lindm.admin.v1.ListDevicesResponse\x12P\n" +
+	"\tGetDevice\x12 .lindm.admin.v1.GetDeviceRequest\x1a!.lindm.admin.v1.GetDeviceResponse\x12k\n" +
+	"\x12ListDevicePackages\x12).lindm.admin.v1.ListDevicePackagesRequest\x1a*.lindm.admin.v1.ListDevicePackagesResponse\x12t\n" +
 	"\x15CreateEnrollmentGrant\x12,.lindm.admin.v1.CreateEnrollmentGrantRequest\x1a-.lindm.admin.v1.CreateEnrollmentGrantResponse\x12t\n" +
 	"\x15RevokeEnrollmentGrant\x12,.lindm.admin.v1.RevokeEnrollmentGrantRequest\x1a-.lindm.admin.v1.RevokeEnrollmentGrantResponse\x12Y\n" +
 	"\fRevokeDevice\x12#.lindm.admin.v1.RevokeDeviceRequest\x1a$.lindm.admin.v1.RevokeDeviceResponse\x12b\n" +
@@ -901,46 +1687,84 @@ func file_lindm_admin_v1_admin_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_admin_v1_admin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_lindm_admin_v1_admin_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_lindm_admin_v1_admin_proto_goTypes = []any{
 	(DeviceState)(0),                      // 0: lindm.admin.v1.DeviceState
 	(*Device)(nil),                        // 1: lindm.admin.v1.Device
 	(*ListDevicesRequest)(nil),            // 2: lindm.admin.v1.ListDevicesRequest
 	(*ListDevicesResponse)(nil),           // 3: lindm.admin.v1.ListDevicesResponse
-	(*CreateEnrollmentGrantRequest)(nil),  // 4: lindm.admin.v1.CreateEnrollmentGrantRequest
-	(*CreateEnrollmentGrantResponse)(nil), // 5: lindm.admin.v1.CreateEnrollmentGrantResponse
-	(*RevokeEnrollmentGrantRequest)(nil),  // 6: lindm.admin.v1.RevokeEnrollmentGrantRequest
-	(*RevokeEnrollmentGrantResponse)(nil), // 7: lindm.admin.v1.RevokeEnrollmentGrantResponse
-	(*RevokeDeviceRequest)(nil),           // 8: lindm.admin.v1.RevokeDeviceRequest
-	(*RevokeDeviceResponse)(nil),          // 9: lindm.admin.v1.RevokeDeviceResponse
-	(*AuditEvent)(nil),                    // 10: lindm.admin.v1.AuditEvent
-	(*ListAuditEventsRequest)(nil),        // 11: lindm.admin.v1.ListAuditEventsRequest
-	(*ListAuditEventsResponse)(nil),       // 12: lindm.admin.v1.ListAuditEventsResponse
-	(*timestamppb.Timestamp)(nil),         // 13: google.protobuf.Timestamp
+	(*GetDeviceRequest)(nil),              // 4: lindm.admin.v1.GetDeviceRequest
+	(*HostObservationDetail)(nil),         // 5: lindm.admin.v1.HostObservationDetail
+	(*PackageAttemptDetail)(nil),          // 6: lindm.admin.v1.PackageAttemptDetail
+	(*PackageSnapshotDetail)(nil),         // 7: lindm.admin.v1.PackageSnapshotDetail
+	(*GetDeviceResponse)(nil),             // 8: lindm.admin.v1.GetDeviceResponse
+	(*ListDevicePackagesRequest)(nil),     // 9: lindm.admin.v1.ListDevicePackagesRequest
+	(*DevicePackage)(nil),                 // 10: lindm.admin.v1.DevicePackage
+	(*ListDevicePackagesResponse)(nil),    // 11: lindm.admin.v1.ListDevicePackagesResponse
+	(*CreateEnrollmentGrantRequest)(nil),  // 12: lindm.admin.v1.CreateEnrollmentGrantRequest
+	(*CreateEnrollmentGrantResponse)(nil), // 13: lindm.admin.v1.CreateEnrollmentGrantResponse
+	(*RevokeEnrollmentGrantRequest)(nil),  // 14: lindm.admin.v1.RevokeEnrollmentGrantRequest
+	(*RevokeEnrollmentGrantResponse)(nil), // 15: lindm.admin.v1.RevokeEnrollmentGrantResponse
+	(*RevokeDeviceRequest)(nil),           // 16: lindm.admin.v1.RevokeDeviceRequest
+	(*RevokeDeviceResponse)(nil),          // 17: lindm.admin.v1.RevokeDeviceResponse
+	(*AuditEvent)(nil),                    // 18: lindm.admin.v1.AuditEvent
+	(*ListAuditEventsRequest)(nil),        // 19: lindm.admin.v1.ListAuditEventsRequest
+	(*ListAuditEventsResponse)(nil),       // 20: lindm.admin.v1.ListAuditEventsResponse
+	(*timestamppb.Timestamp)(nil),         // 21: google.protobuf.Timestamp
+	(*v1.HostObservation)(nil),            // 22: lindm.inventory.v1.HostObservation
+	(v1.CollectionStatus)(0),              // 23: lindm.inventory.v1.CollectionStatus
+	(v1.SnapshotState)(0),                 // 24: lindm.inventory.v1.SnapshotState
 }
 var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
 	0,  // 0: lindm.admin.v1.Device.lifecycle_state:type_name -> lindm.admin.v1.DeviceState
-	13, // 1: lindm.admin.v1.Device.enrolled_at:type_name -> google.protobuf.Timestamp
-	13, // 2: lindm.admin.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
-	1,  // 3: lindm.admin.v1.ListDevicesResponse.devices:type_name -> lindm.admin.v1.Device
-	13, // 4: lindm.admin.v1.CreateEnrollmentGrantResponse.expires_at:type_name -> google.protobuf.Timestamp
-	13, // 5: lindm.admin.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	10, // 6: lindm.admin.v1.ListAuditEventsResponse.events:type_name -> lindm.admin.v1.AuditEvent
-	2,  // 7: lindm.admin.v1.AdminService.ListDevices:input_type -> lindm.admin.v1.ListDevicesRequest
-	4,  // 8: lindm.admin.v1.AdminService.CreateEnrollmentGrant:input_type -> lindm.admin.v1.CreateEnrollmentGrantRequest
-	6,  // 9: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:input_type -> lindm.admin.v1.RevokeEnrollmentGrantRequest
-	8,  // 10: lindm.admin.v1.AdminService.RevokeDevice:input_type -> lindm.admin.v1.RevokeDeviceRequest
-	11, // 11: lindm.admin.v1.AdminService.ListAuditEvents:input_type -> lindm.admin.v1.ListAuditEventsRequest
-	3,  // 12: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
-	5,  // 13: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
-	7,  // 14: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
-	9,  // 15: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
-	12, // 16: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	21, // 1: lindm.admin.v1.Device.enrolled_at:type_name -> google.protobuf.Timestamp
+	21, // 2: lindm.admin.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
+	21, // 3: lindm.admin.v1.Device.host_received_at:type_name -> google.protobuf.Timestamp
+	21, // 4: lindm.admin.v1.Device.package_attempt_received_at:type_name -> google.protobuf.Timestamp
+	21, // 5: lindm.admin.v1.Device.snapshot_received_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: lindm.admin.v1.ListDevicesResponse.devices:type_name -> lindm.admin.v1.Device
+	22, // 7: lindm.admin.v1.HostObservationDetail.observation:type_name -> lindm.inventory.v1.HostObservation
+	21, // 8: lindm.admin.v1.HostObservationDetail.received_at:type_name -> google.protobuf.Timestamp
+	21, // 9: lindm.admin.v1.PackageAttemptDetail.started_at:type_name -> google.protobuf.Timestamp
+	21, // 10: lindm.admin.v1.PackageAttemptDetail.finished_at:type_name -> google.protobuf.Timestamp
+	21, // 11: lindm.admin.v1.PackageAttemptDetail.received_at:type_name -> google.protobuf.Timestamp
+	23, // 12: lindm.admin.v1.PackageAttemptDetail.status:type_name -> lindm.inventory.v1.CollectionStatus
+	24, // 13: lindm.admin.v1.PackageSnapshotDetail.state:type_name -> lindm.inventory.v1.SnapshotState
+	21, // 14: lindm.admin.v1.PackageSnapshotDetail.created_at:type_name -> google.protobuf.Timestamp
+	21, // 15: lindm.admin.v1.PackageSnapshotDetail.started_at:type_name -> google.protobuf.Timestamp
+	21, // 16: lindm.admin.v1.PackageSnapshotDetail.finished_at:type_name -> google.protobuf.Timestamp
+	21, // 17: lindm.admin.v1.PackageSnapshotDetail.received_at:type_name -> google.protobuf.Timestamp
+	21, // 18: lindm.admin.v1.PackageSnapshotDetail.committed_at:type_name -> google.protobuf.Timestamp
+	21, // 19: lindm.admin.v1.PackageSnapshotDetail.superseded_at:type_name -> google.protobuf.Timestamp
+	1,  // 20: lindm.admin.v1.GetDeviceResponse.device:type_name -> lindm.admin.v1.Device
+	5,  // 21: lindm.admin.v1.GetDeviceResponse.host:type_name -> lindm.admin.v1.HostObservationDetail
+	6,  // 22: lindm.admin.v1.GetDeviceResponse.package_attempt:type_name -> lindm.admin.v1.PackageAttemptDetail
+	7,  // 23: lindm.admin.v1.GetDeviceResponse.current_snapshot:type_name -> lindm.admin.v1.PackageSnapshotDetail
+	7,  // 24: lindm.admin.v1.GetDeviceResponse.staging_snapshot:type_name -> lindm.admin.v1.PackageSnapshotDetail
+	10, // 25: lindm.admin.v1.ListDevicePackagesResponse.packages:type_name -> lindm.admin.v1.DevicePackage
+	21, // 26: lindm.admin.v1.ListDevicePackagesResponse.cursor_expires_at:type_name -> google.protobuf.Timestamp
+	21, // 27: lindm.admin.v1.CreateEnrollmentGrantResponse.expires_at:type_name -> google.protobuf.Timestamp
+	21, // 28: lindm.admin.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	18, // 29: lindm.admin.v1.ListAuditEventsResponse.events:type_name -> lindm.admin.v1.AuditEvent
+	2,  // 30: lindm.admin.v1.AdminService.ListDevices:input_type -> lindm.admin.v1.ListDevicesRequest
+	4,  // 31: lindm.admin.v1.AdminService.GetDevice:input_type -> lindm.admin.v1.GetDeviceRequest
+	9,  // 32: lindm.admin.v1.AdminService.ListDevicePackages:input_type -> lindm.admin.v1.ListDevicePackagesRequest
+	12, // 33: lindm.admin.v1.AdminService.CreateEnrollmentGrant:input_type -> lindm.admin.v1.CreateEnrollmentGrantRequest
+	14, // 34: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:input_type -> lindm.admin.v1.RevokeEnrollmentGrantRequest
+	16, // 35: lindm.admin.v1.AdminService.RevokeDevice:input_type -> lindm.admin.v1.RevokeDeviceRequest
+	19, // 36: lindm.admin.v1.AdminService.ListAuditEvents:input_type -> lindm.admin.v1.ListAuditEventsRequest
+	3,  // 37: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
+	8,  // 38: lindm.admin.v1.AdminService.GetDevice:output_type -> lindm.admin.v1.GetDeviceResponse
+	11, // 39: lindm.admin.v1.AdminService.ListDevicePackages:output_type -> lindm.admin.v1.ListDevicePackagesResponse
+	13, // 40: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
+	15, // 41: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
+	17, // 42: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
+	20, // 43: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
+	37, // [37:44] is the sub-list for method output_type
+	30, // [30:37] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_admin_proto_init() }
@@ -954,7 +1778,7 @@ func file_lindm_admin_v1_admin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_admin_proto_rawDesc), len(file_lindm_admin_v1_admin_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

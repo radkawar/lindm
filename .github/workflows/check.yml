@@ -27,13 +27,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install native verification and seed tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils
+      - name: Install native verification, package and seed tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils rpm rpm2cpio cpio createrepo-c
       - run: make bootstrap
       - run: make generate
       - name: Require committed generated contracts
         run: |
-          changes="$(git status --porcelain -- gen web/gen internal/identity/identitydb internal/device/devicedb internal/agent/journal/journaldb)"
+          changes="$(git status --porcelain -- gen web/gen internal/identity/identitydb internal/device/devicedb internal/agent/journal/journaldb internal/agent/spool/spooldb)"
           if [ -n "$changes" ]; then
             printf '%s\n' "$changes"
             exit 1
