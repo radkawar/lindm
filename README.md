@@ -141,6 +141,11 @@ and reaps the owned VM before removing its private overlay/seed. Add
 owner. These commands exercise native inspection, not package installation,
 enrollment, desktop qualification or physical recovery.
 
+The [native service-provider lane](docs/agent-enrollment.md#running-the-native-service-provider-lane)
+exercises typed systemd D-Bus reconciliation in fresh Ubuntu/Fedora guests, with
+independent native state checks. This is provider qualification, not remote policy
+execution or complete G3.
+
 Pre-commit checks the staged snapshot; pre-push runs `make check`. CI additionally
 checks generated-contract drift and real database regressions. Hooks are not a
 substitute for protected-branch CI. Dependency audit requires registry/advisory access;

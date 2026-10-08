@@ -297,6 +297,33 @@ The four scoped reviews, including corrective follow-ups, returned no remaining
 actionable findings. `make check` and `make test-integration build` passed.
 Both native execution-trust lanes passed; broader G3 policy execution remains open.
 
+### Native service-provider integration reviews
+
+The provider and maintained VM proof received separate read-only reviews. The
+provider review found that job-match cleanup could turn a known pre-submission
+cancellation into an unknown service effect. Cleanup now tracks the actual runtime
+submission boundary; earlier enablement effects retain their separate uncertain
+outcome handling. Corrective review found no remaining actionable issue.
+
+Native Ubuntu and Fedora runs exposed two integration errors:
+
+- Persistent enablement leaves `NeedDaemonReload` set. The provider now performs
+  bounded native manager reload, then rechecks definition/state before runtime
+  effects. It does not ignore the condition or claim reload is per-unit isolated.
+- `LoadUnit` can return a cached not-found object. Load-state admission now precedes
+  service-specific and persistent-file queries, preserving unsupported-state
+  classification without confusing an absent unit with transport failure.
+
+The parent also corrected the alias fixture: native disable removes aliases, so
+the negative now creates the alias afterward and proves its loaded canonical ID.
+Both corrected native lanes passed all nine phases, including independent native
+state checks and teardown. Root-isolated filesystem-boundary tests and scoped race
+tests passed. The exact cancellation-between-match-and-submit interleaving was
+reviewed statically; the native lane exercises cancellation before `Apply`.
+`make fmt check test-integration build` passed, followed by both final native
+lanes on the same recorded lab build. These scoped reviews do not qualify signed
+remote policy execution or whole-product security.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

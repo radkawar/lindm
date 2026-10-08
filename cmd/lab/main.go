@@ -39,8 +39,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "inspect" {
 		return runVMInspect(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "services" {
+		return runVMServices(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity}")
+		return errors.New("usage: lab packages {keygen|build|apt|rpm|rejection-fixtures} [flags]; lab auth check [-repo DIR]; lab vm {inspect|lifecycle|services} [flags]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -118,6 +121,35 @@ func runVMInspect(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		return err
 	}
 	result, err := vmlab.InspectVM(ctx, manifest, vmlab.VMInspectOptions{Agent: *agent, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnosticsDir})
+	if err != nil {
+		return err
+	}
+	return writeLabEvidence(stdout, *record, result)
+}
+
+func runVMServices(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("vm services", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	manifestPath := flags.String("manifest", "", "strict protobuf JSON image manifest")
+	cache := flags.String("cache", ".cache/lab/images", "dedicated verified image cache")
+	workDir := flags.String("work-dir", "", "existing parent for owned disposable VM state")
+	diagnostics := flags.String("diagnostics", "", "existing directory for opt-in private failure diagnostics")
+	record := flags.String("record", "", "write successful native service evidence to a new private JSON file")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *manifestPath == "" || flags.NArg() != 0 {
+		return errors.New("-manifest FILE is required; positional arguments are not accepted")
+	}
+	manifest, err := vmlab.LoadManifest(*manifestPath)
+	if err != nil {
+		return err
+	}
+	binary, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	result, err := vmlab.ServicesVM(ctx, manifest, vmlab.VMServicesOptions{LabBinary: binary, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics})
 	if err != nil {
 		return err
 	}

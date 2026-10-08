@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Capability systemd.service.v1 manages existing, canonical, persistent system
+// services. It never accepts unit contents, executable names, argv or bus paths.
+message ServiceDesiredState {
+  string unit = 1 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*(@[a-zA-Z0-9][a-zA-Z0-9_.-]*)?\\.service$"
+  }];
+  ServiceRuntimeState runtime = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ServiceEnablement enablement = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "service_desired_state.managed_dimension"
+    message: "at least one service state dimension must be managed"
+    expression: "this.runtime != 1 || this.enablement != 1"
+  };
+  option (buf.validate.message).cel = {
+    id: "service_desired_state.protected_agent"
+    message: "agent authority services cannot manage themselves"
+    expression: "!this.unit.startsWith('lindm-') && this.unit != 'lindm.service'"
+  };
+}
+
+enum ServiceRuntimeState {
+  SERVICE_RUNTIME_STATE_UNSPECIFIED = 0;
+  SERVICE_RUNTIME_STATE_UNMANAGED = 1;
+  SERVICE_RUNTIME_STATE_ACTIVE = 2;
+  SERVICE_RUNTIME_STATE_INACTIVE = 3;
+}
+
+enum ServiceEnablement {
+  SERVICE_ENABLEMENT_UNSPECIFIED = 0;
+  SERVICE_ENABLEMENT_UNMANAGED = 1;
+  SERVICE_ENABLEMENT_ENABLED = 2;
+  SERVICE_ENABLEMENT_DISABLED = 3;
+}
+
+// Native strings are evidence, not policy values. Unknown native states must
+// remain visible and cannot be interpreted as convergence or absence.
+message ServiceObservation {
+  string unit = 1 [(buf.validate.field).string.max_len = 255];
+  string boot_id = 2 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp observed_at = 3 [(buf.validate.field).required = true];
+  string load_state = 4 [(buf.validate.field).string.max_len = 64];
+  string active_state = 5 [(buf.validate.field).string.max_len = 64];
+  string sub_state = 6 [(buf.validate.field).string.max_len = 64];
+  string unit_file_state = 7 [(buf.validate.field).string.max_len = 64];
+  string service_type = 8 [(buf.validate.field).string.max_len = 64];
+  bool remain_after_exit = 9;
+  bool refuse_manual_start = 10;
+  bool refuse_manual_stop = 11;
+  bool need_daemon_reload = 12;
+  bool transient = 13;
+  // SHA-256 of canonical ordered unit definition paths and their exact bytes.
+  // Paths/bytes are read from root-owned, non-writable-by-others regular files.
+  bytes definition_sha256 = 14 [(buf.validate.field).bytes.len = 32];
+  // Includes definition, boot and native precondition state; excludes time.
+  bytes fingerprint_sha256 = 15 [(buf.validate.field).bytes.len = 32];
+  bool job_pending = 16;
+}
+
+// A plan describes drift, not execution authority. Only the protected executor
+// may apply it after validating and durably consuming separate start authority.
+message ServicePlan {
+  ServiceDesiredState desired = 1 [(buf.validate.field).required = true];
+  ServiceObservation before = 2 [(buf.validate.field).required = true];
+  bool change_runtime = 3;
+  bool change_enablement = 4;
+  option (buf.validate.message).cel = {
+    id: "service_plan.unit_binding"
+    message: "service plan must bind the observed canonical unit"
+    expression: "this.desired.unit == this.before.unit"
+  };
+  option (buf.validate.message).cel = {
+    id: "service_plan.managed_changes"
+    message: "unmanaged dimensions cannot request changes"
+    expression: "(!this.change_runtime || this.desired.runtime != 1) && (!this.change_enablement || this.desired.enablement != 1)"
+  };
+}
+
+message ServiceVerification {
+  ServiceObservation observation = 1 [(buf.validate.field).required = true];
+  bool runtime_matches = 2;
+  bool enablement_matches = 3;
+  bool definition_matches = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "service_verification.convergence"
+    message: "convergence requires matching native evidence without pending work"
+    expression: "!this.converged || (this.runtime_matches && this.enablement_matches && this.definition_matches && this.observation.load_state == 'loaded' && !this.observation.job_pending && !this.observation.need_daemon_reload && !this.observation.transient)"
+  };
+}

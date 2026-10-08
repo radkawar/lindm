@@ -8,6 +8,7 @@ require (
 	connectrpc.com/connect v1.21.0
 	connectrpc.com/validate v0.7.0
 	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/pressly/goose/v3 v3.28.0

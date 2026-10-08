@@ -435,6 +435,48 @@ Transport diagnostics use a descriptor-relative, no-symlink open: systemd's
 the network-owned final spool directory for diagnostics; mutable state and all
 ancestor checks retain their original ownership requirements.
 
+### Running the native service-provider lane
+
+Build the lab with `make build`, then run the provider against a fresh disposable
+guest. No control-plane service or enrollment grant is needed for this provider
+qualification; it does not expose an unauthenticated product management path.
+
+```sh
+artifacts/bin/lab vm services \
+  -manifest lab/images/ubuntu-noble-amd64.json \
+  -record "$HOME/.cache/lindm-services-ubuntu.json"
+artifacts/bin/lab vm services \
+  -manifest lab/images/fedora-44-x86_64.json \
+  -record "$HOME/.cache/lindm-services-fedora.json"
+```
+
+Use new record paths for subsequent runs. The lab uploads a digest-checked snapshot
+of its executable, creates fixed sacrificial service fixtures only in its owned
+guest, and calls `internal/agent/serviceprovider`. Independent `systemctl`
+observations verify enable/start, unchanged desired state, stale-plan rejection,
+reconvergence, disable/stop, cancellation before start, and rejection of missing,
+aliased and nonpersistent oneshot services. Fedora remains SELinux Enforcing.
+Success follows fixture cleanup and complete VM teardown.
+
+The production provider uses typed `ServiceDesiredState` and systemd D-Bus:
+Observe → Plan → Apply → Verify. It never accepts executable paths, arguments or
+unit contents. A plan binds the canonical unit, boot, native state and protected
+unit-definition fingerprint; changed preconditions prevent effects. Native job
+completion alone is not convergence. A submitted effect with lost/canceled
+observation remains uncertain, not implicitly canceled or rolled back.
+
+Persistent enablement changes require a native manager reload. This also
+incorporates other pending unit definitions; it is not an isolated per-unit
+transaction. The provider rechecks its unit definition/state before runtime
+effects. Native `[Install]` semantics can affect related links/units, and an
+enabled/disabled result does not establish link ownership. Ownership-safe profile
+removal still requires journal integration.
+
+These runs qualify the provider in disposable guests, not signed remote policy
+execution, executor-sandbox integration, application health, reboot persistence,
+all distro cells or complete G3. No product RPC calls `Apply` directly. Durable
+action acceptance, resource ownership and start-authority integration remain open.
+
 ## 6. Required G2 failure boundaries
 
 - Real SSO grant issuance, secret redaction/hash-only persistence and lost issuance.
