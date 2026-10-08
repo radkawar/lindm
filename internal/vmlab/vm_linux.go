@@ -84,6 +84,18 @@ func hostCommand(ctx context.Context, dir, name string, files []*os.File, args .
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
+	// cloud-localds copies private user-data into TMPDIR. Its EXIT trap cannot
+	// run after SIGKILL, so all staging must remain inside owned cleanup.
+	cmd.Env = append(os.Environ(), "TMPDIR="+dir)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		// Stop the script and its ISO/image-builder descendants together.
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); errors.Is(err, syscall.ESRCH) {
+			return os.ErrProcessDone
+		} else {
+			return err
+		}
+	}
 	cmd.ExtraFiles = files
 	cmd.WaitDelay = 2 * time.Second
 	out := &limitedOutput{limit: 1 << 20}

@@ -147,6 +147,9 @@ vendor downloads. Actual pinned image acquisition and native-observation VM scen
 are separate maintained lab commands, not hidden in unit tests or pre-commit hooks.
 The VM lane requires accessible KVM, QEMU, `qemu-img` and `cloud-localds`; it neither
 changes host security nor substitutes container observations for a real guest.
+The integration lane also exercises real `cloud-localds` cancellation: staging stays
+inside the owned private run directory and helper descendants stop before cleanup.
+It requires `cloud-image-utils`, but not KVM or a booted guest.
 
 ## 2. Toolchain and quality gates
 

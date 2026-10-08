@@ -27,8 +27,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install native signature-verification tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv
+      - name: Install native verification and seed tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils
       - run: make bootstrap
       - run: make generate
       - name: Require committed generated contracts

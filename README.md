@@ -31,8 +31,10 @@ physical wipe/recovery validation.
 Use the Node LTS version in `.node-version`, Go from `go.mod`, npm, Git and Make.
 Native inventory requires Linux. Signed-image verification and its behavioral tests
 require `gpg`, `gpgv` and `gpgconf` (the distribution's GnuPG tools). The development
-lab additionally requires Docker with Compose v2 and a local daemon. Dependencies
-and build tools are pinned; global npm packages are not required.
+lab additionally requires Docker with Compose v2 and a local daemon. The integration
+lane requires `cloud-localds` (`cloud-image-utils`) for real seed-cancellation cleanup
+coverage without booting a VM. Dependencies and build tools are pinned; global npm
+packages are not required.
 
 ```sh
 make bootstrap
