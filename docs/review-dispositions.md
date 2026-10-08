@@ -259,15 +259,15 @@ cursor out before upgrade. The lab now selects and records a fully compared
 current baseline immediately before upgrade, refreshes its comparison cursor only
 while that snapshot remains current and preserves the fixed cursor after
 supersession. Independent corrective review found no remaining defect in this
-change; maximum-pause runtime verification is still in progress. Executor, spool,
-snapshot, console and native-signing corrective reviews likewise returned no
+change; Fedora's full lifecycle then passed with the maximum ten-minute observation
+pauses. Executor, spool, snapshot, console and native-signing corrective reviews returned no
 additional actionable findings in their assigned scopes. These are scoped reviews,
 not whole-product security certification.
 
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
-Engineering must still finish G2 qualification. Named IdP test tenants/permissions,
+The internal G2 slice is verified and committed as `cb97712`. Named IdP test tenants/permissions,
 licensed enterprise content, physical sacrificial machines/destructive consent,
 distribution license/public namespace and production signing custody must exist
 before their corresponding integration, publication or hardware gates. They are not
