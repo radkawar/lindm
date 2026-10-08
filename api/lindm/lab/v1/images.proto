@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// ImageManifest pins one official image. It is acquisition evidence, not a claim
+// that this image or distribution has passed native lifecycle acceptance.
+message ImageManifest {
+  option (buf.validate.message).cel = {
+    id: "image.signature_mode"
+    message: "detached checksums require a signature URL; clearsigned checksums must not specify one"
+    expression: "(this.checksum_mode == 1 && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))"
+  };
+
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    pattern: "^[a-z0-9][a-z0-9.-]*$"
+  }];
+  string distribution = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  string version = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  string architecture = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  string edition = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  // Immutable vendor release/build or snapshot, never "latest"/"current".
+  string release = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+    not_in: "latest"
+    not_in: "current"
+  }];
+  string image_filename = 7 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
+  }];
+  string image_url = 8 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string checksum_url = 9 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  optional string signature_url = 10 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  // Vendor keyservers require query parameters. Credentials/fragments remain
+  // prohibited; redirects are restricted to the original HTTPS origin.
+  string key_url = 11 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^/@?#]+(/[^#]*)?$"
+  }];
+  string sha256 = 12 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  // Full signing-key or primary-key fingerprint. A primary fingerprint also
+  // permits its cryptographically bound signing subkeys, as reported by gpgv.
+  string signer_fingerprint = 13 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  uint64 image_size_bytes = 14 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 17179869184
+  }];
+  ChecksumMode checksum_mode = 15 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Independent vendor publication of the trusted full fingerprint, not merely
+  // the key download or an unauthenticated key-ID lookup.
+  string signer_provenance_url = 16 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string release_provenance_url = 17 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+}
+
+enum ChecksumMode {
+  CHECKSUM_MODE_UNSPECIFIED = 0;
+  // Ubuntu SHA256SUMS plus separate OpenPGP SHA256SUMS.gpg.
+  CHECKSUM_MODE_DETACHED = 1;
+  // Fedora OpenPGP clearsigned CHECKSUM, parsed only from gpgv's verified output.
+  CHECKSUM_MODE_CLEARSIGNED = 2;
+}

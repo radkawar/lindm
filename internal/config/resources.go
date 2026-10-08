@@ -3,9 +3,6 @@ package config
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -20,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/pki"
 )
 
 // Resources contains resolved dependencies, not a second serialized schema.
@@ -61,7 +59,7 @@ func (d *Document) Resolve() (*Resources, error) {
 	if err := result.ServerCertificate.Leaf.VerifyHostname(publicURL.Hostname()); err != nil {
 		return nil, fmt.Errorf("tls certificate does not cover public_url: %w", err)
 	}
-	if !permitsUsage(result.ServerCertificate.Leaf, x509.ExtKeyUsageServerAuth) {
+	if !pki.PermitsUsage(result.ServerCertificate.Leaf, x509.ExtKeyUsageServerAuth) {
 		return nil, errors.New("tls certificate must permit server authentication")
 	}
 	ca, err := keyPair(base, cfg.GetDeviceCa().GetCertificateFile(), cfg.GetDeviceCa().GetPrivateKeyFile())
@@ -71,7 +69,7 @@ func (d *Document) Resolve() (*Resources, error) {
 	if !ca.Leaf.IsCA || !ca.Leaf.BasicConstraintsValid || ca.Leaf.KeyUsage&x509.KeyUsageCertSign == 0 {
 		return nil, errors.New("device_ca certificate must be a certificate-signing CA")
 	}
-	if !permitsUsage(ca.Leaf, x509.ExtKeyUsageClientAuth) {
+	if !pki.PermitsUsage(ca.Leaf, x509.ExtKeyUsageClientAuth) {
 		return nil, errors.New("device_ca certificate must permit client authentication")
 	}
 	if bytes.Equal(result.ServerCertificate.Leaf.RawSubjectPublicKeyInfo, ca.Leaf.RawSubjectPublicKeyInfo) {
@@ -173,36 +171,8 @@ func keyPair(base, certificateFile, privateKeyFile string) (tls.Certificate, err
 	if now.Before(pair.Leaf.NotBefore) || !now.Before(pair.Leaf.NotAfter) {
 		return tls.Certificate{}, errors.New("certificate is not currently valid")
 	}
-	if err := requireStrongKey(pair.PrivateKey); err != nil {
+	if err := pki.ValidatePublicKey(pair.Leaf.PublicKey); err != nil {
 		return tls.Certificate{}, err
 	}
 	return pair, nil
-}
-
-func permitsUsage(cert *x509.Certificate, required x509.ExtKeyUsage) bool {
-	if len(cert.ExtKeyUsage) == 0 && len(cert.UnknownExtKeyUsage) == 0 {
-		return true
-	}
-	for _, usage := range cert.ExtKeyUsage {
-		if usage == x509.ExtKeyUsageAny || usage == required {
-			return true
-		}
-	}
-	return false
-}
-
-func requireStrongKey(key crypto.PrivateKey) error {
-	switch key := key.(type) {
-	case *ecdsa.PrivateKey:
-		if key.Curve.Params().BitSize >= 256 {
-			return nil
-		}
-	case ed25519.PrivateKey:
-		return nil
-	case *rsa.PrivateKey:
-		if key.N.BitLen() >= 3072 {
-			return nil
-		}
-	}
-	return errors.New("private key must be Ed25519, ECDSA with at least 256 bits, or RSA with at least 3072 bits")
 }

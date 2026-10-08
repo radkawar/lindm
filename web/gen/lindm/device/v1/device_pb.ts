@@ -7,45 +7,15 @@ import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Package } from "../../inventory/v1/observation_pb.js";
+import { file_lindm_inventory_v1_observation } from "../../inventory/v1/observation_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file lindm/device/v1/device.proto.
  */
 export const file_lindm_device_v1_device: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEiewoHUGFja2FnZRIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIAEEhsKB3ZlcnNpb24YAiABKAlCCrpIB3IFEAEYgBASHQoMYXJjaGl0ZWN0dXJlGAMgASgJQge6SARyAhhAEhoKB21hbmFnZXIYBCABKAlCCbpIBnIEEAEYQCLKAgoWUmVwb3J0SW52ZW50b3J5UmVxdWVzdBInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YASABKAlCCLpIBXIDsAEBEhkKB2Jvb3RfaWQYAiABKAlCCLpIBXIDsAEBEiMKCHNlcXVlbmNlGAMgASgEQhG6SA4yDBj//////////38gABIcCghob3N0bmFtZRgEIAEoCUIKukgHcgUQARj9ARIYCgVvc19pZBgFIAEoCUIJukgGcgQQARhAEhwKCm9zX3ZlcnNpb24YBiABKAlCCLpIBXIDGIABEh8KDGFyY2hpdGVjdHVyZRgHIAEoCUIJukgGcgQQARhAEjUKCHBhY2thZ2VzGAggAygLMhgubGluZG0uZGV2aWNlLnYxLlBhY2thZ2VCCbpIBpIBAxD0AxIZChFwYWNrYWdlc19jb21wbGV0ZRgJIAEoCCJlChdSZXBvcnRJbnZlbnRvcnlSZXNwb25zZRIZChFhY2NlcHRlZF9zZXF1ZW5jZRgBIAEoBBIvCgtzZXJ2ZXJfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiNAoUUmVuZXdJZGVudGl0eVJlcXVlc3QSHAoHY3NyX3BlbRgBIAEoDEILukgIegYQQBiAgAEiYAoVUmVuZXdJZGVudGl0eVJlc3BvbnNlEhcKD2NlcnRpZmljYXRlX3BlbRgBIAEoDBIuCgpleHBpcmVzX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDLVAQoNRGV2aWNlU2VydmljZRJkCg9SZXBvcnRJbnZlbnRvcnkSJy5saW5kbS5kZXZpY2UudjEuUmVwb3J0SW52ZW50b3J5UmVxdWVzdBooLmxpbmRtLmRldmljZS52MS5SZXBvcnRJbnZlbnRvcnlSZXNwb25zZRJeCg1SZW5ld0lkZW50aXR5EiUubGluZG0uZGV2aWNlLnYxLlJlbmV3SWRlbnRpdHlSZXF1ZXN0GiYubGluZG0uZGV2aWNlLnYxLlJlbmV3SWRlbnRpdHlSZXNwb25zZUIkWiJsaW5kbS9nZW4vbGluZG0vZGV2aWNlL3YxO2RldmljZXYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
-
-/**
- * @generated from message lindm.device.v1.Package
- */
-export type Package = Message<"lindm.device.v1.Package"> & {
-  /**
-   * @generated from field: string name = 1;
-   */
-  name: string;
-
-  /**
-   * @generated from field: string version = 2;
-   */
-  version: string;
-
-  /**
-   * @generated from field: string architecture = 3;
-   */
-  architecture: string;
-
-  /**
-   * @generated from field: string manager = 4;
-   */
-  manager: string;
-};
-
-/**
- * Describes the message lindm.device.v1.Package.
- * Use `create(PackageSchema)` to create a new message.
- */
-export const PackageSchema: GenMessage<Package> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 0);
+  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEizQIKFlJlcG9ydEludmVudG9yeVJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIZCgdib290X2lkGAIgASgJQgi6SAVyA7ABARIjCghzZXF1ZW5jZRgDIAEoBEIRukgOMgwY//////////9/IAASHAoIaG9zdG5hbWUYBCABKAlCCrpIB3IFEAEY/QESGAoFb3NfaWQYBSABKAlCCbpIBnIEEAEYQBIcCgpvc192ZXJzaW9uGAYgASgJQgi6SAVyAxiAARIfCgxhcmNoaXRlY3R1cmUYByABKAlCCbpIBnIEEAEYQBI4CghwYWNrYWdlcxgIIAMoCzIbLmxpbmRtLmludmVudG9yeS52MS5QYWNrYWdlQgm6SAaSAQMQ9AMSGQoRcGFja2FnZXNfY29tcGxldGUYCSABKAgiZQoXUmVwb3J0SW52ZW50b3J5UmVzcG9uc2USGQoRYWNjZXB0ZWRfc2VxdWVuY2UYASABKAQSLwoLc2VydmVyX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIjQKFFJlbmV3SWRlbnRpdHlSZXF1ZXN0EhwKB2Nzcl9wZW0YASABKAxCC7pICHoGEEAYgIABImAKFVJlbmV3SWRlbnRpdHlSZXNwb25zZRIXCg9jZXJ0aWZpY2F0ZV9wZW0YASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAy1QEKDURldmljZVNlcnZpY2USZAoPUmVwb3J0SW52ZW50b3J5EicubGluZG0uZGV2aWNlLnYxLlJlcG9ydEludmVudG9yeVJlcXVlc3QaKC5saW5kbS5kZXZpY2UudjEuUmVwb3J0SW52ZW50b3J5UmVzcG9uc2USXgoNUmVuZXdJZGVudGl0eRIlLmxpbmRtLmRldmljZS52MS5SZW5ld0lkZW50aXR5UmVxdWVzdBomLmxpbmRtLmRldmljZS52MS5SZW5ld0lkZW50aXR5UmVzcG9uc2VCJFoibGluZG0vZ2VuL2xpbmRtL2RldmljZS92MTtkZXZpY2V2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_inventory_v1_observation]);
 
 /**
  * @generated from message lindm.device.v1.ReportInventoryRequest
@@ -87,7 +57,7 @@ export type ReportInventoryRequest = Message<"lindm.device.v1.ReportInventoryReq
   architecture: string;
 
   /**
-   * @generated from field: repeated lindm.device.v1.Package packages = 8;
+   * @generated from field: repeated lindm.inventory.v1.Package packages = 8;
    */
   packages: Package[];
 
@@ -102,7 +72,7 @@ export type ReportInventoryRequest = Message<"lindm.device.v1.ReportInventoryReq
  * Use `create(ReportInventoryRequestSchema)` to create a new message.
  */
 export const ReportInventoryRequestSchema: GenMessage<ReportInventoryRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 1);
+  messageDesc(file_lindm_device_v1_device, 0);
 
 /**
  * @generated from message lindm.device.v1.ReportInventoryResponse
@@ -124,7 +94,7 @@ export type ReportInventoryResponse = Message<"lindm.device.v1.ReportInventoryRe
  * Use `create(ReportInventoryResponseSchema)` to create a new message.
  */
 export const ReportInventoryResponseSchema: GenMessage<ReportInventoryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 2);
+  messageDesc(file_lindm_device_v1_device, 1);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityRequest
@@ -141,7 +111,7 @@ export type RenewIdentityRequest = Message<"lindm.device.v1.RenewIdentityRequest
  * Use `create(RenewIdentityRequestSchema)` to create a new message.
  */
 export const RenewIdentityRequestSchema: GenMessage<RenewIdentityRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 3);
+  messageDesc(file_lindm_device_v1_device, 2);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityResponse
@@ -163,7 +133,7 @@ export type RenewIdentityResponse = Message<"lindm.device.v1.RenewIdentityRespon
  * Use `create(RenewIdentityResponseSchema)` to create a new message.
  */
 export const RenewIdentityResponseSchema: GenMessage<RenewIdentityResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 4);
+  messageDesc(file_lindm_device_v1_device, 3);
 
 /**
  * @generated from service lindm.device.v1.DeviceService

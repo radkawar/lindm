@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+message ExecutionKey {
+  // SHA-256 of the DER SubjectPublicKeyInfo, lowercase hexadecimal.
+  string key_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  // Initial software signing algorithm is pure Ed25519.
+  bytes public_key = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+// The initial root is supplied through an authenticated out-of-band channel.
+// It is not accepted because it was served by the enrollment endpoint.
+message ExecutionRoot {
+  string deployment_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 version = 2 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp not_before = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+  uint32 threshold = 5 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 16
+  }];
+  repeated ExecutionKey keys = 6 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  option (buf.validate.message).cel = {
+    id: "execution_root.validity"
+    message: "root validity must be increasing"
+    expression: "this.expires_at > this.not_before"
+  };
+  option (buf.validate.message).cel = {
+    id: "execution_root.quorum"
+    message: "threshold must not exceed the number of unique keys"
+    expression: "this.threshold <= uint(this.keys.size()) && this.keys.all(k, this.keys.filter(other, other.key_id == k.key_id).size() == 1)"
+  };
+}
+
+// DSSE payload type application/vnd.lindm.bootstrap.v1+protobuf.
+message BootstrapBundle {
+  string bundle_id = 1 [(buf.validate.field).string.uuid = true];
+  string deployment_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_origin = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  string device_origin = 4 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  bytes transport_ca_pem = 5 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 65536
+  }];
+  bytes device_ca_pem = 6 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  uint64 execution_root_version = 7 [(buf.validate.field).uint64.gt = 0];
+  bytes execution_root_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  bytes release_root_json = 9 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 262144
+  }];
+  google.protobuf.Timestamp not_before = 10 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 11 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "bootstrap.validity"
+    message: "bootstrap validity must be increasing"
+    expression: "this.expires_at > this.not_before"
+  };
+}
+
+// DSSE payload type application/vnd.lindm.renewal-intent.v1+protobuf.
+// This message is constructed by the executor from protected pending state.
+message RenewalIntent {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string issuance_request_id = 4 [(buf.validate.field).string.uuid = true];
+  bytes presented_certificate_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bytes csr_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  uint64 session_epoch = 7 [(buf.validate.field).uint64.gt = 0];
+}
+
+// DSSE payload type application/vnd.lindm.issuance-retrieval.v1+protobuf.
+// Signed by the staged next key; authorizes retrieval, never fresh issuance.
+message IssuanceRetrieval {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string issuance_request_id = 4 [(buf.validate.field).string.uuid = true];
+}
+
+// DSSE payload type application/vnd.lindm.session-acquisition.v1+protobuf.
+message SessionAcquisition {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string request_id = 4 [(buf.validate.field).string.uuid = true];
+  uint64 predecessor_epoch = 5;
+  string incarnation = 6 [(buf.validate.field).string.uuid = true];
+  string boot_id = 7 [(buf.validate.field).string.uuid = true];
+}

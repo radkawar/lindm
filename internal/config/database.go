@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"lindm/internal/pki"
 )
 
 func (d *Document) database(path string) (*pgxpool.Config, error) {
@@ -64,7 +66,7 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("load database client certificate: %w", err)
 		}
-		if !permitsUsage(pair.Leaf, x509.ExtKeyUsageClientAuth) {
+		if !pki.PermitsUsage(pair.Leaf, x509.ExtKeyUsageClientAuth) {
 			return nil, errors.New("database client certificate must permit client authentication")
 		}
 		certificates = []tls.Certificate{pair}

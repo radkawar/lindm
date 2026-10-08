@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	devicev1 "lindm/gen/lindm/device/v1"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
 
 func TestCSRRejectsAuthorityAndUnapprovedKeys(t *testing.T) {
@@ -148,7 +149,7 @@ func TestInventoryDigestDetectsChangedContent(t *testing.T) {
 		OsVersion:            "12",
 		Architecture:         "amd64",
 		PackagesComplete:     true,
-		Packages:             []*devicev1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
 	}
 	same := &devicev1.ReportInventoryRequest{
 		EnrollmentGeneration: base.EnrollmentGeneration,
@@ -159,7 +160,7 @@ func TestInventoryDigestDetectsChangedContent(t *testing.T) {
 		OsVersion:            base.OsVersion,
 		Architecture:         base.Architecture,
 		PackagesComplete:     true,
-		Packages:             []*devicev1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
 	}
 	changed := &devicev1.ReportInventoryRequest{
 		EnrollmentGeneration: base.EnrollmentGeneration,

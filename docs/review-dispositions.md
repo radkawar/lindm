@@ -93,10 +93,31 @@ the original enrollment issuance, and rejected inventory on an existing TLS
 connection immediately after console revocation. This was a temporary protocol
 smoke client, not a packaged agent, complete inventory collector or VM qualification.
 
+Three independent follow-up reviews of corrective commit `2a33788` found no further
+actionable defects in the examined database parser, renewal-expiry boundary and
+console exact-retry lifecycles. They were read-only reviews; runtime evidence remains
+the parent-owned checks above, not a blanket production certification.
+
+### G2 agent contract review
+
+Two independent design reviewers identified eleven concrete gaps before native-agent
+implementation. [The refined contract](agent-enrollment.md) now specifies:
+
+- Message-aware TLS signing, executor-derived renewal intent and separate retrieval
+  of an existing issuance after prolonged interruption.
+- Root-only pending enrollment credentials, marker/journal crash ordering and a
+  reboot-safe session fence with explicit software-clone assurance limits.
+- Independent observation/package sequences, typed failure/freshness evidence,
+  durable replay receipts and immutable snapshot-bound pagination.
+- Aggregate server/spool admission bounds, exact batch-byte hashing and atomic
+  cleanup, plus enforced APT/RPM signer verification before package scripts run.
+
+These are design dispositions, not implemented or certified G2 behavior.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
-Engineering must still finish G1/G2 qualification. Named IdP test tenants/permissions,
+Engineering must still finish G2 qualification. Named IdP test tenants/permissions,
 licensed enterprise content, physical sacrificial machines/destructive consent,
 distribution license/public namespace and production signing custody must exist
 before their corresponding integration, publication or hardware gates. They are not

@@ -1,4 +1,4 @@
-.PHONY: bootstrap tools generate web-assets lint fmt audit check build test test-integration dev-up dev-down dev-check
+.PHONY: bootstrap tools generate web-assets lint fmt audit check build test test-integration dev-up dev-down dev-check dev-trust
 .DEFAULT_GOAL := check
 
 export GOTOOLCHAIN := go1.26.8
@@ -68,6 +68,8 @@ test: web-assets
 
 build: web-assets
 	go build -trimpath -o artifacts/bin/lindmd ./cmd/lindmd
+	go build -trimpath -o artifacts/bin/lindm-agent ./cmd/lindm-agent
+	go build -trimpath -o artifacts/bin/lab ./cmd/lab
 
 check: lint test audit
 
@@ -82,3 +84,6 @@ dev-down:
 
 dev-check:
 	go run ./cmd/dev check
+
+dev-trust:
+	go run ./cmd/dev trust

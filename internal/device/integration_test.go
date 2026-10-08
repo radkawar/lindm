@@ -24,6 +24,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
 )
@@ -180,7 +181,7 @@ func inventory(generation, boot string, seq uint64, host string) *devicev1.Repor
 		OsVersion:            "12",
 		Architecture:         "amd64",
 		PackagesComplete:     true,
-		Packages:             []*devicev1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
+		Packages:             []*inventoryv1.Package{{Name: "openssh", Version: "1:9.2p1-2", Architecture: "amd64", Manager: "apt"}},
 	}
 }
 

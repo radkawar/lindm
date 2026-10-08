@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package lindm.inventory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/inventory/v1;inventoryv1";
+message Package {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+  string version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 2048
+  }];
+  string architecture = 3 [(buf.validate.field).string.max_len = 64];
+  string manager = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+// CollectionStatus describes collection, not compliance or server freshness.
+enum CollectionStatus {
+  COLLECTION_STATUS_UNSPECIFIED = 0;
+  COLLECTION_STATUS_SUCCESS = 1;
+  COLLECTION_STATUS_UNAVAILABLE = 2;
+  COLLECTION_STATUS_PERMISSION_DENIED = 3;
+  COLLECTION_STATUS_TIMEOUT = 4;
+  COLLECTION_STATUS_INVALID_OUTPUT = 5;
+  COLLECTION_STATUS_CAPACITY_EXCEEDED = 6;
+  COLLECTION_STATUS_NATIVE_COMMAND_FAILURE = 7;
+}
+
+message ObservedString {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string value = 2 [(buf.validate.field).string.max_len = 4096];
+  option (buf.validate.message).cel = {
+    id: "observation.value_status"
+    message: "only successful observations carry a nonempty value"
+    expression: "(this.status == 1) == (this.value != '')"
+  };
+}
+
+message HostObservation {
+  google.protobuf.Timestamp started_at = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 2 [(buf.validate.field).required = true];
+  ObservedString boot_id = 3 [(buf.validate.field).required = true];
+  ObservedString hostname = 4 [(buf.validate.field).required = true];
+  ObservedString os_id = 5 [(buf.validate.field).required = true];
+  ObservedString os_version = 6 [(buf.validate.field).required = true];
+  ObservedString architecture = 7 [(buf.validate.field).required = true];
+  ObservedString kernel_release = 8 [(buf.validate.field).required = true];
+  ObservedString hardware_vendor = 9 [(buf.validate.field).required = true];
+  ObservedString hardware_model = 10 [(buf.validate.field).required = true];
+  ObservedString hardware_serial = 11 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "observation.time_order"
+    message: "collection finish must not precede its start"
+    expression: "this.finished_at >= this.started_at"
+  };
+}
+
+message PackageObservation {
+  google.protobuf.Timestamp started_at = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 2 [(buf.validate.field).required = true];
+  CollectionStatus status = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string backend = 4 [(buf.validate.field).string.max_len = 64];
+  repeated Package packages = 5 [(buf.validate.field).repeated.max_items = 100000];
+  option (buf.validate.message).cel = {
+    id: "packages.success_shape"
+    message: "failed collections must not publish partial packages"
+    expression: "this.status == 1 || this.packages.size() == 0"
+  };
+  option (buf.validate.message).cel = {
+    id: "packages.time_order"
+    message: "collection finish must not precede its start"
+    expression: "this.finished_at >= this.started_at"
+  };
+}
+
+// NativeObservation is local evidence, not an enrollment or compliance claim.
+message NativeObservation {
+  HostObservation host = 1 [(buf.validate.field).required = true];
+  PackageObservation packages = 2 [(buf.validate.field).required = true];
+}

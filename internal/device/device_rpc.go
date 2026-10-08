@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	devicev1 "lindm/gen/lindm/device/v1"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 )
 
@@ -200,7 +201,7 @@ func (s *Service) ReportInventory(ctx context.Context, req *connect.Request[devi
 	}), nil
 }
 
-func replacePackages(ctx context.Context, q *devicedb.Queries, deviceID uuid.UUID, packages []*devicev1.Package) error {
+func replacePackages(ctx context.Context, q *devicedb.Queries, deviceID uuid.UUID, packages []*inventoryv1.Package) error {
 	if err := q.DeleteDevicePackages(ctx, deviceID); err != nil {
 		return err
 	}

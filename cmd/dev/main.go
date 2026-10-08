@@ -15,13 +15,14 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|test-integration|down|reset> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset> [options]
 
   init   Atomically generate .cache/dev; validate, never overwrite, on reuse.
   up     Start pinned PostgreSQL/Keycloak, await real TLS/OIDC readiness,
          migrate as lindm_migrator, restrict metadata writes, bootstrap owner.
   check  Check PostgreSQL runtime TLS login and real OIDC directory access.
   test-integration  Run real PostgreSQL regressions in isolated disposable schemas.
+  trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires
          -confirm-delete. Stop the separately supervised lindmd first.
@@ -52,7 +53,7 @@ func run() error {
 		fmt.Print(usage)
 		return nil
 	}
-	if verb != "init" && verb != "up" && verb != "check" && verb != "test-integration" && verb != "down" && verb != "reset" {
+	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" {
 		return fmt.Errorf("unknown command %q; use help", verb)
 	}
 	flags := flag.NewFlagSet(verb, flag.ContinueOnError)
@@ -95,6 +96,7 @@ func run() error {
 		"init": devlab.Init, "up": devlab.Up, "check": devlab.Check,
 		"down": devlab.Down, "reset": devlab.Reset,
 		"test-integration": devlab.TestIntegration,
+		"trust":            devlab.Trust,
 	}
 	fmt.Printf("Compose project: %s\nFixture: %s\n", devlab.ProjectName(absolute), devlab.FixturePath(absolute))
 	if err := operations[verb](ctx, absolute); err != nil {

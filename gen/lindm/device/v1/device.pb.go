@@ -11,6 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	v1 "lindm/gen/lindm/inventory/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -23,74 +24,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Package struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
-	Architecture  string                 `protobuf:"bytes,3,opt,name=architecture,proto3" json:"architecture,omitempty"`
-	Manager       string                 `protobuf:"bytes,4,opt,name=manager,proto3" json:"manager,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Package) Reset() {
-	*x = Package{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Package) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Package) ProtoMessage() {}
-
-func (x *Package) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Package.ProtoReflect.Descriptor instead.
-func (*Package) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *Package) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Package) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
-}
-
-func (x *Package) GetArchitecture() string {
-	if x != nil {
-		return x.Architecture
-	}
-	return ""
-}
-
-func (x *Package) GetManager() string {
-	if x != nil {
-		return x.Manager
-	}
-	return ""
-}
-
 type ReportInventoryRequest struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	EnrollmentGeneration string                 `protobuf:"bytes,1,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
@@ -100,7 +33,7 @@ type ReportInventoryRequest struct {
 	OsId                 string                 `protobuf:"bytes,5,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
 	OsVersion            string                 `protobuf:"bytes,6,opt,name=os_version,json=osVersion,proto3" json:"os_version,omitempty"`
 	Architecture         string                 `protobuf:"bytes,7,opt,name=architecture,proto3" json:"architecture,omitempty"`
-	Packages             []*Package             `protobuf:"bytes,8,rep,name=packages,proto3" json:"packages,omitempty"`
+	Packages             []*v1.Package          `protobuf:"bytes,8,rep,name=packages,proto3" json:"packages,omitempty"`
 	PackagesComplete     bool                   `protobuf:"varint,9,opt,name=packages_complete,json=packagesComplete,proto3" json:"packages_complete,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -108,7 +41,7 @@ type ReportInventoryRequest struct {
 
 func (x *ReportInventoryRequest) Reset() {
 	*x = ReportInventoryRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -120,7 +53,7 @@ func (x *ReportInventoryRequest) String() string {
 func (*ReportInventoryRequest) ProtoMessage() {}
 
 func (x *ReportInventoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -133,7 +66,7 @@ func (x *ReportInventoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportInventoryRequest.ProtoReflect.Descriptor instead.
 func (*ReportInventoryRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{1}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ReportInventoryRequest) GetEnrollmentGeneration() string {
@@ -185,7 +118,7 @@ func (x *ReportInventoryRequest) GetArchitecture() string {
 	return ""
 }
 
-func (x *ReportInventoryRequest) GetPackages() []*Package {
+func (x *ReportInventoryRequest) GetPackages() []*v1.Package {
 	if x != nil {
 		return x.Packages
 	}
@@ -209,7 +142,7 @@ type ReportInventoryResponse struct {
 
 func (x *ReportInventoryResponse) Reset() {
 	*x = ReportInventoryResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +154,7 @@ func (x *ReportInventoryResponse) String() string {
 func (*ReportInventoryResponse) ProtoMessage() {}
 
 func (x *ReportInventoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +167,7 @@ func (x *ReportInventoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportInventoryResponse.ProtoReflect.Descriptor instead.
 func (*ReportInventoryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{2}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ReportInventoryResponse) GetAcceptedSequence() uint64 {
@@ -260,7 +193,7 @@ type RenewIdentityRequest struct {
 
 func (x *RenewIdentityRequest) Reset() {
 	*x = RenewIdentityRequest{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -272,7 +205,7 @@ func (x *RenewIdentityRequest) String() string {
 func (*RenewIdentityRequest) ProtoMessage() {}
 
 func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,7 +218,7 @@ func (x *RenewIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityRequest.ProtoReflect.Descriptor instead.
 func (*RenewIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{3}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RenewIdentityRequest) GetCsrPem() []byte {
@@ -305,7 +238,7 @@ type RenewIdentityResponse struct {
 
 func (x *RenewIdentityResponse) Reset() {
 	*x = RenewIdentityResponse{}
-	mi := &file_lindm_device_v1_device_proto_msgTypes[4]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -317,7 +250,7 @@ func (x *RenewIdentityResponse) String() string {
 func (*RenewIdentityResponse) ProtoMessage() {}
 
 func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_device_proto_msgTypes[4]
+	mi := &file_lindm_device_v1_device_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -330,7 +263,7 @@ func (x *RenewIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewIdentityResponse.ProtoReflect.Descriptor instead.
 func (*RenewIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{4}
+	return file_lindm_device_v1_device_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RenewIdentityResponse) GetCertificatePem() []byte {
@@ -351,14 +284,7 @@ var File_lindm_device_v1_device_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x01\n" +
-	"\aPackage\x12\x1e\n" +
-	"\x04name\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x04name\x12$\n" +
-	"\aversion\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\aversion\x12+\n" +
-	"\farchitecture\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\farchitecture\x12#\n" +
-	"\amanager\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\amanager\"\xb7\x03\n" +
+	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/inventory/v1/observation.proto\"\xba\x03\n" +
 	"\x16ReportInventoryRequest\x12=\n" +
 	"\x15enrollment_generation\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12!\n" +
 	"\aboot_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12-\n" +
@@ -368,8 +294,8 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x05os_id\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\x04osId\x12'\n" +
 	"\n" +
 	"os_version\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\tosVersion\x12-\n" +
-	"\farchitecture\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\farchitecture\x12?\n" +
-	"\bpackages\x18\b \x03(\v2\x18.lindm.device.v1.PackageB\t\xbaH\x06\x92\x01\x03\x10\xf4\x03R\bpackages\x12+\n" +
+	"\farchitecture\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\farchitecture\x12B\n" +
+	"\bpackages\x18\b \x03(\v2\x1b.lindm.inventory.v1.PackageB\t\xbaH\x06\x92\x01\x03\x10\xf4\x03R\bpackages\x12+\n" +
 	"\x11packages_complete\x18\t \x01(\bR\x10packagesComplete\"\x83\x01\n" +
 	"\x17ReportInventoryResponse\x12+\n" +
 	"\x11accepted_sequence\x18\x01 \x01(\x04R\x10acceptedSequence\x12;\n" +
@@ -397,23 +323,23 @@ func file_lindm_device_v1_device_proto_rawDescGZIP() []byte {
 	return file_lindm_device_v1_device_proto_rawDescData
 }
 
-var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_lindm_device_v1_device_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_lindm_device_v1_device_proto_goTypes = []any{
-	(*Package)(nil),                 // 0: lindm.device.v1.Package
-	(*ReportInventoryRequest)(nil),  // 1: lindm.device.v1.ReportInventoryRequest
-	(*ReportInventoryResponse)(nil), // 2: lindm.device.v1.ReportInventoryResponse
-	(*RenewIdentityRequest)(nil),    // 3: lindm.device.v1.RenewIdentityRequest
-	(*RenewIdentityResponse)(nil),   // 4: lindm.device.v1.RenewIdentityResponse
+	(*ReportInventoryRequest)(nil),  // 0: lindm.device.v1.ReportInventoryRequest
+	(*ReportInventoryResponse)(nil), // 1: lindm.device.v1.ReportInventoryResponse
+	(*RenewIdentityRequest)(nil),    // 2: lindm.device.v1.RenewIdentityRequest
+	(*RenewIdentityResponse)(nil),   // 3: lindm.device.v1.RenewIdentityResponse
+	(*v1.Package)(nil),              // 4: lindm.inventory.v1.Package
 	(*timestamppb.Timestamp)(nil),   // 5: google.protobuf.Timestamp
 }
 var file_lindm_device_v1_device_proto_depIdxs = []int32{
-	0, // 0: lindm.device.v1.ReportInventoryRequest.packages:type_name -> lindm.device.v1.Package
+	4, // 0: lindm.device.v1.ReportInventoryRequest.packages:type_name -> lindm.inventory.v1.Package
 	5, // 1: lindm.device.v1.ReportInventoryResponse.server_time:type_name -> google.protobuf.Timestamp
 	5, // 2: lindm.device.v1.RenewIdentityResponse.expires_at:type_name -> google.protobuf.Timestamp
-	1, // 3: lindm.device.v1.DeviceService.ReportInventory:input_type -> lindm.device.v1.ReportInventoryRequest
-	3, // 4: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
-	2, // 5: lindm.device.v1.DeviceService.ReportInventory:output_type -> lindm.device.v1.ReportInventoryResponse
-	4, // 6: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
+	0, // 3: lindm.device.v1.DeviceService.ReportInventory:input_type -> lindm.device.v1.ReportInventoryRequest
+	2, // 4: lindm.device.v1.DeviceService.RenewIdentity:input_type -> lindm.device.v1.RenewIdentityRequest
+	1, // 5: lindm.device.v1.DeviceService.ReportInventory:output_type -> lindm.device.v1.ReportInventoryResponse
+	3, // 6: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
 	5, // [5:7] is the sub-list for method output_type
 	3, // [3:5] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
@@ -432,7 +358,7 @@ func file_lindm_device_v1_device_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_device_proto_rawDesc), len(file_lindm_device_v1_device_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

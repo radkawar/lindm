@@ -121,20 +121,30 @@ semantics rather than relying on framework defaults.
 
 ### Planned code layout
 
-| Area                                               | Responsibility                                                                                                                     |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd/lindmd`, `cmd/lindm-agent`, `cmd/lindmctl`    | Composition and entrypoints only                                                                                                   |
-| `api/`, `gen/`                                     | Versioned protobuf sources and generated Go/TypeScript                                                                             |
-| `internal/controlplane/`                           | Cohesive identity, fleet, policy, execution and audit domains                                                                      |
-| `internal/store/`, `db/migrations/`, `db/queries/` | sqlc-generated pgx persistence and reviewed SQL                                                                                    |
-| `internal/agent/`                                  | Unprivileged transport/spool, separately root-owned executor journal/trust, reconciliation and native update supervision           |
-| `internal/provider/`                               | Native package/network/service/security adapters with narrow contracts                                                             |
-| `web/`                                             | Typed console and browser self-service surfaces                                                                                    |
-| `packaging/`, `deploy/`                            | DEB/RPM/Arch and Nix/OSTree delivery, systemd/SELinux/AppArmor, native/OCI/replicated server deployment and local assistance relay |
-| `test/lab/`                                        | Declarative image/capability/scenario manifests and reusable Go lifecycle harness                                                  |
+| Area                                            | Responsibility                                                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd/lindmd`, `cmd/lindm-agent`, `cmd/lindmctl` | Composition and entrypoints only                                                                                                   |
+| `api/`, `gen/`                                  | Versioned protobuf sources and generated Go/TypeScript                                                                             |
+| `internal/identity/`, `internal/device/`        | Current control-plane domains; each owns its SQL queries and sqlc-generated persistence                                            |
+| `internal/config/`, `internal/server/`, `db/`   | Checked resources, service composition and reviewed migrations                                                                     |
+| `internal/agent/`                               | Unprivileged transport/spool, separately root-owned executor journal/trust, reconciliation and native update supervision           |
+| `internal/provider/`                            | Native package/network/service/security adapters with narrow contracts                                                             |
+| `web/`                                          | Typed console and browser self-service surfaces                                                                                    |
+| `packaging/`, `deploy/`                         | DEB/RPM/Arch and Nix/OSTree delivery, systemd/SELinux/AppArmor, native/OCI/replicated server deployment and local assistance relay |
+| `cmd/lab/`, `internal/vmlab/`, `lab/`           | Maintained Go laboratory and declarative signed-image manifests; VM scenarios remain planned                                       |
 
 Create a package when it owns working behavior. Do not create all directories,
 interfaces and empty tests up front merely to match this table.
+
+Current agent prerequisites live in `internal/agent/inventory/` (bounded native
+observations), `internal/trust/` (DSSE/bootstrap/TLS authority) and `internal/pki/`
+(shared certificate-key/usage policy). Canonical observation messages live in
+`api/lindm/inventory/v1`; the agent and device RPC use the same package record.
+For focused work, run `go test -race ./internal/agent/inventory ./internal/trust
+./internal/vmlab` without rebuilding the console or starting databases. Signed-image
+tests require GnuPG tools and use isolated real keys plus local TLS servers, not
+vendor downloads. Actual pinned image acquisition is a separate maintained lab
+command; it is not hidden in unit tests or pre-commit hooks.
 
 ## 2. Toolchain and quality gates
 
@@ -166,6 +176,15 @@ rejected here because its braces-dependent glob stack had GHSA-vfj7-8cjw-p6xm wi
 patched braces release available during setup. Run the maintained dependency-audit
 command when updating the lock; do not silence advisories or apply unreviewed forced
 downgrades. These are development dependencies, not an application security claim.
+
+`golang.org/x/crypto` is pinned to v0.56.0, including fixes for SSH advisories
+[GO-2026-6354](https://pkg.go.dev/vuln/GO-2026-6354) and
+[GO-2026-6355](https://pkg.go.dev/vuln/GO-2026-6355). The current verbose audit reports
+no affected symbols or imported packages. It still identifies module-level
+[GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) for the unused, unmaintained
+OpenPGP package; do not import it. Vendor-image signatures use isolated GnuPG `gpgv`,
+not that package. Audit output is evidence of known reachability, not proof of
+absence of vulnerabilities.
 
 Pre-commit operates on the staged snapshot and runs fast formatting/lint checks.
 It must not silently reformat unrelated files or require booting VMs. Pre-push and CI
