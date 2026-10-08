@@ -1,9 +1,10 @@
 # Implementation sequence and decision gates
 
-Status: planning, before product implementation. The specification is not a built
-MDM, and this repository does not yet contain a backend, agent, UI or certified distro.
-Each gate below requires working behavior and evidence, not empty package trees or
-passing tests around mocks. The whole commercial contract remains in scope.
+Status: G0 reviewed and committed; G1 implementation and verification in progress.
+The repository contains a working Go control-plane slice and authenticated console,
+not a complete MDM or certified distro. Each gate below requires working behavior
+and evidence, not empty package trees or passing tests around mocks. The whole
+commercial contract remains in scope.
 
 ## 1. Delivery sequence
 
@@ -40,21 +41,29 @@ CLI and worker paths.
 
 ## 2. Evidence ledger
 
-| Deliverable                                | Current evidence/status                                                                                                                                                                                   |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Requirements/research/design               | Primary-source specification, three independent initial reviews plus three follow-up reviews; eleven design findings incorporated in the disposition ledger                                               |
-| Documentation automation                   | Bootstrap/hook install and full lint exercised on pinned Node; two real-hook regression scenarios passed; dependency audit reported zero vulnerabilities. CI workflow configured but not run on hosted CI |
-| Go server, agent and console               | Not implemented or tested                                                                                                                                                                                 |
-| Protobuf/sqlc generation and Go lint gates | Specified; not configured against nonexistent application sources                                                                                                                                         |
-| OIDC/mTLS/device enrollment                | Specified; no exercised product flow                                                                                                                                                                      |
-| Distro/desktop/server lifecycle            | Planned matrix and scenarios; no certified cells                                                                                                                                                          |
-| Air-gapped deployment                      | Required architecture and gates; not exercised                                                                                                                                                            |
-| Physical recovery/lock/wipe                | Required; no laboratory/hardware evidence available                                                                                                                                                       |
-| Capacity/security/production readiness     | Targets and release criteria only; no benchmark, audit or production claim                                                                                                                                |
+| Deliverable                            | Current evidence/status                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Requirements/research/design           | Primary-source specification, three independent initial reviews plus three follow-up reviews; eleven design findings incorporated in the disposition ledger                                                                                                                                                                      |
+| Development automation                 | Maintained Go lab harness starts digest-pinned PostgreSQL/Keycloak with verified TLS, separate migration/runtime roles and protected fixtures; repeated startup and readiness exercised. Hosted CI configured, not executed here                                                                                                 |
+| Go server and console                  | Real HTTPS/OIDC, grant issuance/hide/revocation, durable audit, graceful restart, protected deep links, desktop/mobile layouts and live dark-theme changes exercised in Chromium; no native agent yet                                                                                                                            |
+| Protobuf/sqlc and code quality         | Buf/sqlc generation and `make check test-integration build` pass, including lint, race tests, TypeScript and both npm/Go vulnerability checks; separate integration-tagged Go lint passes                                                                                                                                        |
+| Identity and device safety regressions | Isolated real PostgreSQL regressions cover observation ordering, newer-session survival, concurrent logout/disable, audit rollback, grant/inventory replay, renewal authority and original enrollment issuance binding; configuration tests cover protected TLS resources and device-CA usage                                    |
+| Protocol validation                    | Authenticated live RPC rejects a whitespace-only audit reason through the custom predefined Protovalidate rule; schema is not a duplicate Go configuration struct                                                                                                                                                                |
+| Live identity lifecycle                | Disabling the owner produced 401 and durable disable audit; restored identity required a new login. Mapped administrator group removal denied protected fleet RPC with 403 after 30.4 seconds; an IdP outage denied it after 29.4 seconds, with visible retry/recovery                                                           |
+| Frontend lifetime and replay           | A real committed grant response was held across logout and another-tab login: old request aborted, new session observed, no old secret displayed. A committed revoke response was dropped: inputs stayed frozen and an exact retry succeeded. Invalid-cursor cold load rendered recoverable error and safe first-page navigation |
+| G1/G2 remaining evidence               | Post-correction independent review/implementation commits, live device-listener lifecycle and native agent installation remain open; protocol tests do not satisfy native lifecycle gates                                                                                                                                        |
+| Distro/desktop/server lifecycle        | Planned matrix and scenarios; no certified cells                                                                                                                                                                                                                                                                                 |
+| Air-gapped deployment                  | Required architecture and gates; not exercised                                                                                                                                                                                                                                                                                   |
+| Physical recovery/lock/wipe            | Required; no laboratory/hardware evidence available                                                                                                                                                                                                                                                                              |
+| Capacity/security/production readiness | Targets and release criteria only; no benchmark, audit or production claim                                                                                                                                                                                                                                                       |
 
 When a gate completes, replace its status with immutable build/run references and
 observed outcomes. Never mark a requirement implemented because its documentation,
 interface, generated schema or unit-test fixture exists.
+
+Working-tree evidence is not a signed release artifact. Vite currently emits upstream
+`MODULE_LEVEL_DIRECTIVE` warnings for client-only dependencies; these are not suppressed.
+This console is a browser-only bundle, not an SSR/RSC deployment.
 
 ## 3. Decision ownership and readiness
 

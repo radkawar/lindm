@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  specification:
+  control-plane:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -23,7 +23,20 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: npm
-      - run: npm ci --ignore-scripts
-      - run: make lint
-      - run: make test-tooling
-      - run: make audit
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make bootstrap
+      - run: make generate
+      - name: Require committed generated contracts
+        run: |
+          changes="$(git status --porcelain -- gen web/gen internal/identity/identitydb internal/device/devicedb)"
+          if [ -n "$changes" ]; then
+            printf '%s\n' "$changes"
+            exit 1
+          fi
+      - run: make check test-integration
+      - name: Stop development services
+        if: always()
+        run: make dev-down

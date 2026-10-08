@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+service AdminService {
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc CreateEnrollmentGrant(CreateEnrollmentGrantRequest) returns (CreateEnrollmentGrantResponse);
+  rpc RevokeEnrollmentGrant(RevokeEnrollmentGrantRequest) returns (RevokeEnrollmentGrantResponse);
+  rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+}
+
+message Device {
+  string id = 1;
+  string enrollment_generation = 2;
+  string hostname = 3;
+  string os_id = 4;
+  string os_version = 5;
+  string architecture = 6;
+  string state = 7;
+  google.protobuf.Timestamp enrolled_at = 8;
+  google.protobuf.Timestamp last_seen_at = 9;
+  uint64 inventory_sequence = 10;
+}
+
+message ListDevicesRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 2 [(buf.validate.field).string.max_len = 512];
+}
+message ListDevicesResponse {
+  repeated Device devices = 1;
+  string next_page_token = 2;
+}
+message CreateEnrollmentGrantRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 lifetime_seconds = 2 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 900
+  }];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message CreateEnrollmentGrantResponse {
+  string grant_id = 1;
+  string secret = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  bool secret_delivery_unknown = 4;
+}
+message RevokeEnrollmentGrantRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string grant_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RevokeEnrollmentGrantResponse {}
+message RevokeDeviceRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RevokeDeviceResponse {}
+message AuditEvent {
+  string id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string actor_id = 3;
+  string action = 4;
+  string resource_id = 5;
+  string reason = 6;
+}
+message ListAuditEventsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 2 [(buf.validate.field).string.max_len = 512];
+}
+message ListAuditEventsResponse {
+  repeated AuditEvent events = 1;
+  string next_page_token = 2;
+}

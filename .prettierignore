@@ -2,3 +2,8 @@ node_modules/
 package-lock.json
 artifacts/
 .cache/
+.tools/
+.tanstack/
+web/dist/
+web/gen/
+web/src/routeTree.gen.ts

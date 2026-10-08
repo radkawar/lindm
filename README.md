@@ -3,10 +3,11 @@
 Greenfield Linux device management: desktop-first, servers included, self-hosted,
 single-tenant, connected and air-gapped.
 
-**Specification stage. There is no runnable MDM server or agent yet.** No distro,
-security, capacity or destructive-action capability is certified. The first delivery
-is a researched, independently reviewed implementation contract and repository checks;
-implementation follows its decision gates.
+**Control-plane implementation in progress; not a production-ready MDM.** The Go
+server and authenticated React console run against real PostgreSQL and Keycloak.
+The separate agent, native management providers and commercial release gates remain
+to be implemented and qualified. No distro, capacity or destructive capability is
+certified. The full specification remains the delivery contract.
 
 ## Read the specification
 
@@ -26,38 +27,61 @@ physical wipe/recovery validation.
 
 ## Current development commands
 
-Use the Node LTS version in `.node-version`, npm, Git and Make. Dependencies are exact
-versions with an integrity-bearing lockfile. No global npm packages are required.
+Use the Node LTS version in `.node-version`, Go from `go.mod`, npm, Git and Make.
+The Linux development lab additionally requires Docker with Compose v2 and a local
+daemon. Dependencies and build tools are pinned; global npm packages are not required.
 
 ```sh
 make bootstrap
-make lint
-make fmt
+make generate
+make dev-up
+go run ./cmd/lindmd serve -config .cache/dev/server.json
 ```
 
-- `make bootstrap`: clean locked dependency installation without lifecycle scripts,
-  then explicit repository-local Git hook installation.
-- `make lint`: non-mutating Prettier and Markdown lint checks, also run by CI.
-- `make test-tooling`: exercise the real commit/push hooks in disposable repositories,
-  including invalid staged content, partially staged preservation and dependency exclusion.
-- `make fmt`: apply repository formatting.
-- `make audit`: check the development dependency lock against current registry
-  advisories; requires registry access and is separate from offline linting.
-- Pre-commit: lint-staged checks the staged Markdown/JSON/YAML/JavaScript snapshot, including
-  partially staged files, without reformatting it.
-- Pre-push: run full specification checks. Hooks are not a substitute for protected
-  branch CI and can be bypassed locally.
+`dev-up` builds embedded console assets, generates protected development credentials,
+starts digest-pinned PostgreSQL and Keycloak, checks TLS and directory access, migrates
+with a separate database role, and binds the initial owner. It does not start the
+application process. Repeating it preserves existing credentials and data.
 
-With mise installed, the pinned runtime can be used without changing global settings:
+Open `https://localhost:18444` using a development browser profile that trusts
+`.cache/dev/transport-ca.crt`. Sign in as `owner`; the generated password is in
+`.cache/dev/owner-password`. The application, IdP and database require verified TLS;
+there is no production no-auth or insecure-TLS mode. The separate device mTLS listener
+is on port 18445. Development ports are loopback-only.
+
+| Command                 | Purpose                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `make bootstrap`        | Install pinned generators/linters, locked npm dependencies and repository-local Git hooks |
+| `make generate`         | Generate protobuf Go/TypeScript contracts and sqlc queries                                |
+| `make build`            | Build the console and `artifacts/bin/lindmd`                                              |
+| `make check`            | Format checks, Go/protobuf/Markdown/TypeScript lint, race tests and dependency audit      |
+| `make test-integration` | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas    |
+| `make dev-check`        | Check runtime database TLS and actual OIDC/directory access                               |
+| `make dev-down`         | Stop this checkout's lab services while preserving credentials and volumes                |
+| `make fmt`              | Apply repository formatting                                                               |
+
+The lab uses `.cache/dev` with mode 0700 and secret files with mode 0600. Never commit
+or copy these credentials. Development-only certificates last five years. Moved,
+changed or expired fixtures fail explicitly instead of silently rotating credentials
+beneath persisted data. Destructive reset is a separate, explicitly confirmed command:
+see `go run ./cmd/dev help`. Fixed ports allow one running checkout at a time.
+
+Pre-commit checks the staged snapshot; pre-push runs `make check`. CI additionally
+checks generated-contract drift and real database regressions. Hooks are not a
+substitute for protected-branch CI. Dependency audit requires registry/advisory access;
+`make lint` and `make test` are separate checks for already provisioned offline work.
+
+With mise installed, use the pinned Node runtime without changing global settings:
 
 ```sh
 mise install node@24.21.0
 mise exec node@24.21.0 -- make bootstrap
-mise exec node@24.21.0 -- make lint
+mise exec node@24.21.0 -- make check
 ```
 
-These commands validate the specification/tooling only. Future Go/proto/SQL/UI and
-machine-lifecycle gates are specified in the engineering document; nonexistent
-application checks are not reported as passing. Product license, distribution
-identity, enterprise image entitlements and physical laboratory access are explicit
-decisions before the affected implementation/release gates.
+Current behavior includes real OIDC login, lifecycle-fresh directory authorization,
+audited enrollment grants, device certificate/inventory RPCs and fleet/audit views.
+See the [evidence ledger](docs/implementation-plan.md#2-evidence-ledger) for exercised
+paths and remaining gates. Protocol tests are not proof of native agent installation,
+full distro management or commercial readiness. Distribution identity/licensing,
+enterprise entitlements and physical lab access remain explicit release prerequisites.

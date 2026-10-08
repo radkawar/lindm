@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package lindm.validation.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/validation/v1;validationv1";
+
+// Private extension numbers must be registered before publishing these schemas
+// for composition with external modules. These rules are deterministic and do not
+// inspect files, credentials, networks or authorization state.
+extend buf.validate.StringRules {
+  optional bool https_origin = 50000 [(buf.validate.predefined).cel = {
+    id: "lindm.https_origin"
+    message: "must be an HTTPS origin without credentials, path, query or fragment"
+    expression: "!rule || (this.size() <= 2048 && this.matches('^https://[^/@?#]+/?$'))"
+  }];
+  optional bool https_endpoint = 50001 [(buf.validate.predefined).cel = {
+    id: "lindm.https_endpoint"
+    message: "must be an HTTPS endpoint without credentials, query or fragment"
+    expression: "!rule || (this.size() <= 2048 && this.matches('^https://[^/@?#]+(/[^?#]*)?$'))"
+  }];
+  optional bool file_reference = 50002 [(buf.validate.predefined).cel = {
+    id: "lindm.file_reference"
+    message: "must name a file using between 1 and 4096 characters"
+    expression: "!rule || (this.size() > 0 && this.size() <= 4096)"
+  }];
+  optional bool audit_reason = 50003 [(buf.validate.predefined).cel = {
+    id: "lindm.audit_reason"
+    message: "must contain non-whitespace text and at most 512 characters"
+    expression: "!rule || (this.size() > 0 && this.size() <= 512 && this.matches('\\\\S'))"
+  }];
+}

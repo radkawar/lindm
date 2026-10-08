@@ -1,0 +1,24 @@
+version: "2"
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - sqlclosecheck
+  settings:
+    errcheck:
+      check-type-assertions: true
+  exclusions:
+    generated: strict
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - lindm
+  exclusions:
+    generated: strict

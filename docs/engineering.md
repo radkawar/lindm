@@ -1,8 +1,8 @@
 # Engineering and developer experience
 
-Status: specification-first repository. Only the documentation/tooling commands
-listed as available in the root README exist today. The product build/test commands
-below are implementation requirements, not fake passing targets.
+Status: control-plane implementation in progress. Commands listed in the root README
+run against actual application sources and a real PostgreSQL/Keycloak lab. Broader
+agent, platform and release gates below remain requirements, not passing targets.
 
 ## 1. Maintainability standard
 
@@ -30,8 +30,92 @@ standard, not a claim of Google certification. Linters cannot certify maintainab
 - Every permanent bug fix gets a deterministic regression test when practical.
   Tests protect consumer-visible behavior, boundaries, authority and durability—not
   source text, mock echoes, incidental defaults or copies of implementation details.
+  Do not add tests for Git hooks, formatter invocation, command forwarding or other
+  third-party tooling glue. Running the normal command is sufficient verification.
+  Each proposed test must identify a plausible product failure it would catch.
 - Public APIs and irreversible migrations require design review. Sensitive execution,
   auth, update, encryption and wipe changes require security-owner review.
+
+### Schema and runtime validation
+
+Versioned protobuf messages define serialized configuration and RPC contracts.
+Configuration uses strict protobuf JSON decoding: reject unknown fields rather than
+silently ignoring misspelled security settings. Do not maintain a parallel Go struct
+schema or handwritten copies of field bounds.
+
+Use `buf.validate` built-ins first, message CEL for cross-field relationships, and
+[predefined rules](https://protovalidate.com/schemas/predefined-rules/) for repeated
+domain constraints. `api/lindm/validation/v1/string_rules.proto` owns HTTPS
+origin/endpoint restrictions, required file references and audit reasons. These
+extensions remain CEL-backed and deterministic; they are not hooks for arbitrary
+Go code or I/O. Combine URL restrictions with the standard URI validator. Prefer
+structured messages and existing validators to inventing grammars: listener
+configuration separates a validated IP address from a bounded port.
+
+Custom Buf lint/check plugins inspect schemas, not runtime values. Add one only for
+a concrete, reviewed schema policy that existing Buf checks cannot enforce. Do not
+build a plugin framework merely because the extension mechanism exists. Private
+extension numbers must be registered before publishing schemas for external
+composition.
+
+Filesystem permissions, certificate signatures/trust, authorization, database
+constraints and transitions are checked where the corresponding resources and state
+are available. They cannot be established by static schema validation. Compile
+validation rules during service initialization; do not first discover malformed CEL
+on a production request. RPC and configuration paths use the same schema semantics.
+
+Database credential files contain explicit PostgreSQL URLs (host, user and database)
+with `sslmode=verify-full`. Nonempty `PG*` environment settings, service/pass files,
+duplicate options and unknown URL options are rejected rather than silently changing
+the serialized deployment configuration. Supported options are `sslmode`, `sslrootcert`,
+`sslcert`, `sslkey`, `application_name`, `target_session_attrs`, `load_balance_hosts`,
+`channel_binding`, `require_auth` and `sslnegotiation`.
+
+The checked loader reads database trust roots and client keys through the same owned,
+bounded regular-file descriptors as other resources; pgx does not reopen those paths
+or read home-directory credential defaults. Relative references resolve from the
+configuration directory. Empty/system `sslrootcert` uses system trust. TLS server,
+database-client and device-CA certificates must permit their intended extended key
+usage; a valid signature/key pair alone does not establish that.
+
+### Frontend structure and framework
+
+The console uses React with TanStack Router for typed file-based routes and
+TanStack Query for server state. Vite produces static assets served by the Go
+backend; no second Node server or SSR framework is required for the authenticated
+console. Use official shadcn/ui blocks and components with Tailwind CSS semantic
+theme tokens, not a parallel bespoke component library or sample dashboard data.
+
+Copied shadcn sources retain provenance and MIT notices in `web/LICENSE.shadcn`.
+The console does not depend on the generator CLI at runtime or build time. Its
+required utility stylesheet is vendored with attribution; the CLI was removed from
+the development dependency graph after an unresolved transitive advisory. Generated
+UI remains owned, reviewable source rather than a reason to suppress dependency audit.
+
+Organize `web/src` around working product features:
+
+| Directory                                                      | Responsibility                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `app/`                                                         | Router, query client and application composition                   |
+| `routes/`                                                      | Thin route definitions, loaders and authenticated layout guards    |
+| `features/auth/`                                               | Session and sign-in/sign-out lifecycle                             |
+| `features/devices/`, `features/enrollment/`, `features/audit/` | Cohesive domain queries, views, actions and local types/components |
+| `components/ui/`                                               | shadcn primitives                                                  |
+| `components/layout/`                                           | Shared block-derived console shell                                 |
+| `lib/`                                                         | Shared RPC transport and narrowly named utilities                  |
+| `styles/`                                                      | Tailwind entrypoint and semantic theme tokens                      |
+
+Routes compose features. Shared components/utilities must not import feature or
+route internals; features must not reach into another feature's private files.
+Keep generated contracts in `web/gen`, not duplicated handwritten API models.
+Create a module because it owns cohesive behavior, not to fill every possible
+folder. Avoid catch-all utility files, giant application components and compatibility
+re-exports left behind by moves.
+
+Clear principal-scoped query state on logout and identity changes. Enrollment
+secrets must not enter query caches, persistent storage or URLs. Do not automatically
+retry secret-issuing mutations. Preserve cancellation and backend idempotency
+semantics rather than relying on framework defaults.
 
 ### Planned code layout
 
@@ -143,6 +227,18 @@ actual exercised verification and any unsupported environment. Update docs and r
 notes with behavior changes. Keep commits coherent and reviewable; no claim that a
 planned gate passed. A release manifest references immutable evidence, not a mutable
 "latest successful" badge.
+
+Each implementation slice requires consecutive implementation and review rounds:
+
+1. Complete the affected behavior, exercise its real runtime path, run the affected
+   quality gates and commit the verified implementation with evidence.
+2. Obtain independent correctness, security, maintainability and scope review.
+3. Fix accepted findings, repeat the affected verification and commit corrections
+   separately. Repeat review until findings are resolved or explicitly dispositioned.
+
+Do not manufacture empty corrective commits or superficial tests to satisfy this
+sequence. Do not mix unverified work into a verified implementation commit. Review
+must inspect behavior and failure boundaries, not merely confirm formatting.
 
 The initial specification and automation are committed without selecting a public
 software license on the owner's behalf. Before external distribution, choose product

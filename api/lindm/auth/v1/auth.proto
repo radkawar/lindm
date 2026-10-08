@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package lindm.auth.v1;
+
+option go_package = "lindm/gen/lindm/auth/v1;authv1";
+
+// SessionPrincipal is returned as protobuf JSON by GET /auth/session. Browser
+// redirects and cookies stay HTTP-native; the response contract is still generated.
+// csrf_token is request-session scoped and must never enter persistent storage.
+message SessionPrincipal {
+  string id = 1;
+  string issuer = 2;
+  string subject = 3;
+  string display_name = 4;
+  string role = 5;
+  string csrf_token = 6;
+}

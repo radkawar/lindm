@@ -1,0 +1,43 @@
+# Managed by go run ./cmd/dev {init,up,check,down,reset}.
+# down preserves volumes and credentials; reset -confirm-delete removes both.
+# Run lindmd serve separately with .cache/dev/server.json after up succeeds.
+name: lindm-dev
+services:
+  postgres:
+    image: postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    ports:
+      - "127.0.0.1:15432:5432"
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/lindm-dev/postgres-password
+      POSTGRES_DB: lindm
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ${LINDM_DEV_DIR:?run through go run ./cmd/dev up}/server.crt:/run/lindm-dev/server.crt:ro
+      - ${LINDM_DEV_DIR}/server.key:/run/lindm-dev/server.key:ro
+      - ${LINDM_DEV_DIR}/postgres-password:/run/lindm-dev/postgres-password:ro
+      - ${LINDM_DEV_DIR}/database-init.sql:/run/lindm-dev/database-init.sql:ro
+      - ./postgres-entrypoint.sh:/opt/lindm/postgres-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/opt/lindm/postgres-entrypoint.sh"]
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    user: "${LINDM_DEV_UID:?run through go run ./cmd/dev up}:0"
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "127.0.0.1:18443:8443"
+    environment:
+      KC_HOSTNAME: https://localhost:18443
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /run/lindm-dev/server.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /run/lindm-dev/server.key
+      KC_HTTPS_PROTOCOLS: TLSv1.3
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ${LINDM_DEV_DIR}/server.crt:/run/lindm-dev/server.crt:ro
+      - ${LINDM_DEV_DIR}/server.key:/run/lindm-dev/server.key:ro
+      - ${LINDM_DEV_DIR}/realm.json:/opt/keycloak/data/import/lindm-realm.json:ro
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  postgres-data:
+  keycloak-data:

@@ -1,4 +1,4 @@
-# Independent specification review
+# Independent specification and implementation review
 
 Review date: 2026-10-08. Scope: the product specification, architecture, operations,
 verification, engineering, implementation plan and research. Three independent
@@ -52,13 +52,35 @@ an engineering correction, not a request to remove SAML or weaken revocation.
   WebRTC and local TURN are the proposed implementation, with visible per-session
   consent and no default recording/unattended-access promise.
 
+## Initial control-plane implementation reviews
+
+Independent read-only reviews covered identity/device authority, configuration and
+transport, operational composition, and frontend lifetimes. Parent-owned verification
+used real PostgreSQL/Keycloak, the running Go server and Chromium, not reviewer claims
+that source inspection proves runtime behavior.
+
+| Finding                                                                                                             | Correction and exercised evidence                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Grant secret shadowing; overlapping certificate could mint new authority                                            | Corrected issuance assignment and active-certificate fence; real PostgreSQL replay/concurrent-renewal regressions pass                                                    |
+| Older directory result could overwrite newer disable; authorization changes lacked audit                            | Database-clock observation fence and transactional effective-role auditing; real database ordering/rollback regressions pass                                              |
+| Old disable could revoke a newer login; logout/session updates inverted principal lock order                        | Recheck authority under principal lock and lock principal before sessions; newer-session survival and actual concurrent logout/disable database regressions pass          |
+| Enrollment replay returned a later renewal certificate                                                              | New migration binds grant consumption to the original issuance; same/different-key renewal replay and terminal rejection regressions pass                                 |
+| PostgreSQL indirect file reads bypassed protected-resource checks; wrong CA EKU accepted                            | Checked in-memory TLS resource loading, no implicit credential sources, and intended-usage checks; file-permission/CA regressions and actual lab TLS startup pass         |
+| Session transitions retained caches/observers or accepted late secrets                                              | Cancellable authentication generations, scoped queries and remounted feature state; real delayed grant response across logout/new session was aborted and not displayed   |
+| Ambiguous revoke retry changed its payload; initial list failure bypassed recovery; browser back escaped lists      | Frozen submissions, recoverable prefetch and list-local cursor navigation; actual lost-response retry and invalid-cursor recovery exercised                               |
+| Embedded lazy chunks, stale heading, table overflow, blocked theme initializer and mobile menu obscured destination | Correct embed inclusion, reactive heading, flex width constraint, bundled theme initialization and close-on-navigation; desktop/mobile/light/dark browser paths exercised |
+
+These are verified corrections in an internal integration milestone, not a claim
+that all commercial features are implemented or an independent sign-off of every
+corrected line. A further independent review follows the implementation commit.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
-Engineering must still prove the design in G1/G2; reviewers have not audited an
-implementation. Named IdP test tenants/permissions, licensed enterprise content,
-physical sacrificial machines/destructive consent, distribution license/public
-namespace and production signing custody must exist before their corresponding
-integration, publication or hardware gates. They are not grounds to claim unsupported
-features complete. Old desktop portal compatibility, immutable-provider behavior,
-air-gap trust renewal and capacity are explicit technical qualification work.
+Engineering must still finish G1/G2 qualification. Named IdP test tenants/permissions,
+licensed enterprise content, physical sacrificial machines/destructive consent,
+distribution license/public namespace and production signing custody must exist
+before their corresponding integration, publication or hardware gates. They are not
+grounds to claim unsupported features complete. Old desktop portal compatibility,
+immutable-provider behavior, air-gap trust renewal and capacity remain explicit
+technical qualification work.

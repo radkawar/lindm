@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package lindm.config.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/config/v1;configv1";
+
+// ServerConfig is the only serialized configuration contract for lindmd.
+// Secrets are referenced by protected files, never embedded in configuration.
+message ServerConfig {
+  option (buf.validate.message).cel = {
+    id: "listeners.distinct"
+    message: "administrative and device listeners must be distinct"
+    expression: "!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener"
+  };
+
+  string deployment_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string public_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  ListenerConfig admin_listener = 3 [(buf.validate.field).required = true];
+  ListenerConfig device_listener = 4 [(buf.validate.field).required = true];
+  DatabaseConfig database = 5 [(buf.validate.field).required = true];
+  TLSConfig tls = 6 [(buf.validate.field).required = true];
+  DeviceCAConfig device_ca = 7 [(buf.validate.field).required = true];
+  OIDCConfig oidc = 8 [(buf.validate.field).required = true];
+  // Additional outbound trust roots; empty uses the system trust store.
+  string trusted_ca_file = 9 [(buf.validate.field).string.max_len = 4096];
+}
+
+// Binding uses an explicit IP address and port rather than a second address
+// grammar. Hostname resolution belongs to public URLs, not local bind addresses.
+message ListenerConfig {
+  string address = 1 [(buf.validate.field).string.ip = true];
+  uint32 port = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+}
+
+message DatabaseConfig {
+  string url_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  uint32 max_connections = 2 [
+    (buf.validate.field).uint32.gte = 2,
+    (buf.validate.field).uint32.lte = 256
+  ];
+  // Only the explicit migration command reads this credential. Runtime replicas
+  // need not mount it and should use a database role without DDL privileges.
+  optional string migration_url_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message TLSConfig {
+  string certificate_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string private_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message DeviceCAConfig {
+  string certificate_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string private_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message OIDCConfig {
+  option (buf.validate.message).cel = {
+    id: "oidc.separate_clients"
+    message: "login and directory access must use separate clients"
+    expression: "this.client_id != this.directory_client_id"
+  };
+
+  string issuer = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string client_id = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 256
+  ];
+  string client_secret_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string directory_client_id = 4 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 256
+  ];
+  string directory_client_secret_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  repeated string administrator_groups = 6 [
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 2,
+    (buf.validate.field).repeated.items.string.max_len = 512,
+    (buf.validate.field).repeated.items.string.prefix = "/"
+  ];
+}

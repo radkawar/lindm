@@ -1,0 +1,14 @@
+version: v2
+plugins:
+  - local: .tools/bin/protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  - local: .tools/bin/protoc-gen-connect-go
+    out: gen
+    opt: paths=source_relative
+  - local: node_modules/.bin/protoc-gen-es
+    out: web/gen
+    opt:
+      - target=ts
+      - import_extension=js
+      - map_imports=buf/validate/:@bufbuild/protovalidate/gen

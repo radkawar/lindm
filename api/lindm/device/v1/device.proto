@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package lindm.device.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/device/v1;devicev1";
+
+service DeviceService {
+  rpc ReportInventory(ReportInventoryRequest) returns (ReportInventoryResponse);
+  rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
+}
+message Package {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+  string version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 2048
+  }];
+  string architecture = 3 [(buf.validate.field).string.max_len = 64];
+  string manager = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+message ReportInventoryRequest {
+  string enrollment_generation = 1 [(buf.validate.field).string.uuid = true];
+  string boot_id = 2 [(buf.validate.field).string.uuid = true];
+  uint64 sequence = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string hostname = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 253
+  }];
+  string os_id = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  string os_version = 6 [(buf.validate.field).string.max_len = 128];
+  string architecture = 7 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  repeated Package packages = 8 [(buf.validate.field).repeated.max_items = 500];
+  bool packages_complete = 9;
+}
+message ReportInventoryResponse {
+  uint64 accepted_sequence = 1;
+  google.protobuf.Timestamp server_time = 2;
+}
+message RenewIdentityRequest {
+  bytes csr_pem = 1 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+}
+message RenewIdentityResponse {
+  bytes certificate_pem = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}

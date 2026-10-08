@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package lindm.enrollment.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/enrollment/v1;enrollmentv1";
+
+service EnrollmentService {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+}
+message EnrollRequest {
+  string grant_secret = 1 [(buf.validate.field).string = {
+    min_len: 32
+    max_len: 256
+  }];
+  string transaction_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes csr_pem = 3 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+}
+message EnrollResponse {
+  string device_id = 1;
+  string enrollment_generation = 2;
+  bytes certificate_pem = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
