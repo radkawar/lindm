@@ -639,6 +639,25 @@ native executables. Focused VM-lab/lab-command race checks and lint passed. This
 does not establish general alias classification, symlink-limit equivalence,
 complete lookup snapshots, a production helper sandbox or distro certification.
 
+A Fedora 44 experiment exposed an overly narrow fixture assertion: systemd
+`259.5-1.fc44` points a linked unit's alias through its canonical configuration
+link rather than directly at the external definition. The pinned upstream
+[v259.5 implementation](https://github.com/systemd/systemd/blob/b3d8fc43e9cb531d958c17ef2cd93b374bc14e8a/src/shared/install.c#L2003-L2023)
+implements that rule. The fixture now accepts exactly these two complete link
+arrays, still requiring the staged-only wanted-by target and preserving the actual
+observed links. Independent source review found no false-positive path in that
+change; the two shapes are not claimed to have identical general alias semantics.
+
+The corrected maintained fixture passed inside constrained, disposable native
+worker experiments on Ubuntu/systemd255 and Fedora/systemd259; Fedora was Enforcing
+at the final check. The experiment binary SHA-256 was
+`66a480b91abce534adc663017ab2e2a638852197d6b697a206572d6a7ecfb978`.
+The standalone systemd255 CLI also passed with record
+`/home/r/.cache/lindm-native-install-projection-v6.json`, and the same maintained
+command passed again in the pinned Rocky 8/systemd239 container. Focused lab race
+checks and lint passed. Throwaway experiment code and binary were removed from
+the checkout. No packaged helper or production sandbox is qualified by these runs.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

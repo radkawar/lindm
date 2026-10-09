@@ -129,8 +129,18 @@ func checkProjectionRootBoundary(ctx context.Context, binary, fixture string) (*
 	// directory when its resolved definition is outside the lookup paths.
 	expected = append(expected, InstallProjectionLink{Path: primary, Target: filepath.Join(linked, primary)})
 	slices.SortFunc(expected, func(a, b InstallProjectionLink) int { return strings.Compare(a.Path, b.Path) })
+	// Newer native implementations may point the alias through the canonical
+	// configuration link instead of directly at its linked definition. Both
+	// exact shapes must still select the staged bytes and the same referent.
 	if !slices.Equal(evidence.AbsoluteFileLinks, expected) {
-		return nil, fmt.Errorf("absolute file link did not retain native root-aware linked-unit semantics: %v", evidence.AbsoluteFileLinks)
+		for index := range expected {
+			if expected[index].Path == alias {
+				expected[index].Target = "/etc/systemd/system/" + primary
+			}
+		}
+		if !slices.Equal(evidence.AbsoluteFileLinks, expected) {
+			return nil, fmt.Errorf("absolute file link did not retain native root-aware linked-unit semantics: %v", evidence.AbsoluteFileLinks)
+		}
 	}
 	return evidence, nil
 }

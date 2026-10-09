@@ -246,6 +246,13 @@ selects the copied definition and retains linked-unit install semantics. The rec
 contains the exact link sets for all three cases. This is a controlled demonstration,
 not a general directory-rewriting algorithm or permission to trust arbitrary links.
 
+For the linked-unit case, the fixture accepts exactly two complete native link
+shapes: the alias points directly to the linked definition, or it points through
+the canonical configuration link to that same definition. The staged-only
+wanted-by target remains mandatory, and the record preserves the actual shape.
+Systemd 239/255 produced the direct form; Fedora's 259.5 produced the configuration
+indirection. This does not normalize general alias identity or runtime behavior.
+
 These are native filesystem observations, not a production ownership API. They do
 not qualify production resource-ancestry checks, power-loss recovery, SELinux,
 safe runtime-invocation restoration or supported-distro certification. The fixture
