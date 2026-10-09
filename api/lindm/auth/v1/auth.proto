@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package lindm.auth.v1;
 
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
 option go_package = "lindm/gen/lindm/auth/v1;authv1";
 
 // SessionPrincipal is returned as protobuf JSON by GET /auth/session. Browser
@@ -14,4 +17,126 @@ message SessionPrincipal {
   string display_name = 4;
   string role = 5;
   string csrf_token = 6;
+  bool break_glass = 7;
+  string incident_reason = 8;
+}
+
+// All authentication endpoints use protobuf JSON and no-store responses.
+message AuthenticationOptions {
+  bool external_login = 1;
+  bool local_login = 2;
+  bool break_glass = 3;
+}
+
+// Passwords and incident reasons must never be logged.
+message LocalLoginRequest {
+  string username = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+  }];
+  string password = 2 [(buf.validate.field).string = {
+    min_bytes: 12
+    max_bytes: 1024
+  }];
+  string incident_reason = 3 [(buf.validate.field).string = {
+    max_len: 512
+    max_bytes: 1024
+    pattern: "^$|\\S"
+  }];
+}
+
+message LocalEnrollmentRequest {
+  string secret = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  string password = 2 [(buf.validate.field).string = {
+    min_bytes: 12
+    max_bytes: 1024
+  }];
+}
+
+// options_json contains the WebAuthn publicKey options object.
+message WebAuthnChallenge {
+  string token = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  string options_json = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 65536
+  }];
+}
+
+message WebAuthnFinishRequest {
+  string token = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1024
+  }];
+  string credential_json = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 65536
+  }];
+}
+
+message LocalAccount {
+  string id = 1;
+  string username = 2;
+  string role = 3;
+  bool enabled = 4;
+  bool break_glass = 5;
+  bool enrolled = 6;
+}
+
+message ListAccountsResponse {
+  repeated LocalAccount accounts = 1;
+}
+
+message CreateAccountRequest {
+  option (buf.validate.message).cel = {
+    id: "create_account.break_glass_owner"
+    message: "break-glass accounts must be owners"
+    expression: "!this.break_glass || this.role == 'owner'"
+  };
+  string username = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+  }];
+  string role = 2 [(buf.validate.field).string = {
+    in: [
+      "owner",
+      "admin"
+    ]
+  }];
+  bool break_glass = 3;
+}
+
+message UpdateAccountRequest {
+  option (buf.validate.message).cel = {
+    id: "update_account.break_glass_owner"
+    message: "break-glass accounts must be owners"
+    expression: "!this.break_glass || this.role == 'owner'"
+  };
+  string account_id = 1 [(buf.validate.field).string.uuid = true];
+  bool enabled = 2;
+  string role = 3 [(buf.validate.field).string = {
+    in: [
+      "owner",
+      "admin"
+    ]
+  }];
+  bool break_glass = 4;
+}
+
+message ResetAccountRequest {
+  string account_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// The one-time secret is held only in component memory, never cached or logged.
+message AccountEnrollment {
+  string account_id = 1;
+  string secret = 2;
+  google.protobuf.Timestamp expires_at = 3;
 }

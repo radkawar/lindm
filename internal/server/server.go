@@ -22,20 +22,35 @@ import (
 	"lindm/web"
 )
 
-// NewIdentity composes the same configured identity service for serving and local
-// owner bootstrap. Neither path can bypass upstream directory authorization.
+// NewIdentity composes the configured primary identity source and independent
+// emergency policy for both serving and explicit owner bootstrap.
 func NewIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources) (*identity.Service, error) {
-	oidc := resources.Proto.GetOidc()
-	return identity.New(ctx, pool, identity.Config{
-		Issuer:                oidc.GetIssuer(),
-		ClientID:              oidc.GetClientId(),
+	authentication := resources.Proto.GetAuthentication()
+	keycloak := authentication.GetKeycloak()
+	cfg := identity.Config{
+		Local:                 authentication.GetLocal() != nil,
+		BreakGlass:            resources.Proto.GetBreakGlass(),
+		Issuer:                keycloak.GetIssuer(),
+		ClientID:              keycloak.GetClientId(),
 		ClientSecret:          resources.ClientSecret,
-		DirectoryClientID:     oidc.GetDirectoryClientId(),
+		DirectoryClientID:     keycloak.GetDirectoryClientId(),
 		DirectoryClientSecret: resources.DirectoryClientSecret,
 		PublicURL:             resources.Proto.GetPublicUrl(),
-		AdminGroups:           oidc.GetAdministratorGroups(),
+		AdminGroups:           keycloak.GetAdministratorGroups(),
 		HTTPClient:            resources.HTTPClient,
-	})
+	}
+	if entra := authentication.GetEntra(); entra != nil {
+		issuer, err := identity.EntraIssuer(entra.GetTenantId())
+		if err != nil {
+			return nil, err
+		}
+		cfg.Issuer = issuer
+		cfg.EntraTenantID = entra.GetTenantId()
+		cfg.ClientID = entra.GetClientId()
+		cfg.DirectoryClientID = entra.GetDirectoryClientId()
+		cfg.AdminGroups = entra.GetAdministratorGroupObjectIds()
+	}
+	return identity.New(ctx, pool, cfg)
 }
 
 // Run checks the schema, initializes authenticated services, then binds both TLS
@@ -76,6 +91,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		InventoryBudgetBytes: resources.InventoryBudgetBytes,
 		ExecutionAuthority:   execution,
 		Identity:             auth,
+		ExecutionSigning:     resources.ExecutionSigning,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)

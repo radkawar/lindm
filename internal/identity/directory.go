@@ -10,24 +10,58 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
-type directoryObservation struct {
-	Found       bool
-	UserID      uuid.UUID
-	DisplayName string
-	Enabled     bool
-	Direct      bool
-	Groups      []string
-	// AcquiredAt is the database clock sampled before the directory request.
-	// Commit time must not replace it; a later sample wins across processes.
-	AcquiredAt time.Time
+// keycloakSource reads only the configured realm's authoritative Admin API.
+// Brokered and federated identities do not qualify as direct authority.
+type keycloakSource struct {
+	adminBase  string
+	httpClient *http.Client
+	directory  *clientcredentials.Config
+	tokens     tokenCache
+	flights    flightGroup
+	now        func() time.Time
+}
+
+var _ DirectorySource = (*keycloakSource)(nil)
+
+type tokenCache struct {
+	mu      sync.Mutex
+	access  string
+	expires time.Time
+}
+
+func newKeycloakSource(ctx context.Context, issuer, clientID, clientSecret, tokenURL string, httpClient *http.Client, now func() time.Time) (*keycloakSource, error) {
+	if clientID == "" || clientSecret == "" || httpClient == nil || now == nil || !strings.HasPrefix(tokenURL, "https://") {
+		return nil, errInvalidConfig
+	}
+	adminBase, err := adminRealmBase(issuer)
+	if err != nil {
+		return nil, err
+	}
+	source := &keycloakSource{
+		adminBase:  adminBase,
+		httpClient: httpClient,
+		directory: &clientcredentials.Config{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			TokenURL:     tokenURL,
+			AuthStyle:    oauth2.AuthStyleInParams,
+		},
+		now: now,
+	}
+	if _, err := source.directoryToken(ctx); err != nil {
+		return nil, err
+	}
+	return source, nil
 }
 
 type kcUser struct {
@@ -48,7 +82,7 @@ type kcFederated struct {
 	UserID           string `json:"userId"`
 }
 
-func (s *Service) fetchDirectoryUser(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
+func (s *keycloakSource) Observe(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
 	if subject == uuid.Nil {
 		return directoryObservation{}, errDirectoryResponse
 	}
@@ -98,7 +132,7 @@ func (s *Service) fetchDirectoryUser(ctx context.Context, subject uuid.UUID) (di
 	return obs, nil
 }
 
-func (s *Service) fetchFederated(ctx context.Context, id uuid.UUID) ([]kcFederated, error) {
+func (s *keycloakSource) fetchFederated(ctx context.Context, id uuid.UUID) ([]kcFederated, error) {
 	body, status, err := s.adminGet(ctx, "/users/"+url.PathEscape(id.String())+"/federated-identity")
 	if err != nil {
 		return nil, err
@@ -113,7 +147,7 @@ func (s *Service) fetchFederated(ctx context.Context, id uuid.UUID) ([]kcFederat
 	return links, nil
 }
 
-func (s *Service) fetchGroups(ctx context.Context, id uuid.UUID) ([]string, error) {
+func (s *keycloakSource) fetchGroups(ctx context.Context, id uuid.UUID) ([]string, error) {
 	var out []string
 	for first := 0; first < maxGroupPaths; first += groupPageSize {
 		q := url.Values{}
@@ -145,7 +179,7 @@ func (s *Service) fetchGroups(ctx context.Context, id uuid.UUID) ([]string, erro
 	return nil, errDirectoryResponse
 }
 
-func (s *Service) adminGet(ctx context.Context, path string) ([]byte, int, error) {
+func (s *keycloakSource) adminGet(ctx context.Context, path string) ([]byte, int, error) {
 	body, status, err := s.adminGetOnce(ctx, path)
 	if err == nil && status == http.StatusUnauthorized {
 		s.clearDirectoryToken()
@@ -154,7 +188,7 @@ func (s *Service) adminGet(ctx context.Context, path string) ([]byte, int, error
 	return body, status, err
 }
 
-func (s *Service) adminGetOnce(ctx context.Context, path string) (_ []byte, _ int, err error) {
+func (s *keycloakSource) adminGetOnce(ctx context.Context, path string) (_ []byte, _ int, err error) {
 	if !strings.HasPrefix(path, "/") || strings.Contains(path, "://") || strings.Contains(path, "..") {
 		return nil, 0, errDirectoryResponse
 	}
@@ -187,12 +221,12 @@ func (s *Service) adminGetOnce(ctx context.Context, path string) (_ []byte, _ in
 	return body, resp.StatusCode, nil
 }
 
-func (s *Service) directoryToken(ctx context.Context) (string, error) {
-	if access, ok := s.cachedAccess(s.clock()); ok {
+func (s *keycloakSource) directoryToken(ctx context.Context) (string, error) {
+	if access, ok := s.cachedAccess(s.now()); ok {
 		return access, nil
 	}
 	v, err := s.flights.Do("directory-token", func() (any, error) {
-		if access, ok := s.cachedAccess(s.clock()); ok {
+		if access, ok := s.cachedAccess(s.now()); ok {
 			return access, nil
 		}
 		fctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), directoryFetchTimeout)
@@ -205,7 +239,7 @@ func (s *Service) directoryToken(ctx context.Context) (string, error) {
 		}
 		expires := tok.Expiry
 		if expires.IsZero() {
-			expires = s.clock().Add(time.Minute)
+			expires = s.now().Add(time.Minute)
 		} else {
 			expires = expires.Add(-30 * time.Second)
 		}
@@ -225,7 +259,7 @@ func (s *Service) directoryToken(ctx context.Context) (string, error) {
 	return access, nil
 }
 
-func (s *Service) cachedAccess(now time.Time) (string, bool) {
+func (s *keycloakSource) cachedAccess(now time.Time) (string, bool) {
 	s.tokens.mu.Lock()
 	defer s.tokens.mu.Unlock()
 	if s.tokens.access == "" || !now.Before(s.tokens.expires) {
@@ -234,7 +268,7 @@ func (s *Service) cachedAccess(now time.Time) (string, bool) {
 	return s.tokens.access, true
 }
 
-func (s *Service) clearDirectoryToken() {
+func (s *keycloakSource) clearDirectoryToken() {
 	s.tokens.mu.Lock()
 	s.tokens.access = ""
 	s.tokens.expires = time.Time{}
@@ -283,4 +317,43 @@ func dedupeGroups(in []string) []string {
 		out = append(out, g)
 	}
 	return out
+}
+
+func adminRealmBase(issuer string) (string, error) {
+	u, err := url.Parse(issuer)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return "", errInvalidConfig
+	}
+	if strings.HasSuffix(u.Path, "/") {
+		return "", errInvalidConfig
+	}
+	const marker = "/realms/"
+	i := strings.LastIndex(u.Path, marker)
+	if i < 0 {
+		return "", errInvalidConfig
+	}
+	realm := u.Path[i+len(marker):]
+	if !validRealm(realm) {
+		return "", errInvalidConfig
+	}
+	base := *u
+	base.Path = u.Path[:i] + "/admin/realms/" + realm
+	base.RawPath = ""
+	base.RawQuery = ""
+	base.Fragment = ""
+	return base.String(), nil
+}
+
+func validRealm(realm string) bool {
+	if realm == "" || len(realm) > 128 {
+		return false
+	}
+	for _, r := range realm {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+		default:
+			return false
+		}
+	}
+	return true
 }

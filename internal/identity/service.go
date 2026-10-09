@@ -9,39 +9,43 @@ import (
 	"sync"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+
+	authv1 "lindm/gen/lindm/auth/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/identity/identitydb"
 )
 
-// Service authenticates browser sessions and checks Keycloak before each
-// protected request. It does not run a background refresher.
+// Service authenticates browser sessions and resolves current source authority.
+// It does not run a background refresher.
 type Service struct {
-	pool         *pgxpool.Pool
-	issuer       string
-	clientID     string
-	publicOrigin string
-	redirectURI  string
-	adminGroups  []string
-	adminBase    string
-	httpClient   *http.Client
-	ownsClient   bool
-	oauth        *oauth2.Config
-	verifier     *oidc.IDTokenVerifier
-	directory    *clientcredentials.Config
-	tokens       tokenCache
-	flights      flightGroup
-	now          func() time.Time
-}
-
-type tokenCache struct {
-	mu      sync.Mutex
-	access  string
-	expires time.Time
+	pool          *pgxpool.Pool
+	issuer        string
+	entraTenant   uuid.UUID
+	clientID      string
+	publicOrigin  string
+	redirectURI   string
+	adminGroups   []string
+	localIssuer   string
+	localPrimary  bool
+	breakGlass    *configv1.BreakGlassPolicy
+	webauthn      *webauthn.WebAuthn
+	dummyHash     string
+	passwordSlots chan struct{}
+	rules         protovalidate.Validator
+	httpClient    *http.Client
+	ownsClient    bool
+	oauth         *oauth2.Config
+	verifier      *oidc.IDTokenVerifier
+	directory     DirectorySource
+	flights       flightGroup
+	now           func() time.Time
 }
 
 type flight struct {
@@ -56,18 +60,67 @@ type flightGroup struct {
 }
 
 func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, error) {
-	if pool == nil || cfg.ClientSecret == "" || cfg.DirectoryClientSecret == "" {
+	if pool == nil || (!cfg.Local && (cfg.ClientSecret == "" || cfg.DirectoryClientSecret == "")) {
 		return nil, errInvalidConfig
 	}
 	origin, redirect, err := parsePublicURL(cfg.PublicURL)
 	if err != nil {
 		return nil, err
 	}
-	adminBase, err := adminRealmBase(cfg.Issuer)
+	localIssuer, err := deploymentLocalIssuer(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
+	webAuthn, err := localWebAuthn(cfg.PublicURL)
+	if err != nil {
+		return nil, err
+	}
+	rules, err := protovalidate.New(protovalidate.WithMessages(
+		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
+		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
+	if err != nil {
+		return nil, err
+	}
+	if cfg.BreakGlass != nil {
+		if err := rules.Validate(cfg.BreakGlass); err != nil {
+			return nil, err
+		}
+	}
+	if cfg.Local {
+		s := &Service{pool: pool, issuer: localIssuer, localIssuer: localIssuer,
+			localPrimary: true, publicOrigin: origin, redirectURI: redirect,
+			breakGlass: cfg.BreakGlass, webauthn: webAuthn, dummyHash: dummyPasswordHash(), now: time.Now, rules: rules}
+		s.directory = &localSource{pool: pool}
+		s.passwordSlots = make(chan struct{}, 2)
+		if err := s.checkOwnerAuthenticationMode(ctx); err != nil {
+			return nil, err
+		}
+		if err := s.terminateEmergencySessions(ctx); err != nil {
+			return nil, err
+		}
+		return s, nil
+	}
+	var entraTenant uuid.UUID
+	if cfg.EntraTenantID != "" {
+		issuer, err := EntraIssuer(cfg.EntraTenantID)
+		if err != nil || cfg.Issuer != issuer || strings.EqualFold(cfg.ClientID, cfg.DirectoryClientID) {
+			return nil, errInvalidConfig
+		}
+		entraTenant, err = uuid.Parse(cfg.EntraTenantID)
+		if err != nil {
+			return nil, errInvalidConfig
+		}
+	}
 	groups := append([]string(nil), cfg.AdminGroups...)
+	if entraTenant != uuid.Nil {
+		for i, group := range groups {
+			id, err := uuid.Parse(group)
+			if err != nil || id == uuid.Nil {
+				return nil, errInvalidConfig
+			}
+			groups[i] = id.String()
+		}
+	}
 	httpClient := cfg.HTTPClient
 	owns := false
 	if httpClient == nil {
@@ -90,15 +143,21 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 	}
 	endpoint.AuthStyle = oauth2.AuthStyleInParams
 	s := &Service{
-		pool:         pool,
-		issuer:       cfg.Issuer,
-		clientID:     cfg.ClientID,
-		publicOrigin: origin,
-		redirectURI:  redirect,
-		adminGroups:  groups,
-		adminBase:    adminBase,
-		httpClient:   httpClient,
-		ownsClient:   owns,
+		pool:          pool,
+		issuer:        cfg.Issuer,
+		entraTenant:   entraTenant,
+		clientID:      cfg.ClientID,
+		publicOrigin:  origin,
+		redirectURI:   redirect,
+		adminGroups:   groups,
+		localIssuer:   localIssuer,
+		breakGlass:    cfg.BreakGlass,
+		webauthn:      webAuthn,
+		dummyHash:     dummyPasswordHash(),
+		rules:         rules,
+		passwordSlots: make(chan struct{}, 2),
+		httpClient:    httpClient,
+		ownsClient:    owns,
 		oauth: &oauth2.Config{
 			ClientID:     cfg.ClientID,
 			ClientSecret: cfg.ClientSecret,
@@ -107,16 +166,22 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 			Scopes:       []string{oidc.ScopeOpenID},
 		},
 		verifier: provider.VerifierContext(oidc.ClientContext(context.Background(), httpClient), &oidc.Config{ClientID: cfg.ClientID}),
-		directory: &clientcredentials.Config{
-			ClientID:     cfg.DirectoryClientID,
-			ClientSecret: cfg.DirectoryClientSecret,
-			TokenURL:     endpoint.TokenURL,
-			AuthStyle:    oauth2.AuthStyleInParams,
-		},
-		now: time.Now,
+		now:      time.Now,
 	}
-	if _, err := s.directoryToken(ctx); err != nil {
-		return nil, ErrDirectoryUnavailable
+	if entraTenant != uuid.Nil {
+		s.oauth.Scopes = append(s.oauth.Scopes, "profile")
+		s.directory, err = newEntraSource(ctx, "https://graph.microsoft.com/v1.0", cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
+	} else {
+		s.directory, err = newKeycloakSource(ctx, cfg.Issuer, cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkOwnerAuthenticationMode(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.terminateEmergencySessions(ctx); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
@@ -146,14 +211,39 @@ func (s *Service) resolve(ctx context.Context, cookie string) (Principal, access
 		return Principal{}, accessDecision{}, err
 	}
 	now := s.clock()
+	if s.localPrimary || sess.BreakGlass {
+		now, err = s.databaseTime(ctx)
+		if err != nil {
+			return Principal{}, accessDecision{}, err
+		}
+	}
 	if sess.Revoked || !now.Before(sess.Idle) || !now.Before(sess.Absolute) {
+		if sess.BreakGlass {
+			if !sess.Revoked {
+				if err := s.logout(ctx, cookie, sess.PrincipalID); err != nil && !errors.Is(err, errNotFound) {
+					return Principal{}, accessDecision{}, err
+				}
+			}
+			if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "emergency session expired or revoked"); err != nil {
+				return Principal{}, accessDecision{}, err
+			}
+		}
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
 	}
 	snap, err := s.loadSnapshot(ctx, sess.PrincipalID)
 	if err != nil {
 		return Principal{}, accessDecision{}, err
 	}
-	if needsRefresh(now, snap) {
+	if snap.Local && sess.BreakGlass != snap.BreakGlass {
+		if err := s.logout(ctx, cookie, sess.PrincipalID); err != nil && !errors.Is(err, errNotFound) {
+			return Principal{}, accessDecision{}, err
+		}
+		if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "session authentication mode changed"); err != nil {
+			return Principal{}, accessDecision{}, err
+		}
+		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
+	}
+	if !snap.Local && needsRefresh(now, snap) {
 		subjectID, parseErr := uuid.Parse(snap.Subject)
 		var refreshed directorySnapshot
 		var refreshErr error
@@ -168,7 +258,7 @@ func (s *Service) resolve(ctx context.Context, cookie string) (Principal, access
 			snap = refreshed
 		}
 	}
-	dec := decideAccess(s.clock(), s.issuer, s.adminGroups, snap)
+	dec := decideAccess(s.clock(), s.accessIssuer(snap), s.adminGroups, snap)
 	// snap may predate a re-enable. Revocation rechecks under the principal lock.
 	if dec.RevokeSessions {
 		if err := s.revokePrincipal(ctx, snap.PrincipalID); err != nil {
@@ -178,14 +268,10 @@ func (s *Service) resolve(ctx context.Context, cookie string) (Principal, access
 	if dec.Kind != accessOK {
 		return Principal{}, dec, nil
 	}
-	return Principal{
-		ID:          snap.PrincipalID,
-		Issuer:      snap.Issuer,
-		Subject:     snap.Subject,
-		DisplayName: snap.DisplayName,
-		Role:        dec.Role,
-		CSRFToken:   csrfToken(cookie),
-	}, dec, nil
+	principal := s.snapshotPrincipal(snap, dec.Role)
+	principal.CSRFToken = csrfToken(cookie)
+	principal.IncidentReason = sess.IncidentReason
+	return principal, dec, nil
 }
 
 func (s *Service) refreshPrincipal(ctx context.Context, id, subject uuid.UUID) (directorySnapshot, error) {

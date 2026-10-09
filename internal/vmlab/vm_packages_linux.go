@@ -83,8 +83,8 @@ func nativeArtifactFile(a packaging.Artifact) (*os.File, error) {
 }
 
 func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second packaging.Artifact, apt *packaging.APTRepository, publicKeyPath, signerFingerprint string) (_ *nativeGuestPackages, err error) {
-	if first.Format != second.Format || first.Version == second.Version || !nativeFingerprint.MatchString(signerFingerprint) {
-		return nil, errors.New("native lifecycle requires two versions and a pinned signing fingerprint")
+	if first.Format != second.Format || !nativeFingerprint.MatchString(signerFingerprint) {
+		return nil, errors.New("native packages require matching formats and a pinned signing fingerprint")
 	}
 	for _, artifact := range []packaging.Artifact{first, second} {
 		file, err := nativeArtifactFile(artifact)

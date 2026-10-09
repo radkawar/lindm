@@ -4,35 +4,34 @@ Status: qualification plan. **No matrix cell is certified.** Installation, unit 
 containers, simulations and a source-code review cannot substitute for the required
 machine evidence. All supported claims are capability-specific.
 
-## 1. Confirmed launch families and qualification matrix
+## 1. Release-scoped platform qualification
 
-The owner selected the core matrix plus SUSE enterprise, supported legacy branches,
-and rolling/immutable systems. The named products below make that selection concrete;
-additional derivatives are not implicitly included. Versions are branches, not
-mutable download URLs. Pin exact release/snapshot, verified image digest, repository
-snapshot, architecture and installer recipe in the executable manifest. See
-[research](research.md) for upstream lifecycle sources. Upstream maintenance does not
-prove product support, and a branch that reaches EOL before launch must be explicitly
-replaced or supported with entitled content, not silently called secure.
+R1 targets connected Ubuntu LTS and Fedora/RHEL on x86_64. The remaining mutable
+families, aarch64, employee desktop integrations and full air-gap are later gates.
+Atomic Linux and NixOS have separately approved product scopes, not inherited
+mutable-provider requirements. The table allocates qualification work; it does not
+declare support.
 
-| Family / branch                                                | Desktop acceptance                                                                      | Headless acceptance                          | Initial architecture                                       |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| Ubuntu 24.04 and 26.04 LTS                                     | Official GNOME Desktop; Kubuntu/KDE separately qualified before claiming flavor support | Official Server/minimal                      | x86_64 desktop and server; aarch64 server                  |
-| Debian 13                                                      | GNOME and KDE installer selections                                                      | Minimal installation with no display manager | x86_64 desktop and server; aarch64 server                  |
-| Fedora 43 and 44 while upstream-supported                      | Workstation GNOME and KDE Plasma editions                                               | Server/minimal                               | x86_64 desktop and server; aarch64 server                  |
-| RHEL 9 and 10, supported minor                                 | GNOME workstation-capable installation                                                  | Minimal/server                               | x86_64; aarch64 server on vendor-supported hardware/images |
-| Rocky Linux 9 and 10, current minor                            | GNOME-equipped installation                                                             | Minimal/server                               | x86_64; aarch64 server                                     |
-| AlmaLinux 9 and 10, current minor                              | GNOME-equipped installation                                                             | Minimal/server                               | x86_64; aarch64 server                                     |
-| openSUSE Leap 16.0                                             | GNOME and KDE installer selections                                                      | Headless installation                        | x86_64                                                     |
-| Ubuntu 22.04 LTS                                               | Official GNOME Desktop                                                                  | Official Server/minimal                      | x86_64; aarch64 server                                     |
-| Debian 12 LTS                                                  | GNOME and KDE                                                                           | Minimal                                      | x86_64; aarch64 server                                     |
-| RHEL 8, Rocky 8, AlmaLinux 8 (independent rows)                | Vendor-supported GNOME configuration                                                    | Minimal/server                               | x86_64                                                     |
-| SLES 15 SP7 and 16                                             | Desktop services only where vendor-supported; no implied SLED equivalence               | Vendor server installation                   | x86_64                                                     |
-| SLED 15 SP7                                                    | Vendor GNOME desktop                                                                    | No separate server claim                     | x86_64                                                     |
-| Arch Linux                                                     | GNOME and KDE on pinned rolling snapshot                                                | Minimal installation                         | x86_64                                                     |
-| openSUSE Tumbleweed                                            | GNOME and KDE on pinned snapshot                                                        | Headless installation                        | x86_64                                                     |
-| Fedora Silverblue and Kinoite, supported 43/44 branches        | GNOME and KDE respectively; native atomic deployment                                    | No separate server claim                     | x86_64                                                     |
-| NixOS stable 26.05 and current stable successor before its EOL | GNOME and KDE declarative installations                                                 | Minimal declarative installation             | x86_64                                                     |
+Versions are branches, not mutable download URLs. Pin exact vendor/minor/snapshot,
+verified image digest, repositories, architecture and installer recipe in executable
+evidence. Upstream maintenance does not prove product support. A branch reaching EOL
+before its release must be explicitly replaced or supported with entitled content.
+
+| Family / branch                           | Release allocation           | Native host acceptance                                                               | Architecture scope                       |
+| ----------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Ubuntu 24.04 and 26.04 LTS                | R1                           | Official GNOME Desktop and Server/minimal; no employee UI or Kubuntu parity inferred | x86_64; aarch64 server later             |
+| Fedora 43 and 44 while upstream-supported | R1                           | Workstation/Server/minimal; KDE edition qualified separately                         | x86_64; aarch64 server later             |
+| RHEL 9 and 10, supported minor            | R1                           | Vendor GNOME-capable and minimal/server installations                                | x86_64; entitled images/content required |
+| Rocky Linux 9 and 10, current minor       | Later mutable release        | Separate derivative lifecycle, not RHEL evidence                                     | x86_64; aarch64 server separately        |
+| AlmaLinux 9 and 10, current minor         | Later mutable release        | Separate derivative lifecycle, not Rocky evidence                                    | x86_64; aarch64 server separately        |
+| Debian 13                                 | Later mutable release        | GNOME/KDE and minimal separately                                                     | x86_64; aarch64 server separately        |
+| openSUSE Leap 16.0                        | Later mutable release        | GNOME/KDE and headless separately                                                    | x86_64                                   |
+| Ubuntu 22.04 LTS; Debian 12 LTS           | Later legacy release         | Separate branch/content/runtime evidence                                             | x86_64; aarch64 server separately        |
+| RHEL 8, Rocky 8, AlmaLinux 8              | Later legacy release         | Independent vendor rows and maintained security content                              | x86_64                                   |
+| SLES 15 SP7 and 16; SLED 15 SP7           | Later SUSE release           | Each vendor product/desktop/server installation separately                           | x86_64                                   |
+| Arch Linux; openSUSE Tumbleweed           | Later rolling release        | Separate pinned snapshots, whole-system update and rollback semantics                | x86_64                                   |
+| Fedora Silverblue and Kinoite             | Separate atomic product      | Actual atomic installer, deployment/layering, booted checksum and rollback           | Independently scoped                     |
+| NixOS stable branch                       | Separate declarative product | Owner-approved configuration/closure and system-generation activation                | Independently scoped                     |
 
 RHEL is not certified by testing Rocky; Alma is not certified by testing Rocky; a GUI
 installed on a server is not proof of a vendor's separate desktop product. RPM format
@@ -41,20 +40,71 @@ major version, SELinux/AppArmor mode and kernel. Emulation alone does not establ
 native aarch64 performance/hardware support.
 
 Alpine/OpenRC, Ubuntu Core, Amazon Linux, unrelated transactional products, containers
-as devices, WSL and arbitrary derivatives are not implicitly included. An unsupported
-platform reports its limitations safely instead of guessing a provider. The minimum
-managed-device gate on every row includes install/enroll/renew/revoke, native inventory,
-typed baseline enforcement/drift, native software/OS update, interruption/reboot,
-agent upgrade/recovery and retirement/re-enrollment in both connectivity modes.
-Desktop rows additionally require real-session self-service and the certified
-assistance/consent paths; headless rows require workload-safe unattended maintenance.
-No rolling/immutable row may be called supported with inventory alone.
+as devices, WSL and arbitrary derivatives are not implicitly included. Unsupported
+resources report limitations instead of guessing a provider. R1 qualification includes
+connected install/enroll/renew/revoke, actual inventory, server-dispatched service
+state and authenticated results, interruption/reboot, agent upgrade/recovery and
+explicit identity revocation/re-enrollment. It does not claim package/OS management,
+profile-removal restoration, employee UI, remote assistance or offline operation.
+Those capabilities add their own native lifecycle gates when advertised. Neither a
+rolling/atomic/Nix product nor a new mutable distribution is certified by inventory
+or package installation alone.
 
 Support follows published vendor maintenance and security-content availability.
 Fedora moving-window changes trigger qualification and a communicated transition;
 never substitute a prerelease for a GA image. Publish EOL warnings at least 90 days
 in advance when vendor schedules permit; continued inventory must not imply continued
 security coverage. Entitlement-gated/EUS/ESM branches have explicit rows.
+
+### Resource-kind coverage
+
+Coverage is per resource **and** platform; a shared protobuf vocabulary does not
+create native implementations. `S` means specified/planned only; `I` means code
+exists but the end-to-end platform contract is unqualified; `N` means a named native
+subset was exercised; `Q` would mean full release qualification. `S*` means planned
+through that platform's own native model rather than a mutable-distro provider:
+writable `/etc` and rpm-ostree layering/deployments on Atomic; configuration
+composed into the owner's declaration and activated as a generation on NixOS (only
+runtime state is changed outside the generation). `—` means not applicable.
+There are currently **no Q cells**.
+
+The code column separates implementation from platform evidence. `N24` is Ubuntu
+24.04 and `N44` is Fedora 44 x86_64 only; it does not cover Ubuntu 26.04, other Fedora
+branches, RHEL/derivatives, aarch64 or desktop workflows. For service state, these
+are the existing provider and packaged **local-command** execution/history lanes,
+not the still-missing production server dispatch loop. Exact builds and observed
+limits are in the [evidence ledger](implementation-plan.md#2-evidence-ledger).
+
+| Resource kind                                     | Code | Ubuntu LTS | Fedora | RHEL | Debian/SUSE | Arch/Tumbleweed | Atomic product | NixOS product |
+| ------------------------------------------------- | ---- | ---------- | ------ | ---- | ----------- | --------------- | -------------- | ------------- |
+| Host and native package inventory                 | I    | N24        | N44    | S    | S           | S               | S              | S             |
+| Systemd service state                             | I    | N24        | N44    | S    | S           | S               | S*             | S*            |
+| Device local accounts/groups                      | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Sudo policy                                       | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| SSH configuration                                 | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Session/password settings                         | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Firewall                                          | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Time synchronization                              | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Trust stores                                      | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Wi-Fi/Ethernet                                    | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| VPN                                               | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| DNS/proxy                                         | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Native repositories/packages                      | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| OS/security-update lifecycle                      | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Device/user certificates and directory client     | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Recovery escrow, lock/quarantine and sanitization | S    | S          | S      | S    | S           | S               | S*             | S*            |
+| Atomic OS deployment/boot/rollback                | S    | —          | —      | —    | —           | —               | S              | —             |
+| Declarative system generation/activation          | S    | —          | —      | —    | —           | —               | —              | S             |
+
+Only inventory and service state are R1 managed-device resources. Additional rows
+remain independent later resource releases; `S` is not a delivery promise for every
+combination. Debian/SUSE and Arch/Tumbleweed are compact planning columns, **not**
+shared qualification: each native backend, vendor, version and snapshot needs its
+own executable evidence row. Atomic/NixOS cells reuse the shared typed vocabulary
+only where native semantics match; their provider must say how it persists through
+deployments or generations before a control is claimed. Bind identity, audit and
+evidence metadata across products; do not force package transactions or generated
+configuration into a universal mutable-resource API.
 
 ### Capability matrix dimensions
 
@@ -79,17 +129,18 @@ Compose are independent rows. Pin supported Docker Engine/Compose, PostgreSQL an
 host prerequisites in each manifest. Other endpoint platforms do not implicitly
 become supported server installation hosts.
 
-| Deployment                                                | Mandatory coverage                                                                                                                                                   |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Native server package/systemd                             | L01 installation/permissions/restart; L14 migration/upgrade failure/backup/restore/rotation; L16 complete isolated install/upgrade/restore; single-host L18 capacity |
-| OCI/Docker Compose single host                            | Same L01/L14/L16/single-host L18 with volume ownership, restart and image rollback separately observed                                                               |
-| Replicated API/workers + HA PostgreSQL + shared artifacts | L14 rolling upgrade/restore fences; L16 isolated HA topology; replicated L18 load/failover/queue fencing and artifact availability                                   |
-| Built-in assistance relay                                 | Local TURN and no-relay/direct variants, certificate/credential rotation and bandwidth limits; L09/L12/L16 consent/termination/relay-only behavior                   |
+| Deployment                                                | Mandatory coverage                                                                                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Native server package/systemd                             | R1 connected L01 installation/permissions/restart; L14 migration/upgrade/backup/restore/rotation; measured single-host L18 capacity; later L16 air-gap |
+| OCI/Docker Compose single host                            | Same R1 connected gates, with container volume ownership and image rollback independently observed; later L16                                          |
+| Replicated API/workers + HA PostgreSQL + shared artifacts | Later G8: rolling upgrade, restore/failover fences, replicated capacity and artifact availability; isolated HA separately when offered                 |
+| Built-in assistance relay                                 | Later G5/G6: TURN/direct variants, rotation/bandwidth and consent/termination, including isolated relay-only behavior when offered                     |
 
-Both single-host rows must pass connected and air-gapped acceptance. Native
-dependencies/service hardening/migration invocation cannot be inferred from a
-container success. Core MDM capacity budgets exclude relay media bandwidth, which
-has its own measured concurrent-session and bitrate gate before release.
+Both R1 single-host rows need connected acceptance. Full air-gap is a separate
+release gate, not a hidden prerequisite of R1. Native dependencies/hardening/migration
+invocation cannot be inferred from container success. R1 capacity is a measured
+published limit, not the roadmap's 100k/HA target. Future relay media bandwidth has
+its own measured concurrent-session and bitrate gate.
 
 ## 2. Repeatable laboratory
 

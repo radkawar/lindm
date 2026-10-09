@@ -5,6 +5,7 @@ package lindm.device.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/device/v1/service_dispatch.proto";
 import "lindm/inventory/v1/observation.proto";
 
 option go_package = "lindm/gen/lindm/device/v1;devicev1";
@@ -19,6 +20,14 @@ service DeviceService {
   rpc PutPackageBatch(PutPackageBatchRequest) returns (PutPackageBatchResponse);
   rpc CommitPackageSnapshot(CommitPackageSnapshotRequest) returns (CommitPackageSnapshotResponse);
   rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
+  // Returns the current server-owned service action, minting it only when no
+  // open action exists. Never implies the device is compliant.
+  rpc GetServiceWork(GetServiceWorkRequest) returns (GetServiceWorkResponse);
+  // Reauthorizes the original actor, desired head and device fences before
+  // signing a start grant for the exact device challenge.
+  rpc AuthorizeServiceStart(AuthorizeServiceStartRequest) returns (AuthorizeServiceStartResponse);
+  // Admits a nonce-bound device attestation of protected action history.
+  rpc ReportServiceResult(ReportServiceResultRequest) returns (ReportServiceResultResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {

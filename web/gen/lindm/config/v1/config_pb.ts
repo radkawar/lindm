@@ -5,6 +5,8 @@
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import type { Duration } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration } from "@bufbuild/protobuf/wkt";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -12,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/config/v1/config.proto.
  */
 export const file_lindm_config_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEikAoKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEjEKBG9pZGMYCCABKAsyGy5saW5kbS5jb25maWcudjEuT0lEQ0NvbmZpZ0IGukgDyAEBEiEKD3RydXN0ZWRfY2FfZmlsZRgJIAEoCUIIukgFcgMYgCASOQoWaW52ZW50b3J5X2J1ZGdldF9ieXRlcxgKIAEoBEIUukgRMg8Y//////////9/KICAgCBIAIgBARIsChFkZXZpY2VfcHVibGljX3VybBgLIAEoCUIMukgJcgeAtRgBiAEBSAGIAQESRgoTZXhlY3V0aW9uX2Jvb3RzdHJhcBgMIAEoCzIpLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25Cb290c3RyYXBDb25maWcSQgoRZXhlY3V0aW9uX3NpZ25pbmcYDSABKAsyJy5saW5kbS5jb25maWcudjEuRXhlY3V0aW9uU2lnbmluZ0NvbmZpZzrvA7pI6wMasgEKEmxpc3RlbmVycy5kaXN0aW5jdBI0YWRtaW5pc3RyYXRpdmUgYW5kIGRldmljZSBsaXN0ZW5lcnMgbXVzdCBiZSBkaXN0aW5jdBpmIWhhcyh0aGlzLmFkbWluX2xpc3RlbmVyKSB8fCAhaGFzKHRoaXMuZGV2aWNlX2xpc3RlbmVyKSB8fCB0aGlzLmFkbWluX2xpc3RlbmVyICE9IHRoaXMuZGV2aWNlX2xpc3RlbmVyGo8BChtleGVjdXRpb25fc2lnbmluZy5ib290c3RyYXASMWV4ZWN1dGlvbiBzaWduaW5nIHJlcXVpcmVzIGFuIGV4ZWN1dGlvbiBib290c3RyYXAaPSFoYXModGhpcy5leGVjdXRpb25fc2lnbmluZykgfHwgaGFzKHRoaXMuZXhlY3V0aW9uX2Jvb3RzdHJhcCkaoQEKIWV4ZWN1dGlvbl9ib290c3RyYXAuZGV2aWNlX29yaWdpbhI9ZXhlY3V0aW9uIGJvb3RzdHJhcCByZXF1aXJlcyBhbiBleHBsaWNpdCBwdWJsaWMgZGV2aWNlIG9yaWdpbho9IWhhcyh0aGlzLmV4ZWN1dGlvbl9ib290c3RyYXApIHx8IGhhcyh0aGlzLmRldmljZV9wdWJsaWNfdXJsKUIZChdfaW52ZW50b3J5X2J1ZGdldF9ieXRlc0IUChJfZGV2aWNlX3B1YmxpY191cmwiWwoYRXhlY3V0aW9uQm9vdHN0cmFwQ29uZmlnEhwKCXJvb3RfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiEKDmJvb3RzdHJhcF9maWxlGAIgASgJQgm6SAZyBJC1GAEi6QEKFkV4ZWN1dGlvblNpZ25pbmdDb25maWcSIAoNcGxhbl9rZXlfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiEKDnN0YXJ0X2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAE6iQG6SIUBGoIBCiBleGVjdXRpb25fc2lnbmluZy5kaXN0aW5jdF9maWxlcxIzcGxhbiBhbmQgc3RhcnQgc2lnbmluZyBrZXlzIG11c3QgdXNlIGRpc3RpbmN0IGZpbGVzGil0aGlzLnBsYW5fa2V5X2ZpbGUgIT0gdGhpcy5zdGFydF9rZXlfZmlsZSJFCg5MaXN0ZW5lckNvbmZpZxIYCgdhZGRyZXNzGAEgASgJQge6SARyAnABEhkKBHBvcnQYAiABKA1CC7pICCoGGP//AygBIpUBCg5EYXRhYmFzZUNvbmZpZxIbCgh1cmxfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKD21heF9jb25uZWN0aW9ucxgCIAEoDUIKukgHKgUYgAIoAhIqChJtaWdyYXRpb25fdXJsX2ZpbGUYAyABKAlCCbpIBnIEkLUYAUgAiAEBQhUKE19taWdyYXRpb25fdXJsX2ZpbGUiVQoJVExTQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiWgoORGV2aWNlQ0FDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASKAAwoKT0lEQ0NvbmZpZxIcCgZpc3N1ZXIYASABKAlCDLpICXIHiLUYAYgBARIdCgljbGllbnRfaWQYAiABKAlCCrpIB3IFEAEYgAISJQoSY2xpZW50X3NlY3JldF9maWxlGAMgASgJQgm6SAZyBJC1GAESJwoTZGlyZWN0b3J5X2NsaWVudF9pZBgEIAEoCUIKukgHcgUQARiAAhIvChxkaXJlY3RvcnlfY2xpZW50X3NlY3JldF9maWxlGAUgASgJQgm6SAZyBJC1GAESNAoUYWRtaW5pc3RyYXRvcl9ncm91cHMYBiADKAlCFrpIE5IBEBBkGAEiCnIIEAIYgAQ6AS86frpIexp5ChVvaWRjLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZEIkWiJsaW5kbS9nZW4vbGluZG0vY29uZmlnL3YxO2NvbmZpZ3YxYgZwcm90bzM", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEi3AoKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEkUKDmF1dGhlbnRpY2F0aW9uGAggASgLMiUubGluZG0uY29uZmlnLnYxLkF1dGhlbnRpY2F0aW9uQ29uZmlnQga6SAPIAQESIQoPdHJ1c3RlZF9jYV9maWxlGAkgASgJQgi6SAVyAxiAIBI5ChZpbnZlbnRvcnlfYnVkZ2V0X2J5dGVzGAogASgEQhS6SBEyDxj//////////38ogICAIEgAiAEBEiwKEWRldmljZV9wdWJsaWNfdXJsGAsgASgJQgy6SAlyB4C1GAGIAQFIAYgBARJGChNleGVjdXRpb25fYm9vdHN0cmFwGAwgASgLMikubGluZG0uY29uZmlnLnYxLkV4ZWN1dGlvbkJvb3RzdHJhcENvbmZpZxJCChFleGVjdXRpb25fc2lnbmluZxgNIAEoCzInLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25TaWduaW5nQ29uZmlnEjYKC2JyZWFrX2dsYXNzGA4gASgLMiEubGluZG0uY29uZmlnLnYxLkJyZWFrR2xhc3NQb2xpY3k67wO6SOsDGrIBChJsaXN0ZW5lcnMuZGlzdGluY3QSNGFkbWluaXN0cmF0aXZlIGFuZCBkZXZpY2UgbGlzdGVuZXJzIG11c3QgYmUgZGlzdGluY3QaZiFoYXModGhpcy5hZG1pbl9saXN0ZW5lcikgfHwgIWhhcyh0aGlzLmRldmljZV9saXN0ZW5lcikgfHwgdGhpcy5hZG1pbl9saXN0ZW5lciAhPSB0aGlzLmRldmljZV9saXN0ZW5lchqPAQobZXhlY3V0aW9uX3NpZ25pbmcuYm9vdHN0cmFwEjFleGVjdXRpb24gc2lnbmluZyByZXF1aXJlcyBhbiBleGVjdXRpb24gYm9vdHN0cmFwGj0haGFzKHRoaXMuZXhlY3V0aW9uX3NpZ25pbmcpIHx8IGhhcyh0aGlzLmV4ZWN1dGlvbl9ib290c3RyYXApGqEBCiFleGVjdXRpb25fYm9vdHN0cmFwLmRldmljZV9vcmlnaW4SPWV4ZWN1dGlvbiBib290c3RyYXAgcmVxdWlyZXMgYW4gZXhwbGljaXQgcHVibGljIGRldmljZSBvcmlnaW4aPSFoYXModGhpcy5leGVjdXRpb25fYm9vdHN0cmFwKSB8fCBoYXModGhpcy5kZXZpY2VfcHVibGljX3VybClCGQoXX2ludmVudG9yeV9idWRnZXRfYnl0ZXNCFAoSX2RldmljZV9wdWJsaWNfdXJsIlsKGEV4ZWN1dGlvbkJvb3RzdHJhcENvbmZpZxIcCglyb290X2ZpbGUYASABKAlCCbpIBnIEkLUYARIhCg5ib290c3RyYXBfZmlsZRgCIAEoCUIJukgGcgSQtRgBIukBChZFeGVjdXRpb25TaWduaW5nQ29uZmlnEiAKDXBsYW5fa2V5X2ZpbGUYASABKAlCCbpIBnIEkLUYARIhCg5zdGFydF9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBOokBukiFARqCAQogZXhlY3V0aW9uX3NpZ25pbmcuZGlzdGluY3RfZmlsZXMSM3BsYW4gYW5kIHN0YXJ0IHNpZ25pbmcga2V5cyBtdXN0IHVzZSBkaXN0aW5jdCBmaWxlcxopdGhpcy5wbGFuX2tleV9maWxlICE9IHRoaXMuc3RhcnRfa2V5X2ZpbGUiRQoOTGlzdGVuZXJDb25maWcSGAoHYWRkcmVzcxgBIAEoCUIHukgEcgJwARIZCgRwb3J0GAIgASgNQgu6SAgqBhj//wMoASKVAQoORGF0YWJhc2VDb25maWcSGwoIdXJsX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjCg9tYXhfY29ubmVjdGlvbnMYAiABKA1CCrpIByoFGIACKAISKgoSbWlncmF0aW9uX3VybF9maWxlGAMgASgJQgm6SAZyBJC1GAFIAIgBAUIVChNfbWlncmF0aW9uX3VybF9maWxlIlUKCVRMU0NvbmZpZxIjChBjZXJ0aWZpY2F0ZV9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoQcHJpdmF0ZV9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBIloKDkRldmljZUNBQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiyQEKFEF1dGhlbnRpY2F0aW9uQ29uZmlnEjUKBWxvY2FsGAEgASgLMiQubGluZG0uY29uZmlnLnYxLkxvY2FsQXV0aGVudGljYXRpb25IABI2CghrZXljbG9haxgCIAEoCzIiLmxpbmRtLmNvbmZpZy52MS5LZXljbG9ha0RpcmVjdG9yeUgAEjAKBWVudHJhGAMgASgLMh8ubGluZG0uY29uZmlnLnYxLkVudHJhRGlyZWN0b3J5SABCEAoHcHJpbWFyeRIFukgCCAEiFQoTTG9jYWxBdXRoZW50aWNhdGlvbiKMAwoRS2V5Y2xvYWtEaXJlY3RvcnkSHAoGaXNzdWVyGAEgASgJQgy6SAlyB4i1GAGIAQESHQoJY2xpZW50X2lkGAIgASgJQgq6SAdyBRABGIACEiUKEmNsaWVudF9zZWNyZXRfZmlsZRgDIAEoCUIJukgGcgSQtRgBEicKE2RpcmVjdG9yeV9jbGllbnRfaWQYBCABKAlCCrpIB3IFEAEYgAISLwocZGlyZWN0b3J5X2NsaWVudF9zZWNyZXRfZmlsZRgFIAEoCUIJukgGcgSQtRgBEjQKFGFkbWluaXN0cmF0b3JfZ3JvdXBzGAYgAygJQha6SBOSARAQZBgBIgpyCBACGIAEOgEvOoIBukh/Gn0KGWtleWNsb2FrLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZCK6BAoORW50cmFEaXJlY3RvcnkSQQoJdGVuYW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKCWNsaWVudF9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIlChJjbGllbnRfc2VjcmV0X2ZpbGUYAyABKAlCCbpIBnIEkLUYARJLChNkaXJlY3RvcnlfY2xpZW50X2lkGAQgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEi8KHGRpcmVjdG9yeV9jbGllbnRfc2VjcmV0X2ZpbGUYBSABKAlCCbpIBnIEkLUYARJfCh5hZG1pbmlzdHJhdG9yX2dyb3VwX29iamVjdF9pZHMYBiADKAlCN7pINJIBMRBkGAEiK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQE6mwG6SJcBGpQBChZlbnRyYS5zZXBhcmF0ZV9jbGllbnRzEjRsb2dpbiBhbmQgZGlyZWN0b3J5IGFjY2VzcyBtdXN0IHVzZSBzZXBhcmF0ZSBjbGllbnRzGkR0aGlzLmNsaWVudF9pZC5sb3dlckFzY2lpKCkgIT0gdGhpcy5kaXJlY3RvcnlfY2xpZW50X2lkLmxvd2VyQXNjaWkoKSLXAgoQQnJlYWtHbGFzc1BvbGljeRK3AQoTYWxsb3dlZF9wZXJtaXNzaW9ucxgBIAMoCUKZAbpIlQGSAZEBCAEQCBgBIogBcoUBUgpmbGVldC5yZWFkUhFlbnJvbGxtZW50Lm1hbmFnZVINZGV2aWNlLnJldm9rZVIKYXVkaXQucmVhZFIWZXhlY3V0aW9uX3RydXN0Lm1hbmFnZVIPcHJvZmlsZXMubWFuYWdlUg9zZXJ2aWNlcy5hc3NpZ25SD2FjY291bnRzLm1hbmFnZRIUCgxjb25zb2xlX29ubHkYAiABKAgSSQoUbWF4X3Nlc3Npb25fbGlmZXRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CELpIDcgBAaoBByIDCJAcKgASKAoXcmVxdWlyZV9pbmNpZGVudF9yZWFzb24YBCABKAhCB7pIBGoCCAFCJFoibGluZG0vZ2VuL2xpbmRtL2NvbmZpZy92MTtjb25maWd2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_duration, file_lindm_validation_v1_string_rules]);
 
 /**
  * ServerConfig is the only serialized configuration contract for lindmd.
@@ -57,9 +59,9 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
   deviceCa?: DeviceCAConfig | undefined;
 
   /**
-   * @generated from field: lindm.config.v1.OIDCConfig oidc = 8;
+   * @generated from field: lindm.config.v1.AuthenticationConfig authentication = 8;
    */
-  oidc?: OIDCConfig | undefined;
+  authentication?: AuthenticationConfig | undefined;
 
   /**
    * Additional outbound trust roots; empty uses the system trust store.
@@ -97,6 +99,13 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
    * @generated from field: lindm.config.v1.ExecutionSigningConfig execution_signing = 13;
    */
   executionSigning?: ExecutionSigningConfig | undefined;
+
+  /**
+   * Independent emergency local-owner policy; never unions external grants.
+   *
+   * @generated from field: lindm.config.v1.BreakGlassPolicy break_glass = 14;
+   */
+  breakGlass?: BreakGlassPolicy | undefined;
 };
 
 /**
@@ -253,9 +262,59 @@ export const DeviceCAConfigSchema: GenMessage<DeviceCAConfig> = /*@__PURE__*/
   messageDesc(file_lindm_config_v1_config, 6);
 
 /**
- * @generated from message lindm.config.v1.OIDCConfig
+ * @generated from message lindm.config.v1.AuthenticationConfig
  */
-export type OIDCConfig = Message<"lindm.config.v1.OIDCConfig"> & {
+export type AuthenticationConfig = Message<"lindm.config.v1.AuthenticationConfig"> & {
+  /**
+   * @generated from oneof lindm.config.v1.AuthenticationConfig.primary
+   */
+  primary: {
+    /**
+     * @generated from field: lindm.config.v1.LocalAuthentication local = 1;
+     */
+    value: LocalAuthentication;
+    case: "local";
+  } | {
+    /**
+     * @generated from field: lindm.config.v1.KeycloakDirectory keycloak = 2;
+     */
+    value: KeycloakDirectory;
+    case: "keycloak";
+  } | {
+    /**
+     * @generated from field: lindm.config.v1.EntraDirectory entra = 3;
+     */
+    value: EntraDirectory;
+    case: "entra";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message lindm.config.v1.AuthenticationConfig.
+ * Use `create(AuthenticationConfigSchema)` to create a new message.
+ */
+export const AuthenticationConfigSchema: GenMessage<AuthenticationConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 7);
+
+/**
+ * Local authentication uses only Postgres, passwords and mandatory WebAuthn.
+ *
+ * @generated from message lindm.config.v1.LocalAuthentication
+ */
+export type LocalAuthentication = Message<"lindm.config.v1.LocalAuthentication"> & {
+};
+
+/**
+ * Describes the message lindm.config.v1.LocalAuthentication.
+ * Use `create(LocalAuthenticationSchema)` to create a new message.
+ */
+export const LocalAuthenticationSchema: GenMessage<LocalAuthentication> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 8);
+
+/**
+ * @generated from message lindm.config.v1.KeycloakDirectory
+ */
+export type KeycloakDirectory = Message<"lindm.config.v1.KeycloakDirectory"> & {
   /**
    * @generated from field: string issuer = 1;
    */
@@ -288,9 +347,89 @@ export type OIDCConfig = Message<"lindm.config.v1.OIDCConfig"> & {
 };
 
 /**
- * Describes the message lindm.config.v1.OIDCConfig.
- * Use `create(OIDCConfigSchema)` to create a new message.
+ * Describes the message lindm.config.v1.KeycloakDirectory.
+ * Use `create(KeycloakDirectorySchema)` to create a new message.
  */
-export const OIDCConfigSchema: GenMessage<OIDCConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 7);
+export const KeycloakDirectorySchema: GenMessage<KeycloakDirectory> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 9);
+
+/**
+ * Microsoft Entra ID public-cloud OIDC and authoritative Microsoft Graph access.
+ *
+ * @generated from message lindm.config.v1.EntraDirectory
+ */
+export type EntraDirectory = Message<"lindm.config.v1.EntraDirectory"> & {
+  /**
+   * @generated from field: string tenant_id = 1;
+   */
+  tenantId: string;
+
+  /**
+   * @generated from field: string client_id = 2;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: string client_secret_file = 3;
+   */
+  clientSecretFile: string;
+
+  /**
+   * @generated from field: string directory_client_id = 4;
+   */
+  directoryClientId: string;
+
+  /**
+   * @generated from field: string directory_client_secret_file = 5;
+   */
+  directoryClientSecretFile: string;
+
+  /**
+   * @generated from field: repeated string administrator_group_object_ids = 6;
+   */
+  administratorGroupObjectIds: string[];
+};
+
+/**
+ * Describes the message lindm.config.v1.EntraDirectory.
+ * Use `create(EntraDirectorySchema)` to create a new message.
+ */
+export const EntraDirectorySchema: GenMessage<EntraDirectory> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 10);
+
+/**
+ * @generated from message lindm.config.v1.BreakGlassPolicy
+ */
+export type BreakGlassPolicy = Message<"lindm.config.v1.BreakGlassPolicy"> & {
+  /**
+   * This allowlist always applies, including when console_only is true.
+   *
+   * @generated from field: repeated string allowed_permissions = 1;
+   */
+  allowedPermissions: string[];
+
+  /**
+   * Additionally require the actual request peer to be a loopback address.
+   *
+   * @generated from field: bool console_only = 2;
+   */
+  consoleOnly: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Duration max_session_lifetime = 3;
+   */
+  maxSessionLifetime?: Duration | undefined;
+
+  /**
+   * @generated from field: bool require_incident_reason = 4;
+   */
+  requireIncidentReason: boolean;
+};
+
+/**
+ * Describes the message lindm.config.v1.BreakGlassPolicy.
+ * Use `create(BreakGlassPolicySchema)` to create a new message.
+ */
+export const BreakGlassPolicySchema: GenMessage<BreakGlassPolicy> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 11);
 

@@ -18,9 +18,10 @@ import (
 const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset> [options]
 
   init   Atomically generate .cache/dev; validate, never overwrite, on reuse.
-  up     Start pinned PostgreSQL/Keycloak, await real TLS/OIDC readiness,
-         migrate as lindm_migrator, restrict metadata writes, bootstrap owner.
-  check  Check PostgreSQL runtime TLS login and real OIDC directory access.
+  up     Start pinned PostgreSQL and optional Keycloak, await TLS readiness,
+         migrate as lindm_migrator, restrict metadata writes. Keycloak bootstraps
+         the fixed owner; local mode prints the explicit one-shot bootstrap command.
+  check  Check PostgreSQL runtime TLS login and, in Keycloak mode, directory access.
   test-integration  Run real PostgreSQL regressions in isolated disposable schemas.
   trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
@@ -28,6 +29,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
          -confirm-delete. Stop the separately supervised lindmd first.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m).
+Init/up accept -authentication local|keycloak (default keycloak). A fixture's mode
+is immutable. Local mode does not start or contact an IdP.
 Only reset accepts -confirm-delete. Requires Linux, Go, Docker with Compose v2,
 and a local Docker daemon. Ports 15432, 18443, 18444 and 18445 are loopback-only.
 Run the app separately after up: go run ./cmd/lindmd serve -config .cache/dev/server.json
@@ -60,6 +63,10 @@ func run() error {
 	root := flags.String("root", ".", "repository root")
 	timeout := flags.Duration("timeout", 10*time.Minute, "overall command deadline")
 	var confirm bool
+	authentication := "keycloak"
+	if verb == "init" || verb == "up" {
+		flags.StringVar(&authentication, "authentication", "keycloak", "primary authentication: local or keycloak")
+	}
 	if verb == "reset" {
 		flags.BoolVar(&confirm, "confirm-delete", false, "destroy this checkout's fixture and volumes")
 	}
@@ -93,8 +100,10 @@ func run() error {
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 	operations := map[string]func(context.Context, string) error{
-		"init": devlab.Init, "up": devlab.Up, "check": devlab.Check,
-		"down": devlab.Down, "reset": devlab.Reset,
+		"init":  func(ctx context.Context, root string) error { return devlab.Init(ctx, root, authentication) },
+		"up":    func(ctx context.Context, root string) error { return devlab.Up(ctx, root, authentication) },
+		"check": devlab.Check,
+		"down":  devlab.Down, "reset": devlab.Reset,
 		"test-integration": devlab.TestIntegration,
 		"trust":            devlab.Trust,
 	}
@@ -104,7 +113,10 @@ func run() error {
 	}
 	fmt.Printf("%s complete\n", verb)
 	if verb == "init" || verb == "up" {
-		fmt.Printf("Server config: %s\nBrowser trust CA: %s\nOwner password file: %s\n", filepath.Join(devlab.FixturePath(absolute), "server.json"), filepath.Join(devlab.FixturePath(absolute), "transport-ca.crt"), filepath.Join(devlab.FixturePath(absolute), "owner-password"))
+		fmt.Printf("Server config: %s\nBrowser trust CA: %s\n", filepath.Join(devlab.FixturePath(absolute), "server.json"), filepath.Join(devlab.FixturePath(absolute), "transport-ca.crt"))
+		if authentication == "keycloak" {
+			fmt.Printf("Owner password file: %s\n", filepath.Join(devlab.FixturePath(absolute), "owner-password"))
+		}
 	}
 	return nil
 }

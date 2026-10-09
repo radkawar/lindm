@@ -30,3 +30,53 @@ type PackagePageCursor struct {
 	CreatedAt    pgtype.Timestamptz
 	ExpiresAt    pgtype.Timestamptz
 }
+
+type ServiceAction struct {
+	ID                     uuid.UUID
+	DeviceID               uuid.UUID
+	GenerationID           uuid.UUID
+	AssignmentID           uuid.UUID
+	ResourceID             uuid.UUID
+	ResourceSequence       int64
+	IntentEnvelope         []byte
+	IntentDocument         []byte
+	IssuedAt               pgtype.Timestamptz
+	ExpiresAt              pgtype.Timestamptz
+	ChallengeProof         []byte
+	StartGrantEnvelope     []byte
+	StartAuthorizedAt      pgtype.Timestamptz
+	ClosedAt               pgtype.Timestamptz
+	ClosedReason           string
+	ResultNonce            []byte
+	NonceExpiresAt         pgtype.Timestamptz
+	ActionRevision         pgtype.Numeric
+	AttestationEnvelope    []byte
+	AttestationCertificate []byte
+	StatusDocument         []byte
+	AttestedAt             pgtype.Timestamptz
+	ReceivedAt             pgtype.Timestamptz
+}
+
+type ServiceAssignment struct {
+	ID                   uuid.UUID
+	DeviceID             uuid.UUID
+	GenerationID         uuid.UUID
+	RequestID            uuid.UUID
+	RequestDigest        []byte
+	ActorID              uuid.UUID
+	AuthorizationVersion int64
+	RevisionID           *uuid.UUID
+	Document             []byte
+	AssignedAt           pgtype.Timestamptz
+	BlockedReason        string
+}
+
+type ServiceAssignmentResource struct {
+	AssignmentID uuid.UUID
+	ResourceID   uuid.UUID
+	UnitName     string
+	Position     int32
+	Document     []byte
+	Disposition  int16
+	Reason       string
+}

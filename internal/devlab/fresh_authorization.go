@@ -35,6 +35,9 @@ func checkFreshAuthorization(ctx context.Context, root string, evidence io.Write
 	if err := validateFixture(dir); err != nil {
 		return err
 	}
+	if err := requireKeycloakFixture(dir); err != nil {
+		return err
+	}
 	tlsConfig, err := trustClient(dir)
 	if err != nil {
 		return err

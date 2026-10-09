@@ -26,6 +26,14 @@ func (s *Store) Get(ctx context.Context, profileID uuid.UUID, revisionID *uuid.U
 	return s.readRevision(ctx, profiledb.New(s.pool), profileID, revisionID)
 }
 
+// GetInTransaction reads an immutable revision using the caller's transaction.
+func (s *Store) GetInTransaction(ctx context.Context, tx pgx.Tx, profileID, revisionID uuid.UUID) (*adminv1.ServiceProfileRevision, error) {
+	if tx == nil || profileID == uuid.Nil || revisionID == uuid.Nil {
+		return nil, ErrProfileRejected
+	}
+	return s.readRevision(ctx, profiledb.New(tx), profileID, &revisionID)
+}
+
 func (s *Store) readRevision(ctx context.Context, q *profiledb.Queries, profileID uuid.UUID, revisionID *uuid.UUID) (*adminv1.ServiceProfileRevision, error) {
 	row, err := q.GetProfileRevision(ctx, profiledb.GetProfileRevisionParams{ProfileID: profileID, RevisionID: revisionID})
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -1,7 +1,7 @@
 //go:build linux
 
-// Package transport runs the unprivileged observation process. It cannot enroll,
-// reset protected identity or read device private keys.
+// Package transport runs unprivileged observation and signed service-work relays.
+// It cannot enroll, reset protected identity or read device private keys.
 package transport
 
 import (
@@ -57,7 +57,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	if err := r.report(ctx); err != nil {
 		return err
 	}
-	stopManagement := startExecutionTrustLoop(ctx, executor, r.authorityGate)
+	management := &managementLoop{executor: executor, gate: r.authorityGate}
+	stopManagement := management.start(ctx)
 	defer stopManagement()
 	for {
 		if err := ctx.Err(); err != nil {

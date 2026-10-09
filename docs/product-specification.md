@@ -1,6 +1,9 @@
 # Linux MDM product specification
 
-Status: proposed implementation contract; no product capabilities are implemented or certified yet.
+Status: release-scoped implementation contract. Enrollment, inventory, profile catalog
+and signed local service execution have exercised implementations; production
+dispatch and the revised authentication modes are not yet qualified. No release is
+certified. See the [evidence ledger](implementation-plan.md#2-evidence-ledger).
 Research baseline: 2026-10-08. Working name: `lindm`.
 
 ## 1. Product outcome
@@ -11,10 +14,30 @@ those policies actually took effect, and safely manage the device through retire
 Desktop experience is the priority. Company-owned servers are also in the commercial
 launch scope and share the management core, not the desktop assumptions.
 
-The first commercial release includes the requirements below. Implementation
-milestones are internal integration gates, not permission to ship a reduced product
-as production-ready. "All commercial features" is made finite by this specification;
-new requirements amend this contract rather than silently expanding it.
+The first sellable release is **R1: connected mutable-Linux management**, not the
+entire roadmap below. It includes secure single-host operation, local administrator
+authentication, optional Keycloak or Entra integration, enrollment/inventory,
+immutable service-state profiles, device assignment, server-driven execution and
+visible authenticated results. Ubuntu LTS and Fedora/RHEL-family qualification are
+bounded by the exact branches and resource cells in [verification](verification.md).
+No resource, derivative, architecture or desktop workflow inherits support from a
+neighboring cell.
+
+The first end-to-end implementation priority is one systemd service resource:
+console intent → server work → installed agent → native effect → device-signed result
+→ console. Complete that loop before expanding providers or hardening unrelated
+native edge cases. Delivery leases, revision changes and uncertain outcomes must be
+exercised on that path, not inferred from standalone agent commands.
+
+R1 excludes destructive actions, encryption-key recovery, graphical remote
+assistance, full air-gap, SCIM/Okta/Google, replicated HA and the 100,000-device claim.
+Additional configuration, software/OS lifecycle and employee workflows have their
+own later release gates; they are not prerequisites for selling the qualified R1
+capabilities. Arch, Tumbleweed, Fedora Atomic and NixOS stay on the roadmap as a
+deliberate differentiator: employees can keep the Linux they are productive on. They
+are not R1 providers, and each ships only after its own native contract passes.
+The P requirements retain stable IDs as a roadmap, with their release
+allocation below. New requirements amend that allocation explicitly.
 
 ### Confirmed product decisions
 
@@ -23,20 +46,28 @@ new requirements amend this contract rather than silently expanding it.
 - One organization per installation; single-host deployment must be first-class.
 - Desktop-first, with company-owned servers included. No graphical dependencies in
   the server agent. Desktop integrations are an unprivileged presentation layer.
-- Both connected and genuinely air-gapped installations are required at launch.
-- Remote lock/wipe must be capability-gated, audited, and approval-controlled.
-  Advertised destructive capabilities also require physical-hardware validation.
+- R1 supports connected operation. Complete air-gapped operation is a later release
+  with independent isolated-install/manage/update/restore evidence.
+- R1 exposes no lock, quarantine, wipe or other destructive-action workflow.
+  Later destructive capabilities require approvals and physical-hardware validation.
 - Production security, scaling, repeatable lifecycle testing, maintainable automation,
   code review, linting, and Git hooks are requirements from the start.
-- Launch families include the core matrix, SUSE enterprise, maintained legacy branches,
-  Arch/Tumbleweed, Fedora Atomic desktops and NixOS. Each native management model gets
-  its own qualification; the [matrix](verification.md) names exact initial branches.
-- Employee entitlements support both device and person assignments, with explicit
-  organizational-identity/local-account bindings and no cross-user secret inheritance.
-- Certify Keycloak (including offline and SAML brokerage), Entra ID, Okta and Google
-  Workspace with their actual identity lifecycle integrations, not just an OIDC badge.
-- Graphical remote assistance is built into the product with explicit user consent;
-  it is not outsourced to a third-party support product or an unattended root shell.
+- R1 targets Ubuntu LTS and Fedora/RHEL-family mutable systems. Exact versions,
+  vendors and architectures require separate qualification; Debian, SUSE and legacy
+  branches move to later gates.
+- Arch and Tumbleweed are a committed later rolling-release gate: pinned snapshots,
+  whole-system upgrades and continuously qualified candidates, never partial upgrades.
+- NixOS and Fedora Atomic are committed later product scopes with owner-approved
+  generation/deployment activation, not aliases for mutable DEB/RPM providers.
+- Device assignments ship first. Person assignments and employee integrations follow
+  under explicit organizational-identity/local-account binding gates.
+- Built-in local admin accounts use Postgres, Argon2id and mandatory WebAuthn.
+  Keycloak and Entra are optional external directory adapters in R1; Okta, Google,
+  SCIM and SAML/AD/FreeIPA broker qualification follow. Keycloak is not mandatory.
+- Lindm authenticates its own administrators only. It does not become an IdP or
+  issue identity tokens for other applications.
+- Built-in consent-controlled graphical assistance remains a later product
+  capability, with its own portal, WebRTC and local TURN qualification.
 
 ### Definitions
 
@@ -84,35 +115,52 @@ Connectivity is orthogonal: online, delayed, offline, or stale must not overwrit
 lifecycle. Deleting a record is not unenrollment. Revoking an identity does not erase
 local data. Uninstall and retirement are separately tracked operations.
 
-## 3. Commercial release requirements
+## 3. Release requirements and allocation
 
-All rows are launch requirements for their certified capability combinations. A
-capability limitation must have a visible reason and remediation, not a green check.
-The test references are scenario families in [verification](verification.md).
+The table below describes the complete roadmap, **not a universal launch checklist**.
+R1 requires the explicitly allocated subset; later releases require their allocated
+capabilities and applicable lifecycle evidence. A missing or deferred capability has
+a visible reason, not a green check. The scenario families remain in
+[verification](verification.md).
 
-| ID  | Capability and required behavior                                                                                                                                                             | Acceptance evidence                                                                                                                                                |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P01 | Install and bootstrap a single host using signed artifacts, external hostname/TLS, PostgreSQL, durable artifact storage, and first-owner setup                                               | Fresh connected and offline installs; restart survives; bootstrap cannot be claimed a second time (L01, L14)                                                       |
-| P02 | OIDC/MFA/step-up, group/role mapping, scoped service accounts, SCIM and supported SAML broker; certified Keycloak/Entra/Okta/Google directory lifecycles                                     | Actual login, existing-session disable/group removal, source outage, immutable correlation and bound revocation; broker flow (L02)                                 |
-| P03 | Owner/admin/operator/helpdesk/auditor roles and group-scoped custom roles; separate recovery-key, remote-execution, destructive-action, approval, and infrastructure permissions             | Every RPC denies unauthorized and out-of-scope identities; no self-approval; no scope leakage in counts/exports (L02, L13)                                         |
-| P04 | Interactive and unattended enrollment, short-lived one-use grants, approval flows, offline-site enrollment, reinstall and identity recovery                                                  | Token races, expiration, cloned image, interrupted enrollment, identity renewal/revocation, and re-enrollment (L03)                                                |
-| P05 | Hardware/OS/software inventory, ownership, labels, custom typed attributes, last-seen and data freshness, searchable pagination and export                                                   | Real machines and packages; architecture, package epochs, serial absence, changed boot IDs and stale records handled (L04)                                         |
-| P06 | Static/dynamic groups, assignments, exclusions, immutable profile revisions, previews, staged rollout, drift detection and remediation                                                       | Target preview matches execution snapshot; conflicting resources rejected; obsolete revisions do not execute (L05)                                                 |
-| P07 | Native security/configuration controls: local accounts/groups and sudo, SSH, session/password settings, service state, firewall, time, trust stores, Wi-Fi/Ethernet/VPN and DNS/proxy        | Per-backend enforcement plus fresh observation, reboot persistence, drift repair, safe network rollback and uninstall ownership (L05, L10)                         |
-| P08 | Repository/software management across DEB/RPM/Arch packages and atomic/Nix deployments, Flatpak/Snap capability providers, device/person self-service assignments                            | Native dependencies/signatures/transaction ownership, source failure, offline mirrors and per-person authorization; no unsafe partial upgrades (L06)               |
-| P09 | OS/security update policies, advisory reporting, rings/canaries, maintenance windows, restart deadlines/deferrals, exclusions and server availability budgets                                | Real kernel/package updates and reboot; interrupted transactions; DST/timezone changes; rollout automatically pauses on threshold (L07)                            |
-| P10 | Encryption inventory, supported LUKS recovery escrow and rotation, TPM/Secure Boot posture, controlled recovery access                                                                       | Recovery unlock after cold boot, key rotation and escrow failure recovery on qualified configurations; never generic live encryption (L10, L15)                    |
-| P11 | Certificates and identity: trust roots, device/user certificate enrollment and rotation, revocation, enterprise EAP-TLS/VPN credentials, SSSD/realmd directory configuration where certified | Certificate renewal, removal, wrong EKU/name rejection, network authentication, directory outage and offline-login policy (L10)                                    |
-| P12 | Compliance rules, exceptions with expiry, vulnerability findings using distro advisories, remediation workflows and evidence exports                                                         | Backported fixes and package epochs correctly classified; stale feeds/observations are unknown; expired exception resurfaces (L11)                                 |
-| P13 | Desktop status/disclosure, approved self-service apps, reboot notices/deferrals, recovery interaction and support requests; GNOME and KDE paths                                              | Actual visible Wayland and applicable X11 sessions, accessibility and multi-user isolation; no dependency on a tray extension (L09)                                |
-| P14 | Audited diagnostics, reboot/shutdown, support bundles, built-in consent-controlled graphical assistance and restricted script escape hatch                                                   | Actual console/employee screen-share/control UX, local/remote termination, session isolation and local TURN under air-gap; scripts remain distinct (L09, L12, L16) |
-| P15 | Capability-gated session lock, access restriction/quarantine and sanitization plans with two-person approval, target preview and physical validation                                         | Unsupported plans refused; approvals bind exact targets/action/revision/expiry; ambiguous result stays unknown; qualified physical evidence (L13, L15)             |
-| P16 | Safe offboarding: remove owned profiles/apps/credentials by policy, revoke device/user access, transfer ownership, retain audit and re-enroll deliberately                                   | No unrelated configuration/data removal; cancellation/partial cleanup visible; server reboots not implied by retirement (L08)                                      |
-| P17 | Full admin API/CLI parity, versioned RPC, stable cursors, idempotent mutations, signed webhooks, scheduled reports, SIEM/CMDB export and Git-managed policy import                           | Retry/deduplication, ordering and delivery failure visible; secrets excluded; preview/change authorization same as UI (L12)                                        |
-| P18 | Tamper-evident audit export, configurable retention/legal holds, privacy controls, event alerts, backup/restore, key rotation, upgrade/rollback operations and metrics                       | Restore drills, audit continuity, retention boundary tests, external archive verification and failure alerts (L14)                                                 |
-| P19 | Offline install/update/software/advisory distribution, local IdP and PKI, site mirrors, signed import/export bundles and explicit freshness                                                  | Full isolated lifecycle with egress denied, expired/replayed/corrupt bundles refused; local management continues (L16)                                             |
-| P20 | Native package/image/generation delivery, unattended agent updates, compatibility, reproducible releases, SBOM/provenance/signatures and distro certification                                | Full matrix install/update/recovery and two clean builds with matching unsigned payload digests; old-agent/new-server and rejection attacks (L08, L17)             |
-| P21 | Horizontal control-plane/worker operation with durable jobs, isolation/backpressure, predictable capacity and no mandatory message broker                                                    | Sustained load and failover gates in operations; no duplicate destructive effects or lost accepted work (L18)                                                      |
+| Requirements       | R1 release contract                                                                                                                                                           | Later gated scope                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| P01, P18, P20      | Secure connected single-host deployment; first-owner setup; backup/restore, upgrade/recovery, signed native agents, audit and release evidence for the published cells        | Air-gap, additional deployment topologies/platforms, broader retention/export policy              |
+| P02, P03           | Local administrators with mandatory WebAuthn; optional Keycloak and Entra lifecycle adapters; existing roles, service-execution permission and audited restricted break-glass | Okta/Google, SCIM and broker certification, finer group/custom roles and service accounts         |
+| P04, P05           | Connected enrollment, renewal/revocation/recovery; actual host/package inventory, freshness and bounded search/detail                                                         | Offline enrollment and additional inventory/ownership integrations                                |
+| P06, P07           | Explicit device assignments of immutable systemd-service state; preview/conflict rejection, durable server dispatch, authenticated results and safe revision changes          | Dynamic targeting, staged campaigns and each additional native resource kind independently        |
+| P08, P09, P11, P12 | No software installation, OS update, enterprise credential or compliance-engine claim                                                                                         | Typed package/OS lifecycle, certificates/directory configuration, advisory/compliance providers   |
+| P10, P13–P15       | No encryption recovery, employee desktop, graphical assistance, lock/quarantine or destructive-action claim                                                                   | Separate desktop, support, recovery and physical-safety gates                                     |
+| P16, P17           | Explicit identity revocation with retained evidence; versioned UI/API management and idempotent dispatch/results                                                              | Ownership-safe native resource removal, person offboarding, broader CLI/integration/export parity |
+| P19, P21           | Connected single-host capacity published only after measurement; bounded durable work without a mandatory broker                                                              | Complete air-gap; replicated HA and separately measured 100,000-device capacity                   |
+
+R1 is a service-state and inventory management product, not a claim to implement all
+P07 controls or to replace a package/patch manager. Later capabilities may ship when
+their own gates pass; completing the entire roadmap is not a dependency of R1.
+
+| ID  | Capability and required behavior                                                                                                                                                                                                        | Acceptance evidence                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P01 | Install and bootstrap a single host using signed artifacts, external hostname/TLS, PostgreSQL, durable artifact storage, and first-owner setup                                                                                          | Fresh connected and offline installs; restart survives; bootstrap cannot be claimed a second time (L01, L14)                                                                               |
+| P02 | Built-in local admin accounts with Argon2id and mandatory WebAuthn; optional Keycloak/Entra lifecycle adapters; opaque sessions, roles, CSRF, authorization fencing and audited break-glass; later Okta/Google, SCIM and SAML brokerage | Actual local/external login, immediate local disable, bounded external revocation/outage denial, WebAuthn enrollment and replay rejection, restricted break-glass; later broker flow (L02) |
+| P03 | Owner/admin/operator/helpdesk/auditor roles and group-scoped custom roles; separate recovery-key, remote-execution, destructive-action, approval, and infrastructure permissions                                                        | Every RPC denies unauthorized and out-of-scope identities; no self-approval; no scope leakage in counts/exports (L02, L13)                                                                 |
+| P04 | Interactive and unattended enrollment, short-lived one-use grants, approval flows, offline-site enrollment, reinstall and identity recovery                                                                                             | Token races, expiration, cloned image, interrupted enrollment, identity renewal/revocation, and re-enrollment (L03)                                                                        |
+| P05 | Hardware/OS/software inventory, ownership, labels, custom typed attributes, last-seen and data freshness, searchable pagination and export                                                                                              | Real machines and packages; architecture, package epochs, serial absence, changed boot IDs and stale records handled (L04)                                                                 |
+| P06 | Static/dynamic groups, assignments, exclusions, immutable profile revisions, previews, staged rollout, drift detection and remediation                                                                                                  | Target preview matches execution snapshot; conflicting resources rejected; obsolete revisions do not execute (L05)                                                                         |
+| P07 | Native security/configuration controls: local accounts/groups and sudo, SSH, session/password settings, service state, firewall, time, trust stores, Wi-Fi/Ethernet/VPN and DNS/proxy                                                   | Per-backend enforcement plus fresh observation, reboot persistence, drift repair, safe network rollback and uninstall ownership (L05, L10)                                                 |
+| P08 | Repository/software management across DEB/RPM/Arch packages and atomic/Nix deployments, Flatpak/Snap capability providers, device/person self-service assignments                                                                       | Native dependencies/signatures/transaction ownership, source failure, offline mirrors and per-person authorization; no unsafe partial upgrades (L06)                                       |
+| P09 | OS/security update policies, advisory reporting, rings/canaries, maintenance windows, restart deadlines/deferrals, exclusions and server availability budgets                                                                           | Real kernel/package updates and reboot; interrupted transactions; DST/timezone changes; rollout automatically pauses on threshold (L07)                                                    |
+| P10 | Encryption inventory, supported LUKS recovery escrow and rotation, TPM/Secure Boot posture, controlled recovery access                                                                                                                  | Recovery unlock after cold boot, key rotation and escrow failure recovery on qualified configurations; never generic live encryption (L10, L15)                                            |
+| P11 | Certificates and identity: trust roots, device/user certificate enrollment and rotation, revocation, enterprise EAP-TLS/VPN credentials, SSSD/realmd directory configuration where certified                                            | Certificate renewal, removal, wrong EKU/name rejection, network authentication, directory outage and offline-login policy (L10)                                                            |
+| P12 | Compliance rules, exceptions with expiry, vulnerability findings using distro advisories, remediation workflows and evidence exports                                                                                                    | Backported fixes and package epochs correctly classified; stale feeds/observations are unknown; expired exception resurfaces (L11)                                                         |
+| P13 | Desktop status/disclosure, approved self-service apps, reboot notices/deferrals, recovery interaction and support requests; GNOME and KDE paths                                                                                         | Actual visible Wayland and applicable X11 sessions, accessibility and multi-user isolation; no dependency on a tray extension (L09)                                                        |
+| P14 | Audited diagnostics, reboot/shutdown, support bundles, built-in consent-controlled graphical assistance and restricted script escape hatch                                                                                              | Actual console/employee screen-share/control UX, local/remote termination, session isolation and local TURN under air-gap; scripts remain distinct (L09, L12, L16)                         |
+| P15 | Capability-gated session lock, access restriction/quarantine and sanitization plans with two-person approval, target preview and physical validation                                                                                    | Unsupported plans refused; approvals bind exact targets/action/revision/expiry; ambiguous result stays unknown; qualified physical evidence (L13, L15)                                     |
+| P16 | Safe offboarding: remove owned profiles/apps/credentials by policy, revoke device/user access, transfer ownership, retain audit and re-enroll deliberately                                                                              | No unrelated configuration/data removal; cancellation/partial cleanup visible; server reboots not implied by retirement (L08)                                                              |
+| P17 | Full admin API/CLI parity, versioned RPC, stable cursors, idempotent mutations, signed webhooks, scheduled reports, SIEM/CMDB export and Git-managed policy import                                                                      | Retry/deduplication, ordering and delivery failure visible; secrets excluded; preview/change authorization same as UI (L12)                                                                |
+| P18 | Tamper-evident audit export, configurable retention/legal holds, privacy controls, event alerts, backup/restore, key rotation, upgrade/rollback operations and metrics                                                                  | Restore drills, audit continuity, retention boundary tests, external archive verification and failure alerts (L14)                                                                         |
+| P19 | Offline install/update/software/advisory distribution, local IdP and PKI, site mirrors, signed import/export bundles and explicit freshness                                                                                             | Full isolated lifecycle with egress denied, expired/replayed/corrupt bundles refused; local management continues (L16)                                                                     |
+| P20 | Native package/image/generation delivery, unattended agent updates, compatibility, reproducible releases, SBOM/provenance/signatures and distro certification                                                                           | Full matrix install/update/recovery and two clean builds with matching unsigned payload digests; old-agent/new-server and rejection attacks (L08, L17)                                     |
+| P21 | Horizontal control-plane/worker operation with durable jobs, isolation/backpressure, predictable capacity and no mandatory message broker                                                                                               | Sustained load and failover gates in operations; no duplicate destructive effects or lost accepted work (L18)                                                                              |
 
 ### Management, not a script runner
 
@@ -190,8 +238,9 @@ agent, secure wipe on arbitrary hardware, or universal live disk encryption is
 claimed. Automated enrollment is achievable through trusted installer/image and
 provisioning integrations, not a nonexistent cross-vendor hardware registry.
 
-Commercial launch requires every P requirement and applicable lifecycle gate, a
-published feature-level support matrix, security review, support/incident runbooks,
-and an independently reviewable evidence bundle. Exceptions cannot be labeled
-"supported". See [implementation sequence](implementation-plan.md) for dependencies
-and [research](research.md) for evidence versus design decisions.
+Each commercial release requires its explicitly allocated requirements and lifecycle
+gates, a published resource-level support matrix, security review, support/incident
+runbooks, measured capacity and an independently reviewable evidence bundle.
+Deferred capabilities and unqualified cells are not advertised as supported; they do
+not block a release that excludes them. See the [implementation sequence](implementation-plan.md)
+for release gates and [research](research.md) for evidence versus design decisions.

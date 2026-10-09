@@ -229,7 +229,7 @@ func (q *Queries) GetPrincipalForUpdate(ctx context.Context, id uuid.UUID) (Prin
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
 SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at
+  absolute_expires_at, revoked_at, break_glass, incident_reason
 FROM sessions
 WHERE token_hash = $1
 `
@@ -245,6 +245,8 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.IdleExpiresAt,
 		&i.AbsoluteExpiresAt,
 		&i.RevokedAt,
+		&i.BreakGlass,
+		&i.IncidentReason,
 	)
 	return i, err
 }
@@ -414,7 +416,7 @@ func (q *Queries) ListPrincipalGroupPaths(ctx context.Context, principalID uuid.
 }
 
 const lockDeploymentIdentity = `-- name: LockDeploymentIdentity :one
-SELECT id, owner_principal_id, initialized_at
+SELECT id, deployment_id, owner_principal_id, initialized_at
 FROM deployment_identity
 WHERE id = true
 FOR UPDATE
@@ -423,7 +425,12 @@ FOR UPDATE
 func (q *Queries) LockDeploymentIdentity(ctx context.Context) (DeploymentIdentity, error) {
 	row := q.db.QueryRow(ctx, lockDeploymentIdentity)
 	var i DeploymentIdentity
-	err := row.Scan(&i.ID, &i.OwnerPrincipalID, &i.InitializedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.DeploymentID,
+		&i.OwnerPrincipalID,
+		&i.InitializedAt,
+	)
 	return i, err
 }
 
@@ -540,7 +547,7 @@ WHERE token_hash = $1
   AND idle_expires_at > now()
   AND absolute_expires_at > now()
 RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at
+  absolute_expires_at, revoked_at, break_glass, incident_reason
 `
 
 func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, error) {
@@ -554,6 +561,8 @@ func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, 
 		&i.IdleExpiresAt,
 		&i.AbsoluteExpiresAt,
 		&i.RevokedAt,
+		&i.BreakGlass,
+		&i.IncidentReason,
 	)
 	return i, err
 }

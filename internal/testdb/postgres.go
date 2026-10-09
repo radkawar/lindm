@@ -69,6 +69,9 @@ func New(ctx context.Context, dsn string) (_ *Database, resultErr error) {
 	if err := db.Migrate(ctx, database.Pool); err != nil {
 		return nil, err
 	}
+	if err := db.Check(ctx, database.Pool); err != nil {
+		return nil, err
+	}
 	database.Conn, err = pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
 	if err != nil {
 		return nil, errors.New("connect isolated test connection failed")

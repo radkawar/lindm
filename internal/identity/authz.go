@@ -47,9 +47,14 @@ type directorySnapshot struct {
 	RefreshFailed        bool
 	AuthorizationVersion int64
 	AuthorizationRole    string
+	Local                bool
+	BreakGlass           bool
 }
 
 func needsRefresh(now time.Time, snap directorySnapshot) bool {
+	if snap.Local {
+		return false
+	}
 	if snap.RefreshFailed || !snap.Observed || snap.ObservedAt.IsZero() {
 		return true
 	}
@@ -57,7 +62,7 @@ func needsRefresh(now time.Time, snap directorySnapshot) bool {
 }
 
 func decideAccess(now time.Time, configuredIssuer string, adminGroups []string, snap directorySnapshot) accessDecision {
-	if snap.RefreshFailed || !fresh(now, snap) {
+	if !snap.Local && (snap.RefreshFailed || !fresh(now, snap)) {
 		return accessDecision{Kind: accessForbidden}
 	}
 	if !snap.Qualified || snap.Issuer != configuredIssuer || snap.Issuer == "" || snap.Subject == "" {
@@ -75,6 +80,9 @@ func decideAccess(now time.Time, configuredIssuer string, adminGroups []string, 
 			AuditAction:    auditDisabled,
 			AuditReason:    reasonDisabled,
 		}
+	}
+	if snap.Local {
+		return accessDecision{Kind: accessOK, Role: snap.AuthorizationRole}
 	}
 	return accessDecision{Kind: accessOK, Role: effectiveRole(snap.PinnedRole, snap.Groups, adminGroups)}
 }
@@ -111,12 +119,19 @@ func effectiveRole(pinned string, groups, adminGroups []string) string {
 	return ""
 }
 
-func qualifiedLineage(issuer, subject, connector, upstreamProvider, upstreamSubject, brokerIssuer, brokerSubject string) bool {
-	return connector == connectorKeycloak &&
+func (s *Service) qualifiedLineage(issuer, subject, connector, upstreamProvider, upstreamSubject, brokerIssuer, brokerSubject string) bool {
+	return connector == s.connector() &&
 		brokerIssuer == "" &&
 		brokerSubject == "" &&
 		upstreamProvider == issuer &&
 		upstreamSubject == subject &&
 		issuer != "" &&
 		subject != ""
+}
+
+func (s *Service) connector() string {
+	if s.entraTenant != uuid.Nil {
+		return connectorEntra
+	}
+	return connectorKeycloak
 }

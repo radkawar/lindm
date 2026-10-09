@@ -144,10 +144,17 @@ func oidcReady(ctx context.Context, dir string) error {
 func awaitReady(ctx context.Context, dir string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
+	local, err := localFixture(dir)
+	if err != nil {
+		return err
+	}
 	checks := []struct {
 		name  string
 		check func(context.Context, string) error
 	}{{"PostgreSQL TLS/runtime login", databaseReady}, {"Keycloak HTTPS/discovery/directory", oidcReady}}
+	if local {
+		checks = checks[:1]
+	}
 	for _, check := range checks {
 		var last error
 		for {

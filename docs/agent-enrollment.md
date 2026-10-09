@@ -121,12 +121,10 @@ recovery epoch and exact versioned capabilities for separate plan/start roles.
 Empty delegates revoke all online execution signers. Current root, TLS-CA and
 release keys cannot become online execution delegates.
 
-The current protected SQLite schema is version 3. Genuine version-1 and version-2
-databases migrate transactionally after validating existing authority; original
-identity/trust bytes and independent revisions are preserved. The version-1 path
-adds the separately revisioned execution-trust singleton. Missing or damaged
-current-schema trust is recovery hold, not an empty replacement. The executor
-verifies complete root/delegation proposals before one durable commit and
+The protected SQLite journal supports only its current version-1 schema, including
+the separately revisioned execution-trust singleton. Unexpected versions, missing
+tables or damaged trust enter recovery hold, not migration or an empty replacement.
+The executor verifies complete root/delegation proposals before one durable commit and
 acknowledgment. Wrong quorum, delegation rollback and recovery-floor regression
 return `permission_denied` with `Lindm-Reason: execution_trust_rejected`, without
 changing accepted authority or putting a healthy installation in recovery hold.
@@ -139,8 +137,8 @@ across restart. A local clock regression blocks new acceptance, not reconstructi
 of a historical receipt.
 
 The maintained `lab vm lifecycle -execution-trust` lane exercises the installed
-CLI as the network UID after upgrade. Use a genuine schema-version-1 first package
-and the new second package to qualify migration. It rejects a wrong quorum and
+CLI as the network UID after a package binary upgrade; both packages must use the
+current journal schema. It rejects a wrong quorum and
 independently root-signed delegation/recovery rollback proposals, rotates roots,
 revokes delegates and compares public TLS identity/pins. After reboot and
 remove/reinstall it first rejects the previously accepted rotation, then replays
@@ -226,9 +224,11 @@ can establish success; otherwise uncertainty remains persistent. It never replay
 the old effect. Historical signatures are checked at their recorded acceptance
 times; current revocation blocks new effects without erasing old evidence.
 
-Schema 3 normalizes actions, resource floors and capacity accounting alongside the
-unchanged identity/trust records. Admission and transitions compare all relevant
-revisions transactionally. Limits are 65,536 actions, 128 KiB per encoded record and
+The single journal schema (version 1) normalizes actions, resource floors and
+capacity accounting alongside identity/trust records. There are no schema-upgrade
+paths; an unexpected version enters recovery hold without rewriting protected
+state. Admission and transitions compare all relevant revisions transactionally.
+Limits are 65,536 actions, 128 KiB per encoded record and
 a 256 MiB record budget. Each unfinished action reserves its entire 128 KiB allowance,
 including across restart; terminal records consume their actual size. New work is
 rejected at capacity, rather than accepting an effect whose outcome cannot fit.
@@ -605,6 +605,69 @@ discards its in-memory timestamps. This is a no-effect check, not service execut
 qualification. Cleanup stops and joins the private server before dropping its
 owned database without force.
 
+### Running the connected service-dispatch lane
+
+With the development PostgreSQL/Keycloak dependencies running, initialize the
+development enrollment trust with `go run ./cmd/dev trust` if it is absent (for
+example after a dev reset). Build current `artifacts/bin/lab` and
+`artifacts/bin/lindmd` binaries; the lab executable must be portable to the guest,
+so use `CGO_ENABLED=0 go build -trimpath -o artifacts/bin/lab ./cmd/lab`. Then run:
+
+```sh
+artifacts/bin/lab vm dispatch \
+  -manifest lab/images/ubuntu-noble-amd64.json \
+  -lindmd artifacts/bin/lindmd -record "$HOME/.cache/dispatch-ubuntu.json"
+artifacts/bin/lab vm dispatch \
+  -manifest lab/images/fedora-44-x86_64.json \
+  -lindmd artifacts/bin/lindmd -record "$HOME/.cache/dispatch-fedora.json"
+```
+
+Use new record paths. This command builds the real agent into a development-signed
+RPM or signed APT archive using the lifecycle package path, installs it in an owned
+disposable guest, and starts a real isolated server/database with fresh online
+plan/start keys. The owner admits their offline-root-signed delegation through
+`UpdateExecutionAuthority`; no lab signer issues plans or start grants and no
+manual service-prepare/start commands are used. The guest imports trust and relays
+dispatch automatically. Fedora must remain SELinux Enforcing.
+
+Before enrollment the lab installs an inert `labdispatch.service` fixture and
+checks its inactive/disabled baseline using independent `systemctl`. Profile
+revision 1 enables/starts it; revision 2 disables/stops it with a higher resource
+sequence. A further action remains open during a real server restart and must
+complete under the same action ID. Reassigning unchanged desired state must
+succeed without a start grant. Two further assignments must succeed with guest
+network time disabled and its clock stepped first +90 seconds and then −90
+seconds relative to the host. Each case restores the guest clock and its original
+NTP setting. Certificate and admitted trust validity are never weakened.
+Revocation must deny another assignment, be observed by the automatic transport
+and leave native state unchanged. Each completion must contain verified device
+history, and remain in `recent_actions`.
+A persistent native start witness detects extra starts; timestamps, IDs,
+sequences, package/image/lab/server digests and native observations are recorded.
+Failed runs can also produce a record with `passed: false`; successful evidence
+is returned only after owned server/database/VM cleanup.
+
+Add `-hold 45m` (maximum one hour) to inspect the live authenticated console after
+the execution scenarios and before revocation. This mode reserves
+`127.0.0.1:18444` at startup; the ordinary dev server must not be running there.
+The printed origin is `https://localhost:18444`, with the existing development
+transport CA (`.cache/dev/transport-ca.crt`) and normal Keycloak callback. Trust
+that CA in the browser; no certificate-error bypass is provided. Sign in through
+Keycloak as `owner` using the protected `.cache/dev/owner-password` file.
+The lab prints `DISPATCH HOLD READY` only after successful pre-revocation checks.
+The device and automatic relay remain active for browser assignments. Timeout or
+SIGINT ends the hold, obtains a fresh automated owner session, waits for outstanding
+work to settle, re-reads native state, then runs revocation and owned cleanup.
+The final record notes whether the assignment head changed during browser
+inspection. Records are written after cleanup, not when the hold begins.
+
+Unstarted supersession is **covered by integration test, not natively exercised**.
+Minting is acquisition-driven and the executor holds the mTLS signer, so stopping
+it prevents acquisition rather than deterministically pausing before preparation.
+No test-only product fault seam or fabricated native result is used. This lane
+does not replace the local trust-rotation lifecycle scenarios, whose mutual
+exclusion remains intentional.
+
 ### Running the native service-provider lane
 
 Build the lab with `make build`, then run the provider against a fresh disposable
@@ -672,11 +735,10 @@ Ownership-safe removal remains a separate required contract.
 ### Running the packaged signed service lane
 
 Add `-service-execution` to the maintained `lab vm lifecycle` commands above. It
-implies `-execution-trust` and requires an upgraded package implementing the typed
-service RPCs. To qualify migration, retain a genuine old schema-1 or schema-2 first
-package; rebuilding the current source with an older version label is not migration
-evidence. Keep the actual control plane/Keycloak/PostgreSQL running and product
-inventory timers unchanged.
+implies `-execution-trust` and requires packages implementing the typed service
+RPCs and current journal schema. Package binary upgrade lanes remain supported;
+historical journal schema-upgrade lanes are not. Keep the actual control
+plane/Keycloak/PostgreSQL running and product inventory timers unchanged.
 
 The lab signs narrowly scoped disposable authority, authenticates the root challenge
 against its separately pinned device CA, and relays through the installed agent as

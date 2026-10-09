@@ -29,14 +29,12 @@ import (
 )
 
 const (
-	markerName         = "installation"
-	databaseName       = "journal.sqlite"
-	maximumStateBytes  = 1 << 20
-	maximumTrustBytes  = 128 << 10
-	applicationID      = 1279872580
-	priorSchemaVersion = 1
-	trustSchemaVersion = 2
-	schemaVersion      = 3
+	markerName        = "installation"
+	databaseName      = "journal.sqlite"
+	maximumStateBytes = 1 << 20
+	maximumTrustBytes = 128 << 10
+	applicationID     = 1279872580
+	schemaVersion     = 1
 )
 
 var (
@@ -219,7 +217,7 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := s.verifyDatabase(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.migrateSchema(ctx); err != nil {
+	if err := validateJournalSchema(ctx, s.db); err != nil {
 		return nil, err
 	}
 	if _, _, err := s.Load(ctx); err != nil {
@@ -275,7 +273,7 @@ func (s *Store) connect(ctx context.Context) error {
 		return err
 	}
 	s.queries = journaldb.New(db)
-	// sqlc does not emit PRAGMA statements. Connection metadata and migration
+	// sqlc does not emit PRAGMA statements. Connection metadata and schema
 	// DDL are the only handwritten SQL; state DML is generated.
 	var journalMode string
 	var synchronous int
@@ -303,7 +301,7 @@ func (s *Store) verifyDatabase(ctx context.Context) error {
 	if err := s.db.QueryRowContext(ctx, "PRAGMA quick_check(1)").Scan(&integrity); err != nil {
 		return stateReadError(ctx)
 	}
-	if (version != priorSchemaVersion && version != trustSchemaVersion && version != schemaVersion) || id != applicationID || integrity != "ok" {
+	if version != schemaVersion || id != applicationID || integrity != "ok" {
 		return ErrRecoveryHold
 	}
 	return nil

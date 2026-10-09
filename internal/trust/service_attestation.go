@@ -15,6 +15,15 @@ import (
 	"lindm/internal/pki"
 )
 
+// MaxDeviceClockSkew bounds control-plane acceptance of device-signed wall
+// timestamps. Server-held single-use nonces and leases still expire on server
+// time; this tolerance never extends those independent freshness fences.
+const MaxDeviceClockSkew = 2 * time.Minute
+
+// ErrDeviceClockSkew means authenticated device timestamps lie outside the
+// consumer's explicit clock tolerance.
+var ErrDeviceClockSkew = errors.New("device_clock_skew")
+
 // ServiceAttestationBinding is the consumer's independently trusted request
 // context. Nonce must be chosen unpredictably by that consumer, not by the relay.
 type ServiceAttestationBinding struct {
@@ -33,7 +42,11 @@ type ServiceAttestationBinding struct {
 // to execute. The consumer must separately enforce current device revocation,
 // desired-head and authorization policy. Retained observation timestamps are not
 // bounded by issuance: the device wall clock may have moved backwards.
-func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, certificatePEM []byte, deviceCA *x509.Certificate, expected *ServiceAttestationBinding, now time.Time) (*agentv1.ServiceExecutionAttestation, error) {
+// clockSkew must be explicitly selected by the consumer; zero remains strict.
+func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, certificatePEM []byte, deviceCA *x509.Certificate, expected *ServiceAttestationBinding, now time.Time, clockSkew time.Duration) (*agentv1.ServiceExecutionAttestation, error) {
+	if clockSkew < 0 {
+		return nil, errors.New("invalid device clock tolerance")
+	}
 	if expected == nil || expected.DeploymentID == uuid.Nil || expected.DeviceID == uuid.Nil || expected.EnrollmentGeneration == uuid.Nil || expected.ActionID == uuid.Nil || expected.SessionEpoch == 0 {
 		return nil, errors.New("invalid service attestation binding")
 	}
@@ -72,7 +85,10 @@ func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, cert
 		return nil, errors.New("service attestation binding rejected")
 	}
 	issued, expires := attestation.GetIssuedAt().AsTime(), attestation.GetExpiresAt().AsTime()
-	if now.Before(issued) || !now.Before(expires) || expires.After(cert.NotAfter) {
+	if issued.After(now.Add(clockSkew)) || !now.Add(-clockSkew).Before(expires) {
+		return nil, ErrDeviceClockSkew
+	}
+	if expires.After(cert.NotAfter) {
 		return nil, errors.New("service attestation validity rejected")
 	}
 	return attestation, nil

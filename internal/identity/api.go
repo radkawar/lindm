@@ -1,9 +1,9 @@
 // Package identity is the admin session boundary.
 //
-// Login uses authorization-code PKCE. Access after login is granted only from a
-// fresh Keycloak Admin API snapshot, never from the login token alone. Sessions
-// are opaque and hashed at rest. The first owner is bound by BootstrapOwner,
-// not by the first successful login.
+// Local login requires password plus WebAuthn; optional external login uses
+// authorization-code PKCE. Authority comes from current local accounts or fresh
+// directory observations, never login claims alone. Sessions are opaque and hashed
+// at rest. Owner bootstrap is explicit, never claimed by the first login.
 package identity
 
 import (
@@ -13,12 +13,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	configv1 "lindm/gen/lindm/config/v1"
 )
 
 // Config is the process dependency injection for one configured issuer.
 // It is not a serialized user-config schema.
 type Config struct {
+	Local                 bool
+	BreakGlass            *configv1.BreakGlassPolicy
 	Issuer                string
+	EntraTenantID         string
 	ClientID              string
 	ClientSecret          string
 	DirectoryClientID     string
@@ -31,12 +36,15 @@ type Config struct {
 // Principal is the authenticated admin stored in the request context.
 // GET /auth/session encodes authv1.SessionPrincipal, not this struct.
 type Principal struct {
-	ID          uuid.UUID
-	Issuer      string
-	Subject     string
-	DisplayName string
-	Role        string
-	CSRFToken   string
+	ID                 uuid.UUID
+	Issuer             string
+	Subject            string
+	DisplayName        string
+	Role               string
+	CSRFToken          string
+	BreakGlass         bool
+	IncidentReason     string
+	AllowedPermissions []string
 }
 
 // Permission is an authorization action. Unknown values are denied.
@@ -49,14 +57,15 @@ const (
 	PermissionReadAudit            Permission = "audit.read"
 	PermissionManageExecutionTrust Permission = "execution_trust.manage"
 	PermissionManageProfiles       Permission = "profiles.manage"
+	PermissionAssignServices       Permission = "services.assign"
+	PermissionManageAccounts       Permission = "accounts.manage"
 
 	RoleOwner = "owner"
 	RoleAdmin = "admin"
 )
 
-// Bootstrap and directory failures returned to the local owner command.
-// ErrOwnerInitialized means a different principal is already owner.
-// The same issuer and subject is idempotent and returns nil.
+// Bootstrap and directory failures returned to the owner command.
+// Local owner bootstrap is one-shot; external bootstrap permits exact replay.
 var (
 	ErrOwnerInitialized     = errors.New("identity: a different owner is already initialized")
 	ErrIssuerMismatch       = errors.New("identity: issuer does not match configured issuer")
@@ -78,25 +87,39 @@ func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 	return p, ok
 }
 
-// Authorize allows the implemented fleet permissions only for owner and admin.
-// Every other role, including auditor, is denied. Owner and admin are equal
-// for this slice; finer roles are not granted here.
+// Authorize applies the role policy and intersects emergency grants with their
+// explicit allowlist. Account management is owner-only; unknown permissions deny.
 func Authorize(p Principal, perm Permission) bool {
+	if p.BreakGlass {
+		allowed := false
+		for _, value := range p.AllowedPermissions {
+			if value == string(perm) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return false
+		}
+	}
+	if perm == PermissionManageAccounts {
+		return p.Role == RoleOwner
+	}
 	switch p.Role {
 	case RoleOwner, RoleAdmin:
 	default:
 		return false
 	}
 	switch perm {
-	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles:
+	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignServices:
 		return true
 	default:
 		return false
 	}
 }
 
-// New builds a service. It discovers the issuer and rejects a directory
-// credential that the issuer will not accept. There is no unauthenticated mode.
+// New builds the selected authoritative source and compiles request validation.
+// Local mode never contacts an identity provider.
 func New(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	return newService(ctx, pool, cfg)
 }

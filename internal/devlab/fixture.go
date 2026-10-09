@@ -18,9 +18,10 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/config"
 )
 
-const fixtureVersion = 1
+const fixtureVersion = 2
 
 type manifest struct {
 	Version   int               `json:"version"`
@@ -49,10 +50,23 @@ func protected(path string, directory bool) error {
 	return nil
 }
 
-func initialize(root string) (err error) {
+func initialize(root, authentication string) (err error) {
+	if authentication != "local" && authentication != "keycloak" {
+		return errors.New("authentication must be local or keycloak")
+	}
 	dir := FixturePath(root)
 	if _, err := os.Lstat(dir); err == nil {
-		return validateFixture(dir)
+		if err := validateFixture(dir); err != nil {
+			return err
+		}
+		local, err := localFixture(dir)
+		if err != nil {
+			return err
+		}
+		if local != (authentication == "local") {
+			return errors.New("fixture authentication mode differs; preserve it or explicitly reset -confirm-delete")
+		}
+		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -67,7 +81,11 @@ func initialize(root string) (err error) {
 		return err
 	}
 	secrets := make(map[string]string)
-	for _, name := range []string{"postgres-password", "runtime-password", "migrator-password", "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password"} {
+	secretNames := []string{"postgres-password", "runtime-password", "migrator-password"}
+	if authentication == "keycloak" {
+		secretNames = append(secretNames, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password")
+	}
+	for _, name := range secretNames {
 		var bytes [32]byte
 		if _, err := rand.Read(bytes[:]); err != nil {
 			return err
@@ -95,20 +113,27 @@ GRANT USAGE ON SCHEMA public TO lindm_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lindm_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO lindm_runtime;
 `, secrets["migrator-password"], secrets["runtime-password"]))
-	files["realm.json"], err = realmFile(secrets)
-	if err != nil {
-		return err
+	if authentication == "keycloak" {
+		files["realm.json"], err = realmFile(secrets)
+		if err != nil {
+			return err
+		}
 	}
 	cfg := &configv1.ServerConfig{
 		DeploymentId: uuid.NewString(), PublicUrl: "https://localhost:18444",
-		AdminListener:        &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444},
-		DeviceListener:       &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
-		Database:             &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("migration-database-url"), MaxConnections: 16},
-		Tls:                  &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
-		DeviceCa:             &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"},
-		Oidc:                 &configv1.OIDCConfig{Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret", AdministratorGroups: []string{"/mdm-admins"}},
+		AdminListener:  &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444},
+		DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
+		Database:       &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("migration-database-url"), MaxConnections: 16},
+		Tls:            &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
+		DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"},
+		Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{
+			Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret", AdministratorGroups: []string{"/mdm-admins"},
+		}}},
 		TrustedCaFile:        "transport-ca.crt",
 		InventoryBudgetBytes: proto.Uint64(10 << 30),
+	}
+	if authentication == "local" {
+		cfg.Authentication = &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}
 	}
 	files["server.json"], err = (protojson.MarshalOptions{Indent: "  "}).Marshal(cfg)
 	if err != nil {
@@ -140,7 +165,15 @@ func validateFixture(dir string) error {
 	if m.Version != fixtureVersion || m.Directory != dir {
 		return fmt.Errorf("fixture version or absolute directory changed; preserve its data or explicitly reset -confirm-delete before regenerating")
 	}
-	for _, name := range []string{"transport-ca.crt", "transport-ca.key", "device-ca.crt", "device-ca.key", "server.crt", "server.key", "postgres-password", "runtime-password", "migrator-password", "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password", "database-url", "migration-database-url", "database-init.sql", "realm.json", "server.json"} {
+	local, err := localFixture(dir)
+	if err != nil {
+		return err
+	}
+	names := []string{"transport-ca.crt", "transport-ca.key", "device-ca.crt", "device-ca.key", "server.crt", "server.key", "postgres-password", "runtime-password", "migrator-password", "database-url", "migration-database-url", "database-init.sql", "server.json"}
+	if !local {
+		names = append(names, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password", "realm.json")
+	}
+	for _, name := range names {
 		path := filepath.Join(dir, name)
 		if err := protected(path, false); err != nil {
 			return err
@@ -174,4 +207,23 @@ func readManifest(dir string) (*manifest, error) {
 		return nil, err
 	}
 	return &m, nil
+}
+
+func localFixture(dir string) (bool, error) {
+	document, err := config.Load(filepath.Join(dir, "server.json"))
+	if err != nil {
+		return false, err
+	}
+	return document.Proto.GetAuthentication().GetLocal() != nil, nil
+}
+
+func requireKeycloakFixture(dir string) error {
+	local, err := localFixture(dir)
+	if err != nil {
+		return err
+	}
+	if local {
+		return errors.New("this check requires the Keycloak development fixture")
+	}
+	return nil
 }

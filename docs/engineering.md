@@ -119,6 +119,19 @@ secrets must not enter query caches, persistent storage or URLs. Do not automati
 retry secret-issuing mutations. Preserve cancellation and backend idempotency
 semantics rather than relying on framework defaults.
 
+The console discovers enabled sign-in modes through generated protobuf JSON
+`GET /auth/options`. Local sign-in requires password acceptance followed by
+WebAuthn user verification; it never treats the password challenge as a session.
+Use a current HTTPS browser with native WebAuthn JSON conversion support. `/enroll`
+accepts a manually entered one-time secret and new password, registers an
+authenticator, then directs the user back to sign in. Never put enrollment secrets
+in links. Owners manage local accounts at `/accounts`: create, enable/disable,
+change owner/admin role or break-glass designation, and reset credentials.
+Issued enrollment secrets remain component-memory-only and disappear on navigation.
+Account mutations send the session CSRF header and are never automatically retried.
+Every authenticated route displays a persistent emergency banner for break-glass
+sessions, including the incident reason; navigation is not an authorization boundary.
+
 ### Planned code layout
 
 | Area                                                                                         | Responsibility                                                                                                                     |
@@ -155,6 +168,38 @@ against the fixed development fixture. The reusable development-session helper k
 passwords/cookies in memory, restricts TLS destinations and credential form actions,
 and revokes its console session. It is not an alternate production authentication API.
 
+Local identity tests use a real PostgreSQL schema and a software P-256 WebAuthn
+authenticator, not a verifier mock. The `TestLocal*` and `TestBreakGlass*` integration
+tests exercise password lockout, one-use enrollment and challenges, replay/expiry,
+immediate disable, worker fences and emergency audit. Run these with the same
+`LINDM_TEST_DATABASE_URL` used by the integration lane. Browser qualification must
+add a Chromium CDP virtual authenticator with user verification enabled and complete
+`/enroll`, sign-in, account reset and the persistent emergency banner.
+
+The generated protobuf-JSON HTTP contract is `GET /auth/options`, plus
+`POST /auth/local/login/begin`, `/auth/local/login/finish`,
+`/auth/local/enroll/begin` and `/auth/local/enroll/finish`. Owner-only account
+operations are `GET /auth/accounts` and `POST /auth/accounts/create`,
+`/auth/accounts/update`, `/auth/accounts/reset`. Unsafe requests require the exact
+configured origin; account mutations additionally require the session CSRF token.
+Responses are no-store. Enrollment finishes without creating a session.
+
+Identity schema `00001_identity.sql` owns `local_accounts` (the same immutable UUID
+as its principal), `local_credentials`, hash-only `local_enrollments` and
+`local_ceremonies`. Ceremony library state has its challenge removed and a separate
+SHA-256 digest; one-use challenge consumption commits even when verification fails.
+Enrollment ceremonies retain only the enrollment-secret digest. Beginning or
+cancelling registration does not consume that secret or set the account password:
+a new begin replaces the unfinished ceremony. Successful WebAuthn registration
+atomically consumes the still-unexpired secret and stores the password and
+credential. A failed registration can retry with the same secret until expiry.
+Enrollment secrets expire after one hour; ceremonies after five minutes. Five
+failed attempts lock an account for fifteen minutes. Password PHC strings encode
+Argon2id v19, 64 MiB, three iterations and one lane with a random 16-byte salt.
+Emergency session lifetime is additionally bounded by configuration and worker
+approvals require an active emergency session. Restarting identity ends existing
+emergency sessions and invalidates their pending authority before new policy applies.
+
 `go run ./cmd/lab auth check-fresh -repo .` exercises the worker-authorization API
 with real Keycloak lifecycle changes and PostgreSQL transaction fences. It creates
 unique test-owned user/group objects and a private migrated PostgreSQL schema;
@@ -166,6 +211,22 @@ disable denials, regrant/re-enable versions, stale approvals, committed writes a
 rollback. It reports nonsecret owned identifiers and bounded cleanup results.
 An unavailable or invalid supplied fixture fails; it never falls back to cached
 authority or changes shared users, groups, realm settings or application tables.
+
+Entra uses the same `DirectorySource`, durable observation/version transitions and
+worker transaction fences as Keycloak. Its public-cloud OIDC client requests
+`openid profile` and binds issuer + signed tenant-local object ID, not pairwise
+subject or email. The app-only Graph source uses a separate credential and reads
+`accountEnabled` plus bounded transitive group-ID pages. Graph's advanced-query
+index is eventually consistent: qualification must measure upstream visibility
+delay separately; no retry or outage extends the 30/60-second refresh/denial rules.
+`TestEntra*` uses local `httptest` TLS servers with signed OIDC tokens and documented
+Graph shapes. These are deterministic unit/race checks, **not live Entra
+qualification**. A live tenant, two registered apps with admin-consented Graph
+application access, and test-owned users/groups remain prerequisites for R1.
+The [Entra setup and manual qualification procedure](../README.md#microsoft-entra-id)
+lists exact calls, least privileges, disable/removal/deletion/outage scenarios and
+required timing evidence. The greenfield identity migration admits an `entra`
+deactivation source; no compatibility migration or cached-authority fallback exists.
 
 `go run ./cmd/dev test-integration -root .` runs that same live check before the
 real-PostgreSQL integration tests. It requires already-running development
@@ -195,6 +256,30 @@ restarts the server, then verifies exact historical retry, retained dependencies
 and the current catalog listing. Session revocation precedes server/database
 teardown. Publishing a catalog revision does not assign or deploy it to devices;
 this command does not qualify target preview, dispatch or native reconciliation.
+
+`artifacts/bin/lab vm dispatch -manifest lab/images/ubuntu-noble-amd64.json
+-lindmd artifacts/bin/lindmd [-record NEW_FILE]` qualifies connected service
+dispatch through real signed native packages, the private server/database fixture,
+authenticated profile publication/assignment and the installed automatic relay.
+Use `lab/images/fedora-44-x86_64.json` for the SELinux Enforcing RPM guest. It checks
+active/enabled then inactive/disabled revisions, strictly increasing sequences,
+device-signed ingested history, server restart retaining an open action ID,
+no-drift completion without a start grant, successful assignments at guest clock
+offsets of +90 and −90 seconds (with time sync disabled and restored afterward),
+and revocation without native effect.
+An inert pre-enrollment fixture and independent systemctl/start-witness observations
+remain separate from server evidence. `-record` includes build digests, timing and
+explicit failure state and never overwrites an earlier run. Owned guests, private
+server processes, signing material and databases are cleaned up.
+Optional `-hold 45m` reserves the normal development console port and pauses before
+revocation, keeping the guest, database and real server available for authenticated
+browser assignments. The ordinary dev server must not occupy port 18444. The
+printed origin uses the same dev CA and Keycloak owner login; timeout or SIGINT
+resumes native re-observation, revocation and cleanup. Holds are bounded to one hour.
+Unstarted supersession is covered by the real-Postgres integration test, **not
+natively exercised**: acquisition requires the executor-held mTLS signer, so
+stopping that executor cannot deterministically hold an unstarted acquired action.
+No product fault seam is added. See [the command details](agent-enrollment.md#running-the-connected-service-dispatch-lane).
 
 The authenticated **Profiles** console uses these same catalog RPCs. Editors use
 the generated protobuf constraints, including shared custom validation rules,

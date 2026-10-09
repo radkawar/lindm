@@ -4,13 +4,16 @@
 
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file lindm/auth/v1/auth.proto.
  */
 export const file_lindm_auth_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEidwoQU2Vzc2lvblByaW5jaXBhbBIKCgJpZBgBIAEoCRIOCgZpc3N1ZXIYAiABKAkSDwoHc3ViamVjdBgDIAEoCRIUCgxkaXNwbGF5X25hbWUYBCABKAkSDAoEcm9sZRgFIAEoCRISCgpjc3JmX3Rva2VuGAYgASgJQiBaHmxpbmRtL2dlbi9saW5kbS9hdXRoL3YxO2F1dGh2MWIGcHJvdG8z");
+  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEipQEKEFNlc3Npb25QcmluY2lwYWwSCgoCaWQYASABKAkSDgoGaXNzdWVyGAIgASgJEg8KB3N1YmplY3QYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEgwKBHJvbGUYBSABKAkSEgoKY3NyZl90b2tlbhgGIAEoCRITCgticmVha19nbGFzcxgHIAEoCBIXCg9pbmNpZGVudF9yZWFzb24YCCABKAkiWQoVQXV0aGVudGljYXRpb25PcHRpb25zEhYKDmV4dGVybmFsX2xvZ2luGAEgASgIEhMKC2xvY2FsX2xvZ2luGAIgASgIEhMKC2JyZWFrX2dsYXNzGAMgASgIIpkBChFMb2NhbExvZ2luUmVxdWVzdBI5Cgh1c2VybmFtZRgBIAEoCUInukgkciIQARhAMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIEisKD2luY2lkZW50X3JlYXNvbhgDIAEoCUISukgPcg0YgAQogAgyBV4kfFxTIlIKFkxvY2FsRW5yb2xsbWVudFJlcXVlc3QSGgoGc2VjcmV0GAEgASgJQgq6SAdyBSABKIAIEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIIlEKEVdlYkF1dGhuQ2hhbGxlbmdlEhkKBXRva2VuGAEgASgJQgq6SAdyBSABKIAIEiEKDG9wdGlvbnNfanNvbhgCIAEoCUILukgIcgYgASiAgAQiWAoVV2ViQXV0aG5GaW5pc2hSZXF1ZXN0EhkKBXRva2VuGAEgASgJQgq6SAdyBSABKIAIEiQKD2NyZWRlbnRpYWxfanNvbhgCIAEoCUILukgIcgYgASiAgAQicgoMTG9jYWxBY2NvdW50EgoKAmlkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEgwKBHJvbGUYAyABKAkSDwoHZW5hYmxlZBgEIAEoCBITCgticmVha19nbGFzcxgFIAEoCBIQCghlbnJvbGxlZBgGIAEoCCJFChRMaXN0QWNjb3VudHNSZXNwb25zZRItCghhY2NvdW50cxgBIAMoCzIbLmxpbmRtLmF1dGgudjEuTG9jYWxBY2NvdW50IoICChRDcmVhdGVBY2NvdW50UmVxdWVzdBI5Cgh1c2VybmFtZRgBIAEoCUInukgkciIQARhAMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEiEKBHJvbGUYAiABKAlCE7pIEHIOUgVvd25lclIFYWRtaW4SEwoLYnJlYWtfZ2xhc3MYAyABKAg6d7pIdBpyCiBjcmVhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIvYBChRVcGRhdGVBY2NvdW50UmVxdWVzdBIcCgphY2NvdW50X2lkGAEgASgJQgi6SAVyA7ABARIPCgdlbmFibGVkGAIgASgIEiEKBHJvbGUYAyABKAlCE7pIEHIOUgVvd25lclIFYWRtaW4SEwoLYnJlYWtfZ2xhc3MYBCABKAg6d7pIdBpyCiB1cGRhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIjMKE1Jlc2V0QWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQEiZwoRQWNjb3VudEVucm9sbG1lbnQSEgoKYWNjb3VudF9pZBgBIAEoCRIOCgZzZWNyZXQYAiABKAkSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCIFoebGluZG0vZ2VuL2xpbmRtL2F1dGgvdjE7YXV0aHYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * SessionPrincipal is returned as protobuf JSON by GET /auth/session. Browser
@@ -49,6 +52,16 @@ export type SessionPrincipal = Message<"lindm.auth.v1.SessionPrincipal"> & {
    * @generated from field: string csrf_token = 6;
    */
   csrfToken: string;
+
+  /**
+   * @generated from field: bool break_glass = 7;
+   */
+  breakGlass: boolean;
+
+  /**
+   * @generated from field: string incident_reason = 8;
+   */
+  incidentReason: string;
 };
 
 /**
@@ -57,4 +70,294 @@ export type SessionPrincipal = Message<"lindm.auth.v1.SessionPrincipal"> & {
  */
 export const SessionPrincipalSchema: GenMessage<SessionPrincipal> = /*@__PURE__*/
   messageDesc(file_lindm_auth_v1_auth, 0);
+
+/**
+ * All authentication endpoints use protobuf JSON and no-store responses.
+ *
+ * @generated from message lindm.auth.v1.AuthenticationOptions
+ */
+export type AuthenticationOptions = Message<"lindm.auth.v1.AuthenticationOptions"> & {
+  /**
+   * @generated from field: bool external_login = 1;
+   */
+  externalLogin: boolean;
+
+  /**
+   * @generated from field: bool local_login = 2;
+   */
+  localLogin: boolean;
+
+  /**
+   * @generated from field: bool break_glass = 3;
+   */
+  breakGlass: boolean;
+};
+
+/**
+ * Describes the message lindm.auth.v1.AuthenticationOptions.
+ * Use `create(AuthenticationOptionsSchema)` to create a new message.
+ */
+export const AuthenticationOptionsSchema: GenMessage<AuthenticationOptions> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 1);
+
+/**
+ * Passwords and incident reasons must never be logged.
+ *
+ * @generated from message lindm.auth.v1.LocalLoginRequest
+ */
+export type LocalLoginRequest = Message<"lindm.auth.v1.LocalLoginRequest"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string password = 2;
+   */
+  password: string;
+
+  /**
+   * @generated from field: string incident_reason = 3;
+   */
+  incidentReason: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.LocalLoginRequest.
+ * Use `create(LocalLoginRequestSchema)` to create a new message.
+ */
+export const LocalLoginRequestSchema: GenMessage<LocalLoginRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 2);
+
+/**
+ * @generated from message lindm.auth.v1.LocalEnrollmentRequest
+ */
+export type LocalEnrollmentRequest = Message<"lindm.auth.v1.LocalEnrollmentRequest"> & {
+  /**
+   * @generated from field: string secret = 1;
+   */
+  secret: string;
+
+  /**
+   * @generated from field: string password = 2;
+   */
+  password: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.LocalEnrollmentRequest.
+ * Use `create(LocalEnrollmentRequestSchema)` to create a new message.
+ */
+export const LocalEnrollmentRequestSchema: GenMessage<LocalEnrollmentRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 3);
+
+/**
+ * options_json contains the WebAuthn publicKey options object.
+ *
+ * @generated from message lindm.auth.v1.WebAuthnChallenge
+ */
+export type WebAuthnChallenge = Message<"lindm.auth.v1.WebAuthnChallenge"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+
+  /**
+   * @generated from field: string options_json = 2;
+   */
+  optionsJson: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.WebAuthnChallenge.
+ * Use `create(WebAuthnChallengeSchema)` to create a new message.
+ */
+export const WebAuthnChallengeSchema: GenMessage<WebAuthnChallenge> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 4);
+
+/**
+ * @generated from message lindm.auth.v1.WebAuthnFinishRequest
+ */
+export type WebAuthnFinishRequest = Message<"lindm.auth.v1.WebAuthnFinishRequest"> & {
+  /**
+   * @generated from field: string token = 1;
+   */
+  token: string;
+
+  /**
+   * @generated from field: string credential_json = 2;
+   */
+  credentialJson: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.WebAuthnFinishRequest.
+ * Use `create(WebAuthnFinishRequestSchema)` to create a new message.
+ */
+export const WebAuthnFinishRequestSchema: GenMessage<WebAuthnFinishRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 5);
+
+/**
+ * @generated from message lindm.auth.v1.LocalAccount
+ */
+export type LocalAccount = Message<"lindm.auth.v1.LocalAccount"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string username = 2;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string role = 3;
+   */
+  role: string;
+
+  /**
+   * @generated from field: bool enabled = 4;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: bool break_glass = 5;
+   */
+  breakGlass: boolean;
+
+  /**
+   * @generated from field: bool enrolled = 6;
+   */
+  enrolled: boolean;
+};
+
+/**
+ * Describes the message lindm.auth.v1.LocalAccount.
+ * Use `create(LocalAccountSchema)` to create a new message.
+ */
+export const LocalAccountSchema: GenMessage<LocalAccount> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 6);
+
+/**
+ * @generated from message lindm.auth.v1.ListAccountsResponse
+ */
+export type ListAccountsResponse = Message<"lindm.auth.v1.ListAccountsResponse"> & {
+  /**
+   * @generated from field: repeated lindm.auth.v1.LocalAccount accounts = 1;
+   */
+  accounts: LocalAccount[];
+};
+
+/**
+ * Describes the message lindm.auth.v1.ListAccountsResponse.
+ * Use `create(ListAccountsResponseSchema)` to create a new message.
+ */
+export const ListAccountsResponseSchema: GenMessage<ListAccountsResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 7);
+
+/**
+ * @generated from message lindm.auth.v1.CreateAccountRequest
+ */
+export type CreateAccountRequest = Message<"lindm.auth.v1.CreateAccountRequest"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string role = 2;
+   */
+  role: string;
+
+  /**
+   * @generated from field: bool break_glass = 3;
+   */
+  breakGlass: boolean;
+};
+
+/**
+ * Describes the message lindm.auth.v1.CreateAccountRequest.
+ * Use `create(CreateAccountRequestSchema)` to create a new message.
+ */
+export const CreateAccountRequestSchema: GenMessage<CreateAccountRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 8);
+
+/**
+ * @generated from message lindm.auth.v1.UpdateAccountRequest
+ */
+export type UpdateAccountRequest = Message<"lindm.auth.v1.UpdateAccountRequest"> & {
+  /**
+   * @generated from field: string account_id = 1;
+   */
+  accountId: string;
+
+  /**
+   * @generated from field: bool enabled = 2;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: string role = 3;
+   */
+  role: string;
+
+  /**
+   * @generated from field: bool break_glass = 4;
+   */
+  breakGlass: boolean;
+};
+
+/**
+ * Describes the message lindm.auth.v1.UpdateAccountRequest.
+ * Use `create(UpdateAccountRequestSchema)` to create a new message.
+ */
+export const UpdateAccountRequestSchema: GenMessage<UpdateAccountRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 9);
+
+/**
+ * @generated from message lindm.auth.v1.ResetAccountRequest
+ */
+export type ResetAccountRequest = Message<"lindm.auth.v1.ResetAccountRequest"> & {
+  /**
+   * @generated from field: string account_id = 1;
+   */
+  accountId: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.ResetAccountRequest.
+ * Use `create(ResetAccountRequestSchema)` to create a new message.
+ */
+export const ResetAccountRequestSchema: GenMessage<ResetAccountRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 10);
+
+/**
+ * The one-time secret is held only in component memory, never cached or logged.
+ *
+ * @generated from message lindm.auth.v1.AccountEnrollment
+ */
+export type AccountEnrollment = Message<"lindm.auth.v1.AccountEnrollment"> & {
+  /**
+   * @generated from field: string account_id = 1;
+   */
+  accountId: string;
+
+  /**
+   * @generated from field: string secret = 2;
+   */
+  secret: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 3;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.auth.v1.AccountEnrollment.
+ * Use `create(AccountEnrollmentSchema)` to create a new message.
+ */
+export const AccountEnrollmentSchema: GenMessage<AccountEnrollment> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 11);
 

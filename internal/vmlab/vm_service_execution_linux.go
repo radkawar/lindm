@@ -493,25 +493,40 @@ func vmServiceSucceeded(status *agentv1.ServiceExecutionStatus, started bool) er
 	return nil
 }
 func vmServiceNative(ctx context.Context, vm *guestVM, active, enablement string) error {
-	data, err := vm.run(ctx, "sudo -n systemctl show --no-pager --property=Id --property=LoadState --property=ActiveState --property=UnitFileState "+nativeQuote(devlab.ServiceExecutionProbeUnit), nil, 4096, 15*time.Second)
+	return vmServiceNativeUnit(ctx, vm, devlab.ServiceExecutionProbeUnit, active, enablement)
+}
+
+func vmServiceNativeUnit(ctx context.Context, vm *guestVM, unit, active, enablement string) error {
+	properties, err := vmServiceNativeProperties(ctx, vm, unit)
 	if err != nil {
 		return err
+	}
+	if properties["ActiveState"] != active || properties["UnitFileState"] != enablement {
+		return fmt.Errorf("independent service state differs: got=%v want=%s/%s", properties, active, enablement)
+	}
+	return nil
+}
+
+func vmServiceNativeProperties(ctx context.Context, vm *guestVM, unit string) (map[string]string, error) {
+	data, err := vm.run(ctx, "sudo -n systemctl show --no-pager --property=Id --property=LoadState --property=ActiveState --property=UnitFileState "+nativeQuote(unit), nil, 4096, 15*time.Second)
+	if err != nil {
+		return nil, err
 	}
 	properties := make(map[string]string, 4)
 	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		key, value, ok := strings.Cut(line, "=")
 		if !ok {
-			return errors.New("invalid independent service observation")
+			return nil, errors.New("invalid independent service observation")
 		}
 		if _, duplicate := properties[key]; duplicate {
-			return errors.New("duplicate independent service property")
+			return nil, errors.New("duplicate independent service property")
 		}
 		properties[key] = value
 	}
-	if len(properties) != 4 || properties["Id"] != devlab.ServiceExecutionProbeUnit || properties["LoadState"] != "loaded" || properties["ActiveState"] != active || properties["UnitFileState"] != enablement {
-		return fmt.Errorf("independent service state differs: got=%v want=%s/%s", properties, active, enablement)
+	if len(properties) != 4 || properties["Id"] != unit || properties["LoadState"] != "loaded" || properties["ActiveState"] == "" || properties["UnitFileState"] == "" {
+		return nil, fmt.Errorf("incomplete independent service observation: %v", properties)
 	}
-	return nil
+	return properties, nil
 }
 func verifyRetainedVMServiceActions(ctx context.Context, vm *guestVM, evidence *vmServiceExecutionEvidence, phase string) error {
 	if evidence == nil {

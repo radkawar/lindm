@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net/url"
 	"testing"
@@ -177,7 +178,7 @@ func TestServiceAttestationBindsConsumerContextAndValidity(t *testing.T) {
 				tc.change(candidate, &expected)
 			}
 			envelope := executionSign(t, f.authority, candidate, f.key)
-			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &expected, tc.at)
+			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &expected, tc.at, 0)
 			if tc.valid {
 				if err != nil || !proto.Equal(got, candidate) {
 					t.Fatalf("valid attestation changed or rejected: %v", err)
@@ -188,7 +189,7 @@ func TestServiceAttestationBindsConsumerContextAndValidity(t *testing.T) {
 		})
 	}
 	envelope := executionSign(t, f.authority, f.attestation, f.key)
-	if got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, nil, f.now); err == nil || got != nil {
+	if got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, nil, f.now, 0); err == nil || got != nil {
 		t.Fatal("missing consumer context accepted")
 	}
 }
@@ -257,7 +258,7 @@ func TestServiceAttestationRequiresPinnedCurrentDeviceLeaf(t *testing.T) {
 				}
 				certificatePEM = f.certificate(t, public, tc.change)
 			}
-			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, certificatePEM, tc.ca, &f.binding, f.now)
+			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, certificatePEM, tc.ca, &f.binding, f.now, 0)
 			if tc.valid {
 				if err != nil || !proto.Equal(got, f.attestation) {
 					t.Fatalf("valid device certificate rejected: %v", err)
@@ -319,7 +320,7 @@ func TestServiceAttestationRejectsForgeriesAndWrongDomains(t *testing.T) {
 		{name: "trailing envelope", envelope: append(bytes.Clone(valid), valid...)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got, err := f.authority.VerifyServiceAttestation(t.Context(), tc.envelope, f.certificatePEM, f.ca, &f.binding, f.now); err == nil || got != nil {
+			if got, err := f.authority.VerifyServiceAttestation(t.Context(), tc.envelope, f.certificatePEM, f.ca, &f.binding, f.now, 0); err == nil || got != nil {
 				t.Fatal("forged or cross-domain proof accepted")
 			}
 		})
@@ -392,7 +393,7 @@ func TestServiceAttestationRejectsSignedMalformedPayloads(t *testing.T) {
 			candidate := proto.CloneOf(f.attestation)
 			tc.change(candidate)
 			envelope := signServiceAttestationUnchecked(t, candidate, ServiceAttestationType, f.key)
-			if got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now); err == nil || got != nil {
+			if got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now, 0); err == nil || got != nil {
 				t.Fatal("signed malformed evidence accepted")
 			}
 		})
@@ -429,7 +430,7 @@ func TestServiceAttestationPreservesEveryDurableState(t *testing.T) {
 				candidate.Status.StartedAt = nil
 			}
 			envelope := executionSign(t, f.authority, candidate, f.key)
-			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now)
+			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now, 0)
 			if err != nil || !proto.Equal(got, candidate) {
 				t.Fatalf("durable status changed or rejected: %v", err)
 			}
@@ -448,13 +449,13 @@ func TestServiceAttestationRenewalAuthenticatesUnchangedHistoricalEvidence(t *te
 	historical.IssuedAt = timestamppb.New(f.now.Add(-28 * time.Minute))
 	historical.ExpiresAt = timestamppb.New(f.now.Add(-28*time.Minute + 30*time.Second))
 	oldEnvelope := executionSign(t, f.authority, historical, oldKey)
-	if got, err := f.authority.VerifyServiceAttestation(t.Context(), oldEnvelope, oldCertificate, f.ca, &f.binding, historical.GetIssuedAt().AsTime()); err != nil || !proto.Equal(got.Status, f.attestation.Status) {
+	if got, err := f.authority.VerifyServiceAttestation(t.Context(), oldEnvelope, oldCertificate, f.ca, &f.binding, historical.GetIssuedAt().AsTime(), 0); err != nil || !proto.Equal(got.Status, f.attestation.Status) {
 		t.Fatalf("original proof invalid during old leaf lifetime: %v", err)
 	}
 	// The renewed key/certificate were not valid at the recorded observation.
 	// Only the freshly signed snapshot must satisfy current identity validity.
 	freshEnvelope := executionSign(t, f.authority, f.attestation, f.key)
-	got, err := f.authority.VerifyServiceAttestation(t.Context(), freshEnvelope, f.certificatePEM, f.ca, &f.binding, f.now)
+	got, err := f.authority.VerifyServiceAttestation(t.Context(), freshEnvelope, f.certificatePEM, f.ca, &f.binding, f.now, 0)
 	if err != nil || !proto.Equal(got, f.attestation) || !proto.Equal(got.Status, historical.Status) || got.GetActionRevision() != historical.GetActionRevision() {
 		t.Fatalf("renewal lost historical evidence: %v", err)
 	}
@@ -468,7 +469,7 @@ func TestServiceAttestationRenewalAuthenticatesUnchangedHistoricalEvidence(t *te
 		{name: "old key relabeled with renewed certificate", envelope: freshWithOldKey, certificate: f.certificatePEM},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if result, err := f.authority.VerifyServiceAttestation(t.Context(), tc.envelope, tc.certificate, f.ca, &f.binding, f.now); err == nil || result != nil {
+			if result, err := f.authority.VerifyServiceAttestation(t.Context(), tc.envelope, tc.certificate, f.ca, &f.binding, f.now, 0); err == nil || result != nil {
 				t.Fatal("expired identity or substituted renewal key accepted")
 			}
 		})
@@ -484,8 +485,52 @@ func TestServiceAttestationRenewalAuthenticatesUnchangedHistoricalEvidence(t *te
 		timestamp.Seconds += int64((2 * time.Hour) / time.Second)
 	}
 	envelope := executionSign(t, f.authority, rolledBack, f.key)
-	got, err = f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now)
+	got, err = f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now, 0)
 	if err != nil || !proto.Equal(got, rolledBack) {
 		t.Fatalf("historic timestamps after clock rollback changed or rejected: %v", err)
+	}
+}
+
+func TestServiceAttestationExplicitDeviceClockTolerance(t *testing.T) {
+	f := newServiceAttestationFixture(t)
+	for _, tc := range []struct {
+		name      string
+		offset    time.Duration
+		tolerance time.Duration
+		accepted  bool
+	}{
+		{"ahead ninety seconds", 90 * time.Second, MaxDeviceClockSkew, true},
+		{"behind ninety seconds", -90 * time.Second, MaxDeviceClockSkew, true},
+		{"ahead at inclusive boundary", MaxDeviceClockSkew, MaxDeviceClockSkew, true},
+		{"ahead beyond boundary", MaxDeviceClockSkew + time.Nanosecond, MaxDeviceClockSkew, false},
+		{"expired at exclusive boundary", -MaxDeviceClockSkew - 30*time.Second, MaxDeviceClockSkew, false},
+		{"ahead three minutes", 3 * time.Minute, MaxDeviceClockSkew, false},
+		{"behind three minutes", -3 * time.Minute, MaxDeviceClockSkew, false},
+		{"explicit strict mode", time.Second, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := proto.CloneOf(f.attestation)
+			candidate.IssuedAt = timestamppb.New(f.now.Add(tc.offset))
+			candidate.ExpiresAt = timestamppb.New(f.now.Add(tc.offset + 30*time.Second))
+			envelope := executionSign(t, f.authority, candidate, f.key)
+			got, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now, tc.tolerance)
+			if tc.accepted {
+				if err != nil || !proto.Equal(got, candidate) {
+					t.Fatalf("bounded clock tolerance rejected evidence: %v", err)
+				}
+			} else if got != nil || !errors.Is(err, ErrDeviceClockSkew) {
+				t.Fatalf("outside tolerance = %v, want device_clock_skew", err)
+			}
+		})
+	}
+	envelope := executionSign(t, f.authority, f.attestation, f.key)
+	if _, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, f.certificatePEM, f.ca, &f.binding, f.now, -time.Second); err == nil {
+		t.Fatal("negative clock tolerance accepted")
+	}
+	certificate := f.certificate(t, f.key.Public(), func(cert *x509.Certificate) {
+		cert.NotAfter = f.now.Add(15 * time.Second)
+	})
+	if _, err := f.authority.VerifyServiceAttestation(t.Context(), envelope, certificate, f.ca, &f.binding, f.now, MaxDeviceClockSkew); err == nil {
+		t.Fatal("clock tolerance extended signing certificate validity")
 	}
 }

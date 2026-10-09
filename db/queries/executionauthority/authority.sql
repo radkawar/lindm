@@ -4,6 +4,9 @@ SELECT * FROM execution_authority WHERE id = true;
 -- name: LockAuthority :one
 SELECT * FROM execution_authority WHERE id = true FOR UPDATE;
 
+-- name: ShareAuthority :one
+SELECT * FROM execution_authority WHERE id = true FOR SHARE;
+
 -- name: ReadClock :one
 SELECT clock_timestamp()::timestamptz;
 

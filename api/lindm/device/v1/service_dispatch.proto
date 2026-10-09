@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package lindm.device.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/device/v1;devicev1";
+
+// Server-owned systemd service work for the authenticated device generation.
+// The server retains every signed byte; retries return those exact bytes and
+// never mint new authority for an existing action.
+message ServiceWork {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  // Plan-role DSSE ServiceExecutionIntent. Authorizes preflight only.
+  bytes intent_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  // Previously issued exact start-role grant, if any. Present after a lost
+  // AuthorizeServiceStart response; it is never a fresh authorization.
+  bytes start_grant_envelope = 3 [(buf.validate.field).bytes.max_len = 16384];
+  // Fresh server-selected nonce for one ReportServiceResult attestation.
+  bytes result_nonce = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp result_nonce_expires_at = 5 [(buf.validate.field).required = true];
+}
+
+message GetServiceWorkRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+
+message GetServiceWorkResponse {
+  // Absent means no current action needs this device. It is not compliance.
+  ServiceWork work = 1;
+}
+
+message AuthorizeServiceStartRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  // Exact executor-returned device-key DSSE ServiceExecutionChallenge.
+  bytes challenge_proof = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+message AuthorizeServiceStartResponse {
+  // Start-role DSSE ServiceExecutionStartGrant. An exact retry returns the
+  // original bytes; a lapsed challenge requires a new server action.
+  bytes start_grant_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+message ReportServiceResultRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  // Exact executor AttestServiceExecution output for the issued result nonce.
+  bytes attestation_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+message ReportServiceResultResponse {
+  // True when the server will issue no further work for this action.
+  bool closed = 1;
+}

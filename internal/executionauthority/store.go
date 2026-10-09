@@ -236,6 +236,22 @@ func (s *Store) Get(ctx context.Context) (*Snapshot, error) {
 	return s.snapshot(ctx, q, row)
 }
 
+// CurrentInTransaction holds the authority share lock until the caller commits.
+// Call after the actor fence and before locking the device. The verifier accepts
+// only this authenticated snapshot, never a caller-supplied root or delegation.
+func (s *Store) CurrentInTransaction(ctx context.Context, tx pgx.Tx) (*Snapshot, *trust.ExecutionVerifier, error) {
+	if tx == nil {
+		return nil, nil, ErrRejected
+	}
+	q := authoritydb.New(tx)
+	row, err := q.ShareAuthority(ctx)
+	if err != nil {
+		return nil, nil, stateError(err)
+	}
+	snapshot, err := s.snapshot(ctx, q, row)
+	return snapshot, s.verifier, err
+}
+
 func (s *Store) snapshot(ctx context.Context, q *authoritydb.Queries, row authoritydb.ExecutionAuthority) (*Snapshot, error) {
 	if row.DeploymentID == nil || row.Revision < 1 || row.RootCount < 1 || row.Revision != int64(row.UpdateCount)+1 || !row.AcceptedAt.Valid || row.AcceptedAt.InfinityModifier != pgtype.Finite {
 		return nil, ErrCorrupt

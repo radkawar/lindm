@@ -53,6 +53,16 @@ function AuthenticatedLayout() {
           .finally(() => setLoggingOut(false));
       }}
     >
+      {principal.breakGlass ? (
+        <div
+          role="alert"
+          className="sticky top-0 z-50 rounded border-2 border-destructive bg-background p-4 text-destructive"
+        >
+          <strong>Break-glass emergency session — restricted and audited</strong>
+          <p>Incident: {principal.incidentReason}</p>
+          <p>Sign out to end this emergency session when the incident is resolved.</p>
+        </div>
+      ) : null}
       {logoutError !== "" ? <p role="alert">{logoutError}</p> : null}
       <AuthLifetimeContext key={lifetime.generation} value={lifetime}>
         <div id="main">

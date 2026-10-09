@@ -40,6 +40,16 @@ type AuthorityFixture struct {
 }
 
 func OpenAuthorityFixture(ctx context.Context, repository, binary string) (_ *AuthorityFixture, resultErr error) {
+	return openAuthorityFixture(ctx, repository, binary, false)
+}
+
+// OpenConsoleAuthorityFixture reserves the normal development admin origin for
+// an interactive disposable run. It never evicts another listener on that port.
+func OpenConsoleAuthorityFixture(ctx context.Context, repository, binary string) (*AuthorityFixture, error) {
+	return openAuthorityFixture(ctx, repository, binary, true)
+}
+
+func openAuthorityFixture(ctx context.Context, repository, binary string, console bool) (_ *AuthorityFixture, resultErr error) {
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return nil, err
@@ -100,7 +110,11 @@ func OpenAuthorityFixture(ctx context.Context, repository, binary string) (_ *Au
 			return nil, err
 		}
 	}
-	admin, err := net.Listen("tcp4", "127.0.0.1:0")
+	adminAddressToReserve := "127.0.0.1:0"
+	if console {
+		adminAddressToReserve = "127.0.0.1:18444"
+	}
+	admin, err := net.Listen("tcp4", adminAddressToReserve)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +146,12 @@ func OpenAuthorityFixture(ctx context.Context, repository, binary string) (_ *Au
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")
 	cfg.DeviceCa.CertificateFile = filepath.Join(shared, "device-ca.crt")
 	cfg.DeviceCa.PrivateKeyFile = filepath.Join(shared, "device-ca.key")
-	cfg.Oidc.ClientSecretFile = filepath.Join(shared, "console-secret")
-	cfg.Oidc.DirectoryClientSecretFile = filepath.Join(shared, "directory-secret")
+	keycloak := cfg.GetAuthentication().GetKeycloak()
+	if keycloak == nil {
+		return nil, errors.New("isolated control-plane checks require the Keycloak development fixture")
+	}
+	keycloak.ClientSecretFile = filepath.Join(shared, "console-secret")
+	keycloak.DirectoryClientSecretFile = filepath.Join(shared, "directory-secret")
 	cfg.TrustedCaFile = filepath.Join(shared, "transport-ca.crt")
 	cfg.DevicePublicUrl = proto.String("https://localhost:18445")
 	cfg.ExecutionBootstrap = &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"}

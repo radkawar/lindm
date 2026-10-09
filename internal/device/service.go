@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"crypto"
+	"crypto/ed25519"
 	"crypto/x509"
 	"errors"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/config"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
@@ -69,6 +71,7 @@ type Config struct {
 	InventoryBudgetBytes int64
 	ExecutionAuthority   *executionauthority.Store
 	Identity             *identity.Service
+	ExecutionSigning     *config.ExecutionSigning
 }
 
 // Service implements the admin, enrollment, and device RPC surfaces.
@@ -86,6 +89,7 @@ type Service struct {
 	execution       *executionauthority.Store
 	identity        *identity.Service
 	profiles        *policy.Store
+	signing         *config.ExecutionSigning
 }
 
 var (
@@ -118,6 +122,11 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if cfg.ExecutionAuthority != nil && cfg.Identity == nil {
 		return nil, errors.New("device: execution authority requires fresh identity authorization")
 	}
+	if cfg.ExecutionSigning != nil {
+		if cfg.ExecutionAuthority == nil || len(cfg.ExecutionSigning.PlanKey) != ed25519.PrivateKeySize || len(cfg.ExecutionSigning.StartKey) != ed25519.PrivateKeySize || cfg.ExecutionSigning.PlanKey.Equal(cfg.ExecutionSigning.StartKey) {
+			return nil, errors.New("device: execution signing requires authority and distinct Ed25519 keys")
+		}
+	}
 	compiled, err := protovalidate.New(
 		protovalidate.WithMessages(
 			&adminv1.ListDevicesRequest{},
@@ -132,6 +141,11 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.PublishServiceProfileRevisionRequest{},
 			&adminv1.GetServiceProfileRevisionRequest{},
 			&adminv1.ListServiceProfilesRequest{},
+			&adminv1.SetServiceAssignmentRequest{},
+			&adminv1.GetDeviceServiceStateRequest{},
+			&devicev1.GetServiceWorkRequest{},
+			&devicev1.AuthorizeServiceStartRequest{},
+			&devicev1.ReportServiceResultRequest{},
 			&enrollmentv1.EnrollRequest{},
 			&enrollmentv1.RetrieveIssuanceRequest{},
 			&devicev1.AcquireSessionRequest{},
@@ -172,6 +186,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		execution:       cfg.ExecutionAuthority,
 		identity:        cfg.Identity,
 		profiles:        profiles,
+		signing:         cfg.ExecutionSigning,
 	}, nil
 }
 

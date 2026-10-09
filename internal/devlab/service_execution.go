@@ -101,7 +101,7 @@ func (f *ExecutionTrustExercise) VerifyServiceAttestation(ctx context.Context, e
 	if f == nil || f.authority == nil || expected == nil || expected.DeploymentID.String() != f.deploymentID {
 		return nil, errors.New("service attestation is outside the disposable verification fixture")
 	}
-	return f.authority.VerifyServiceAttestation(ctx, envelope, certificatePEM, f.deviceCA, expected, now)
+	return f.authority.VerifyServiceAttestation(ctx, envelope, certificatePEM, f.deviceCA, expected, now, trust.MaxDeviceClockSkew)
 }
 
 func serviceExerciseCertificate(encoded []byte) (*x509.Certificate, error) {

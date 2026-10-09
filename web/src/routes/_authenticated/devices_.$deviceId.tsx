@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
 import { parsePackageSearch } from "@/features/devices/package-search";
+import { DeviceServices } from "@/features/services/view";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
@@ -29,11 +30,13 @@ function DeviceDetailRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <DeviceDetailView
-      key={deviceId}
-      deviceId={deviceId}
-      search={search}
-      onSearch={(next, replace = false) => void navigate({ search: next, replace })}
-    />
+    <div className="grid gap-6" key={deviceId}>
+      <DeviceDetailView
+        deviceId={deviceId}
+        search={search}
+        onSearch={(next, replace = false) => void navigate({ search: next, replace })}
+      />
+      <DeviceServices deviceId={deviceId} />
+    </div>
   );
 }

@@ -29,7 +29,7 @@ func attestService(t *testing.T, f *serviceFixture, status *agentv1.ServiceExecu
 		SessionEpoch:         state.GetSessionEpoch(), ActionID: uuid.MustParse(status.GetActionId()),
 		IntentSHA256: [32]byte(status.GetIntentSha256()), Nonce: nonce,
 	}
-	verified, err := f.svc.authority.VerifyServiceAttestation(t.Context(), response.Msg.GetAttestationEnvelope(), response.Msg.GetCertificatePem(), f.fix.ca, binding, f.svc.now())
+	verified, err := f.svc.authority.VerifyServiceAttestation(t.Context(), response.Msg.GetAttestationEnvelope(), response.Msg.GetCertificatePem(), f.fix.ca, binding, f.svc.now(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}

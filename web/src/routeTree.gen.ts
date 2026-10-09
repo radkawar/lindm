@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as EnrollRouteImport } from './routes/enroll'
+import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
 import { Route as AuthenticatedEnrollmentRouteImport } from './routes/_authenticated/enrollment'
@@ -27,6 +29,16 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
+} as any)
+const EnrollRoute = EnrollRouteImport.update({
+  id: '/enroll',
+  path: '/enroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
@@ -69,6 +81,8 @@ const AuthenticatedProfilesNewRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/enroll': typeof EnrollRoute
+  '/accounts': typeof AuthenticatedAccountsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -79,6 +93,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/enroll': typeof EnrollRoute
+  '/accounts': typeof AuthenticatedAccountsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -91,6 +107,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/enroll': typeof EnrollRoute
+  '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
   '/_authenticated/enrollment': typeof AuthenticatedEnrollmentRoute
@@ -103,6 +121,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/enroll'
+    | '/accounts'
     | '/audit'
     | '/devices'
     | '/enrollment'
@@ -113,6 +133,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/enroll'
+    | '/accounts'
     | '/audit'
     | '/devices'
     | '/enrollment'
@@ -124,6 +146,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/enroll'
+    | '/_authenticated/accounts'
     | '/_authenticated/audit'
     | '/_authenticated/devices'
     | '/_authenticated/enrollment'
@@ -136,6 +160,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  EnrollRoute: typeof EnrollRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -153,6 +178,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/enroll': {
+      id: '/enroll'
+      path: '/enroll'
+      fullPath: '/enroll'
+      preLoaderRoute: typeof EnrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/accounts': {
+      id: '/_authenticated/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AuthenticatedAccountsRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
@@ -207,6 +246,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
   AuthenticatedEnrollmentRoute: typeof AuthenticatedEnrollmentRoute
@@ -217,6 +257,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
   AuthenticatedEnrollmentRoute: AuthenticatedEnrollmentRoute,
@@ -233,6 +274,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  EnrollRoute: EnrollRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

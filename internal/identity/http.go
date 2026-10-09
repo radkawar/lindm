@@ -27,15 +27,16 @@ func (s *Service) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /auth/login", s.handleLogin)
 	mux.HandleFunc("GET /auth/callback", s.handleCallback)
-	mux.HandleFunc("POST /auth/logout", s.handleLogout)
-	mux.HandleFunc("GET /auth/session", s.handleSession)
+	mux.Handle("POST /auth/logout", s.RequireSession(http.HandlerFunc(s.handleLogout)))
+	mux.Handle("GET /auth/session", s.RequireSession(http.HandlerFunc(s.handleSession)))
+	s.registerLocalHTTP(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prepare(w)
 		mux.ServeHTTP(w, r)
 	})
 }
 
-// RequireSession authenticates the opaque session, refreshes Keycloak state,
+// RequireSession authenticates the opaque session, refreshes directory state,
 // and requires an exact Origin plus CSRF token on unsafe methods.
 func (s *Service) RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,21 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			writeStatus(w, statusForDecision(dec))
 			return
 		}
+		if principal.BreakGlass {
+			if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_used", principal.IncidentReason); err != nil {
+				writeStatus(w, http.StatusServiceUnavailable)
+				return
+			}
+			response := &emergencyResponse{ResponseWriter: w}
+			w = response
+			defer func() {
+				if response.status >= http.StatusBadRequest {
+					if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "protected request denied"); err != nil {
+						slog.Error("identity emergency denial audit failed")
+					}
+				}
+			}()
+		}
 		if unsafeMethod(r.Method) && (!originMatches(s.publicOrigin, r.Header.Get("Origin")) || !csrfMatch(cookie, r.Header.Get(csrfHeader))) {
 			writeStatus(w, http.StatusForbidden)
 			return
@@ -71,6 +87,10 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 
 func (s *Service) handleLogin(w http.ResponseWriter, r *http.Request) {
 	prepare(w)
+	if s.oauth == nil {
+		writeStatus(w, http.StatusNotFound)
+		return
+	}
 	state, err := randomToken()
 	if err != nil {
 		writeStatus(w, http.StatusServiceUnavailable)
@@ -106,6 +126,10 @@ func (s *Service) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) handleCallback(w http.ResponseWriter, r *http.Request) {
 	prepare(w)
+	if s.oauth == nil {
+		writeStatus(w, http.StatusNotFound)
+		return
+	}
 	if len(r.URL.RawQuery) > 4096 || r.URL.Query().Get("error") != "" {
 		s.failCallback(w, http.StatusUnauthorized)
 		return
@@ -157,28 +181,13 @@ func (s *Service) handleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleLogout(w http.ResponseWriter, r *http.Request) {
-	prepare(w)
 	cookie, ok := readOpaqueCookie(r, sessionCookie)
-	if !ok {
-		clearHostCookie(w, sessionCookie)
+	principal, authenticated := PrincipalFromContext(r.Context())
+	if !ok || !authenticated {
 		writeStatus(w, http.StatusUnauthorized)
 		return
 	}
-	if !originMatches(s.publicOrigin, r.Header.Get("Origin")) || !csrfMatch(cookie, r.Header.Get(csrfHeader)) {
-		writeStatus(w, http.StatusForbidden)
-		return
-	}
-	sess, err := s.getSession(r.Context(), sessionHash(cookie))
-	if err != nil || sess.Revoked || !s.clock().Before(sess.Idle) || !s.clock().Before(sess.Absolute) {
-		clearHostCookie(w, sessionCookie)
-		if err != nil && !errors.Is(err, errNotFound) && !errors.Is(err, errUnauthenticated) {
-			writeStatus(w, statusFor(err))
-			return
-		}
-		writeStatus(w, http.StatusUnauthorized)
-		return
-	}
-	if err := s.logout(r.Context(), cookie, sess.PrincipalID); err != nil && !errors.Is(err, errNotFound) {
+	if err := s.logout(r.Context(), cookie, principal.ID); err != nil && !errors.Is(err, errNotFound) {
 		writeStatus(w, statusFor(err))
 		return
 	}
@@ -187,26 +196,9 @@ func (s *Service) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleSession(w http.ResponseWriter, r *http.Request) {
-	prepare(w)
-	cookie, ok := readOpaqueCookie(r, sessionCookie)
+	principal, ok := PrincipalFromContext(r.Context())
 	if !ok {
 		writeStatus(w, http.StatusUnauthorized)
-		return
-	}
-	principal, dec, err := s.resolve(r.Context(), cookie)
-	if err != nil {
-		writeStatus(w, statusFor(err))
-		return
-	}
-	if dec.Kind != accessOK {
-		if dec.Kind == accessUnauthenticated {
-			clearHostCookie(w, sessionCookie)
-		}
-		writeStatus(w, statusForDecision(dec))
-		return
-	}
-	if err := s.touch(r.Context(), cookie); err != nil {
-		writeStatus(w, statusFor(err))
 		return
 	}
 	writeSession(w, principal)
@@ -235,17 +227,30 @@ func (s *Service) exchangeAndVerify(ctx context.Context, code, verifier string, 
 	}
 	var claims struct {
 		AZP string `json:"azp"`
+		TID string `json:"tid"`
+		OID string `json:"oid"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return uuid.Nil, errUnauthenticated
 	}
-	if idToken.Issuer != s.issuer || !idTokenAccepted(s.clientID, idToken.Audience, claims.AZP, idToken.Nonce, wantNonce, idToken.IssuedAt, s.clock()) {
+	if idToken.Subject == "" || idToken.Issuer != s.issuer || !idTokenAccepted(s.clientID, idToken.Audience, claims.AZP, idToken.Nonce, wantNonce, idToken.IssuedAt, s.clock()) {
 		return uuid.Nil, errUnauthenticated
 	}
 	if idToken.AccessTokenHash != "" {
 		if err := idToken.VerifyAccessToken(tok.AccessToken); err != nil {
 			return uuid.Nil, errUnauthenticated
 		}
+	}
+	if s.entraTenant != uuid.Nil {
+		tenant, err := uuid.Parse(claims.TID)
+		if err != nil || tenant != s.entraTenant {
+			return uuid.Nil, errUnauthenticated
+		}
+		object, err := uuid.Parse(claims.OID)
+		if err != nil || object == uuid.Nil {
+			return uuid.Nil, errUnauthenticated
+		}
+		return object, nil
 	}
 	subject, err := uuid.Parse(idToken.Subject)
 	if err != nil || subject == uuid.Nil {
@@ -261,12 +266,14 @@ func (s *Service) failCallback(w http.ResponseWriter, status int) {
 
 func writeSession(w http.ResponseWriter, principal Principal) {
 	body, err := (protojson.MarshalOptions{EmitDefaultValues: true}).Marshal(&authv1.SessionPrincipal{
-		Id:          principal.ID.String(),
-		Issuer:      principal.Issuer,
-		Subject:     principal.Subject,
-		DisplayName: principal.DisplayName,
-		Role:        principal.Role,
-		CsrfToken:   principal.CSRFToken,
+		Id:             principal.ID.String(),
+		Issuer:         principal.Issuer,
+		Subject:        principal.Subject,
+		DisplayName:    principal.DisplayName,
+		Role:           principal.Role,
+		CsrfToken:      principal.CSRFToken,
+		BreakGlass:     principal.BreakGlass,
+		IncidentReason: principal.IncidentReason,
 	})
 	if err != nil {
 		writeStatus(w, http.StatusServiceUnavailable)

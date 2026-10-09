@@ -14,12 +14,6 @@ import (
 	"lindm/internal/protodata"
 )
 
-// executionTrustDDL also serves genuine-v1 migration fixtures. The reviewed
-// table definition has one source for fresh initialization and migration.
-func executionTrustDDL() string {
-	return journalTableDDL("execution_trust")
-}
-
 func unconfiguredExecutionTrust(installationID string) *agentv1.ExecutionTrustState {
 	return &agentv1.ExecutionTrustState{FormatVersion: 1, InstallationId: installationID}
 }

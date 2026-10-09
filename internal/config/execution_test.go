@@ -119,7 +119,7 @@ func newExecutionConfigFixture(t *testing.T) *executionConfigFixture {
 		Database:           &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 2},
 		Tls:                &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
 		DeviceCa:           &configv1.DeviceCAConfig{CertificateFile: "device.crt", PrivateKeyFile: "device.key"},
-		Oidc:               &configv1.OIDCConfig{ClientSecretFile: "oidc-secret", DirectoryClientSecretFile: "oidc-secret"},
+		Authentication:     &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{ClientSecretFile: "oidc-secret", DirectoryClientSecretFile: "oidc-secret"}}},
 		ExecutionBootstrap: &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"},
 	}}
 	public, private, err := ed25519.GenerateKey(rand.Reader)

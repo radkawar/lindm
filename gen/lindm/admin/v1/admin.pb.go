@@ -1724,7 +1724,7 @@ var File_lindm_admin_v1_admin_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\n" +
-	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dlindm/admin/v1/profiles.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1alindm/agent/v1/trust.proto\x1a$lindm/inventory/v1/observation.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa8\x06\n" +
+	"\x1alindm/admin/v1/admin.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dlindm/admin/v1/profiles.proto\x1a(lindm/admin/v1/service_assignments.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1alindm/agent/v1/trust.proto\x1a$lindm/inventory/v1/observation.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa8\x06\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12\x1a\n" +
@@ -1882,8 +1882,7 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x14DEVICE_STATE_PENDING\x10\x01\x12\x17\n" +
 	"\x13DEVICE_STATE_ACTIVE\x10\x02\x12\x18\n" +
 	"\x14DEVICE_STATE_REVOKED\x10\x03\x12\x1e\n" +
-	"\x1aDEVICE_STATE_RECOVERY_HOLD\x10\x042\xc7\n" +
-	"\n" +
+	"\x1aDEVICE_STATE_RECOVERY_HOLD\x10\x042\xb0\f\n" +
 	"\fAdminService\x12V\n" +
 	"\vListDevices\x12\".lindm.admin.v1.ListDevicesRequest\x1a#.lindm.admin.v1.ListDevicesResponse\x12P\n" +
 	"\tGetDevice\x12 .lindm.admin.v1.GetDeviceRequest\x1a!.lindm.admin.v1.GetDeviceResponse\x12k\n" +
@@ -1896,7 +1895,9 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x18UpdateExecutionAuthority\x12/.lindm.admin.v1.UpdateExecutionAuthorityRequest\x1a0.lindm.admin.v1.UpdateExecutionAuthorityResponse\x12\x8c\x01\n" +
 	"\x1dPublishServiceProfileRevision\x124.lindm.admin.v1.PublishServiceProfileRevisionRequest\x1a5.lindm.admin.v1.PublishServiceProfileRevisionResponse\x12\x80\x01\n" +
 	"\x19GetServiceProfileRevision\x120.lindm.admin.v1.GetServiceProfileRevisionRequest\x1a1.lindm.admin.v1.GetServiceProfileRevisionResponse\x12n\n" +
-	"\x13ListServiceProfiles\x12*.lindm.admin.v1.ListServiceProfilesRequest\x1a+.lindm.admin.v1.ListServiceProfilesResponseB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x13ListServiceProfiles\x12*.lindm.admin.v1.ListServiceProfilesRequest\x1a+.lindm.admin.v1.ListServiceProfilesResponse\x12q\n" +
+	"\x14SetServiceAssignment\x12+.lindm.admin.v1.SetServiceAssignmentRequest\x1a,.lindm.admin.v1.SetServiceAssignmentResponse\x12t\n" +
+	"\x15GetDeviceServiceState\x12,.lindm.admin.v1.GetDeviceServiceStateRequest\x1a-.lindm.admin.v1.GetDeviceServiceStateResponseB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_admin_proto_rawDescOnce sync.Once
@@ -1949,9 +1950,13 @@ var file_lindm_admin_v1_admin_proto_goTypes = []any{
 	(*PublishServiceProfileRevisionRequest)(nil),  // 33: lindm.admin.v1.PublishServiceProfileRevisionRequest
 	(*GetServiceProfileRevisionRequest)(nil),      // 34: lindm.admin.v1.GetServiceProfileRevisionRequest
 	(*ListServiceProfilesRequest)(nil),            // 35: lindm.admin.v1.ListServiceProfilesRequest
-	(*PublishServiceProfileRevisionResponse)(nil), // 36: lindm.admin.v1.PublishServiceProfileRevisionResponse
-	(*GetServiceProfileRevisionResponse)(nil),     // 37: lindm.admin.v1.GetServiceProfileRevisionResponse
-	(*ListServiceProfilesResponse)(nil),           // 38: lindm.admin.v1.ListServiceProfilesResponse
+	(*SetServiceAssignmentRequest)(nil),           // 36: lindm.admin.v1.SetServiceAssignmentRequest
+	(*GetDeviceServiceStateRequest)(nil),          // 37: lindm.admin.v1.GetDeviceServiceStateRequest
+	(*PublishServiceProfileRevisionResponse)(nil), // 38: lindm.admin.v1.PublishServiceProfileRevisionResponse
+	(*GetServiceProfileRevisionResponse)(nil),     // 39: lindm.admin.v1.GetServiceProfileRevisionResponse
+	(*ListServiceProfilesResponse)(nil),           // 40: lindm.admin.v1.ListServiceProfilesResponse
+	(*SetServiceAssignmentResponse)(nil),          // 41: lindm.admin.v1.SetServiceAssignmentResponse
+	(*GetDeviceServiceStateResponse)(nil),         // 42: lindm.admin.v1.GetDeviceServiceStateResponse
 }
 var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
 	0,  // 0: lindm.admin.v1.Device.lifecycle_state:type_name -> lindm.admin.v1.DeviceState
@@ -2001,20 +2006,24 @@ var file_lindm_admin_v1_admin_proto_depIdxs = []int32{
 	33, // 44: lindm.admin.v1.AdminService.PublishServiceProfileRevision:input_type -> lindm.admin.v1.PublishServiceProfileRevisionRequest
 	34, // 45: lindm.admin.v1.AdminService.GetServiceProfileRevision:input_type -> lindm.admin.v1.GetServiceProfileRevisionRequest
 	35, // 46: lindm.admin.v1.AdminService.ListServiceProfiles:input_type -> lindm.admin.v1.ListServiceProfilesRequest
-	3,  // 47: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
-	8,  // 48: lindm.admin.v1.AdminService.GetDevice:output_type -> lindm.admin.v1.GetDeviceResponse
-	11, // 49: lindm.admin.v1.AdminService.ListDevicePackages:output_type -> lindm.admin.v1.ListDevicePackagesResponse
-	13, // 50: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
-	15, // 51: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
-	17, // 52: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
-	20, // 53: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
-	22, // 54: lindm.admin.v1.AdminService.GetExecutionAuthority:output_type -> lindm.admin.v1.GetExecutionAuthorityResponse
-	24, // 55: lindm.admin.v1.AdminService.UpdateExecutionAuthority:output_type -> lindm.admin.v1.UpdateExecutionAuthorityResponse
-	36, // 56: lindm.admin.v1.AdminService.PublishServiceProfileRevision:output_type -> lindm.admin.v1.PublishServiceProfileRevisionResponse
-	37, // 57: lindm.admin.v1.AdminService.GetServiceProfileRevision:output_type -> lindm.admin.v1.GetServiceProfileRevisionResponse
-	38, // 58: lindm.admin.v1.AdminService.ListServiceProfiles:output_type -> lindm.admin.v1.ListServiceProfilesResponse
-	47, // [47:59] is the sub-list for method output_type
-	35, // [35:47] is the sub-list for method input_type
+	36, // 47: lindm.admin.v1.AdminService.SetServiceAssignment:input_type -> lindm.admin.v1.SetServiceAssignmentRequest
+	37, // 48: lindm.admin.v1.AdminService.GetDeviceServiceState:input_type -> lindm.admin.v1.GetDeviceServiceStateRequest
+	3,  // 49: lindm.admin.v1.AdminService.ListDevices:output_type -> lindm.admin.v1.ListDevicesResponse
+	8,  // 50: lindm.admin.v1.AdminService.GetDevice:output_type -> lindm.admin.v1.GetDeviceResponse
+	11, // 51: lindm.admin.v1.AdminService.ListDevicePackages:output_type -> lindm.admin.v1.ListDevicePackagesResponse
+	13, // 52: lindm.admin.v1.AdminService.CreateEnrollmentGrant:output_type -> lindm.admin.v1.CreateEnrollmentGrantResponse
+	15, // 53: lindm.admin.v1.AdminService.RevokeEnrollmentGrant:output_type -> lindm.admin.v1.RevokeEnrollmentGrantResponse
+	17, // 54: lindm.admin.v1.AdminService.RevokeDevice:output_type -> lindm.admin.v1.RevokeDeviceResponse
+	20, // 55: lindm.admin.v1.AdminService.ListAuditEvents:output_type -> lindm.admin.v1.ListAuditEventsResponse
+	22, // 56: lindm.admin.v1.AdminService.GetExecutionAuthority:output_type -> lindm.admin.v1.GetExecutionAuthorityResponse
+	24, // 57: lindm.admin.v1.AdminService.UpdateExecutionAuthority:output_type -> lindm.admin.v1.UpdateExecutionAuthorityResponse
+	38, // 58: lindm.admin.v1.AdminService.PublishServiceProfileRevision:output_type -> lindm.admin.v1.PublishServiceProfileRevisionResponse
+	39, // 59: lindm.admin.v1.AdminService.GetServiceProfileRevision:output_type -> lindm.admin.v1.GetServiceProfileRevisionResponse
+	40, // 60: lindm.admin.v1.AdminService.ListServiceProfiles:output_type -> lindm.admin.v1.ListServiceProfilesResponse
+	41, // 61: lindm.admin.v1.AdminService.SetServiceAssignment:output_type -> lindm.admin.v1.SetServiceAssignmentResponse
+	42, // 62: lindm.admin.v1.AdminService.GetDeviceServiceState:output_type -> lindm.admin.v1.GetDeviceServiceStateResponse
+	49, // [49:63] is the sub-list for method output_type
+	35, // [35:49] is the sub-list for method input_type
 	35, // [35:35] is the sub-list for extension type_name
 	35, // [35:35] is the sub-list for extension extendee
 	0,  // [0:35] is the sub-list for field type_name
@@ -2026,6 +2035,7 @@ func file_lindm_admin_v1_admin_proto_init() {
 		return
 	}
 	file_lindm_admin_v1_profiles_proto_init()
+	file_lindm_admin_v1_service_assignments_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

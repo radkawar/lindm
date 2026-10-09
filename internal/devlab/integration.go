@@ -20,8 +20,14 @@ func TestIntegration(ctx context.Context, repoRoot string) error {
 		if err := databaseReady(ctx, dir); err != nil {
 			return fmt.Errorf("integration database is not ready; run make dev-up: %w", err)
 		}
-		if err := checkFreshAuthorization(ctx, root, os.Stdout); err != nil {
-			return fmt.Errorf("real fresh-authorization smoke: %w", err)
+		local, err := localFixture(dir)
+		if err != nil {
+			return err
+		}
+		if !local {
+			if err := checkFreshAuthorization(ctx, root, os.Stdout); err != nil {
+				return fmt.Errorf("real fresh-authorization smoke: %w", err)
+			}
 		}
 		dsn, err := os.ReadFile(filepath.Join(dir, "migration-database-url"))
 		if err != nil {

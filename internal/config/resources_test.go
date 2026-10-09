@@ -218,11 +218,11 @@ func TestResolveDeviceCAUsage(t *testing.T) {
 			writeCertificate(t, dir, "device", true, test.usage, test.unknown)
 			writeFixtureFile(t, dir, "oidc-secret", []byte("isolated-test-credential"))
 			document := &Document{base: dir, Proto: &configv1.ServerConfig{
-				PublicUrl: "https://localhost",
-				Database:  &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 2},
-				Tls:       &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
-				DeviceCa:  &configv1.DeviceCAConfig{CertificateFile: "device.crt", PrivateKeyFile: "device.key"},
-				Oidc:      &configv1.OIDCConfig{ClientSecretFile: "oidc-secret", DirectoryClientSecretFile: "oidc-secret"},
+				PublicUrl:      "https://localhost",
+				Database:       &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 2},
+				Tls:            &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
+				DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: "device.crt", PrivateKeyFile: "device.key"},
+				Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{ClientSecretFile: "oidc-secret", DirectoryClientSecretFile: "oidc-secret"}}},
 			}}
 			resources, err := document.Resolve()
 			if !test.accepted {

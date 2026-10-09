@@ -1,6 +1,6 @@
 -- Protected authority and trust retain independent revisions. Service actions,
 -- monotonic resource floors and capacity accounting commit in one transaction.
--- Schema changes require explicit migration; damaged installations are held.
+-- Only this schema is supported; unexpected versions or damage are held.
 CREATE TABLE executor_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     revision INTEGER NOT NULL CHECK (revision > 0),
@@ -44,5 +44,5 @@ CREATE TABLE service_action_usage (
     record_bytes INTEGER NOT NULL CHECK (record_bytes BETWEEN 0 AND 268435456)
 ) STRICT;
 
-PRAGMA user_version = 3;
+PRAGMA user_version = 1;
 PRAGMA application_id = 1279872580;

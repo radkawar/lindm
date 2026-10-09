@@ -68,6 +68,12 @@ const (
 	// AdminServiceListServiceProfilesProcedure is the fully-qualified name of the AdminService's
 	// ListServiceProfiles RPC.
 	AdminServiceListServiceProfilesProcedure = "/lindm.admin.v1.AdminService/ListServiceProfiles"
+	// AdminServiceSetServiceAssignmentProcedure is the fully-qualified name of the AdminService's
+	// SetServiceAssignment RPC.
+	AdminServiceSetServiceAssignmentProcedure = "/lindm.admin.v1.AdminService/SetServiceAssignment"
+	// AdminServiceGetDeviceServiceStateProcedure is the fully-qualified name of the AdminService's
+	// GetDeviceServiceState RPC.
+	AdminServiceGetDeviceServiceStateProcedure = "/lindm.admin.v1.AdminService/GetDeviceServiceState"
 )
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
@@ -84,6 +90,8 @@ type AdminServiceClient interface {
 	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
 	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
 	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
+	SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error)
+	GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the lindm.admin.v1.AdminService service. By
@@ -169,6 +177,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
 			connect.WithClientOptions(opts...),
 		),
+		setServiceAssignment: connect.NewClient[v1.SetServiceAssignmentRequest, v1.SetServiceAssignmentResponse](
+			httpClient,
+			baseURL+AdminServiceSetServiceAssignmentProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetServiceAssignment")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceServiceState: connect.NewClient[v1.GetDeviceServiceStateRequest, v1.GetDeviceServiceStateResponse](
+			httpClient,
+			baseURL+AdminServiceGetDeviceServiceStateProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDeviceServiceState")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -186,6 +206,8 @@ type adminServiceClient struct {
 	publishServiceProfileRevision *connect.Client[v1.PublishServiceProfileRevisionRequest, v1.PublishServiceProfileRevisionResponse]
 	getServiceProfileRevision     *connect.Client[v1.GetServiceProfileRevisionRequest, v1.GetServiceProfileRevisionResponse]
 	listServiceProfiles           *connect.Client[v1.ListServiceProfilesRequest, v1.ListServiceProfilesResponse]
+	setServiceAssignment          *connect.Client[v1.SetServiceAssignmentRequest, v1.SetServiceAssignmentResponse]
+	getDeviceServiceState         *connect.Client[v1.GetDeviceServiceStateRequest, v1.GetDeviceServiceStateResponse]
 }
 
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
@@ -248,6 +270,16 @@ func (c *adminServiceClient) ListServiceProfiles(ctx context.Context, req *conne
 	return c.listServiceProfiles.CallUnary(ctx, req)
 }
 
+// SetServiceAssignment calls lindm.admin.v1.AdminService.SetServiceAssignment.
+func (c *adminServiceClient) SetServiceAssignment(ctx context.Context, req *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error) {
+	return c.setServiceAssignment.CallUnary(ctx, req)
+}
+
+// GetDeviceServiceState calls lindm.admin.v1.AdminService.GetDeviceServiceState.
+func (c *adminServiceClient) GetDeviceServiceState(ctx context.Context, req *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error) {
+	return c.getDeviceServiceState.CallUnary(ctx, req)
+}
+
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
@@ -262,6 +294,8 @@ type AdminServiceHandler interface {
 	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
 	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
 	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
+	SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error)
+	GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -343,6 +377,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceSetServiceAssignmentHandler := connect.NewUnaryHandler(
+		AdminServiceSetServiceAssignmentProcedure,
+		svc.SetServiceAssignment,
+		connect.WithSchema(adminServiceMethods.ByName("SetServiceAssignment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDeviceServiceStateHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceServiceStateProcedure,
+		svc.GetDeviceServiceState,
+		connect.WithSchema(adminServiceMethods.ByName("GetDeviceServiceState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceListDevicesProcedure:
@@ -369,6 +415,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetServiceProfileRevisionHandler.ServeHTTP(w, r)
 		case AdminServiceListServiceProfilesProcedure:
 			adminServiceListServiceProfilesHandler.ServeHTTP(w, r)
+		case AdminServiceSetServiceAssignmentProcedure:
+			adminServiceSetServiceAssignmentHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceServiceStateProcedure:
+			adminServiceGetDeviceServiceStateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -424,4 +474,12 @@ func (UnimplementedAdminServiceHandler) GetServiceProfileRevision(context.Contex
 
 func (UnimplementedAdminServiceHandler) ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListServiceProfiles is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetServiceAssignment is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceServiceState is not implemented"))
 }

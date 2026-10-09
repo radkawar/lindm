@@ -60,6 +60,15 @@ const (
 	// DeviceServiceRenewIdentityProcedure is the fully-qualified name of the DeviceService's
 	// RenewIdentity RPC.
 	DeviceServiceRenewIdentityProcedure = "/lindm.device.v1.DeviceService/RenewIdentity"
+	// DeviceServiceGetServiceWorkProcedure is the fully-qualified name of the DeviceService's
+	// GetServiceWork RPC.
+	DeviceServiceGetServiceWorkProcedure = "/lindm.device.v1.DeviceService/GetServiceWork"
+	// DeviceServiceAuthorizeServiceStartProcedure is the fully-qualified name of the DeviceService's
+	// AuthorizeServiceStart RPC.
+	DeviceServiceAuthorizeServiceStartProcedure = "/lindm.device.v1.DeviceService/AuthorizeServiceStart"
+	// DeviceServiceReportServiceResultProcedure is the fully-qualified name of the DeviceService's
+	// ReportServiceResult RPC.
+	DeviceServiceReportServiceResultProcedure = "/lindm.device.v1.DeviceService/ReportServiceResult"
 )
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
@@ -73,6 +82,14 @@ type DeviceServiceClient interface {
 	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
 	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
+	// Returns the current server-owned service action, minting it only when no
+	// open action exists. Never implies the device is compliant.
+	GetServiceWork(context.Context, *connect.Request[v1.GetServiceWorkRequest]) (*connect.Response[v1.GetServiceWorkResponse], error)
+	// Reauthorizes the original actor, desired head and device fences before
+	// signing a start grant for the exact device challenge.
+	AuthorizeServiceStart(context.Context, *connect.Request[v1.AuthorizeServiceStartRequest]) (*connect.Response[v1.AuthorizeServiceStartResponse], error)
+	// Admits a nonce-bound device attestation of protected action history.
+	ReportServiceResult(context.Context, *connect.Request[v1.ReportServiceResultRequest]) (*connect.Response[v1.ReportServiceResultResponse], error)
 }
 
 // NewDeviceServiceClient constructs a client for the lindm.device.v1.DeviceService service. By
@@ -140,6 +157,24 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("RenewIdentity")),
 			connect.WithClientOptions(opts...),
 		),
+		getServiceWork: connect.NewClient[v1.GetServiceWorkRequest, v1.GetServiceWorkResponse](
+			httpClient,
+			baseURL+DeviceServiceGetServiceWorkProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("GetServiceWork")),
+			connect.WithClientOptions(opts...),
+		),
+		authorizeServiceStart: connect.NewClient[v1.AuthorizeServiceStartRequest, v1.AuthorizeServiceStartResponse](
+			httpClient,
+			baseURL+DeviceServiceAuthorizeServiceStartProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("AuthorizeServiceStart")),
+			connect.WithClientOptions(opts...),
+		),
+		reportServiceResult: connect.NewClient[v1.ReportServiceResultRequest, v1.ReportServiceResultResponse](
+			httpClient,
+			baseURL+DeviceServiceReportServiceResultProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("ReportServiceResult")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -154,6 +189,9 @@ type deviceServiceClient struct {
 	putPackageBatch       *connect.Client[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse]
 	commitPackageSnapshot *connect.Client[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse]
 	renewIdentity         *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
+	getServiceWork        *connect.Client[v1.GetServiceWorkRequest, v1.GetServiceWorkResponse]
+	authorizeServiceStart *connect.Client[v1.AuthorizeServiceStartRequest, v1.AuthorizeServiceStartResponse]
+	reportServiceResult   *connect.Client[v1.ReportServiceResultRequest, v1.ReportServiceResultResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -201,6 +239,21 @@ func (c *deviceServiceClient) RenewIdentity(ctx context.Context, req *connect.Re
 	return c.renewIdentity.CallUnary(ctx, req)
 }
 
+// GetServiceWork calls lindm.device.v1.DeviceService.GetServiceWork.
+func (c *deviceServiceClient) GetServiceWork(ctx context.Context, req *connect.Request[v1.GetServiceWorkRequest]) (*connect.Response[v1.GetServiceWorkResponse], error) {
+	return c.getServiceWork.CallUnary(ctx, req)
+}
+
+// AuthorizeServiceStart calls lindm.device.v1.DeviceService.AuthorizeServiceStart.
+func (c *deviceServiceClient) AuthorizeServiceStart(ctx context.Context, req *connect.Request[v1.AuthorizeServiceStartRequest]) (*connect.Response[v1.AuthorizeServiceStartResponse], error) {
+	return c.authorizeServiceStart.CallUnary(ctx, req)
+}
+
+// ReportServiceResult calls lindm.device.v1.DeviceService.ReportServiceResult.
+func (c *deviceServiceClient) ReportServiceResult(ctx context.Context, req *connect.Request[v1.ReportServiceResultRequest]) (*connect.Response[v1.ReportServiceResultResponse], error) {
+	return c.reportServiceResult.CallUnary(ctx, req)
+}
+
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
@@ -212,6 +265,14 @@ type DeviceServiceHandler interface {
 	PutPackageBatch(context.Context, *connect.Request[v1.PutPackageBatchRequest]) (*connect.Response[v1.PutPackageBatchResponse], error)
 	CommitPackageSnapshot(context.Context, *connect.Request[v1.CommitPackageSnapshotRequest]) (*connect.Response[v1.CommitPackageSnapshotResponse], error)
 	RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error)
+	// Returns the current server-owned service action, minting it only when no
+	// open action exists. Never implies the device is compliant.
+	GetServiceWork(context.Context, *connect.Request[v1.GetServiceWorkRequest]) (*connect.Response[v1.GetServiceWorkResponse], error)
+	// Reauthorizes the original actor, desired head and device fences before
+	// signing a start grant for the exact device challenge.
+	AuthorizeServiceStart(context.Context, *connect.Request[v1.AuthorizeServiceStartRequest]) (*connect.Response[v1.AuthorizeServiceStartResponse], error)
+	// Admits a nonce-bound device attestation of protected action history.
+	ReportServiceResult(context.Context, *connect.Request[v1.ReportServiceResultRequest]) (*connect.Response[v1.ReportServiceResultResponse], error)
 }
 
 // NewDeviceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -275,6 +336,24 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("RenewIdentity")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServiceGetServiceWorkHandler := connect.NewUnaryHandler(
+		DeviceServiceGetServiceWorkProcedure,
+		svc.GetServiceWork,
+		connect.WithSchema(deviceServiceMethods.ByName("GetServiceWork")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceAuthorizeServiceStartHandler := connect.NewUnaryHandler(
+		DeviceServiceAuthorizeServiceStartProcedure,
+		svc.AuthorizeServiceStart,
+		connect.WithSchema(deviceServiceMethods.ByName("AuthorizeServiceStart")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceReportServiceResultHandler := connect.NewUnaryHandler(
+		DeviceServiceReportServiceResultProcedure,
+		svc.ReportServiceResult,
+		connect.WithSchema(deviceServiceMethods.ByName("ReportServiceResult")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DeviceServiceAcquireSessionProcedure:
@@ -295,6 +374,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceCommitPackageSnapshotHandler.ServeHTTP(w, r)
 		case DeviceServiceRenewIdentityProcedure:
 			deviceServiceRenewIdentityHandler.ServeHTTP(w, r)
+		case DeviceServiceGetServiceWorkProcedure:
+			deviceServiceGetServiceWorkHandler.ServeHTTP(w, r)
+		case DeviceServiceAuthorizeServiceStartProcedure:
+			deviceServiceAuthorizeServiceStartHandler.ServeHTTP(w, r)
+		case DeviceServiceReportServiceResultProcedure:
+			deviceServiceReportServiceResultHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -338,4 +423,16 @@ func (UnimplementedDeviceServiceHandler) CommitPackageSnapshot(context.Context, 
 
 func (UnimplementedDeviceServiceHandler) RenewIdentity(context.Context, *connect.Request[v1.RenewIdentityRequest]) (*connect.Response[v1.RenewIdentityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.RenewIdentity is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) GetServiceWork(context.Context, *connect.Request[v1.GetServiceWorkRequest]) (*connect.Response[v1.GetServiceWorkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetServiceWork is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) AuthorizeServiceStart(context.Context, *connect.Request[v1.AuthorizeServiceStartRequest]) (*connect.Response[v1.AuthorizeServiceStartResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.AuthorizeServiceStart is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) ReportServiceResult(context.Context, *connect.Request[v1.ReportServiceResultRequest]) (*connect.Response[v1.ReportServiceResultResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ReportServiceResult is not implemented"))
 }

@@ -1,6 +1,6 @@
 -- Unprivileged observation spool. Bounded metadata, counters and receipts only.
 -- Package batch bytes live in owned collection directories, never in this database.
--- Schema changes require an explicit reviewed migration, never recreation.
+-- Only the current schema is supported; unexpected versions require recovery.
 
 CREATE TABLE scope (
     id INTEGER PRIMARY KEY CHECK (id = 1),

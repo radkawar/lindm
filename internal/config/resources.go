@@ -119,18 +119,8 @@ func (d *Document) Resolve() (*Resources, error) {
 		return nil, err
 	}
 
-	secret, err := readFile(reference(base, cfg.GetOidc().GetClientSecretFile()), true)
-	if err != nil {
-		return nil, fmt.Errorf("read oidc.client_secret_file: %w", err)
-	}
-	result.ClientSecret = strings.TrimSpace(string(secret))
-	secret, err = readFile(reference(base, cfg.GetOidc().GetDirectoryClientSecretFile()), true)
-	if err != nil {
-		return nil, fmt.Errorf("read oidc.directory_client_secret_file: %w", err)
-	}
-	result.DirectoryClientSecret = strings.TrimSpace(string(secret))
-	if result.ClientSecret == "" || result.DirectoryClientSecret == "" {
-		return nil, errors.New("OIDC secret files must not be empty")
+	if err := d.authenticationSecrets(result); err != nil {
+		return nil, err
 	}
 	roots, err := x509.SystemCertPool()
 	if err != nil {
@@ -159,6 +149,31 @@ func (d *Document) Resolve() (*Resources, error) {
 		},
 	}
 	return result, nil
+}
+
+func (d *Document) authenticationSecrets(result *Resources) error {
+	var provider, loginFile, directoryFile string
+	if keycloak := d.Proto.GetAuthentication().GetKeycloak(); keycloak != nil {
+		provider, loginFile, directoryFile = "keycloak", keycloak.GetClientSecretFile(), keycloak.GetDirectoryClientSecretFile()
+	} else if entra := d.Proto.GetAuthentication().GetEntra(); entra != nil {
+		provider, loginFile, directoryFile = "entra", entra.GetClientSecretFile(), entra.GetDirectoryClientSecretFile()
+	} else {
+		return nil
+	}
+	secret, err := readFile(reference(d.base, loginFile), true)
+	if err != nil {
+		return fmt.Errorf("read authentication.%s.client_secret_file: %w", provider, err)
+	}
+	result.ClientSecret = strings.TrimSpace(string(secret))
+	secret, err = readFile(reference(d.base, directoryFile), true)
+	if err != nil {
+		return fmt.Errorf("read authentication.%s.directory_client_secret_file: %w", provider, err)
+	}
+	result.DirectoryClientSecret = strings.TrimSpace(string(secret))
+	if result.ClientSecret == "" || result.DirectoryClientSecret == "" {
+		return fmt.Errorf("%s secret files must not be empty", provider)
+	}
+	return nil
 }
 
 // Database resolves only the runtime database credential.

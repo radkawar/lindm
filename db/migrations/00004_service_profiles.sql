@@ -66,8 +66,6 @@ BEGIN
     DROP TABLE service_profile_requests;
     DROP TABLE service_profile_dependencies;
     DROP TABLE service_profile_resources;
-    ALTER TABLE service_profiles DROP CONSTRAINT service_profile_head;
-    DROP TABLE service_profile_revisions;
-    DROP TABLE service_profiles;
+    DROP TABLE service_profile_revisions, service_profiles;
 END $$;
 -- +goose StatementEnd

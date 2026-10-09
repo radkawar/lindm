@@ -18,24 +18,35 @@ import (
 	"lindm/internal/protodata"
 )
 
+const managementInterval = 20 * time.Second
+
 // The management loop owns its cancellation, join and connection cache. It does
 // not share inventory scheduling, collection, spool state or transport status;
-// even a two-minute native collection cannot delay execution-trust admission.
-func startExecutionTrustLoop(parent context.Context, executor agentv1connect.ExecutorServiceClient, gate authorityGate) func() {
+// even a two-minute native collection cannot delay trust admission or dispatch.
+type managementLoop struct {
+	executor agentv1connect.ExecutorServiceClient
+	cache    connectionCache
+	gate     authorityGate
+}
+
+func (m *managementLoop) start(parent context.Context) func() {
 	ctx, cancel := context.WithCancel(parent)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		var cache connectionCache
-		defer cache.Close()
+		defer m.cache.Close()
 		for ctx.Err() == nil {
-			if err := synchronizeExecutionTrust(ctx, executor, &cache, gate); err != nil && ctx.Err() == nil {
-				slog.Warn("execution trust synchronization incomplete", "error", err)
+			if err := synchronizeExecutionTrust(ctx, m.executor, &m.cache, m.gate); err != nil {
+				if ctx.Err() == nil {
+					slog.Warn("execution trust synchronization incomplete", "error", err)
+				}
+			} else if err := m.dispatchServices(ctx); err != nil && ctx.Err() == nil {
+				slog.Warn("service dispatch incomplete", "error", err)
 			}
 			if ctx.Err() != nil {
 				return
 			}
-			timer := time.NewTimer(heartbeatDelay())
+			timer := time.NewTimer(managementInterval)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
@@ -61,7 +72,7 @@ func synchronizeExecutionTrust(ctx context.Context, executor agentv1connect.Exec
 	if err != nil {
 		return err
 	}
-	if err := validateTrustMessage(view); err != nil {
+	if err := validateManagementMessage(view); err != nil {
 		return fmt.Errorf("invalid protected execution trust view: %w", err)
 	}
 	desired, err := rpc(ctx, authority.servers.device.GetExecutionTrust, &devicev1.GetExecutionTrustRequest{
@@ -72,7 +83,7 @@ func synchronizeExecutionTrust(ctx context.Context, executor agentv1connect.Exec
 	if err != nil {
 		return err
 	}
-	if err := validateTrustMessage(desired); err != nil {
+	if err := validateManagementMessage(desired); err != nil {
 		return fmt.Errorf("invalid server execution trust response: %w", err)
 	}
 	if desired.GetUpdate() == nil {
@@ -103,7 +114,7 @@ func checkUnchangedTrust(view *agentv1.GetExecutionTrustResponse, desired *devic
 }
 
 func checkTrustReceipt(receipt *agentv1.UpdateExecutionTrustResponse, desired *devicev1.GetExecutionTrustResponse) error {
-	if err := validateTrustMessage(receipt); err != nil {
+	if err := validateManagementMessage(receipt); err != nil {
 		return fmt.Errorf("invalid protected execution trust receipt: %w", err)
 	}
 	if receipt.GetRootVersion() != desired.GetRootVersion() || receipt.GetDelegationVersion() != desired.GetDelegationVersion() || receipt.GetMinimumRecoveryEpoch() != desired.GetMinimumRecoveryEpoch() {
@@ -112,9 +123,9 @@ func checkTrustReceipt(receipt *agentv1.UpdateExecutionTrustResponse, desired *d
 	return nil
 }
 
-func validateTrustMessage(message proto.Message) error {
+func validateManagementMessage(message proto.Message) error {
 	if message == nil || !message.ProtoReflect().IsValid() {
-		return errors.New("missing execution trust message")
+		return errors.New("missing management message")
 	}
 	if err := protodata.ValidateClosed(message.ProtoReflect()); err != nil {
 		return err

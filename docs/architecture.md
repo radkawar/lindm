@@ -1,9 +1,11 @@
 # Architecture and protocol contract
 
-Status: design, not implemented. Requirements originate in the
-[product specification](product-specification.md). Tradeoffs and sources are in
-[research](research.md). Security/operations requirements are normative alongside
-this document.
+Status: implementation contract, not a claim that every component exists. The
+[release allocation](product-specification.md#3-release-requirements-and-allocation)
+limits R1 to connected mutable-Linux service/inventory management; later and
+separate-product sections do not block that release. Actual implementation and
+qualification are recorded in the [evidence ledger](implementation-plan.md).
+Security/operations requirements apply to the capability and release that uses them.
 
 ## 1. Selected architecture
 
@@ -26,7 +28,8 @@ truth. The frontend is a TypeScript web application embedded in the server relea
 ```mermaid
 flowchart LR
     Human[Admin browser or CLI] --> Admin[Admin TLS listener]
-    IdP[Local or external OIDC IdP] --> Admin
+    Local[Local password and WebAuthn] --> Admin
+    IdP[Optional external OIDC provider] --> Admin
     Device[Agent network process] --> MTLS[Device mTLS listener]
     Admin --> Core[Go domain services]
     MTLS --> Core
@@ -136,25 +139,55 @@ quarantines ambiguous identities rather than merging by hostname.
 
 ## 4. Admin identity and authorization
 
-OIDC Authorization Code with PKCE, state, nonce, issuer/audience/signature/expiry
-validation and exact redirect URI matching. Use a maintained implementation. Browser
-sessions are opaque, random, hashed in PostgreSQL, with Secure/HttpOnly/SameSite
-cookies, CSRF and origin protection on mutations, 30-minute idle and 12-hour absolute
-expiry. Tokens never go in browser local storage. CLI uses system-browser login with
-PKCE and a loopback redirect; service accounts use separately scoped expiring tokens.
+Lindm authenticates people **to Lindm only**. It is not an identity provider, never
+issues identity tokens to other applications and does not implement an OIDC/SAML
+broker. Existing organization identity and joiner/leaver processes remain external.
 
-Bind principals to issuer plus subject, not email. Group claims map only through
-explicit administrator policy; default deny. No first-login ownership auto-claim.
-An install-time local bootstrap workflow binds the initial owner once. Admin MFA
-and step-up requirements validate configured IdP authentication context and freshness;
-if the IdP cannot supply the required assurance, privileged actions are unavailable.
+| Mode                          | Source of authority                                                  | Freshness and outage behavior                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Built-in local administrators | Postgres account, credentials, role and authorization version        | Read current account authority for every protected request and again in mutation transactions; disable revokes immediately without directory polling |
+| Optional external directory   | Keycloak Admin API or Entra Microsoft Graph in R1                    | Authoritative refresh at most every 30 seconds; no access from a snapshot older than 60 seconds; failures deny external sessions                     |
+| Local break-glass             | Separately designated local owner accounts and explicit local policy | Independent of external-directory availability; mandatory MFA, restricted access and unmistakable audit                                              |
+| Optional federation           | Keycloak may broker SAML or AD/FreeIPA; Lindm remains an OIDC client | Later qualification must verify original-source lifecycle, not merely Keycloak's imported user copy                                                  |
 
-SAML-only organizations federate through the supported Keycloak OIDC broker path;
-this is not native SAML support. Launch certification also includes Microsoft Entra
-ID, Okta and Google Workspace, each with actual provider-specific directory lifecycle
-integration. SCIM users/groups are a separate provisioning endpoint with dedicated
-authorization, filtering, PATCH/ETag behavior, bounded membership and explicit optional
-capabilities. Keycloak and Google are not assumed to supply a native SCIM sender.
+Local accounts live in Postgres. Password hashing uses Argon2id from
+`golang.org/x/crypto/argon2`, with per-password random salts and bounded resource
+costs. Mandatory WebAuthn uses `go-webauthn/webauthn`; require user verification,
+configured RP/origin binding and one-use expiring challenges. Password acceptance
+alone cannot create a privileged session. Bootstrap/enrollment and authenticator
+replacement must not provide an MFA bypass. No local password hashes, challenges,
+credential material or authentication secrets enter application logs or audit data.
+
+Both modes reuse opaque random sessions hashed in Postgres, Secure/HttpOnly/SameSite
+cookies, CSRF/origin checks, roles, audit and authorization-version fencing. The
+normal limits remain 30-minute idle and 12-hour absolute expiry; break-glass may be
+shorter. Tokens never go in browser local storage. A `DirectorySource` boundary
+supplies authoritative observations: Keycloak/Entra poll their directory; local
+accounts use always-fresh Postgres reads. `decideAccess`, session handling,
+`AuthorizeFresh` and transaction fences remain common, not parallel auth systems.
+The config schema selects one primary directory source with a `oneof` and a separate
+local break-glass section; no union of external grants with local emergency grants.
+Local-only startup and authentication must not discover or contact an IdP.
+
+External login uses OIDC Authorization Code with PKCE, state, nonce,
+issuer/audience/signature/expiry validation and exact redirect URI matching through
+a maintained library. A later CLI uses system-browser PKCE and loopback redirect;
+scoped service accounts are a separate later feature.
+
+Bind external principals to the configured issuer and immutable provider identity,
+never email. Validate Entra tenant/object correlation to the signed login identity;
+do not assume its pairwise OIDC subject is a Keycloak-style UUID. Local principals
+have their own deployment-bound immutable namespace. Group claims map only through
+explicit policy; default deny. No first-login owner auto-claim: install-time setup
+binds the initial owner once. External MFA/step-up validates configured provider
+assurance and freshness; local MFA verifies WebAuthn. Missing assurance denies the
+privileged operation rather than falling back to a password-only owner.
+
+Keycloak is optional. A direct authoritative Keycloak realm and Entra are R1 adapter
+targets; Okta, Google, SCIM and brokered lifecycle certification remain G5. Optional
+Keycloak SAML/AD/FreeIPA federation does not become native Lindm SAML/LDAP support.
+SCIM later has separate provisioning authorization, filtering, PATCH/ETag behavior
+and bounded membership. Keycloak and Google are not assumed to have SCIM senders.
 
 Provisioned identities correlate by a configured immutable provider subject/object ID
 to the OIDC issuer/subject, with uniqueness enforced. SCIM `externalId` alone is not
@@ -166,10 +199,10 @@ stale OIDC claims cannot resurrect a SCIM-disabled account. Select exactly one
 authoritative membership source per mapping; additive unions of conflicting sources
 are forbidden. Device ownership and employee identity are separate records.
 
-OIDC authentication alone does not notify us that an account/group was disabled.
-Every certified deployment therefore includes an authoritative lifecycle adapter:
-Keycloak Admin API locally, Microsoft Graph for Entra, Okta management APIs, or Google
-Admin SDK Directory; SCIM/events accelerate updates but are not freshness proof.
+OIDC alone does not notify Lindm that an account or group was disabled. Every
+certified **external** source therefore includes an authoritative lifecycle adapter:
+Keycloak Admin API or Microsoft Graph in R1; Okta/Google management APIs later.
+SCIM/events can accelerate updates but do not establish freshness.
 Bind the least-privileged connector and immutable IDs during setup. Obtain a fresh
 authorization snapshot at login and refresh active principals at most every 30 seconds.
 No admin request uses an authorization snapshot older than 60 seconds; stale/failed
@@ -180,9 +213,13 @@ that cannot meet the declared bound is not certified by weakening it silently.
 The 60-second enforcement bound starts when the change is visible in the configured
 authoritative directory; separately measure and expose upstream propagation delay.
 Accepted local/SCIM deactivation immediately invalidates sessions, principal-owned
-credentials and pending authority. Directory deletion never erases audit or machines.
-G1 includes the real Keycloak lifecycle adapter, not just the login flow. An outage
-uses audited local-console break-glass, not indefinitely cached admin privileges.
+credentials and pending authority in the same transaction. Local authorization
+never inherits the external 30/60-second cache window. Directory deletion does not
+erase audit or machines. Existing G1 evidence covers the direct Keycloak lifecycle.
+Local accounts, restricted break-glass and the Entra adapter are implemented;
+their R1 qualification gates remain distinct. Entra's TLS fixture tests are not
+live tenant evidence: Graph propagation, browser login and lifecycle/outage timing
+still require live qualification. An external outage never extends cached privileges.
 
 For brokered identities, persist the complete immutable lineage: trusted broker
 issuer/subject, configured upstream IdP, signed persistent upstream subject/object ID,
@@ -193,8 +230,11 @@ through its approved connector and intersect its active/entitlement state with a
 broker-local restrictions. Neither source may widen the other's authority. Missing,
 ambiguous or stale lineage denies access under the same 60-second bound; freshness
 timestamps derive from the upstream observation, never from reading a cached import.
-The offline reference uses a local authoritative Keycloak realm as SAML upstream and
-a separate broker realm, with the upstream realm's Admin API as lifecycle source.
+The later air-gap reference can use local Lindm accounts without deploying Keycloak.
+An optional local Keycloak federation topology may use a separate authoritative
+upstream realm and broker realm, with the upstream Admin API as lifecycle source.
+Existing AD/FreeIPA may federate through an explicitly qualified connector; a future
+LDAP adapter is not implicitly implemented by this design.
 Entra/Okta/Google broker paths use their original authoritative connectors. A generic
 SAML-only source without a qualified lifecycle connector is not a certified
 bounded-revocation integration; it cannot bypass this gate through a broker.
@@ -206,8 +246,8 @@ are certified at G5.
 
 ### Employee and local-account entitlements
 
-Launch supports both device assignments and person assignments, as confirmed by the
-owner. Device baselines apply independently of a login. Device-wide self-service items
+R1 supports device assignments. Person assignments and employee workflows are a
+later release. Device baselines apply independently of a login. Device-wide self-service items
 must explicitly allow local users and never convey person-specific secrets. Person
 assignments require an active organizational principal and a verified binding to
 device generation plus a local account incarnation, not merely a reusable numeric UID.
@@ -234,9 +274,9 @@ exports, search/counts and workers. Actor authorization changes invalidate pendi
 privileged approvals. Two distinct authorized humans must approve a destructive plan;
 service accounts cannot constitute the second person.
 
-The implemented Keycloak worker boundary is `identity.Service.AuthorizeFresh`,
-followed by `LockAuthorization(ctx, tx, authorization, requiredPermission)` in the
-mutation transaction. The first performs a new authoritative read without using the
+The existing worker boundary is `identity.Service.AuthorizeFresh`, followed by
+`LockAuthorization(ctx, tx, authorization, requiredPermission)` in the mutation
+transaction. The source adapter performs a new authoritative read without using the
 browser cache or an earlier in-flight refresh; no transaction spans directory HTTP.
 An observed denial still commits revocation, audit and the effective authority
 version. `principals.authorization_version` advances on effective role changes,
@@ -254,10 +294,20 @@ desired-head, recovery or worker-lease fences, and production dispatch integrati
 remains open. Finer roles/scopes and future lifecycle adapters must participate in
 the same durable version transitions; replicas must use consistent authority policy.
 
-Break-glass is a documented local-console recovery procedure using separately held
-recovery material. It is disabled during normal operation, time-bounded, unmistakably
-audited, revokes affected sessions and requires a post-incident review. No universal
-password or unauthenticated environment flag.
+Break-glass uses one or more explicitly designated local owner accounts. Their
+password plus mandatory WebAuthn works while the external directory is down;
+Postgres and Lindm themselves must still be available. Their designation never
+permits a disabled local account or invalid session to authenticate.
+
+The separate break-glass policy restricts access to an authenticated local-console
+boundary or an explicit permission allowlist. Enforce that restriction in domain
+authorization and worker fences, not just in navigation. Do not infer console
+presence from a client-supplied forwarding header. Bound emergency session lifetime,
+require an incident reason, visibly identify emergency use and emit durable audit
+for activation, use, denials and termination. Account disable or policy/role changes
+invalidate sessions and pending authority immediately. End the incident by revoking
+emergency sessions and reviewing their audit. There is no universal password,
+password-only recovery path or unauthenticated environment flag.
 
 ## 5. Desired state and execution semantics
 
@@ -340,6 +390,66 @@ network-facing process is unprivileged; executor has the minimum practical syste
 SELinux/AppArmor and filesystem permissions per provider. Privilege separation
 reduces exposure; it cannot withstand an already compromised kernel/root executor.
 
+### Implemented connected service dispatch (G3)
+
+The first dispatch path is pull-based and limited to `systemd.service.v1`. Postgres
+owns the desired head, actions, signed bytes and results; the executor journal owns
+local acceptance and effects. Nothing is queued in the unprivileged spool.
+
+```mermaid
+sequenceDiagram
+    participant A as Admin console
+    participant S as lindmd
+    participant N as Agent network
+    participant E as Root executor
+    A->>S: SetServiceAssignment (fresh actor auth, head CAS)
+    N->>S: GetServiceWork (mTLS, session epoch)
+    S-->>N: exact intent [+ prior grant] + fresh nonce
+    N->>E: PrepareServiceExecution(intent)
+    E-->>N: plan + device-signed challenge (≤30 s)
+    N->>S: AuthorizeServiceStart(challenge)
+    S-->>N: start grant (fresh actor auth, ≤ challenge)
+    N->>E: StartServiceExecution(grant)
+    N->>S: GetServiceWork (fresh nonce)
+    N->>E: AttestServiceExecution(action, nonce)
+    N->>S: ReportServiceResult(attestation, certificate)
+    A->>S: GetDeviceServiceState
+```
+
+- An assignment is an immutable head per device enrollment generation: one profile
+  revision or cleared. Its UUID is the signed `desired_revision`. Clearing stops new
+  work and never restores native state. Resources run one at a time in dependency
+  order (ties by unit); a dependent waits for a verified SUCCEEDED dependency.
+- A server action is the lease. Intents are minted only during device acquisition,
+  after fresh authorization of the assigning actor; a changed authorization version
+  or denial blocks the head (`assignment_authority_changed`). An intent is valid from
+  database time minus two minutes for twelve minutes, clipped to the delegation.
+  `resource_sequence` increases forever per generation and unit.
+- Device clocks may differ from the server by up to two minutes
+  (`trust.MaxDeviceClockSkew`). Server checks of device-signed challenge and
+  attestation times allow that tolerance; beyond it the call fails with
+  `device_clock_skew`. Freshness comes from server-held state: a single-use nonce
+  that expires on server time and the open action. Start grants are expressed in
+  device time from the challenge, clipped to the remaining server approval and the
+  delegation. Certificate, root and delegation validity stay strict.
+- An open action without a start grant closes as `expired_unstarted` or
+  `assignment_changed` and may be replaced. Once a grant is issued, the action stays
+  open until verified terminal evidence arrives: the effect may already have run.
+- Start grants require a valid device challenge bound to the stored intent, a fresh
+  re-authorization at the same version and the unchanged head. Exact retries return
+  stored bytes; nothing is re-signed for an existing action.
+- Results are nonce-bound attestations verified against the device CA and the
+  registered, unrevoked device certificate, with monotonic `action_revision`.
+  SUCCEEDED converges the resource for the head; FAILED, OUTCOME_UNKNOWN or a started
+  non-success needs operator attention with no automatic retry. Unstarted expiry or
+  supersession returns the resource to pending. Results are signed history, not
+  live compliance; periodic drift detection is later work.
+- The agent relays after each trust sync: at most four actions per cycle, a 20-second
+  management delay, 10 seconds of local polling before reporting non-terminal history
+  and resuming next cycle, and 15-second RPC deadlines.
+- Lock order: principal → execution authority (share) → device → assignment head →
+  action. Directory calls never run inside a transaction.
+
 ### Execution trust lifecycle
 
 DSSE authenticates exact envelope payload bytes and a recognized versioned payload
@@ -421,8 +531,11 @@ packages in PostgreSQL or read them into a whole-memory byte slice.
 
 ## 8. Mutable, rolling and declarative platform contracts
 
-The owner included legacy, SUSE enterprise, rolling and immutable/declarative Linux
-in the launch scope. Do not model these as DEB/RPM aliases:
+R1 includes the mutable Ubuntu and Fedora/RHEL contracts below. Other mutable
+families are later resource/platform releases. Atomic Linux and NixOS are separate
+products: each requires an approved feature boundary, ownership/activation model,
+packaging, recovery and its own qualification matrix. Do not make either a provider
+checkbox that inherits all P07 controls or model them as DEB/RPM aliases:
 
 | Platform                  | Native provider contract                                                                                                                                                                            |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -434,17 +547,23 @@ in the launch scope. Do not model these as DEB/RPM aliases:
 | Fedora Silverblue/Kinoite | rpm-ostree staged deployment and booted checksum, explicit layering, reboot/rollback and preserved mutable state; no apt/dnf mutation of the immutable OS                                           |
 | NixOS                     | Explicit composition with the owner's declarative configuration, pinned inputs and signed closure/cache; build/test/boot/activate a system generation, never edit generated `/etc` files behind Nix |
 
-Core typed policy vocabulary stays shared, but each provider declares what it can
-enforce and how. On NixOS, activation requires a previewed configuration/closure
-digest and ownership agreement; arbitrary Nix expressions from a low-privilege
-request are not a policy API. Offline bundles include closure dependencies and binary
-cache trust. Agent and baseline changes participate in the platform transaction;
-they cannot be overwritten independently by a second package updater. Flatpak apps,
-user data and database migrations are not reverted merely by rolling back the OS.
-Rolling systems are certified at recorded repository/installation snapshots, with a
-published supported update window and continuously tested candidate snapshots.
-Failure to qualify the next snapshot pauses rollout and is visible; it does not
-silently make all rolling releases supported.
+Share identity, audit and typed desired/observed evidence where their semantics match;
+do not force all native controls into one universal policy vocabulary. The
+[coverage table](verification.md#resource-kind-coverage) names resource/platform
+status instead of multiplying an unsupported provider promise.
+
+The NixOS product requires owner-approved configuration composition and a previewed
+configuration/closure digest, then a build/test/boot/activation transaction. It never
+edits generated `/etc` behind Nix, accepts arbitrary low-privilege Nix expressions,
+or installs an independent updater that overwrites the owner's generation. Its later
+offline bundles include closure dependencies and binary-cache trust.
+
+The atomic product owns staged/booted deployment identity, layering, reboot and
+rollback, rather than pretending an RPM package operation updates the immutable OS.
+In either product, Flatpak apps, user data and database migrations do not roll back
+merely because the OS does. Rolling mutable systems need recorded repository/
+installation snapshots, supported update windows and continuously tested candidate
+snapshots. Failed qualification pauses rollout visibly; it never expands support.
 
 ## 9. Built-in graphical remote assistance
 

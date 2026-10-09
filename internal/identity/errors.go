@@ -18,6 +18,7 @@ var (
 
 const (
 	connectorKeycloak = "keycloak"
+	connectorEntra    = "entra"
 	deactivationSCIM  = "scim"
 
 	auditOwnerBootstrapped    = "identity.owner_bootstrapped"

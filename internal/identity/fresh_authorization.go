@@ -33,6 +33,7 @@ type Authorization struct {
 	observedAt        time.Time
 	expiresAt         time.Time
 	monotonicDeadline time.Time
+	breakGlass        bool
 }
 
 func (a *Authorization) ActorID() uuid.UUID {
@@ -80,11 +81,11 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 		return nil, s.authorizationStoreError(err)
 	}
 	subject, err := uuid.Parse(row.Subject)
-	if err != nil || subject == uuid.Nil || subject.String() != row.Subject || row.Issuer != s.issuer {
+	if err != nil || subject == uuid.Nil || subject.String() != row.Subject || (row.Issuer != s.issuer && row.Issuer != s.localIssuer) {
 		return nil, ErrAuthorizationDenied
 	}
 	monotonicDeadline := time.Now().Add(dispatchAuthorizationWindow)
-	observation, err := s.observeDirectory(ctx, subject)
+	observation, err := s.observePrincipal(ctx, row.Issuer, subject)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -114,9 +115,12 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 		if err != nil {
 			return err
 		}
-		decision := decideAccess(now, s.issuer, s.adminGroups, snapshot)
-		if decision.Kind != accessOK || !Authorize(Principal{Role: decision.Role}, permission) {
+		decision := decideAccess(now, s.accessIssuer(snapshot), s.adminGroups, snapshot)
+		if decision.Kind != accessOK || !Authorize(s.snapshotPrincipal(snapshot, decision.Role), permission) {
 			denied = ErrAuthorizationDenied
+			if snapshot.BreakGlass {
+				return s.insertAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "permission denied: "+string(permission))
+			}
 			return nil
 		}
 		if snapshot.AuthorizationVersion <= 0 || snapshot.AuthorizationRole != decision.Role {
@@ -124,6 +128,16 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 			return nil
 		}
 		expires := snapshot.ObservedAt.Add(dispatchAuthorizationWindow)
+		if snapshot.BreakGlass {
+			deadline, err := q.ActiveBreakGlassDeadline(ctx, actorID)
+			if err != nil {
+				denied = ErrAuthorizationDenied
+				return s.insertAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "active emergency session required")
+			}
+			if deadline.Time.Before(expires) {
+				expires = deadline.Time
+			}
+		}
 		if snapshot.ObservedAt.Before(observation.AcquiredAt) || now.Before(snapshot.ObservedAt) || !now.Before(expires) {
 			denied = ErrAuthorizationExpired
 			return nil
@@ -132,6 +146,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 			service: s, actorID: actorID, role: decision.Role, permission: permission,
 			version: snapshot.AuthorizationVersion, observedAt: snapshot.ObservedAt, expiresAt: expires,
 			monotonicDeadline: monotonicDeadline,
+			breakGlass:        snapshot.BreakGlass,
 		}
 		return nil
 	})
@@ -151,7 +166,12 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 // the domain caller's responsibility. The required operation permission must
 // match the approval; a read approval cannot gate a write. The lock remains held
 // on return.
-func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) error {
+func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) (result error) {
+	defer func() {
+		if result != nil && s != nil && authorization != nil && authorization.service == s && authorization.breakGlass {
+			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "worker authorization fence denied: "+string(permission)))
+		}
+	}()
 	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(Principal{Role: authorization.role}, permission) {
 		return ErrAuthorizationDenied
 	}
@@ -160,7 +180,7 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if err != nil {
 		return s.authorizationStoreError(err)
 	}
-	if row.Issuer != s.issuer {
+	if row.Issuer != s.issuer && row.Issuer != s.localIssuer {
 		return ErrAuthorizationDenied
 	}
 	if row.AuthorizationVersion != authorization.version {
@@ -180,9 +200,15 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if authorization.observedAt.IsZero() || now.Before(authorization.observedAt) || now.Before(snapshot.ObservedAt) || !now.Before(authorization.expiresAt) || authorization.expiresAt.After(authorization.observedAt.Add(dispatchAuthorizationWindow)) || !authorization.expiresAt.After(authorization.observedAt) {
 		return ErrAuthorizationExpired
 	}
-	decision := decideAccess(now, s.issuer, s.adminGroups, snapshot)
-	if decision.Kind != accessOK || !Authorize(Principal{Role: decision.Role}, authorization.permission) {
+	decision := decideAccess(now, s.accessIssuer(snapshot), s.adminGroups, snapshot)
+	if decision.Kind != accessOK || !Authorize(s.snapshotPrincipal(snapshot, decision.Role), authorization.permission) {
 		return ErrAuthorizationDenied
+	}
+	if snapshot.BreakGlass {
+		deadline, err := q.ActiveBreakGlassDeadline(ctx, authorization.actorID)
+		if err != nil || !now.Before(deadline.Time) {
+			return ErrAuthorizationDenied
+		}
 	}
 	if decision.Role != authorization.role || snapshot.AuthorizationRole != authorization.role || snapshot.ObservedAt.Before(authorization.observedAt) {
 		return ErrAuthorizationChanged

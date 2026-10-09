@@ -31,6 +31,7 @@ const NAV = [
   { to: "/profiles", label: "Profiles", icon: LayersIcon },
   { to: "/enrollment", label: "Enrollment", icon: KeyRoundIcon },
   { to: "/audit", label: "Audit", icon: ClipboardListIcon },
+  { to: "/accounts", label: "Accounts", icon: KeyRoundIcon },
 ] as const;
 
 export function ConsoleShell({
@@ -61,7 +62,7 @@ export function ConsoleShell({
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel>Control plane</SidebarGroupLabel>
-            <NavigationMenu pathname={pathname} />
+            <NavigationMenu pathname={pathname} role={role} />
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
@@ -99,11 +100,11 @@ export function ConsoleShell({
   );
 }
 
-function NavigationMenu({ pathname }: { pathname: string }) {
+function NavigationMenu({ pathname, role }: { pathname: string; role: string }) {
   const { setOpenMobile } = useSidebar();
   return (
     <SidebarMenu>
-      {NAV.map((item) => (
+      {NAV.filter((item) => item.to !== "/accounts" || role === "owner").map((item) => (
         <SidebarMenuItem key={item.to}>
           <SidebarMenuButton
             isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}

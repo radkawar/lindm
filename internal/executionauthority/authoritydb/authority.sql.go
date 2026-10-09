@@ -398,3 +398,28 @@ func (q *Queries) SetInitialBootstrap(ctx context.Context, arg SetInitialBootstr
 	)
 	return err
 }
+
+const shareAuthority = `-- name: ShareAuthority :one
+SELECT id, deployment_id, trust_domain_digest, root_document, initial_root_json, initial_bootstrap_envelope, initialized_at, delegation_envelope, accepted_at, revision, root_count, update_count, retained_bytes FROM execution_authority WHERE id = true FOR SHARE
+`
+
+func (q *Queries) ShareAuthority(ctx context.Context) (ExecutionAuthority, error) {
+	row := q.db.QueryRow(ctx, shareAuthority)
+	var i ExecutionAuthority
+	err := row.Scan(
+		&i.ID,
+		&i.DeploymentID,
+		&i.TrustDomainDigest,
+		&i.RootDocument,
+		&i.InitialRootJson,
+		&i.InitialBootstrapEnvelope,
+		&i.InitializedAt,
+		&i.DelegationEnvelope,
+		&i.AcceptedAt,
+		&i.Revision,
+		&i.RootCount,
+		&i.UpdateCount,
+		&i.RetainedBytes,
+	)
+	return i, err
+}

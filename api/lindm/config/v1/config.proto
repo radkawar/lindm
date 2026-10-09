@@ -3,6 +3,7 @@ syntax = "proto3";
 package lindm.config.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/config/v1;configv1";
@@ -39,7 +40,7 @@ message ServerConfig {
   DatabaseConfig database = 5 [(buf.validate.field).required = true];
   TLSConfig tls = 6 [(buf.validate.field).required = true];
   DeviceCAConfig device_ca = 7 [(buf.validate.field).required = true];
-  OIDCConfig oidc = 8 [(buf.validate.field).required = true];
+  AuthenticationConfig authentication = 8 [(buf.validate.field).required = true];
   // Additional outbound trust roots; empty uses the system trust store.
   string trusted_ca_file = 9 [(buf.validate.field).string.max_len = 4096];
   // Deployment cap on retained package-snapshot bytes, including opaque batch
@@ -59,6 +60,8 @@ message ServerConfig {
   // Online plan and start PKCS#8 keys. Absence means this process has no
   // execution issuer. Presence does not admit a delegation or authorize issuance.
   ExecutionSigningConfig execution_signing = 13;
+  // Independent emergency local-owner policy; never unions external grants.
+  BreakGlassPolicy break_glass = 14;
 }
 
 message ExecutionBootstrapConfig {
@@ -110,9 +113,21 @@ message DeviceCAConfig {
   string private_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
 
-message OIDCConfig {
+message AuthenticationConfig {
+  oneof primary {
+    option (buf.validate.oneof).required = true;
+    LocalAuthentication local = 1;
+    KeycloakDirectory keycloak = 2;
+    EntraDirectory entra = 3;
+  }
+}
+
+// Local authentication uses only Postgres, passwords and mandatory WebAuthn.
+message LocalAuthentication {}
+
+message KeycloakDirectory {
   option (buf.validate.message).cel = {
-    id: "oidc.separate_clients"
+    id: "keycloak.separate_clients"
     message: "login and directory access must use separate clients"
     expression: "this.client_id != this.directory_client_id"
   };
@@ -138,4 +153,65 @@ message OIDCConfig {
     (buf.validate.field).repeated.items.string.max_len = 512,
     (buf.validate.field).repeated.items.string.prefix = "/"
   ];
+}
+
+// Microsoft Entra ID public-cloud OIDC and authoritative Microsoft Graph access.
+message EntraDirectory {
+  option (buf.validate.message).cel = {
+    id: "entra.separate_clients"
+    message: "login and directory access must use separate clients"
+    expression: "this.client_id.lowerAscii() != this.directory_client_id.lowerAscii()"
+  };
+
+  string tenant_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string client_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string client_secret_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string directory_client_id = 4 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string directory_client_secret_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  repeated string administrator_group_object_ids = 6 [
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.uuid = true,
+    (buf.validate.field).repeated.items.string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+
+message BreakGlassPolicy {
+  // This allowlist always applies, including when console_only is true.
+  repeated string allowed_permissions = 1 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 8,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string = {
+      in: [
+        "fleet.read",
+        "enrollment.manage",
+        "device.revoke",
+        "audit.read",
+        "execution_trust.manage",
+        "profiles.manage",
+        "services.assign",
+        "accounts.manage"
+      ]
+    }
+  ];
+  // Additionally require the actual request peer to be a loopback address.
+  bool console_only = 2;
+  google.protobuf.Duration max_session_lifetime = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration = {
+      gt: {}
+      lte: {seconds: 3600}
+    }
+  ];
+  bool require_incident_reason = 4 [(buf.validate.field).bool.const = true];
 }

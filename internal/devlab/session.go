@@ -54,6 +54,9 @@ func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *Ow
 	if err := validateFixture(dir); err != nil {
 		return nil, err
 	}
+	if err := requireKeycloakFixture(dir); err != nil {
+		return nil, err
+	}
 	tlsConfig, err := trustClient(dir)
 	if err != nil {
 		return nil, err

@@ -5,16 +5,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"lindm/db"
 	"lindm/internal/config"
+	"lindm/internal/identity"
 	"lindm/internal/server"
 )
 
@@ -40,10 +44,13 @@ func run(ctx context.Context, args []string) error {
 	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	path := flags.String("config", "", "protobuf JSON configuration file")
-	var issuer, subject string
+	var issuer, subject, username, tenantID, objectID string
 	if command == "bootstrap-owner" {
 		flags.StringVar(&issuer, "issuer", "", "exact configured issuer")
 		flags.StringVar(&subject, "subject", "", "immutable upstream owner subject")
+		flags.StringVar(&username, "username", "", "local owner username")
+		flags.StringVar(&tenantID, "tenant-id", "", "configured Entra tenant UUID")
+		flags.StringVar(&objectID, "object-id", "", "immutable Entra owner object UUID")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -70,8 +77,30 @@ func run(ctx context.Context, args []string) error {
 		slog.Info("configuration and runtime files are valid", "connectivity_checked", false)
 		return nil
 	}
-	if issuer == "" || subject == "" {
-		return errors.New("bootstrap-owner requires -issuer and -subject")
+	local := resources.Proto.GetAuthentication().GetLocal() != nil
+	if local {
+		if username == "" || issuer != "" || subject != "" || tenantID != "" || objectID != "" {
+			return errors.New("local bootstrap-owner requires -username and rejects external identity flags")
+		}
+	} else if entra := resources.Proto.GetAuthentication().GetEntra(); entra != nil {
+		if tenantID == "" || objectID == "" || issuer != "" || subject != "" || username != "" {
+			return errors.New("entra bootstrap-owner requires -tenant-id and -object-id and rejects -issuer/-subject/-username")
+		}
+		configuredIssuer, err := identity.EntraIssuer(entra.GetTenantId())
+		if err != nil {
+			return err
+		}
+		issuer, err = identity.EntraIssuer(tenantID)
+		if err != nil || issuer != configuredIssuer {
+			return identity.ErrIssuerMismatch
+		}
+		object, err := uuid.Parse(objectID)
+		if err != nil || object == uuid.Nil {
+			return identity.ErrSubjectUnqualified
+		}
+		subject = object.String()
+	} else if issuer == "" || subject == "" || username != "" || tenantID != "" || objectID != "" {
+		return errors.New("keycloak bootstrap-owner requires -issuer and -subject and rejects -username/-tenant-id/-object-id")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -87,11 +116,23 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if local {
+		enrollment, err := auth.BootstrapLocalOwner(ctx, username)
+		if err != nil {
+			return err
+		}
+		return printEnrollment(os.Stdout, resources.Proto.GetPublicUrl(), enrollment)
+	}
 	if err := auth.BootstrapOwner(ctx, issuer, subject); err != nil {
 		return err
 	}
 	slog.Info("owner binding confirmed", "issuer", issuer, "subject", subject)
 	return nil
+}
+
+func printEnrollment(w io.Writer, origin string, enrollment identity.Enrollment) error {
+	_, err := fmt.Fprintf(w, "Enrollment URL: %s/enroll\nEnrollment secret (shown once): %s\nExpires: %s\nAccount ID: %s\n", strings.TrimSuffix(origin, "/"), enrollment.Secret, enrollment.ExpiresAt.UTC().Format(time.RFC3339), enrollment.AccountID)
+	return err
 }
 
 func migrate(ctx context.Context, document *config.Document) error {

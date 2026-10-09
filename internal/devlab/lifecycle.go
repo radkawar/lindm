@@ -19,20 +19,25 @@ import (
 
 // Init creates a protected fixture atomically, or validates the existing one.
 // It does not contact Docker or alter an existing fixture.
-func Init(ctx context.Context, repoRoot string) error {
-	return locked(ctx, repoRoot, func(root string) error { return initialize(root) })
+func Init(ctx context.Context, repoRoot, authentication string) error {
+	return locked(ctx, repoRoot, func(root string) error { return initialize(root, authentication) })
 }
 
 // Up starts real dependencies, waits for authenticated TLS readiness, then runs
-// the server's explicit migrate and exact-owner-idempotent bootstrap commands.
-func Up(ctx context.Context, repoRoot string) error {
+// the server's explicit migrate command. Keycloak bootstraps the fixed owner;
+// local enrollment is an explicit one-shot operator command.
+func Up(ctx context.Context, repoRoot, authentication string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	return locked(ctx, repoRoot, func(root string) error {
-		if err := initialize(root); err != nil {
+		if err := initialize(root, authentication); err != nil {
 			return err
 		}
-		if err := compose(ctx, root, "up", "--detach"); err != nil {
+		services := []string{"up", "--detach", "postgres"}
+		if authentication == "keycloak" {
+			services = append(services, "keycloak")
+		}
+		if err := compose(ctx, root, services...); err != nil {
 			return err
 		}
 		dir := FixturePath(root)
@@ -45,6 +50,10 @@ func Up(ctx context.Context, repoRoot string) error {
 		}
 		if err := restrictMigrationMetadata(ctx, dir); err != nil {
 			return fmt.Errorf("restrict runtime migration metadata access: %w", err)
+		}
+		if authentication == "local" {
+			_, err := fmt.Fprintf(os.Stdout, "Claim the local owner once: go run ./cmd/lindmd bootstrap-owner -config %s -username owner\n", config)
+			return err
 		}
 		return command(ctx, root, nil, "go", "run", "./cmd/lindmd", "bootstrap-owner", "-config", config, "-issuer", issuer, "-subject", ownerSubject)
 	})
@@ -77,7 +86,7 @@ func Reset(ctx context.Context, repoRoot string) error {
 			if err != nil {
 				return fmt.Errorf("refusing to remove an unrecognized fixture: %w", err)
 			}
-			if m.Directory != dir || m.Version != fixtureVersion {
+			if m.Directory != dir || m.Version < 1 || m.Version > fixtureVersion {
 				return fmt.Errorf("refusing to remove a fixture not owned by this checkout/version")
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {

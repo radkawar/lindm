@@ -11,8 +11,32 @@ import (
 
 type DeploymentIdentity struct {
 	ID               bool
+	DeploymentID     uuid.UUID
 	OwnerPrincipalID *uuid.UUID
 	InitializedAt    pgtype.Timestamptz
+}
+
+type LocalAccount struct {
+	ID             uuid.UUID
+	Username       string
+	Role           string
+	Enabled        bool
+	BreakGlass     bool
+	PasswordHash   string
+	FailedAttempts int32
+	LockedUntil    pgtype.Timestamptz
+}
+
+type LocalCeremony struct {
+	TokenHash            []byte
+	AccountID            uuid.UUID
+	Kind                 string
+	ChallengeHash        []byte
+	SessionData          []byte
+	PasswordHash         string
+	IncidentReason       string
+	AuthorizationVersion int64
+	ExpiresAt            pgtype.Timestamptz
 }
 
 type Principal struct {
@@ -49,4 +73,6 @@ type Session struct {
 	IdleExpiresAt     pgtype.Timestamptz
 	AbsoluteExpiresAt pgtype.Timestamptz
 	RevokedAt         pgtype.Timestamptz
+	BreakGlass        bool
+	IncidentReason    string
 }

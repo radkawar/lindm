@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"math"
 	"net/url"
 	"os"
@@ -20,12 +19,6 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
-
-const historicalAuthoritySchema = `CREATE TABLE executor_state (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    revision INTEGER NOT NULL CHECK (revision > 0),
-    state BLOB NOT NULL CHECK (length(state) BETWEEN 1 AND 1048576)
-) STRICT`
 
 func acknowledgedState(t *testing.T) *agentv1.ExecutorJournalState {
 	t.Helper()
@@ -42,28 +35,28 @@ func acknowledgedState(t *testing.T) *agentv1.ExecutorJournalState {
 	return state
 }
 
-func TestExecutionTrustMigratesAcknowledgedV1WithoutRewritingAuthority(t *testing.T) {
+func TestExecutionTrustPreservesAcknowledgedAuthority(t *testing.T) {
 	ctx := t.Context()
 	state := acknowledgedState(t)
-	const acknowledgedRevision int64 = 4
-	directory, original := writeHistoricalJournal(t, state, acknowledgedRevision, nil)
+	const acknowledgedRevision int64 = 1
+	directory := protectedDirectory(t)
+	store, err := Initialize(ctx, directory, state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	_, original := authorityColumn(t, store.db)
 	marker, err := os.ReadFile(filepath.Join(directory, markerName))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	store, err := Open(ctx, directory)
-	if err != nil {
-		t.Fatalf("valid v1 journal was not migrated: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
 	authority, revision, err := store.Load(ctx)
 	if err != nil || revision != acknowledgedRevision || !proto.Equal(authority, state) {
-		t.Fatalf("migrated authority changed: revision=%d err=%v", revision, err)
+		t.Fatalf("initialized authority changed: revision=%d err=%v", revision, err)
 	}
 	if blobRevision, blob := authorityColumn(t, store.db); blobRevision != acknowledgedRevision || !bytes.Equal(blob, original) {
-		t.Fatal("migration rewrote acknowledged authority bytes")
+		t.Fatal("initialization rewrote acknowledged authority bytes")
 	}
 	trust, trustRevision, err := store.LoadExecutionTrust(ctx)
 	if err != nil || trustRevision != 1 {
@@ -90,7 +83,7 @@ func TestExecutionTrustMigratesAcknowledgedV1WithoutRewritingAuthority(t *testin
 	rotated.RenewAfter = timestamppb.New(acceptedAt)
 	nextAuthority, err := store.Update(ctx, acknowledgedRevision, rotated)
 	if err != nil || nextAuthority != acknowledgedRevision+1 {
-		t.Fatalf("authority update after migration: revision=%d err=%v", nextAuthority, err)
+		t.Fatalf("authority update: revision=%d err=%v", nextAuthority, err)
 	}
 	persistedTrust, persistedTrustRevision, err := store.LoadExecutionTrust(ctx)
 	if err != nil || persistedTrustRevision != nextTrustRevision || !proto.Equal(persistedTrust, configured) {
@@ -106,7 +99,7 @@ func TestExecutionTrustMigratesAcknowledgedV1WithoutRewritingAuthority(t *testin
 
 	reopened, err := Open(ctx, directory)
 	if err != nil {
-		t.Fatalf("migrated journal did not reopen: %v", err)
+		t.Fatalf("journal did not reopen: %v", err)
 	}
 	defer func() { _ = reopened.Close() }()
 	reloaded, reloadedRevision, err := reopened.Load(ctx)
@@ -119,93 +112,12 @@ func TestExecutionTrustMigratesAcknowledgedV1WithoutRewritingAuthority(t *testin
 	}
 	assertSchemaIdentity(t, reopened.db, schemaVersion)
 	if got, err := os.ReadFile(filepath.Join(directory, markerName)); err != nil || !bytes.Equal(got, marker) {
-		t.Fatal("migration replaced the installation marker")
+		t.Fatal("reopen replaced the installation marker")
 	}
 }
 
-func TestExecutionTrustV1DamageDoesNotMigrate(t *testing.T) {
-	for _, failure := range []string{"corrupt authority", "unknown authority fields", "installation mismatch", "missing authority", "preexisting trust row"} {
-		t.Run(failure, func(t *testing.T) {
-			state := acknowledgedState(t)
-			var sentinel []byte
-			directory, original := writeHistoricalJournal(t, state, 4, func(db *sql.DB, directory string) {
-				switch failure {
-				case "corrupt authority":
-					if _, err := db.Exec(`UPDATE executor_state SET state=? WHERE id=1`, []byte{0xff}); err != nil {
-						t.Fatal(err)
-					}
-				case "unknown authority fields":
-					damaged := proto.CloneOf(state)
-					damaged.ProtoReflect().SetUnknown([]byte{0xa0, 0x06, 0x01})
-					encoded, err := proto.Marshal(damaged)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if _, err := db.Exec(`UPDATE executor_state SET state=? WHERE id=1`, encoded); err != nil {
-						t.Fatal(err)
-					}
-				case "installation mismatch":
-					if err := os.WriteFile(filepath.Join(directory, markerName), []byte(uuid.NewString()+"\n"), 0600); err != nil {
-						t.Fatal(err)
-					}
-				case "missing authority":
-					if _, err := db.Exec(`DELETE FROM executor_state`); err != nil {
-						t.Fatal(err)
-					}
-				case "preexisting trust row":
-					sentinel = []byte("preexisting-trust-row")
-					if _, err := db.Exec(executionTrustDDL()); err != nil {
-						t.Fatal(err)
-					}
-					if _, err := db.Exec(`INSERT INTO execution_trust (id, revision, state) VALUES (1, 9, ?)`, sentinel); err != nil {
-						t.Fatal(err)
-					}
-				}
-			})
-			before := inspectJournal(t, directory)
-			if opened, err := Open(t.Context(), directory); !errors.Is(err, ErrRecoveryHold) {
-				if opened != nil {
-					_ = opened.Close()
-				}
-				t.Fatalf("%s was not held: %v", failure, err)
-			}
-			after := inspectJournal(t, directory)
-			if after.version != priorSchemaVersion || after.appID != applicationID {
-				t.Fatalf("%s changed schema identity: version=%d app=%d", failure, after.version, after.appID)
-			}
-			switch failure {
-			case "missing authority":
-				if after.hasAuthority {
-					t.Fatal("missing authority was replaced")
-				}
-			case "preexisting trust row":
-				if !after.hasTrustRow || after.trustRevision != 9 || !bytes.Equal(after.trust, sentinel) {
-					t.Fatal("preexisting trust row was replaced")
-				}
-				if !after.hasAuthority || !bytes.Equal(after.authority, original) {
-					t.Fatal("preexisting trust damage rewrote authority")
-				}
-			case "installation mismatch":
-				if !bytes.Equal(after.authority, original) {
-					t.Fatal("installation mismatch rewrote authority")
-				}
-			default:
-				if !after.hasAuthority || bytes.Equal(after.authority, original) {
-					t.Fatal("damaged authority bytes were not preserved")
-				}
-			}
-			if failure != "preexisting trust row" && after.hasTrustTable {
-				t.Fatalf("%s created an execution trust table", failure)
-			}
-			if failure != "missing authority" && failure != "preexisting trust row" && !bytes.Equal(before.authority, after.authority) {
-				t.Fatal("failed migration changed damaged authority")
-			}
-		})
-	}
-}
-
-func TestExecutionTrustV2DamageStaysHold(t *testing.T) {
-	for _, failure := range []string{"missing table", "missing row", "corrupt row", "unknown fields", "installation mismatch", "oversized row", "downgraded version"} {
+func TestExecutionTrustDamageStaysHold(t *testing.T) {
+	for _, failure := range []string{"missing table", "missing row", "corrupt row", "unknown fields", "installation mismatch", "oversized row", "unexpected version"} {
 		t.Run(failure, func(t *testing.T) {
 			ctx := t.Context()
 			initial := acknowledgedState(t)
@@ -261,7 +173,7 @@ func TestExecutionTrustV2DamageStaysHold(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = store.db.ExecContext(ctx, `INSERT INTO execution_trust (id, revision, state) VALUES (1, 3, ?)`, preserved)
-			case "downgraded version":
+			case "unexpected version":
 				configured := configuredTrust(initial.GetInstallationId(), 2, 4, 1, time.Unix(1_800_000_000, 0).UTC())
 				if _, err = store.UpdateExecutionTrust(ctx, 1, configured); err != nil {
 					t.Fatal(err)
@@ -270,7 +182,7 @@ func TestExecutionTrustV2DamageStaysHold(t *testing.T) {
 					t.Fatal(err)
 				}
 				preserved = append([]byte(nil), preserved...)
-				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 1`)
+				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 2`)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -297,9 +209,9 @@ func TestExecutionTrustV2DamageStaysHold(t *testing.T) {
 				if !after.hasTrustTable || after.hasTrustRow || after.version != schemaVersion {
 					t.Fatal("missing trust row was reinserted")
 				}
-			case "downgraded version":
-				if after.version != priorSchemaVersion || !after.hasTrustRow || after.trustRevision != 2 || !bytes.Equal(after.trust, preserved) {
-					t.Fatal("downgraded v2 journal was migrated over the committed trust row")
+			case "unexpected version":
+				if after.version != 2 || !after.hasTrustRow || after.trustRevision != 2 || !bytes.Equal(after.trust, preserved) {
+					t.Fatal("unexpected schema version changed committed trust")
 				}
 			case "oversized row":
 				if !after.hasTrustRow || after.trustRevision != 3 || !bytes.Equal(after.trust, preserved) || after.version != schemaVersion {
@@ -590,49 +502,6 @@ func inspectJournal(t *testing.T, directory string) journalFacts {
 		}
 	}
 	return facts
-}
-
-func writeHistoricalJournal(t *testing.T, state *agentv1.ExecutorJournalState, revision int64, mutate func(*sql.DB, string)) (string, []byte) {
-	t.Helper()
-	directory := protectedDirectory(t)
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(directory, markerName), []byte(state.GetInstallationId()+"\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	db := openFixtureDB(t, directory, "rwc")
-	if _, err := db.Exec(`PRAGMA journal_mode = DELETE`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(historicalAuthoritySchema); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`INSERT INTO executor_state (id, revision, state) VALUES (1, ?, ?)`, revision, encoded); err != nil {
-		t.Fatal(err)
-	}
-	if mutate != nil {
-		mutate(db, directory)
-	}
-	if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, priorSchemaVersion)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(fmt.Sprintf(`PRAGMA application_id = %d`, applicationID)); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(filepath.Join(directory, databaseName), 0600); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{databaseName + "-wal", databaseName + "-shm", databaseName + "-journal"} {
-		if err := os.Remove(filepath.Join(directory, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			t.Fatal(err)
-		}
-	}
-	return directory, encoded
 }
 
 func openFixtureDB(t *testing.T, directory, mode string) *sql.DB {

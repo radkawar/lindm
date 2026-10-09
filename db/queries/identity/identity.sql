@@ -148,7 +148,7 @@ INSERT INTO sessions (
 
 -- name: GetSessionByTokenHash :one
 SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at
+  absolute_expires_at, revoked_at, break_glass, incident_reason
 FROM sessions
 WHERE token_hash = sqlc.arg(token_hash);
 
@@ -161,7 +161,7 @@ WHERE token_hash = sqlc.arg(token_hash)
   AND idle_expires_at > now()
   AND absolute_expires_at > now()
 RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at;
+  absolute_expires_at, revoked_at, break_glass, incident_reason;
 
 -- name: RevokeSessionByTokenHash :execrows
 UPDATE sessions
@@ -174,7 +174,7 @@ SET revoked_at = now()
 WHERE principal_id = sqlc.arg(principal_id) AND revoked_at IS NULL;
 
 -- name: LockDeploymentIdentity :one
-SELECT id, owner_principal_id, initialized_at
+SELECT id, deployment_id, owner_principal_id, initialized_at
 FROM deployment_identity
 WHERE id = true
 FOR UPDATE;

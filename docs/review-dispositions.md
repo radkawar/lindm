@@ -52,6 +52,21 @@ an engineering correction, not a request to remove SAML or weaken revocation.
   WebRTC and local TURN are the proposed implementation, with visible per-session
   consent and no default recording/unattended-access promise.
 
+### Owner scope revision (2026-10-09)
+
+The owner accepted four review challenges to the all-at-launch contract:
+
+| Challenge                                                             | Disposition                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every feature was a launch requirement, so nothing smaller could ship | R1 is connected, non-destructive Ubuntu LTS + Fedora/RHEL service-state and inventory management. Everything else is gated roadmap; see the [release allocation](product-specification.md#3-release-requirements-and-allocation) |
+| The server could not send work while edge cases got deep hardening    | G3 is the server → agent → signed result → console loop for systemd service state. The unverified install-projection worker draft was moved out of the active tree                                                               |
+| Provider count multiplies faster than one typed vocabulary            | Published per-resource × platform [coverage](verification.md#resource-kind-coverage). Arch/Tumbleweed form a committed rolling gate; Atomic and NixOS are committed separate products with native persistence models             |
+| Keycloak as a mandatory dependency and break-glass gap                | Built-in local administrators (Argon2id + mandatory WebAuthn) and restricted audited break-glass; Keycloak/Entra are optional `DirectorySource` adapters. Lindm never issues tokens to other applications, so it is not an IdP   |
+
+The owner also selected greenfield persistence: changed decisions rewrite existing
+migrations instead of accumulating upgrade debt before the first shipped release.
+The earlier clarifications above remain roadmap commitments, not R1 requirements.
+
 ## Initial control-plane implementation reviews
 
 Independent read-only reviews covered identity/device authority, configuration and
@@ -732,10 +747,34 @@ crash recovery or G3. Protected destination ancestry is still the caller's
 precondition; root-TCB mutation and atomic/ABA guarantees remain outside this
 snapshot contract.
 
+### R1 pivot: dispatch, greenfield schema and admin authentication
+
+Four independent read-only security reviews covered the server dispatch path
+(including clock-skew handling), the agent relay/console/lab/squash, local
+authentication, and the Entra adapter. The parent found two defects in native and
+browser runs that review did not catch.
+
+| Finding                                                                                                                                   | Disposition and evidence                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Zero tolerance for device clock skew: a guest even 1 s ahead could never report results (found in native Ubuntu run, reproduced at ±45 s) | Two-minute `trust.MaxDeviceClockSkew`; freshness from server nonces and leases; `device_clock_skew` beyond the bound. Real-Postgres ±90 s/+3 min regressions; both guests passed ±90 s natively |
+| Remote policy denials incremented password lockout, letting an unauthenticated client freeze break-glass (high)                           | Only eligible wrong-password attempts count; regression proves policy denials leave counters unchanged                                                                                          |
+| Options advertised break-glass without a policy (medium)                                                                                  | Gated on configured policy; Chromium shows only organization sign-in in external-only mode                                                                                                      |
+| Local sessions inherited the external freshness window and compared DB to process time (medium)                                           | Local access decided from the current DB row only; ±24 h process-skew regression                                                                                                                |
+| Mode switches could leave no usable owner login (medium)                                                                                  | Startup refuses incompatible owner/source configurations; real-constructor regressions                                                                                                          |
+| Expired locks kept the failure count (low)                                                                                                | Fresh five-attempt window after expiry; exact-count regression                                                                                                                                  |
+| Enrollment secret burned at ceremony begin, so a cancelled passkey prompt required an owner reset (found in Chromium)                     | Secret consumed atomically at finish; abandoned-then-retried enrollment passed in Chromium and in regressions                                                                                   |
+
+Dispatch server, client and Entra reviews found no further defects. Noted gaps:
+dispatch integration tests inject the device principal and construct challenges
+instead of running the executor (the VM lane covers that), and closures/blocks
+are visible in `recent_actions` but are not separate audit events. The schema
+squash was compared with `pg_dump` against the previous migration chain; the only
+differences are the intended identity additions, column order and default FK names.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
-The internal G2 slice is verified and committed as `cb97712`. Named IdP test tenants/permissions,
+The internal G2 slice is verified and committed as `cb97712`. Live Entra tenant access, named IdP test tenants/permissions,
 licensed enterprise content, physical sacrificial machines/destructive consent,
 distribution license/public namespace and production signing custody must exist
 before their corresponding integration, publication or hardware gates. They are not

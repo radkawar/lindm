@@ -15,11 +15,15 @@ CREATE TABLE principals (
   deactivation_source text NOT NULL DEFAULT '',
   directory_enabled boolean NOT NULL DEFAULT false,
   directory_observed_at timestamptz NULL,
+  authorization_version bigint NOT NULL DEFAULT 1,
+  authorization_role text NOT NULL DEFAULT '',
+  CONSTRAINT principals_authorization_version_positive CHECK (authorization_version > 0),
+  CONSTRAINT principals_authorization_role_known CHECK (authorization_role IN ('', 'owner', 'admin')),
   CONSTRAINT principals_issuer_len CHECK (char_length(issuer) BETWEEN 1 AND 2048),
   CONSTRAINT principals_subject_len CHECK (char_length(subject) BETWEEN 1 AND 256),
   CONSTRAINT principals_display_name_len CHECK (char_length(display_name) <= 256),
   CONSTRAINT principals_pinned_role_chk CHECK (pinned_role IN ('', 'owner')),
-  CONSTRAINT principals_deactivation_source_chk CHECK (deactivation_source IN ('', 'keycloak', 'scim')),
+  CONSTRAINT principals_deactivation_source_chk CHECK (deactivation_source IN ('', 'keycloak', 'entra', 'scim')),
   CONSTRAINT principals_deactivation_pair CHECK (
     (deactivated_at IS NULL AND deactivation_source = '')
     OR (deactivated_at IS NOT NULL AND deactivation_source <> '')
@@ -31,6 +35,7 @@ CREATE UNIQUE INDEX principals_one_owner ON principals (pinned_role) WHERE pinne
 
 CREATE TABLE deployment_identity (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  deployment_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
   owner_principal_id uuid NULL REFERENCES principals (id) ON DELETE RESTRICT,
   initialized_at timestamptz NULL,
   CONSTRAINT deployment_identity_pair CHECK (
@@ -80,6 +85,13 @@ CREATE TABLE sessions (
   idle_expires_at timestamptz NOT NULL,
   absolute_expires_at timestamptz NOT NULL,
   revoked_at timestamptz NULL,
+  break_glass boolean NOT NULL DEFAULT false,
+  incident_reason text NOT NULL DEFAULT '',
+  CONSTRAINT sessions_incident_reason CHECK (
+    (NOT break_glass AND incident_reason = '') OR
+    (break_glass AND char_length(incident_reason) BETWEEN 1 AND 512
+      AND absolute_expires_at <= created_at + interval '1 hour')
+  ),
   CONSTRAINT sessions_token_hash_len CHECK (octet_length(token_hash) = 32),
   CONSTRAINT sessions_expiry CHECK (
     created_at <= last_seen_at
@@ -135,10 +147,55 @@ CREATE INDEX audit_events_keyset ON audit_events (occurred_at DESC, id DESC);
 
 CREATE INDEX audit_events_actor_id_idx ON audit_events (actor_id);
 
+-- Local account UUID is also its immutable principal subject and actor ID.
+CREATE TABLE local_accounts (
+  id uuid PRIMARY KEY REFERENCES principals(id) ON DELETE RESTRICT,
+  username text NOT NULL UNIQUE CHECK (username ~ '^[A-Za-z0-9._-]{1,64}$'),
+  role text NOT NULL CHECK (role IN ('owner', 'admin')),
+  enabled boolean NOT NULL DEFAULT true,
+  break_glass boolean NOT NULL DEFAULT false,
+  password_hash text NOT NULL DEFAULT '' CHECK (octet_length(password_hash) <= 512),
+  failed_attempts integer NOT NULL DEFAULT 0 CHECK (failed_attempts BETWEEN 0 AND 5),
+  locked_until timestamptz,
+  CHECK (NOT break_glass OR role = 'owner')
+);
+
+CREATE TABLE local_credentials (
+  credential_id bytea PRIMARY KEY CHECK (octet_length(credential_id) BETWEEN 1 AND 1024),
+  account_id uuid NOT NULL REFERENCES local_accounts(id) ON DELETE CASCADE,
+  credential_json jsonb NOT NULL
+);
+CREATE INDEX local_credentials_account ON local_credentials(account_id);
+
+CREATE TABLE local_enrollments (
+  secret_hash bytea PRIMARY KEY CHECK (octet_length(secret_hash) = 32),
+  account_id uuid NOT NULL UNIQUE REFERENCES local_accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL DEFAULT now() + interval '1 hour'
+);
+
+CREATE TABLE local_ceremonies (
+  token_hash bytea PRIMARY KEY CHECK (octet_length(token_hash) = 32),
+  account_id uuid NOT NULL REFERENCES local_accounts(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('login', 'enroll')),
+  challenge_hash bytea NOT NULL CHECK (octet_length(challenge_hash) = 32),
+  session_data jsonb NOT NULL,
+  password_hash text NOT NULL DEFAULT '',
+  incident_reason text NOT NULL DEFAULT '' CHECK (char_length(incident_reason) <= 512),
+  authorization_version bigint NOT NULL CHECK (authorization_version > 0),
+  expires_at timestamptz NOT NULL DEFAULT now() + interval '5 minutes',
+  CHECK (session_data->>'challenge' IS NULL OR session_data->>'challenge' = '')
+);
+CREATE INDEX local_ceremonies_expiry ON local_ceremonies(expires_at);
+CREATE UNIQUE INDEX local_ceremonies_account ON local_ceremonies(account_id);
+
 -- +goose Down
 -- +goose StatementBegin
 DO $$
 BEGIN
+  DROP TABLE IF EXISTS local_ceremonies;
+  DROP TABLE IF EXISTS local_enrollments;
+  DROP TABLE IF EXISTS local_credentials;
+  DROP TABLE IF EXISTS local_accounts;
   DROP TABLE IF EXISTS audit_events;
   DROP TABLE IF EXISTS auth_flows;
   DROP TABLE IF EXISTS sessions;

@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
 	sync "sync"
@@ -34,7 +35,7 @@ type ServerConfig struct {
 	Database       *DatabaseConfig        `protobuf:"bytes,5,opt,name=database,proto3" json:"database,omitempty"`
 	Tls            *TLSConfig             `protobuf:"bytes,6,opt,name=tls,proto3" json:"tls,omitempty"`
 	DeviceCa       *DeviceCAConfig        `protobuf:"bytes,7,opt,name=device_ca,json=deviceCa,proto3" json:"device_ca,omitempty"`
-	Oidc           *OIDCConfig            `protobuf:"bytes,8,opt,name=oidc,proto3" json:"oidc,omitempty"`
+	Authentication *AuthenticationConfig  `protobuf:"bytes,8,opt,name=authentication,proto3" json:"authentication,omitempty"`
 	// Additional outbound trust roots; empty uses the system trust store.
 	TrustedCaFile string `protobuf:"bytes,9,opt,name=trusted_ca_file,json=trustedCaFile,proto3" json:"trusted_ca_file,omitempty"`
 	// Deployment cap on retained package-snapshot bytes, including opaque batch
@@ -48,8 +49,10 @@ type ServerConfig struct {
 	// Online plan and start PKCS#8 keys. Absence means this process has no
 	// execution issuer. Presence does not admit a delegation or authorize issuance.
 	ExecutionSigning *ExecutionSigningConfig `protobuf:"bytes,13,opt,name=execution_signing,json=executionSigning,proto3" json:"execution_signing,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Independent emergency local-owner policy; never unions external grants.
+	BreakGlass    *BreakGlassPolicy `protobuf:"bytes,14,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -131,9 +134,9 @@ func (x *ServerConfig) GetDeviceCa() *DeviceCAConfig {
 	return nil
 }
 
-func (x *ServerConfig) GetOidc() *OIDCConfig {
+func (x *ServerConfig) GetAuthentication() *AuthenticationConfig {
 	if x != nil {
-		return x.Oidc
+		return x.Authentication
 	}
 	return nil
 }
@@ -169,6 +172,13 @@ func (x *ServerConfig) GetExecutionBootstrap() *ExecutionBootstrapConfig {
 func (x *ServerConfig) GetExecutionSigning() *ExecutionSigningConfig {
 	if x != nil {
 		return x.ExecutionSigning
+	}
+	return nil
+}
+
+func (x *ServerConfig) GetBreakGlass() *BreakGlassPolicy {
+	if x != nil {
+		return x.BreakGlass
 	}
 	return nil
 }
@@ -499,32 +509,32 @@ func (x *DeviceCAConfig) GetPrivateKeyFile() string {
 	return ""
 }
 
-type OIDCConfig struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	Issuer                    string                 `protobuf:"bytes,1,opt,name=issuer,proto3" json:"issuer,omitempty"`
-	ClientId                  string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	ClientSecretFile          string                 `protobuf:"bytes,3,opt,name=client_secret_file,json=clientSecretFile,proto3" json:"client_secret_file,omitempty"`
-	DirectoryClientId         string                 `protobuf:"bytes,4,opt,name=directory_client_id,json=directoryClientId,proto3" json:"directory_client_id,omitempty"`
-	DirectoryClientSecretFile string                 `protobuf:"bytes,5,opt,name=directory_client_secret_file,json=directoryClientSecretFile,proto3" json:"directory_client_secret_file,omitempty"`
-	AdministratorGroups       []string               `protobuf:"bytes,6,rep,name=administrator_groups,json=administratorGroups,proto3" json:"administrator_groups,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+type AuthenticationConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Primary:
+	//
+	//	*AuthenticationConfig_Local
+	//	*AuthenticationConfig_Keycloak
+	//	*AuthenticationConfig_Entra
+	Primary       isAuthenticationConfig_Primary `protobuf_oneof:"primary"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *OIDCConfig) Reset() {
-	*x = OIDCConfig{}
+func (x *AuthenticationConfig) Reset() {
+	*x = AuthenticationConfig{}
 	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *OIDCConfig) String() string {
+func (x *AuthenticationConfig) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*OIDCConfig) ProtoMessage() {}
+func (*AuthenticationConfig) ProtoMessage() {}
 
-func (x *OIDCConfig) ProtoReflect() protoreflect.Message {
+func (x *AuthenticationConfig) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -536,58 +546,348 @@ func (x *OIDCConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use OIDCConfig.ProtoReflect.Descriptor instead.
-func (*OIDCConfig) Descriptor() ([]byte, []int) {
+// Deprecated: Use AuthenticationConfig.ProtoReflect.Descriptor instead.
+func (*AuthenticationConfig) Descriptor() ([]byte, []int) {
 	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *OIDCConfig) GetIssuer() string {
+func (x *AuthenticationConfig) GetPrimary() isAuthenticationConfig_Primary {
+	if x != nil {
+		return x.Primary
+	}
+	return nil
+}
+
+func (x *AuthenticationConfig) GetLocal() *LocalAuthentication {
+	if x != nil {
+		if x, ok := x.Primary.(*AuthenticationConfig_Local); ok {
+			return x.Local
+		}
+	}
+	return nil
+}
+
+func (x *AuthenticationConfig) GetKeycloak() *KeycloakDirectory {
+	if x != nil {
+		if x, ok := x.Primary.(*AuthenticationConfig_Keycloak); ok {
+			return x.Keycloak
+		}
+	}
+	return nil
+}
+
+func (x *AuthenticationConfig) GetEntra() *EntraDirectory {
+	if x != nil {
+		if x, ok := x.Primary.(*AuthenticationConfig_Entra); ok {
+			return x.Entra
+		}
+	}
+	return nil
+}
+
+type isAuthenticationConfig_Primary interface {
+	isAuthenticationConfig_Primary()
+}
+
+type AuthenticationConfig_Local struct {
+	Local *LocalAuthentication `protobuf:"bytes,1,opt,name=local,proto3,oneof"`
+}
+
+type AuthenticationConfig_Keycloak struct {
+	Keycloak *KeycloakDirectory `protobuf:"bytes,2,opt,name=keycloak,proto3,oneof"`
+}
+
+type AuthenticationConfig_Entra struct {
+	Entra *EntraDirectory `protobuf:"bytes,3,opt,name=entra,proto3,oneof"`
+}
+
+func (*AuthenticationConfig_Local) isAuthenticationConfig_Primary() {}
+
+func (*AuthenticationConfig_Keycloak) isAuthenticationConfig_Primary() {}
+
+func (*AuthenticationConfig_Entra) isAuthenticationConfig_Primary() {}
+
+// Local authentication uses only Postgres, passwords and mandatory WebAuthn.
+type LocalAuthentication struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LocalAuthentication) Reset() {
+	*x = LocalAuthentication{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocalAuthentication) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocalAuthentication) ProtoMessage() {}
+
+func (x *LocalAuthentication) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocalAuthentication.ProtoReflect.Descriptor instead.
+func (*LocalAuthentication) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{8}
+}
+
+type KeycloakDirectory struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Issuer                    string                 `protobuf:"bytes,1,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	ClientId                  string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientSecretFile          string                 `protobuf:"bytes,3,opt,name=client_secret_file,json=clientSecretFile,proto3" json:"client_secret_file,omitempty"`
+	DirectoryClientId         string                 `protobuf:"bytes,4,opt,name=directory_client_id,json=directoryClientId,proto3" json:"directory_client_id,omitempty"`
+	DirectoryClientSecretFile string                 `protobuf:"bytes,5,opt,name=directory_client_secret_file,json=directoryClientSecretFile,proto3" json:"directory_client_secret_file,omitempty"`
+	AdministratorGroups       []string               `protobuf:"bytes,6,rep,name=administrator_groups,json=administratorGroups,proto3" json:"administrator_groups,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *KeycloakDirectory) Reset() {
+	*x = KeycloakDirectory{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeycloakDirectory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeycloakDirectory) ProtoMessage() {}
+
+func (x *KeycloakDirectory) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeycloakDirectory.ProtoReflect.Descriptor instead.
+func (*KeycloakDirectory) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *KeycloakDirectory) GetIssuer() string {
 	if x != nil {
 		return x.Issuer
 	}
 	return ""
 }
 
-func (x *OIDCConfig) GetClientId() string {
+func (x *KeycloakDirectory) GetClientId() string {
 	if x != nil {
 		return x.ClientId
 	}
 	return ""
 }
 
-func (x *OIDCConfig) GetClientSecretFile() string {
+func (x *KeycloakDirectory) GetClientSecretFile() string {
 	if x != nil {
 		return x.ClientSecretFile
 	}
 	return ""
 }
 
-func (x *OIDCConfig) GetDirectoryClientId() string {
+func (x *KeycloakDirectory) GetDirectoryClientId() string {
 	if x != nil {
 		return x.DirectoryClientId
 	}
 	return ""
 }
 
-func (x *OIDCConfig) GetDirectoryClientSecretFile() string {
+func (x *KeycloakDirectory) GetDirectoryClientSecretFile() string {
 	if x != nil {
 		return x.DirectoryClientSecretFile
 	}
 	return ""
 }
 
-func (x *OIDCConfig) GetAdministratorGroups() []string {
+func (x *KeycloakDirectory) GetAdministratorGroups() []string {
 	if x != nil {
 		return x.AdministratorGroups
 	}
 	return nil
 }
 
+// Microsoft Entra ID public-cloud OIDC and authoritative Microsoft Graph access.
+type EntraDirectory struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	TenantId                    string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ClientId                    string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	ClientSecretFile            string                 `protobuf:"bytes,3,opt,name=client_secret_file,json=clientSecretFile,proto3" json:"client_secret_file,omitempty"`
+	DirectoryClientId           string                 `protobuf:"bytes,4,opt,name=directory_client_id,json=directoryClientId,proto3" json:"directory_client_id,omitempty"`
+	DirectoryClientSecretFile   string                 `protobuf:"bytes,5,opt,name=directory_client_secret_file,json=directoryClientSecretFile,proto3" json:"directory_client_secret_file,omitempty"`
+	AdministratorGroupObjectIds []string               `protobuf:"bytes,6,rep,name=administrator_group_object_ids,json=administratorGroupObjectIds,proto3" json:"administrator_group_object_ids,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *EntraDirectory) Reset() {
+	*x = EntraDirectory{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EntraDirectory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EntraDirectory) ProtoMessage() {}
+
+func (x *EntraDirectory) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EntraDirectory.ProtoReflect.Descriptor instead.
+func (*EntraDirectory) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *EntraDirectory) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *EntraDirectory) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *EntraDirectory) GetClientSecretFile() string {
+	if x != nil {
+		return x.ClientSecretFile
+	}
+	return ""
+}
+
+func (x *EntraDirectory) GetDirectoryClientId() string {
+	if x != nil {
+		return x.DirectoryClientId
+	}
+	return ""
+}
+
+func (x *EntraDirectory) GetDirectoryClientSecretFile() string {
+	if x != nil {
+		return x.DirectoryClientSecretFile
+	}
+	return ""
+}
+
+func (x *EntraDirectory) GetAdministratorGroupObjectIds() []string {
+	if x != nil {
+		return x.AdministratorGroupObjectIds
+	}
+	return nil
+}
+
+type BreakGlassPolicy struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// This allowlist always applies, including when console_only is true.
+	AllowedPermissions []string `protobuf:"bytes,1,rep,name=allowed_permissions,json=allowedPermissions,proto3" json:"allowed_permissions,omitempty"`
+	// Additionally require the actual request peer to be a loopback address.
+	ConsoleOnly           bool                 `protobuf:"varint,2,opt,name=console_only,json=consoleOnly,proto3" json:"console_only,omitempty"`
+	MaxSessionLifetime    *durationpb.Duration `protobuf:"bytes,3,opt,name=max_session_lifetime,json=maxSessionLifetime,proto3" json:"max_session_lifetime,omitempty"`
+	RequireIncidentReason bool                 `protobuf:"varint,4,opt,name=require_incident_reason,json=requireIncidentReason,proto3" json:"require_incident_reason,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *BreakGlassPolicy) Reset() {
+	*x = BreakGlassPolicy{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BreakGlassPolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BreakGlassPolicy) ProtoMessage() {}
+
+func (x *BreakGlassPolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BreakGlassPolicy.ProtoReflect.Descriptor instead.
+func (*BreakGlassPolicy) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *BreakGlassPolicy) GetAllowedPermissions() []string {
+	if x != nil {
+		return x.AllowedPermissions
+	}
+	return nil
+}
+
+func (x *BreakGlassPolicy) GetConsoleOnly() bool {
+	if x != nil {
+		return x.ConsoleOnly
+	}
+	return false
+}
+
+func (x *BreakGlassPolicy) GetMaxSessionLifetime() *durationpb.Duration {
+	if x != nil {
+		return x.MaxSessionLifetime
+	}
+	return nil
+}
+
+func (x *BreakGlassPolicy) GetRequireIncidentReason() bool {
+	if x != nil {
+		return x.RequireIncidentReason
+	}
+	return false
+}
+
 var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc3\v\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa5\f\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -596,14 +896,16 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x0fdevice_listener\x18\x04 \x01(\v2\x1f.lindm.config.v1.ListenerConfigB\x06\xbaH\x03\xc8\x01\x01R\x0edeviceListener\x12C\n" +
 	"\bdatabase\x18\x05 \x01(\v2\x1f.lindm.config.v1.DatabaseConfigB\x06\xbaH\x03\xc8\x01\x01R\bdatabase\x124\n" +
 	"\x03tls\x18\x06 \x01(\v2\x1a.lindm.config.v1.TLSConfigB\x06\xbaH\x03\xc8\x01\x01R\x03tls\x12D\n" +
-	"\tdevice_ca\x18\a \x01(\v2\x1f.lindm.config.v1.DeviceCAConfigB\x06\xbaH\x03\xc8\x01\x01R\bdeviceCa\x127\n" +
-	"\x04oidc\x18\b \x01(\v2\x1b.lindm.config.v1.OIDCConfigB\x06\xbaH\x03\xc8\x01\x01R\x04oidc\x120\n" +
+	"\tdevice_ca\x18\a \x01(\v2\x1f.lindm.config.v1.DeviceCAConfigB\x06\xbaH\x03\xc8\x01\x01R\bdeviceCa\x12U\n" +
+	"\x0eauthentication\x18\b \x01(\v2%.lindm.config.v1.AuthenticationConfigB\x06\xbaH\x03\xc8\x01\x01R\x0eauthentication\x120\n" +
 	"\x0ftrusted_ca_file\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\rtrustedCaFile\x12O\n" +
 	"\x16inventory_budget_bytes\x18\n" +
 	" \x01(\x04B\x14\xbaH\x112\x0f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f(\x80\x80\x80 H\x00R\x14inventoryBudgetBytes\x88\x01\x01\x12=\n" +
 	"\x11device_public_url\x18\v \x01(\tB\f\xbaH\tr\a\x80\xb5\x18\x01\x88\x01\x01H\x01R\x0fdevicePublicUrl\x88\x01\x01\x12Z\n" +
 	"\x13execution_bootstrap\x18\f \x01(\v2).lindm.config.v1.ExecutionBootstrapConfigR\x12executionBootstrap\x12T\n" +
-	"\x11execution_signing\x18\r \x01(\v2'.lindm.config.v1.ExecutionSigningConfigR\x10executionSigning:\xef\x03\xbaH\xeb\x03\x1a\xb2\x01\n" +
+	"\x11execution_signing\x18\r \x01(\v2'.lindm.config.v1.ExecutionSigningConfigR\x10executionSigning\x12B\n" +
+	"\vbreak_glass\x18\x0e \x01(\v2!.lindm.config.v1.BreakGlassPolicyR\n" +
+	"breakGlass:\xef\x03\xbaH\xeb\x03\x1a\xb2\x01\n" +
 	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x8f\x01\n" +
 	"\x1bexecution_signing.bootstrap\x121execution signing requires an execution bootstrap\x1a=!has(this.execution_signing) || has(this.execution_bootstrap)\x1a\xa1\x01\n" +
 	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)B\x19\n" +
@@ -630,9 +932,14 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x10private_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0eprivateKeyFile\"{\n" +
 	"\x0eDeviceCAConfig\x124\n" +
 	"\x10certificate_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0fcertificateFile\x123\n" +
-	"\x10private_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0eprivateKeyFile\"\xe7\x03\n" +
-	"\n" +
-	"OIDCConfig\x12$\n" +
+	"\x10private_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0eprivateKeyFile\"\xe1\x01\n" +
+	"\x14AuthenticationConfig\x12<\n" +
+	"\x05local\x18\x01 \x01(\v2$.lindm.config.v1.LocalAuthenticationH\x00R\x05local\x12@\n" +
+	"\bkeycloak\x18\x02 \x01(\v2\".lindm.config.v1.KeycloakDirectoryH\x00R\bkeycloak\x127\n" +
+	"\x05entra\x18\x03 \x01(\v2\x1f.lindm.config.v1.EntraDirectoryH\x00R\x05entraB\x10\n" +
+	"\aprimary\x12\x05\xbaH\x02\b\x01\"\x15\n" +
+	"\x13LocalAuthentication\"\xf3\x03\n" +
+	"\x11KeycloakDirectory\x12$\n" +
 	"\x06issuer\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x06issuer\x12'\n" +
 	"\tclient_id\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\bclientId\x127\n" +
@@ -641,8 +948,23 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x11directoryClientId\x12J\n" +
 	"\x1cdirectory_client_secret_file\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x19directoryClientSecretFile\x12I\n" +
 	"\x14administrator_groups\x18\x06 \x03(\tB\x16\xbaH\x13\x92\x01\x10\x10d\x18\x01\"\n" +
-	"r\b\x10\x02\x18\x80\x04:\x01/R\x13administratorGroups:~\xbaH{\x1ay\n" +
-	"\x15oidc.separate_clients\x124login and directory access must use separate clients\x1a*this.client_id != this.directory_client_idB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
+	"r\b\x10\x02\x18\x80\x04:\x01/R\x13administratorGroups:\x82\x01\xbaH\x7f\x1a}\n" +
+	"\x19keycloak.separate_clients\x124login and directory access must use separate clients\x1a*this.client_id != this.directory_client_id\"\xab\x05\n" +
+	"\x0eEntraDirectory\x12K\n" +
+	"\ttenant_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\btenantId\x12K\n" +
+	"\tclient_id\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bclientId\x127\n" +
+	"\x12client_secret_file\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10clientSecretFile\x12^\n" +
+	"\x13directory_client_id\x18\x04 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x11directoryClientId\x12J\n" +
+	"\x1cdirectory_client_secret_file\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x19directoryClientSecretFile\x12|\n" +
+	"\x1eadministrator_group_object_ids\x18\x06 \x03(\tB7\xbaH4\x92\x011\x10d\x18\x01\"+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x1badministratorGroupObjectIds:\x9b\x01\xbaH\x97\x01\x1a\x94\x01\n" +
+	"\x16entra.separate_clients\x124login and directory access must use separate clients\x1aDthis.client_id.lowerAscii() != this.directory_client_id.lowerAscii()\"\xa3\x03\n" +
+	"\x10BreakGlassPolicy\x12\xcb\x01\n" +
+	"\x13allowed_permissions\x18\x01 \x03(\tB\x99\x01\xbaH\x95\x01\x92\x01\x91\x01\b\x01\x10\b\x18\x01\"\x88\x01r\x85\x01R\n" +
+	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x0fservices.assignR\x0faccounts.manageR\x12allowedPermissions\x12!\n" +
+	"\fconsole_only\x18\x02 \x01(\bR\vconsoleOnly\x12]\n" +
+	"\x14max_session_lifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xc8\x01\x01\xaa\x01\a\"\x03\b\x90\x1c*\x00R\x12maxSessionLifetime\x12?\n" +
+	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReasonB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
 
 var (
 	file_lindm_config_v1_config_proto_rawDescOnce sync.Once
@@ -656,7 +978,7 @@ func file_lindm_config_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_config_v1_config_proto_rawDescData
 }
 
-var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*ServerConfig)(nil),             // 0: lindm.config.v1.ServerConfig
 	(*ExecutionBootstrapConfig)(nil), // 1: lindm.config.v1.ExecutionBootstrapConfig
@@ -665,22 +987,32 @@ var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*DatabaseConfig)(nil),           // 4: lindm.config.v1.DatabaseConfig
 	(*TLSConfig)(nil),                // 5: lindm.config.v1.TLSConfig
 	(*DeviceCAConfig)(nil),           // 6: lindm.config.v1.DeviceCAConfig
-	(*OIDCConfig)(nil),               // 7: lindm.config.v1.OIDCConfig
+	(*AuthenticationConfig)(nil),     // 7: lindm.config.v1.AuthenticationConfig
+	(*LocalAuthentication)(nil),      // 8: lindm.config.v1.LocalAuthentication
+	(*KeycloakDirectory)(nil),        // 9: lindm.config.v1.KeycloakDirectory
+	(*EntraDirectory)(nil),           // 10: lindm.config.v1.EntraDirectory
+	(*BreakGlassPolicy)(nil),         // 11: lindm.config.v1.BreakGlassPolicy
+	(*durationpb.Duration)(nil),      // 12: google.protobuf.Duration
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
-	3, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
-	3, // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
-	4, // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
-	5, // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
-	6, // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
-	7, // 5: lindm.config.v1.ServerConfig.oidc:type_name -> lindm.config.v1.OIDCConfig
-	1, // 6: lindm.config.v1.ServerConfig.execution_bootstrap:type_name -> lindm.config.v1.ExecutionBootstrapConfig
-	2, // 7: lindm.config.v1.ServerConfig.execution_signing:type_name -> lindm.config.v1.ExecutionSigningConfig
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	3,  // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
+	3,  // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
+	4,  // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
+	5,  // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
+	6,  // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
+	7,  // 5: lindm.config.v1.ServerConfig.authentication:type_name -> lindm.config.v1.AuthenticationConfig
+	1,  // 6: lindm.config.v1.ServerConfig.execution_bootstrap:type_name -> lindm.config.v1.ExecutionBootstrapConfig
+	2,  // 7: lindm.config.v1.ServerConfig.execution_signing:type_name -> lindm.config.v1.ExecutionSigningConfig
+	11, // 8: lindm.config.v1.ServerConfig.break_glass:type_name -> lindm.config.v1.BreakGlassPolicy
+	8,  // 9: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
+	9,  // 10: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
+	10, // 11: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
+	12, // 12: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }
@@ -690,13 +1022,18 @@ func file_lindm_config_v1_config_proto_init() {
 	}
 	file_lindm_config_v1_config_proto_msgTypes[0].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[4].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[7].OneofWrappers = []any{
+		(*AuthenticationConfig_Local)(nil),
+		(*AuthenticationConfig_Keycloak)(nil),
+		(*AuthenticationConfig_Entra)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_config_v1_config_proto_rawDesc), len(file_lindm_config_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

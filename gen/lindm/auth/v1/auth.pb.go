@@ -7,8 +7,10 @@
 package authv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -25,15 +27,17 @@ const (
 // redirects and cookies stay HTTP-native; the response contract is still generated.
 // csrf_token is request-session scoped and must never enter persistent storage.
 type SessionPrincipal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Issuer        string                 `protobuf:"bytes,2,opt,name=issuer,proto3" json:"issuer,omitempty"`
-	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Role          string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
-	CsrfToken     string                 `protobuf:"bytes,6,opt,name=csrf_token,json=csrfToken,proto3" json:"csrf_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Issuer         string                 `protobuf:"bytes,2,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Subject        string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Role           string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
+	CsrfToken      string                 `protobuf:"bytes,6,opt,name=csrf_token,json=csrfToken,proto3" json:"csrf_token,omitempty"`
+	BreakGlass     bool                   `protobuf:"varint,7,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	IncidentReason string                 `protobuf:"bytes,8,opt,name=incident_reason,json=incidentReason,proto3" json:"incident_reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SessionPrincipal) Reset() {
@@ -108,11 +112,665 @@ func (x *SessionPrincipal) GetCsrfToken() string {
 	return ""
 }
 
+func (x *SessionPrincipal) GetBreakGlass() bool {
+	if x != nil {
+		return x.BreakGlass
+	}
+	return false
+}
+
+func (x *SessionPrincipal) GetIncidentReason() string {
+	if x != nil {
+		return x.IncidentReason
+	}
+	return ""
+}
+
+// All authentication endpoints use protobuf JSON and no-store responses.
+type AuthenticationOptions struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExternalLogin bool                   `protobuf:"varint,1,opt,name=external_login,json=externalLogin,proto3" json:"external_login,omitempty"`
+	LocalLogin    bool                   `protobuf:"varint,2,opt,name=local_login,json=localLogin,proto3" json:"local_login,omitempty"`
+	BreakGlass    bool                   `protobuf:"varint,3,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthenticationOptions) Reset() {
+	*x = AuthenticationOptions{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthenticationOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthenticationOptions) ProtoMessage() {}
+
+func (x *AuthenticationOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthenticationOptions.ProtoReflect.Descriptor instead.
+func (*AuthenticationOptions) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AuthenticationOptions) GetExternalLogin() bool {
+	if x != nil {
+		return x.ExternalLogin
+	}
+	return false
+}
+
+func (x *AuthenticationOptions) GetLocalLogin() bool {
+	if x != nil {
+		return x.LocalLogin
+	}
+	return false
+}
+
+func (x *AuthenticationOptions) GetBreakGlass() bool {
+	if x != nil {
+		return x.BreakGlass
+	}
+	return false
+}
+
+// Passwords and incident reasons must never be logged.
+type LocalLoginRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Username       string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password       string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	IncidentReason string                 `protobuf:"bytes,3,opt,name=incident_reason,json=incidentReason,proto3" json:"incident_reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *LocalLoginRequest) Reset() {
+	*x = LocalLoginRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocalLoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocalLoginRequest) ProtoMessage() {}
+
+func (x *LocalLoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocalLoginRequest.ProtoReflect.Descriptor instead.
+func (*LocalLoginRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *LocalLoginRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LocalLoginRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *LocalLoginRequest) GetIncidentReason() string {
+	if x != nil {
+		return x.IncidentReason
+	}
+	return ""
+}
+
+type LocalEnrollmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Secret        string                 `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LocalEnrollmentRequest) Reset() {
+	*x = LocalEnrollmentRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocalEnrollmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocalEnrollmentRequest) ProtoMessage() {}
+
+func (x *LocalEnrollmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocalEnrollmentRequest.ProtoReflect.Descriptor instead.
+func (*LocalEnrollmentRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LocalEnrollmentRequest) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *LocalEnrollmentRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+// options_json contains the WebAuthn publicKey options object.
+type WebAuthnChallenge struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	OptionsJson   string                 `protobuf:"bytes,2,opt,name=options_json,json=optionsJson,proto3" json:"options_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebAuthnChallenge) Reset() {
+	*x = WebAuthnChallenge{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnChallenge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnChallenge) ProtoMessage() {}
+
+func (x *WebAuthnChallenge) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnChallenge.ProtoReflect.Descriptor instead.
+func (*WebAuthnChallenge) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *WebAuthnChallenge) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *WebAuthnChallenge) GetOptionsJson() string {
+	if x != nil {
+		return x.OptionsJson
+	}
+	return ""
+}
+
+type WebAuthnFinishRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Token          string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	CredentialJson string                 `protobuf:"bytes,2,opt,name=credential_json,json=credentialJson,proto3" json:"credential_json,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *WebAuthnFinishRequest) Reset() {
+	*x = WebAuthnFinishRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebAuthnFinishRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebAuthnFinishRequest) ProtoMessage() {}
+
+func (x *WebAuthnFinishRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebAuthnFinishRequest.ProtoReflect.Descriptor instead.
+func (*WebAuthnFinishRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WebAuthnFinishRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *WebAuthnFinishRequest) GetCredentialJson() string {
+	if x != nil {
+		return x.CredentialJson
+	}
+	return ""
+}
+
+type LocalAccount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	Enabled       bool                   `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	BreakGlass    bool                   `protobuf:"varint,5,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	Enrolled      bool                   `protobuf:"varint,6,opt,name=enrolled,proto3" json:"enrolled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LocalAccount) Reset() {
+	*x = LocalAccount{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LocalAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LocalAccount) ProtoMessage() {}
+
+func (x *LocalAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LocalAccount.ProtoReflect.Descriptor instead.
+func (*LocalAccount) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LocalAccount) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *LocalAccount) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LocalAccount) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *LocalAccount) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *LocalAccount) GetBreakGlass() bool {
+	if x != nil {
+		return x.BreakGlass
+	}
+	return false
+}
+
+func (x *LocalAccount) GetEnrolled() bool {
+	if x != nil {
+		return x.Enrolled
+	}
+	return false
+}
+
+type ListAccountsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accounts      []*LocalAccount        `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountsResponse) Reset() {
+	*x = ListAccountsResponse{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountsResponse) ProtoMessage() {}
+
+func (x *ListAccountsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountsResponse.ProtoReflect.Descriptor instead.
+func (*ListAccountsResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListAccountsResponse) GetAccounts() []*LocalAccount {
+	if x != nil {
+		return x.Accounts
+	}
+	return nil
+}
+
+type CreateAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
+	BreakGlass    bool                   `protobuf:"varint,3,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAccountRequest) Reset() {
+	*x = CreateAccountRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAccountRequest) ProtoMessage() {}
+
+func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAccountRequest.ProtoReflect.Descriptor instead.
+func (*CreateAccountRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateAccountRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *CreateAccountRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *CreateAccountRequest) GetBreakGlass() bool {
+	if x != nil {
+		return x.BreakGlass
+	}
+	return false
+}
+
+type UpdateAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	BreakGlass    bool                   `protobuf:"varint,4,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAccountRequest) Reset() {
+	*x = UpdateAccountRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccountRequest) ProtoMessage() {}
+
+func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccountRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAccountRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UpdateAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UpdateAccountRequest) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *UpdateAccountRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *UpdateAccountRequest) GetBreakGlass() bool {
+	if x != nil {
+		return x.BreakGlass
+	}
+	return false
+}
+
+type ResetAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetAccountRequest) Reset() {
+	*x = ResetAccountRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetAccountRequest) ProtoMessage() {}
+
+func (x *ResetAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetAccountRequest.ProtoReflect.Descriptor instead.
+func (*ResetAccountRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ResetAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// The one-time secret is held only in component memory, never cached or logged.
+type AccountEnrollment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Secret        string                 `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountEnrollment) Reset() {
+	*x = AccountEnrollment{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountEnrollment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountEnrollment) ProtoMessage() {}
+
+func (x *AccountEnrollment) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountEnrollment.ProtoReflect.Descriptor instead.
+func (*AccountEnrollment) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AccountEnrollment) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AccountEnrollment) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *AccountEnrollment) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_lindm_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\"\xaa\x01\n" +
+	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf4\x01\n" +
 	"\x10SessionPrincipal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x12\x18\n" +
@@ -120,7 +778,67 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x12\n" +
 	"\x04role\x18\x05 \x01(\tR\x04role\x12\x1d\n" +
 	"\n" +
-	"csrf_token\x18\x06 \x01(\tR\tcsrfTokenB Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
+	"csrf_token\x18\x06 \x01(\tR\tcsrfToken\x12\x1f\n" +
+	"\vbreak_glass\x18\a \x01(\bR\n" +
+	"breakGlass\x12'\n" +
+	"\x0fincident_reason\x18\b \x01(\tR\x0eincidentReason\"\x80\x01\n" +
+	"\x15AuthenticationOptions\x12%\n" +
+	"\x0eexternal_login\x18\x01 \x01(\bR\rexternalLogin\x12\x1f\n" +
+	"\vlocal_login\x18\x02 \x01(\bR\n" +
+	"localLogin\x12\x1f\n" +
+	"\vbreak_glass\x18\x03 \x01(\bR\n" +
+	"breakGlass\"\xbd\x01\n" +
+	"\x11LocalLoginRequest\x12C\n" +
+	"\busername\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x12&\n" +
+	"\bpassword\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05 \f(\x80\bR\bpassword\x12;\n" +
+	"\x0fincident_reason\x18\x03 \x01(\tB\x12\xbaH\x0fr\r\x18\x80\x04(\x80\b2\x05^$|\\SR\x0eincidentReason\"d\n" +
+	"\x16LocalEnrollmentRequest\x12\"\n" +
+	"\x06secret\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x06secret\x12&\n" +
+	"\bpassword\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05 \f(\x80\bR\bpassword\"e\n" +
+	"\x11WebAuthnChallenge\x12 \n" +
+	"\x05token\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x05token\x12.\n" +
+	"\foptions_json\x18\x02 \x01(\tB\v\xbaH\br\x06 \x01(\x80\x80\x04R\voptionsJson\"o\n" +
+	"\x15WebAuthnFinishRequest\x12 \n" +
+	"\x05token\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05 \x01(\x80\bR\x05token\x124\n" +
+	"\x0fcredential_json\x18\x02 \x01(\tB\v\xbaH\br\x06 \x01(\x80\x80\x04R\x0ecredentialJson\"\xa5\x01\n" +
+	"\fLocalAccount\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12\x18\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\x12\x1f\n" +
+	"\vbreak_glass\x18\x05 \x01(\bR\n" +
+	"breakGlass\x12\x1a\n" +
+	"\benrolled\x18\x06 \x01(\bR\benrolled\"O\n" +
+	"\x14ListAccountsResponse\x127\n" +
+	"\baccounts\x18\x01 \x03(\v2\x1b.lindm.auth.v1.LocalAccountR\baccounts\"\x9e\x02\n" +
+	"\x14CreateAccountRequest\x12C\n" +
+	"\busername\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x12'\n" +
+	"\x04role\x18\x02 \x01(\tB\x13\xbaH\x10r\x0eR\x05ownerR\x05adminR\x04role\x12\x1f\n" +
+	"\vbreak_glass\x18\x03 \x01(\bR\n" +
+	"breakGlass:w\xbaHt\x1ar\n" +
+	" create_account.break_glass_owner\x12#break-glass accounts must be owners\x1a)!this.break_glass || this.role == 'owner'\"\x9c\x02\n" +
+	"\x14UpdateAccountRequest\x12'\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\taccountId\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x12'\n" +
+	"\x04role\x18\x03 \x01(\tB\x13\xbaH\x10r\x0eR\x05ownerR\x05adminR\x04role\x12\x1f\n" +
+	"\vbreak_glass\x18\x04 \x01(\bR\n" +
+	"breakGlass:w\xbaHt\x1ar\n" +
+	" update_account.break_glass_owner\x12#break-glass accounts must be owners\x1a)!this.break_glass || this.role == 'owner'\">\n" +
+	"\x13ResetAccountRequest\x12'\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\taccountId\"\x85\x01\n" +
+	"\x11AccountEnrollment\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06secret\x18\x02 \x01(\tR\x06secret\x129\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAtB Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
 
 var (
 	file_lindm_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -134,16 +852,30 @@ func file_lindm_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_lindm_auth_v1_auth_proto_rawDescData
 }
 
-var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_lindm_auth_v1_auth_proto_goTypes = []any{
-	(*SessionPrincipal)(nil), // 0: lindm.auth.v1.SessionPrincipal
+	(*SessionPrincipal)(nil),       // 0: lindm.auth.v1.SessionPrincipal
+	(*AuthenticationOptions)(nil),  // 1: lindm.auth.v1.AuthenticationOptions
+	(*LocalLoginRequest)(nil),      // 2: lindm.auth.v1.LocalLoginRequest
+	(*LocalEnrollmentRequest)(nil), // 3: lindm.auth.v1.LocalEnrollmentRequest
+	(*WebAuthnChallenge)(nil),      // 4: lindm.auth.v1.WebAuthnChallenge
+	(*WebAuthnFinishRequest)(nil),  // 5: lindm.auth.v1.WebAuthnFinishRequest
+	(*LocalAccount)(nil),           // 6: lindm.auth.v1.LocalAccount
+	(*ListAccountsResponse)(nil),   // 7: lindm.auth.v1.ListAccountsResponse
+	(*CreateAccountRequest)(nil),   // 8: lindm.auth.v1.CreateAccountRequest
+	(*UpdateAccountRequest)(nil),   // 9: lindm.auth.v1.UpdateAccountRequest
+	(*ResetAccountRequest)(nil),    // 10: lindm.auth.v1.ResetAccountRequest
+	(*AccountEnrollment)(nil),      // 11: lindm.auth.v1.AccountEnrollment
+	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
 }
 var file_lindm_auth_v1_auth_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6,  // 0: lindm.auth.v1.ListAccountsResponse.accounts:type_name -> lindm.auth.v1.LocalAccount
+	12, // 1: lindm.auth.v1.AccountEnrollment.expires_at:type_name -> google.protobuf.Timestamp
+	2,  // [2:2] is the sub-list for method output_type
+	2,  // [2:2] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_lindm_auth_v1_auth_proto_init() }
@@ -157,7 +889,7 @@ func file_lindm_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_auth_v1_auth_proto_rawDesc), len(file_lindm_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
