@@ -61,6 +61,64 @@ func TestDefinitionReadDetectsMetadataChange(t *testing.T) {
 	}
 }
 
+func TestDefinitionRejectsLegacyIncludes(t *testing.T) {
+	for _, input := range []string{
+		".include /unbound.conf\n",
+		"[Service]\n \t.include relative.conf\n",
+		"\xef\xbb\xbf.include /unbound.conf\n",
+		"# earlier physical line\x00.include /unbound.conf\n",
+		".include\\\n /unbound.conf\n",
+		" \\\n.include /unbound.conf\n",
+	} {
+		t.Run(input, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "unit.service")
+			if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			file, err := os.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = file.Close() }()
+			var stat unix.Stat_t
+			if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+				t.Fatal(err)
+			}
+			// Keep tokens and BOM bytes split across reads.
+			var buffer [2]byte
+			if err := hashFile(context.Background(), sha256.New(), file, stat, buffer[:]); !errors.Is(err, ErrUnsupported) {
+				t.Fatalf("unbound legacy include accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestDefinitionHashesOrdinaryIncludeMentions(t *testing.T) {
+	const input = "# .include in a comment\n[Unit]\nDescription=Text mentioning .include\n; .include in another comment\n[Service]\nExecStart=/usr/bin/sleep infinity\n"
+	path := filepath.Join(t.TempDir(), "unit.service")
+	if err := os.WriteFile(path, []byte(input), 0600); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+		t.Fatal(err)
+	}
+	var buffer [2]byte
+	h := sha256.New()
+	if err := hashFile(context.Background(), h, file, stat, buffer[:]); err != nil {
+		t.Fatal(err)
+	}
+	want := sha256.Sum256([]byte(input))
+	if !bytes.Equal(h.Sum(nil), want[:]) {
+		t.Fatal("ordinary definition bytes changed during include screening")
+	}
+}
+
 func rootDefinitionDirectory(t *testing.T) string {
 	t.Helper()
 	if os.Geteuid() != 0 {

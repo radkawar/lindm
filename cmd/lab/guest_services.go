@@ -25,6 +25,7 @@ const serviceProofUnit = "lab-native-service-proof.service"
 const serviceProofAlias = "lab-native-service-proof-alias.service"
 const serviceProofOneshot = "lab-native-service-proof-oneshot.service"
 const serviceProofMissing = "lab-native-service-proof-missing.service"
+const serviceProofLegacyInclude = "lab-native-service-proof-legacy-include.service"
 const serviceProofDirectory = "/etc/systemd/system/"
 
 // These literal fixtures belong only to a disposable laboratory guest. The
@@ -65,7 +66,7 @@ func guestServices(ctx context.Context, output io.Writer) error {
 }
 
 func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err error) {
-	owned := make([]string, 0, 3)
+	owned := make([]string, 0, 4)
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -89,7 +90,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		_, reloadErr := serviceProofCommand(cleanup, "/usr/bin/systemctl", "--no-ask-password", "daemon-reload")
 		err = errors.Join(err, reloadErr)
 	}()
-	for _, unit := range []string{serviceProofUnit, serviceProofAlias, serviceProofOneshot, serviceProofMissing} {
+	for _, unit := range []string{serviceProofUnit, serviceProofAlias, serviceProofOneshot, serviceProofMissing, serviceProofLegacyInclude} {
 		native, err := serviceProofNative(ctx, unit)
 		if err != nil {
 			return nil, err
@@ -104,7 +105,11 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 			return nil, errors.New("service proof requires native sleep and true executables")
 		}
 	}
-	for _, fixture := range []struct{ unit, content string }{{serviceProofUnit, serviceProofDefinition}, {serviceProofOneshot, serviceProofOneshotDefinition}} {
+	for _, fixture := range []struct{ unit, content string }{
+		{serviceProofUnit, serviceProofDefinition},
+		{serviceProofOneshot, serviceProofOneshotDefinition},
+		{serviceProofLegacyInclude, serviceProofDefinition + "\n.include /dev/null\n"},
+	} {
 		file, err := os.OpenFile(serviceProofDirectory+fixture.unit, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, err
@@ -121,7 +126,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		}
 		// Restore only our new fixtures to vendor policy labels. Never relabel
 		// vendor executables, alter policy, or relax the guest enforcement mode.
-		if _, err := serviceProofCommand(ctx, "/usr/sbin/restorecon", serviceProofDirectory+serviceProofUnit, serviceProofDirectory+serviceProofOneshot); err != nil {
+		if _, err := serviceProofCommand(ctx, "/usr/sbin/restorecon", serviceProofDirectory+serviceProofUnit, serviceProofDirectory+serviceProofOneshot, serviceProofDirectory+serviceProofLegacyInclude); err != nil {
 			return nil, err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -239,7 +244,12 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if _, err := serviceProofCommand(ctx, "/usr/bin/systemctl", "--no-ask-password", "daemon-reload"); err != nil {
 		return nil, err
 	}
-	for _, target := range []struct{ name, unit string }{{"missing-rejected", serviceProofMissing}, {"alias-rejected", serviceProofAlias}, {"oneshot-rejected", serviceProofOneshot}} {
+	for _, target := range []struct{ name, unit string }{
+		{"missing-rejected", serviceProofMissing},
+		{"alias-rejected", serviceProofAlias},
+		{"oneshot-rejected", serviceProofOneshot},
+		{"legacy-include-rejected", serviceProofLegacyInclude},
+	} {
 		before, err := provider.Observe(ctx, serviceProofUnit)
 		if err != nil {
 			return nil, err
@@ -250,6 +260,9 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		}
 		if target.unit == serviceProofAlias && (nativeBefore.LoadState != "loaded" || nativeBefore.ID != serviceProofUnit) {
 			return nil, errors.New("alias rejection requires a loaded alias of the canonical fixture")
+		}
+		if target.unit == serviceProofLegacyInclude && (nativeBefore.LoadState != "loaded" || nativeBefore.ID != serviceProofLegacyInclude || nativeBefore.ActiveState != "inactive" || nativeBefore.UnitFileState != "disabled") {
+			return nil, errors.New("legacy include rejection requires an otherwise loaded, inactive and disabled service")
 		}
 		desired := proto.CloneOf(active)
 		desired.Unit = target.unit

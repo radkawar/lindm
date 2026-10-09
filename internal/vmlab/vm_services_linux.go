@@ -144,8 +144,8 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 	if err := decoder.Decode(evidence); err != nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("invalid native service evidence encoding")
 	}
-	if evidence.Capability != "systemd.service.v1" || len(evidence.Steps) != 9 {
-		return nil, errors.New("incomplete native service evidence")
+	if err := validateServiceEvidence(evidence); err != nil {
+		return nil, err
 	}
 	result.Services = evidence
 	if manifest.Distribution == "fedora" {
@@ -155,6 +155,50 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 		}
 	}
 	return result, nil
+}
+
+// This validates the required qualification scenarios, not the authenticity of
+// an arbitrary executable. The caller still selects and trusts the lab binary.
+func validateServiceEvidence(evidence *VMServicesEvidence) error {
+	const primary = "lab-native-service-proof.service"
+	expected := [...]struct{ name, target, rejection string }{
+		{"converge-active", primary, ""},
+		{"repeat-active", primary, ""},
+		{"stale-plan", primary, "conflict"},
+		{"reconverge-active", primary, ""},
+		{"converge-inactive", primary, ""},
+		{"canceled-before-start", primary, "canceled"},
+		{"missing-rejected", "lab-native-service-proof-missing.service", "unsupported"},
+		{"alias-rejected", "lab-native-service-proof-alias.service", "unsupported"},
+		{"oneshot-rejected", "lab-native-service-proof-oneshot.service", "unsupported"},
+		{"legacy-include-rejected", "lab-native-service-proof-legacy-include.service", "unsupported"},
+	}
+	if evidence == nil || evidence.Capability != "systemd.service.v1" || len(evidence.Steps) != len(expected) {
+		return errors.New("incomplete native service evidence")
+	}
+	for index, want := range expected {
+		step := &evidence.Steps[index]
+		if step.Name != want.name || step.Target != want.target || step.Rejection != want.rejection ||
+			step.NativeBefore == nil || step.NativeAfter == nil || step.After == nil ||
+			step.NativeBefore.Unit != want.target || step.NativeAfter.Unit != want.target || step.After.Unit != primary {
+			return fmt.Errorf("incomplete native service scenario %s", want.name)
+		}
+		id := want.target
+		if want.name == "alias-rejected" {
+			id = primary
+		}
+		if step.NativeBefore.ID != id || step.NativeAfter.ID != id {
+			return fmt.Errorf("incorrect canonical identity in native service scenario %s", want.name)
+		}
+		if want.rejection != "" && *step.NativeBefore != *step.NativeAfter {
+			return fmt.Errorf("rejected native service scenario changed state: %s", want.name)
+		}
+		if want.name == "legacy-include-rejected" &&
+			(step.NativeBefore.LoadState != "loaded" || step.NativeBefore.ActiveState != "inactive" || step.NativeBefore.UnitFileState != "disabled") {
+			return errors.New("legacy include refusal lacks loaded inactive disabled native evidence")
+		}
+	}
+	return nil
 }
 
 func serviceGuestEnforcing(ctx context.Context, vm *guestVM) (string, error) {

@@ -76,6 +76,7 @@ func writeLength(h hash.Hash, value uint64) {
 
 func hashFile(ctx context.Context, h hash.Hash, file *os.File, before unix.Stat_t, buffer []byte) error {
 	remaining := before.Size
+	var include legacyIncludeGuard
 	for remaining > 0 {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -84,6 +85,9 @@ func hashFile(ctx context.Context, h hash.Hash, file *os.File, before unix.Stat_
 		n, err := io.ReadFull(file, buffer[:size])
 		if err != nil {
 			return fmt.Errorf("%w: definition changed while reading: %w", ErrConflict, err)
+		}
+		if include.scan(buffer[:n]) {
+			return fmt.Errorf("%w: legacy .include definitions are not bound; use drop-ins", ErrUnsupported)
 		}
 		_, _ = h.Write(buffer[:n])
 		remaining -= int64(n)
@@ -98,6 +102,53 @@ func hashFile(ctx context.Context, h hash.Hash, file *os.File, before unix.Stat_
 		return fmt.Errorf("%w: definition changed while reading", ErrConflict)
 	}
 	return nil
+}
+
+// Legacy systemd accepts .include before section dispatch and can load files
+// absent from FragmentPath/DropInPaths. Refuse the directive rather than hash
+// an incomplete definition. This screens physical-line prefixes, not INI values
+// or install semantics. It conservatively rejects prefixes in continuations too.
+// Native continuation folding inserts a space, so it cannot assemble the token
+// from separate lines. v239 read_line also treats NUL as a physical delimiter.
+type legacyIncludeGuard uint8
+
+func (g *legacyIncludeGuard) scan(data []byte) bool {
+	const (
+		token   = ".include"
+		ignored = 255
+		bomEF   = 254
+		bomBB   = 253
+	)
+	for _, c := range data {
+		switch {
+		case c == '\n' || c == 0:
+			*g = 0
+		case *g == ignored:
+			continue
+		case *g == bomEF:
+			*g = ignored
+			if c == 0xbb {
+				*g = bomBB
+			}
+		case *g == bomBB:
+			*g = ignored
+			if c == 0xbf {
+				*g = 0
+			}
+		case *g == 0 && (c == ' ' || c == '\t' || c == '\r' || c == '\v' || c == '\f'):
+			continue
+		case *g == 0 && c == 0xef:
+			*g = bomEF
+		case c == token[*g]:
+			*g++
+			if int(*g) == len(token) {
+				return true
+			}
+		default:
+			*g = ignored
+		}
+	}
+	return false
 }
 
 func trustedDirectory(stat *unix.Stat_t) bool {

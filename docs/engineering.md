@@ -243,6 +243,13 @@ safe runtime-invocation restoration or supported-distro certification. The fixtu
 uses fixed arguments/environment and `SYSTEMCTL_SKIP_SYSV=1`; `--root` is not
 treated as a general sandbox for arbitrary input, and `--dry-run` is not relied on.
 
+The same maintained scenario also passed with systemd `239-78.el8` as UID 0 on
+tmpfs in a network-disabled, read-only, capability-free Rocky 8 container, using
+image digest
+`sha256:9794037624aaa6212aeada1d28861ef5e0a935adaf93e4ef79837119f2a2d04c`.
+This checks the isolated native install/custody mechanics, not the Rocky guest
+lifecycle or production SELinux policy.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node

@@ -324,6 +324,38 @@ reviewed statically; the native lane exercises cancellation before `Apply`.
 lanes on the same recorded lab build. These scoped reviews do not qualify signed
 remote policy execution or whole-product security.
 
+### Legacy include definition-binding correction
+
+Upstream systemd v239's
+[configuration parser](https://github.com/systemd/systemd/blob/v239/src/shared/conf-parser.c#L180-L206)
+can open `.include` files outside the fragment/drop-in paths hashed by the
+provider. Its
+[line reader](https://github.com/systemd/systemd/blob/v239/src/basic/fileio.c#L1586-L1653)
+also treats NUL as a physical-line delimiter. Six regressions failed before the
+correction: plain, whitespace, BOM, NUL and two continuation forms were accepted.
+The streaming definition reader now refuses legacy include prefixes as unsupported
+without normalizing accepted bytes. It does not attempt to reproduce native INI
+or install semantics; ordinary comment/value mentions remain accepted.
+
+Independent stateless source review found no actionable guard defect within that
+scope. A separate fixture review found that the host accepted only capability and
+record count, not the required scenarios. The host now verifies ordered scenario
+names, targets, rejection values, canonical IDs and native state bindings, including
+the loaded/inactive/disabled legacy fixture. Empty records are rejected. Replay of
+both real native evidence records rejected duplicate scenarios, changed state,
+substituted canonical IDs and falsely absent legacy targets; the throwaway replay
+code was removed. Corrective source review found no further actionable issue.
+These source reviews did not execute checks. The caller-selected lab executable
+remains trusted; structural validation does not authenticate an arbitrary program.
+
+The corrected ten-scenario native lane passed on Ubuntu 24.04 and Fedora 44.
+Fedora's enforcement checks were Enforcing before and after. Evidence:
+`/home/r/.cache/lindm-services-ubuntu-legacy-include-v2.json` and
+`/home/r/.cache/lindm-services-fedora-legacy-include-v2.json`; both used lab SHA-256
+`342e5c0efdac76724ecc8654e0dea5dba30aa80c7f81c4bfa67480fb596bff88`.
+Focused provider/executor/lab race checks and lint passed. This qualifies the
+refusal and existing provider scenarios, not profile ownership or full G3.
+
 ### Signed durable service-execution reviews
 
 Four independent read-only reviews covered the action journal, cryptographic/native

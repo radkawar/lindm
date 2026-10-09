@@ -625,7 +625,9 @@ of its executable, creates fixed sacrificial service fixtures only in its owned
 guest, and calls `internal/agent/serviceprovider`. Independent `systemctl`
 observations verify enable/start, unchanged desired state, stale-plan rejection,
 reconvergence, disable/stop, cancellation before start, and rejection of missing,
-aliased and nonpersistent oneshot services. Fedora remains SELinux Enforcing.
+aliased, nonpersistent oneshot and legacy-include services. The host checks the
+exact required scenarios and their native identity/state bindings, not only a
+record count. Fedora enforcement is checked before and after the scenario.
 Success follows fixture cleanup and complete VM teardown.
 
 The production provider uses typed `ServiceDesiredState` and systemd D-Bus:
@@ -634,6 +636,15 @@ unit contents. A plan binds the canonical unit, boot, native state and protected
 unit-definition fingerprint; changed preconditions prevent effects. Native job
 completion alone is not convergence. A submitted effect with lost/canceled
 observation remains uncertain, not implicitly canceled or rolled back.
+
+Legacy `.include` prefixes in fragments or drop-ins are unsupported: older native
+parsers can load files outside the definition set reported by systemd. Convert
+such definitions to native drop-ins before managing them. The bounded reader
+screens physical-line prefixes across read boundaries, including BOM and NUL
+handling; it conservatively refuses those prefixes inside continued lines too.
+Ordinary comment and assignment-value mentions remain accepted. Accepted bytes
+retain their existing fingerprint encoding; historical signed records are not
+rewritten.
 
 Persistent enablement changes require a native manager reload. This also
 incorporates other pending unit definitions; it is not an isolated per-unit
