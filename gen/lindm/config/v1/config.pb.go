@@ -45,8 +45,11 @@ type ServerConfig struct {
 	// Public owner-pinned material only. Absence cannot erase previously
 	// provisioned authority or authorize execution.
 	ExecutionBootstrap *ExecutionBootstrapConfig `protobuf:"bytes,12,opt,name=execution_bootstrap,json=executionBootstrap,proto3" json:"execution_bootstrap,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Online plan and start PKCS#8 keys. Absence means this process has no
+	// execution issuer. Presence does not admit a delegation or authorize issuance.
+	ExecutionSigning *ExecutionSigningConfig `protobuf:"bytes,13,opt,name=execution_signing,json=executionSigning,proto3" json:"execution_signing,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -163,6 +166,13 @@ func (x *ServerConfig) GetExecutionBootstrap() *ExecutionBootstrapConfig {
 	return nil
 }
 
+func (x *ServerConfig) GetExecutionSigning() *ExecutionSigningConfig {
+	if x != nil {
+		return x.ExecutionSigning
+	}
+	return nil
+}
+
 type ExecutionBootstrapConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RootFile      string                 `protobuf:"bytes,1,opt,name=root_file,json=rootFile,proto3" json:"root_file,omitempty"`
@@ -215,6 +225,60 @@ func (x *ExecutionBootstrapConfig) GetBootstrapFile() string {
 	return ""
 }
 
+// ExecutionSigningConfig names protected unencrypted PKCS#8 Ed25519 files for
+// the distinct online plan and start roles. It requires execution_bootstrap.
+type ExecutionSigningConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlanKeyFile   string                 `protobuf:"bytes,1,opt,name=plan_key_file,json=planKeyFile,proto3" json:"plan_key_file,omitempty"`
+	StartKeyFile  string                 `protobuf:"bytes,2,opt,name=start_key_file,json=startKeyFile,proto3" json:"start_key_file,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutionSigningConfig) Reset() {
+	*x = ExecutionSigningConfig{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutionSigningConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutionSigningConfig) ProtoMessage() {}
+
+func (x *ExecutionSigningConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutionSigningConfig.ProtoReflect.Descriptor instead.
+func (*ExecutionSigningConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ExecutionSigningConfig) GetPlanKeyFile() string {
+	if x != nil {
+		return x.PlanKeyFile
+	}
+	return ""
+}
+
+func (x *ExecutionSigningConfig) GetStartKeyFile() string {
+	if x != nil {
+		return x.StartKeyFile
+	}
+	return ""
+}
+
 // Binding uses an explicit IP address and port rather than a second address
 // grammar. Hostname resolution belongs to public URLs, not local bind addresses.
 type ListenerConfig struct {
@@ -227,7 +291,7 @@ type ListenerConfig struct {
 
 func (x *ListenerConfig) Reset() {
 	*x = ListenerConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +303,7 @@ func (x *ListenerConfig) String() string {
 func (*ListenerConfig) ProtoMessage() {}
 
 func (x *ListenerConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[2]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +316,7 @@ func (x *ListenerConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListenerConfig.ProtoReflect.Descriptor instead.
 func (*ListenerConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{2}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListenerConfig) GetAddress() string {
@@ -282,7 +346,7 @@ type DatabaseConfig struct {
 
 func (x *DatabaseConfig) Reset() {
 	*x = DatabaseConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +358,7 @@ func (x *DatabaseConfig) String() string {
 func (*DatabaseConfig) ProtoMessage() {}
 
 func (x *DatabaseConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[3]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +371,7 @@ func (x *DatabaseConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DatabaseConfig.ProtoReflect.Descriptor instead.
 func (*DatabaseConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{3}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DatabaseConfig) GetUrlFile() string {
@@ -341,7 +405,7 @@ type TLSConfig struct {
 
 func (x *TLSConfig) Reset() {
 	*x = TLSConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +417,7 @@ func (x *TLSConfig) String() string {
 func (*TLSConfig) ProtoMessage() {}
 
 func (x *TLSConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +430,7 @@ func (x *TLSConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TLSConfig.ProtoReflect.Descriptor instead.
 func (*TLSConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{4}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TLSConfig) GetCertificateFile() string {
@@ -393,7 +457,7 @@ type DeviceCAConfig struct {
 
 func (x *DeviceCAConfig) Reset() {
 	*x = DeviceCAConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -405,7 +469,7 @@ func (x *DeviceCAConfig) String() string {
 func (*DeviceCAConfig) ProtoMessage() {}
 
 func (x *DeviceCAConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[5]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -418,7 +482,7 @@ func (x *DeviceCAConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceCAConfig.ProtoReflect.Descriptor instead.
 func (*DeviceCAConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{5}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DeviceCAConfig) GetCertificateFile() string {
@@ -449,7 +513,7 @@ type OIDCConfig struct {
 
 func (x *OIDCConfig) Reset() {
 	*x = OIDCConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +525,7 @@ func (x *OIDCConfig) String() string {
 func (*OIDCConfig) ProtoMessage() {}
 
 func (x *OIDCConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[6]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +538,7 @@ func (x *OIDCConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OIDCConfig.ProtoReflect.Descriptor instead.
 func (*OIDCConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{6}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *OIDCConfig) GetIssuer() string {
@@ -523,7 +587,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xdb\t\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc3\v\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -538,14 +602,20 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x16inventory_budget_bytes\x18\n" +
 	" \x01(\x04B\x14\xbaH\x112\x0f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f(\x80\x80\x80 H\x00R\x14inventoryBudgetBytes\x88\x01\x01\x12=\n" +
 	"\x11device_public_url\x18\v \x01(\tB\f\xbaH\tr\a\x80\xb5\x18\x01\x88\x01\x01H\x01R\x0fdevicePublicUrl\x88\x01\x01\x12Z\n" +
-	"\x13execution_bootstrap\x18\f \x01(\v2).lindm.config.v1.ExecutionBootstrapConfigR\x12executionBootstrap:\xdd\x02\xbaH\xd9\x02\x1a\xb2\x01\n" +
-	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\xa1\x01\n" +
+	"\x13execution_bootstrap\x18\f \x01(\v2).lindm.config.v1.ExecutionBootstrapConfigR\x12executionBootstrap\x12T\n" +
+	"\x11execution_signing\x18\r \x01(\v2'.lindm.config.v1.ExecutionSigningConfigR\x10executionSigning:\xef\x03\xbaH\xeb\x03\x1a\xb2\x01\n" +
+	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x8f\x01\n" +
+	"\x1bexecution_signing.bootstrap\x121execution signing requires an execution bootstrap\x1a=!has(this.execution_signing) || has(this.execution_bootstrap)\x1a\xa1\x01\n" +
 	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)B\x19\n" +
 	"\x17_inventory_budget_bytesB\x14\n" +
 	"\x12_device_public_url\"t\n" +
 	"\x18ExecutionBootstrapConfig\x12&\n" +
 	"\troot_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\brootFile\x120\n" +
-	"\x0ebootstrap_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\"T\n" +
+	"\x0ebootstrap_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\"\x84\x02\n" +
+	"\x16ExecutionSigningConfig\x12-\n" +
+	"\rplan_key_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\vplanKeyFile\x12/\n" +
+	"\x0estart_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fstartKeyFile:\x89\x01\xbaH\x85\x01\x1a\x82\x01\n" +
+	" execution_signing.distinct_files\x123plan and start signing keys must use distinct files\x1a)this.plan_key_file != this.start_key_file\"T\n" +
 	"\x0eListenerConfig\x12!\n" +
 	"\aaddress\x18\x01 \x01(\tB\a\xbaH\x04r\x02p\x01R\aaddress\x12\x1f\n" +
 	"\x04port\x18\x02 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\x03(\x01R\x04port\"\xc0\x01\n" +
@@ -586,29 +656,31 @@ func file_lindm_config_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_config_v1_config_proto_rawDescData
 }
 
-var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*ServerConfig)(nil),             // 0: lindm.config.v1.ServerConfig
 	(*ExecutionBootstrapConfig)(nil), // 1: lindm.config.v1.ExecutionBootstrapConfig
-	(*ListenerConfig)(nil),           // 2: lindm.config.v1.ListenerConfig
-	(*DatabaseConfig)(nil),           // 3: lindm.config.v1.DatabaseConfig
-	(*TLSConfig)(nil),                // 4: lindm.config.v1.TLSConfig
-	(*DeviceCAConfig)(nil),           // 5: lindm.config.v1.DeviceCAConfig
-	(*OIDCConfig)(nil),               // 6: lindm.config.v1.OIDCConfig
+	(*ExecutionSigningConfig)(nil),   // 2: lindm.config.v1.ExecutionSigningConfig
+	(*ListenerConfig)(nil),           // 3: lindm.config.v1.ListenerConfig
+	(*DatabaseConfig)(nil),           // 4: lindm.config.v1.DatabaseConfig
+	(*TLSConfig)(nil),                // 5: lindm.config.v1.TLSConfig
+	(*DeviceCAConfig)(nil),           // 6: lindm.config.v1.DeviceCAConfig
+	(*OIDCConfig)(nil),               // 7: lindm.config.v1.OIDCConfig
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
-	2, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
-	2, // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
-	3, // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
-	4, // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
-	5, // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
-	6, // 5: lindm.config.v1.ServerConfig.oidc:type_name -> lindm.config.v1.OIDCConfig
+	3, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
+	3, // 1: lindm.config.v1.ServerConfig.device_listener:type_name -> lindm.config.v1.ListenerConfig
+	4, // 2: lindm.config.v1.ServerConfig.database:type_name -> lindm.config.v1.DatabaseConfig
+	5, // 3: lindm.config.v1.ServerConfig.tls:type_name -> lindm.config.v1.TLSConfig
+	6, // 4: lindm.config.v1.ServerConfig.device_ca:type_name -> lindm.config.v1.DeviceCAConfig
+	7, // 5: lindm.config.v1.ServerConfig.oidc:type_name -> lindm.config.v1.OIDCConfig
 	1, // 6: lindm.config.v1.ServerConfig.execution_bootstrap:type_name -> lindm.config.v1.ExecutionBootstrapConfig
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	2, // 7: lindm.config.v1.ServerConfig.execution_signing:type_name -> lindm.config.v1.ExecutionSigningConfig
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }
@@ -617,14 +689,14 @@ func file_lindm_config_v1_config_proto_init() {
 		return
 	}
 	file_lindm_config_v1_config_proto_msgTypes[0].OneofWrappers = []any{}
-	file_lindm_config_v1_config_proto_msgTypes[3].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_config_v1_config_proto_rawDesc), len(file_lindm_config_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

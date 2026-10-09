@@ -121,17 +121,17 @@ semantics rather than relying on framework defaults.
 
 ### Planned code layout
 
-| Area                                            | Responsibility                                                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd/lindmd`, `cmd/lindm-agent`, `cmd/lindmctl` | Composition and entrypoints only                                                                                                   |
-| `api/`, `gen/`                                  | Versioned protobuf sources and generated Go/TypeScript                                                                             |
-| `internal/identity/`, `internal/device/`        | Current control-plane domains; each owns its SQL queries and sqlc-generated persistence                                            |
-| `internal/config/`, `internal/server/`, `db/`   | Checked resources, service composition and reviewed migrations                                                                     |
-| `internal/agent/`                               | Unprivileged transport/spool, separately root-owned executor journal/trust, reconciliation and native update supervision           |
-| `internal/provider/`                            | Native package/network/service/security adapters with narrow contracts                                                             |
-| `web/`                                          | Typed console and browser self-service surfaces                                                                                    |
-| `packaging/`, `deploy/`                         | DEB/RPM/Arch and Nix/OSTree delivery, systemd/SELinux/AppArmor, native/OCI/replicated server deployment and local assistance relay |
-| `cmd/lab/`, `internal/vmlab/`, `lab/`           | Maintained Go laboratory, signed-image manifests and disposable native-observation VM scenarios                                    |
+| Area                                                                                         | Responsibility                                                                                                                     |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd/lindmd`, `cmd/lindm-agent`, `cmd/lindmctl`                                              | Composition and entrypoints only                                                                                                   |
+| `api/`, `gen/`                                                                               | Versioned protobuf sources and generated Go/TypeScript                                                                             |
+| `internal/identity/`, `internal/device/`, `internal/executionauthority/`, `internal/policy/` | Control-plane domains, typed resolution and owned sqlc persistence                                                                 |
+| `internal/config/`, `internal/server/`, `db/`                                                | Checked resources, service composition and reviewed migrations                                                                     |
+| `internal/agent/`                                                                            | Unprivileged transport/spool, separately root-owned executor journal/trust, reconciliation and native update supervision           |
+| `internal/provider/`                                                                         | Native package/network/service/security adapters with narrow contracts                                                             |
+| `web/`                                                                                       | Typed console and browser self-service surfaces                                                                                    |
+| `packaging/`, `deploy/`                                                                      | DEB/RPM/Arch and Nix/OSTree delivery, systemd/SELinux/AppArmor, native/OCI/replicated server deployment and local assistance relay |
+| `cmd/lab/`, `internal/vmlab/`, `lab/`                                                        | Maintained Go laboratory, signed-image manifests and disposable native-observation VM scenarios                                    |
 
 Create a package when it owns working behavior. Do not create all directories,
 interfaces and empty tests up front merely to match this table.
@@ -183,6 +183,35 @@ configuration intentionally rejects arbitrary `search_path` parameters. Lab-only
 cluster administration creates the uniquely named database; the subprocess receives
 only a non-superuser migrator URL. Owned server shutdown precedes database cleanup.
 Neither this fixture nor the fresh-authorization fixture changes shared IdP policy.
+
+`go run ./cmd/lab profiles check-catalog -lindmd <prebuilt-server> -repo .`
+uses the same private real-process/database boundary for profile publication.
+Optional `-record <new-file>` persists successful evidence without overwriting an
+earlier run. It first restarts the real server with two fresh, protected, undelegated
+online keys to exercise configuration-resource loading. It follows the real owner
+authorization-code/PKCE login, publishes
+two typed immutable revisions, rejects stale-head and changed-request mutations,
+restarts the server, then verifies exact historical retry, retained dependencies
+and the current catalog listing. Session revocation precedes server/database
+teardown. Publishing a catalog revision does not assign or deploy it to devices;
+this command does not qualify target preview, dispatch or native reconciliation.
+
+The authenticated **Profiles** console uses these same catalog RPCs. Editors use
+the generated protobuf constraints, including shared custom validation rules,
+instead of a second handwritten schema. Resource dependencies are typed references;
+the resolver additionally rejects cycles and preserves blocked/conflicting results.
+The editor captures one request ID and payload before sending, retains an ambiguous
+attempt across route navigation, and only changes its expected head/request identity
+on an explicit rebase or replacement. Revision refresh failures do not discard an
+unsent draft. These drafts and attempts are tab-memory state, not durable browser
+storage: full reload and sign-out clear them. Exact server-side retry receipts and
+retained revisions remain durable.
+
+Optional `execution_signing.plan_key_file` and `start_key_file` are distinct protected
+file references to single unencrypted PKCS#8 Ed25519 private keys. Loading excludes
+pinned transport/root/release keys and TLS/device-CA identity keys. It does not
+delegate authority or enable an issuer; current authority and admission must still
+authorize every later issuance. Absent configuration provides no signing fallback.
 
 ## 2. Toolchain and quality gates
 

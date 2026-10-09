@@ -4,6 +4,7 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/profiles.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
 import "lindm/inventory/v1/observation.proto";
@@ -21,6 +22,9 @@ service AdminService {
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
   rpc GetExecutionAuthority(GetExecutionAuthorityRequest) returns (GetExecutionAuthorityResponse);
   rpc UpdateExecutionAuthority(UpdateExecutionAuthorityRequest) returns (UpdateExecutionAuthorityResponse);
+  rpc PublishServiceProfileRevision(PublishServiceProfileRevisionRequest) returns (PublishServiceProfileRevisionResponse);
+  rpc GetServiceProfileRevision(GetServiceProfileRevisionRequest) returns (GetServiceProfileRevisionResponse);
+  rpc ListServiceProfiles(ListServiceProfilesRequest) returns (ListServiceProfilesResponse);
 }
 
 enum DeviceState {

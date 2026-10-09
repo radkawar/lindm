@@ -464,6 +464,60 @@ confirmed absent after teardown. Artifact identities and device IDs are recorded
 in the implementation ledger. These reviews do not qualify profile dispatch or
 whole-product security.
 
+### Profile catalog and online signing-resource review
+
+The current integration has source-reviewed immutable catalog persistence and
+optional online signing-resource loading. A reviewer found that Go's PEM decoder
+could skip a malformed first section and load a later valid private key. A protected
+configuration-file regression reproduced acceptance before the correction. The
+loader now requires exactly one BEGIN and END marker as well as the existing
+type, header, remainder, PKCS#8 and Ed25519 checks. The signing-resource race suite
+passed, and focused source re-review found no remaining actionable issue.
+
+Parent verification also reproduced a dependency-graph defect: with `a -> {b,c}`,
+`b -> a`, and `c -> b`, DFS back-edge marking classified `c` as merely blocked
+rather than a cycle member. Strongly connected components now classify all cycle
+members, and reverse-edge propagation blocks their transitive dependents. The
+failing-before regression and resolver race suite pass.
+
+Real PostgreSQL checks passed canonical immutable history, exact retries,
+concurrent expected-head publication, rollback and corrupted-resource rejection.
+The maintained real-server catalog command passed under actual owner login,
+including restart/retry and typed dependency retention; run profile
+`8adb88c7-d5a6-4157-b35d-e295166b0373`. Integration-tagged Go lint and focused
+race checks passed after correcting unchecked assertions in test helpers.
+The extended command also passed real server startup with two distinct protected
+online-key files before repeating the full catalog scenario; run profile
+`53aad558-d4b2-4686-890e-fd0e7646ace5`. Focused source re-review confirmed private
+key/config ownership and cleanup, without treating loaded keys as delegated authority.
+A separate scoped review found no actionable defect in the maintained command's
+real-process isolation, cleanup ordering or RPC pagination budget. The pagination
+regression covers control-character-heavy JSON metadata against real PostgreSQL;
+the maintained command and browser exercise the actual HTTP service.
+
+The independent console review found two reachable lifecycle bugs: failed revision
+refreshes unmounted and discarded unsent drafts, and finishing creation from the
+detail page left the create route holding a consumed profile UUID. Both were
+reproduced in the real browser before correction. A pinned editor source now
+survives read failures, recovery and exact-revision navigation. Clearing a published
+attempt retires its matching creation reservation without retiring pending or
+ambiguous attempts. Source re-review and browser after-checks passed.
+
+Browser verification additionally replaced duplicate handwritten schema checks with
+generated protobuf validation, corrected non-BMP input truncation, cleared stale
+pre-publication notices on send, and corrected the narrow-screen revision lookup.
+Real owner SSO, a successfully committed reply dropped before delivery, byte-identical
+retry after route navigation, a genuinely competing revision, explicit refresh/rebase
+without implicit publication, immutable history and sign-out with a held successful
+reply all passed. The accepted-before-sign-out mutation remained accepted; its late
+reply did not restore the old authenticated surface. Browser evidence is retained at
+`.cache/g3-profiles-browser-evidence-v1.json`.
+
+Full quality gates, integration-tagged lint and the production console build passed.
+The full PostgreSQL/Keycloak integration run also passed. These reviews do not qualify
+online issuance, profile activation, native ownership, fleet capacity or whole-product
+security. Full G3 remains open.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

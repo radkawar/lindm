@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package lindm.policy.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/service.proto";
+
+option go_package = "lindm/gen/lindm/policy/v1;policyv1";
+
+// ServiceProfileSpec describes one immutable catalog revision of typed resources.
+// Publishing another revision never rewrites an earlier specification.
+message ServiceProfileSpec {
+  option (buf.validate.message).cel = {
+    id: "service_profile.unique_resources"
+    message: "profile resources must have distinct identities and units"
+    expression: "this.resources.all(r, this.resources.filter(o, o.resource_id == r.resource_id).size() == 1) && this.resources.all(r, has(r.desired) && this.resources.filter(o, has(o.desired) && o.desired.unit == r.desired.unit).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "service_profile.dependencies"
+    message: "dependencies must name another resource in the same profile"
+    expression: "this.resources.all(r, r.depends_on.all(id, id != r.resource_id && this.resources.exists(o, o.resource_id == id)))"
+  };
+
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 160
+    pattern: "^[^\\x00]+$"
+  }];
+  string description = 2 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^[^\\x00]*$"
+  }];
+  repeated ServiceProfileResource resources = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+}
+
+// ServiceProfileResource binds one canonical systemd unit. Desired state reuses
+// the agent service contract, including its managed-dimension and protected-unit
+// rules. Dependency cycles are rejected by the policy resolver, not by CEL.
+message ServiceProfileResource {
+  string resource_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  lindm.agent.v1.ServiceDesiredState desired = 2 [(buf.validate.field).required = true];
+  repeated string depends_on = 3 [(buf.validate.field).repeated = {
+    max_items: 63
+    unique: true
+    items: {
+      string: {
+        uuid: true
+        not_in: "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }];
+}

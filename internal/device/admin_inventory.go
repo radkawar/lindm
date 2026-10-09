@@ -218,7 +218,7 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 		if err != nil {
 			return err
 		}
-		var budget inventoryPageBudget
+		var budget responsePageBudget
 		packages := make([]*adminv1.DevicePackage, 0, min(len(rows), int(limit)))
 		for _, row := range rows {
 			if int32(len(packages)) == limit {

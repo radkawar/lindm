@@ -39,12 +39,18 @@ type ExecutionVerifier struct {
 	deploymentID   string
 	initialVersion uint64
 	reserved       map[[sha256.Size]byte]reservedDomain
+	// roots are copied fingerprints of the bootstrap execution root only. They
+	// are excluded from TrustDomainDigest and from accepted root checks.
+	roots map[[sha256.Size]byte]struct{}
 }
 
 // NewExecutionVerifier takes a Bootstrap previously returned by VerifyBootstrap.
-// Reserved TLS and release public keys are copied as fingerprints; subsequent
-// mutation of the supplied bootstrap cannot change this verifier's trust domains.
-// Additional reservations cover deployment-local keys such as a server TLS leaf.
+// Reserved transport, device CA, and release public keys are copied as
+// fingerprints; subsequent mutation of the supplied bootstrap cannot change
+// this verifier's trust domains. Additional reservations cover deployment-local
+// keys such as a server TLS leaf. Bootstrap execution-root fingerprints are
+// copied for OnlineKeySeparated only and do not alter reserved-role digests or
+// accepted root checks.
 func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap, additionalReserved ...crypto.PublicKey) (*ExecutionVerifier, error) {
 	if bootstrap == nil || bootstrap.Root == nil || bootstrap.Bundle == nil || bootstrap.Root.GetDeploymentId() != bootstrap.Bundle.GetDeploymentId() {
 		return nil, errors.New("verified bootstrap is required")
@@ -112,7 +118,40 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap, additionalReserve
 			}
 		}
 	}
+	v.roots = make(map[[sha256.Size]byte]struct{}, len(bootstrap.Root.GetKeys()))
+	for _, key := range bootstrap.Root.GetKeys() {
+		digest, err := publicKeyDigest(ed25519.PublicKey(key.GetPublicKey()))
+		if err != nil {
+			// Keep construction success identical for callers that do not inspect
+			// domains. OnlineKeySeparated fails closed when fingerprints are absent.
+			v.roots = nil
+			break
+		}
+		v.roots[digest] = struct{}{}
+	}
 	return v, nil
+}
+
+// OnlineKeySeparated reports whether public lies outside this verifier's pinned
+// transport, device CA, release, and bootstrap execution-root domains and its
+// additional reservations. It is only a key-domain check: it does not admit a
+// delegation or authorize issuance. A rotated current root is not part of this
+// pinned bootstrap domain and must be excluded by admission before any signing.
+func (v *ExecutionVerifier) OnlineKeySeparated(public crypto.PublicKey) error {
+	if v == nil || v.reserved == nil || v.roots == nil {
+		return errors.New("verified execution bootstrap is required")
+	}
+	digest, err := publicKeyDigest(public)
+	if err != nil {
+		return err
+	}
+	if _, reserved := v.reserved[digest]; reserved {
+		return errors.New("public key is reserved by pinned execution trust")
+	}
+	if _, root := v.roots[digest]; root {
+		return errors.New("public key is reserved by pinned execution trust")
+	}
+	return nil
 }
 
 // TrustDomainDigest identifies the bootstrap's CA/release public-key domains,

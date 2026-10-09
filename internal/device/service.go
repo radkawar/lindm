@@ -26,6 +26,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/policy"
 	"lindm/internal/trust"
 )
 
@@ -84,6 +85,7 @@ type Service struct {
 	inventoryBudget int64
 	execution       *executionauthority.Store
 	identity        *identity.Service
+	profiles        *policy.Store
 }
 
 var (
@@ -127,6 +129,9 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.ListAuditEventsRequest{},
 			&adminv1.GetExecutionAuthorityRequest{},
 			&adminv1.UpdateExecutionAuthorityRequest{},
+			&adminv1.PublishServiceProfileRevisionRequest{},
+			&adminv1.GetServiceProfileRevisionRequest{},
+			&adminv1.ListServiceProfilesRequest{},
 			&enrollmentv1.EnrollRequest{},
 			&enrollmentv1.RetrieveIssuanceRequest{},
 			&devicev1.AcquireSessionRequest{},
@@ -149,6 +154,10 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	profiles, err := policy.NewStore(pool)
+	if err != nil {
+		return nil, err
+	}
 	return &Service{
 		pool:            pool,
 		deploymentID:    deploymentID,
@@ -162,6 +171,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		inventoryBudget: budget,
 		execution:       cfg.ExecutionAuthority,
 		identity:        cfg.Identity,
+		profiles:        profiles,
 	}, nil
 }
 

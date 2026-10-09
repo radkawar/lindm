@@ -11,7 +11,7 @@ import (
 )
 
 func TestAuthorizeDefaultDeny(t *testing.T) {
-	perms := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust}
+	perms := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles}
 	allow := []string{RoleOwner, RoleAdmin}
 	deny := []string{"", "auditor", "operator", "helpdesk", "owner ", "Admin"}
 	for _, role := range allow {

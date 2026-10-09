@@ -34,6 +34,9 @@ type Resources struct {
 	DirectoryClientSecret string
 	InventoryBudgetBytes  int64
 	ExecutionBootstrap    *ExecutionBootstrap
+	// ExecutionSigning is nil unless execution_signing is configured. Loaded
+	// keys are not a delegation and do not authorize issuance.
+	ExecutionSigning *ExecutionSigning
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -106,7 +109,12 @@ func (d *Document) Resolve() (*Resources, error) {
 	if !ok {
 		return nil, errors.New("device_ca private key cannot sign certificates")
 	}
-	result.ExecutionBootstrap, err = d.executionBootstrap(result)
+	bootstrap, verifier, err := d.executionBootstrap(result)
+	if err != nil {
+		return nil, err
+	}
+	result.ExecutionBootstrap = bootstrap
+	result.ExecutionSigning, err = d.executionSigning(verifier)
 	if err != nil {
 		return nil, err
 	}

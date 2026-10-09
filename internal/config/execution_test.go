@@ -87,12 +87,13 @@ func TestExecutionBootstrapBindsDeploymentAndTransport(t *testing.T) {
 }
 
 type executionConfigFixture struct {
-	document  *Document
-	authority *trust.Authority
-	root      *agentv1.ExecutionRoot
-	bundle    *agentv1.BootstrapBundle
-	rootKey   ed25519.PrivateKey
-	transport tls.Certificate
+	document   *Document
+	authority  *trust.Authority
+	root       *agentv1.ExecutionRoot
+	bundle     *agentv1.BootstrapBundle
+	rootKey    ed25519.PrivateKey
+	releaseKey ed25519.PrivateKey
+	transport  tls.Certificate
 }
 
 func newExecutionConfigFixture(t *testing.T) *executionConfigFixture {
@@ -165,7 +166,7 @@ func newExecutionConfigFixture(t *testing.T) *executionConfigFixture {
 		t.Fatal(err)
 	}
 	f := &executionConfigFixture{
-		document: document, authority: authority, root: root, rootKey: private, transport: transport,
+		document: document, authority: authority, root: root, rootKey: private, releaseKey: releasePrivate, transport: transport,
 		bundle: &agentv1.BootstrapBundle{
 			BundleId: uuid.NewString(), DeploymentId: deployment, EnrollmentOrigin: document.Proto.GetPublicUrl(), DeviceOrigin: document.Proto.GetDevicePublicUrl(),
 			TransportCaPem: executionConfigFile(t, dir, "transport.crt"), DeviceCaPem: executionConfigFile(t, dir, "device.crt"),

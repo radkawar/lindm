@@ -16,6 +16,11 @@ message ServerConfig {
     expression: "!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener"
   };
   option (buf.validate.message).cel = {
+    id: "execution_signing.bootstrap"
+    message: "execution signing requires an execution bootstrap"
+    expression: "!has(this.execution_signing) || has(this.execution_bootstrap)"
+  };
+  option (buf.validate.message).cel = {
     id: "execution_bootstrap.device_origin"
     message: "execution bootstrap requires an explicit public device origin"
     expression: "!has(this.execution_bootstrap) || has(this.device_public_url)"
@@ -51,11 +56,27 @@ message ServerConfig {
   // Public owner-pinned material only. Absence cannot erase previously
   // provisioned authority or authorize execution.
   ExecutionBootstrapConfig execution_bootstrap = 12;
+  // Online plan and start PKCS#8 keys. Absence means this process has no
+  // execution issuer. Presence does not admit a delegation or authorize issuance.
+  ExecutionSigningConfig execution_signing = 13;
 }
 
 message ExecutionBootstrapConfig {
   string root_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   string bootstrap_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+// ExecutionSigningConfig names protected unencrypted PKCS#8 Ed25519 files for
+// the distinct online plan and start roles. It requires execution_bootstrap.
+message ExecutionSigningConfig {
+  option (buf.validate.message).cel = {
+    id: "execution_signing.distinct_files"
+    message: "plan and start signing keys must use distinct files"
+    expression: "this.plan_key_file != this.start_key_file"
+  };
+
+  string plan_key_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string start_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
 
 // Binding uses an explicit IP address and port rather than a second address

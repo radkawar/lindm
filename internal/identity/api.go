@@ -48,6 +48,7 @@ const (
 	PermissionRevokeDevice         Permission = "device.revoke"
 	PermissionReadAudit            Permission = "audit.read"
 	PermissionManageExecutionTrust Permission = "execution_trust.manage"
+	PermissionManageProfiles       Permission = "profiles.manage"
 
 	RoleOwner = "owner"
 	RoleAdmin = "admin"
@@ -87,7 +88,7 @@ func Authorize(p Principal, perm Permission) bool {
 		return false
 	}
 	switch perm {
-	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust:
+	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles:
 		return true
 	default:
 		return false

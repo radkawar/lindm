@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ClipboardListIcon, KeyRoundIcon, LogOutIcon, MonitorIcon } from "lucide-react";
+import { ClipboardListIcon, KeyRoundIcon, LayersIcon, LogOutIcon, MonitorIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   Breadcrumb,
@@ -28,6 +28,7 @@ import {
 
 const NAV = [
   { to: "/devices", label: "Devices", icon: MonitorIcon },
+  { to: "/profiles", label: "Profiles", icon: LayersIcon },
   { to: "/enrollment", label: "Enrollment", icon: KeyRoundIcon },
   { to: "/audit", label: "Audit", icon: ClipboardListIcon },
 ] as const;

@@ -14,7 +14,10 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
 import { Route as AuthenticatedEnrollmentRouteImport } from './routes/_authenticated/enrollment'
+import { Route as AuthenticatedProfilesRouteImport } from './routes/_authenticated/profiles'
 import { Route as AuthenticatedDevicesDeviceIdRouteImport } from './routes/_authenticated/devices_.$deviceId'
+import { Route as AuthenticatedProfilesProfileIdRouteImport } from './routes/_authenticated/profiles_.$profileId'
+import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenticated/profiles_.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,10 +43,27 @@ const AuthenticatedEnrollmentRoute = AuthenticatedEnrollmentRouteImport.update({
   path: '/enrollment',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProfilesRoute = AuthenticatedProfilesRouteImport.update({
+  id: '/profiles',
+  path: '/profiles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDevicesDeviceIdRoute =
   AuthenticatedDevicesDeviceIdRouteImport.update({
     id: '/devices_/$deviceId',
     path: '/devices/$deviceId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedProfilesProfileIdRoute =
+  AuthenticatedProfilesProfileIdRouteImport.update({
+    id: '/profiles_/$profileId',
+    path: '/profiles/$profileId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedProfilesNewRoute =
+  AuthenticatedProfilesNewRouteImport.update({
+    id: '/profiles_/new',
+    path: '/profiles/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 
@@ -52,14 +72,20 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuthenticatedAuditRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/profiles': typeof AuthenticatedProfilesRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
+  '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
+  '/profiles/new': typeof AuthenticatedProfilesNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/profiles': typeof AuthenticatedProfilesRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
+  '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
+  '/profiles/new': typeof AuthenticatedProfilesNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,13 +94,32 @@ export interface FileRoutesById {
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
   '/_authenticated/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/_authenticated/profiles': typeof AuthenticatedProfilesRoute
   '/_authenticated/devices_/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
+  '/_authenticated/profiles_/$profileId': typeof AuthenticatedProfilesProfileIdRoute
+  '/_authenticated/profiles_/new': typeof AuthenticatedProfilesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/audit' | '/devices' | '/enrollment' | '/devices/$deviceId'
+  fullPaths:
+    | '/'
+    | '/audit'
+    | '/devices'
+    | '/enrollment'
+    | '/profiles'
+    | '/devices/$deviceId'
+    | '/profiles/$profileId'
+    | '/profiles/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit' | '/devices' | '/enrollment' | '/devices/$deviceId'
+  to:
+    | '/'
+    | '/audit'
+    | '/devices'
+    | '/enrollment'
+    | '/profiles'
+    | '/devices/$deviceId'
+    | '/profiles/$profileId'
+    | '/profiles/new'
   id:
     | '__root__'
     | '/'
@@ -82,7 +127,10 @@ export interface FileRouteTypes {
     | '/_authenticated/audit'
     | '/_authenticated/devices'
     | '/_authenticated/enrollment'
+    | '/_authenticated/profiles'
     | '/_authenticated/devices_/$deviceId'
+    | '/_authenticated/profiles_/$profileId'
+    | '/_authenticated/profiles_/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -127,11 +175,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEnrollmentRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/profiles': {
+      id: '/_authenticated/profiles'
+      path: '/profiles'
+      fullPath: '/profiles'
+      preLoaderRoute: typeof AuthenticatedProfilesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/devices_/$deviceId': {
       id: '/_authenticated/devices_/$deviceId'
       path: '/devices/$deviceId'
       fullPath: '/devices/$deviceId'
       preLoaderRoute: typeof AuthenticatedDevicesDeviceIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/profiles_/$profileId': {
+      id: '/_authenticated/profiles_/$profileId'
+      path: '/profiles/$profileId'
+      fullPath: '/profiles/$profileId'
+      preLoaderRoute: typeof AuthenticatedProfilesProfileIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/profiles_/new': {
+      id: '/_authenticated/profiles_/new'
+      path: '/profiles/new'
+      fullPath: '/profiles/new'
+      preLoaderRoute: typeof AuthenticatedProfilesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }
@@ -141,14 +210,20 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
   AuthenticatedEnrollmentRoute: typeof AuthenticatedEnrollmentRoute
+  AuthenticatedProfilesRoute: typeof AuthenticatedProfilesRoute
   AuthenticatedDevicesDeviceIdRoute: typeof AuthenticatedDevicesDeviceIdRoute
+  AuthenticatedProfilesProfileIdRoute: typeof AuthenticatedProfilesProfileIdRoute
+  AuthenticatedProfilesNewRoute: typeof AuthenticatedProfilesNewRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
   AuthenticatedEnrollmentRoute: AuthenticatedEnrollmentRoute,
+  AuthenticatedProfilesRoute: AuthenticatedProfilesRoute,
   AuthenticatedDevicesDeviceIdRoute: AuthenticatedDevicesDeviceIdRoute,
+  AuthenticatedProfilesProfileIdRoute: AuthenticatedProfilesProfileIdRoute,
+  AuthenticatedProfilesNewRoute: AuthenticatedProfilesNewRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

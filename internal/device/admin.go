@@ -74,7 +74,7 @@ func (s *Service) listDevicesAfter(ctx context.Context, q *devicedb.Queries, tok
 }
 
 func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1.Device, string, error) {
-	var budget inventoryPageBudget
+	var budget responsePageBudget
 	devices := make([]*adminv1.Device, 0, min(len(rows), int(limit)))
 	for _, row := range rows {
 		if int32(len(devices)) == limit {

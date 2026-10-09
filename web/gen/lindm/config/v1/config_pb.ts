@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/config/v1/config.proto.
  */
 export const file_lindm_config_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEiuggKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEjEKBG9pZGMYCCABKAsyGy5saW5kbS5jb25maWcudjEuT0lEQ0NvbmZpZ0IGukgDyAEBEiEKD3RydXN0ZWRfY2FfZmlsZRgJIAEoCUIIukgFcgMYgCASOQoWaW52ZW50b3J5X2J1ZGdldF9ieXRlcxgKIAEoBEIUukgRMg8Y//////////9/KICAgCBIAIgBARIsChFkZXZpY2VfcHVibGljX3VybBgLIAEoCUIMukgJcgeAtRgBiAEBSAGIAQESRgoTZXhlY3V0aW9uX2Jvb3RzdHJhcBgMIAEoCzIpLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25Cb290c3RyYXBDb25maWc63QK6SNkCGrIBChJsaXN0ZW5lcnMuZGlzdGluY3QSNGFkbWluaXN0cmF0aXZlIGFuZCBkZXZpY2UgbGlzdGVuZXJzIG11c3QgYmUgZGlzdGluY3QaZiFoYXModGhpcy5hZG1pbl9saXN0ZW5lcikgfHwgIWhhcyh0aGlzLmRldmljZV9saXN0ZW5lcikgfHwgdGhpcy5hZG1pbl9saXN0ZW5lciAhPSB0aGlzLmRldmljZV9saXN0ZW5lchqhAQohZXhlY3V0aW9uX2Jvb3RzdHJhcC5kZXZpY2Vfb3JpZ2luEj1leGVjdXRpb24gYm9vdHN0cmFwIHJlcXVpcmVzIGFuIGV4cGxpY2l0IHB1YmxpYyBkZXZpY2Ugb3JpZ2luGj0haGFzKHRoaXMuZXhlY3V0aW9uX2Jvb3RzdHJhcCkgfHwgaGFzKHRoaXMuZGV2aWNlX3B1YmxpY191cmwpQhkKF19pbnZlbnRvcnlfYnVkZ2V0X2J5dGVzQhQKEl9kZXZpY2VfcHVibGljX3VybCJbChhFeGVjdXRpb25Cb290c3RyYXBDb25maWcSHAoJcm9vdF9maWxlGAEgASgJQgm6SAZyBJC1GAESIQoOYm9vdHN0cmFwX2ZpbGUYAiABKAlCCbpIBnIEkLUYASJFCg5MaXN0ZW5lckNvbmZpZxIYCgdhZGRyZXNzGAEgASgJQge6SARyAnABEhkKBHBvcnQYAiABKA1CC7pICCoGGP//AygBIpUBCg5EYXRhYmFzZUNvbmZpZxIbCgh1cmxfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKD21heF9jb25uZWN0aW9ucxgCIAEoDUIKukgHKgUYgAIoAhIqChJtaWdyYXRpb25fdXJsX2ZpbGUYAyABKAlCCbpIBnIEkLUYAUgAiAEBQhUKE19taWdyYXRpb25fdXJsX2ZpbGUiVQoJVExTQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiWgoORGV2aWNlQ0FDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASKAAwoKT0lEQ0NvbmZpZxIcCgZpc3N1ZXIYASABKAlCDLpICXIHiLUYAYgBARIdCgljbGllbnRfaWQYAiABKAlCCrpIB3IFEAEYgAISJQoSY2xpZW50X3NlY3JldF9maWxlGAMgASgJQgm6SAZyBJC1GAESJwoTZGlyZWN0b3J5X2NsaWVudF9pZBgEIAEoCUIKukgHcgUQARiAAhIvChxkaXJlY3RvcnlfY2xpZW50X3NlY3JldF9maWxlGAUgASgJQgm6SAZyBJC1GAESNAoUYWRtaW5pc3RyYXRvcl9ncm91cHMYBiADKAlCFrpIE5IBEBBkGAEiCnIIEAIYgAQ6AS86frpIexp5ChVvaWRjLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZEIkWiJsaW5kbS9nZW4vbGluZG0vY29uZmlnL3YxO2NvbmZpZ3YxYgZwcm90bzM", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEikAoKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEjEKBG9pZGMYCCABKAsyGy5saW5kbS5jb25maWcudjEuT0lEQ0NvbmZpZ0IGukgDyAEBEiEKD3RydXN0ZWRfY2FfZmlsZRgJIAEoCUIIukgFcgMYgCASOQoWaW52ZW50b3J5X2J1ZGdldF9ieXRlcxgKIAEoBEIUukgRMg8Y//////////9/KICAgCBIAIgBARIsChFkZXZpY2VfcHVibGljX3VybBgLIAEoCUIMukgJcgeAtRgBiAEBSAGIAQESRgoTZXhlY3V0aW9uX2Jvb3RzdHJhcBgMIAEoCzIpLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25Cb290c3RyYXBDb25maWcSQgoRZXhlY3V0aW9uX3NpZ25pbmcYDSABKAsyJy5saW5kbS5jb25maWcudjEuRXhlY3V0aW9uU2lnbmluZ0NvbmZpZzrvA7pI6wMasgEKEmxpc3RlbmVycy5kaXN0aW5jdBI0YWRtaW5pc3RyYXRpdmUgYW5kIGRldmljZSBsaXN0ZW5lcnMgbXVzdCBiZSBkaXN0aW5jdBpmIWhhcyh0aGlzLmFkbWluX2xpc3RlbmVyKSB8fCAhaGFzKHRoaXMuZGV2aWNlX2xpc3RlbmVyKSB8fCB0aGlzLmFkbWluX2xpc3RlbmVyICE9IHRoaXMuZGV2aWNlX2xpc3RlbmVyGo8BChtleGVjdXRpb25fc2lnbmluZy5ib290c3RyYXASMWV4ZWN1dGlvbiBzaWduaW5nIHJlcXVpcmVzIGFuIGV4ZWN1dGlvbiBib290c3RyYXAaPSFoYXModGhpcy5leGVjdXRpb25fc2lnbmluZykgfHwgaGFzKHRoaXMuZXhlY3V0aW9uX2Jvb3RzdHJhcCkaoQEKIWV4ZWN1dGlvbl9ib290c3RyYXAuZGV2aWNlX29yaWdpbhI9ZXhlY3V0aW9uIGJvb3RzdHJhcCByZXF1aXJlcyBhbiBleHBsaWNpdCBwdWJsaWMgZGV2aWNlIG9yaWdpbho9IWhhcyh0aGlzLmV4ZWN1dGlvbl9ib290c3RyYXApIHx8IGhhcyh0aGlzLmRldmljZV9wdWJsaWNfdXJsKUIZChdfaW52ZW50b3J5X2J1ZGdldF9ieXRlc0IUChJfZGV2aWNlX3B1YmxpY191cmwiWwoYRXhlY3V0aW9uQm9vdHN0cmFwQ29uZmlnEhwKCXJvb3RfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiEKDmJvb3RzdHJhcF9maWxlGAIgASgJQgm6SAZyBJC1GAEi6QEKFkV4ZWN1dGlvblNpZ25pbmdDb25maWcSIAoNcGxhbl9rZXlfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiEKDnN0YXJ0X2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAE6iQG6SIUBGoIBCiBleGVjdXRpb25fc2lnbmluZy5kaXN0aW5jdF9maWxlcxIzcGxhbiBhbmQgc3RhcnQgc2lnbmluZyBrZXlzIG11c3QgdXNlIGRpc3RpbmN0IGZpbGVzGil0aGlzLnBsYW5fa2V5X2ZpbGUgIT0gdGhpcy5zdGFydF9rZXlfZmlsZSJFCg5MaXN0ZW5lckNvbmZpZxIYCgdhZGRyZXNzGAEgASgJQge6SARyAnABEhkKBHBvcnQYAiABKA1CC7pICCoGGP//AygBIpUBCg5EYXRhYmFzZUNvbmZpZxIbCgh1cmxfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKD21heF9jb25uZWN0aW9ucxgCIAEoDUIKukgHKgUYgAIoAhIqChJtaWdyYXRpb25fdXJsX2ZpbGUYAyABKAlCCbpIBnIEkLUYAUgAiAEBQhUKE19taWdyYXRpb25fdXJsX2ZpbGUiVQoJVExTQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiWgoORGV2aWNlQ0FDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASKAAwoKT0lEQ0NvbmZpZxIcCgZpc3N1ZXIYASABKAlCDLpICXIHiLUYAYgBARIdCgljbGllbnRfaWQYAiABKAlCCrpIB3IFEAEYgAISJQoSY2xpZW50X3NlY3JldF9maWxlGAMgASgJQgm6SAZyBJC1GAESJwoTZGlyZWN0b3J5X2NsaWVudF9pZBgEIAEoCUIKukgHcgUQARiAAhIvChxkaXJlY3RvcnlfY2xpZW50X3NlY3JldF9maWxlGAUgASgJQgm6SAZyBJC1GAESNAoUYWRtaW5pc3RyYXRvcl9ncm91cHMYBiADKAlCFrpIE5IBEBBkGAEiCnIIEAIYgAQ6AS86frpIexp5ChVvaWRjLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZEIkWiJsaW5kbS9nZW4vbGluZG0vY29uZmlnL3YxO2NvbmZpZ3YxYgZwcm90bzM", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
 
 /**
  * ServerConfig is the only serialized configuration contract for lindmd.
@@ -89,6 +89,14 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
    * @generated from field: lindm.config.v1.ExecutionBootstrapConfig execution_bootstrap = 12;
    */
   executionBootstrap?: ExecutionBootstrapConfig | undefined;
+
+  /**
+   * Online plan and start PKCS#8 keys. Absence means this process has no
+   * execution issuer. Presence does not admit a delegation or authorize issuance.
+   *
+   * @generated from field: lindm.config.v1.ExecutionSigningConfig execution_signing = 13;
+   */
+  executionSigning?: ExecutionSigningConfig | undefined;
 };
 
 /**
@@ -121,6 +129,31 @@ export const ExecutionBootstrapConfigSchema: GenMessage<ExecutionBootstrapConfig
   messageDesc(file_lindm_config_v1_config, 1);
 
 /**
+ * ExecutionSigningConfig names protected unencrypted PKCS#8 Ed25519 files for
+ * the distinct online plan and start roles. It requires execution_bootstrap.
+ *
+ * @generated from message lindm.config.v1.ExecutionSigningConfig
+ */
+export type ExecutionSigningConfig = Message<"lindm.config.v1.ExecutionSigningConfig"> & {
+  /**
+   * @generated from field: string plan_key_file = 1;
+   */
+  planKeyFile: string;
+
+  /**
+   * @generated from field: string start_key_file = 2;
+   */
+  startKeyFile: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.ExecutionSigningConfig.
+ * Use `create(ExecutionSigningConfigSchema)` to create a new message.
+ */
+export const ExecutionSigningConfigSchema: GenMessage<ExecutionSigningConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 2);
+
+/**
  * Binding uses an explicit IP address and port rather than a second address
  * grammar. Hostname resolution belongs to public URLs, not local bind addresses.
  *
@@ -143,7 +176,7 @@ export type ListenerConfig = Message<"lindm.config.v1.ListenerConfig"> & {
  * Use `create(ListenerConfigSchema)` to create a new message.
  */
 export const ListenerConfigSchema: GenMessage<ListenerConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 2);
+  messageDesc(file_lindm_config_v1_config, 3);
 
 /**
  * @generated from message lindm.config.v1.DatabaseConfig
@@ -173,7 +206,7 @@ export type DatabaseConfig = Message<"lindm.config.v1.DatabaseConfig"> & {
  * Use `create(DatabaseConfigSchema)` to create a new message.
  */
 export const DatabaseConfigSchema: GenMessage<DatabaseConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 3);
+  messageDesc(file_lindm_config_v1_config, 4);
 
 /**
  * @generated from message lindm.config.v1.TLSConfig
@@ -195,7 +228,7 @@ export type TLSConfig = Message<"lindm.config.v1.TLSConfig"> & {
  * Use `create(TLSConfigSchema)` to create a new message.
  */
 export const TLSConfigSchema: GenMessage<TLSConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 4);
+  messageDesc(file_lindm_config_v1_config, 5);
 
 /**
  * @generated from message lindm.config.v1.DeviceCAConfig
@@ -217,7 +250,7 @@ export type DeviceCAConfig = Message<"lindm.config.v1.DeviceCAConfig"> & {
  * Use `create(DeviceCAConfigSchema)` to create a new message.
  */
 export const DeviceCAConfigSchema: GenMessage<DeviceCAConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 5);
+  messageDesc(file_lindm_config_v1_config, 6);
 
 /**
  * @generated from message lindm.config.v1.OIDCConfig
@@ -259,5 +292,5 @@ export type OIDCConfig = Message<"lindm.config.v1.OIDCConfig"> & {
  * Use `create(OIDCConfigSchema)` to create a new message.
  */
 export const OIDCConfigSchema: GenMessage<OIDCConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 6);
+  messageDesc(file_lindm_config_v1_config, 7);
 

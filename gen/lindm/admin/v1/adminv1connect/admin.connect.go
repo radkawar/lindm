@@ -59,6 +59,15 @@ const (
 	// AdminServiceUpdateExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
 	// UpdateExecutionAuthority RPC.
 	AdminServiceUpdateExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/UpdateExecutionAuthority"
+	// AdminServicePublishServiceProfileRevisionProcedure is the fully-qualified name of the
+	// AdminService's PublishServiceProfileRevision RPC.
+	AdminServicePublishServiceProfileRevisionProcedure = "/lindm.admin.v1.AdminService/PublishServiceProfileRevision"
+	// AdminServiceGetServiceProfileRevisionProcedure is the fully-qualified name of the AdminService's
+	// GetServiceProfileRevision RPC.
+	AdminServiceGetServiceProfileRevisionProcedure = "/lindm.admin.v1.AdminService/GetServiceProfileRevision"
+	// AdminServiceListServiceProfilesProcedure is the fully-qualified name of the AdminService's
+	// ListServiceProfiles RPC.
+	AdminServiceListServiceProfilesProcedure = "/lindm.admin.v1.AdminService/ListServiceProfiles"
 )
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
@@ -72,6 +81,9 @@ type AdminServiceClient interface {
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
+	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
+	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
+	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the lindm.admin.v1.AdminService service. By
@@ -139,20 +151,41 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
 			connect.WithClientOptions(opts...),
 		),
+		publishServiceProfileRevision: connect.NewClient[v1.PublishServiceProfileRevisionRequest, v1.PublishServiceProfileRevisionResponse](
+			httpClient,
+			baseURL+AdminServicePublishServiceProfileRevisionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PublishServiceProfileRevision")),
+			connect.WithClientOptions(opts...),
+		),
+		getServiceProfileRevision: connect.NewClient[v1.GetServiceProfileRevisionRequest, v1.GetServiceProfileRevisionResponse](
+			httpClient,
+			baseURL+AdminServiceGetServiceProfileRevisionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetServiceProfileRevision")),
+			connect.WithClientOptions(opts...),
+		),
+		listServiceProfiles: connect.NewClient[v1.ListServiceProfilesRequest, v1.ListServiceProfilesResponse](
+			httpClient,
+			baseURL+AdminServiceListServiceProfilesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	listDevices              *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	getDevice                *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
-	listDevicePackages       *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
-	createEnrollmentGrant    *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
-	revokeEnrollmentGrant    *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
-	revokeDevice             *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
-	listAuditEvents          *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
-	getExecutionAuthority    *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
-	updateExecutionAuthority *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
+	listDevices                   *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	getDevice                     *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
+	listDevicePackages            *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
+	createEnrollmentGrant         *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
+	revokeEnrollmentGrant         *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
+	revokeDevice                  *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	listAuditEvents               *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	getExecutionAuthority         *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
+	updateExecutionAuthority      *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
+	publishServiceProfileRevision *connect.Client[v1.PublishServiceProfileRevisionRequest, v1.PublishServiceProfileRevisionResponse]
+	getServiceProfileRevision     *connect.Client[v1.GetServiceProfileRevisionRequest, v1.GetServiceProfileRevisionResponse]
+	listServiceProfiles           *connect.Client[v1.ListServiceProfilesRequest, v1.ListServiceProfilesResponse]
 }
 
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
@@ -200,6 +233,21 @@ func (c *adminServiceClient) UpdateExecutionAuthority(ctx context.Context, req *
 	return c.updateExecutionAuthority.CallUnary(ctx, req)
 }
 
+// PublishServiceProfileRevision calls lindm.admin.v1.AdminService.PublishServiceProfileRevision.
+func (c *adminServiceClient) PublishServiceProfileRevision(ctx context.Context, req *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error) {
+	return c.publishServiceProfileRevision.CallUnary(ctx, req)
+}
+
+// GetServiceProfileRevision calls lindm.admin.v1.AdminService.GetServiceProfileRevision.
+func (c *adminServiceClient) GetServiceProfileRevision(ctx context.Context, req *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error) {
+	return c.getServiceProfileRevision.CallUnary(ctx, req)
+}
+
+// ListServiceProfiles calls lindm.admin.v1.AdminService.ListServiceProfiles.
+func (c *adminServiceClient) ListServiceProfiles(ctx context.Context, req *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error) {
+	return c.listServiceProfiles.CallUnary(ctx, req)
+}
+
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
@@ -211,6 +259,9 @@ type AdminServiceHandler interface {
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
+	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
+	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
+	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -274,6 +325,24 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServicePublishServiceProfileRevisionHandler := connect.NewUnaryHandler(
+		AdminServicePublishServiceProfileRevisionProcedure,
+		svc.PublishServiceProfileRevision,
+		connect.WithSchema(adminServiceMethods.ByName("PublishServiceProfileRevision")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetServiceProfileRevisionHandler := connect.NewUnaryHandler(
+		AdminServiceGetServiceProfileRevisionProcedure,
+		svc.GetServiceProfileRevision,
+		connect.WithSchema(adminServiceMethods.ByName("GetServiceProfileRevision")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListServiceProfilesHandler := connect.NewUnaryHandler(
+		AdminServiceListServiceProfilesProcedure,
+		svc.ListServiceProfiles,
+		connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceListDevicesProcedure:
@@ -294,6 +363,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetExecutionAuthorityHandler.ServeHTTP(w, r)
 		case AdminServiceUpdateExecutionAuthorityProcedure:
 			adminServiceUpdateExecutionAuthorityHandler.ServeHTTP(w, r)
+		case AdminServicePublishServiceProfileRevisionProcedure:
+			adminServicePublishServiceProfileRevisionHandler.ServeHTTP(w, r)
+		case AdminServiceGetServiceProfileRevisionProcedure:
+			adminServiceGetServiceProfileRevisionHandler.ServeHTTP(w, r)
+		case AdminServiceListServiceProfilesProcedure:
+			adminServiceListServiceProfilesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -337,4 +412,16 @@ func (UnimplementedAdminServiceHandler) GetExecutionAuthority(context.Context, *
 
 func (UnimplementedAdminServiceHandler) UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateExecutionAuthority is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PublishServiceProfileRevision is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetServiceProfileRevision is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListServiceProfiles is not implemented"))
 }
