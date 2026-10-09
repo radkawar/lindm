@@ -26,3 +26,21 @@ func runInstallProjection(ctx context.Context, args []string, stdout, stderr io.
 	}
 	return writeLabEvidence(stdout, *record, result)
 }
+
+func runInstallSnapshot(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("native check-install-snapshot", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	workDir := flags.String("work-dir", "", "required protected root-owned mode-0700 work directory on an exec/dev filesystem")
+	record := flags.String("record", "", "write successful copied-root evidence to a new private JSON file")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("native check-install-snapshot accepts flags only")
+	}
+	result, err := vmlab.CheckInstallSnapshot(ctx, *workDir)
+	if err != nil {
+		return err
+	}
+	return writeLabEvidence(stdout, *record, result)
+}

@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -281,14 +280,6 @@ func projectionCommand(ctx context.Context, binary string, args ...string) ([]by
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Env = []string{"LC_ALL=C", "SYSTEMCTL_SKIP_SYSV=1", "SYSTEMD_LOG_TARGET=console", "SYSTEMD_COLORS=0", "SYSTEMD_PAGER=cat"}
 	command.Stdout, command.Stderr = output, output
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Cancel = func() error {
-		err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-		if errors.Is(err, syscall.ESRCH) {
-			return os.ErrProcessDone
-		}
-		return err
-	}
 	command.WaitDelay = time.Second
 	if err := command.Run(); err != nil {
 		return nil, fmt.Errorf("native projection fixture command %s: %w: %s", filepath.Base(binary), err, output.data)

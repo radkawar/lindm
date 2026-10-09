@@ -40,7 +40,7 @@ func definitionHash(ctx context.Context, fragment string, dropIns []string) ([]b
 		if index > 0 {
 			path = dropIns[index-1]
 		}
-		file, canonical, stat, err := openDefinition(path)
+		file, canonical, stat, err := openProtectedFile(path, maxDefinitionBytes)
 		if err != nil {
 			return nil, fmt.Errorf("%w: unsafe definition %q: %w", ErrUnsupported, path, err)
 		}
@@ -163,14 +163,14 @@ func trustedDirectory(stat *unix.Stat_t) bool {
 	return stat.Mode&unix.S_IFMT == unix.S_IFDIR && stat.Uid == 0 && stat.Mode&0022 == 0
 }
 
-// openDefinition resolves even vendor /lib symlinks without following any
+// openProtectedFile resolves even vendor /lib symlinks without following any
 // unchecked directory. Each link is pinned with O_PATH|O_NOFOLLOW and read via
 // its own descriptor; both the original and resolved ancestry must be trusted.
-// Unlike private agent state, definitions may be world-readable but may never
+// Unlike private agent state, these files may be world-readable but may never
 // have a non-root owner or group/world-writable ancestry (including sticky dirs).
-func openDefinition(path string) (*os.File, string, unix.Stat_t, error) {
+func openProtectedFile(path string, maxBytes int64) (*os.File, string, unix.Stat_t, error) {
 	var zero unix.Stat_t
-	if !strings.HasPrefix(path, "/") || strings.ContainsRune(path, '\x00') || len(path) > maxDefinitionPath {
+	if maxBytes <= 0 || !strings.HasPrefix(path, "/") || strings.ContainsRune(path, '\x00') || len(path) > maxDefinitionPath {
 		return nil, "", zero, fmt.Errorf("invalid absolute definition path")
 	}
 	root, err := unix.Open("/", unix.O_PATH|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW, 0)
@@ -257,7 +257,7 @@ func openDefinition(path string) (*os.File, string, unix.Stat_t, error) {
 			}
 			continue
 		}
-		if len(pending) != 0 || stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0022 != 0 || stat.Size < 0 || stat.Size > maxDefinitionBytes {
+		if len(pending) != 0 || stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0022 != 0 || stat.Size < 0 || stat.Size > maxBytes {
 			_ = unix.Close(next)
 			return nil, "", zero, fmt.Errorf("unsafe or oversized definition file")
 		}

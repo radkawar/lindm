@@ -266,6 +266,59 @@ image digest
 This checks the isolated native install/custody mechanics, not the Rocky guest
 lifecycle or production SELinux policy.
 
+### Captured-input native root check
+
+`lab native check-install-snapshot -work-dir DIR [-record FILE]` exercises the
+bounded source snapshot with actual native commands inside the copied filesystem
+as the process root. Build the lab with `CGO_ENABLED=0` and install it under
+root-owned, non-writable ancestry before invoking this check. It requires UID0,
+chroot/mknod bootstrap capabilities and an existing root-owned mode-0700 work
+directory on an executable, device-capable filesystem. A normal checkout,
+`sudo go run`, a shared temporary parent or a noexec/nodev work mount is not a
+substitute for these prerequisites.
+
+The command creates only its private fixture. It captures a protected unit tree,
+an unchanged literal absolute directory symlink, OS context and the native ELF
+runtime; the private configuration starts deliberately empty. A fresh fingerprint
+must match the capture. Changing the original definition must then change the
+fingerprint, while actual `systemctl --root=/ enable` in the copied root must still
+use the original captured WantedBy. The record retains the exact wanted-link
+target and confirms that this uniquely named link is absent outside the copy.
+The private fixture is removed before successful evidence is returned.
+
+The snapshot enforces root ownership, non-writable ancestry, bounded traversal,
+actual EOF and rejection of observed metadata/content changes. Unit/context limits
+are 1MiB per file and 32MiB per unique inode set; runtime limits are 64MiB and
+256MiB. The graph admits at most 32,768 nodes, 32,768 outstanding entries and
+32MiB of metadata accounting, including paths, targets, labels, pending directory
+names, queued targets and symlink-resolution states. Fixed per-entry charges cover
+container overhead; this is not an exact Go resident-memory ceiling.
+Directory-link targets are processed iteratively after the current descriptor
+stack closes. Canonical depth is limited to 64 for files and links as well as
+directories. A repeated symlink is a cycle only with the same remaining suffix.
+Trailing slash and final-dot requirements survive symlink expansion; a regular
+file followed by either records ENOTDIR rather than an invented successful lookup.
+Being observed as runtime never waives unit/context limits or the legacy include
+guard. Revisited nodes require matching metadata and SELinux labels. Directory
+and symlink topology, negatives, observed hardlinks and labels contribute to the
+deterministic source fingerprint. Destination identity does not. Protected
+destination ancestry remains a caller precondition; a partially written
+destination must be discarded after failure.
+
+Native stdout state is separate from bounded diagnostic stderr. The command
+preserves, rather than suppresses, modern systemd's missing-proc/sys warning.
+NNP and capability dropping apply on an OS-locked native-exec thread; the evidence
+does not claim every Go runtime thread has lost privileges. Parent-death signals
+bound the fixed child chain without signalling a reusable numeric process group.
+The bootstrap chroot/mknod grants are lab requirements, not new executor grants.
+
+This qualifies copied-byte/topology mechanics for the exercised fixture. It does
+not provide host execution authority, an atomic source snapshot, a packaged
+production worker, general native-tool compatibility without proc/sys, crash
+recovery, ownership-safe release or distro certification. In particular, a
+production worker's execution placement on a noexec state volume still needs
+separate design and qualification.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node

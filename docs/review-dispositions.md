@@ -658,6 +658,80 @@ command passed again in the pinned Rocky 8/systemd239 container. Focused lab rac
 checks and lint passed. Throwaway experiment code and binary were removed from
 the checkout. No packaged helper or production sandbox is qualified by these runs.
 
+### Captured native-input snapshot and real-root qualification
+
+Independent read-only source reviews identified defects in the initial snapshot
+and loader components. They were corrected before the maintained copied-root
+command was qualified:
+
+| Finding                                                                           | Correction and exercised boundary                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A nested bind of the logical root was mistaken for the root during `..`           | Clamp by traversal-stack depth, not inode equality. Actual isolated-mount regressions passed in Ubuntu and Fedora guests.                                                                                                                                                                          |
+| Runtime ancestry and shared inodes waived unit/include limits                     | Recursion carries the requested class; each inode is charged once to every applicable pool. Runtime siblings, hardlinks, oversized context files and aggregate limits have root regressions.                                                                                                       |
+| Destination retained every directory FD; recursive directory depth was unchecked  | Nofollow destination walks close temporary descriptors per operation. Low-FD wide-tree capture passed; recursive depth and directory bind cycles are refused.                                                                                                                                      |
+| Private-state ancestor symlinks and malformed directory records could be accepted | Reject those symlinks and incomplete getdents records; captured destinations never receive the forbidden ancestor link.                                                                                                                                                                            |
+| Include rescans lacked content/metadata stability checks                          | Rehash and post-check metadata after EOF. Cancellation is checked during traversal, file consumption and symlink planting.                                                                                                                                                                         |
+| Numeric process-group cancellation could signal a reused group                    | Loader discovery and the fixed native fixture runner use process-handle cancellation instead. The new lab child chain uses parent-death signals with its creating OS thread pinned.                                                                                                                |
+| Finite repeated symlink traversal was mistaken for a cycle                        | Resolution states include both the symlink path and remaining suffix. The reproduced `/data/s/s/file` case now captures the final file while preserving both literal links.                                                                                                                        |
+| Shallow directory-link chains retained nested descriptor stacks                   | Targets are queued and processed after the active walk closes. A 128-directory chain now fingerprints and captures under a 64-FD process limit.                                                                                                                                                    |
+| Pending directory names and retained metadata had no aggregate budget             | Reserve names before allocation and bound global pending entries plus metadata payload/overhead. Nested directory lists and long-target graphs reproduced the old acceptance and now fail closed.                                                                                                  |
+| Same-path cache hits ignored newly observed metadata                              | Files, directories, symlinks and null devices now require full metadata and label agreement. In-place size, mode and symlink-time changes reproduce the old acceptance and now return conflict.                                                                                                    |
+| A depth-65 final file or symlink fingerprinted but could not be captured          | All canonical positive paths use the same depth limit. Both operations now refuse these unchanged over-depth sources.                                                                                                                                                                              |
+| Trailing slash and final-dot elision omitted ENOTDIR observations                 | Preserve directory-requiring components through traversal and symlink expansion. Four explicit/discovered-link cases failed before correction and now retain typed negatives, literal targets and native ENOTDIR behavior. Cycle states also distinguish an empty suffix from one empty component. |
+
+After the graph corrections, the maintained
+`lab native check-install-snapshot` command passed again on the pinned
+Rocky 8/systemd239 container, an actual Ubuntu/systemd255 guest and an actual
+Fedora/systemd259.5 guest. Both guests used lab SHA-256
+`d903bbd29e64e4a3b42ca180a601d351e4c63c4fec1513b615dc547d45e7513f`.
+Fedora remained Enforcing. Both guests exercised the complete snapshot regression
+set, including nested-root-bind and directory-cycle cases that require a private
+mount namespace and correctly skipped in the constrained container.
+
+The copied root consumed the captured WantedBy after the original source was
+changed; the fresh source fingerprint changed, the literal directory alias was
+preserved, and the uniquely named host wanted-link remained absent. The fixture
+has an explicitly synthetic empty configuration, not a captured host baseline.
+Modern systemd's missing-proc/sys warning is retained in bounded stderr, separate
+from native state stdout. This is scoped filesystem evidence, not general
+native-tool support in that environment.
+
+Integration corrected two fixture prerequisites rather than weakening production
+checks: separate host staging directories for two uploaded binaries, and an owned
+mode-0700 work directory beneath Fedora's observed root-owned mode-0550 `/root`.
+The mount tests create their namespace before exec so every Go thread inherits
+it, verify that it differs from the parent's namespace, and unmount before cleanup.
+The null-device regression also exposed Fedora's nodev `/tmp`. The fixture now
+declares its device-capable-filesystem prerequisite; the guest qualification ran
+it in an owned temporary directory under `/root` and required its pass, rather
+than changing mount policy or counting a skipped device case as verification.
+The lab locks its native-exec thread across NNP/capability changes and execution;
+the older throwaway probe's capability check did not establish that inheritance.
+No whole-Go-process privilege-drop claim is made.
+
+A follow-up independent review found no must-fix in destination FD handling,
+loader cancellation or the maintained lab bootstrap under these boundaries.
+It withdrew a shared-writer race concern after confirming Go's single-writer
+goroutine guarantee for identical comparable stdout/stderr writers. A separate
+stateless source-walk review found the five additional graph defects above; each
+was reproduced before correction and the corresponding root regressions passed
+afterward. The next review identified the ENOTDIR classification defect; its four
+failing-before cases passed after preserving path components. Final independent
+corrective source review found no further must-fix within this non-atomic snapshot
+contract. All reviews were read-only; execution evidence came from the root
+regressions and actual native runs above. The existing definition reader's root
+regressions passed with its unchanged 1MiB limit.
+After removing the throwaway probes, `make check` passed web/type/format checks,
+protobuf validation, Go lint, the full Go race suite and dependency audits.
+Govulncheck reported no called vulnerabilities, with one finding in a required
+module outside the imported/called paths; this is not a blanket module-clear claim.
+
+These components do not complete the packaged worker/controller, full native
+install closure qualification, authorization integration, ownership-safe release,
+crash recovery or G3. Protected destination ancestry is still the caller's
+precondition; root-TCB mutation and atomic/ABA guarantees remain outside this
+snapshot contract.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
