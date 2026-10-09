@@ -208,10 +208,16 @@ patched braces release available during setup. Run the maintained dependency-aud
 command when updating the lock; do not silence advisories or apply unreviewed forced
 downgrades. These are development dependencies, not an application security claim.
 
-`golang.org/x/crypto` is pinned to v0.56.0, including fixes for SSH advisories
+Go is pinned to 1.26.9 in `go.mod` and Make, and `golang.org/x/net` to v0.60.0.
+These replace the versions rejected by the audit for newly published HTTP/TLS
+advisories, including [GO-2026-6617](https://pkg.go.dev/vuln/GO-2026-6617) and
+[GO-2026-6607](https://pkg.go.dev/vuln/GO-2026-6607). The required dependency updates
+also select `x/crypto` v0.57.0, retaining the fixes for SSH advisories
 [GO-2026-6354](https://pkg.go.dev/vuln/GO-2026-6354) and
-[GO-2026-6355](https://pkg.go.dev/vuln/GO-2026-6355). The current verbose audit reports
-no affected symbols or imported packages. It still identifies module-level
+[GO-2026-6355](https://pkg.go.dev/vuln/GO-2026-6355). The patched build passed the
+full quality/integration run and real SSO login against the restarted server.
+The audit reports no affected symbols or imported packages. It still identifies
+module-level
 [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) for the unused, unmaintained
 OpenPGP package; do not import it. Vendor-image signatures use isolated GnuPG `gpgv`,
 not that package. Audit output is evidence of known reachability, not proof of

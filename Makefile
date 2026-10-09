@@ -1,7 +1,7 @@
 .PHONY: bootstrap tools generate web-assets lint fmt audit check build test test-integration dev-up dev-down dev-check dev-trust
 .DEFAULT_GOAL := check
 
-export GOTOOLCHAIN := go1.26.8
+export GOTOOLCHAIN := go1.26.9
 TOOLS := $(CURDIR)/.tools/bin
 BUF := $(TOOLS)/buf
 SQLC := $(TOOLS)/sqlc

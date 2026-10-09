@@ -640,7 +640,7 @@ not imply G3 policy execution, G4 sessions or any unrun release/hardware gate.
 - [Go TUF implementation](https://github.com/theupdateframework/go-tuf).
 - [Ubuntu image authenticity and trusted signer verification](https://documentation.ubuntu.com/security/software-integrity/image-verification/).
 - [Ubuntu cloud-image checksum verification and distinct UEC signer](https://ubuntu.com/docs/public-images/public-images-how-to/verify-image-checksum/).
-- [Go message-aware signing interface](https://github.com/golang/go/blob/go1.26.8/src/crypto/crypto.go).
+- [Go message-aware signing interface](https://github.com/golang/go/blob/go1.26.9/src/crypto/crypto.go).
 - [APT authenticated repository chain](https://manpages.debian.org/trixie/apt/apt-secure.8.en.html).
 - [DNF package-signature controls](https://dnf.readthedocs.io/en/latest/conf_ref.html#localpkg-gpgcheck-label).
 - [Fedora image/signing-key verification](https://fedoraproject.org/security/).

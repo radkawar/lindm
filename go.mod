@@ -1,6 +1,6 @@
 module lindm
 
-go 1.26.8
+go 1.26.9
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
@@ -15,8 +15,8 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/sigstore/sigstore v1.10.6
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
-	golang.org/x/crypto v0.56.0
-	golang.org/x/net v0.58.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/net v0.60.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.48.0
 	google.golang.org/protobuf v1.36.12
@@ -44,8 +44,8 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260831171406-18b4a7587f8a // indirect
 	modernc.org/libc v1.77.1 // indirect
