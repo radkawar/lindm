@@ -7,6 +7,8 @@ import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { UpdateExecutionTrustRequest } from "../../agent/v1/execution_trust_pb.js";
+import { file_lindm_agent_v1_execution_trust } from "../../agent/v1/execution_trust_pb.js";
 import type { CollectionStatus, HostObservation, SnapshotState } from "../../inventory/v1/observation_pb.js";
 import { file_lindm_inventory_v1_observation } from "../../inventory/v1/observation_pb.js";
 import type { Message } from "@bufbuild/protobuf";
@@ -15,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/device/v1/device.proto.
  */
 export const file_lindm_device_v1_device: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEiPQoVQWNxdWlyZVNlc3Npb25SZXF1ZXN0EiQKD2F1dGhvcml0eV9wcm9vZhgBIAEoDEILukgIegYQARiAgAEikQEKFkFjcXVpcmVTZXNzaW9uUmVzcG9uc2USFQoNc2Vzc2lvbl9lcG9jaBgBIAEoBBIVCg1ob3N0X3NlcXVlbmNlGAIgASgEEhgKEHBhY2thZ2Vfc2VxdWVuY2UYAyABKAQSLwoLc2VydmVyX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj8KE0dldFN5bmNTdGF0ZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAAijwEKFEdldFN5bmNTdGF0ZVJlc3BvbnNlEhUKDXNlc3Npb25fZXBvY2gYASABKAQSFQoNaG9zdF9zZXF1ZW5jZRgCIAEoBBIYChBwYWNrYWdlX3NlcXVlbmNlGAMgASgEEi8KC3NlcnZlcl90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKIAQoWUGFja2FnZUJhdGNoRGVzY3JpcHRvchIXCgVpbmRleBgBIAEoDUIIukgFKgMY/wMSFwoGc2hhMjU2GAIgASgMQge6SAR6AmggEhkKBWNvdW50GAMgASgNQgq6SAcqBRj0AygBEiEKDGVuY29kZWRfc2l6ZRgEIAEoDUILukgIKgYYgIAwKAEikgQKF1BhY2thZ2VTbmFwc2hvdE1hbmlmZXN0Eh0KC3NuYXBzaG90X2lkGAEgASgJQgi6SAVyA7ABARI2CgpjcmVhdGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEicKFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgDIAEoCUIIukgFcgOwAQESIwoIc2VxdWVuY2UYBCABKARCEbpIDjIMGP//////////fyAAEjYKCnN0YXJ0ZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESNwoLZmluaXNoZWRfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESGAoHYmFja2VuZBgIIAEoCUIHukgEcgIYQBJDCgdiYXRjaGVzGAkgAygLMicubGluZG0uZGV2aWNlLnYxLlBhY2thZ2VCYXRjaERlc2NyaXB0b3JCCbpIBpIBAxCABDptukhqGmgKE3NuYXBzaG90LnRpbWVfb3JkZXISLGNvbGxlY3Rpb24gZmluaXNoIG11c3Qgbm90IHByZWNlZGUgaXRzIHN0YXJ0GiN0aGlzLmZpbmlzaGVkX2F0ID49IHRoaXMuc3RhcnRlZF9hdEoECAUQBlINc2Vzc2lvbl9lcG9jaCLYAQocUmVwb3J0SG9zdE9ic2VydmF0aW9uUmVxdWVzdBInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YASABKAlCCLpIBXIDsAEBEigKDXNlc3Npb25fZXBvY2gYAiABKARCEbpIDjIMGP//////////fyAAEiMKCHNlcXVlbmNlGAMgASgEQhG6SA4yDBj//////////38gABJACgtvYnNlcnZhdGlvbhgEIAEoCzIjLmxpbmRtLmludmVudG9yeS52MS5Ib3N0T2JzZXJ2YXRpb25CBrpIA8gBASJrCh1SZXBvcnRIb3N0T2JzZXJ2YXRpb25SZXNwb25zZRIZChFhY2NlcHRlZF9zZXF1ZW5jZRgBIAEoBBIvCgtzZXJ2ZXJfdGltZRgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAi0gMKG1JlcG9ydFBhY2thZ2VBdHRlbXB0UmVxdWVzdBInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YASABKAlCCLpIBXIDsAEBEigKDXNlc3Npb25fZXBvY2gYAiABKARCEbpIDjIMGP//////////fyAAEiMKCHNlcXVlbmNlGAMgASgEQhG6SA4yDBj//////////38gABI2CgpzdGFydGVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjcKC2ZpbmlzaGVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEkIKBnN0YXR1cxgGIAEoDjIkLmxpbmRtLmludmVudG9yeS52MS5Db2xsZWN0aW9uU3RhdHVzQgy6SAmCAQYQASAAIAESGAoHYmFja2VuZBgHIAEoCUIHukgEcgIYQDpsukhpGmcKEmF0dGVtcHQudGltZV9vcmRlchIsY29sbGVjdGlvbiBmaW5pc2ggbXVzdCBub3QgcHJlY2VkZSBpdHMgc3RhcnQaI3RoaXMuZmluaXNoZWRfYXQgPj0gdGhpcy5zdGFydGVkX2F0ImoKHFJlcG9ydFBhY2thZ2VBdHRlbXB0UmVzcG9uc2USGQoRYWNjZXB0ZWRfc2VxdWVuY2UYASABKAQSLwoLc2VydmVyX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrQBChtCZWdpblBhY2thZ2VTbmFwc2hvdFJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIoCg1zZXNzaW9uX2Vwb2NoGAIgASgEQhG6SA4yDBj//////////38gABJCCghtYW5pZmVzdBgDIAEoCzIoLmxpbmRtLmRldmljZS52MS5QYWNrYWdlU25hcHNob3RNYW5pZmVzdEIGukgDyAEBIrQCChxCZWdpblBhY2thZ2VTbmFwc2hvdFJlc3BvbnNlEjAKBXN0YXRlGAEgASgOMiEubGluZG0uaW52ZW50b3J5LnYxLlNuYXBzaG90U3RhdGUSGAoQcGFja2FnZV9zZXF1ZW5jZRgCIAEoBBIvCgthY2NlcHRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKb3Blbl91bnRpbBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoScmVjZWlwdF9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtzZXJ2ZXJfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAixQEKFlB1dFBhY2thZ2VCYXRjaFJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIoCg1zZXNzaW9uX2Vwb2NoGAIgASgEQhG6SA4yDBj//////////38gABIdCgtzbmFwc2hvdF9pZBgDIAEoCUIIukgFcgOwAQESHQoLYmF0Y2hfaW5kZXgYBCABKA1CCLpIBSoDGP8DEhoKBWJhdGNoGAUgASgMQgu6SAh6BhABGICAMCKtAQoXUHV0UGFja2FnZUJhdGNoUmVzcG9uc2USMAoFc3RhdGUYASABKA4yIS5saW5kbS5pbnZlbnRvcnkudjEuU25hcHNob3RTdGF0ZRIvCgthY2NlcHRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLc2VydmVyX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIrUBChxDb21taXRQYWNrYWdlU25hcHNob3RSZXF1ZXN0EicKFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgBIAEoCUIIukgFcgOwAQESKAoNc2Vzc2lvbl9lcG9jaBgCIAEoBEIRukgOMgwY//////////9/IAASQgoIbWFuaWZlc3QYAyABKAsyKC5saW5kbS5kZXZpY2UudjEuUGFja2FnZVNuYXBzaG90TWFuaWZlc3RCBrpIA8gBASKhAgodQ29tbWl0UGFja2FnZVNuYXBzaG90UmVzcG9uc2USMAoFc3RhdGUYASABKA4yIS5saW5kbS5pbnZlbnRvcnkudjEuU25hcHNob3RTdGF0ZRIYChBwYWNrYWdlX3NlcXVlbmNlGAIgASgEEhoKEnB1Ymxpc2hlZF9zZXF1ZW5jZRgDIAEoBBIvCgthY2NlcHRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoScmVjZWlwdF9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtzZXJ2ZXJfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiWgoUUmVuZXdJZGVudGl0eVJlcXVlc3QSHAoHY3NyX3BlbRgBIAEoDEILukgIegYQQBiAgAESJAoPYXV0aG9yaXR5X3Byb29mGAIgASgMQgu6SAh6BhABGICAASJgChVSZW5ld0lkZW50aXR5UmVzcG9uc2USFwoPY2VydGlmaWNhdGVfcGVtGAEgASgMEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wMu8GCg1EZXZpY2VTZXJ2aWNlEmEKDkFjcXVpcmVTZXNzaW9uEiYubGluZG0uZGV2aWNlLnYxLkFjcXVpcmVTZXNzaW9uUmVxdWVzdBonLmxpbmRtLmRldmljZS52MS5BY3F1aXJlU2Vzc2lvblJlc3BvbnNlElsKDEdldFN5bmNTdGF0ZRIkLmxpbmRtLmRldmljZS52MS5HZXRTeW5jU3RhdGVSZXF1ZXN0GiUubGluZG0uZGV2aWNlLnYxLkdldFN5bmNTdGF0ZVJlc3BvbnNlEnYKFVJlcG9ydEhvc3RPYnNlcnZhdGlvbhItLmxpbmRtLmRldmljZS52MS5SZXBvcnRIb3N0T2JzZXJ2YXRpb25SZXF1ZXN0Gi4ubGluZG0uZGV2aWNlLnYxLlJlcG9ydEhvc3RPYnNlcnZhdGlvblJlc3BvbnNlEnMKFFJlcG9ydFBhY2thZ2VBdHRlbXB0EiwubGluZG0uZGV2aWNlLnYxLlJlcG9ydFBhY2thZ2VBdHRlbXB0UmVxdWVzdBotLmxpbmRtLmRldmljZS52MS5SZXBvcnRQYWNrYWdlQXR0ZW1wdFJlc3BvbnNlEnMKFEJlZ2luUGFja2FnZVNuYXBzaG90EiwubGluZG0uZGV2aWNlLnYxLkJlZ2luUGFja2FnZVNuYXBzaG90UmVxdWVzdBotLmxpbmRtLmRldmljZS52MS5CZWdpblBhY2thZ2VTbmFwc2hvdFJlc3BvbnNlEmQKD1B1dFBhY2thZ2VCYXRjaBInLmxpbmRtLmRldmljZS52MS5QdXRQYWNrYWdlQmF0Y2hSZXF1ZXN0GigubGluZG0uZGV2aWNlLnYxLlB1dFBhY2thZ2VCYXRjaFJlc3BvbnNlEnYKFUNvbW1pdFBhY2thZ2VTbmFwc2hvdBItLmxpbmRtLmRldmljZS52MS5Db21taXRQYWNrYWdlU25hcHNob3RSZXF1ZXN0Gi4ubGluZG0uZGV2aWNlLnYxLkNvbW1pdFBhY2thZ2VTbmFwc2hvdFJlc3BvbnNlEl4KDVJlbmV3SWRlbnRpdHkSJS5saW5kbS5kZXZpY2UudjEuUmVuZXdJZGVudGl0eVJlcXVlc3QaJi5saW5kbS5kZXZpY2UudjEuUmVuZXdJZGVudGl0eVJlc3BvbnNlQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_inventory_v1_observation]);
+  fileDesc("ChxsaW5kbS9kZXZpY2UvdjEvZGV2aWNlLnByb3RvEg9saW5kbS5kZXZpY2UudjEiPQoVQWNxdWlyZVNlc3Npb25SZXF1ZXN0EiQKD2F1dGhvcml0eV9wcm9vZhgBIAEoDEILukgIegYQARiAgAEikQEKFkFjcXVpcmVTZXNzaW9uUmVzcG9uc2USFQoNc2Vzc2lvbl9lcG9jaBgBIAEoBBIVCg1ob3N0X3NlcXVlbmNlGAIgASgEEhgKEHBhY2thZ2Vfc2VxdWVuY2UYAyABKAQSLwoLc2VydmVyX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIj8KE0dldFN5bmNTdGF0ZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAAijwEKFEdldFN5bmNTdGF0ZVJlc3BvbnNlEhUKDXNlc3Npb25fZXBvY2gYASABKAQSFQoNaG9zdF9zZXF1ZW5jZRgCIAEoBBIYChBwYWNrYWdlX3NlcXVlbmNlGAMgASgEEi8KC3NlcnZlcl90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKMBAoYR2V0RXhlY3V0aW9uVHJ1c3RSZXF1ZXN0EigKDXNlc3Npb25fZXBvY2gYASABKARCEbpIDjIMGP//////////fyAAEh0KDHJvb3RfdmVyc2lvbhgCIAEoBEIHukgEMgIgABIcCgtyb290X3NoYTI1NhgDIAEoDEIHukgEegJoIBIaChJkZWxlZ2F0aW9uX3ZlcnNpb24YBCABKAQSIgoRZGVsZWdhdGlvbl9zaGEyNTYYBSABKAxCB7pIBHoCGCASHgoWbWluaW11bV9yZWNvdmVyeV9lcG9jaBgGIAEoBDqoArpIpAIaoQIKH2V4ZWN1dGlvbl90cnVzdF9jdXJzb3IuY29tcGxldGUSSGRlbGVnYXRpb24gZGlnZXN0IGFuZCByZWNvdmVyeSBmbG9vciBtdXN0IGFncmVlIHdpdGggY29uZmlndXJhdGlvbiBzdGF0ZRqzASh0aGlzLmRlbGVnYXRpb25fdmVyc2lvbiA9PSAwdSAmJiB0aGlzLmRlbGVnYXRpb25fc2hhMjU2LnNpemUoKSA9PSAwICYmIHRoaXMubWluaW11bV9yZWNvdmVyeV9lcG9jaCA9PSAwdSkgfHwgKHRoaXMuZGVsZWdhdGlvbl92ZXJzaW9uID4gMHUgJiYgdGhpcy5kZWxlZ2F0aW9uX3NoYTI1Ni5zaXplKCkgPT0gMzIpIqoBChlHZXRFeGVjdXRpb25UcnVzdFJlc3BvbnNlEjsKBnVwZGF0ZRgBIAEoCzIrLmxpbmRtLmFnZW50LnYxLlVwZGF0ZUV4ZWN1dGlvblRydXN0UmVxdWVzdBIUCgxyb290X3ZlcnNpb24YAiABKAQSGgoSZGVsZWdhdGlvbl92ZXJzaW9uGAMgASgEEh4KFm1pbmltdW1fcmVjb3ZlcnlfZXBvY2gYBCABKAQiiAEKFlBhY2thZ2VCYXRjaERlc2NyaXB0b3ISFwoFaW5kZXgYASABKA1CCLpIBSoDGP8DEhcKBnNoYTI1NhgCIAEoDEIHukgEegJoIBIZCgVjb3VudBgDIAEoDUIKukgHKgUY9AMoARIhCgxlbmNvZGVkX3NpemUYBCABKA1CC7pICCoGGICAMCgBIpIEChdQYWNrYWdlU25hcHNob3RNYW5pZmVzdBIdCgtzbmFwc2hvdF9pZBgBIAEoCUIIukgFcgOwAQESNgoKY3JlYXRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAyABKAlCCLpIBXIDsAEBEiMKCHNlcXVlbmNlGAQgASgEQhG6SA4yDBj//////////38gABI2CgpzdGFydGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjcKC2ZpbmlzaGVkX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhgKB2JhY2tlbmQYCCABKAlCB7pIBHICGEASQwoHYmF0Y2hlcxgJIAMoCzInLmxpbmRtLmRldmljZS52MS5QYWNrYWdlQmF0Y2hEZXNjcmlwdG9yQgm6SAaSAQMQgAQ6bbpIahpoChNzbmFwc2hvdC50aW1lX29yZGVyEixjb2xsZWN0aW9uIGZpbmlzaCBtdXN0IG5vdCBwcmVjZWRlIGl0cyBzdGFydBojdGhpcy5maW5pc2hlZF9hdCA+PSB0aGlzLnN0YXJ0ZWRfYXRKBAgFEAZSDXNlc3Npb25fZXBvY2gi2AEKHFJlcG9ydEhvc3RPYnNlcnZhdGlvblJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIoCg1zZXNzaW9uX2Vwb2NoGAIgASgEQhG6SA4yDBj//////////38gABIjCghzZXF1ZW5jZRgDIAEoBEIRukgOMgwY//////////9/IAASQAoLb2JzZXJ2YXRpb24YBCABKAsyIy5saW5kbS5pbnZlbnRvcnkudjEuSG9zdE9ic2VydmF0aW9uQga6SAPIAQEiawodUmVwb3J0SG9zdE9ic2VydmF0aW9uUmVzcG9uc2USGQoRYWNjZXB0ZWRfc2VxdWVuY2UYASABKAQSLwoLc2VydmVyX3RpbWUYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wItIDChtSZXBvcnRQYWNrYWdlQXR0ZW1wdFJlcXVlc3QSJwoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAEgASgJQgi6SAVyA7ABARIoCg1zZXNzaW9uX2Vwb2NoGAIgASgEQhG6SA4yDBj//////////38gABIjCghzZXF1ZW5jZRgDIAEoBEIRukgOMgwY//////////9/IAASNgoKc3RhcnRlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARI3CgtmaW5pc2hlZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJCCgZzdGF0dXMYBiABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IMukgJggEGEAEgACABEhgKB2JhY2tlbmQYByABKAlCB7pIBHICGEA6bLpIaRpnChJhdHRlbXB0LnRpbWVfb3JkZXISLGNvbGxlY3Rpb24gZmluaXNoIG11c3Qgbm90IHByZWNlZGUgaXRzIHN0YXJ0GiN0aGlzLmZpbmlzaGVkX2F0ID49IHRoaXMuc3RhcnRlZF9hdCJqChxSZXBvcnRQYWNrYWdlQXR0ZW1wdFJlc3BvbnNlEhkKEWFjY2VwdGVkX3NlcXVlbmNlGAEgASgEEi8KC3NlcnZlcl90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCK0AQobQmVnaW5QYWNrYWdlU25hcHNob3RSZXF1ZXN0EicKFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgBIAEoCUIIukgFcgOwAQESKAoNc2Vzc2lvbl9lcG9jaBgCIAEoBEIRukgOMgwY//////////9/IAASQgoIbWFuaWZlc3QYAyABKAsyKC5saW5kbS5kZXZpY2UudjEuUGFja2FnZVNuYXBzaG90TWFuaWZlc3RCBrpIA8gBASK0AgocQmVnaW5QYWNrYWdlU25hcHNob3RSZXNwb25zZRIwCgVzdGF0ZRgBIAEoDjIhLmxpbmRtLmludmVudG9yeS52MS5TbmFwc2hvdFN0YXRlEhgKEHBhY2thZ2Vfc2VxdWVuY2UYAiABKAQSLwoLYWNjZXB0ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCm9wZW5fdW50aWwYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnJlY2VpcHRfZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLc2VydmVyX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIsUBChZQdXRQYWNrYWdlQmF0Y2hSZXF1ZXN0EicKFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgBIAEoCUIIukgFcgOwAQESKAoNc2Vzc2lvbl9lcG9jaBgCIAEoBEIRukgOMgwY//////////9/IAASHQoLc25hcHNob3RfaWQYAyABKAlCCLpIBXIDsAEBEh0KC2JhdGNoX2luZGV4GAQgASgNQgi6SAUqAxj/AxIaCgViYXRjaBgFIAEoDEILukgIegYQARiAgDAirQEKF1B1dFBhY2thZ2VCYXRjaFJlc3BvbnNlEjAKBXN0YXRlGAEgASgOMiEubGluZG0uaW52ZW50b3J5LnYxLlNuYXBzaG90U3RhdGUSLwoLYWNjZXB0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC3NlcnZlcl90aW1lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCK1AQocQ29tbWl0UGFja2FnZVNuYXBzaG90UmVxdWVzdBInChVlbnJvbGxtZW50X2dlbmVyYXRpb24YASABKAlCCLpIBXIDsAEBEigKDXNlc3Npb25fZXBvY2gYAiABKARCEbpIDjIMGP//////////fyAAEkIKCG1hbmlmZXN0GAMgASgLMigubGluZG0uZGV2aWNlLnYxLlBhY2thZ2VTbmFwc2hvdE1hbmlmZXN0Qga6SAPIAQEioQIKHUNvbW1pdFBhY2thZ2VTbmFwc2hvdFJlc3BvbnNlEjAKBXN0YXRlGAEgASgOMiEubGluZG0uaW52ZW50b3J5LnYxLlNuYXBzaG90U3RhdGUSGAoQcGFja2FnZV9zZXF1ZW5jZRgCIAEoBBIaChJwdWJsaXNoZWRfc2VxdWVuY2UYAyABKAQSLwoLYWNjZXB0ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnJlY2VpcHRfZXhwaXJlc19hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLc2VydmVyX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIloKFFJlbmV3SWRlbnRpdHlSZXF1ZXN0EhwKB2Nzcl9wZW0YASABKAxCC7pICHoGEEAYgIABEiQKD2F1dGhvcml0eV9wcm9vZhgCIAEoDEILukgIegYQARiAgAEiYAoVUmVuZXdJZGVudGl0eVJlc3BvbnNlEhcKD2NlcnRpZmljYXRlX3BlbRgBIAEoDBIuCgpleHBpcmVzX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcDLbBwoNRGV2aWNlU2VydmljZRJhCg5BY3F1aXJlU2Vzc2lvbhImLmxpbmRtLmRldmljZS52MS5BY3F1aXJlU2Vzc2lvblJlcXVlc3QaJy5saW5kbS5kZXZpY2UudjEuQWNxdWlyZVNlc3Npb25SZXNwb25zZRJbCgxHZXRTeW5jU3RhdGUSJC5saW5kbS5kZXZpY2UudjEuR2V0U3luY1N0YXRlUmVxdWVzdBolLmxpbmRtLmRldmljZS52MS5HZXRTeW5jU3RhdGVSZXNwb25zZRJqChFHZXRFeGVjdXRpb25UcnVzdBIpLmxpbmRtLmRldmljZS52MS5HZXRFeGVjdXRpb25UcnVzdFJlcXVlc3QaKi5saW5kbS5kZXZpY2UudjEuR2V0RXhlY3V0aW9uVHJ1c3RSZXNwb25zZRJ2ChVSZXBvcnRIb3N0T2JzZXJ2YXRpb24SLS5saW5kbS5kZXZpY2UudjEuUmVwb3J0SG9zdE9ic2VydmF0aW9uUmVxdWVzdBouLmxpbmRtLmRldmljZS52MS5SZXBvcnRIb3N0T2JzZXJ2YXRpb25SZXNwb25zZRJzChRSZXBvcnRQYWNrYWdlQXR0ZW1wdBIsLmxpbmRtLmRldmljZS52MS5SZXBvcnRQYWNrYWdlQXR0ZW1wdFJlcXVlc3QaLS5saW5kbS5kZXZpY2UudjEuUmVwb3J0UGFja2FnZUF0dGVtcHRSZXNwb25zZRJzChRCZWdpblBhY2thZ2VTbmFwc2hvdBIsLmxpbmRtLmRldmljZS52MS5CZWdpblBhY2thZ2VTbmFwc2hvdFJlcXVlc3QaLS5saW5kbS5kZXZpY2UudjEuQmVnaW5QYWNrYWdlU25hcHNob3RSZXNwb25zZRJkCg9QdXRQYWNrYWdlQmF0Y2gSJy5saW5kbS5kZXZpY2UudjEuUHV0UGFja2FnZUJhdGNoUmVxdWVzdBooLmxpbmRtLmRldmljZS52MS5QdXRQYWNrYWdlQmF0Y2hSZXNwb25zZRJ2ChVDb21taXRQYWNrYWdlU25hcHNob3QSLS5saW5kbS5kZXZpY2UudjEuQ29tbWl0UGFja2FnZVNuYXBzaG90UmVxdWVzdBouLmxpbmRtLmRldmljZS52MS5Db21taXRQYWNrYWdlU25hcHNob3RSZXNwb25zZRJeCg1SZW5ld0lkZW50aXR5EiUubGluZG0uZGV2aWNlLnYxLlJlbmV3SWRlbnRpdHlSZXF1ZXN0GiYubGluZG0uZGV2aWNlLnYxLlJlbmV3SWRlbnRpdHlSZXNwb25zZUIkWiJsaW5kbS9nZW4vbGluZG0vZGV2aWNlL3YxO2RldmljZXYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_execution_trust, file_lindm_inventory_v1_observation]);
 
 /**
  * @generated from message lindm.device.v1.AcquireSessionRequest
@@ -116,6 +118,84 @@ export const GetSyncStateResponseSchema: GenMessage<GetSyncStateResponse> = /*@_
   messageDesc(file_lindm_device_v1_device, 3);
 
 /**
+ * Untrusted selection hints, not a device-signed applied-authority receipt.
+ *
+ * @generated from message lindm.device.v1.GetExecutionTrustRequest
+ */
+export type GetExecutionTrustRequest = Message<"lindm.device.v1.GetExecutionTrustRequest"> & {
+  /**
+   * @generated from field: uint64 session_epoch = 1;
+   */
+  sessionEpoch: bigint;
+
+  /**
+   * @generated from field: uint64 root_version = 2;
+   */
+  rootVersion: bigint;
+
+  /**
+   * @generated from field: bytes root_sha256 = 3;
+   */
+  rootSha256: Uint8Array;
+
+  /**
+   * @generated from field: uint64 delegation_version = 4;
+   */
+  delegationVersion: bigint;
+
+  /**
+   * @generated from field: bytes delegation_sha256 = 5;
+   */
+  delegationSha256: Uint8Array;
+
+  /**
+   * @generated from field: uint64 minimum_recovery_epoch = 6;
+   */
+  minimumRecoveryEpoch: bigint;
+};
+
+/**
+ * Describes the message lindm.device.v1.GetExecutionTrustRequest.
+ * Use `create(GetExecutionTrustRequestSchema)` to create a new message.
+ */
+export const GetExecutionTrustRequestSchema: GenMessage<GetExecutionTrustRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 4);
+
+/**
+ * @generated from message lindm.device.v1.GetExecutionTrustResponse
+ */
+export type GetExecutionTrustResponse = Message<"lindm.device.v1.GetExecutionTrustResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.UpdateExecutionTrustRequest update = 1;
+   */
+  update?: UpdateExecutionTrustRequest | undefined;
+
+  /**
+   * Desired server authority only. Zeroes mean authority is not provisioned.
+   *
+   * @generated from field: uint64 root_version = 2;
+   */
+  rootVersion: bigint;
+
+  /**
+   * @generated from field: uint64 delegation_version = 3;
+   */
+  delegationVersion: bigint;
+
+  /**
+   * @generated from field: uint64 minimum_recovery_epoch = 4;
+   */
+  minimumRecoveryEpoch: bigint;
+};
+
+/**
+ * Describes the message lindm.device.v1.GetExecutionTrustResponse.
+ * Use `create(GetExecutionTrustResponseSchema)` to create a new message.
+ */
+export const GetExecutionTrustResponseSchema: GenMessage<GetExecutionTrustResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_device, 5);
+
+/**
  * PackageBatchDescriptor binds one opaque inventory.v1.PackageBatch. SHA-256 and
  * encoded_size cover those exact bytes, not a server reserialization.
  *
@@ -148,7 +228,7 @@ export type PackageBatchDescriptor = Message<"lindm.device.v1.PackageBatchDescri
  * Use `create(PackageBatchDescriptorSchema)` to create a new message.
  */
 export const PackageBatchDescriptorSchema: GenMessage<PackageBatchDescriptor> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 4);
+  messageDesc(file_lindm_device_v1_device, 6);
 
 /**
  * PackageSnapshotManifest is immutable for the life of the attempt. Session epoch
@@ -204,7 +284,7 @@ export type PackageSnapshotManifest = Message<"lindm.device.v1.PackageSnapshotMa
  * Use `create(PackageSnapshotManifestSchema)` to create a new message.
  */
 export const PackageSnapshotManifestSchema: GenMessage<PackageSnapshotManifest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 5);
+  messageDesc(file_lindm_device_v1_device, 7);
 
 /**
  * @generated from message lindm.device.v1.ReportHostObservationRequest
@@ -236,7 +316,7 @@ export type ReportHostObservationRequest = Message<"lindm.device.v1.ReportHostOb
  * Use `create(ReportHostObservationRequestSchema)` to create a new message.
  */
 export const ReportHostObservationRequestSchema: GenMessage<ReportHostObservationRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 6);
+  messageDesc(file_lindm_device_v1_device, 8);
 
 /**
  * @generated from message lindm.device.v1.ReportHostObservationResponse
@@ -258,7 +338,7 @@ export type ReportHostObservationResponse = Message<"lindm.device.v1.ReportHostO
  * Use `create(ReportHostObservationResponseSchema)` to create a new message.
  */
 export const ReportHostObservationResponseSchema: GenMessage<ReportHostObservationResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 7);
+  messageDesc(file_lindm_device_v1_device, 9);
 
 /**
  * @generated from message lindm.device.v1.ReportPackageAttemptRequest
@@ -307,7 +387,7 @@ export type ReportPackageAttemptRequest = Message<"lindm.device.v1.ReportPackage
  * Use `create(ReportPackageAttemptRequestSchema)` to create a new message.
  */
 export const ReportPackageAttemptRequestSchema: GenMessage<ReportPackageAttemptRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 8);
+  messageDesc(file_lindm_device_v1_device, 10);
 
 /**
  * @generated from message lindm.device.v1.ReportPackageAttemptResponse
@@ -329,7 +409,7 @@ export type ReportPackageAttemptResponse = Message<"lindm.device.v1.ReportPackag
  * Use `create(ReportPackageAttemptResponseSchema)` to create a new message.
  */
 export const ReportPackageAttemptResponseSchema: GenMessage<ReportPackageAttemptResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 9);
+  messageDesc(file_lindm_device_v1_device, 11);
 
 /**
  * @generated from message lindm.device.v1.BeginPackageSnapshotRequest
@@ -356,7 +436,7 @@ export type BeginPackageSnapshotRequest = Message<"lindm.device.v1.BeginPackageS
  * Use `create(BeginPackageSnapshotRequestSchema)` to create a new message.
  */
 export const BeginPackageSnapshotRequestSchema: GenMessage<BeginPackageSnapshotRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 10);
+  messageDesc(file_lindm_device_v1_device, 12);
 
 /**
  * @generated from message lindm.device.v1.BeginPackageSnapshotResponse
@@ -398,7 +478,7 @@ export type BeginPackageSnapshotResponse = Message<"lindm.device.v1.BeginPackage
  * Use `create(BeginPackageSnapshotResponseSchema)` to create a new message.
  */
 export const BeginPackageSnapshotResponseSchema: GenMessage<BeginPackageSnapshotResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 11);
+  messageDesc(file_lindm_device_v1_device, 13);
 
 /**
  * @generated from message lindm.device.v1.PutPackageBatchRequest
@@ -437,7 +517,7 @@ export type PutPackageBatchRequest = Message<"lindm.device.v1.PutPackageBatchReq
  * Use `create(PutPackageBatchRequestSchema)` to create a new message.
  */
 export const PutPackageBatchRequestSchema: GenMessage<PutPackageBatchRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 12);
+  messageDesc(file_lindm_device_v1_device, 14);
 
 /**
  * @generated from message lindm.device.v1.PutPackageBatchResponse
@@ -464,7 +544,7 @@ export type PutPackageBatchResponse = Message<"lindm.device.v1.PutPackageBatchRe
  * Use `create(PutPackageBatchResponseSchema)` to create a new message.
  */
 export const PutPackageBatchResponseSchema: GenMessage<PutPackageBatchResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 13);
+  messageDesc(file_lindm_device_v1_device, 15);
 
 /**
  * @generated from message lindm.device.v1.CommitPackageSnapshotRequest
@@ -491,7 +571,7 @@ export type CommitPackageSnapshotRequest = Message<"lindm.device.v1.CommitPackag
  * Use `create(CommitPackageSnapshotRequestSchema)` to create a new message.
  */
 export const CommitPackageSnapshotRequestSchema: GenMessage<CommitPackageSnapshotRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 14);
+  messageDesc(file_lindm_device_v1_device, 16);
 
 /**
  * @generated from message lindm.device.v1.CommitPackageSnapshotResponse
@@ -533,7 +613,7 @@ export type CommitPackageSnapshotResponse = Message<"lindm.device.v1.CommitPacka
  * Use `create(CommitPackageSnapshotResponseSchema)` to create a new message.
  */
 export const CommitPackageSnapshotResponseSchema: GenMessage<CommitPackageSnapshotResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 15);
+  messageDesc(file_lindm_device_v1_device, 17);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityRequest
@@ -555,7 +635,7 @@ export type RenewIdentityRequest = Message<"lindm.device.v1.RenewIdentityRequest
  * Use `create(RenewIdentityRequestSchema)` to create a new message.
  */
 export const RenewIdentityRequestSchema: GenMessage<RenewIdentityRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 16);
+  messageDesc(file_lindm_device_v1_device, 18);
 
 /**
  * @generated from message lindm.device.v1.RenewIdentityResponse
@@ -577,7 +657,7 @@ export type RenewIdentityResponse = Message<"lindm.device.v1.RenewIdentityRespon
  * Use `create(RenewIdentityResponseSchema)` to create a new message.
  */
 export const RenewIdentityResponseSchema: GenMessage<RenewIdentityResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_device, 17);
+  messageDesc(file_lindm_device_v1_device, 19);
 
 /**
  * @generated from service lindm.device.v1.DeviceService
@@ -598,6 +678,14 @@ export const DeviceService: GenService<{
     methodKind: "unary";
     input: typeof GetSyncStateRequestSchema;
     output: typeof GetSyncStateResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.device.v1.DeviceService.GetExecutionTrust
+   */
+  getExecutionTrust: {
+    methodKind: "unary";
+    input: typeof GetExecutionTrustRequestSchema;
+    output: typeof GetExecutionTrustResponseSchema;
   },
   /**
    * @generated from rpc lindm.device.v1.DeviceService.ReportHostObservation

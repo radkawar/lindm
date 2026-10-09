@@ -1,5 +1,6 @@
-// Package devlab provisions real, loopback-only development dependencies. It
-// never starts lindmd serve and never imports development bypasses into it.
+// Package devlab provisions real, loopback-only development dependencies.
+// Explicit disposable authority fixtures may start an isolated lindmd; no
+// development authorization bypasses are imported into the server.
 package devlab
 
 import (

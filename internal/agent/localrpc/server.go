@@ -60,6 +60,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.PrepareRenewalRequest{},
 		&agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{},
+		&agentv1.GetExecutionTrustRequest{},
 		&agentv1.PrepareServiceExecutionRequest{},
 		&agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{},
@@ -142,6 +143,7 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServicePrepareRenewalProcedure ||
 		procedure == agentv1connect.ExecutorServiceCommitRenewalProcedure ||
 		procedure == agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceStartServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetServiceExecutionProcedure ||

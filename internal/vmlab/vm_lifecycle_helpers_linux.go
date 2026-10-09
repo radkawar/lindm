@@ -120,10 +120,10 @@ func waitGuestExecutorReady(ctx context.Context, vm *guestVM, expected agentv1.L
 	return status, nil
 }
 
-func openLifecycleForwards(ctx context.Context, vm *guestVM) ([]*guestForward, error) {
+func openLifecycleForwards(ctx context.Context, vm *guestVM, destinations [2]string) ([]*guestForward, error) {
 	var forwards []*guestForward
-	for _, address := range []string{"127.0.0.1:18444", "127.0.0.1:18445"} {
-		forward, err := newGuestForward(ctx, vm, address, address)
+	for i, address := range []string{"127.0.0.1:18444", "127.0.0.1:18445"} {
+		forward, err := newGuestForward(ctx, vm, address, destinations[i])
 		if err != nil {
 			return nil, errors.Join(err, closeLifecycleForwards(forwards))
 		}

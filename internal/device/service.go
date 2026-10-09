@@ -24,6 +24,7 @@ import (
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/trust"
 )
@@ -65,6 +66,8 @@ type Config struct {
 	CACertificate        *x509.Certificate
 	CAKey                crypto.Signer
 	InventoryBudgetBytes int64
+	ExecutionAuthority   *executionauthority.Store
+	Identity             *identity.Service
 }
 
 // Service implements the admin, enrollment, and device RPC surfaces.
@@ -79,6 +82,8 @@ type Service struct {
 	clock           func() time.Time
 	authority       *trust.Authority
 	inventoryBudget int64
+	execution       *executionauthority.Store
+	identity        *identity.Service
 }
 
 var (
@@ -108,6 +113,9 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if budget < minInventoryBudget || budget > maxInventoryBudget {
 		return nil, errors.New("device: inventory budget is outside the admitted range")
 	}
+	if cfg.ExecutionAuthority != nil && cfg.Identity == nil {
+		return nil, errors.New("device: execution authority requires fresh identity authorization")
+	}
 	compiled, err := protovalidate.New(
 		protovalidate.WithMessages(
 			&adminv1.ListDevicesRequest{},
@@ -117,10 +125,13 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.RevokeEnrollmentGrantRequest{},
 			&adminv1.RevokeDeviceRequest{},
 			&adminv1.ListAuditEventsRequest{},
+			&adminv1.GetExecutionAuthorityRequest{},
+			&adminv1.UpdateExecutionAuthorityRequest{},
 			&enrollmentv1.EnrollRequest{},
 			&enrollmentv1.RetrieveIssuanceRequest{},
 			&devicev1.AcquireSessionRequest{},
 			&devicev1.GetSyncStateRequest{},
+			&devicev1.GetExecutionTrustRequest{},
 			&devicev1.ReportHostObservationRequest{},
 			&devicev1.ReportPackageAttemptRequest{},
 			&devicev1.BeginPackageSnapshotRequest{},
@@ -149,6 +160,8 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		clock:           time.Now,
 		authority:       authority,
 		inventoryBudget: budget,
+		execution:       cfg.ExecutionAuthority,
+		identity:        cfg.Identity,
 	}, nil
 }
 

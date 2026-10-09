@@ -20,14 +20,67 @@ type authorized struct {
 	connection *agentv1.GetConnectionResponse
 	servers    *connections
 	epoch      uint64
-	state      *devicev1.GetSyncStateResponse
 }
 
-// establish resolves a protected rotation before acquiring a boot successor.
-// Every receipt is committed locally before an observation can use its fence.
-func establish(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache) (*authorized, error) {
+type synchronized struct {
+	*authorized
+	state *devicev1.GetSyncStateResponse
+}
+
+// A transition spans several executor/server RPCs. The executor serializes
+// individual calls, not a caller's captured credential and subsequent session.
+type authorityGate chan struct{}
+
+func (g authorityGate) lock(ctx context.Context) error {
+	select {
+	case g <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			g.unlock()
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (g authorityGate) unlock() { <-g }
+
+// synchronize fetches inventory high-water marks only for the inventory loop.
+// Management uses establish directly and never advances the inventory poll.
+func synchronize(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache, gate authorityGate) (*synchronized, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+	if err := gate.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer gate.unlock()
+	authority, err := establishLocked(ctx, executor, cache)
+	if err != nil {
+		return nil, err
+	}
+	state, err := rpc(ctx, authority.servers.device.GetSyncState, &devicev1.GetSyncStateRequest{SessionEpoch: authority.epoch})
+	if err != nil {
+		return nil, err
+	}
+	if state.GetSessionEpoch() != authority.epoch || state.GetHostSequence() > math.MaxInt64 || state.GetPackageSequence() > math.MaxInt64 {
+		return nil, errors.New("server sync state does not bind the protected session")
+	}
+	return &synchronized{authorized: authority, state: state}, nil
+}
+
+func establish(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache, gate authorityGate) (*authorized, error) {
+	if err := gate.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer gate.unlock()
+	return establishLocked(ctx, executor, cache)
+}
+
+// establishLocked resolves rotation before acquiring a boot successor. Callers
+// hold the shared gate until establishment (and inventory GetSyncState) finishes.
+// Collection, upload and execution-trust synchronization never hold this gate.
+func establishLocked(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache) (*authorized, error) {
 	// A pending old-boot acquisition may need exact replay and then a second
 	// acquisition for this boot. These are state transitions, not blind retries.
 	for range 8 {
@@ -83,14 +136,7 @@ func establish(ctx context.Context, executor agentv1connect.ExecutorServiceClien
 			}
 			continue
 		}
-		state, err := rpc(ctx, servers.device.GetSyncState, &devicev1.GetSyncStateRequest{SessionEpoch: accepted.GetSessionEpoch()})
-		if err != nil {
-			return nil, err
-		}
-		if state.GetSessionEpoch() != accepted.GetSessionEpoch() || state.GetHostSequence() > math.MaxInt64 || state.GetPackageSequence() > math.MaxInt64 {
-			return nil, errors.New("server sync state does not bind the protected session")
-		}
-		return &authorized{connection: connection, servers: servers, epoch: accepted.GetSessionEpoch(), state: state}, nil
+		return &authorized{connection: connection, servers: servers, epoch: accepted.GetSessionEpoch()}, nil
 	}
 	return nil, errors.New("executor authority did not converge within its transition bound")
 }

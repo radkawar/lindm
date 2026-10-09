@@ -42,6 +42,27 @@ sql:
               import: github.com/google/uuid
               type: UUID
               pointer: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/executionauthority
+    gen:
+      go:
+        package: authoritydb
+        out: internal/executionauthority/authoritydb
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              type: UUID
+              pointer: true
   - engine: sqlite
     schema: internal/agent/journal/schema.sql
     queries: internal/agent/journal/queries.sql

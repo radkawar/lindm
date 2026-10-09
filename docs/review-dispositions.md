@@ -436,6 +436,34 @@ certificate/device revocation, desired-head/recovery policy and production recei
 ingestion remain consumer responsibilities; this is not a compliance or release
 certification.
 
+### Control-plane authority and automatic relay reviews
+
+Independent source reviews covered public-bootstrap configuration and RPC fences,
+durable authority history, root/transport synchronization, and private native proof.
+The following failures were reproduced and corrected before qualification:
+
+| Finding                                                                                | Correction and exercised evidence                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Concurrent relay loops could interleave renewal with session establishment             | A shared cancellable gate spans the complete transition sequence, including inventory `GetSyncState`, but not collection/upload or trust delivery. The deterministic regression failed with `renewal_pending` before the correction and passes under the race detector; cancellation of a waiting loop leaves inventory usable   |
+| A restored singleton delegation could lower live floors beneath newer retained history | Real PostgreSQL admitted D15 after D20 when only the singleton envelope was restored to D10. Live snapshots now bind their captured revision to immutable admission bytes, digest, receipt, time and retained root. The reproduced case, metadata corruption, historical retry and concurrent captured-snapshot regressions pass |
+| Root-only initial state bypassed retained-root binding                                 | Real PostgreSQL accepted an attacker-quorum first delegation after replacement of only the initial root document. Root identity/position checks now precede both snapshot branches; initial acceptance metadata must match initialization. The same attack and seed-metadata regressions pass                                    |
+| systemd garbage collection erased the no-effect probe's start timestamp                | An actual owned user-service start/stop/reload returned timestamp zero while a persistent marker remained. The VM probe uses its own persistent marker and positively tests it before the synchronization observation window                                                                                                     |
+| The isolated server fixture supplied a forbidden `search_path` option                  | Native startup failed, and the production resource loader reproduced the rejection. The fixture now owns a separate database rather than weakening configuration validation. Real server migration, owner login/admission, restart/exact retry, session revocation and confirmed database cleanup passed                         |
+
+The database cutover also corrected a missing optional migration URL reference.
+It uses the owned non-superuser migrator URL for both migration and runtime; cluster
+administration remains confined to laboratory code. Final source re-reviews reported
+no remaining actionable findings in their assigned scopes. Full generation,
+formatting, lint/race and PostgreSQL/Keycloak integration checks passed; the corrected
+fixture additionally passed its real-process smoke and focused checks. Packaged
+Ubuntu 24.04 and Fedora 44 authority synchronization lifecycles passed owner admission,
+automatic relay, rotation/revocation, quorum and rollback denials, exact historical
+retry after server restart, unchanged TLS identity, positively witnessed no-effect
+checks and trust retention after reboot/reinstall. Both isolated databases were
+confirmed absent after teardown. Artifact identities and device IDs are recorded
+in the implementation ledger. These reviews do not qualify profile dispatch or
+whole-product security.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.

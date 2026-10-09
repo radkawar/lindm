@@ -18,6 +18,54 @@ import (
 	"lindm/internal/trust"
 )
 
+// GetExecutionTrust reports only authenticated protected state. Expiry blocks
+// new effects, not historical inspection; reading never retires credentials,
+// changes trust counters, or opens a native provider.
+func (s *Service) GetExecutionTrust(ctx context.Context, req *connect.Request[agentv1.GetExecutionTrustRequest]) (*connect.Response[agentv1.GetExecutionTrustResponse], error) {
+	ctx, cancel := s.bounded(ctx)
+	defer cancel()
+	if req == nil {
+		return nil, mapError(errInvalid)
+	}
+	msg, err := s.getExecutionTrust(ctx, req.Msg)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return noStore(msg), nil
+}
+
+func (s *Service) getExecutionTrust(ctx context.Context, req *agentv1.GetExecutionTrustRequest) (*agentv1.GetExecutionTrustResponse, error) {
+	if err := s.admit(req); err != nil {
+		return nil, err
+	}
+	if err := s.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer s.mu.Unlock()
+	loaded, err := s.loadBound(ctx)
+	if err != nil {
+		return nil, err
+	}
+	current := loaded.execution
+	rootDigest, err := trust.ExecutionRootDigest(current.root)
+	if err != nil {
+		return nil, errInternal
+	}
+	view := &agentv1.GetExecutionTrustResponse{
+		RootVersion: current.root.GetVersion(), RootSha256: rootDigest[:],
+		RootExpiresAt: proto.CloneOf(current.root.GetExpiresAt()),
+	}
+	if current.delegation != nil {
+		delegationDigest := sha256.Sum256(current.state.GetDelegationEnvelope())
+		view.DelegationVersion = current.delegation.GetVersion()
+		view.DelegationSha256 = delegationDigest[:]
+		view.MinimumRecoveryEpoch = current.delegation.GetMinimumRecoveryEpoch()
+		view.AcceptedAt = proto.CloneOf(current.state.GetAcceptedAt())
+		view.DelegationExpiresAt = proto.CloneOf(current.delegation.GetExpiresAt())
+	}
+	return view, nil
+}
+
 // UpdateExecutionTrust verifies rotations and a root-signed delegation against
 // protected bootstrap material, then commits the trust row before acknowledgment.
 // It does not start work, select verification keys, or change enrollment pins.

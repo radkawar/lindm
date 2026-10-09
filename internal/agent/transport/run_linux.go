@@ -41,7 +41,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, cleanup()) }()
-	r := &runner{document: document, executor: executor, status: &agentv1.TransportStatus{}}
+	r := &runner{document: document, executor: executor, status: &agentv1.TransportStatus{}, authorityGate: make(authorityGate, 1)}
 	defer r.cache.Close()
 	defer func() {
 		if r.store != nil {
@@ -57,6 +57,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	if err := r.report(ctx); err != nil {
 		return err
 	}
+	stopManagement := startExecutionTrustLoop(ctx, executor, r.authorityGate)
+	defer stopManagement()
 	for {
 		if err := ctx.Err(); err != nil {
 			return r.stopped()
@@ -73,7 +75,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 			return err
 		}
 		// Jitter affects scheduling only, never authority, sequence or expiry.
-		delay := heartbeatInterval - heartbeatInterval/10 + time.Duration(rand.Int64N(int64(heartbeatInterval/5)))
+		delay := heartbeatDelay()
 		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
@@ -84,10 +86,15 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	}
 }
 
+func heartbeatDelay() time.Duration {
+	return heartbeatInterval - heartbeatInterval/10 + time.Duration(rand.Int64N(int64(heartbeatInterval/5)))
+}
+
 type runner struct {
 	document       *config.Document
 	executor       agentv1connect.ExecutorServiceClient
 	cache          connectionCache
+	authorityGate  authorityGate
 	store          *spool.Store
 	identity       spool.Identity
 	status         *agentv1.TransportStatus
@@ -111,7 +118,7 @@ func (r *runner) cycle(ctx context.Context) error {
 	if connectionErr != nil {
 		return errors.Join(connectionErr, collectionErr)
 	}
-	authority, err := establish(ctx, r.executor, &r.cache)
+	authority, err := synchronize(ctx, r.executor, &r.cache, r.authorityGate)
 	if err != nil {
 		return errors.Join(err, collectionErr)
 	}
@@ -132,7 +139,7 @@ func (r *runner) cycle(ctx context.Context) error {
 		}
 		r.waiting = nil
 	}
-	return errors.Join(flush(ctx, r.store, authority, r.status), collectionErr)
+	return errors.Join(flush(ctx, r.store, authority.authorized, r.status), collectionErr)
 }
 
 func (r *runner) bind(ctx context.Context, connection *agentv1.GetConnectionResponse) error {

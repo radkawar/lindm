@@ -17,6 +17,7 @@ import (
 	"lindm/db"
 	"lindm/internal/config"
 	"lindm/internal/device"
+	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/web"
 )
@@ -56,11 +57,25 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return fmt.Errorf("initialize identity service: %w", err)
 	}
+	var execution *executionauthority.Store
+	if bootstrap := resources.ExecutionBootstrap; bootstrap != nil {
+		execution, err = executionauthority.New(startup, pool, executionauthority.Config{
+			RootJSON: bootstrap.RootJSON, BootstrapEnvelope: bootstrap.Envelope,
+			TLSPublicKey: resources.ServerCertificate.Leaf.PublicKey,
+		})
+	} else {
+		err = executionauthority.CheckUnconfigured(startup, pool)
+	}
+	if err != nil {
+		return fmt.Errorf("initialize execution authority: %w", err)
+	}
 	devices, err := device.New(pool, device.Config{
 		DeploymentID:         resources.Proto.GetDeploymentId(),
 		CACertificate:        resources.DeviceCACertificate,
 		CAKey:                resources.DeviceCAKey,
 		InventoryBudgetBytes: resources.InventoryBudgetBytes,
+		ExecutionAuthority:   execution,
+		Identity:             auth,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)

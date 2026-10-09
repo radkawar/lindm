@@ -60,6 +60,9 @@ const (
 	// ExecutorServiceUpdateExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
 	// UpdateExecutionTrust RPC.
 	ExecutorServiceUpdateExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/UpdateExecutionTrust"
+	// ExecutorServiceGetExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
+	// GetExecutionTrust RPC.
+	ExecutorServiceGetExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/GetExecutionTrust"
 	// ExecutorServicePrepareServiceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's PrepareServiceExecution RPC.
 	ExecutorServicePrepareServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareServiceExecution"
@@ -113,6 +116,8 @@ type ExecutorServiceClient interface {
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
+	// Reads protected public trust facts, not fresh resource observations.
+	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Verifies signed desired intent and records native preflight/challenge before
 	// replying. No native effect; callers cannot supply a plan or challenge.
 	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
@@ -194,6 +199,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
 			connect.WithClientOptions(opts...),
 		),
+		getExecutionTrust: connect.NewClient[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetExecutionTrustProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetExecutionTrust")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareServiceExecution: connect.NewClient[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareServiceExecutionProcedure,
@@ -238,6 +249,7 @@ type executorServiceClient struct {
 	prepareRenewal          *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
 	commitRenewal           *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
 	updateExecutionTrust    *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
+	getExecutionTrust       *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	prepareServiceExecution *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
 	startServiceExecution   *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
 	getServiceExecution     *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
@@ -288,6 +300,11 @@ func (c *executorServiceClient) CommitRenewal(ctx context.Context, req *connect.
 // UpdateExecutionTrust calls lindm.agent.v1.ExecutorService.UpdateExecutionTrust.
 func (c *executorServiceClient) UpdateExecutionTrust(ctx context.Context, req *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {
 	return c.updateExecutionTrust.CallUnary(ctx, req)
+}
+
+// GetExecutionTrust calls lindm.agent.v1.ExecutorService.GetExecutionTrust.
+func (c *executorServiceClient) GetExecutionTrust(ctx context.Context, req *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error) {
+	return c.getExecutionTrust.CallUnary(ctx, req)
 }
 
 // PrepareServiceExecution calls lindm.agent.v1.ExecutorService.PrepareServiceExecution.
@@ -352,6 +369,8 @@ type ExecutorServiceHandler interface {
 	// delegation, then durably commits rollback fences before acknowledgment.
 	// This never starts work or accepts caller-selected verification keys.
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
+	// Reads protected public trust facts, not fresh resource observations.
+	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Verifies signed desired intent and records native preflight/challenge before
 	// replying. No native effect; callers cannot supply a plan or challenge.
 	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
@@ -429,6 +448,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("UpdateExecutionTrust")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceGetExecutionTrustHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetExecutionTrustProcedure,
+		svc.GetExecutionTrust,
+		connect.WithSchema(executorServiceMethods.ByName("GetExecutionTrust")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServicePrepareServiceExecutionHandler := connect.NewUnaryHandler(
 		ExecutorServicePrepareServiceExecutionProcedure,
 		svc.PrepareServiceExecution,
@@ -479,6 +504,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceCommitRenewalHandler.ServeHTTP(w, r)
 		case ExecutorServiceUpdateExecutionTrustProcedure:
 			executorServiceUpdateExecutionTrustHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetExecutionTrustProcedure:
+			executorServiceGetExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareServiceExecutionProcedure:
 			executorServicePrepareServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartServiceExecutionProcedure:
@@ -532,6 +559,10 @@ func (UnimplementedExecutorServiceHandler) CommitRenewal(context.Context, *conne
 
 func (UnimplementedExecutorServiceHandler) UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.UpdateExecutionTrust is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetExecutionTrust is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {

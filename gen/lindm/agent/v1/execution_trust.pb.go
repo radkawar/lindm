@@ -283,6 +283,146 @@ func (x *ExecutionDelegation) GetDelegates() []*ExecutionDelegate {
 	return nil
 }
 
+type GetExecutionTrustRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExecutionTrustRequest) Reset() {
+	*x = GetExecutionTrustRequest{}
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExecutionTrustRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExecutionTrustRequest) ProtoMessage() {}
+
+func (x *GetExecutionTrustRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExecutionTrustRequest.ProtoReflect.Descriptor instead.
+func (*GetExecutionTrustRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{3}
+}
+
+// Public, locally authenticated history. Expiry is not a claim of current
+// authority; this view never observes resources or changes protected state.
+type GetExecutionTrustResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	RootVersion uint64                 `protobuf:"varint,1,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
+	// SHA-256 of deterministic protobuf ExecutionRoot bytes.
+	RootSha256        []byte `protobuf:"bytes,2,opt,name=root_sha256,json=rootSha256,proto3" json:"root_sha256,omitempty"`
+	DelegationVersion uint64 `protobuf:"varint,3,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
+	// SHA-256 of the exact accepted DSSE envelope; empty before first delegation.
+	DelegationSha256     []byte                 `protobuf:"bytes,4,opt,name=delegation_sha256,json=delegationSha256,proto3" json:"delegation_sha256,omitempty"`
+	MinimumRecoveryEpoch uint64                 `protobuf:"varint,5,opt,name=minimum_recovery_epoch,json=minimumRecoveryEpoch,proto3" json:"minimum_recovery_epoch,omitempty"`
+	AcceptedAt           *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	RootExpiresAt        *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=root_expires_at,json=rootExpiresAt,proto3" json:"root_expires_at,omitempty"`
+	DelegationExpiresAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=delegation_expires_at,json=delegationExpiresAt,proto3" json:"delegation_expires_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *GetExecutionTrustResponse) Reset() {
+	*x = GetExecutionTrustResponse{}
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExecutionTrustResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExecutionTrustResponse) ProtoMessage() {}
+
+func (x *GetExecutionTrustResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExecutionTrustResponse.ProtoReflect.Descriptor instead.
+func (*GetExecutionTrustResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetExecutionTrustResponse) GetRootVersion() uint64 {
+	if x != nil {
+		return x.RootVersion
+	}
+	return 0
+}
+
+func (x *GetExecutionTrustResponse) GetRootSha256() []byte {
+	if x != nil {
+		return x.RootSha256
+	}
+	return nil
+}
+
+func (x *GetExecutionTrustResponse) GetDelegationVersion() uint64 {
+	if x != nil {
+		return x.DelegationVersion
+	}
+	return 0
+}
+
+func (x *GetExecutionTrustResponse) GetDelegationSha256() []byte {
+	if x != nil {
+		return x.DelegationSha256
+	}
+	return nil
+}
+
+func (x *GetExecutionTrustResponse) GetMinimumRecoveryEpoch() uint64 {
+	if x != nil {
+		return x.MinimumRecoveryEpoch
+	}
+	return 0
+}
+
+func (x *GetExecutionTrustResponse) GetAcceptedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AcceptedAt
+	}
+	return nil
+}
+
+func (x *GetExecutionTrustResponse) GetRootExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RootExpiresAt
+	}
+	return nil
+}
+
+func (x *GetExecutionTrustResponse) GetDelegationExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DelegationExpiresAt
+	}
+	return nil
+}
+
 // Network callers relay signed documents; they cannot choose trusted keys.
 type UpdateExecutionTrustRequest struct {
 	state              protoimpl.MessageState     `protogen:"open.v1"`
@@ -294,7 +434,7 @@ type UpdateExecutionTrustRequest struct {
 
 func (x *UpdateExecutionTrustRequest) Reset() {
 	*x = UpdateExecutionTrustRequest{}
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +446,7 @@ func (x *UpdateExecutionTrustRequest) String() string {
 func (*UpdateExecutionTrustRequest) ProtoMessage() {}
 
 func (x *UpdateExecutionTrustRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +459,7 @@ func (x *UpdateExecutionTrustRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateExecutionTrustRequest.ProtoReflect.Descriptor instead.
 func (*UpdateExecutionTrustRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateExecutionTrustRequest) GetRootTransitions() []*ExecutionRootTransition {
@@ -348,7 +488,7 @@ type UpdateExecutionTrustResponse struct {
 
 func (x *UpdateExecutionTrustResponse) Reset() {
 	*x = UpdateExecutionTrustResponse{}
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -360,7 +500,7 @@ func (x *UpdateExecutionTrustResponse) String() string {
 func (*UpdateExecutionTrustResponse) ProtoMessage() {}
 
 func (x *UpdateExecutionTrustResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -373,7 +513,7 @@ func (x *UpdateExecutionTrustResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateExecutionTrustResponse.ProtoReflect.Descriptor instead.
 func (*UpdateExecutionTrustResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateExecutionTrustResponse) GetRootVersion() uint64 {
@@ -423,7 +563,7 @@ type ExecutionTrustState struct {
 
 func (x *ExecutionTrustState) Reset() {
 	*x = ExecutionTrustState{}
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -435,7 +575,7 @@ func (x *ExecutionTrustState) String() string {
 func (*ExecutionTrustState) ProtoMessage() {}
 
 func (x *ExecutionTrustState) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_execution_trust_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -448,7 +588,7 @@ func (x *ExecutionTrustState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecutionTrustState.ProtoReflect.Descriptor instead.
 func (*ExecutionTrustState) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{5}
+	return file_lindm_agent_v1_execution_trust_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ExecutionTrustState) GetFormatVersion() uint32 {
@@ -531,7 +671,20 @@ const file_lindm_agent_v1_execution_trust_proto_rawDesc = "" +
 	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12I\n" +
 	"\tdelegates\x18\a \x03(\v2!.lindm.agent.v1.ExecutionDelegateB\b\xbaH\x05\x92\x01\x02\x10\x10R\tdelegates:\xa7\x02\xbaH\xa3\x02\x1aj\n" +
 	"\x1dexecution_delegation.validity\x12&delegation validity must be increasing\x1a!this.expires_at > this.not_before\x1a\xb4\x01\n" +
-	" execution_delegation.unique_keys\x12-each delegated key must have exactly one role\x1aathis.delegates.all(d, this.delegates.filter(other, other.key.key_id == d.key.key_id).size() == 1)\"\xb9\x01\n" +
+	" execution_delegation.unique_keys\x12-each delegated key must have exactly one role\x1aathis.delegates.all(d, this.delegates.filter(other, other.key.key_id == d.key.key_id).size() == 1)\"\x1a\n" +
+	"\x18GetExecutionTrustRequest\"\x8b\a\n" +
+	"\x19GetExecutionTrustResponse\x12*\n" +
+	"\froot_version\x18\x01 \x01(\x04B\a\xbaH\x042\x02 \x00R\vrootVersion\x12(\n" +
+	"\vroot_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\n" +
+	"rootSha256\x12-\n" +
+	"\x12delegation_version\x18\x03 \x01(\x04R\x11delegationVersion\x124\n" +
+	"\x11delegation_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02\x18 R\x10delegationSha256\x124\n" +
+	"\x16minimum_recovery_epoch\x18\x05 \x01(\x04R\x14minimumRecoveryEpoch\x12;\n" +
+	"\vaccepted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"acceptedAt\x12J\n" +
+	"\x0froot_expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\rrootExpiresAt\x12N\n" +
+	"\x15delegation_expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x13delegationExpiresAt:\xa3\x03\xbaH\x9f\x03\x1a\x9c\x03\n" +
+	"\x1dexecution_trust_view.complete\x12Kdelegation facts must be absent before configuration and complete afterward\x1a\xad\x02(this.delegation_version == 0u && this.delegation_sha256.size() == 0 && this.minimum_recovery_epoch == 0u && !has(this.accepted_at) && !has(this.delegation_expires_at)) || (this.delegation_version > 0u && this.delegation_sha256.size() == 32 && has(this.accepted_at) && has(this.delegation_expires_at))\"\xb9\x01\n" +
 	"\x1bUpdateExecutionTrustRequest\x12\\\n" +
 	"\x10root_transitions\x18\x01 \x03(\v2'.lindm.agent.v1.ExecutionRootTransitionB\b\xbaH\x05\x92\x01\x02\x10\bR\x0frootTransitions\x12<\n" +
 	"\x13delegation_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x12delegationEnvelope\"\xfb\x01\n" +
@@ -570,34 +723,39 @@ func file_lindm_agent_v1_execution_trust_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_execution_trust_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_agent_v1_execution_trust_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_lindm_agent_v1_execution_trust_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_agent_v1_execution_trust_proto_goTypes = []any{
 	(ExecutionSignerRole)(0),             // 0: lindm.agent.v1.ExecutionSignerRole
 	(*ExecutionRootTransition)(nil),      // 1: lindm.agent.v1.ExecutionRootTransition
 	(*ExecutionDelegate)(nil),            // 2: lindm.agent.v1.ExecutionDelegate
 	(*ExecutionDelegation)(nil),          // 3: lindm.agent.v1.ExecutionDelegation
-	(*UpdateExecutionTrustRequest)(nil),  // 4: lindm.agent.v1.UpdateExecutionTrustRequest
-	(*UpdateExecutionTrustResponse)(nil), // 5: lindm.agent.v1.UpdateExecutionTrustResponse
-	(*ExecutionTrustState)(nil),          // 6: lindm.agent.v1.ExecutionTrustState
-	(*ExecutionKey)(nil),                 // 7: lindm.agent.v1.ExecutionKey
-	(*timestamppb.Timestamp)(nil),        // 8: google.protobuf.Timestamp
-	(*ExecutionRoot)(nil),                // 9: lindm.agent.v1.ExecutionRoot
+	(*GetExecutionTrustRequest)(nil),     // 4: lindm.agent.v1.GetExecutionTrustRequest
+	(*GetExecutionTrustResponse)(nil),    // 5: lindm.agent.v1.GetExecutionTrustResponse
+	(*UpdateExecutionTrustRequest)(nil),  // 6: lindm.agent.v1.UpdateExecutionTrustRequest
+	(*UpdateExecutionTrustResponse)(nil), // 7: lindm.agent.v1.UpdateExecutionTrustResponse
+	(*ExecutionTrustState)(nil),          // 8: lindm.agent.v1.ExecutionTrustState
+	(*ExecutionKey)(nil),                 // 9: lindm.agent.v1.ExecutionKey
+	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
+	(*ExecutionRoot)(nil),                // 11: lindm.agent.v1.ExecutionRoot
 }
 var file_lindm_agent_v1_execution_trust_proto_depIdxs = []int32{
-	7, // 0: lindm.agent.v1.ExecutionDelegate.key:type_name -> lindm.agent.v1.ExecutionKey
-	0, // 1: lindm.agent.v1.ExecutionDelegate.role:type_name -> lindm.agent.v1.ExecutionSignerRole
-	8, // 2: lindm.agent.v1.ExecutionDelegation.not_before:type_name -> google.protobuf.Timestamp
-	8, // 3: lindm.agent.v1.ExecutionDelegation.expires_at:type_name -> google.protobuf.Timestamp
-	2, // 4: lindm.agent.v1.ExecutionDelegation.delegates:type_name -> lindm.agent.v1.ExecutionDelegate
-	1, // 5: lindm.agent.v1.UpdateExecutionTrustRequest.root_transitions:type_name -> lindm.agent.v1.ExecutionRootTransition
-	8, // 6: lindm.agent.v1.UpdateExecutionTrustResponse.expires_at:type_name -> google.protobuf.Timestamp
-	9, // 7: lindm.agent.v1.ExecutionTrustState.root:type_name -> lindm.agent.v1.ExecutionRoot
-	8, // 8: lindm.agent.v1.ExecutionTrustState.accepted_at:type_name -> google.protobuf.Timestamp
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	9,  // 0: lindm.agent.v1.ExecutionDelegate.key:type_name -> lindm.agent.v1.ExecutionKey
+	0,  // 1: lindm.agent.v1.ExecutionDelegate.role:type_name -> lindm.agent.v1.ExecutionSignerRole
+	10, // 2: lindm.agent.v1.ExecutionDelegation.not_before:type_name -> google.protobuf.Timestamp
+	10, // 3: lindm.agent.v1.ExecutionDelegation.expires_at:type_name -> google.protobuf.Timestamp
+	2,  // 4: lindm.agent.v1.ExecutionDelegation.delegates:type_name -> lindm.agent.v1.ExecutionDelegate
+	10, // 5: lindm.agent.v1.GetExecutionTrustResponse.accepted_at:type_name -> google.protobuf.Timestamp
+	10, // 6: lindm.agent.v1.GetExecutionTrustResponse.root_expires_at:type_name -> google.protobuf.Timestamp
+	10, // 7: lindm.agent.v1.GetExecutionTrustResponse.delegation_expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 8: lindm.agent.v1.UpdateExecutionTrustRequest.root_transitions:type_name -> lindm.agent.v1.ExecutionRootTransition
+	10, // 9: lindm.agent.v1.UpdateExecutionTrustResponse.expires_at:type_name -> google.protobuf.Timestamp
+	11, // 10: lindm.agent.v1.ExecutionTrustState.root:type_name -> lindm.agent.v1.ExecutionRoot
+	10, // 11: lindm.agent.v1.ExecutionTrustState.accepted_at:type_name -> google.protobuf.Timestamp
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_execution_trust_proto_init() }
@@ -612,7 +770,7 @@ func file_lindm_agent_v1_execution_trust_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_execution_trust_proto_rawDesc), len(file_lindm_agent_v1_execution_trust_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

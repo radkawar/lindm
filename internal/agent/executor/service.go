@@ -160,7 +160,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.GetConnectionRequest{}, &agentv1.SignTLSClientMessageRequest{},
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
-		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.StatusRequest{},
+		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
 		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
@@ -280,6 +280,30 @@ func (s *Service) lock(ctx context.Context) error {
 }
 
 func (s *Service) load(ctx context.Context) (*bound, error) {
+	loaded, err := s.loadBound(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if loaded.prior != nil && !s.now().Before(loaded.prior.retain) {
+		// Validate all bindings before retirement, then durably remove the old
+		// private key before returning authority to any caller.
+		loaded.state.PriorCredential = nil
+		revision, err := s.store.Update(ctx, loaded.revision, loaded.state)
+		if err != nil {
+			if errors.Is(err, journal.ErrConflict) {
+				return nil, errInternal
+			}
+			return nil, err
+		}
+		loaded.revision = revision
+		loaded.prior = nil
+	}
+	return loaded, nil
+}
+
+// loadBound authenticates the protected records without retiring credentials or
+// otherwise mutating the journal. Read-only public trust views use this path.
+func (s *Service) loadBound(ctx context.Context) (*bound, error) {
 	if s.hold {
 		return nil, errRecoveryHold
 	}
@@ -310,19 +334,6 @@ func (s *Service) load(ctx context.Context) (*bound, error) {
 			s.noteTrustDamage()
 		}
 		return nil, err
-	}
-	if loaded.prior != nil && !now.Before(loaded.prior.retain) {
-		// Validate all bindings before retirement, then durably remove the old
-		// private key before returning authority to any caller.
-		state.PriorCredential = nil
-		revision, err = s.store.Update(ctx, revision, state)
-		if err != nil {
-			if errors.Is(err, journal.ErrConflict) {
-				return nil, errInternal
-			}
-			return nil, err
-		}
-		loaded.prior = nil
 	}
 	loaded.revision = revision
 	return loaded, nil

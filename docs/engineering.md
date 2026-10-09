@@ -177,6 +177,13 @@ tests retain the `testdb.Open(t)` wrapper. This is schema isolation, not a separ
 PostgreSQL database. The fresh-authorization proof does not qualify job dispatch,
 device execution or finer commercial authorization scopes.
 
+The control-plane trust VM lane uses a separate disposable PostgreSQL **database**,
+not `testdb`'s schema. It invokes the real `lindmd` executable, whose protected
+configuration intentionally rejects arbitrary `search_path` parameters. Lab-only
+cluster administration creates the uniquely named database; the subprocess receives
+only a non-superuser migrator URL. Owned server shutdown precedes database cleanup.
+Neither this fixture nor the fresh-authorization fixture changes shared IdP policy.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node

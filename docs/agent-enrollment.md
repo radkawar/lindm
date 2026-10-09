@@ -10,7 +10,7 @@ replace its desktop/physical acceptance.
 ## 1. Process and source boundaries
 
 Build `cmd/lindm-agent` separately from `cmd/lindmd`. The agent executable has
-`executor`, `run`, `bootstrap`, `resume`, `status`, `trust-update` and typed
+`executor`, `run`, `bootstrap`, `resume`, `status`, `trust-update`, `trust-status` and typed
 `service-prepare`, `service-start`, `service-status`, `service-attest` commands, plus
 standalone inspection/verification. Real per-user session behavior belongs to G4.
 
@@ -29,6 +29,9 @@ standalone inspection/verification. Real per-user session behavior belongs to G4
   `/etc/lindm/agent.json`. Root or the configured network UID may relay signed
   documents, not select trusted keys. This command never starts policy work or
   changes TLS enrollment pins.
+- `trust-status`: reads the protected root/delegation versions, deterministic root
+  digest, exact delegation-envelope digest, acceptance time and validity. Expired
+  retained authority remains visible; reading it grants no authority or native effect.
 - `service-prepare -file FILE`: relays a `PrepareServiceExecutionRequest` containing
   a signed desired intent. Root constructs the native plan and device challenge.
 - `service-start -file FILE`: relays a `StartServiceExecutionRequest` containing
@@ -144,6 +147,44 @@ remove/reinstall it first rejects the previously accepted rotation, then replays
 the final receipt; this detects lost revocation instead of silently reinstalling
 it. Disposable fixture signatures have a one-minute validity overlap, clamped to
 the root's validity. Product time checks remain strict.
+
+### Control-plane authority and automatic relay
+
+Optional server `execution_bootstrap` contains protected public `root_file` and
+`bootstrap_file` references; `device_public_url` is then required. These are the
+owner-pinned execution-root JSON and its genuinely quorum-signed bootstrap, not
+private signing keys. Resolution binds deployment, admin/device origins and device
+CA to the server configuration, and verifies its TLS leaf against the pinned
+transport roots for both hostnames. TLS leaf, CA and release keys cannot become
+execution roots or delegates. Removing this configuration after database
+provisioning fails startup; it does not clear authority.
+
+`AdminService.GetExecutionAuthority` exposes retained public state.
+`UpdateExecutionAuthority` requires an owner/admin with fresh directory
+authorization, a signed `UpdateExecutionTrustRequest`, and an audit reason.
+Principal authorization, root/delegation changes, immutable receipts and audit
+commit together. The server retains the original signed bootstrap, authenticated
+root history and deployment-wide version/recovery floors. Exact historical request
+replay returns its original receipt even after newer updates or expiry; it cannot
+rewind authority or add a second audit. Live state must match its captured retained
+admission/root records; contradictory partial restores fail closed.
+
+Device `GetExecutionTrust` checks eligible certificate, device/generation and
+session under the existing authority lock. Credential overlap retains its existing
+bounded semantics. Reported versions/digests are untrusted delivery hints, not
+applied-state receipts. Responses contain verified signed documents; a missing or
+expired prerequisite, unknown root, divergent digest or chain longer than eight
+transitions requires explicit recovery rather than a guessed reset or partial chain.
+History is bounded at 4,097 roots, 65,536 updates and 64 MiB of retained document
+bytes; capacity rejection preserves existing authority and historical retries.
+
+The installed network process owns a separate cancellable synchronization loop and
+connection cache. Inventory collection cannot starve it. Both loops share a
+cancellable gate around complete identity/session establishment; inventory holds
+that gate through `GetSyncState`, but collection, upload and trust synchronization
+do not. Root alone verifies and atomically admits the signed update. Server desired
+counters must match its receipt. An unprovisioned response never erases local trust.
+This path does not dispatch work, load online signing keys, or establish compliance.
 
 ### Signed durable service execution
 
@@ -534,6 +575,35 @@ Transport diagnostics use a descriptor-relative, no-symlink open: systemd's
 `RestrictSUIDSGID=yes` blocks `openat2` even for read-only requests. Root may read
 the network-owned final spool directory for diagnostics; mutable state and all
 ancestor checks retain their original ownership requirements.
+
+### Running the control-plane authority lane
+
+Use a genuinely older installed package and a current second build, plus separately
+built current `lab` and `lindmd` binaries. Add these options to either native
+lifecycle command above, using new output paths:
+
+```sh
+-control-plane-trust -lindmd /absolute/path/to/lindmd
+```
+
+This mode is exclusive with `-execution-trust` and `-service-execution`. The lab
+creates a unique disposable PostgreSQL database and starts the real server on
+private host ports. Only lab code uses the protected development PostgreSQL admin
+credential to create/drop that database; the server receives its non-superuser
+migrator credential. Production database option validation is unchanged. Shared
+application data, roles, Keycloak configuration and execution authority are not
+modified. Owner login retains certificate/hostname validation, CSRF and S256-PKCE;
+private transports and guest tunnels preserve the logical public origins.
+
+The lane admits delegation through the real owner API and waits for the installed
+network process to synchronize it, without `trust-update`. It exercises quorum and
+rollback denials, root rotation, empty-delegate revocation and historical retry
+after a real server restart, then retained root facts across reboot/reinstall.
+A dormant owned service has a persistent start marker, positive-controlled before
+the observation window, to detect unintended start/stop cycles even if systemd
+discards its in-memory timestamps. This is a no-effect check, not service execution
+qualification. Cleanup stops and joins the private server before dropping its
+owned database without force.
 
 ### Running the native service-provider lane
 

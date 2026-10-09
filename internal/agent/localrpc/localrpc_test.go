@@ -82,6 +82,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		t.Fatal("wrong local UID was authorized to relay execution trust")
 	}
 	for _, procedure := range []string{
+		agentv1connect.ExecutorServiceGetExecutionTrustProcedure,
 		agentv1connect.ExecutorServicePrepareServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,

@@ -31,12 +31,20 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	observe := flags.Duration("observe-for", 0, "optional console inspection interval after first two publications (at most ten minutes)")
 	executionTrust := flags.Bool("execution-trust", false, "exercise signed execution trust rotation, revocation and retained rollback fences after upgrade")
 	serviceExecution := flags.Bool("service-execution", false, "exercise packaged signed service execution and retained journal evidence; implies execution-trust")
+	controlPlaneTrust := flags.Bool("control-plane-trust", false, "exercise isolated real control-plane authority and automatic installed agent trust synchronization")
+	lindmd := flags.String("lindmd", "", "prebuilt current lindmd binary (required with -control-plane-trust)")
 	record := flags.String("record", "", "write successful lifecycle evidence to a new private file")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 || *manifestPath == "" || *firstPath == "" || *secondPath == "" || *rejectionPath == "" || *publicKey == "" || *fingerprint == "" {
 		return errors.New("vm lifecycle requires -manifest, -first-build, -second-build, -rejections, -public-key and -fingerprint; no positional arguments")
+	}
+	if *controlPlaneTrust && (*executionTrust || *serviceExecution) {
+		return errors.New("-control-plane-trust is exclusive with -execution-trust and -service-execution")
+	}
+	if *controlPlaneTrust != (*lindmd != "") {
+		return errors.New("-control-plane-trust requires -lindmd; -lindmd is only valid with -control-plane-trust")
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {
@@ -71,7 +79,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, LabBinary: *probe, First: first, Second: second, APT: apt, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution})
+	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, LabBinary: *probe, First: first, Second: second, APT: apt, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution, ControlPlaneTrust: *controlPlaneTrust, LindmdBinary: *lindmd})
 	if err != nil {
 		return err
 	}

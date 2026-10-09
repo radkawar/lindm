@@ -212,6 +212,9 @@ func TestDamagedExecutionTrustRemainsHeldAcrossRestartAndInspection(t *testing.T
 	if _, err := svc.UpdateExecutionTrust(t.Context(), connect.NewRequest(request)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("damaged trust did not hold update: %v", err)
 	}
+	if _, err := svc.GetExecutionTrust(t.Context(), connect.NewRequest(&agentv1.GetExecutionTrustRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("damaged trust was reported as an authenticated public view: %v", err)
+	}
 	if err := svc.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -226,6 +229,9 @@ func TestDamagedExecutionTrustRemainsHeldAcrossRestartAndInspection(t *testing.T
 	}
 	if _, err := svc.GetConnection(t.Context(), connect.NewRequest(&agentv1.GetConnectionRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Errorf("damaged trust released connection credentials: %v", err)
+	}
+	if _, err := svc.GetExecutionTrust(t.Context(), connect.NewRequest(&agentv1.GetExecutionTrustRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("restart reported damaged trust as an authenticated public view: %v", err)
 	}
 }
 

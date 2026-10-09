@@ -22,6 +22,8 @@ type executionFixture struct {
 	keys      []ed25519.PrivateKey
 	reserved  []ed25519.PrivateKey
 	now       time.Time
+	bootstrap *Bootstrap
+	rootJSON  []byte
 }
 
 func newExecutionFixture(t *testing.T, count int) executionFixture {
@@ -56,6 +58,7 @@ func newExecutionFixture(t *testing.T, count int) executionFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.bootstrap, f.rootJSON = bootstrap, rootJSON
 	f.verifier, err = a.NewExecutionVerifier(bootstrap)
 	if err != nil {
 		t.Fatal(err)
@@ -216,5 +219,57 @@ func TestExecutionDelegationRollbackAndRevocation(t *testing.T) {
 				t.Fatalf("accepted invalid delegation: %v", err)
 			}
 		})
+	}
+}
+
+func TestExecutionVerifierReservesServerTLSLeaf(t *testing.T) {
+	f := newExecutionFixture(t, 2)
+	leaf := testKey(t)
+	delegation := executionTestDelegation(t, f, leaf)
+	envelope := executionSign(t, f.authority, delegation, f.keys...)
+	if accepted, err := f.verifier.VerifyDelegation(t.Context(), f.root, envelope, 0, 0, f.now); err != nil || !proto.Equal(accepted, delegation) {
+		t.Fatalf("independent online key was not authorized: %v", err)
+	}
+	server, err := f.authority.NewExecutionVerifier(f.bootstrap, leaf.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.VerifyDelegation(t.Context(), f.root, envelope, 0, 0, f.now); err == nil {
+		t.Fatal("server TLS leaf acquired online execution authority")
+	}
+	next := proto.CloneOf(f.root)
+	next.Version++
+	next.Threshold = 1
+	next.Keys = []*agentv1.ExecutionKey{executionTestKey(t, leaf)}
+	transition := &agentv1.ExecutionRootTransition{
+		PreviousQuorumEnvelope: executionSign(t, f.authority, next, f.keys...),
+		NextQuorumEnvelope:     executionSign(t, f.authority, next, leaf),
+	}
+	if _, err := server.VerifyRootTransition(t.Context(), f.root, transition, f.now); err == nil {
+		t.Fatal("server TLS leaf acquired offline root authority")
+	}
+	if _, err := f.authority.NewExecutionVerifier(f.bootstrap, f.keys[0].Public()); err == nil {
+		t.Fatal("configured TLS leaf reused an initial offline root")
+	}
+	if server.TrustDomainDigest() != f.verifier.TrustDomainDigest() {
+		t.Fatal("local TLS leaf rotation changed the pinned bootstrap domains")
+	}
+}
+
+func TestExecutionTrustDomainDigestPreservesRoles(t *testing.T) {
+	f := newExecutionFixture(t, 2)
+	swapped := proto.CloneOf(f.bootstrap.Bundle)
+	swapped.TransportCaPem = testCA(t, f.reserved[1], f.now, x509.ExtKeyUsageServerAuth)
+	swapped.DeviceCaPem = testCA(t, f.reserved[0], f.now, x509.ExtKeyUsageClientAuth)
+	verified, err := f.authority.VerifyBootstrap(t.Context(), f.rootJSON, executionSign(t, f.authority, swapped, f.keys...), f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := f.authority.NewExecutionVerifier(verified)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.TrustDomainDigest() == f.verifier.TrustDomainDigest() {
+		t.Fatal("swapping transport and device CA roles preserved the durable domain pin")
 	}
 }

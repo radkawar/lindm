@@ -71,6 +71,28 @@ message ExecutionDelegation {
   };
 }
 
+message GetExecutionTrustRequest {}
+
+// Public, locally authenticated history. Expiry is not a claim of current
+// authority; this view never observes resources or changes protected state.
+message GetExecutionTrustResponse {
+  uint64 root_version = 1 [(buf.validate.field).uint64.gt = 0];
+  // SHA-256 of deterministic protobuf ExecutionRoot bytes.
+  bytes root_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  uint64 delegation_version = 3;
+  // SHA-256 of the exact accepted DSSE envelope; empty before first delegation.
+  bytes delegation_sha256 = 4 [(buf.validate.field).bytes.max_len = 32];
+  uint64 minimum_recovery_epoch = 5;
+  google.protobuf.Timestamp accepted_at = 6;
+  google.protobuf.Timestamp root_expires_at = 7 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp delegation_expires_at = 8;
+  option (buf.validate.message).cel = {
+    id: "execution_trust_view.complete"
+    message: "delegation facts must be absent before configuration and complete afterward"
+    expression: "(this.delegation_version == 0u && this.delegation_sha256.size() == 0 && this.minimum_recovery_epoch == 0u && !has(this.accepted_at) && !has(this.delegation_expires_at)) || (this.delegation_version > 0u && this.delegation_sha256.size() == 32 && has(this.accepted_at) && has(this.delegation_expires_at))"
+  };
+}
+
 // Network callers relay signed documents; they cannot choose trusted keys.
 message UpdateExecutionTrustRequest {
   repeated ExecutionRootTransition root_transitions = 1 [(buf.validate.field).repeated.max_items = 8];

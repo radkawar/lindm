@@ -39,6 +39,9 @@ const (
 	// DeviceServiceGetSyncStateProcedure is the fully-qualified name of the DeviceService's
 	// GetSyncState RPC.
 	DeviceServiceGetSyncStateProcedure = "/lindm.device.v1.DeviceService/GetSyncState"
+	// DeviceServiceGetExecutionTrustProcedure is the fully-qualified name of the DeviceService's
+	// GetExecutionTrust RPC.
+	DeviceServiceGetExecutionTrustProcedure = "/lindm.device.v1.DeviceService/GetExecutionTrust"
 	// DeviceServiceReportHostObservationProcedure is the fully-qualified name of the DeviceService's
 	// ReportHostObservation RPC.
 	DeviceServiceReportHostObservationProcedure = "/lindm.device.v1.DeviceService/ReportHostObservation"
@@ -63,6 +66,7 @@ const (
 type DeviceServiceClient interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
 	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
+	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error)
 	ReportPackageAttempt(context.Context, *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error)
 	BeginPackageSnapshot(context.Context, *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error)
@@ -92,6 +96,12 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+DeviceServiceGetSyncStateProcedure,
 			connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
+			connect.WithClientOptions(opts...),
+		),
+		getExecutionTrust: connect.NewClient[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse](
+			httpClient,
+			baseURL+DeviceServiceGetExecutionTrustProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("GetExecutionTrust")),
 			connect.WithClientOptions(opts...),
 		),
 		reportHostObservation: connect.NewClient[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse](
@@ -137,6 +147,7 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 type deviceServiceClient struct {
 	acquireSession        *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
 	getSyncState          *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
+	getExecutionTrust     *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	reportHostObservation *connect.Client[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse]
 	reportPackageAttempt  *connect.Client[v1.ReportPackageAttemptRequest, v1.ReportPackageAttemptResponse]
 	beginPackageSnapshot  *connect.Client[v1.BeginPackageSnapshotRequest, v1.BeginPackageSnapshotResponse]
@@ -153,6 +164,11 @@ func (c *deviceServiceClient) AcquireSession(ctx context.Context, req *connect.R
 // GetSyncState calls lindm.device.v1.DeviceService.GetSyncState.
 func (c *deviceServiceClient) GetSyncState(ctx context.Context, req *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error) {
 	return c.getSyncState.CallUnary(ctx, req)
+}
+
+// GetExecutionTrust calls lindm.device.v1.DeviceService.GetExecutionTrust.
+func (c *deviceServiceClient) GetExecutionTrust(ctx context.Context, req *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error) {
+	return c.getExecutionTrust.CallUnary(ctx, req)
 }
 
 // ReportHostObservation calls lindm.device.v1.DeviceService.ReportHostObservation.
@@ -189,6 +205,7 @@ func (c *deviceServiceClient) RenewIdentity(ctx context.Context, req *connect.Re
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
 	GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error)
+	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error)
 	ReportPackageAttempt(context.Context, *connect.Request[v1.ReportPackageAttemptRequest]) (*connect.Response[v1.ReportPackageAttemptResponse], error)
 	BeginPackageSnapshot(context.Context, *connect.Request[v1.BeginPackageSnapshotRequest]) (*connect.Response[v1.BeginPackageSnapshotResponse], error)
@@ -214,6 +231,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		DeviceServiceGetSyncStateProcedure,
 		svc.GetSyncState,
 		connect.WithSchema(deviceServiceMethods.ByName("GetSyncState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	deviceServiceGetExecutionTrustHandler := connect.NewUnaryHandler(
+		DeviceServiceGetExecutionTrustProcedure,
+		svc.GetExecutionTrust,
+		connect.WithSchema(deviceServiceMethods.ByName("GetExecutionTrust")),
 		connect.WithHandlerOptions(opts...),
 	)
 	deviceServiceReportHostObservationHandler := connect.NewUnaryHandler(
@@ -258,6 +281,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceAcquireSessionHandler.ServeHTTP(w, r)
 		case DeviceServiceGetSyncStateProcedure:
 			deviceServiceGetSyncStateHandler.ServeHTTP(w, r)
+		case DeviceServiceGetExecutionTrustProcedure:
+			deviceServiceGetExecutionTrustHandler.ServeHTTP(w, r)
 		case DeviceServiceReportHostObservationProcedure:
 			deviceServiceReportHostObservationHandler.ServeHTTP(w, r)
 		case DeviceServiceReportPackageAttemptProcedure:
@@ -285,6 +310,10 @@ func (UnimplementedDeviceServiceHandler) AcquireSession(context.Context, *connec
 
 func (UnimplementedDeviceServiceHandler) GetSyncState(context.Context, *connect.Request[v1.GetSyncStateRequest]) (*connect.Response[v1.GetSyncStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetSyncState is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetExecutionTrust is not implemented"))
 }
 
 func (UnimplementedDeviceServiceHandler) ReportHostObservation(context.Context, *connect.Request[v1.ReportHostObservationRequest]) (*connect.Response[v1.ReportHostObservationResponse], error) {

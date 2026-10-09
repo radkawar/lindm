@@ -4,6 +4,8 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/execution_trust.proto";
+import "lindm/agent/v1/trust.proto";
 import "lindm/inventory/v1/observation.proto";
 import "lindm/validation/v1/string_rules.proto";
 
@@ -17,6 +19,8 @@ service AdminService {
   rpc RevokeEnrollmentGrant(RevokeEnrollmentGrantRequest) returns (RevokeEnrollmentGrantResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+  rpc GetExecutionAuthority(GetExecutionAuthorityRequest) returns (GetExecutionAuthorityResponse);
+  rpc UpdateExecutionAuthority(UpdateExecutionAuthorityRequest) returns (UpdateExecutionAuthorityResponse);
 }
 
 enum DeviceState {
@@ -179,4 +183,23 @@ message ListAuditEventsRequest {
 message ListAuditEventsResponse {
   repeated AuditEvent events = 1;
   string next_page_token = 2;
+}
+
+message GetExecutionAuthorityRequest {}
+message GetExecutionAuthorityResponse {
+  // Absent root means this deployment has not provisioned execution authority.
+  lindm.agent.v1.ExecutionRoot root = 1;
+  lindm.agent.v1.ExecutionDelegation delegation = 2;
+  google.protobuf.Timestamp accepted_at = 3;
+  uint64 revision = 4;
+}
+
+message UpdateExecutionAuthorityRequest {
+  // Exact signed-document digest is the natural, durable idempotency key.
+  lindm.agent.v1.UpdateExecutionTrustRequest update = 1 [(buf.validate.field).required = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message UpdateExecutionAuthorityResponse {
+  // Exact retries return original acceptance, not a new authority lifetime.
+  lindm.agent.v1.UpdateExecutionTrustResponse receipt = 1 [(buf.validate.field).required = true];
 }

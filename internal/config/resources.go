@@ -33,6 +33,7 @@ type Resources struct {
 	ClientSecret          string
 	DirectoryClientSecret string
 	InventoryBudgetBytes  int64
+	ExecutionBootstrap    *ExecutionBootstrap
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -104,6 +105,10 @@ func (d *Document) Resolve() (*Resources, error) {
 	result.DeviceCAKey, ok = ca.PrivateKey.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("device_ca private key cannot sign certificates")
+	}
+	result.ExecutionBootstrap, err = d.executionBootstrap(result)
+	if err != nil {
+		return nil, err
 	}
 
 	secret, err := readFile(reference(base, cfg.GetOidc().GetClientSecretFile()), true)

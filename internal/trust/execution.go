@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/theupdateframework/go-tuf/v2/metadata"
@@ -18,6 +19,15 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/protodata"
+)
+
+type reservedDomain byte
+
+const (
+	reservedTransport reservedDomain = 1 << iota
+	reservedDeviceCA
+	reservedRelease
+	reservedAdditional
 )
 
 // ExecutionVerifier checks execution authority against the separately provisioned
@@ -28,13 +38,14 @@ type ExecutionVerifier struct {
 	authority      *Authority
 	deploymentID   string
 	initialVersion uint64
-	reserved       map[[sha256.Size]byte]struct{}
+	reserved       map[[sha256.Size]byte]reservedDomain
 }
 
 // NewExecutionVerifier takes a Bootstrap previously returned by VerifyBootstrap.
 // Reserved TLS and release public keys are copied as fingerprints; subsequent
 // mutation of the supplied bootstrap cannot change this verifier's trust domains.
-func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap) (*ExecutionVerifier, error) {
+// Additional reservations cover deployment-local keys such as a server TLS leaf.
+func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap, additionalReserved ...crypto.PublicKey) (*ExecutionVerifier, error) {
 	if bootstrap == nil || bootstrap.Root == nil || bootstrap.Bundle == nil || bootstrap.Root.GetDeploymentId() != bootstrap.Bundle.GetDeploymentId() {
 		return nil, errors.New("verified bootstrap is required")
 	}
@@ -43,9 +54,16 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap) (*ExecutionVerifi
 	}
 	v := &ExecutionVerifier{
 		authority: a, deploymentID: bootstrap.Root.GetDeploymentId(),
-		initialVersion: bootstrap.Root.GetVersion(), reserved: make(map[[sha256.Size]byte]struct{}),
+		initialVersion: bootstrap.Root.GetVersion(), reserved: make(map[[sha256.Size]byte]reservedDomain),
 	}
-	for _, encoded := range [][]byte{bootstrap.Bundle.GetTransportCaPem(), bootstrap.Bundle.GetDeviceCaPem()} {
+	for _, domain := range []struct {
+		encoded []byte
+		kind    reservedDomain
+	}{
+		{bootstrap.Bundle.GetTransportCaPem(), reservedTransport},
+		{bootstrap.Bundle.GetDeviceCaPem(), reservedDeviceCA},
+	} {
+		encoded := domain.encoded
 		if len(encoded) == 0 || len(encoded) > 65536 {
 			return nil, errors.New("missing or oversized bootstrap certificates")
 		}
@@ -58,7 +76,7 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap) (*ExecutionVerifi
 			if err != nil {
 				return nil, errors.New("invalid bootstrap certificate")
 			}
-			v.reserved[sha256.Sum256(certificate.RawSubjectPublicKeyInfo)] = struct{}{}
+			v.reserved[sha256.Sum256(certificate.RawSubjectPublicKeyInfo)] |= domain.kind
 			encoded = rest
 		}
 	}
@@ -78,9 +96,68 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap) (*ExecutionVerifi
 		if err != nil {
 			return nil, err
 		}
-		v.reserved[digest] = struct{}{}
+		v.reserved[digest] |= reservedRelease
+	}
+	for _, public := range additionalReserved {
+		digest, err := publicKeyDigest(public)
+		if err != nil {
+			return nil, err
+		}
+		v.reserved[digest] |= reservedAdditional
+	}
+	if len(additionalReserved) != 0 {
+		for _, key := range bootstrap.Root.GetKeys() {
+			if _, err := v.executionKey(key); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return v, nil
+}
+
+// TrustDomainDigest identifies the bootstrap's CA/release public-key domains,
+// independent of certificate dates, root pin advancement and local TLS leaves.
+func (v *ExecutionVerifier) TrustDomainDigest() [sha256.Size]byte {
+	return executionDomainDigest(v.reserved)
+}
+
+func executionDomainDigest(reserved map[[sha256.Size]byte]reservedDomain) [sha256.Size]byte {
+	digests := make([][sha256.Size + 1]byte, 0, len(reserved))
+	for digest, domains := range reserved {
+		pinned := domains & (reservedTransport | reservedDeviceCA | reservedRelease)
+		if pinned == 0 {
+			continue
+		}
+		var item [sha256.Size + 1]byte
+		copy(item[:], digest[:])
+		item[sha256.Size] = byte(pinned)
+		digests = append(digests, item)
+	}
+	slices.SortFunc(digests, func(a, b [sha256.Size + 1]byte) int { return bytes.Compare(a[:], b[:]) })
+	h := sha256.New()
+	h.Write([]byte("lindm.execution-trust-domains.v1\x00"))
+	for _, digest := range digests {
+		h.Write(digest[:])
+	}
+	var result [sha256.Size]byte
+	h.Sum(result[:0])
+	return result
+}
+
+// ExecutionRootDigest identifies exact deterministic protobuf root content.
+// It is a selection hint, not a substitute for authenticating that root.
+func ExecutionRootDigest(root *agentv1.ExecutionRoot) ([sha256.Size]byte, error) {
+	if root == nil {
+		return [sha256.Size]byte{}, errors.New("missing execution root")
+	}
+	if err := protodata.ValidateClosed(root.ProtoReflect()); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(root)
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return sha256.Sum256(encoded), nil
 }
 
 // VerifyRootTransition requires consecutive versions and both independent

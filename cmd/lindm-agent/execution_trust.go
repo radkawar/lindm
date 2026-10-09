@@ -67,3 +67,39 @@ func executionTrustCommand(ctx context.Context, args []string, output io.Writer)
 	_, err = output.Write(append(encoded, '\n'))
 	return err
 }
+
+func executionTrustStatusCommand(ctx context.Context, args []string, output io.Writer) (err error) {
+	if len(args) != 0 {
+		return errors.New("trust-status accepts no arguments")
+	}
+	document, err := config.Load(config.NetworkConfigPath)
+	if err != nil {
+		return err
+	}
+	client, cleanup, err := localrpc.Dial(document.SocketPath)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, cleanup()) }()
+	call, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	response, err := client.GetExecutionTrust(call, connect.NewRequest(&agentv1.GetExecutionTrustRequest{}))
+	if err != nil {
+		return err
+	}
+	if response == nil || response.Msg == nil {
+		return errors.New("missing execution trust view")
+	}
+	if err := protovalidate.Validate(response.Msg); err != nil {
+		return errors.New("invalid execution trust view")
+	}
+	if err := protodata.ValidateClosed(response.Msg.ProtoReflect()); err != nil {
+		return errors.New("unknown execution trust view fields")
+	}
+	encoded, err := (protojson.MarshalOptions{Indent: "  ", UseProtoNames: true}).Marshal(response.Msg)
+	if err != nil {
+		return err
+	}
+	_, err = output.Write(append(encoded, '\n'))
+	return err
+}

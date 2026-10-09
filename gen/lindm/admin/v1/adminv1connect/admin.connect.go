@@ -53,6 +53,12 @@ const (
 	// AdminServiceListAuditEventsProcedure is the fully-qualified name of the AdminService's
 	// ListAuditEvents RPC.
 	AdminServiceListAuditEventsProcedure = "/lindm.admin.v1.AdminService/ListAuditEvents"
+	// AdminServiceGetExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
+	// GetExecutionAuthority RPC.
+	AdminServiceGetExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/GetExecutionAuthority"
+	// AdminServiceUpdateExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
+	// UpdateExecutionAuthority RPC.
+	AdminServiceUpdateExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/UpdateExecutionAuthority"
 )
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
@@ -64,6 +70,8 @@ type AdminServiceClient interface {
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
+	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the lindm.admin.v1.AdminService service. By
@@ -119,18 +127,32 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListAuditEvents")),
 			connect.WithClientOptions(opts...),
 		),
+		getExecutionAuthority: connect.NewClient[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse](
+			httpClient,
+			baseURL+AdminServiceGetExecutionAuthorityProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetExecutionAuthority")),
+			connect.WithClientOptions(opts...),
+		),
+		updateExecutionAuthority: connect.NewClient[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse](
+			httpClient,
+			baseURL+AdminServiceUpdateExecutionAuthorityProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	listDevices           *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	getDevice             *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
-	listDevicePackages    *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
-	createEnrollmentGrant *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
-	revokeEnrollmentGrant *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
-	revokeDevice          *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
-	listAuditEvents       *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	listDevices              *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	getDevice                *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
+	listDevicePackages       *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
+	createEnrollmentGrant    *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
+	revokeEnrollmentGrant    *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
+	revokeDevice             *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	listAuditEvents          *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	getExecutionAuthority    *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
+	updateExecutionAuthority *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
 }
 
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
@@ -168,6 +190,16 @@ func (c *adminServiceClient) ListAuditEvents(ctx context.Context, req *connect.R
 	return c.listAuditEvents.CallUnary(ctx, req)
 }
 
+// GetExecutionAuthority calls lindm.admin.v1.AdminService.GetExecutionAuthority.
+func (c *adminServiceClient) GetExecutionAuthority(ctx context.Context, req *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error) {
+	return c.getExecutionAuthority.CallUnary(ctx, req)
+}
+
+// UpdateExecutionAuthority calls lindm.admin.v1.AdminService.UpdateExecutionAuthority.
+func (c *adminServiceClient) UpdateExecutionAuthority(ctx context.Context, req *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error) {
+	return c.updateExecutionAuthority.CallUnary(ctx, req)
+}
+
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
@@ -177,6 +209,8 @@ type AdminServiceHandler interface {
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
+	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -228,6 +262,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ListAuditEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceGetExecutionAuthorityHandler := connect.NewUnaryHandler(
+		AdminServiceGetExecutionAuthorityProcedure,
+		svc.GetExecutionAuthority,
+		connect.WithSchema(adminServiceMethods.ByName("GetExecutionAuthority")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceUpdateExecutionAuthorityHandler := connect.NewUnaryHandler(
+		AdminServiceUpdateExecutionAuthorityProcedure,
+		svc.UpdateExecutionAuthority,
+		connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceListDevicesProcedure:
@@ -244,6 +290,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceRevokeDeviceHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditEventsProcedure:
 			adminServiceListAuditEventsHandler.ServeHTTP(w, r)
+		case AdminServiceGetExecutionAuthorityProcedure:
+			adminServiceGetExecutionAuthorityHandler.ServeHTTP(w, r)
+		case AdminServiceUpdateExecutionAuthorityProcedure:
+			adminServiceUpdateExecutionAuthorityHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -279,4 +329,12 @@ func (UnimplementedAdminServiceHandler) RevokeDevice(context.Context, *connect.R
 
 func (UnimplementedAdminServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAuditEvents is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetExecutionAuthority is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateExecutionAuthority is not implemented"))
 }

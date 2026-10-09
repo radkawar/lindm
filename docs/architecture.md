@@ -358,6 +358,23 @@ revokes its delegation and fences dispatch; a disconnected host may retain stale
 non-destructive policy only within its original validity. No software mechanism
 can immediately revoke authority on a disconnected compromised machine.
 
+The implemented control-plane authority store retains the genuine initial public
+bootstrap and admitted signed history in PostgreSQL. Configuration changes cannot
+silently repin or disable an initialized authority. Administrative updates combine
+uncached directory authorization and principal locking with root quorum checks,
+monotonic admission, immutable exact-retry receipts and audit in one transaction.
+Live snapshots bind their captured revision to retained admission/root evidence,
+including the root-only initial state; partial state restoration cannot lower
+admission floors. Current public state remains readable after ordinary expiry.
+
+The agent's independent management loop fetches signed authority over eligible
+device/session-authenticated RPC, then submits it to the protected executor.
+Delivery hints and returned server counters are not authenticated applied/compliance
+evidence. Shared cancellable identity/session establishment prevents renewal races
+with inventory without serializing long native collection. This implemented trust
+distribution path is separate from the still-required profile/job/online-signing
+and ownership integration.
+
 ## 6. Persistence and transaction boundaries
 
 Use normalized tables for identities, devices/enrollments/certificates, groups and

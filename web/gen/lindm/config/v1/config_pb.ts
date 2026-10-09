@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/config/v1/config.proto.
  */
 export const file_lindm_config_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEiigYKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEjEKBG9pZGMYCCABKAsyGy5saW5kbS5jb25maWcudjEuT0lEQ0NvbmZpZ0IGukgDyAEBEiEKD3RydXN0ZWRfY2FfZmlsZRgJIAEoCUIIukgFcgMYgCASOQoWaW52ZW50b3J5X2J1ZGdldF9ieXRlcxgKIAEoBEIUukgRMg8Y//////////9/KICAgCBIAIgBATq5AbpItQEasgEKEmxpc3RlbmVycy5kaXN0aW5jdBI0YWRtaW5pc3RyYXRpdmUgYW5kIGRldmljZSBsaXN0ZW5lcnMgbXVzdCBiZSBkaXN0aW5jdBpmIWhhcyh0aGlzLmFkbWluX2xpc3RlbmVyKSB8fCAhaGFzKHRoaXMuZGV2aWNlX2xpc3RlbmVyKSB8fCB0aGlzLmFkbWluX2xpc3RlbmVyICE9IHRoaXMuZGV2aWNlX2xpc3RlbmVyQhkKF19pbnZlbnRvcnlfYnVkZ2V0X2J5dGVzIkUKDkxpc3RlbmVyQ29uZmlnEhgKB2FkZHJlc3MYASABKAlCB7pIBHICcAESGQoEcG9ydBgCIAEoDUILukgIKgYY//8DKAEilQEKDkRhdGFiYXNlQ29uZmlnEhsKCHVybF9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoPbWF4X2Nvbm5lY3Rpb25zGAIgASgNQgq6SAcqBRiAAigCEioKEm1pZ3JhdGlvbl91cmxfZmlsZRgDIAEoCUIJukgGcgSQtRgBSACIAQFCFQoTX21pZ3JhdGlvbl91cmxfZmlsZSJVCglUTFNDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASJaCg5EZXZpY2VDQUNvbmZpZxIjChBjZXJ0aWZpY2F0ZV9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoQcHJpdmF0ZV9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBIoADCgpPSURDQ29uZmlnEhwKBmlzc3VlchgBIAEoCUIMukgJcgeItRgBiAEBEh0KCWNsaWVudF9pZBgCIAEoCUIKukgHcgUQARiAAhIlChJjbGllbnRfc2VjcmV0X2ZpbGUYAyABKAlCCbpIBnIEkLUYARInChNkaXJlY3RvcnlfY2xpZW50X2lkGAQgASgJQgq6SAdyBRABGIACEi8KHGRpcmVjdG9yeV9jbGllbnRfc2VjcmV0X2ZpbGUYBSABKAlCCbpIBnIEkLUYARI0ChRhZG1pbmlzdHJhdG9yX2dyb3VwcxgGIAMoCUIWukgTkgEQEGQYASIKcggQAhiABDoBLzp+ukh7GnkKFW9pZGMuc2VwYXJhdGVfY2xpZW50cxI0bG9naW4gYW5kIGRpcmVjdG9yeSBhY2Nlc3MgbXVzdCB1c2Ugc2VwYXJhdGUgY2xpZW50cxoqdGhpcy5jbGllbnRfaWQgIT0gdGhpcy5kaXJlY3RvcnlfY2xpZW50X2lkQiRaImxpbmRtL2dlbi9saW5kbS9jb25maWcvdjE7Y29uZmlndjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEiuggKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEjEKBG9pZGMYCCABKAsyGy5saW5kbS5jb25maWcudjEuT0lEQ0NvbmZpZ0IGukgDyAEBEiEKD3RydXN0ZWRfY2FfZmlsZRgJIAEoCUIIukgFcgMYgCASOQoWaW52ZW50b3J5X2J1ZGdldF9ieXRlcxgKIAEoBEIUukgRMg8Y//////////9/KICAgCBIAIgBARIsChFkZXZpY2VfcHVibGljX3VybBgLIAEoCUIMukgJcgeAtRgBiAEBSAGIAQESRgoTZXhlY3V0aW9uX2Jvb3RzdHJhcBgMIAEoCzIpLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25Cb290c3RyYXBDb25maWc63QK6SNkCGrIBChJsaXN0ZW5lcnMuZGlzdGluY3QSNGFkbWluaXN0cmF0aXZlIGFuZCBkZXZpY2UgbGlzdGVuZXJzIG11c3QgYmUgZGlzdGluY3QaZiFoYXModGhpcy5hZG1pbl9saXN0ZW5lcikgfHwgIWhhcyh0aGlzLmRldmljZV9saXN0ZW5lcikgfHwgdGhpcy5hZG1pbl9saXN0ZW5lciAhPSB0aGlzLmRldmljZV9saXN0ZW5lchqhAQohZXhlY3V0aW9uX2Jvb3RzdHJhcC5kZXZpY2Vfb3JpZ2luEj1leGVjdXRpb24gYm9vdHN0cmFwIHJlcXVpcmVzIGFuIGV4cGxpY2l0IHB1YmxpYyBkZXZpY2Ugb3JpZ2luGj0haGFzKHRoaXMuZXhlY3V0aW9uX2Jvb3RzdHJhcCkgfHwgaGFzKHRoaXMuZGV2aWNlX3B1YmxpY191cmwpQhkKF19pbnZlbnRvcnlfYnVkZ2V0X2J5dGVzQhQKEl9kZXZpY2VfcHVibGljX3VybCJbChhFeGVjdXRpb25Cb290c3RyYXBDb25maWcSHAoJcm9vdF9maWxlGAEgASgJQgm6SAZyBJC1GAESIQoOYm9vdHN0cmFwX2ZpbGUYAiABKAlCCbpIBnIEkLUYASJFCg5MaXN0ZW5lckNvbmZpZxIYCgdhZGRyZXNzGAEgASgJQge6SARyAnABEhkKBHBvcnQYAiABKA1CC7pICCoGGP//AygBIpUBCg5EYXRhYmFzZUNvbmZpZxIbCgh1cmxfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKD21heF9jb25uZWN0aW9ucxgCIAEoDUIKukgHKgUYgAIoAhIqChJtaWdyYXRpb25fdXJsX2ZpbGUYAyABKAlCCbpIBnIEkLUYAUgAiAEBQhUKE19taWdyYXRpb25fdXJsX2ZpbGUiVQoJVExTQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiWgoORGV2aWNlQ0FDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASKAAwoKT0lEQ0NvbmZpZxIcCgZpc3N1ZXIYASABKAlCDLpICXIHiLUYAYgBARIdCgljbGllbnRfaWQYAiABKAlCCrpIB3IFEAEYgAISJQoSY2xpZW50X3NlY3JldF9maWxlGAMgASgJQgm6SAZyBJC1GAESJwoTZGlyZWN0b3J5X2NsaWVudF9pZBgEIAEoCUIKukgHcgUQARiAAhIvChxkaXJlY3RvcnlfY2xpZW50X3NlY3JldF9maWxlGAUgASgJQgm6SAZyBJC1GAESNAoUYWRtaW5pc3RyYXRvcl9ncm91cHMYBiADKAlCFrpIE5IBEBBkGAEiCnIIEAIYgAQ6AS86frpIexp5ChVvaWRjLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZEIkWiJsaW5kbS9nZW4vbGluZG0vY29uZmlnL3YxO2NvbmZpZ3YxYgZwcm90bzM", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
 
 /**
  * ServerConfig is the only serialized configuration contract for lindmd.
@@ -76,6 +76,19 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
    * @generated from field: optional uint64 inventory_budget_bytes = 10;
    */
   inventoryBudgetBytes?: bigint | undefined;
+
+  /**
+   * @generated from field: optional string device_public_url = 11;
+   */
+  devicePublicUrl?: string | undefined;
+
+  /**
+   * Public owner-pinned material only. Absence cannot erase previously
+   * provisioned authority or authorize execution.
+   *
+   * @generated from field: lindm.config.v1.ExecutionBootstrapConfig execution_bootstrap = 12;
+   */
+  executionBootstrap?: ExecutionBootstrapConfig | undefined;
 };
 
 /**
@@ -84,6 +97,28 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
  */
 export const ServerConfigSchema: GenMessage<ServerConfig> = /*@__PURE__*/
   messageDesc(file_lindm_config_v1_config, 0);
+
+/**
+ * @generated from message lindm.config.v1.ExecutionBootstrapConfig
+ */
+export type ExecutionBootstrapConfig = Message<"lindm.config.v1.ExecutionBootstrapConfig"> & {
+  /**
+   * @generated from field: string root_file = 1;
+   */
+  rootFile: string;
+
+  /**
+   * @generated from field: string bootstrap_file = 2;
+   */
+  bootstrapFile: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.ExecutionBootstrapConfig.
+ * Use `create(ExecutionBootstrapConfigSchema)` to create a new message.
+ */
+export const ExecutionBootstrapConfigSchema: GenMessage<ExecutionBootstrapConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 1);
 
 /**
  * Binding uses an explicit IP address and port rather than a second address
@@ -108,7 +143,7 @@ export type ListenerConfig = Message<"lindm.config.v1.ListenerConfig"> & {
  * Use `create(ListenerConfigSchema)` to create a new message.
  */
 export const ListenerConfigSchema: GenMessage<ListenerConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 1);
+  messageDesc(file_lindm_config_v1_config, 2);
 
 /**
  * @generated from message lindm.config.v1.DatabaseConfig
@@ -138,7 +173,7 @@ export type DatabaseConfig = Message<"lindm.config.v1.DatabaseConfig"> & {
  * Use `create(DatabaseConfigSchema)` to create a new message.
  */
 export const DatabaseConfigSchema: GenMessage<DatabaseConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 2);
+  messageDesc(file_lindm_config_v1_config, 3);
 
 /**
  * @generated from message lindm.config.v1.TLSConfig
@@ -160,7 +195,7 @@ export type TLSConfig = Message<"lindm.config.v1.TLSConfig"> & {
  * Use `create(TLSConfigSchema)` to create a new message.
  */
 export const TLSConfigSchema: GenMessage<TLSConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 3);
+  messageDesc(file_lindm_config_v1_config, 4);
 
 /**
  * @generated from message lindm.config.v1.DeviceCAConfig
@@ -182,7 +217,7 @@ export type DeviceCAConfig = Message<"lindm.config.v1.DeviceCAConfig"> & {
  * Use `create(DeviceCAConfigSchema)` to create a new message.
  */
 export const DeviceCAConfigSchema: GenMessage<DeviceCAConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 4);
+  messageDesc(file_lindm_config_v1_config, 5);
 
 /**
  * @generated from message lindm.config.v1.OIDCConfig
@@ -224,5 +259,5 @@ export type OIDCConfig = Message<"lindm.config.v1.OIDCConfig"> & {
  * Use `create(OIDCConfigSchema)` to create a new message.
  */
 export const OIDCConfigSchema: GenMessage<OIDCConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 5);
+  messageDesc(file_lindm_config_v1_config, 6);
 

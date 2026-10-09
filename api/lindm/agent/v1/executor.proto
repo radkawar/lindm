@@ -57,6 +57,8 @@ service ExecutorService {
   // delegation, then durably commits rollback fences before acknowledgment.
   // This never starts work or accepts caller-selected verification keys.
   rpc UpdateExecutionTrust(UpdateExecutionTrustRequest) returns (UpdateExecutionTrustResponse);
+  // Reads protected public trust facts, not fresh resource observations.
+  rpc GetExecutionTrust(GetExecutionTrustRequest) returns (GetExecutionTrustResponse);
   // Verifies signed desired intent and records native preflight/challenge before
   // replying. No native effect; callers cannot supply a plan or challenge.
   rpc PrepareServiceExecution(PrepareServiceExecutionRequest) returns (PrepareServiceExecutionResponse);

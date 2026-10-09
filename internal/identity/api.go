@@ -43,10 +43,11 @@ type Principal struct {
 type Permission string
 
 const (
-	PermissionReadFleet        Permission = "fleet.read"
-	PermissionManageEnrollment Permission = "enrollment.manage"
-	PermissionRevokeDevice     Permission = "device.revoke"
-	PermissionReadAudit        Permission = "audit.read"
+	PermissionReadFleet            Permission = "fleet.read"
+	PermissionManageEnrollment     Permission = "enrollment.manage"
+	PermissionRevokeDevice         Permission = "device.revoke"
+	PermissionReadAudit            Permission = "audit.read"
+	PermissionManageExecutionTrust Permission = "execution_trust.manage"
 
 	RoleOwner = "owner"
 	RoleAdmin = "admin"
@@ -86,7 +87,7 @@ func Authorize(p Principal, perm Permission) bool {
 		return false
 	}
 	switch perm {
-	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit:
+	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust:
 		return true
 	default:
 		return false

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -39,6 +40,12 @@ type OwnerSession struct {
 // submits only the fixed fixture owner's password to the pinned Keycloak origin.
 // This deterministic fixture adapter deliberately does not automate arbitrary IdPs.
 func OpenOwnerSession(ctx context.Context, repoRoot string) (_ *OwnerSession, resultErr error) {
+	return openOwnerSession(ctx, repoRoot, "")
+}
+
+// openOwnerSession changes only this session's TCP destination. Logical URLs,
+// TLS hostname verification, redirect checks and CSRF origins remain unchanged.
+func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *OwnerSession, resultErr error) {
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return nil, err
@@ -56,6 +63,9 @@ func OpenOwnerSession(ctx context.Context, repoRoot string) (_ *OwnerSession, re
 		return nil, err
 	}
 	transport := &http.Transport{TLSClientConfig: tlsConfig, MaxIdleConns: 4, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
+	if adminAddress != "" {
+		transport.DialContext = ownerDialContext(adminAddress)
+	}
 	seenPKCE := false
 	client := &http.Client{Transport: transport, Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 8 || !fixtureURL(req.URL) || req.Method != http.MethodGet {
@@ -148,6 +158,16 @@ func OpenOwnerSession(ctx context.Context, repoRoot string) (_ *OwnerSession, re
 		}
 	})))
 	return session, nil
+}
+
+func ownerDialContext(adminAddress string) func(context.Context, string, string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		if address == "localhost:18444" {
+			address = adminAddress
+		}
+		return dialer.DialContext(ctx, network, address)
+	}
 }
 
 func (s *OwnerSession) Close(ctx context.Context) error {

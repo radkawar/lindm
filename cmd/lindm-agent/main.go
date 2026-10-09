@@ -24,6 +24,7 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent bootstrap -root FILE -bundle FILE -grant FILE
        lindm-agent resume
        lindm-agent status
+       lindm-agent trust-status
        lindm-agent trust-update -file FILE
        lindm-agent service-prepare -file FILE
        lindm-agent service-start -file FILE
@@ -43,6 +44,8 @@ run uses /etc/lindm/agent.json as the configured unprivileged network account.
 trust-update relays signed execution trust through the root-authenticated socket
 using /etc/lindm/agent.json. Only root or the configured network UID may submit it.
 It never changes TLS enrollment pins or starts an operation.
+trust-status reads the protected root/delegation counters, digests and historical
+expiry through that socket. It does not collect native evidence or mutate trust.
 service-prepare/start/status/attest use the same socket and network configuration.
 Prepare verifies signed intent and returns preflight evidence; start relays a
 separately signed short-lived grant. Start acceptance is not native completion:
@@ -78,6 +81,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return resumeCommand(ctx, args[1:])
 	case "status":
 		return statusCommand(ctx, args[1:], output)
+	case "trust-status":
+		return executionTrustStatusCommand(ctx, args[1:], output)
 	case "trust-update":
 		return executionTrustCommand(ctx, args[1:], output)
 	case "service-prepare", "service-start", "service-status", "service-attest":

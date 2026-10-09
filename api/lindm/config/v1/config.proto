@@ -15,6 +15,11 @@ message ServerConfig {
     message: "administrative and device listeners must be distinct"
     expression: "!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener"
   };
+  option (buf.validate.message).cel = {
+    id: "execution_bootstrap.device_origin"
+    message: "execution bootstrap requires an explicit public device origin"
+    expression: "!has(this.execution_bootstrap) || has(this.device_public_url)"
+  };
 
   string deployment_id = 1 [
     (buf.validate.field).string.uuid = true,
@@ -39,6 +44,18 @@ message ServerConfig {
     gte: 67108864
     lte: 9223372036854775807
   }];
+  optional string device_public_url = 11 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  // Public owner-pinned material only. Absence cannot erase previously
+  // provisioned authority or authorize execution.
+  ExecutionBootstrapConfig execution_bootstrap = 12;
+}
+
+message ExecutionBootstrapConfig {
+  string root_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string bootstrap_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
 
 // Binding uses an explicit IP address and port rather than a second address

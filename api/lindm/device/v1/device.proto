@@ -4,6 +4,7 @@ package lindm.device.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/execution_trust.proto";
 import "lindm/inventory/v1/observation.proto";
 
 option go_package = "lindm/gen/lindm/device/v1;devicev1";
@@ -11,6 +12,7 @@ option go_package = "lindm/gen/lindm/device/v1;devicev1";
 service DeviceService {
   rpc AcquireSession(AcquireSessionRequest) returns (AcquireSessionResponse);
   rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
+  rpc GetExecutionTrust(GetExecutionTrustRequest) returns (GetExecutionTrustResponse);
   rpc ReportHostObservation(ReportHostObservationRequest) returns (ReportHostObservationResponse);
   rpc ReportPackageAttempt(ReportPackageAttemptRequest) returns (ReportPackageAttemptResponse);
   rpc BeginPackageSnapshot(BeginPackageSnapshotRequest) returns (BeginPackageSnapshotResponse);
@@ -41,6 +43,32 @@ message GetSyncStateResponse {
   uint64 host_sequence = 2;
   uint64 package_sequence = 3;
   google.protobuf.Timestamp server_time = 4;
+}
+
+// Untrusted selection hints, not a device-signed applied-authority receipt.
+message GetExecutionTrustRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 root_version = 2 [(buf.validate.field).uint64.gt = 0];
+  bytes root_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  uint64 delegation_version = 4;
+  bytes delegation_sha256 = 5 [(buf.validate.field).bytes.max_len = 32];
+  uint64 minimum_recovery_epoch = 6;
+  option (buf.validate.message).cel = {
+    id: "execution_trust_cursor.complete"
+    message: "delegation digest and recovery floor must agree with configuration state"
+    expression: "(this.delegation_version == 0u && this.delegation_sha256.size() == 0 && this.minimum_recovery_epoch == 0u) || (this.delegation_version > 0u && this.delegation_sha256.size() == 32)"
+  };
+}
+
+message GetExecutionTrustResponse {
+  lindm.agent.v1.UpdateExecutionTrustRequest update = 1;
+  // Desired server authority only. Zeroes mean authority is not provisioned.
+  uint64 root_version = 2;
+  uint64 delegation_version = 3;
+  uint64 minimum_recovery_epoch = 4;
 }
 
 // PackageBatchDescriptor binds one opaque inventory.v1.PackageBatch. SHA-256 and

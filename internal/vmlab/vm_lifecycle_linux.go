@@ -17,6 +17,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 )
 
@@ -39,6 +40,9 @@ type VMLifecycleOptions struct {
 	ExecutionTrust bool
 	// Requires the upgraded executor's signed durable service execution API.
 	ServiceExecution bool
+	// Uses a private real server/database and automatic network trust relay.
+	ControlPlaneTrust bool
+	LindmdBinary      string
 	// Optional bounded observation time after the first two publications lets
 	// a human inspect the actual console without changing product timers.
 	ObserveFor time.Duration
@@ -65,6 +69,7 @@ type VMLifecycleResult struct {
 	RejectedArtifacts        []string                       `json:"rejected_artifacts"`
 	PrivilegeEvidence        *labv1.NetworkBoundaryEvidence `json:"privilege_evidence"`
 	ExecutionTrust           *vmExecutionTrustEvidence      `json:"execution_trust,omitempty"`
+	ControlPlaneTrust        *vmControlPlaneTrustEvidence   `json:"control_plane_trust,omitempty"`
 	LostIssuanceRecovered    bool                           `json:"lost_issuance_recovered"`
 	PurgeRetainedIdentity    bool                           `json:"purge_retained_identity"`
 	SpoolCorruptionRecovered bool                           `json:"spool_corruption_recovered"`
@@ -87,6 +92,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	if options.ObserveFor < 0 || options.ObserveFor > 10*time.Minute {
 		return nil, errors.New("observation interval must be between zero and ten minutes")
+	}
+	if options.ControlPlaneTrust && (options.ExecutionTrust || options.ServiceExecution) {
+		return nil, errors.New("control-plane trust is exclusive with manual trust/service execution")
+	}
+	if options.ControlPlaneTrust != (options.LindmdBinary != "") {
+		return nil, errors.New("control-plane trust requires a prebuilt lindmd binary exclusively")
 	}
 	if err := packaging.UpgradeOrdered(options.First.Version, options.Second.Version); err != nil {
 		return nil, err
@@ -145,7 +156,17 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
 		return nil, err
 	}
-	forwards, err := openLifecycleForwards(ctx, vm)
+	var isolated *devlab.AuthorityFixture
+	destinations := [2]string{"127.0.0.1:18444", "127.0.0.1:18445"}
+	if options.ControlPlaneTrust {
+		isolated, err = devlab.OpenAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { err = errors.Join(err, isolated.Close()) }()
+		destinations = [2]string{isolated.AdminAddress, isolated.DeviceAddress}
+	}
+	forwards, err := openLifecycleForwards(ctx, vm, destinations)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +176,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	// Keep the owner session fresh for its first authenticated API operation,
 	// and revoke authority before the VM and its private files are torn down.
-	control, err := openVMControlPlane(ctx, options.Repository)
+	control, err := openVMControlPlane(ctx, options.Repository, isolated)
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +289,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 			return nil, err
 		}
 	}
+	if options.ControlPlaneTrust {
+		result.ControlPlaneTrust, err = exerciseVMControlPlaneTrust(ctx, packages, control, isolated, options.Repository)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if err := closeLifecycleForwards(forwards); err != nil {
 		return nil, err
@@ -279,7 +306,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := rebootLifecycleGuest(ctx, vm, identity.GetCommittedBootId()); err != nil {
 		return nil, err
 	}
-	forwards, err = openLifecycleForwards(ctx, vm)
+	forwards, err = openLifecycleForwards(ctx, vm, destinations)
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +326,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 			return nil, err
 		}
 		result.ExecutionTrust.RebootRetained = true
+	}
+	if result.ControlPlaneTrust != nil {
+		if err := verifyRetainedVMControlPlaneTrust(ctx, vm, result.ControlPlaneTrust); err != nil {
+			return nil, err
+		}
+		result.ControlPlaneTrust.RebootRetained = true
 	}
 	if err := lifecycleCommand(ctx, vm, "synchronize after reboot", "systemctl restart lindm-agent.service"); err != nil {
 		return nil, err
@@ -341,6 +374,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 			return nil, err
 		}
 		result.ExecutionTrust.ReinstallRetained = true
+	}
+	if result.ControlPlaneTrust != nil {
+		if err := verifyRetainedVMControlPlaneTrust(ctx, vm, result.ControlPlaneTrust); err != nil {
+			return nil, err
+		}
+		result.ControlPlaneTrust.ReinstallRetained = true
 	}
 	reinstalled, err := waitLifecycleInventory(ctx, vm, control, manifest.GetDistribution(), result.DeviceID, rebooted)
 	if err != nil {

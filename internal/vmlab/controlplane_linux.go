@@ -79,12 +79,17 @@ type vmPackageSnapshot struct {
 	packages        map[nativePackage]int
 }
 
-func openVMControlPlane(ctx context.Context, repoRoot string) (*vmControlPlane, error) {
+func openVMControlPlane(ctx context.Context, repoRoot string, isolated *devlab.AuthorityFixture) (*vmControlPlane, error) {
 	fixture, err := devlab.ReadAgentFixture(ctx, repoRoot)
 	if err != nil {
 		return nil, fmt.Errorf("read existing agent fixture: %w", err)
 	}
-	session, err := devlab.OpenOwnerSession(ctx, repoRoot)
+	var session *devlab.OwnerSession
+	if isolated == nil {
+		session, err = devlab.OpenOwnerSession(ctx, repoRoot)
+	} else {
+		session, err = isolated.OpenOwnerSession(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}

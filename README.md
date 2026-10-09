@@ -114,8 +114,12 @@ unprivileged transport diagnostics; it does not assert online presence or
 compliance. Removal and purge retain identity and inventory state, never reset it.
 `trust-update -file FILE` relays signed execution-root rotations and online
 delegations through the protected executor; it never starts work or replaces TLS
-pins. The native lifecycle lane's `-execution-trust` option exercises this command
-and retained rollback fences across upgrade, reboot and reinstall.
+pins. `trust-status` reads retained versions, digests and validity without native
+effects. The network process also synchronizes signed authority automatically from
+the configured control plane, independently of inventory collection.
+The native lifecycle options `-execution-trust` and
+`-control-plane-trust -lindmd /absolute/path/to/lindmd` exercise manual admission and
+isolated real-server delivery respectively; they are mutually exclusive.
 `service-prepare`, `service-start` and `service-status` relay typed signed work and
 read durable results. They cannot create authority or turn queue acceptance into
 completion. `service-attest` returns device-signed, nonce-bound retained evidence,
