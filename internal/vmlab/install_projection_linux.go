@@ -29,6 +29,7 @@ type InstallProjectionEvidence struct {
 	Before                       []InstallProjectionLink `json:"before"`
 	AfterEnable                  []InstallProjectionLink `json:"after_enable"`
 	AfterDisable                 []InstallProjectionLink `json:"after_disable"`
+	AfterReenable                []InstallProjectionLink `json:"after_reenable"`
 	DisableRemovedBaselineAlias  bool                    `json:"disable_removed_baseline_alias"`
 	DisableRemovedEmptyParent    bool                    `json:"disable_removed_empty_parent"`
 	CustodySurvivedDisable       bool                    `json:"custody_survived_disable"`
@@ -44,10 +45,11 @@ type InstallProjectionLink struct {
 }
 
 const (
-	projectionPrimary = "projection-primary.service"
-	projectionAlias   = "projection-preexisting.service"
-	projectionCustody = ".lindm-ownership"
-	projectionInstall = "multi-user.target.wants/" + projectionPrimary
+	projectionPrimary       = "projection-primary.service"
+	projectionAlias         = "projection-preexisting.service"
+	projectionExternalAlias = "projection-external.service"
+	projectionCustody       = ".lindm-ownership"
+	projectionInstall       = "multi-user.target.wants/" + projectionPrimary
 )
 
 // CheckInstallProjection uses fixed native arguments and fixture-only paths.
@@ -117,6 +119,7 @@ func CheckInstallProjection(ctx context.Context, workDir string) (_ *InstallProj
 		{Path: projectionInstall, Target: "/usr/lib/systemd/system/" + projectionPrimary},
 		{Path: "multi-user.target.wants/projection-related@worker.service", Target: "/usr/lib/systemd/system/projection-related@.service"},
 		{Path: "projection-created.service", Target: "/usr/lib/systemd/system/" + projectionPrimary},
+		{Path: projectionExternalAlias, Target: "/usr/lib/systemd/system/" + projectionPrimary},
 		{Path: "projection-extra.target.wants/" + projectionPrimary, Target: "/usr/lib/systemd/system/" + projectionPrimary},
 		{Path: projectionAlias, Target: "/usr/lib/systemd/system/" + projectionPrimary},
 	}
@@ -149,11 +152,11 @@ func CheckInstallProjection(ctx context.Context, workDir string) (_ *InstallProj
 		return nil, err
 	}
 	for _, link := range evidence.AfterDisable {
-		if link.Path != projectionAlias || link.Target != "/usr/lib/systemd/system/"+projectionPrimary {
+		if (link.Path != projectionAlias && link.Path != projectionExternalAlias) || link.Target != "/usr/lib/systemd/system/"+projectionPrimary {
 			return nil, fmt.Errorf("native disable retained an unexpected fixture install link: %s", link.Path)
 		}
 	}
-	evidence.DisableRemovedBaselineAlias = len(evidence.AfterDisable) == 0
+	evidence.DisableRemovedBaselineAlias = !slices.Contains(evidence.AfterDisable, InstallProjectionLink{Path: projectionAlias, Target: "/usr/lib/systemd/system/" + projectionPrimary})
 	_, err = os.Lstat(filepath.Dir(filepath.Join(units, projectionInstall)))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -177,6 +180,23 @@ func CheckInstallProjection(ctx context.Context, workDir string) (_ *InstallProj
 		return nil, errors.New("fresh native process did not observe the retained anchor inode")
 	}
 	evidence.FreshProcessVerifiedAnchor = true
+	// Compare a counterfactual disable/enable cycle with direct enable. It must
+	// recover the already-present declared alias and Also link, but not adopt
+	// an unrelated pre-existing alias as part of the declared install footprint.
+	declared := slices.DeleteFunc(expected, func(link InstallProjectionLink) bool { return link.Path == projectionExternalAlias })
+	if _, err := projectionCommand(ctx, binary, "--system", "--root="+root, "--no-reload", "--no-ask-password", "--no-pager", "enable", "--", projectionPrimary); err != nil {
+		return nil, err
+	}
+	evidence.AfterReenable, err = observeProjectionLinks(units)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Equal(evidence.AfterReenable, declared) {
+		return nil, fmt.Errorf("counterfactual enable did not distinguish declared and external install links: %v", evidence.AfterReenable)
+	}
+	if _, err := projectionCommand(ctx, binary, "--system", "--root="+root, "--no-reload", "--no-ask-password", "--no-pager", "disable", "--", projectionPrimary); err != nil {
+		return nil, err
+	}
 	if err := checkProjectionCaptureRaces(units, anchor, before); err != nil {
 		return nil, err
 	}
@@ -206,7 +226,20 @@ func seedInstallProjection(root string) error {
 			return err
 		}
 	}
-	return os.Symlink("/usr/lib/systemd/system/"+projectionPrimary, filepath.Join(units, projectionAlias))
+	for _, link := range []InstallProjectionLink{
+		{Path: projectionAlias, Target: "/usr/lib/systemd/system/" + projectionPrimary},
+		{Path: projectionExternalAlias, Target: "/usr/lib/systemd/system/" + projectionPrimary},
+		{Path: "multi-user.target.wants/projection-related@worker.service", Target: "/usr/lib/systemd/system/projection-related@.service"},
+	} {
+		path := filepath.Join(units, link.Path)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			return err
+		}
+		if err := os.Symlink(link.Target, path); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func observeProjectionLinks(units string) ([]InstallProjectionLink, error) {

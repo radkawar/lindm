@@ -225,10 +225,14 @@ are rejected before fixture creation. Do not change checkout permissions to make
 this check pass; use a protected parent such as `$HOME/.cache` or the default.
 The optional record is created privately and exclusively, after successful cleanup.
 
-The scenario observes exact native enablement links for aliases, an `Also` instance
-and an install drop-in, then records native disable's treatment of the pre-existing
-alias and empty parent directory. It verifies that a private non-unit-named hardlink
-retains the symlink inode across native disable and observation by a fresh process.
+The scenario starts with a declared alias, an undeclared alias and an already-enabled
+`Also` instance. It observes exact native enablement links, including an install
+drop-in, then records native disable's treatment of the baseline alias and empty
+parent directory. A subsequent enable must recover the declared alias and `Also`
+link without adopting the undeclared alias. This distinguishes the declared
+footprint from both the direct-enable delta and the complete pre-existing link set
+for this fixture. A private non-unit-named hardlink retains the symlink inode across
+native disable and observation by a fresh process.
 Actual `renameat2(RENAME_NOREPLACE)` interleavings exercise owned capture,
 replacement restoration and preservation of both entries when a newer public entry
 blocks restoration, including a captured unrelated regular file.

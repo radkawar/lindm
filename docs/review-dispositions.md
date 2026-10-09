@@ -542,6 +542,16 @@ writes. This verifies filesystem permission boundaries, not a native distro lane
 Profile ownership, crash/power-loss recovery, runtime restoration and full G3 remain
 unqualified.
 
+A follow-on actual native run, recorded as
+`/home/r/.cache/lindm-native-install-projection-v4.json`, started with both declared
+and undeclared aliases plus an already-enabled `Also` instance. Direct enable
+preserved all three; disable removed them; re-enable recovered the declared alias
+and `Also` link but not the undeclared alias. Focused lab race checks and lint
+passed. This establishes the counterfactual footprint only for the controlled
+fixture; it does not establish a general snapshot algorithm, shared ownership or
+production release semantics. The earlier independent reviews did not review this
+follow-on extension.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
