@@ -625,7 +625,10 @@ of its executable, creates fixed sacrificial service fixtures only in its owned
 guest, and calls `internal/agent/serviceprovider`. Independent `systemctl`
 observations verify enable/start, unchanged desired state, stale-plan rejection,
 reconvergence, disable/stop, cancellation before start, and rejection of missing,
-aliased, nonpersistent oneshot and legacy-include services. The host checks the
+aliased, nonpersistent oneshot and legacy-include services. An eleventh phase
+requires systemd to load a valid procfs-backed drop-in whose actual bytes exceed
+its reported size, then verifies conflict without runtime/enablement changes and
+restoration of the original definition after fixture cleanup. The host checks the
 exact required scenarios and their native identity/state bindings, not only a
 record count. Fedora enforcement is checked before and after the scenario.
 Success follows fixture cleanup and complete VM teardown.
@@ -645,6 +648,14 @@ handling; it conservatively refuses those prefixes inside continued lines too.
 Ordinary comment and assignment-value mentions remain accepted. Accepted bytes
 retain their existing fingerprint encoding; historical signed records are not
 rewritten.
+
+The definition reader also requires actual EOF immediately after the reported
+file length. Regular-file type and stable metadata alone do not prove that all
+bytes were hashed: procfs can expose nonempty files with size zero. Unreported
+bytes or an inability to establish EOF cause conflict, not an accepted partial
+definition. Stable ordinary files, including empty files, retain their existing
+hash encoding. Filesystem reads still use cooperative cancellation; a blocked
+kernel read is not made interruptible by a context check.
 
 Persistent enablement changes require a native manager reload. This also
 incorporates other pending unit definitions; it is not an isolated per-unit

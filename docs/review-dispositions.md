@@ -356,6 +356,44 @@ Fedora's enforcement checks were Enforcing before and after. Evidence:
 Focused provider/executor/lab race checks and lint passed. This qualifies the
 refusal and existing provider scenarios, not profile ownership or full G3.
 
+### Exact definition-length binding correction
+
+A real procfs regression showed that the reader accepted `/proc/version` as an
+empty definition because it trusted a stable reported size of zero. It now reads
+at most one additional byte after the reported length and requires actual EOF
+before the existing metadata recheck. Accepted ordinary-file hashes are unchanged.
+The regression failed before correction and passed afterward; empty ordinary
+files and cancellation at the zero-length boundary are also covered.
+
+The maintained VM lane now has eleven phases. Its new phase exposes a valid
+drop-in through a private root-owned process's argv, checks the exact unreported
+bytes, and requires the native manager's Description to prove actual consumption.
+The observed native service is loaded/inactive/indirect; the requested change is
+runtime-only, with enablement unmanaged. An isolated build overlay using the exact
+committed pre-fix reader reached these prerequisites and incorrectly accepted the
+plan in Ubuntu. Diagnostic record:
+`/home/r/.cache/lindm-cloud-init-2159137191.json`. Earlier setup failures were
+diagnosed, not counted as provider refusal.
+
+Independent stateless reader review found no blocking defect and requested the
+empty-file boundary coverage. A separate fixture review required the failing-before
+native comparison, explicit source UID checking and rejection of absent restoration
+fingerprints or a wrong before-unit binding. All were addressed; corrective source
+review found no remaining actionable issue. These reviews did not run checks.
+Replay of both real final evidence records accepted the originals and rejected
+missing fingerprints, substituted before-unit identity, missing native consumption,
+matching reported/actual sizes and changed native state. Throwaway replay and
+counterfactual-build inputs were removed.
+
+The corrected eleven-phase lane passed in Ubuntu 24.04 and Fedora 44, with Fedora
+Enforcing at both checks. Both used lab SHA-256
+`05a9bfbf6f35a54342e4e6b812840a6f8427a9047246eaaf78662ba40d6e86a6`.
+Records: `/home/r/.cache/lindm-services-ubuntu-unreported-v1.json` and
+`/home/r/.cache/lindm-services-fedora-unreported-v1.json`. Success followed drop-in
+cleanup, producer reaping, original-definition restoration and full VM teardown.
+Focused provider/executor/VM-lab/lab-command race checks and lint passed. This is
+definition admission qualification, not profile ownership or complete G3.
+
 ### Signed durable service-execution reviews
 
 Four independent read-only reviews covered the action journal, cryptographic/native

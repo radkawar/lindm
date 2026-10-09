@@ -61,6 +61,57 @@ func TestDefinitionReadDetectsMetadataChange(t *testing.T) {
 	}
 }
 
+func TestDefinitionRejectsUnreportedBytes(t *testing.T) {
+	// procfs exposes regular, root-owned files with bytes beyond st_size.
+	// Metadata stability alone must not authorize an empty hash of those bytes.
+	file, _, stat, err := openDefinition("/proc/version")
+	if errors.Is(err, os.ErrNotExist) {
+		t.Skip("procfs is not mounted")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if stat.Size != 0 {
+		t.Skip("procfs version file reports its content length")
+	}
+	var probe [1]byte
+	if n, err := file.ReadAt(probe[:], 0); n != 1 || err != nil {
+		t.Fatalf("procfs fixture does not expose bytes beyond its reported size: n=%d err=%v", n, err)
+	}
+	var buffer [32]byte
+	if err := hashFile(context.Background(), sha256.New(), file, stat, buffer[:]); !errors.Is(err, ErrConflict) {
+		t.Fatalf("unreported definition bytes accepted: %v", err)
+	}
+}
+
+func TestDefinitionHashesEmptyFileAndHonorsCancellation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "empty.conf")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+		t.Fatal(err)
+	}
+	var buffer [1]byte
+	h := sha256.New()
+	if err := hashFile(context.Background(), h, file, stat, buffer[:]); err != nil {
+		t.Fatal(err)
+	}
+	want := sha256.Sum256(nil)
+	if !bytes.Equal(h.Sum(nil), want[:]) {
+		t.Fatal("empty regular definition hash changed")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := hashFile(ctx, sha256.New(), file, stat, buffer[:]); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled empty definition read accepted: %v", err)
+	}
+}
+
 func TestDefinitionRejectsLegacyIncludes(t *testing.T) {
 	for _, input := range []string{
 		".include /unbound.conf\n",

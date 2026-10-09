@@ -282,6 +282,25 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		}
 		evidence.Steps = append(evidence.Steps, vmlab.VMServiceStep{Name: target.name, Target: target.unit, Before: before, After: after, NativeBefore: nativeBefore, NativeAfter: nativeAfter, Rejection: "unsupported"})
 	}
+	beforeLength, err := provider.Observe(ctx, serviceProofUnit)
+	if err != nil {
+		return nil, err
+	}
+	lengthStep, err := serviceProofUnreportedDefinition(ctx, provider)
+	if err != nil {
+		return nil, err
+	}
+	// The helper has removed its drop-in and reaped its source process before
+	// this observation. The native refusal snapshots were taken before cleanup.
+	lengthStep.Before = beforeLength
+	lengthStep.After, err = provider.Observe(ctx, serviceProofUnit)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(beforeLength.FingerprintSha256, lengthStep.After.FingerprintSha256) {
+		return nil, errors.New("unreported definition fixture did not restore the original service definition")
+	}
+	evidence.Steps = append(evidence.Steps, *lengthStep)
 	return evidence, nil
 }
 

@@ -92,6 +92,14 @@ func hashFile(ctx context.Context, h hash.Hash, file *os.File, before unix.Stat_
 		_, _ = h.Write(buffer[:n])
 		remaining -= int64(n)
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// A regular file can expose bytes beyond st_size (for example procfs).
+	// Require actual EOF: metadata stability alone does not bind those bytes.
+	if _, err := io.ReadFull(file, buffer[:1]); err != io.EOF {
+		return fmt.Errorf("%w: definition length does not match metadata", ErrConflict)
+	}
 	var after unix.Stat_t
 	if err := unix.Fstat(int(file.Fd()), &after); err != nil {
 		return err

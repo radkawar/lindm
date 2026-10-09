@@ -42,15 +42,22 @@ type VMServiceNativeState struct {
 // Provider messages retain complete native observations, including definition
 // hashes and fingerprints. Native states come from independent systemctl calls.
 type VMServiceStep struct {
-	Name         string                       `json:"name"`
-	Target       string                       `json:"target"`
-	Plan         *agentv1.ServicePlan         `json:"plan,omitempty"`
-	Before       *agentv1.ServiceObservation  `json:"before,omitempty"`
-	After        *agentv1.ServiceObservation  `json:"after"`
-	Verification *agentv1.ServiceVerification `json:"verification,omitempty"`
-	NativeBefore *VMServiceNativeState        `json:"native_before"`
-	NativeAfter  *VMServiceNativeState        `json:"native_after"`
-	Rejection    string                       `json:"rejection,omitempty"`
+	Name                 string                       `json:"name"`
+	Target               string                       `json:"target"`
+	Plan                 *agentv1.ServicePlan         `json:"plan,omitempty"`
+	Before               *agentv1.ServiceObservation  `json:"before,omitempty"`
+	After                *agentv1.ServiceObservation  `json:"after"`
+	Verification         *agentv1.ServiceVerification `json:"verification,omitempty"`
+	NativeBefore         *VMServiceNativeState        `json:"native_before"`
+	NativeAfter          *VMServiceNativeState        `json:"native_after"`
+	Rejection            string                       `json:"rejection,omitempty"`
+	UnreportedDefinition *VMServiceDefinitionLength   `json:"unreported_definition,omitempty"`
+}
+
+type VMServiceDefinitionLength struct {
+	ReportedSize      int64  `json:"reported_size"`
+	ObservedSize      int64  `json:"observed_size"`
+	NativeDescription string `json:"native_description"`
 }
 
 type VMServicesEvidence struct {
@@ -172,6 +179,7 @@ func validateServiceEvidence(evidence *VMServicesEvidence) error {
 		{"alias-rejected", "lab-native-service-proof-alias.service", "unsupported"},
 		{"oneshot-rejected", "lab-native-service-proof-oneshot.service", "unsupported"},
 		{"legacy-include-rejected", "lab-native-service-proof-legacy-include.service", "unsupported"},
+		{"unreported-bytes-rejected", primary, "conflict"},
 	}
 	if evidence == nil || evidence.Capability != "systemd.service.v1" || len(evidence.Steps) != len(expected) {
 		return errors.New("incomplete native service evidence")
@@ -196,6 +204,19 @@ func validateServiceEvidence(evidence *VMServicesEvidence) error {
 		if want.name == "legacy-include-rejected" &&
 			(step.NativeBefore.LoadState != "loaded" || step.NativeBefore.ActiveState != "inactive" || step.NativeBefore.UnitFileState != "disabled") {
 			return errors.New("legacy include refusal lacks loaded inactive disabled native evidence")
+		}
+		if want.name == "unreported-bytes-rejected" {
+			length := step.UnreportedDefinition
+			if length == nil || length.ReportedSize != 0 || length.ObservedSize <= 0 || length.ObservedSize >= 4096 ||
+				length.NativeDescription != "Disposable native unreported definition bytes proof\n" ||
+				step.NativeBefore.LoadState != "loaded" || step.NativeBefore.ActiveState != "inactive" || step.NativeBefore.UnitFileState != "indirect" ||
+				step.Before == nil || step.Before.Unit != primary ||
+				len(step.Before.FingerprintSha256) != sha256.Size || len(step.After.FingerprintSha256) != sha256.Size ||
+				!bytes.Equal(step.Before.FingerprintSha256, step.After.FingerprintSha256) {
+				return errors.New("unreported definition refusal lacks loaded native bytes or restored definition evidence")
+			}
+		} else if step.UnreportedDefinition != nil {
+			return errors.New("unexpected unreported definition evidence in another scenario")
 		}
 	}
 	return nil
