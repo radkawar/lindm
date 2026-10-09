@@ -29,7 +29,7 @@ func OpenDiagnosticDirectory(directory string, owner uint32) (int, error) {
 	return openDirectory(directory, owner)
 }
 
-func openDirectory(directory string, owner uint32) (int, error) {
+func walkDirectory(directory string) (int, error) {
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
 		return -1, err
@@ -39,16 +39,9 @@ func openDirectory(directory string, owner uint32) (int, error) {
 		return -1, err
 	}
 	for _, component := range strings.Split(strings.TrimPrefix(absolute, "/"), "/") {
-		var info unix.Stat_t
-		if err := unix.Fstat(fd, &info); err != nil {
+		if err := checkAncestor(fd); err != nil {
 			_ = unix.Close(fd)
 			return -1, err
-		}
-		// Sticky trusted parents (notably /tmp) cannot rename an entry owned
-		// by this UID/root. Diagnostics alone may accept another final owner.
-		if info.Uid != 0 && info.Uid != uint32(os.Geteuid()) || info.Mode&0022 != 0 && info.Mode&unix.S_ISVTX == 0 {
-			_ = unix.Close(fd)
-			return -1, ErrUnsafe
 		}
 		if component == "" {
 			continue
@@ -60,6 +53,30 @@ func openDirectory(directory string, owner uint32) (int, error) {
 		}
 		fd = next
 	}
+	return fd, nil
+}
+
+// OpenTemporaryParent checks the directory and its ancestry before a caller
+// creates private temporary children. Root/caller ownership and trusted sticky
+// shared parents are accepted; symlinks and replaceable ancestry are not.
+// The caller owns the descriptor. The same UID, root and filesystem are trusted.
+func OpenTemporaryParent(directory string) (int, error) {
+	fd, err := walkDirectory(directory)
+	if err != nil {
+		return -1, err
+	}
+	if err := checkAncestor(fd); err != nil {
+		_ = unix.Close(fd)
+		return -1, err
+	}
+	return fd, nil
+}
+
+func openDirectory(directory string, owner uint32) (int, error) {
+	fd, err := walkDirectory(directory)
+	if err != nil {
+		return -1, err
+	}
 	var info unix.Stat_t
 	if err := unix.Fstat(fd, &info); err != nil {
 		_ = unix.Close(fd)
@@ -70,6 +87,19 @@ func openDirectory(directory string, owner uint32) (int, error) {
 		return -1, ErrUnsafe
 	}
 	return fd, nil
+}
+
+func checkAncestor(fd int) error {
+	var info unix.Stat_t
+	if err := unix.Fstat(fd, &info); err != nil {
+		return err
+	}
+	// Sticky trusted parents (notably /tmp) cannot rename an entry owned
+	// by this UID/root. Diagnostics alone may accept another final owner.
+	if info.Uid != 0 && info.Uid != uint32(os.Geteuid()) || info.Mode&0022 != 0 && info.Mode&unix.S_ISVTX == 0 {
+		return ErrUnsafe
+	}
+	return nil
 }
 
 // CheckFile rejects symlinks, special files, hardlinks, other owners and modes

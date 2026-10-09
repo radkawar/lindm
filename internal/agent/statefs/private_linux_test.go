@@ -63,3 +63,45 @@ func TestDiagnosticDirectoryOwnerIsFinalOnly(t *testing.T) {
 		t.Fatalf("mutable state accepted an untrusted ancestor: %v", err)
 	}
 }
+
+func TestTemporaryParentOwnershipBoundary(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mode   os.FileMode
+		unsafe bool
+	}{
+		{name: "protected", mode: 0755},
+		{name: "sticky-shared", mode: os.ModeSticky | 0777},
+		{name: "replaceable-shared", mode: 0777, unsafe: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			parent := t.TempDir()
+			if err := os.Chmod(parent, test.mode); err != nil {
+				t.Fatal(err)
+			}
+			fd, err := OpenTemporaryParent(parent)
+			if fd >= 0 {
+				defer func() { _ = unix.Close(fd) }()
+			}
+			if test.unsafe {
+				if !errors.Is(err, ErrUnsafe) || fd >= 0 {
+					t.Fatalf("replaceable parent was admitted: fd=%d err=%v", fd, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var expected, actual unix.Stat_t
+			if err := unix.Stat(parent, &expected); err != nil {
+				t.Fatal(err)
+			}
+			if err := unix.Fstat(fd, &actual); err != nil {
+				t.Fatal(err)
+			}
+			if expected.Dev != actual.Dev || expected.Ino != actual.Ino || actual.Mode&unix.S_IFMT != unix.S_IFDIR {
+				t.Fatal("temporary parent descriptor does not identify the checked directory")
+			}
+		})
+	}
+}

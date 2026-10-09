@@ -213,6 +213,32 @@ pinned transport/root/release keys and TLS/device-CA identity keys. It does not
 delegate authority or enable an issuer; current authority and admission must still
 authorize every later issuance. Absent configuration provides no signing fallback.
 
+### Isolated native install and custody check
+
+`go run ./cmd/lab native check-install-projection [-work-dir DIR] [-record FILE]`
+requires Linux, native `systemctl` and GNU `stat`. It creates and removes its own
+private fixture; it never enables, disables or starts host units. `-work-dir`
+selects an existing parent on a trusted filesystem. The fixture must have
+root/caller-owned ancestry without group/other write access; trusted sticky shared
+temporary directories are accepted. Replaceable ancestry and symlink components
+are rejected before fixture creation. Do not change checkout permissions to make
+this check pass; use a protected parent such as `$HOME/.cache` or the default.
+The optional record is created privately and exclusively, after successful cleanup.
+
+The scenario observes exact native enablement links for aliases, an `Also` instance
+and an install drop-in, then records native disable's treatment of the pre-existing
+alias and empty parent directory. It verifies that a private non-unit-named hardlink
+retains the symlink inode across native disable and observation by a fresh process.
+Actual `renameat2(RENAME_NOREPLACE)` interleavings exercise owned capture,
+replacement restoration and preservation of both entries when a newer public entry
+blocks restoration, including a captured unrelated regular file.
+
+These are native filesystem observations, not a production ownership API. They do
+not qualify production resource-ancestry checks, power-loss recovery, SELinux,
+safe runtime-invocation restoration or supported-distro certification. The fixture
+uses fixed arguments/environment and `SYSTEMCTL_SKIP_SYSV=1`; `--root` is not
+treated as a general sandbox for arbitrary input, and `--dry-run` is not relied on.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node

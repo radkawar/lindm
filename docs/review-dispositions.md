@@ -518,6 +518,30 @@ The full PostgreSQL/Keycloak integration run also passed. These reviews do not q
 online issuance, profile activation, native ownership, fleet capacity or whole-product
 security. Full G3 remains open.
 
+### Isolated native install and custody checks
+
+Independent stateless source reviews examined native command isolation, retained
+symlink identity, replacement preservation, bounded output and evidence publication.
+They did not execute the native scenario or certify production ownership.
+
+An actual failing-before regression showed that the initial lab command accepted a
+replaceable `0777` work parent. Corrective review then found that validating ancestry
+only after creation still left recursive cleanup exposed to directory substitution.
+The maintained command now validates and retains the work-parent boundary before
+creating its fixture. Shared `statefs` traversal retains the distinct diagnostic
+final-owner rule; it does not trust that foreign owner for ancestor directories.
+Source re-review found no additional actionable issue within the stated UID/root
+and trusted-filesystem assumptions. No adversarial cross-UID rename schedule was run.
+
+The corrected native CLI passed on systemd `255.4-1ubuntu8.17` with evidence
+`/home/r/.cache/lindm-native-install-projection-v3.json`. Focused lint and all agent,
+VM-lab and lab-command race checks passed. The existing foreign-final-owner
+regression and new temporary-parent checks also passed as actual UID 0 in an
+isolated, network-disabled, read-only container with only temporary filesystem
+writes. This verifies filesystem permission boundaries, not a native distro lane.
+Profile ownership, crash/power-loss recovery, runtime restoration and full G3 remain
+unqualified.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
