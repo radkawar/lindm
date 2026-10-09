@@ -237,6 +237,15 @@ Actual `renameat2(RENAME_NOREPLACE)` interleavings exercise owned capture,
 replacement restoration and preservation of both entries when a newer public entry
 blocks restoration, including a captured unrelated regular file.
 
+The root-boundary cases use two deliberately different definitions, both owned by
+the fixture. An absolute directory symlink lets native `--root` read the definition
+outside that root. Rewriting only that directory link to a private relative path
+selects the copied definition while preserving the native install-link paths.
+A separate absolute final-file symlink remains unchanged: native root-aware lookup
+selects the copied definition and retains linked-unit install semantics. The record
+contains the exact link sets for all three cases. This is a controlled demonstration,
+not a general directory-rewriting algorithm or permission to trust arbitrary links.
+
 These are native filesystem observations, not a production ownership API. They do
 not qualify production resource-ancestry checks, power-loss recovery, SELinux,
 safe runtime-invocation restoration or supported-distro certification. The fixture

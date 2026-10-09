@@ -23,20 +23,21 @@ import (
 // management, executor authorization, crash recovery or platform certification.
 // Native output is diagnostic only; symlink observations establish the results.
 type InstallProjectionEvidence struct {
-	NativeVersion                string                  `json:"native_version"`
-	FixtureUID                   int                     `json:"fixture_uid"`
-	FilesystemType               string                  `json:"filesystem_type"`
-	Before                       []InstallProjectionLink `json:"before"`
-	AfterEnable                  []InstallProjectionLink `json:"after_enable"`
-	AfterDisable                 []InstallProjectionLink `json:"after_disable"`
-	AfterReenable                []InstallProjectionLink `json:"after_reenable"`
-	DisableRemovedBaselineAlias  bool                    `json:"disable_removed_baseline_alias"`
-	DisableRemovedEmptyParent    bool                    `json:"disable_removed_empty_parent"`
-	CustodySurvivedDisable       bool                    `json:"custody_survived_disable"`
-	FreshProcessVerifiedAnchor   bool                    `json:"fresh_process_verified_anchor"`
-	CapturedReplacementRestored  bool                    `json:"captured_replacement_restored"`
-	ConflictingReplacementsKept  bool                    `json:"conflicting_replacements_kept"`
-	CapturedRegularFilePreserved bool                    `json:"captured_regular_file_preserved"`
+	NativeVersion                string                             `json:"native_version"`
+	FixtureUID                   int                                `json:"fixture_uid"`
+	FilesystemType               string                             `json:"filesystem_type"`
+	Before                       []InstallProjectionLink            `json:"before"`
+	AfterEnable                  []InstallProjectionLink            `json:"after_enable"`
+	AfterDisable                 []InstallProjectionLink            `json:"after_disable"`
+	AfterReenable                []InstallProjectionLink            `json:"after_reenable"`
+	DisableRemovedBaselineAlias  bool                               `json:"disable_removed_baseline_alias"`
+	DisableRemovedEmptyParent    bool                               `json:"disable_removed_empty_parent"`
+	CustodySurvivedDisable       bool                               `json:"custody_survived_disable"`
+	FreshProcessVerifiedAnchor   bool                               `json:"fresh_process_verified_anchor"`
+	CapturedReplacementRestored  bool                               `json:"captured_replacement_restored"`
+	ConflictingReplacementsKept  bool                               `json:"conflicting_replacements_kept"`
+	CapturedRegularFilePreserved bool                               `json:"captured_regular_file_preserved"`
+	RootBoundary                 *InstallProjectionBoundaryEvidence `json:"root_boundary"`
 }
 
 type InstallProjectionLink struct {
@@ -203,6 +204,10 @@ func CheckInstallProjection(ctx context.Context, workDir string) (_ *InstallProj
 	evidence.CapturedReplacementRestored = true
 	evidence.ConflictingReplacementsKept = true
 	evidence.CapturedRegularFilePreserved = true
+	evidence.RootBoundary, err = checkProjectionRootBoundary(ctx, binary, root)
+	if err != nil {
+		return nil, err
+	}
 	return evidence, nil
 }
 

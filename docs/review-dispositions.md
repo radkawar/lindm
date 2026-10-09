@@ -584,6 +584,23 @@ fixture; it does not establish a general snapshot algorithm, shared ownership or
 production release semantics. The earlier independent reviews did not review this
 follow-on extension.
 
+The root-boundary extension passed on both systemd `255.4-1ubuntu8.17` (host UID
+1000; record `/home/r/.cache/lindm-native-install-projection-v5.json`) and
+`239-78.el8` (UID 0 in the same pinned, capability-free Rocky 8 container).
+An absolute directory symlink caused native `--root` to read a different
+fixture-owned definition outside the staged root. A relative directory rewrite
+selected the staged definition without changing the logical install-link targets.
+An unchanged absolute final-file link selected the staged bytes through native
+root-aware lookup, including the extra linked-unit configuration link. Every
+result was checked against the exact observed filesystem link set.
+
+An independent stateless source review found no actionable issue in this extension
+under the existing fixture ownership/parent-trust assumptions. It did not run the
+scenario, inspect the trust/output-limit helpers or authenticate caller-selected
+native executables. Focused VM-lab/lab-command race checks and lint passed. This
+does not establish general alias classification, symlink-limit equivalence,
+complete lookup snapshots, a production helper sandbox or distro certification.
+
 ## Remaining external gates
 
 No product-owner ambiguity remains in the first-slice scope after these decisions.
