@@ -27,6 +27,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	enrollmentv1connect "lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
@@ -110,6 +111,7 @@ type runner struct {
 	enrollmentTransport *http.Transport
 	profile             *adminv1.ProfileRevision
 	packages            packageData
+	historicalHost      *inventoryv1.HostObservation
 	metrics             *measurements
 	completed           atomic.Uint64
 	completedDevices    atomic.Uint64

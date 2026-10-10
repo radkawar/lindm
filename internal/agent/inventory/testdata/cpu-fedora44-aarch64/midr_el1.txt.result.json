@@ -1,0 +1,5 @@
+{
+  "command": "cat /sys/devices/system/cpu/cpu0/regs/identification/midr_el1",
+  "exit_code": 0,
+  "stderr": ""
+}

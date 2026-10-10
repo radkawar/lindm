@@ -32,7 +32,7 @@ func TestRecoveryHelpersFollowQualifiedOperations(t *testing.T) {
 		},
 		{
 			name:   "LUKS observation",
-			target: &agentv1.QualifiedActionTarget{Target: &agentv1.StorageTarget{LuksUuid: "12345678-1234-1234-1234-123456789abc"}},
+			target: &agentv1.QualifiedActionTarget{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: "12345678-1234-1234-1234-123456789abc", Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}},
 			want:   []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/cryptsetup"},
 		},
 		{

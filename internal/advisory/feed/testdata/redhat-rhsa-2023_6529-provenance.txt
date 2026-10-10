@@ -1,0 +1,12 @@
+Original vendor CSAF bytes, unmodified, extracted from the authenticated weekly archive.
+Artifact URL: https://security.access.redhat.com/data/csaf/v2/advisories/csaf_advisories_2026-10-04.tar.zst
+Archive SHA-256: 708b53eff66e7150fd95e1649457d26987e9c88e8e7f92405c0f695354afc1ee
+Archive bytes: 113835796
+Archive member: 2023/rhsa-2023_6529.json
+Member SHA-256: 77457519f52e8451607b3448253b7eaadf3ad5845c43b5a45f4c5dcd4f10a001
+Member bytes: 44623
+Acquisition: 2026-10-10; archive checksum and detached signature verified by RpmCVECardinality research with pinned primary fingerprint 77E79ABE93673533ED09EBE2DCE3823597F5EAC4.
+Retained archive provenance: artifacts/rpm-advisory-cve-cardinality-20261010.json.
+This is a final csaf_informational_advisory for native RHEL 9 AppStream and has no vulnerabilities property. Its profile supplies no vulnerability claims, not a clean-host assertion.
+Profile semantics: OASIS CSAF 2.0 sections 4.3 and 6.1.27.3, https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html . The vulnerabilities property SHALL NOT exist for an informational advisory.
+Copyright Red Hat, Inc.; the original document's legal_disclaimer retains CC BY 4.0 attribution and license terms.

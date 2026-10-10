@@ -129,50 +129,31 @@ func readApplicationOutput(reader io.Reader) ([]byte, inventoryv1.CollectionStat
 	return data, success
 }
 
-func parseApplications(reader io.Reader, manager string) *inventoryv1.ApplicationDetails {
+func parseFlatpak(reader io.Reader) *inventoryv1.ApplicationDetails {
 	data, status := readApplicationOutput(reader)
 	if status != success {
 		return &inventoryv1.ApplicationDetails{Status: status}
 	}
-	return parseApplicationData(data, manager)
+	return parseFlatpakData(data)
 }
 
-func parseApplicationData(data []byte, manager string) *inventoryv1.ApplicationDetails {
+func parseFlatpakData(data []byte) *inventoryv1.ApplicationDetails {
 	result := &inventoryv1.ApplicationDetails{Status: success}
 	if !nativeText(data) || (len(data) > 0 && data[len(data)-1] != '\n') {
 		result.Status = invalid
 		return result
 	}
 	lines := strings.SplitSeq(strings.TrimSuffix(string(data), "\n"), "\n")
-	header := manager != "snap"
 	for line := range lines {
 		if line == "" && len(data) == 0 {
 			break
 		}
-		var name, version, arch string
-		if manager == "snap" {
-			fields := strings.Fields(line)
-			if !header {
-				if strings.Join(fields, " ") != "Name Version Rev Tracking Publisher Notes" {
-					result.Status = invalid
-					break
-				}
-				header = true
-				continue
-			}
-			if len(fields) != 6 {
-				result.Status = invalid
-				break
-			}
-			name, version = fields[0], fields[1]
-		} else {
-			fields := strings.Split(line, "\t")
-			if len(fields) != 3 {
-				result.Status = invalid
-				break
-			}
-			name, version, arch = fields[0], fields[1], fields[2]
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 {
+			result.Status = invalid
+			break
 		}
+		name, version, arch := fields[0], fields[1], fields[2]
 		if name == "" || len(name) > 512 {
 			result.Status = invalid
 			break
@@ -183,9 +164,6 @@ func parseApplicationData(data []byte, manager string) *inventoryv1.ApplicationD
 		}
 		result.Applications = append(result.Applications, &inventoryv1.Application{Name: name, Version: observed(version, nil), Architecture: observed(arch, nil), Scope: observed("system", nil)})
 	}
-	if manager == "snap" && !header {
-		result.Status = invalid
-	}
 	if result.Status != success {
 		result.Applications = nil
 	}
@@ -194,23 +172,18 @@ func parseApplicationData(data []byte, manager string) *inventoryv1.ApplicationD
 
 // Flatpak deliberately inventories system-installed applications, not runtimes
 // or the service account's user installation. It never enumerates employee HOME
-// directories. Snap's system service provides its system-wide installed list.
-func collectApplications(ctx context.Context, run nativeRunner, manager string) *inventoryv1.ApplicationDetails {
-	selected := backend{name: manager, path: "/usr/bin/flatpak", args: []string{"list", "--system", "--app", "--columns=application,version,arch"}}
-	if manager == "snap" {
-		selected.path = "/usr/bin/snap"
-		selected.args = []string{"list"}
-	}
+// directories.
+func collectFlatpak(ctx context.Context, run nativeRunner) *inventoryv1.ApplicationDetails {
+	selected := backend{name: "flatpak", path: "/usr/bin/flatpak", args: []string{"list", "--system", "--app", "--columns=application,version,arch"}}
 	var parsed *inventoryv1.ApplicationDetails
 	status := run(ctx, selected, func(reader io.Reader) inventoryv1.CollectionStatus {
 		data, status := readApplicationOutput(reader)
 		if status != success {
 			return status
 		}
-		parsed = parseApplicationData(data, manager)
+		parsed = parseFlatpakData(data)
 		// Output reached bounded EOF: allow the runner to observe native exit
-		// and diagnostics before reporting semantic parse failure. Empty stdout
-		// is not success evidence, but can accompany an explicit native failure.
+		// and diagnostics before reporting semantic parse failure.
 		// Capacity/read failures still abort immediately and retain precedence.
 		if parsed.Status == invalid {
 			return success

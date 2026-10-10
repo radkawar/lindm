@@ -153,7 +153,8 @@ func provisioningCursor(id uuid.UUID) string { return base64.RawURLEncoding.Enco
 func (s *Service) ListProvisioningTokens(ctx context.Context, req *connect.Request[adminv1.ListProvisioningTokensRequest]) (*connect.Response[adminv1.ListProvisioningTokensResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.requireUnrestricted(ctx, identity.PermissionManageEnrollment); err != nil {
+	actor, err := s.requireUnrestricted(ctx, identity.PermissionManageEnrollment)
+	if err != nil {
 		return nil, err
 	}
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
@@ -168,18 +169,23 @@ func (s *Service) ListProvisioningTokens(ctx context.Context, req *connect.Reque
 		return nil, err
 	}
 	limit := pageLimit(req.Msg.GetPageSize())
-	rows, err := devicedb.New(s.pool).ListProvisioningTokens(ctx, devicedb.ListProvisioningTokensParams{AfterID: after, RowLimit: limit + 1})
+	var rows []devicedb.ListProvisioningTokensRow
+	err = s.withinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageEnrollment, func(ctx context.Context, q *devicedb.Queries) error {
+		var err error
+		rows, err = q.ListProvisioningTokens(ctx, devicedb.ListProvisioningTokensParams{AfterID: after, RowLimit: limit + 1})
+		return err
+	})
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	response := new(adminv1.ListProvisioningTokensResponse)
 	var budget responsePageBudget
 	for _, row := range rows {
-		assignment, err := provisioningAssignment(row)
+		assignment, err := provisioningAssignment(devicedb.ProvisioningToken{Assignment: row.Assignment})
 		if err != nil {
 			return nil, mapErr(err)
 		}
-		item := &adminv1.ProvisioningToken{TokenId: row.ID.String(), CreatedBy: row.CreatedBy.String(), CreatedAt: timestamppb.New(row.CreatedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), MaxUses: uint32(row.MaxUses), UsedCount: uint32(row.UsedCount), ApprovalRequired: row.ApprovalRequired, Reason: row.Reason, Metadata: assignment.GetMetadata(), GroupIds: assignment.GetGroupIds(), ProfileRevisionIds: assignment.GetProfileRevisionIds()}
+		item := &adminv1.ProvisioningToken{TokenId: row.ID.String(), CreatedBy: row.CreatedBy.String(), CreatorDisplayName: row.CreatorDisplayName, CreatedAt: timestamppb.New(row.CreatedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), MaxUses: uint32(row.MaxUses), UsedCount: uint32(row.UsedCount), ApprovalRequired: row.ApprovalRequired, Reason: row.Reason, Metadata: assignment.GetMetadata(), GroupIds: assignment.GetGroupIds(), ProfileRevisionIds: assignment.GetProfileRevisionIds()}
 		if row.RevokedAt.Valid {
 			item.RevokedAt = timestamppb.New(row.RevokedAt.Time)
 		}

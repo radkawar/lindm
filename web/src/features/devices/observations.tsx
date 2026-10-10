@@ -11,28 +11,58 @@ import { StatusBadge } from "@/components/ui/status-badge";
 export const collectionLabels: Record<CollectionStatus, string> = {
   [CollectionStatus.UNSPECIFIED]: "Not reported",
   [CollectionStatus.SUCCESS]: "Successful collection",
-  [CollectionStatus.UNAVAILABLE]: "Unavailable",
+  [CollectionStatus.UNAVAILABLE]: "Not available",
   [CollectionStatus.PERMISSION_DENIED]: "Permission denied",
   [CollectionStatus.TIMEOUT]: "Collection timed out",
   [CollectionStatus.INVALID_OUTPUT]: "Invalid native output",
   [CollectionStatus.CAPACITY_EXCEEDED]: "Collection capacity exceeded",
   [CollectionStatus.NATIVE_COMMAND_FAILURE]: "Native command failed",
+  [CollectionStatus.NOT_APPLICABLE]: "Not applicable",
 };
 
+export function isOptionalCollectionAbsence(status: CollectionStatus | undefined) {
+  return (
+    status === undefined ||
+    status === CollectionStatus.UNSPECIFIED ||
+    status === CollectionStatus.UNAVAILABLE ||
+    status === CollectionStatus.NOT_APPLICABLE
+  );
+}
+
+export function CollectionStatusText({
+  status,
+  unavailableLabel,
+}: {
+  status: CollectionStatus | undefined;
+  unavailableLabel?: string;
+}) {
+  const label =
+    collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status";
+  return (
+    <span
+      className={
+        isOptionalCollectionAbsence(status) || status === CollectionStatus.SUCCESS
+          ? "text-muted-foreground"
+          : "text-warning"
+      }
+      title={CollectionStatus[status ?? CollectionStatus.UNSPECIFIED]}
+    >
+      {status === CollectionStatus.UNAVAILABLE && unavailableLabel ? unavailableLabel : label}
+    </span>
+  );
+}
+
 export function CollectionStatusBadge({ status }: { status: CollectionStatus | undefined }) {
+  if (isOptionalCollectionAbsence(status)) return <CollectionStatusText status={status} />;
   return (
     <StatusBadge
       status={
         status === CollectionStatus.SUCCESS
           ? "success"
-          : status === undefined ||
-              status === CollectionStatus.UNSPECIFIED ||
-              status === CollectionStatus.UNAVAILABLE
-            ? "neutral"
-            : status === CollectionStatus.PERMISSION_DENIED ||
-                status === CollectionStatus.CAPACITY_EXCEEDED
-              ? "warning"
-              : "destructive"
+          : status === CollectionStatus.PERMISSION_DENIED ||
+              status === CollectionStatus.CAPACITY_EXCEEDED
+            ? "warning"
+            : "destructive"
       }
     >
       {collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status"}
@@ -49,12 +79,17 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function ObservedValue({ field }: { field: ObservedString | undefined }) {
-  if (!field) return <CollectionStatusBadge status={undefined} />;
-  return field.status === CollectionStatus.SUCCESS ? (
+export function ObservedValue({
+  field,
+  unavailableLabel,
+}: {
+  field: ObservedString | undefined;
+  unavailableLabel?: string;
+}) {
+  return field?.status === CollectionStatus.SUCCESS ? (
     <span>{field.value}</span>
   ) : (
-    <CollectionStatusBadge status={field.status} />
+    <CollectionStatusText status={field?.status} unavailableLabel={unavailableLabel} />
   );
 }
 

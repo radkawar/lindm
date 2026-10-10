@@ -114,18 +114,26 @@ func EncryptedSmoke(ctx context.Context, m *labv1.ImageManifest, opts EncryptedV
 }
 
 func observeEncryptedGuest(ctx context.Context, vm *EncryptedVM, secureBoot bool) (*encryptedGuestEvidence, error) {
-	posture, err := vm.Run(ctx, `sudo sh -eu -c '
-root=$(findmnt -n -o SOURCE /)
+	// Keep failures attributable to one native operation. Never publish raw
+	// stderr: root paths and native diagnostics can contain private guest data.
+	if _, err := encryptedPostureCommand(ctx, vm, "encrypted root ancestry", `root=$(findmnt -n -o SOURCE /)
 root=${root%%\[*}
-lsblk -s -r -n -o TYPE "$root" | grep -qx crypt
-if [ -r /sys/class/tpm/tpm0/tpm_version_major ]; then cat /sys/class/tpm/tpm0/tpm_version_major; else printf "absent\n"; fi
-od -An -tu1 -j4 -N1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c
-od -An -tu1 -j4 -N1 /sys/firmware/efi/efivars/SetupMode-8be4df61-93ca-11d2-aa0d-00e098032b8c
-'`, nil)
-	if err != nil {
-		return nil, fmt.Errorf("observe encrypted root/TPM/UEFI: %w", err)
+test -b "$root"
+lsblk -s -r -n -o TYPE "$root" | grep -qx crypt`); err != nil {
+		return nil, err
 	}
-	fields := strings.Fields(string(posture))
+	var fields []string
+	for _, probe := range []struct{ name, command string }{
+		{"TPM version", `if [ -r /sys/class/tpm/tpm0/tpm_version_major ]; then cat /sys/class/tpm/tpm0/tpm_version_major; else printf "absent\n"; fi`},
+		{"UEFI SecureBoot variable", `od -An -tu1 -j4 -N1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c`},
+		{"UEFI SetupMode variable", `od -An -tu1 -j4 -N1 /sys/firmware/efi/efivars/SetupMode-8be4df61-93ca-11d2-aa0d-00e098032b8c`},
+	} {
+		data, err := encryptedPostureCommand(ctx, vm, probe.name, probe.command)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, strings.Fields(string(data))...)
+	}
 	expectedTPM := "absent"
 	if vm.hardware.TPM {
 		expectedTPM = "2"
@@ -162,4 +170,33 @@ printf "]"
 		return nil, errors.New("guest contains no observed LUKS2 headers")
 	}
 	return result, nil
+}
+
+// These commands inspect only public boot posture, but a native error can quote
+// a private device path. Retain fixed native failure reasons, not quoted values.
+func encryptedPostureCommand(ctx context.Context, vm *EncryptedVM, phase, command string) ([]byte, error) {
+	if vm.guest == nil {
+		return nil, errors.New("encrypted posture requires a running guest")
+	}
+	result, err := vm.guest.runResult(ctx, "sudo -n env LC_ALL=C sh -eu -c "+nativeQuote(command), nil, 16<<10, time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("observe %s: %w", phase, err)
+	}
+	if result.ExitCode != 0 || len(strings.TrimSpace(string(result.Stderr))) != 0 {
+		return nil, fmt.Errorf("observe %s: guest exit %d; %s", phase, result.ExitCode, encryptedPostureDiagnostic(result.Stderr))
+	}
+	return result.Stdout, nil
+}
+
+func encryptedPostureDiagnostic(stderr []byte) string {
+	var reasons []string
+	for _, reason := range []string{"No such file or directory", "Permission denied", "Operation not permitted", "not a block device", "command not found", "not found", "Input/output error", "Invalid argument", "Illegal seek", "cannot skip past end of combined input"} {
+		if strings.Contains(string(stderr), reason) {
+			reasons = append(reasons, reason)
+		}
+	}
+	if len(reasons) != 0 {
+		return strings.Join(reasons, "; ") + " (guest paths and other stderr redacted)"
+	}
+	return fmt.Sprintf("unclassified native failure (stderr bytes %d; private text withheld)", len(stderr))
 }

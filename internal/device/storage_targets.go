@@ -99,14 +99,47 @@ func storageString(value *inventoryv1.ObservedString) string {
 	return value.GetValue()
 }
 
-func storageTarget(device *inventoryv1.BlockDevice) *agentv1.StorageTarget {
+func storageTarget(device *inventoryv1.BlockDevice, byName map[string]*inventoryv1.BlockDevice, diskSerials map[string]int) *agentv1.StorageTarget {
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	identity := device.GetIdentity()
 	wwn, serial := storageString(identity.GetWwn()), storageString(identity.GetSerial())
-	if wwn == "" || serial == "" || device.GetSizeBytes().GetStatus() != success || device.GetSizeBytes().GetValue() == 0 {
+	size := device.GetSizeBytes()
+	if serial == "" || size.GetStatus() != success || size.GetValue() == 0 {
 		return nil
 	}
-	return &agentv1.StorageTarget{Wwn: wwn, Serial: serial, SizeBytes: device.GetSizeBytes().GetValue(), LuksUuid: storageString(identity.GetLuksUuid())}
+	luks := storageString(identity.GetLuksUuid())
+	if wwn != "" {
+		return &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: wwn, Serial: serial, SizeBytes: size.GetValue(), LuksUuid: luks}
+	}
+	// Only an explicitly unavailable WWN can select the fallback. Failed,
+	// historical or contradictory WWN observations cannot silently downgrade.
+	unavailable := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	if identity.GetWwn().GetStatus() != unavailable || identity.GetWwn().GetValue() != "" || storageString(device.GetType()) != "part" || !luksContainer(device) {
+		return nil
+	}
+	if id, err := uuid.Parse(luks); err != nil || id == uuid.Nil {
+		return nil
+	}
+	disk := byName[storageString(identity.GetBackingDisk())]
+	diskIdentity := disk.GetIdentity()
+	if storageString(disk.GetType()) != "disk" || storageString(diskIdentity.GetSerial()) != serial || diskSerials[serial] != 1 {
+		return nil
+	}
+	if diskIdentity.GetWwn().GetStatus() != unavailable || diskIdentity.GetWwn().GetValue() != "" {
+		return nil
+	}
+	diskSize := disk.GetSizeBytes()
+	if diskSize.GetStatus() != success || diskSize.GetValue() < size.GetValue() {
+		return nil
+	}
+	guid := storageString(identity.GetGptDiskGuid())
+	if guid != storageString(diskIdentity.GetGptDiskGuid()) {
+		return nil
+	}
+	if id, err := uuid.Parse(guid); err != nil || id == uuid.Nil {
+		return nil
+	}
+	return &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS, Serial: serial, SizeBytes: size.GetValue(), LuksUuid: luks, GptDiskGuid: guid, DiskSizeBytes: diskSize.GetValue()}
 }
 
 func luksContainer(device *inventoryv1.BlockDevice) bool {
@@ -143,15 +176,23 @@ func observedStorageTargets(details *inventoryv1.NativeDetails, kind string) ([]
 		return nil, "device_action_tpm2_unavailable"
 	}
 	byName := make(map[string]*inventoryv1.BlockDevice, len(storage.GetDevices()))
+	diskSerials := make(map[string]int)
 	for _, device := range storage.GetDevices() {
 		if _, duplicate := byName[device.GetName()]; duplicate {
 			return nil, "device_action_storage_identity_unavailable"
 		}
 		byName[device.GetName()] = device
+		// Children inherit serials for target display and matching, but are not
+		// additional physical identities for fallback uniqueness.
+		if storageString(device.GetType()) == "disk" {
+			if serial := storageString(device.GetIdentity().GetSerial()); serial != "" {
+				diskSerials[serial]++
+			}
+		}
 	}
 	var targets []*adminv1.DeviceStorageTarget
 	for _, device := range storage.GetDevices() {
-		target := storageTarget(device)
+		target := storageTarget(device, byName, diskSerials)
 		if target == nil {
 			continue
 		}
@@ -164,7 +205,7 @@ func observedStorageTargets(details *inventoryv1.NativeDetails, kind string) ([]
 				continue
 			}
 		case "sanitize":
-			if target.GetLuksUuid() != "" || !unencryptedDisk(device, storage.GetDevices(), byName) {
+			if target.GetIdentityBasis() != agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL || target.GetLuksUuid() != "" || !unencryptedDisk(device, storage.GetDevices(), byName) {
 				continue
 			}
 		default:

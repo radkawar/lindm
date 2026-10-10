@@ -1,0 +1,5 @@
+{
+  "command": "lscpu --json",
+  "exit_code": 0,
+  "stderr": ""
+}

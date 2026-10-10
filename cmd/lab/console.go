@@ -21,6 +21,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	packages := flags.Int("packages", 200, "simulated packages per device (1..5000)")
 	assignments := flags.Int("assignment-percent", 20, "percentage assigned synthetic service work (1..100)")
 	workers := flags.Int("enrollment-workers", 8, "bounded parallel enrollments (1..64)")
+	hostObservation := flags.String("host-observation", "", "captured HostObservation protobuf JSON to replay on one simulated device (historical, at most 1 MiB)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, fixture.Close()) }()
-	population, err := loadlab.Populate(setup, fixture, loadlab.PopulateOptions{Devices: *devices, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers})
+	population, err := loadlab.Populate(setup, fixture, loadlab.PopulateOptions{Devices: *devices, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, HostObservationFile: *hostObservation})
 	if err != nil {
 		return err
 	}
@@ -47,6 +48,11 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	enrollment.Secret = ""
 	if err != nil {
 		return err
+	}
+	if population.HistoricalDeviceID != "" {
+		if _, err := fmt.Fprintf(stdout, "Historical host replay device: %s\nOriginal observation fields and collection times are preserved. Labels identify historical replay; package inventory and action results remain synthetic.\n", population.HistoricalDeviceID); err != nil {
+			return err
+		}
 	}
 	cancel()
 	return fixture.Wait(ctx)

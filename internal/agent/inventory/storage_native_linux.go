@@ -21,25 +21,6 @@ import (
 	"lindm/internal/agent/actionprovider"
 )
 
-// CollectStorage observes public native identities through read-only interfaces.
-// The root executor uses this bounded projection for inventory; it grants no
-// authority to execute an action and never publishes key material.
-func CollectStorage(ctx context.Context) *inventoryv1.StorageDetails {
-	ctx, cancel := context.WithTimeout(ctx, commandTimeout)
-	defer cancel()
-	result := collectStorage(ctx, detailSources{
-		readFile: readDetailFile, run: runNative, openBlock: openStorageBlock,
-		nvmeScope: actionprovider.ReadNVMeSanitizeScope,
-	})
-	if status := detailCategoryStatus(result); status != success {
-		return &inventoryv1.StorageDetails{Status: status}
-	}
-	if err := protovalidate.Validate(result); err != nil {
-		return &inventoryv1.StorageDetails{Status: invalid}
-	}
-	return result
-}
-
 func openStorageBlock(path string) (_ *os.File, err error) {
 	file, err := os.OpenFile(path, os.O_RDONLY|unix.O_NONBLOCK|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if err != nil {
@@ -87,7 +68,7 @@ func collectNVMeScope(ctx context.Context, s detailSources, name string, device 
 		result.Status = id.Wwn.Status
 		return result
 	}
-	scope, err := s.nvmeScope(ctx, file, &agentv1.StorageTarget{Wwn: id.Wwn.Value, Serial: id.Serial.Value, SizeBytes: device.SizeBytes.Value})
+	scope, err := s.nvmeScope(ctx, file, &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: id.Wwn.Value, Serial: id.Serial.Value, SizeBytes: device.SizeBytes.Value})
 	if errors.Is(err, actionprovider.ErrUnsupported) {
 		return result
 	}

@@ -156,7 +156,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 				if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
 					return advisorydb.AdvisoryEvaluation{}, err
 				}
-				if selectedSource.GetDistro() == "rhel" {
+				if selectedSource.GetDistro() == "rhel" && !record.GetSourceRecordRejected() {
 					if row.ModuleStatus != 1 {
 						unknown("native_module_identity_unavailable")
 						continue
@@ -180,7 +180,9 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 				if !affected {
 					continue
 				}
-				if record.GetAssessmentUnknown() {
+				if record.GetSourceRecordRejected() {
+					unknown("source_record_rejected")
+				} else if record.GetAssessmentUnknown() {
 					unknown("vendor_assessment_unknown")
 				}
 				id := findingID(deviceID, selected.ID, record.GetId(), row.Name, row.Version, row.Architecture)
@@ -197,7 +199,7 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 					f.Cves = append(previous.Cves, f.Cves...)
 					slices.Sort(f.Cves)
 					f.Cves = slices.Compact(f.Cves)
-					if len(f.Cves) > 1000 {
+					if len(f.Cves) > 2048 {
 						return advisorydb.AdvisoryEvaluation{}, ErrCapacity
 					}
 					if feed.SeverityRank(previous.Severity) > feed.SeverityRank(f.Severity) {
@@ -240,6 +242,12 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 		_, _ = hash.Write([]byte(strings.Join([]string{f.FixedVersion, f.Severity, f.PublishedAt.Time.UTC().Format(time.RFC3339Nano), strings.Join(f.Cves, ","), f.SourceUrl}, "\x00")))
 	}
 	e.FindingDigest = hash.Sum(nil)
+	// Candidate-level uncertainty (including a rejected source record) is
+	// discovered after the fast path above. Reuse its evaluation identity when
+	// evidence is unchanged so pagination does not invalidate itself.
+	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt && bytes.Equal(previous.FindingDigest, e.FindingDigest) {
+		return previous, nil
+	}
 	if err := q.DeleteAdvisoryFindings(ctx, deviceID); err != nil {
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
@@ -275,6 +283,11 @@ func findingID(device uuid.UUID, parts ...string) uuid.UUID {
 }
 
 func matches(manager, installed string, record *advisoryv1.Advisory) (bool, error) {
+	// A rejected source record supplies no trustworthy version or module
+	// boundary. Its exact candidate package identity alone requires UNKNOWN.
+	if record.GetSourceRecordRejected() {
+		return true, nil
+	}
 	if record.GetNotAffected() {
 		return false, nil
 	}

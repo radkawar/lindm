@@ -4,6 +4,7 @@ import {
   type ApplicationDetails,
   type NativeDetails,
   type ObservedBool,
+  type ObservedString,
   type ObservedUint64,
   type ObservedStrings,
 } from "../../../gen/lindm/inventory/v1/observation_pb";
@@ -17,61 +18,105 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CollectionStatusBadge, Fact, ObservedValue } from "./observations";
+import { CollectionStatusText, Fact, isOptionalCollectionAbsence } from "./observations";
 
-export function NumberValue({
-  field,
-  unit = "",
-}: {
-  field: ObservedUint64 | undefined;
+type NativeField = ObservedString | ObservedBool | ObservedUint64 | ObservedStrings;
+
+type NativeFact = {
+  label: string;
+  field: NativeField | undefined;
   unit?: string;
-}) {
-  return field?.status === CollectionStatus.SUCCESS ? (
+  optional?: boolean;
+  unavailableLabel?: string;
+};
+
+function NativeValue({
+  field,
+  unit,
+  unavailableLabel,
+}: Pick<NativeFact, "field" | "unit" | "unavailableLabel">) {
+  if (field?.status !== CollectionStatus.SUCCESS) {
+    return <CollectionStatusText status={field?.status} unavailableLabel={unavailableLabel} />;
+  }
+  if ("values" in field) {
+    return <span>{field.values.length ? field.values.join(", ") : "None observed"}</span>;
+  }
+  if (typeof field.value === "boolean") return <span>{field.value ? "Yes" : "No"}</span>;
+  return (
     <span>
-      {field.value.toLocaleString()}
+      {typeof field.value === "bigint" ? field.value.toLocaleString() : field.value}
       {unit ? ` ${unit}` : ""}
     </span>
-  ) : (
-    <CollectionStatusBadge status={field?.status} />
   );
 }
 
-function BoolValue({ field }: { field: ObservedBool | undefined }) {
-  return field?.status === CollectionStatus.SUCCESS ? (
-    <span>{field.value ? "Yes" : "No"}</span>
-  ) : (
-    <CollectionStatusBadge status={field?.status} />
+export function NumberValue({ field, unit }: { field: ObservedUint64 | undefined; unit?: string }) {
+  return <NativeValue field={field} unit={unit} />;
+}
+
+function NativeFacts({
+  fields,
+  showUnavailable,
+}: {
+  fields: NativeFact[];
+  showUnavailable: boolean;
+}) {
+  const visible = fields.filter(
+    ({ field, optional }) =>
+      showUnavailable || !optional || !isOptionalCollectionAbsence(field?.status),
+  );
+  if (!visible.length) return null;
+  return (
+    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {visible.map(({ label, ...props }) => (
+        <Fact key={label} label={label}>
+          <NativeValue {...props} />
+        </Fact>
+      ))}
+    </dl>
   );
 }
 
-function StringsValue({ field }: { field: ObservedStrings | undefined }) {
-  return field?.status === CollectionStatus.SUCCESS ? (
-    <span>{field.values.length ? field.values.join(", ") : "None observed"}</span>
-  ) : (
-    <CollectionStatusBadge status={field?.status} />
-  );
-}
+type NativeColumn<T> = { header: string } & (
+  | { field: (row: T) => NativeField | undefined; optional?: boolean; unit?: string }
+  | { render: (row: T) => ReactNode }
+);
 
 function NativeRows<T>({
   title,
   status,
   rows,
-  headers,
-  render,
+  columns,
+  showUnavailable,
+  optional = false,
+  unavailableLabel,
 }: {
   title: string;
   status: CollectionStatus | undefined;
   rows: T[];
-  headers: string[];
-  render: (row: T) => ReactNode[];
+  columns: NativeColumn<T>[];
+  showUnavailable: boolean;
+  optional?: boolean;
+  unavailableLabel?: string;
 }) {
   const [page, setPage] = useState(0);
+  if (optional && !showUnavailable && !rows.length && isOptionalCollectionAbsence(status))
+    return null;
   const current = Math.min(page, Math.max(0, Math.ceil(rows.length / 50) - 1));
+  // Inspect the entire collection, not just this page, so a failure or known
+  // value always keeps its column visible, including successful zero/false.
+  const visibleColumns = columns.filter(
+    (column) =>
+      showUnavailable ||
+      !("field" in column) ||
+      !column.optional ||
+      rows.some((row) => !isOptionalCollectionAbsence(column.field(row)?.status)),
+  );
   return (
     <section className="grid min-w-0 gap-3">
       <h3 className="font-semibold">{title}</h3>
       {status !== CollectionStatus.SUCCESS ? (
-        <CollectionStatusBadge status={status} />
+        <CollectionStatusText status={status} unavailableLabel={unavailableLabel} />
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
@@ -83,7 +128,7 @@ function NativeRows<T>({
             <Table>
               <TableHeader>
                 <TableRow>
-                  {headers.map((header) => (
+                  {visibleColumns.map(({ header }) => (
                     <TableHead key={header}>{header}</TableHead>
                   ))}
                 </TableRow>
@@ -91,9 +136,13 @@ function NativeRows<T>({
               <TableBody>
                 {rows.slice(current * 50, (current + 1) * 50).map((row, index) => (
                   <TableRow key={current * 50 + index}>
-                    {render(row).map((cell, column) => (
-                      <TableCell key={headers[column]} className="whitespace-normal break-words">
-                        {cell}
+                    {visibleColumns.map((column) => (
+                      <TableCell key={column.header} className="whitespace-normal break-words">
+                        {"field" in column ? (
+                          <NativeValue field={column.field(row)} unit={column.unit} />
+                        ) : (
+                          column.render(row)
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -128,229 +177,293 @@ function NativeRows<T>({
   );
 }
 
-function Applications({ title, data }: { title: string; data: ApplicationDetails | undefined }) {
+function Applications({
+  title,
+  data,
+  backend,
+  showUnavailable,
+}: {
+  title: string;
+  data: ApplicationDetails | undefined;
+  backend: ObservedBool | undefined;
+  showUnavailable: boolean;
+}) {
   return (
     <NativeRows
       title={title}
       status={data?.status}
       rows={data?.applications ?? []}
-      headers={["Name", "Version", "Architecture", "Scope"]}
-      render={(row) => [
-        row.name,
-        <ObservedValue field={row.version} />,
-        <ObservedValue field={row.architecture} />,
-        <ObservedValue field={row.scope} />,
+      optional
+      showUnavailable={showUnavailable}
+      unavailableLabel={
+        backend?.status === CollectionStatus.SUCCESS && !backend.value ? "Not installed" : undefined
+      }
+      columns={[
+        { header: "Name", render: (row) => row.name },
+        { header: "Version", field: (row) => row.version, optional: true },
+        { header: "Architecture", field: (row) => row.architecture, optional: true },
+        { header: "Scope", field: (row) => row.scope, optional: true },
       ]}
     />
   );
 }
 
-export function DeviceNativeDetails({ details }: { details: NativeDetails | undefined }) {
+export function DeviceNativeDetails({
+  details,
+  osId,
+}: {
+  details: NativeDetails | undefined;
+  osId: ObservedString | undefined;
+}) {
+  const [showUnavailable, setShowUnavailable] = useState(false);
+  // Only the successful OS observation from this same host collection can
+  // contextualize the DNF-specific fields. CPE is not DNF-specific.
+  const dnfUnavailableLabel =
+    osId?.status === CollectionStatus.SUCCESS && osId.value === "ubuntu"
+      ? "Not applicable on Ubuntu"
+      : undefined;
+  const platform = details?.platform;
+  const showPlatform =
+    showUnavailable ||
+    [platform?.cpe, platform?.releaseverLock, platform?.releasever, platform?.repositories].some(
+      (field) => !isOptionalCollectionAbsence(field?.status),
+    ) ||
+    !!platform?.repositories?.backend;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Native hardware and software observations</CardTitle>
-        <CardDescription>
-          Collected with the host observation above; its device collection and server receipt times
-          apply to every field below. These are observations, not compliance or management support
-          claims. Unavailable and denied measurements are never shown as zero or false.
-        </CardDescription>
+        <CardTitle>Hardware and software</CardTitle>
+        <CardDescription>Reported in the host collection above.</CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-6">
         {!details ? (
-          <p>Native details were not reported by this host observation.</p>
+          <p className="text-muted-foreground">
+            Native details were not reported by this host observation.
+          </p>
         ) : (
           <>
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Fact label="CPU model">
-                <ObservedValue field={details.cpu?.model} />
-              </Fact>
-              <Fact label="Logical CPU cores">
-                <NumberValue field={details.cpu?.logicalCores} />
-              </Fact>
-              <Fact label="Physical CPU cores">
-                <NumberValue field={details.cpu?.physicalCores} />
-              </Fact>
-              <Fact label="x86-64 level">
-                <ObservedValue field={details.cpu?.x8664Level} />
-              </Fact>
-              <Fact label="Memory total">
-                <NumberValue field={details.memory?.totalBytes} unit="bytes" />
-              </Fact>
-              <Fact label="Memory available">
-                <NumberValue field={details.memory?.availableBytes} unit="bytes" />
-              </Fact>
-              <Fact label="Swap total">
-                <NumberValue field={details.memory?.swapTotalBytes} unit="bytes" />
-              </Fact>
-              <Fact label="Firmware mode">
-                <ObservedValue field={details.firmware?.mode} />
-              </Fact>
-              <Fact label="Secure Boot">
-                <ObservedValue field={details.firmware?.secureBoot} />
-              </Fact>
-              <Fact label="TPM present">
-                <BoolValue field={details.tpm?.present} />
-              </Fact>
-              <Fact label="TPM version">
-                <ObservedValue field={details.tpm?.version} />
-              </Fact>
-              <Fact label="Chassis">
-                <ObservedValue field={details.power?.chassis} />
-              </Fact>
-              <Fact label="Logged-in users">
-                <NumberValue field={details.sessions?.users} />
-              </Fact>
-              <Fact label="Sessions">
-                <NumberValue field={details.sessions?.sessions} />
-              </Fact>
-              <Fact label="Loaded kernel modules">
-                <NumberValue field={details.kernelModuleCount} />
-              </Fact>
-              <Fact label="Uptime">
-                <NumberValue field={details.uptimeSeconds} unit="seconds" />
-              </Fact>
-              <Fact label="Boot time (Unix seconds, device clock)">
-                <NumberValue field={details.bootTimeUnixSeconds} />
-              </Fact>
-            </dl>
-            <section className="grid gap-4">
-              <h3 className="font-semibold">Native platform evidence</h3>
+            <div className="grid justify-items-start gap-2">
+              <Button
+                variant="outline"
+                aria-pressed={showUnavailable}
+                onClick={() => setShowUnavailable(!showUnavailable)}
+              >
+                Show unavailable fields
+              </Button>
               <p className="text-sm text-muted-foreground">
-                These are raw native values. Repository IDs do not prove entitlement, support
-                coverage or a package module stream.
+                Optional fields with no data are hidden. Collection problems remain visible.
               </p>
-              {!details.platform ? (
-                <p className="text-sm">Unknown. Platform evidence was not reported.</p>
-              ) : (
-                <>
-                  <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Fact label="Platform CPE">
-                      <ObservedValue field={details.platform.cpe} />
-                    </Fact>
-                    <Fact label="Release version lock">
-                      <ObservedValue field={details.platform.releaseverLock} />
-                    </Fact>
+            </div>
+            <NativeFacts
+              showUnavailable={showUnavailable}
+              fields={[
+                { label: "CPU model", field: details.cpu?.model },
+                { label: "CPU model source", field: details.cpu?.modelSource, optional: true },
+                { label: "Logical CPU cores", field: details.cpu?.logicalCores },
+                { label: "Physical CPU cores", field: details.cpu?.physicalCores, optional: true },
+                { label: "x86-64 level", field: details.cpu?.x8664Level, optional: true },
+                { label: "Memory total", field: details.memory?.totalBytes, unit: "bytes" },
+                { label: "Memory available", field: details.memory?.availableBytes, unit: "bytes" },
+                { label: "Swap total", field: details.memory?.swapTotalBytes, unit: "bytes" },
+                { label: "Firmware mode", field: details.firmware?.mode, optional: true },
+                { label: "Secure Boot", field: details.firmware?.secureBoot, optional: true },
+                { label: "TPM present", field: details.tpm?.present, optional: true },
+                { label: "TPM version", field: details.tpm?.version, optional: true },
+                { label: "Chassis", field: details.power?.chassis, optional: true },
+                { label: "Logged-in users", field: details.sessions?.users },
+                { label: "Sessions", field: details.sessions?.sessions },
+                {
+                  label: "Loaded kernel modules",
+                  field: details.kernelModuleCount,
+                  optional: true,
+                },
+                { label: "Uptime", field: details.uptimeSeconds, unit: "seconds" },
+                {
+                  label: "Boot time (Unix seconds, device clock)",
+                  field: details.bootTimeUnixSeconds,
+                },
+              ]}
+            />
+            {showPlatform ? (
+              <section className="grid gap-4">
+                <h3 className="font-semibold">Native platform evidence</h3>
+                <p className="text-sm text-muted-foreground">
+                  DNF configuration is not proof of repository reachability or entitlement. URL
+                  credentials, query strings and fragments are omitted.
+                </p>
+                <NativeFacts
+                  showUnavailable={showUnavailable}
+                  fields={[
+                    { label: "Platform CPE", field: platform?.cpe, optional: true },
+                    {
+                      label: "Effective release version",
+                      field: platform?.releasever,
+                      optional: true,
+                      unavailableLabel: dnfUnavailableLabel,
+                    },
+                    {
+                      label: "Release version lock",
+                      field: platform?.releaseverLock,
+                      optional: true,
+                      unavailableLabel: dnfUnavailableLabel,
+                    },
+                  ]}
+                />
+                {platform?.repositories?.backend ? (
+                  <dl>
                     <Fact label="Repository collection backend">
-                      {details.platform.repositories?.backend || "Not reported"}
+                      {platform.repositories.backend}
                     </Fact>
                   </dl>
+                ) : showUnavailable ? (
+                  <dl>
+                    <Fact label="Repository collection backend">
+                      <CollectionStatusText status={undefined} />
+                    </Fact>
+                  </dl>
+                ) : null}
+                {platform?.repositories?.configurations.length ? (
+                  <NativeRows
+                    title="Enabled repositories"
+                    status={platform.repositories.status}
+                    rows={platform.repositories.configurations}
+                    columns={[
+                      { header: "Repository ID", render: (row) => row.id },
+                      {
+                        header: "Base URLs",
+                        render: (row) => row.baseUrls.join(", ") || "None configured",
+                      },
+                      { header: "Metalink", render: (row) => row.metalink || "None configured" },
+                      {
+                        header: "Mirror list",
+                        render: (row) => row.mirrorlist || "None configured",
+                      },
+                      {
+                        header: "Package signatures checked",
+                        render: (row) => (row.gpgcheck ? "Yes" : "No"),
+                      },
+                      {
+                        header: "Signing keys",
+                        render: (row) => row.gpgKeys.join(", ") || "None configured",
+                      },
+                      {
+                        header: "URL data omitted",
+                        render: (row) => (row.urlsRedacted ? "Yes" : "No"),
+                      },
+                    ]}
+                    showUnavailable={showUnavailable}
+                  />
+                ) : (
                   <NativeRows
                     title="Native repository IDs"
-                    status={details.platform.repositories?.status}
-                    rows={details.platform.repositories?.ids ?? []}
-                    headers={["Repository ID"]}
-                    render={(id) => [id]}
+                    status={platform?.repositories?.status}
+                    rows={platform?.repositories?.ids ?? []}
+                    columns={[{ header: "Repository ID", render: (id) => id }]}
+                    optional
+                    showUnavailable={showUnavailable}
+                    unavailableLabel={dnfUnavailableLabel}
                   />
-                </>
-              )}
-            </section>
+                )}
+              </section>
+            ) : null}
             <NativeRows
               title="Block devices"
               status={details.storage?.status}
               rows={details.storage?.devices ?? []}
-              headers={[
-                "Name",
-                "Type",
-                "Parent",
-                "Size (bytes)",
-                "Filesystem",
-                "Mountpoint",
-                "Encryption",
-              ]}
-              render={(row) => [
-                row.name,
-                <ObservedValue field={row.type} />,
-                <ObservedValue field={row.parent} />,
-                <NumberValue field={row.sizeBytes} />,
-                <ObservedValue field={row.filesystem} />,
-                <ObservedValue field={row.mountpoint} />,
-                <ObservedValue field={row.encryption} />,
+              showUnavailable={showUnavailable}
+              columns={[
+                { header: "Name", render: (row) => row.name },
+                { header: "Type", field: (row) => row.type },
+                { header: "Parent", field: (row) => row.parent, optional: true },
+                { header: "Size (bytes)", field: (row) => row.sizeBytes },
+                { header: "Filesystem", field: (row) => row.filesystem, optional: true },
+                { header: "Mountpoint", field: (row) => row.mountpoint, optional: true },
+                { header: "Encryption", field: (row) => row.encryption },
               ]}
             />
             <NativeRows
               title="Network interfaces"
               status={details.network?.status}
               rows={details.network?.interfaces ?? []}
-              headers={[
-                "Name",
-                "MAC",
-                "Link",
-                "Addresses",
-                "IPv4 default route",
-                "IPv6 default route",
-              ]}
-              render={(row) => [
-                row.name,
-                <ObservedValue field={row.mac} />,
-                <ObservedValue field={row.link} />,
-                <StringsValue field={row.addresses} />,
-                <BoolValue field={row.defaultRouteIpv4} />,
-                <BoolValue field={row.defaultRouteIpv6} />,
+              showUnavailable={showUnavailable}
+              columns={[
+                { header: "Name", render: (row) => row.name },
+                { header: "MAC", field: (row) => row.mac, optional: true },
+                { header: "Link", field: (row) => row.link },
+                { header: "Addresses", field: (row) => row.addresses },
+                { header: "IPv4 default route", field: (row) => row.defaultRouteIpv4 },
+                { header: "IPv6 default route", field: (row) => row.defaultRouteIpv6 },
               ]}
             />
             <NativeRows
               title="Active sessions"
               status={details.sessions?.activeSessions?.status}
               rows={details.sessions?.activeSessions?.sessions ?? []}
-              headers={["User", "Class", "Type", "Seat", "Remote"]}
-              render={(row) => [
-                <ObservedValue field={row.userName} />,
-                <ObservedValue field={row.sessionClass} />,
-                <ObservedValue field={row.sessionType} />,
-                <ObservedValue field={row.seat} />,
-                <BoolValue field={row.remote} />,
+              showUnavailable={showUnavailable}
+              columns={[
+                { header: "User", field: (row) => row.userName },
+                { header: "Class", field: (row) => row.sessionClass },
+                { header: "Type", field: (row) => row.sessionType },
+                { header: "Seat", field: (row) => row.seat, optional: true },
+                { header: "Remote", field: (row) => row.remote },
               ]}
             />
             <NativeRows
               title="Batteries"
               status={details.power?.batteries?.status}
               rows={details.power?.batteries?.items ?? []}
-              headers={["Name", "Status", "Capacity"]}
-              render={(row) => [
-                row.name,
-                <ObservedValue field={row.status} />,
-                <NumberValue field={row.capacityPercent} unit="%" />,
+              optional
+              showUnavailable={showUnavailable}
+              columns={[
+                { header: "Name", render: (row) => row.name },
+                { header: "Status", field: (row) => row.status },
+                {
+                  header: "Capacity",
+                  field: (row) => row.capacityPercent,
+                  unit: "%",
+                  optional: true,
+                },
               ]}
             />
             <NativeRows
               title="Local accounts"
               status={details.localUsers?.status}
               rows={details.localUsers?.users ?? []}
-              headers={["UID", "Name", "Shell"]}
-              render={(row) => [row.uid.toString(), row.name, row.shell || "No shell recorded"]}
+              showUnavailable={showUnavailable}
+              columns={[
+                { header: "UID", render: (row) => row.uid.toString() },
+                { header: "Name", render: (row) => row.name },
+                { header: "Shell", render: (row) => row.shell || "No shell recorded" },
+              ]}
             />
             <section className="grid gap-3">
               <h3 className="font-semibold">Native backend presence</h3>
-              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Fact label="dpkg">
-                  <BoolValue field={details.backends?.dpkg} />
-                </Fact>
-                <Fact label="RPM">
-                  <BoolValue field={details.backends?.rpm} />
-                </Fact>
-                <Fact label="pacman">
-                  <BoolValue field={details.backends?.pacman} />
-                </Fact>
-                <Fact label="zypper">
-                  <BoolValue field={details.backends?.zypper} />
-                </Fact>
-                <Fact label="rpm-ostree">
-                  <BoolValue field={details.backends?.rpmOstree} />
-                </Fact>
-                <Fact label="Nix">
-                  <BoolValue field={details.backends?.nix} />
-                </Fact>
-                <Fact label="Flatpak">
-                  <BoolValue field={details.backends?.flatpak} />
-                </Fact>
-                <Fact label="Snap">
-                  <BoolValue field={details.backends?.snap} />
-                </Fact>
-              </dl>
+              <NativeFacts
+                showUnavailable={showUnavailable}
+                fields={[
+                  { label: "dpkg", field: details.backends?.dpkg },
+                  { label: "RPM", field: details.backends?.rpm },
+                  { label: "pacman", field: details.backends?.pacman },
+                  { label: "zypper", field: details.backends?.zypper },
+                  { label: "rpm-ostree", field: details.backends?.rpmOstree },
+                  { label: "Nix", field: details.backends?.nix },
+                  { label: "Flatpak", field: details.backends?.flatpak },
+                  { label: "Snap", field: details.backends?.snap },
+                ]}
+              />
             </section>
-            <Applications title="Flatpak applications" data={details.flatpak} />
-            <Applications title="Snap applications" data={details.snap} />
+            <Applications
+              title="Flatpak applications"
+              data={details.flatpak}
+              backend={details.backends?.flatpak}
+              showUnavailable={showUnavailable}
+            />
+            <Applications
+              title="Snap applications"
+              data={details.snap}
+              backend={details.backends?.snap}
+              showUnavailable={showUnavailable}
+            />
           </>
         )}
       </CardContent>

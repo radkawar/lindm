@@ -9,6 +9,8 @@ import "lindm/admin/v1/approvals.proto";
 import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/authz_groups.proto";
 import "lindm/admin/v1/device_actions.proto";
+import "lindm/admin/v1/enrollment_grants.proto";
+import "lindm/admin/v1/enrollment_instructions.proto";
 import "lindm/admin/v1/enrollment_recovery.proto";
 import "lindm/admin/v1/fleet_summary.proto";
 import "lindm/admin/v1/inventory_management.proto";
@@ -34,6 +36,8 @@ service AdminService {
   rpc ListAttributeDefinitions(ListAttributeDefinitionsRequest) returns (ListAttributeDefinitionsResponse);
   rpc ExportDevices(ExportDevicesRequest) returns (ExportDevicesResponse);
   rpc CreateEnrollmentGrant(CreateEnrollmentGrantRequest) returns (CreateEnrollmentGrantResponse);
+  rpc ListEnrollmentGrants(ListEnrollmentGrantsRequest) returns (ListEnrollmentGrantsResponse);
+  rpc GetEnrollmentInstructions(GetEnrollmentInstructionsRequest) returns (GetEnrollmentInstructionsResponse);
   rpc RevokeEnrollmentGrant(RevokeEnrollmentGrantRequest) returns (RevokeEnrollmentGrantResponse);
   rpc CreateProvisioningToken(CreateProvisioningTokenRequest) returns (CreateProvisioningTokenResponse);
   rpc ListProvisioningTokens(ListProvisioningTokensRequest) returns (ListProvisioningTokensResponse);

@@ -1,0 +1,5 @@
+{
+  "command": "rpm -q kernel-core util-linux dmidecode fedora-release-common; uname -a",
+  "exit_code": 0,
+  "stderr": ""
+}

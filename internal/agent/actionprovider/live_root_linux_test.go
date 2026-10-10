@@ -19,8 +19,8 @@ import (
 )
 
 func liveScopeFixture() (*Provider, *agentv1.DeviceActionSpec) {
-	root := &agentv1.StorageTarget{LuksUuid: fixtureLUKS, Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 64 << 20}
-	data := &agentv1.StorageTarget{LuksUuid: "ea5f1f9c-fd35-476d-996b-f771484ec8e2", Wwn: "data-wwn", Serial: "data-serial", SizeBytes: 64 << 20}
+	root := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: fixtureLUKS, Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 64 << 20}
+	data := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: "ea5f1f9c-fd35-476d-996b-f771484ec8e2", Wwn: "data-wwn", Serial: "data-serial", SizeBytes: 64 << 20}
 	p := &Provider{config: &agentv1.DeviceActionProviderConfig{AllowLiveRootCryptoErase: true, Targets: []*agentv1.QualifiedActionTarget{{Target: root, AllowCryptoErase: true, QualificationId: "root-test"}, {Target: data, AllowCryptoErase: true, QualificationId: "data-test"}}}}
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{proto.CloneOf(root), proto.CloneOf(data)}}}}
 	return p, spec
@@ -37,7 +37,7 @@ func TestLiveRootRequiresCompleteQualifiedEncryptedSet(t *testing.T) {
 			case "missing-data":
 				action.Targets = action.Targets[:1]
 			case "extra":
-				action.Targets = append(action.Targets, &agentv1.StorageTarget{LuksUuid: "83357b28-c8d0-4185-a614-64415dc9eaf0", Wwn: "extra", Serial: "extra", SizeBytes: 64 << 20})
+				action.Targets = append(action.Targets, &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: "83357b28-c8d0-4185-a614-64415dc9eaf0", Wwn: "extra", Serial: "extra", SizeBytes: 64 << 20})
 			case "duplicate":
 				action.Targets[1] = proto.CloneOf(action.Targets[0])
 			case "changed-size":

@@ -41,6 +41,96 @@ local offline-compatible option. Offline release root/targets signing custody is
 never bundled into the online server image. Provide rotation/revocation drills with
 overlap, missed rotations, old agents, expired certs and lost keys.
 
+### Public enrollment installation material
+
+`GetEnrollmentInstructions` requires fresh, unrestricted `enrollment.manage`
+authority. It returns the configured `public_url` enrollment origin and optional
+`device_public_url`, never a browser Host header, listener bind address, or guessed
+hostname. The API's optional device origin, bootstrap URLs and repository messages
+remain absent when not configured; the console must show **Not configured** rather
+than invent a usable installation command.
+
+When `execution_bootstrap` is configured, startup reads its `root_file` and
+`bootstrap_file` through the existing bounded, ownership-checked resource loader.
+It verifies the DSSE signature/quorum, deployment, enrollment/device origins,
+device CA and TLS pins before serving either listener. The administrative HTTPS
+origin then exposes these exact public bytes without a login or client certificate:
+
+- `GET /bootstrap/execution-root.json`
+- `GET /bootstrap/bootstrap.dsse.json`
+
+Both also support `HEAD`, have `Cache-Control: no-store`, and reject write methods.
+No directory listing, arbitrary file retrieval, private signing key, bearer grant,
+or unsigned replacement bundle is published. Without configured bootstrap material,
+these paths return 404. The device listener remains mTLS-only. A reverse proxy must
+preserve these public read-only paths on `public_url`; do not require an admin
+session for initial installation or expose local configuration directories.
+Documents are the startup-verified snapshot; replacing referenced files requires
+restarting the server and passing the same verification again.
+
+**Delivery is not initial trust.** Downloading a root and a bundle signed by that
+same root does not authenticate either to a new device. Supply or independently
+authenticate the initial execution root through the deployment owner's trusted
+installation channel. The agent verifies the downloaded DSSE bundle against that
+authenticated root, including expiry and exact deployment/transport bindings.
+Never use `curl -k`, unsigned trust substitution, or downloaded root self-signatures
+as a replacement for this provenance.
+
+Native APT/DNF installation sources are optional and separate from
+`release_repository` (the TUF update repository). Configure the following strict
+protobuf-JSON fields inside `ServerConfig` to advertise sources that the operator
+has actually published:
+
+```json
+{
+  "enrollmentInstructions": {
+    "aptRepository": {
+      "baseUrl": "https://packages.example/apt",
+      "signingKeyUrl": "https://packages.example/package-signing.asc",
+      "signingKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567",
+      "suite": "stable",
+      "components": ["main"]
+    },
+    "dnfRepository": {
+      "baseUrl": "https://packages.example/rpm",
+      "signingKeyUrl": "https://packages.example/package-signing.asc",
+      "signingKeyFingerprint": "0123456789ABCDEF0123456789ABCDEF01234567"
+    }
+  }
+}
+```
+
+These are illustrative origins and fingerprints, not a published Lindm service or
+trusted key. Replace them with deployment-owned values. Repository/key URLs must
+be HTTPS without credentials, queries or fragments. Fingerprints must be the full
+uppercase 40-hex or 64-hex OpenPGP fingerprint, never a short key ID. APT suite and
+component tokens are bounded and cannot inject additional source-file fields.
+An absent repository means that installation method is not configured; a present
+but incomplete repository is rejected during configuration validation.
+The server advertises these values but does not fetch, host or prove availability
+of native packages or repository keys.
+
+Before installing, verify the downloaded primary signing key's complete fingerprint
+against the authoritative deployment value. APT must use a dedicated `Signed-By`
+keyring, not global trusted keys. DNF requires signed packages **and signed repository
+metadata**, with `gpgcheck=1`, `localpkg_gpgcheck=1` and `repo_gpgcheck=1`; do not disable
+verification when the configured publisher lacks signatures.
+
+The response also contains the exact installed-agent `grant_command`,
+`provisioning_command` and `resume_command` templates, without credentials. The
+grant template reads `/run/lindm-enrollment/grant`; the unattended template reads
+`/etc/lindm/provisioning-token`. Create their containing directories with protected
+root ownership, and credential files with mode 0600. The templates use
+`bootstrap -root /etc/lindm/execution-root.json -bundle /etc/lindm/bootstrap.dsse.json`
+and exactly one of `-grant FILE` or `-provisioning-token-file FILE`, then
+`resume -wait-seconds 3600`. Only `-grant -` supports stdin. These template strings
+do not establish that repositories or authenticated bootstrap prerequisites exist.
+Native declarative platforms must use their installed package executable path
+while preserving these actual CLI flags and protected credential-file boundaries.
+Never place bearer credentials in arguments, environment variables, URLs, shared
+images or logs. Keep installer inputs private and remove them only after durable
+success; removal does not promise forensic erasure of installer/WAL copies.
+
 ### Offline owner execution delegation
 
 `lindmctl execution delegation sign` is an offline owner operation, not an admin

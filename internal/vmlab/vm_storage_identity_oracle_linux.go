@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
@@ -22,6 +24,15 @@ func storageTruthIdentity(fields map[string]string) *inventoryv1.StorageIdentity
 		LuksUuid: truthString(""), LuksVersion: truthString(""), LuksTokenTypes: truthString(""),
 		LuksKeyslotCount: &inventoryv1.ObservedUint64{Status: truthUnavailable}, LuksTokenCount: &inventoryv1.ObservedUint64{Status: truthUnavailable},
 		BackingDisk: truthString(""), RootBacking: &inventoryv1.ObservedBool{Status: truthUnavailable}, Nvme: &inventoryv1.ObservedNVMeScope{Status: truthUnavailable},
+		GptDiskGuid: truthString(""),
+	}
+	if fields["TYPE"] == "disk" && fields["PTTYPE"] == "gpt" {
+		id.GptDiskGuid = truthString(fields["PTUUID"])
+		if id.GptDiskGuid.Status == truthSuccess {
+			if guid, err := uuid.Parse(id.GptDiskGuid.Value); err != nil || guid == uuid.Nil {
+				id.GptDiskGuid = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT}
+			}
+		}
 	}
 	if fields["FSTYPE"] == "crypto_LUKS" {
 		id.LuksUuid, id.LuksVersion, id.FilesystemUuid = truthString(fields["UUID"]), truthString(fields["FSVER"]), truthString("")
@@ -96,6 +107,7 @@ func (o vmInventoryOracle) storageIdentities(storage *inventoryv1.StorageDetails
 					src *inventoryv1.ObservedString
 				}{
 					{&id.Transport, disk.Transport}, {&id.Model, disk.Model}, {&id.Serial, disk.Serial}, {&id.Wwn, disk.Wwn}, {&id.Firmware, disk.Firmware}, {&id.Eui, disk.Eui},
+					{&id.GptDiskGuid, disk.GptDiskGuid},
 				} {
 					if (*pair.dst).Status == truthUnavailable {
 						*pair.dst = pair.src

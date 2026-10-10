@@ -119,7 +119,7 @@ func journalFixture(key ed25519.PublicKey) *agentv1.RecoveryJournal {
 	const id = "ae04fc3a-f3f4-4f97-9675-207bb5404c8c"
 	now := time.Date(2031, 9, 1, 0, 0, 0, 0, time.UTC)
 	digest := bytes.Repeat([]byte{5}, 32)
-	target := &agentv1.StorageTarget{Serial: "qualified-original-disk", Wwn: "qualified-wwn", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Serial: "qualified-original-disk", Wwn: "qualified-wwn", SizeBytes: 1 << 30}
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: digest, MediaSha256: digest, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}}}}
 	plan := &agentv1.DeviceActionPlan{ActionId: id, Spec: spec, Before: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(now), Supported: true, Target: target}}
 	intent := &agentv1.DeviceActionIntent{DeploymentId: id, DeviceId: id, EnrollmentGeneration: id, ActionId: id, ActorId: id, ActionSequence: 1, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1, NotBefore: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(time.Minute)), Spec: spec, SpecSha256: digest}

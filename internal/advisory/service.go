@@ -16,6 +16,7 @@ import (
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/proto"
@@ -78,12 +79,23 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := advisorydb.New(tx)
 	ids := make([]string, 0, len(cfg.GetFeeds()))
+	var retired []advisoryGeneration
 	for _, source := range cfg.GetFeeds() {
 		encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
 		if err != nil {
 			return nil, err
 		}
 		ids = append(ids, source.GetId())
+		current, err := q.LockAdvisoryFeed(ctx, source.GetId())
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		if err == nil && !bytes.Equal(current.ConfigBytes, encoded) {
+			retired = append(retired, advisoryGeneration{feedID: source.GetId(), revision: current.Revision})
+			if err := q.QueueAdvisoryGenerationCleanup(ctx, advisorydb.QueueAdvisoryGenerationCleanupParams{FeedID: source.GetId(), Generation: current.Revision}); err != nil {
+				return nil, err
+			}
+		}
 		if err := q.ConfigureAdvisoryFeed(ctx, advisorydb.ConfigureAdvisoryFeedParams{ID: source.GetId(), Distro: source.GetDistro(), Release: source.GetRelease(), PlatformStream: source.GetPlatformStream(), SourceUrl: source.GetUrl(), ConfigBytes: encoded, Revision: uuid.New()}); err != nil {
 			return nil, fmt.Errorf("configure advisory feed: %w", err)
 		}
@@ -94,12 +106,15 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
+	s.cleanupAdvisoryGenerations(ctx, retired)
 	return s, nil
 }
 
 // Refresh explicitly refreshes all configured feeds even when scheduled egress is
 // disabled. Each feed has an independent bounded fetch and atomic publication.
 func (s *Service) Refresh(ctx context.Context) error {
+	// Maintenance also runs when egress is disabled or no sources are configured.
+	s.cleanupAdvisoryGenerations(ctx, nil)
 	var result error
 	for _, source := range s.config.GetFeeds() {
 		if err := ctx.Err(); err != nil {
@@ -107,17 +122,20 @@ func (s *Service) Refresh(ctx context.Context) error {
 		}
 		started := s.clock().UTC()
 		bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		doc, err := s.client.Fetch(bounded, source)
-		if err == nil {
-			err = s.publish(bounded, source, doc, started)
-		}
+		err := s.publishStream(bounded, source, started, func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			return s.client.FetchStream(bounded, source, emit)
+		})
 		cancel()
 		if err != nil {
 			result = errors.Join(result, fmt.Errorf("refresh feed %s: %w", source.GetId(), err))
-			failureCtx, stop := context.WithTimeout(ctx, 5*time.Second)
-			storeErr := advisorydb.New(s.pool).FailAdvisoryFeed(failureCtx, advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(started), Error: "refresh_failed"})
-			stop()
-			result = errors.Join(result, storeErr)
+			encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
+			result = errors.Join(result, encodeErr)
+			if encodeErr == nil {
+				failureCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				storeErr := advisorydb.New(s.pool).FailAdvisoryFeed(failureCtx, advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(started), Error: "refresh_failed", ConfigBytes: encoded})
+				stop()
+				result = errors.Join(result, storeErr)
+			}
 		}
 	}
 	return result
@@ -133,111 +151,21 @@ func (s *Service) Import(ctx context.Context, id string, input io.Reader) error 
 		if len(source.GetExpectedSha256()) != sha256.Size {
 			return errors.New("advisory: offline import requires configured expected_sha256")
 		}
-		doc, err := feed.Parse(source, input)
-		if err != nil {
-			return err
-		}
-		// A byte pin establishes integrity, not when the vendor last served the
-		// snapshot. Until bundle custody binds acquisition time, imported files
-		// can contribute findings but cannot establish current complete coverage.
-		doc.CompleteSnapshot = false
-		return s.publish(ctx, source, doc, s.clock().UTC())
+		started := s.clock().UTC()
+		bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+		return s.publishStream(bounded, source, started, func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			doc, err := feed.ParseStream(bounded, source, input, emit)
+			if err != nil {
+				return nil, err
+			}
+			// A byte pin establishes integrity, not when the vendor served the
+			// snapshot. Imports cannot establish current complete coverage.
+			doc.CompleteSnapshot = false
+			return doc, nil
+		})
 	}
 	return ErrNotFound
-}
-
-func (s *Service) publish(ctx context.Context, source *advisoryv1.FeedSource, doc *advisoryv1.FeedDocument, started time.Time) error {
-	if doc == nil || len(doc.GetSourceSha256()) != sha256.Size {
-		return ErrInvalid
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	q := advisorydb.New(tx)
-	current, err := q.LockAdvisoryFeed(ctx, source.GetId())
-	if err != nil {
-		return err
-	}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
-	if err != nil {
-		return err
-	}
-	if !current.Enabled || !bytes.Equal(current.ConfigBytes, encoded) {
-		return ErrConflict
-	}
-	if current.CheckedAt.Valid && current.CheckedAt.Time.After(started) {
-		return nil
-	}
-	revision := current.Revision
-	recordsChanged := !bytes.Equal(current.SourceSha256, doc.GetSourceSha256())
-	if recordsChanged || current.CompleteSnapshot != doc.GetCompleteSnapshot() {
-		revision = uuid.New()
-	}
-	if recordsChanged {
-		if err := q.DeleteAdvisoryRecords(ctx, source.GetId()); err != nil {
-			return err
-		}
-		batch := make([]advisorydb.InsertAdvisoryRecordsParams, 0, 500)
-		seen := make(map[uuid.UUID]struct{}, len(doc.GetAdvisories()))
-		namespace := uuid.NewSHA1(uuid.NameSpaceOID, []byte(source.GetId()))
-		flush := func() error {
-			if len(batch) == 0 {
-				return nil
-			}
-			_, err := q.InsertAdvisoryRecords(ctx, batch)
-			clear(batch)
-			batch = batch[:0]
-			return err
-		}
-		for _, record := range doc.GetAdvisories() {
-			payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(record)
-			if err != nil {
-				return err
-			}
-			id := uuid.NewSHA1(namespace, payload)
-			if _, exists := seen[id]; exists {
-				continue
-			}
-			seen[id] = struct{}{}
-			batch = append(batch, advisorydb.InsertAdvisoryRecordsParams{ID: id, FeedID: source.GetId(), AdvisoryID: record.GetId(), PackageName: record.GetPackageName(), SourcePackage: record.GetSourcePackage(), Architecture: record.GetArchitecture(), RecordBytes: payload})
-			if len(batch) == cap(batch) {
-				if err := flush(); err != nil {
-					return err
-				}
-			}
-		}
-		if err := flush(); err != nil {
-			return err
-		}
-	}
-	artifacts := doc.GetArtifacts()
-	if len(artifacts) == 0 {
-		artifacts = []*advisoryv1.FeedArtifact{{Url: source.GetUrl(), Sha256: doc.GetSourceSha256()}}
-	}
-	manifest, err := proto.MarshalOptions{Deterministic: true}.Marshal(&advisoryv1.FeedManifest{Artifacts: artifacts})
-	if err != nil {
-		return err
-	}
-	expires := started.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second)
-	var snapshotAt pgtype.Timestamptz
-	if doc.GetSnapshotAt() != nil {
-		if err := doc.GetSnapshotAt().CheckValid(); err != nil || doc.GetSnapshotAt().AsTime().After(s.clock().UTC()) {
-			return ErrInvalid
-		}
-		snapshotAt = timestamp(doc.GetSnapshotAt().AsTime())
-		if until := snapshotAt.Time.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second); until.Before(expires) {
-			expires = until
-		}
-	}
-	if err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: manifest, SnapshotAt: snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(expires), AdvisoryCount: int64(len(doc.GetAdvisories())), CompleteSnapshot: doc.GetCompleteSnapshot()}); err != nil {
-		return err
-	}
-	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.feed.ingested", ResourceID: source.GetId(), Reason: "Vendor advisory revision published"}); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
 }
 
 // Run owns no detached goroutines. The caller cancels and joins it before closing
@@ -249,6 +177,11 @@ func (s *Service) Run(ctx context.Context) {
 	var nextRefresh time.Time
 	var after uuid.UUID
 	for {
+		cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
+		if err := s.drainAdvisoryGenerationCleanup(cleanupCtx); err != nil && ctx.Err() == nil {
+			slog.Warn("advisory generation cleanup deferred", "error", err)
+		}
+		cleanupCancel()
 		if s.config.GetRefreshEnabled() && !s.clock().Before(nextRefresh) {
 			if err := s.Refresh(ctx); err != nil && ctx.Err() == nil {
 				slog.Warn("advisory refresh failed", "error", err)

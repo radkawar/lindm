@@ -152,7 +152,19 @@ No configured sources is a setup state, not a refresh failure. Stale or missing
 coverage explicitly means exposure counts may be incomplete.
 
 Profiles distinguish saved revisions from assignments; Rollouts owns deployment.
-Enrollment separates one-time grants, unattended tokens and offline signed files.
+Enrollment starts with two goals: a single-use code for one device now, or a bounded
+reusable provisioning token for automated installation. Creation forms name the
+credential type, show lifetime/use defaults and keep assignment identifiers in
+Advanced settings. Server-backed grant and token tabs show state, usage, expiry
+and creator; revocation belongs to the selected row, not a pasted UUID form.
+Show each issued secret and its matching instructions in one shown-once dialog
+with explicit copy controls. Secrets and generated installer seeds remain in
+component memory, never query caches, URLs or browser storage. Keep frozen issue
+requests across dialog dismissal so an ambiguous response cannot become a new
+issuance. Install snippets use the server's configured repository/signing trust
+and exact CLI commands; missing setup stays explicit, never guessed. Downloading
+an execution root does not authenticate it. Offline enrollment stays a separate
+disclosure below the main enrollment methods.
 Device action forms use dialogs for short operations and dedicated pages for
 storage, encryption and recovery workflows. Keep one concise warning at confirmation;
 put policy explanations in Details. Preserve typed confirmation, independent approval,
@@ -230,6 +242,20 @@ Inventory mounts on first activation (or an explicit package-search deep link),
 so opening Overview does not silently start an inventory cursor. Encryption and
 recovery secrets are cleared on navigation, blur and their existing expiry timers.
 
+Inventory distinguishes missing optional observations from collection failures.
+Unavailable fields are hidden by default behind **Show unavailable fields**;
+installed-backend and OS observations provide context for “Not installed” and
+“Not applicable on Ubuntu.” Successful zero/false values remain visible.
+Permission, timeout and native-command failures remain visible as warnings with
+their reported collection status. Do not invent stderr or a cause when the API
+does not include it.
+
+Advisory source freshness does not imply complete coverage. A current source with
+rejected records keeps a warning badge and an expandable record ID, reason and
+package list; unscoped rejections say that affected packages could not be identified.
+Findings rejected by the source remain **Unknown (source record rejected)**, never
+unaffected or eligible for risk acceptance. Exposure counts may be incomplete.
+
 For isolated visual acceptance, build embedded assets and run a disposable console:
 
 ```sh
@@ -253,6 +279,15 @@ Interrupting the command cleans its owned process/database/material. Never point
 the generator at a production tenant or publish enrollment/browser credentials.
 The fixture also enables real integration/report RPCs with its own protected,
 random encryption key; no destinations or schedules are preconfigured.
+
+For a historical inventory presentation check, add `-host-observation FILE` with
+a captured `lindm.inventory.v1.HostObservation` protobuf JSON document. The lab
+rejects unknown fields, invalid observations and files above 1 MiB. It publishes
+the unchanged fields and original collection timestamps for exactly one enrolled
+simulator through its authenticated inventory RPC, then labels that device
+`historical-inventory-replay` and prints its ID. This is a historical replay,
+not a live recollection or native qualification; package data and service work
+remain synthetic. Keep capture provenance alongside screenshots.
 
 Organize `web/src` around working product features:
 
@@ -365,6 +400,39 @@ reusing the agent's proc-table parser. Active-session truth uses `loginctl`
 properties independently of the agent's `busctl` JSON decoder. Missing optional
 properties retain unavailable status; neither oracle chooses a preferred interface
 or infers session activity from session counts.
+
+Native equality is not health: matching permission, timeout, malformed-output,
+capacity or command failures fail inspection. Only exact `UNAVAILABLE` fields in
+`internal/vmlab/inventory_unavailable_linux.go` may pass, with an explicit distro,
+documented reason and applicable native capability guards. Backend detection must
+succeed even when the backend is absent. Missing LUKS metadata on LUKS media and
+missing Fedora DNF5 repository observations are failures, not not-applicable
+capabilities. `CheckInventoryHealth` applies the same policy to fresh host and
+package evidence and also rejects omitted current inventory categories; it does
+not replace independent native value comparisons.
+Session seats additionally admit `NOT_APPLICABLE` only when that same session's
+successful native Class/Type/Remote evidence proves a manager/background, remote
+or tty context. This is not a global field exemption; local graphical missing
+seats and missing or failed contextual evidence remain failures.
+
+`lab vm inspect` executes its fixed uploaded `lindm-agent inspect` with `sudo -n`
+and an empty, fixed environment. Full native inventory requires the root privilege
+used by the production executor for DMI/sysfs serials and block metadata; running
+this lane as the SSH user would measure expected permission denials instead.
+Standalone agent `inspect` still retains the caller's privilege. This laboratory
+invocation does not grant new privilege to the unprivileged production network
+process or weaken the strict per-field health checks.
+
+Before its first native sample, inspection waits on
+`systemctl is-system-running --wait` and, when installed, `nm-online -s -q
+--timeout=30`. Commands and their output are bounded; the complete readiness
+operation has a one-minute deadline. Systemd `running` or `degraded` is a settled
+startup state—`degraded` does not certify service health. The record retains
+system state, NetworkManager startup completion or native binary absence, and
+start/completion timestamps in `NativeReadiness`. SSH and cloud-init completion
+alone did not prevent a real RHEL9.8 IPv6 startup transition. Network and all other
+inventory fields still undergo unchanged independent before/agent/after
+comparison; changing evidence yields no collector verdict.
 
 The default native VM lane requires accessible KVM, QEMU, `qemu-img` and
 `cloud-localds`. Explicit foreign-architecture runs use QEMU TCG instead; neither
@@ -1389,6 +1457,12 @@ six hours (configurable one hour–seven days). Package/host evidence defaults t
 24-hour validity, configurable five minutes–seven days. Inventory matching and
 expiry handling do not need network access.
 
+Feed publication and device finding reads use database-backed feed configuration,
+so an explicit refresh command can enable a new source without restarting the
+serving replica. Its in-memory scheduled refresh configuration is loaded only at
+startup: until a planned restart, repeat the explicit command to refresh the new
+source. A device findings read evaluates the current published snapshot immediately.
+
 `lindmd advisories-import -config FILE -feed ID -file FILE` admits cached vendor
 bytes only when that feed has an out-of-band `expectedSha256` pin (protobuf JSON
 base64). The raw compressed/ZIP bytes are hashed before decompression. For repository
@@ -1409,17 +1483,80 @@ individual CSAF imports still require externally authenticated operator pins and
 do not claim signature provenance; paired Red Hat archive import requires the
 separate replay-fenced bundle protocol.
 
-Ordinary input is capped at 128 MiB compressed, 512 MiB expanded and 500,000
-normalized records. Signed individual CSAF is capped at 32 MiB with 64 KiB proofs.
-Red Hat acquisition stages at most one 512 MiB compressed archive in a private
-temporary file, removes it on every exit, bounds each archive to 16 GiB expanded
-and 250,000 entries, and bounds the combined normalized data to 128 MiB/500,000
-records. Eight logical requests (forty including redirects) and parsing share one
-five-minute deadline. Database insertion uses bounded COPY batches. A scheduled
+Malformed OSV records are rejected individually, never repaired or interpreted as
+clean. Feed status exposes each rejected record's ID, reason and parseable package
+names; a current feed with rejections is labeled “Current, N records rejected”.
+Packages matching either an observed binary or source name from a rejected record
+receive an unknown assessment with reason `source_record_rejected`. Valid unrelated
+records remain usable. A rejection without trustworthy package scope makes coverage
+partial rather than allowing a clean result. `FeedSource.maxRejectedRecords`
+defaults to 1000 (0 fails on the first rejection; maximum 10000). Rejection metadata
+is additionally capped at 48 KiB, with at most 64 names per record; exceeding the
+metadata/count budget fails the refresh and retains the previous publication.
+An invalid record discards all of its partially normalized claims before adding
+conservative unknown assessments. Older serving binaries can read these unknown
+assessments but need a planned upgrade to render the new rejection-status fields.
+
+Ordinary non-ZIP input is capped at 128 MiB compressed, 512 MiB expanded and
+500,000 normalized records. OSV ZIP exports are streamed to a private temporary
+file (removed on success and failure), with a default 1 GiB compressed limit;
+`FeedSource.maxArchiveBytes` can select 1 MiB–4 GiB. ZIP processing admits at most
+250,000 entries, 4 MiB per entry, 16 GiB total expanded bytes and a 1000:1 compression
+ratio. Only one source entry's normalized claims are held in memory (at most
+128 MiB); production publication does not retain a whole-feed list or deduplication
+map. `FeedSource.totalClaimsLimit` bounds emitted claims, including duplicates,
+at 5,000,000 by default, configurable from 1 to 20,000,000.
+Entries are read individually and checked for damage, with ecosystem filtering
+before decoding native ranges and binary maps. Acquisition uses verified HTTPS
+and verifies `expectedSha256` when configured, plus the GCS CRC32C checksum when
+supplied. ZIP CRCs are corruption checks,
+not vendor signatures. Only the canonical complete ecosystem export can establish
+complete coverage. Ubuntu 24.04 uses
+`https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip`,
+`FEED_FORMAT_OSV_ZIP`, distro `ubuntu`, release `24.04` and architecture `amd64`.
+OSV acquisition and parsing share the five-minute refresh deadline.
+Signed individual SUSE CSAF is capped at 32 MiB with 64 KiB proofs.
+Red Hat accepts 128 MiB documents, incrementally walks JSON product metadata and
+one vulnerability at a time, and verifies original-byte proofs before publication.
+Acquisition stages at most one 512 MiB compressed archive in a private temporary
+file, removes it on every exit, and bounds each archive to 16 GiB expanded and
+250,000 entries. A private disk-backed reconciliation index is capped at 2 GiB
+with an 8 MiB cache; source-wide claims are never held in a Go map. The configured
+total-claims limit bounds publication independently. Only materializing callers
+retain the 128 MiB/500,000-claim result cap. Eight logical requests (forty including
+redirects) and parsing share one five-minute deadline. Database insertion uses
+bounded COPY batches. A scheduled
 matcher scans at most 100 devices per minute; reads evaluate the current snapshot
 immediately. Expiry is rechecked at read time independently of scan progress.
 Findings pages are row- and byte-bounded. Failed refreshes preserve historical
 evidence and expose an error without resetting freshness.
+
+Forward migration `00011` stores advisory claims by publication generation and
+exposes the canonical `advisory_records` view for the active feed revision only.
+Publication COPYs at most 500 claims per batch into staging, deduplicates exact
+claims in PostgreSQL, and switches the active generation only after complete
+source verification and parsing. Failed or canceled staging never replaces the
+previous generation. Source configuration and refresh-start fences still apply;
+concurrent work cannot publish under changed authority. Previous and failed
+generations are removed through bounded cleanup. The maintained refresh command
+logs emitted/unique/rejected counts and publication duration; process peak RSS is
+measured independently in real-feed qualification.
+
+Migration `00013` makes generation cleanup durable and retryable. Startup,
+explicit refresh and the periodic worker drain at most 5,000 rows per transaction
+with a 30-second per-drain deadline; pending keys survive deadline or process loss.
+New staging owns a ten-minute lease renewed with every COPY batch and before the
+final switch. An expired lease cannot resume or publish a partially reclaimed
+generation. Retirement is queued in the same transaction as the active-generation
+switch; SQL always protects the active revision. Historical inactive generations
+receive a 35-minute migration grace period covering the older 30-minute import
+command, rather than being mistaken for abandoned concurrent staging immediately.
+
+Real-source RHEL qualification is explicitly opt-in:
+`LINDM_TEST_DATABASE_URL=... go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=13m`.
+It acquires both real signed archives and publishes through the production service
+inside an owned disposable test schema. It requires network access and a test role
+with schema-creation privileges, never the demo database or an owner's session.
 
 ### Signed release repository core (P20/L17)
 

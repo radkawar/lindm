@@ -59,6 +59,12 @@ const (
 	// AdminServiceCreateEnrollmentGrantProcedure is the fully-qualified name of the AdminService's
 	// CreateEnrollmentGrant RPC.
 	AdminServiceCreateEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/CreateEnrollmentGrant"
+	// AdminServiceListEnrollmentGrantsProcedure is the fully-qualified name of the AdminService's
+	// ListEnrollmentGrants RPC.
+	AdminServiceListEnrollmentGrantsProcedure = "/lindm.admin.v1.AdminService/ListEnrollmentGrants"
+	// AdminServiceGetEnrollmentInstructionsProcedure is the fully-qualified name of the AdminService's
+	// GetEnrollmentInstructions RPC.
+	AdminServiceGetEnrollmentInstructionsProcedure = "/lindm.admin.v1.AdminService/GetEnrollmentInstructions"
 	// AdminServiceRevokeEnrollmentGrantProcedure is the fully-qualified name of the AdminService's
 	// RevokeEnrollmentGrant RPC.
 	AdminServiceRevokeEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/RevokeEnrollmentGrant"
@@ -209,6 +215,8 @@ type AdminServiceClient interface {
 	ListAttributeDefinitions(context.Context, *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error)
 	ExportDevices(context.Context, *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
+	ListEnrollmentGrants(context.Context, *connect.Request[v1.ListEnrollmentGrantsRequest]) (*connect.Response[v1.ListEnrollmentGrantsResponse], error)
+	GetEnrollmentInstructions(context.Context, *connect.Request[v1.GetEnrollmentInstructionsRequest]) (*connect.Response[v1.GetEnrollmentInstructionsResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	CreateProvisioningToken(context.Context, *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error)
 	ListProvisioningTokens(context.Context, *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error)
@@ -320,6 +328,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceCreateEnrollmentGrantProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("CreateEnrollmentGrant")),
+			connect.WithClientOptions(opts...),
+		),
+		listEnrollmentGrants: connect.NewClient[v1.ListEnrollmentGrantsRequest, v1.ListEnrollmentGrantsResponse](
+			httpClient,
+			baseURL+AdminServiceListEnrollmentGrantsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListEnrollmentGrants")),
+			connect.WithClientOptions(opts...),
+		),
+		getEnrollmentInstructions: connect.NewClient[v1.GetEnrollmentInstructionsRequest, v1.GetEnrollmentInstructionsResponse](
+			httpClient,
+			baseURL+AdminServiceGetEnrollmentInstructionsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetEnrollmentInstructions")),
 			connect.WithClientOptions(opts...),
 		),
 		revokeEnrollmentGrant: connect.NewClient[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse](
@@ -612,6 +632,8 @@ type adminServiceClient struct {
 	listAttributeDefinitions             *connect.Client[v1.ListAttributeDefinitionsRequest, v1.ListAttributeDefinitionsResponse]
 	exportDevices                        *connect.Client[v1.ExportDevicesRequest, v1.ExportDevicesResponse]
 	createEnrollmentGrant                *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
+	listEnrollmentGrants                 *connect.Client[v1.ListEnrollmentGrantsRequest, v1.ListEnrollmentGrantsResponse]
+	getEnrollmentInstructions            *connect.Client[v1.GetEnrollmentInstructionsRequest, v1.GetEnrollmentInstructionsResponse]
 	revokeEnrollmentGrant                *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
 	createProvisioningToken              *connect.Client[v1.CreateProvisioningTokenRequest, v1.CreateProvisioningTokenResponse]
 	listProvisioningTokens               *connect.Client[v1.ListProvisioningTokensRequest, v1.ListProvisioningTokensResponse]
@@ -703,6 +725,16 @@ func (c *adminServiceClient) ExportDevices(ctx context.Context, req *connect.Req
 // CreateEnrollmentGrant calls lindm.admin.v1.AdminService.CreateEnrollmentGrant.
 func (c *adminServiceClient) CreateEnrollmentGrant(ctx context.Context, req *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error) {
 	return c.createEnrollmentGrant.CallUnary(ctx, req)
+}
+
+// ListEnrollmentGrants calls lindm.admin.v1.AdminService.ListEnrollmentGrants.
+func (c *adminServiceClient) ListEnrollmentGrants(ctx context.Context, req *connect.Request[v1.ListEnrollmentGrantsRequest]) (*connect.Response[v1.ListEnrollmentGrantsResponse], error) {
+	return c.listEnrollmentGrants.CallUnary(ctx, req)
+}
+
+// GetEnrollmentInstructions calls lindm.admin.v1.AdminService.GetEnrollmentInstructions.
+func (c *adminServiceClient) GetEnrollmentInstructions(ctx context.Context, req *connect.Request[v1.GetEnrollmentInstructionsRequest]) (*connect.Response[v1.GetEnrollmentInstructionsResponse], error) {
+	return c.getEnrollmentInstructions.CallUnary(ctx, req)
 }
 
 // RevokeEnrollmentGrant calls lindm.admin.v1.AdminService.RevokeEnrollmentGrant.
@@ -948,6 +980,8 @@ type AdminServiceHandler interface {
 	ListAttributeDefinitions(context.Context, *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error)
 	ExportDevices(context.Context, *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
+	ListEnrollmentGrants(context.Context, *connect.Request[v1.ListEnrollmentGrantsRequest]) (*connect.Response[v1.ListEnrollmentGrantsResponse], error)
+	GetEnrollmentInstructions(context.Context, *connect.Request[v1.GetEnrollmentInstructionsRequest]) (*connect.Response[v1.GetEnrollmentInstructionsResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
 	CreateProvisioningToken(context.Context, *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error)
 	ListProvisioningTokens(context.Context, *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error)
@@ -1055,6 +1089,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceCreateEnrollmentGrantProcedure,
 		svc.CreateEnrollmentGrant,
 		connect.WithSchema(adminServiceMethods.ByName("CreateEnrollmentGrant")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListEnrollmentGrantsHandler := connect.NewUnaryHandler(
+		AdminServiceListEnrollmentGrantsProcedure,
+		svc.ListEnrollmentGrants,
+		connect.WithSchema(adminServiceMethods.ByName("ListEnrollmentGrants")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetEnrollmentInstructionsHandler := connect.NewUnaryHandler(
+		AdminServiceGetEnrollmentInstructionsProcedure,
+		svc.GetEnrollmentInstructions,
+		connect.WithSchema(adminServiceMethods.ByName("GetEnrollmentInstructions")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceRevokeEnrollmentGrantHandler := connect.NewUnaryHandler(
@@ -1353,6 +1399,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceExportDevicesHandler.ServeHTTP(w, r)
 		case AdminServiceCreateEnrollmentGrantProcedure:
 			adminServiceCreateEnrollmentGrantHandler.ServeHTTP(w, r)
+		case AdminServiceListEnrollmentGrantsProcedure:
+			adminServiceListEnrollmentGrantsHandler.ServeHTTP(w, r)
+		case AdminServiceGetEnrollmentInstructionsProcedure:
+			adminServiceGetEnrollmentInstructionsHandler.ServeHTTP(w, r)
 		case AdminServiceRevokeEnrollmentGrantProcedure:
 			adminServiceRevokeEnrollmentGrantHandler.ServeHTTP(w, r)
 		case AdminServiceCreateProvisioningTokenProcedure:
@@ -1488,6 +1538,14 @@ func (UnimplementedAdminServiceHandler) ExportDevices(context.Context, *connect.
 
 func (UnimplementedAdminServiceHandler) CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateEnrollmentGrant is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListEnrollmentGrants(context.Context, *connect.Request[v1.ListEnrollmentGrantsRequest]) (*connect.Response[v1.ListEnrollmentGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListEnrollmentGrants is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetEnrollmentInstructions(context.Context, *connect.Request[v1.GetEnrollmentInstructionsRequest]) (*connect.Response[v1.GetEnrollmentInstructionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetEnrollmentInstructions is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error) {

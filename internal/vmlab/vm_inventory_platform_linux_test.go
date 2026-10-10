@@ -3,8 +3,13 @@
 package vmlab
 
 import (
+	"os"
+	"slices"
 	"strings"
 	"testing"
+
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
@@ -97,22 +102,28 @@ func TestNativeRepositoriesCompareIDsNotProductNames(t *testing.T) {
 func TestNativePlatformComparisonRequiresFreshCompleteEvidence(t *testing.T) {
 	before, after, actual := nativeDetailsFixture(), nativeDetailsFixture(), nativeDetailsFixture()
 	// Historical observations may all lack the optional platform category.
-	if err := compareVMDetails(before, after, actual); err != nil {
+	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	for _, details := range []*inventoryv1.NativeDetails{before, after, actual} {
-		details.Platform = &inventoryv1.PlatformDetails{Cpe: truthString("cpe:/o:redhat:enterprise_linux:9::baseos"), ReleaseverLock: truthString("9.4"), Repositories: &inventoryv1.RepositoryObservation{Status: truthSuccess, Backend: "dnf4", Ids: []string{"rhel-9-baseos-eus", "rhel-9-appstream-eus"}}}
+		details.Platform = &inventoryv1.PlatformDetails{
+			Cpe: truthString("cpe:/o:redhat:enterprise_linux:9::baseos"), ReleaseverLock: truthString("9.8"), Releasever: truthString("9.8"),
+			Repositories: &inventoryv1.RepositoryObservation{
+				Status: truthSuccess, Backend: "dnf4", Ids: []string{"rhel-9-baseos-eus", "rhel-9-appstream-eus"},
+				Configurations: []*inventoryv1.RepositoryConfiguration{{Id: "rhel-9-baseos-eus"}, {Id: "rhel-9-appstream-eus"}},
+			},
+		}
 	}
 	actual.Platform.Repositories.Ids[0], actual.Platform.Repositories.Ids[1] = actual.Platform.Repositories.Ids[1], actual.Platform.Repositories.Ids[0]
-	if err := compareVMDetails(before, after, actual); err != nil {
+	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.Platform.ReleaseverLock = truthString("")
-	if err := compareVMDetails(before, after, actual); err == nil {
+	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err == nil {
 		t.Fatal("lost release lock accepted")
 	}
 	actual.Platform = nil
-	if err := compareVMDetails(before, after, actual); err == nil {
+	if err := compareVMDetails("rhel", "x86_64", before, after, actual); err == nil {
 		t.Fatal("fresh expected platform accepted omitted category")
 	}
 }
@@ -130,5 +141,169 @@ func TestSecureBootDiagnosticReportsOnlyKnownPostureValues(t *testing.T) {
 	err = compareInspectHardware(hardware, details)
 	if err == nil || strings.Contains(err.Error(), "private-") {
 		t.Fatalf("unsafe posture diagnostic: %v", err)
+	}
+}
+
+func TestNativeDNF5ConfigurationsPreserveNativeFieldsAndRedactCredentials(t *testing.T) {
+	list := guestCommandResult{Stdout: []byte(`[{"id":"fedora","is_enabled":true}]`)}
+	info := guestCommandResult{Stdout: []byte(`[
+		{"id":"fedora","is_enabled":false,"base_url":["https://user:secret@example.test/44/x86_64?token=secret#private"],"metalink":"https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=x86_64","mirrorlist":"","pkg_gpgcheck":true,"gpg_key":["file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-x86_64"]},
+		{"id":"fedora-source","is_enabled":false}
+	]`)}
+	repos, err := parseDNF5RepositoryTruth(list, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repos.Status != truthSuccess || repos.Backend != "dnf5" || len(repos.Ids) != 1 || len(repos.Configurations) != 1 {
+		t.Fatalf("wrong native enabled configuration selection: %v", repos)
+	}
+	config := repos.Configurations[0]
+	if config.Id != "fedora" || !config.Gpgcheck || !config.UrlsRedacted || config.Metalink != "https://mirrors.fedoraproject.org/metalink" || config.Mirrorlist != "" || len(config.BaseUrls) != 1 || config.BaseUrls[0] != "https://example.test/44/x86_64" || len(config.GpgKeys) != 1 || config.GpgKeys[0] != "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-x86_64" {
+		t.Fatal("native configuration fields or credential redaction changed")
+	}
+}
+
+func TestNativeDNF5RepositoryTruthRejectsIncompleteEvidence(t *testing.T) {
+	full := `{"id":"fedora","base_url":[],"metalink":"","mirrorlist":"","pkg_gpgcheck":false,"gpg_key":[]}`
+	list := guestCommandResult{Stdout: []byte(`[{"id":"fedora","is_enabled":true}]`)}
+	for _, data := range []string{
+		`null`, `{}`, `[]`, `[{"id":"fedora"}]`,
+		`[` + full + `,` + full + `]`,
+		strings.ReplaceAll(`[`+full+`]`, `"pkg_gpgcheck":false,`, ""),
+		strings.ReplaceAll(`[`+full+`]`, `"base_url":[]`, `"base_url":null`),
+	} {
+		if _, err := parseDNF5RepositoryTruth(list, guestCommandResult{Stdout: []byte(data)}); err == nil {
+			t.Fatal("accepted missing, duplicate or incomplete native configuration")
+		}
+	}
+	for _, data := range []string{`null`, `[{"id":"fedora"}]`, `[{"id":"fedora","is_enabled":false}]`, `[{"id":"fedora","is_enabled":true},{"id":"fedora","is_enabled":true}]`} {
+		if _, err := parseDNF5RepositoryTruth(guestCommandResult{Stdout: []byte(data)}, guestCommandResult{Stdout: []byte(`[` + full + `]`)}); err == nil {
+			t.Fatal("accepted malformed enabled repository truth")
+		}
+	}
+	for _, native := range []guestCommandResult{{ExitCode: 1}, {Stderr: []byte("private configuration failure")}} {
+		repos, err := parseDNF5RepositoryTruth(list, native)
+		if err != nil || repos.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_NATIVE_COMMAND_FAILURE || len(repos.Ids) != 0 || len(repos.Configurations) != 0 {
+			t.Fatal("native failure became partial success")
+		}
+	}
+	empty := guestCommandResult{Stdout: []byte("[]")}
+	repos, err := parseDNF5RepositoryTruth(empty, empty)
+	if err != nil || repos.Status != truthSuccess || len(repos.Ids) != 0 || len(repos.Configurations) != 0 {
+		t.Fatal("successful empty native repository configuration was lost")
+	}
+}
+
+func TestNativeRepositoryTruthURLRedaction(t *testing.T) {
+	for _, test := range []struct {
+		raw, clean string
+		redacted   bool
+	}{
+		{"https://user:secret@example.test/path?password=secret#private", "https://example.test/path", true},
+		{"https://example.test/path?", "https://example.test/path", true},
+		{"https://example.test/path#", "https://example.test/path", true},
+		{"https://example.test/a%2Fb", "https://example.test/a%2Fb", false},
+		{"file:///etc/pki/key", "file:///etc/pki/key", false},
+	} {
+		value, redacted, err := redactDNFTruthURL(test.raw)
+		if err != nil || value != test.clean || redacted != test.redacted {
+			t.Fatal("URL redaction contract mismatch")
+		}
+	}
+	for _, value := range []string{"https://user:private@[bad", "https://example.test/$releasever", "relative/path", "https:opaque-private", "https://example.test/\nprivate"} {
+		clean, _, err := redactDNFTruthURL(value)
+		if err == nil || clean != "" || strings.Contains(err.Error(), "private") {
+			t.Fatal("invalid URL escaped or appeared in diagnostic")
+		}
+	}
+}
+
+func TestNativeDNF5EffectiveReleaseverIsNotAnExplicitLock(t *testing.T) {
+	got, err := parseDNF5ReleaseverTruth(guestCommandResult{Stdout: []byte("======== Variables: ========\narch = x86_64\nreleasever = 44\nreleasever_major = 44\nreleasever_minor = \n")})
+	if err != nil || got.Status != truthSuccess || got.Value != "44" {
+		t.Fatalf("native effective release version lost: %v %v", got, err)
+	}
+	got, err = parseDNF5ReleaseverTruth(guestCommandResult{Stdout: []byte("======== Variables: ========\narch = x86_64\n")})
+	if err != nil || got.Status != truthUnavailable || got.Value != "" {
+		t.Fatal("missing native releasever became inferred OS version")
+	}
+	for _, data := range []string{"releasever = 44\n", "======== Variables: ========\nreleasever = \n", "======== Variables: ========\nreleasever = 44\nreleasever = 45\n"} {
+		if _, err := parseDNF5ReleaseverTruth(guestCommandResult{Stdout: []byte(data)}); err == nil {
+			t.Fatal("invalid releasever truth accepted")
+		}
+	}
+}
+
+func TestNativePlatformComparisonCoversEveryConfigurationField(t *testing.T) {
+	before := nativeDetailsFixture()
+	before.Platform = &inventoryv1.PlatformDetails{
+		Cpe: truthString("cpe:/o:fedoraproject:fedora:44"), ReleaseverLock: truthString(""), Releasever: truthString("44"),
+		Repositories: &inventoryv1.RepositoryObservation{
+			Status: truthSuccess, Backend: "dnf5", Ids: []string{"fedora", "updates"},
+			Configurations: []*inventoryv1.RepositoryConfiguration{
+				{Id: "fedora", BaseUrls: []string{"https://one.test/fedora", "https://two.test/fedora"}, Metalink: "https://mirror.test/metalink", Mirrorlist: "https://mirror.test/list", Gpgcheck: true, GpgKeys: []string{"file:///one", "file:///two"}, UrlsRedacted: true},
+				{Id: "updates", Gpgcheck: true},
+			},
+		},
+	}
+	after, actual := proto.CloneOf(before), proto.CloneOf(before)
+	repositories := actual.Platform.Repositories
+	repositories.Configurations[0], repositories.Configurations[1] = repositories.Configurations[1], repositories.Configurations[0]
+	config := repositories.Configurations[1]
+	config.BaseUrls[0], config.BaseUrls[1] = config.BaseUrls[1], config.BaseUrls[0]
+	config.GpgKeys[0], config.GpgKeys[1] = config.GpgKeys[1], config.GpgKeys[0]
+	if err := compareVMDetails("fedora", "x86_64", before, after, actual); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*inventoryv1.PlatformDetails){
+		func(p *inventoryv1.PlatformDetails) { p.Releasever.Value = "45" },
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].Id = "other" },
+		func(p *inventoryv1.PlatformDetails) {
+			p.Repositories.Configurations[0].BaseUrls[0] = "https://changed.test/"
+		},
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].Metalink = "" },
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].Mirrorlist = "" },
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].Gpgcheck = false },
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].GpgKeys = nil },
+		func(p *inventoryv1.PlatformDetails) { p.Repositories.Configurations[0].UrlsRedacted = false },
+	} {
+		changed := proto.CloneOf(before)
+		mutate(changed.Platform)
+		if err := compareVMDetails("fedora", "x86_64", before, after, changed); err == nil {
+			t.Fatal("configuration field mismatch accepted")
+		}
+	}
+}
+
+func TestNativeDNF5CapturedFedora44Truth(t *testing.T) {
+	fixture := func(name string) []byte {
+		t.Helper()
+		data, err := os.ReadFile("../agent/inventory/testdata/dnf5-fedora44/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	repos, err := parseDNF5RepositoryTruth(
+		guestCommandResult{Stdout: fixture("repo-list-enabled.json")},
+		guestCommandResult{Stdout: fixture("repo-info-config-only.json")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	captured := new(inventoryv1.PlatformDetails)
+	if err := protojson.Unmarshal(fixture("collector-helper.json"), captured); err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(repos.Ids)
+	slices.SortFunc(repos.Configurations, func(a, b *inventoryv1.RepositoryConfiguration) int {
+		return strings.Compare(a.Id, b.Id)
+	})
+	if !proto.Equal(repos, captured.Repositories) {
+		t.Fatal("independent native CLI configuration differs from captured supported-binding evidence")
+	}
+	releasever, err := parseDNF5ReleaseverTruth(guestCommandResult{Stdout: fixture("variables.txt")})
+	if err != nil || !proto.Equal(releasever, captured.Releasever) {
+		t.Fatalf("native effective releasever differs: %v", err)
 	}
 }

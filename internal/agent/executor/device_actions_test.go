@@ -338,7 +338,7 @@ func TestDeviceActionPartialEffectRemainsUnknown(t *testing.T) {
 
 func TestDeviceActionDestructiveApprovalExactBinding(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}}}}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}}}}
 	i := f.actionIntent(t, 1, spec)
 	f.actionPrepare(t, i)
 	if _, err := f.svc.StartDeviceAction(t.Context(), connect.NewRequest(&agentv1.StartDeviceActionRequest{ActionId: i.GetActionId(), StartGrantEnvelope: f.actionGrant(t, i)})); err == nil {

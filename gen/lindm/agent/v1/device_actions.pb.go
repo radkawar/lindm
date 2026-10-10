@@ -23,6 +23,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// The basis is approved and signed, never inferred again at execution.
+type StorageIdentityBasis int32
+
+const (
+	StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED     StorageIdentityBasis = 0
+	StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL      StorageIdentityBasis = 1
+	StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS StorageIdentityBasis = 2
+)
+
+// Enum value maps for StorageIdentityBasis.
+var (
+	StorageIdentityBasis_name = map[int32]string{
+		0: "STORAGE_IDENTITY_BASIS_UNSPECIFIED",
+		1: "STORAGE_IDENTITY_BASIS_WWN_SERIAL",
+		2: "STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS",
+	}
+	StorageIdentityBasis_value = map[string]int32{
+		"STORAGE_IDENTITY_BASIS_UNSPECIFIED":     0,
+		"STORAGE_IDENTITY_BASIS_WWN_SERIAL":      1,
+		"STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS": 2,
+	}
+)
+
+func (x StorageIdentityBasis) Enum() *StorageIdentityBasis {
+	p := new(StorageIdentityBasis)
+	*p = x
+	return p
+}
+
+func (x StorageIdentityBasis) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StorageIdentityBasis) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[0].Descriptor()
+}
+
+func (StorageIdentityBasis) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[0]
+}
+
+func (x StorageIdentityBasis) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StorageIdentityBasis.Descriptor instead.
+func (StorageIdentityBasis) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{0}
+}
+
 type CryptoEraseMode int32
 
 const (
@@ -56,11 +106,11 @@ func (x CryptoEraseMode) String() string {
 }
 
 func (CryptoEraseMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[0].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[1].Descriptor()
 }
 
 func (CryptoEraseMode) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[0]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[1]
 }
 
 func (x CryptoEraseMode) Number() protoreflect.EnumNumber {
@@ -69,7 +119,7 @@ func (x CryptoEraseMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CryptoEraseMode.Descriptor instead.
 func (CryptoEraseMode) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{0}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{1}
 }
 
 type RecoveryBootMode int32
@@ -105,11 +155,11 @@ func (x RecoveryBootMode) String() string {
 }
 
 func (RecoveryBootMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[1].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[2].Descriptor()
 }
 
 func (RecoveryBootMode) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[1]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[2]
 }
 
 func (x RecoveryBootMode) Number() protoreflect.EnumNumber {
@@ -118,7 +168,7 @@ func (x RecoveryBootMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RecoveryBootMode.Descriptor instead.
 func (RecoveryBootMode) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{1}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{2}
 }
 
 type SanitizeMethod int32
@@ -166,11 +216,11 @@ func (x SanitizeMethod) String() string {
 }
 
 func (SanitizeMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[2].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[3].Descriptor()
 }
 
 func (SanitizeMethod) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[2]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[3]
 }
 
 func (x SanitizeMethod) Number() protoreflect.EnumNumber {
@@ -179,7 +229,7 @@ func (x SanitizeMethod) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SanitizeMethod.Descriptor instead.
 func (SanitizeMethod) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{2}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{3}
 }
 
 type NvmeIdentityBasis int32
@@ -215,11 +265,11 @@ func (x NvmeIdentityBasis) String() string {
 }
 
 func (NvmeIdentityBasis) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[3].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[4].Descriptor()
 }
 
 func (NvmeIdentityBasis) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[3]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[4]
 }
 
 func (x NvmeIdentityBasis) Number() protoreflect.EnumNumber {
@@ -228,7 +278,7 @@ func (x NvmeIdentityBasis) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NvmeIdentityBasis.Descriptor instead.
 func (NvmeIdentityBasis) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{4}
 }
 
 type DeviceActionState int32
@@ -285,11 +335,11 @@ func (x DeviceActionState) String() string {
 }
 
 func (DeviceActionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[4].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[5].Descriptor()
 }
 
 func (DeviceActionState) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[4]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[5]
 }
 
 func (x DeviceActionState) Number() protoreflect.EnumNumber {
@@ -298,7 +348,7 @@ func (x DeviceActionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceActionState.Descriptor instead.
 func (DeviceActionState) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{5}
 }
 
 type DeviceActionFailure int32
@@ -352,11 +402,11 @@ func (x DeviceActionFailure) String() string {
 }
 
 func (DeviceActionFailure) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[5].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[6].Descriptor()
 }
 
 func (DeviceActionFailure) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[5]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[6]
 }
 
 func (x DeviceActionFailure) Number() protoreflect.EnumNumber {
@@ -365,7 +415,7 @@ func (x DeviceActionFailure) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceActionFailure.Descriptor instead.
 func (DeviceActionFailure) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{5}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{6}
 }
 
 // Stable native identity, never a caller-selected device path. Providers require
@@ -376,6 +426,10 @@ type StorageTarget struct {
 	Wwn           string                 `protobuf:"bytes,2,opt,name=wwn,proto3" json:"wwn,omitempty"`
 	Serial        string                 `protobuf:"bytes,3,opt,name=serial,proto3" json:"serial,omitempty"`
 	SizeBytes     uint64                 `protobuf:"varint,4,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	IdentityBasis StorageIdentityBasis   `protobuf:"varint,5,opt,name=identity_basis,json=identityBasis,proto3,enum=lindm.agent.v1.StorageIdentityBasis" json:"identity_basis,omitempty"`
+	GptDiskGuid   string                 `protobuf:"bytes,6,opt,name=gpt_disk_guid,json=gptDiskGuid,proto3" json:"gpt_disk_guid,omitempty"`
+	// Whole backing-disk size, distinct from the selected LUKS container size.
+	DiskSizeBytes uint64 `protobuf:"varint,7,opt,name=disk_size_bytes,json=diskSizeBytes,proto3" json:"disk_size_bytes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -434,6 +488,27 @@ func (x *StorageTarget) GetSerial() string {
 func (x *StorageTarget) GetSizeBytes() uint64 {
 	if x != nil {
 		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *StorageTarget) GetIdentityBasis() StorageIdentityBasis {
+	if x != nil {
+		return x.IdentityBasis
+	}
+	return StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED
+}
+
+func (x *StorageTarget) GetGptDiskGuid() string {
+	if x != nil {
+		return x.GptDiskGuid
+	}
+	return ""
+}
+
+func (x *StorageTarget) GetDiskSizeBytes() uint64 {
+	if x != nil {
+		return x.DiskSizeBytes
 	}
 	return 0
 }
@@ -4284,14 +4359,18 @@ var File_lindm_agent_v1_device_actions_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\n" +
-	"#lindm/agent/v1/device_actions.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1alindm/agent/v1/trust.proto\"\xa4\x02\n" +
+	"#lindm/agent/v1/device_actions.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1alindm/agent/v1/trust.proto\"\xac\x06\n" +
 	"\rStorageTarget\x12(\n" +
 	"\tluks_uuid\x18\x01 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\bluksUuid\x12\x1a\n" +
 	"\x03wwn\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x03wwn\x12 \n" +
 	"\x06serial\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x06serial\x12&\n" +
 	"\n" +
-	"size_bytes\x18\x04 \x01(\x04B\a\xbaH\x042\x02 \x00R\tsizeBytes:\x82\x01\xbaH\x7f\x1a}\n" +
-	"\x17storage_target.identity\x12%a stable storage identity is required\x1a;this.luks_uuid != '' || this.wwn != '' || this.serial != ''\"\xed\x02\n" +
+	"size_bytes\x18\x04 \x01(\x04B\a\xbaH\x042\x02 \x00R\tsizeBytes\x12W\n" +
+	"\x0eidentity_basis\x18\x05 \x01(\x0e2$.lindm.agent.v1.StorageIdentityBasisB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\ridentityBasis\x12U\n" +
+	"\rgpt_disk_guid\x18\x06 \x01(\tB1\xbaH.\xd8\x01\x01r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\vgptDiskGuid\x12&\n" +
+	"\x0fdisk_size_bytes\x18\a \x01(\x04R\rdiskSizeBytes:\xb2\x03\xbaH\xae\x03\x1a\xab\x03\n" +
+	"\x17storage_target.identity\x12Ethe explicit storage identity basis requires its complete exact tuple\x1a\xc8\x02this.serial != '' && ((this.identity_basis == 1 && this.wwn != '' && this.gpt_disk_guid == '' && this.disk_size_bytes == 0u) || (this.identity_basis == 2 && this.wwn == '' && this.gpt_disk_guid != '' && this.disk_size_bytes >= this.size_bytes && this.luks_uuid != '' && this.luks_uuid != '00000000-0000-0000-0000-000000000000'))\"\xed\x02\n" +
 	"\x12EscrowRotateAction\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x129\n" +
 	"\rescrow_key_id\x18\x02 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\vescrowKeyId\x127\n" +
@@ -4688,7 +4767,11 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"credential\x18\x02 \x01(\fB\n" +
 	"\xbaH\az\x05\x10\x01\x18\x80 R\n" +
 	"credential\"&\n" +
-	"$SupplyDeviceActionCredentialResponse*{\n" +
+	"$SupplyDeviceActionCredentialResponse*\x91\x01\n" +
+	"\x14StorageIdentityBasis\x12&\n" +
+	"\"STORAGE_IDENTITY_BASIS_UNSPECIFIED\x10\x00\x12%\n" +
+	"!STORAGE_IDENTITY_BASIS_WWN_SERIAL\x10\x01\x12*\n" +
+	"&STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS\x10\x02*{\n" +
 	"\x0fCryptoEraseMode\x12!\n" +
 	"\x1dCRYPTO_ERASE_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CRYPTO_ERASE_MODE_OFFLINE\x10\x01\x12&\n" +
@@ -4743,153 +4826,155 @@ func file_lindm_agent_v1_device_actions_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_device_actions_proto_rawDescData
 }
 
-var file_lindm_agent_v1_device_actions_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_lindm_agent_v1_device_actions_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_lindm_agent_v1_device_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
 var file_lindm_agent_v1_device_actions_proto_goTypes = []any{
-	(CryptoEraseMode)(0),                         // 0: lindm.agent.v1.CryptoEraseMode
-	(RecoveryBootMode)(0),                        // 1: lindm.agent.v1.RecoveryBootMode
-	(SanitizeMethod)(0),                          // 2: lindm.agent.v1.SanitizeMethod
-	(NvmeIdentityBasis)(0),                       // 3: lindm.agent.v1.NvmeIdentityBasis
-	(DeviceActionState)(0),                       // 4: lindm.agent.v1.DeviceActionState
-	(DeviceActionFailure)(0),                     // 5: lindm.agent.v1.DeviceActionFailure
-	(*StorageTarget)(nil),                        // 6: lindm.agent.v1.StorageTarget
-	(*EscrowRotateAction)(nil),                   // 7: lindm.agent.v1.EscrowRotateAction
-	(*TPM2BindAction)(nil),                       // 8: lindm.agent.v1.TPM2BindAction
-	(*LockSessionsAction)(nil),                   // 9: lindm.agent.v1.LockSessionsAction
-	(*ReleaseLockAction)(nil),                    // 10: lindm.agent.v1.ReleaseLockAction
-	(*QuarantineAction)(nil),                     // 11: lindm.agent.v1.QuarantineAction
-	(*ReleaseQuarantineAction)(nil),              // 12: lindm.agent.v1.ReleaseQuarantineAction
-	(*CryptoEraseAction)(nil),                    // 13: lindm.agent.v1.CryptoEraseAction
-	(*CryptoEraseTargetPlan)(nil),                // 14: lindm.agent.v1.CryptoEraseTargetPlan
-	(*CryptoEraseTargetResult)(nil),              // 15: lindm.agent.v1.CryptoEraseTargetResult
-	(*RecoveryBootSpec)(nil),                     // 16: lindm.agent.v1.RecoveryBootSpec
-	(*NVMeSanitizeIdentity)(nil),                 // 17: lindm.agent.v1.NVMeSanitizeIdentity
-	(*NVMeSanitizeScope)(nil),                    // 18: lindm.agent.v1.NVMeSanitizeScope
-	(*NVMeSanitizePlan)(nil),                     // 19: lindm.agent.v1.NVMeSanitizePlan
-	(*NVMeSanitizeVerification)(nil),             // 20: lindm.agent.v1.NVMeSanitizeVerification
-	(*SanitizeAction)(nil),                       // 21: lindm.agent.v1.SanitizeAction
-	(*RestartAction)(nil),                        // 22: lindm.agent.v1.RestartAction
-	(*ShutdownAction)(nil),                       // 23: lindm.agent.v1.ShutdownAction
-	(*RefreshInventoryAction)(nil),               // 24: lindm.agent.v1.RefreshInventoryAction
-	(*DeviceActionSpec)(nil),                     // 25: lindm.agent.v1.DeviceActionSpec
-	(*LUKSTokenObservation)(nil),                 // 26: lindm.agent.v1.LUKSTokenObservation
-	(*DeviceActionObservation)(nil),              // 27: lindm.agent.v1.DeviceActionObservation
-	(*DeviceActionPlan)(nil),                     // 28: lindm.agent.v1.DeviceActionPlan
-	(*DeviceActionEscrow)(nil),                   // 29: lindm.agent.v1.DeviceActionEscrow
-	(*DeviceActionVerification)(nil),             // 30: lindm.agent.v1.DeviceActionVerification
-	(*DeviceActionIntent)(nil),                   // 31: lindm.agent.v1.DeviceActionIntent
-	(*DeviceActionChallenge)(nil),                // 32: lindm.agent.v1.DeviceActionChallenge
-	(*DeviceActionApprovalBinding)(nil),          // 33: lindm.agent.v1.DeviceActionApprovalBinding
-	(*DeviceActionHumanApproval)(nil),            // 34: lindm.agent.v1.DeviceActionHumanApproval
-	(*DeviceActionStartGrant)(nil),               // 35: lindm.agent.v1.DeviceActionStartGrant
-	(*DeviceActionRecord)(nil),                   // 36: lindm.agent.v1.DeviceActionRecord
-	(*DeviceActionStatus)(nil),                   // 37: lindm.agent.v1.DeviceActionStatus
-	(*DeviceActionAttestation)(nil),              // 38: lindm.agent.v1.DeviceActionAttestation
-	(*DeviceActionEscrowReceipt)(nil),            // 39: lindm.agent.v1.DeviceActionEscrowReceipt
-	(*PrepareDeviceActionRequest)(nil),           // 40: lindm.agent.v1.PrepareDeviceActionRequest
-	(*PrepareDeviceActionResponse)(nil),          // 41: lindm.agent.v1.PrepareDeviceActionResponse
-	(*StartDeviceActionRequest)(nil),             // 42: lindm.agent.v1.StartDeviceActionRequest
-	(*StartDeviceActionResponse)(nil),            // 43: lindm.agent.v1.StartDeviceActionResponse
-	(*GetDeviceActionRequest)(nil),               // 44: lindm.agent.v1.GetDeviceActionRequest
-	(*GetDeviceActionResponse)(nil),              // 45: lindm.agent.v1.GetDeviceActionResponse
-	(*AttestDeviceActionRequest)(nil),            // 46: lindm.agent.v1.AttestDeviceActionRequest
-	(*AttestDeviceActionResponse)(nil),           // 47: lindm.agent.v1.AttestDeviceActionResponse
-	(*ConfirmDeviceActionEscrowRequest)(nil),     // 48: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
-	(*ConfirmDeviceActionEscrowResponse)(nil),    // 49: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
-	(*RecoveryKeyBinding)(nil),                   // 50: lindm.agent.v1.RecoveryKeyBinding
-	(*SupplyDeviceActionCredentialRequest)(nil),  // 51: lindm.agent.v1.SupplyDeviceActionCredentialRequest
-	(*SupplyDeviceActionCredentialResponse)(nil), // 52: lindm.agent.v1.SupplyDeviceActionCredentialResponse
-	(*timestamppb.Timestamp)(nil),                // 53: google.protobuf.Timestamp
-	(*ExecutionRoot)(nil),                        // 54: lindm.agent.v1.ExecutionRoot
+	(StorageIdentityBasis)(0),                    // 0: lindm.agent.v1.StorageIdentityBasis
+	(CryptoEraseMode)(0),                         // 1: lindm.agent.v1.CryptoEraseMode
+	(RecoveryBootMode)(0),                        // 2: lindm.agent.v1.RecoveryBootMode
+	(SanitizeMethod)(0),                          // 3: lindm.agent.v1.SanitizeMethod
+	(NvmeIdentityBasis)(0),                       // 4: lindm.agent.v1.NvmeIdentityBasis
+	(DeviceActionState)(0),                       // 5: lindm.agent.v1.DeviceActionState
+	(DeviceActionFailure)(0),                     // 6: lindm.agent.v1.DeviceActionFailure
+	(*StorageTarget)(nil),                        // 7: lindm.agent.v1.StorageTarget
+	(*EscrowRotateAction)(nil),                   // 8: lindm.agent.v1.EscrowRotateAction
+	(*TPM2BindAction)(nil),                       // 9: lindm.agent.v1.TPM2BindAction
+	(*LockSessionsAction)(nil),                   // 10: lindm.agent.v1.LockSessionsAction
+	(*ReleaseLockAction)(nil),                    // 11: lindm.agent.v1.ReleaseLockAction
+	(*QuarantineAction)(nil),                     // 12: lindm.agent.v1.QuarantineAction
+	(*ReleaseQuarantineAction)(nil),              // 13: lindm.agent.v1.ReleaseQuarantineAction
+	(*CryptoEraseAction)(nil),                    // 14: lindm.agent.v1.CryptoEraseAction
+	(*CryptoEraseTargetPlan)(nil),                // 15: lindm.agent.v1.CryptoEraseTargetPlan
+	(*CryptoEraseTargetResult)(nil),              // 16: lindm.agent.v1.CryptoEraseTargetResult
+	(*RecoveryBootSpec)(nil),                     // 17: lindm.agent.v1.RecoveryBootSpec
+	(*NVMeSanitizeIdentity)(nil),                 // 18: lindm.agent.v1.NVMeSanitizeIdentity
+	(*NVMeSanitizeScope)(nil),                    // 19: lindm.agent.v1.NVMeSanitizeScope
+	(*NVMeSanitizePlan)(nil),                     // 20: lindm.agent.v1.NVMeSanitizePlan
+	(*NVMeSanitizeVerification)(nil),             // 21: lindm.agent.v1.NVMeSanitizeVerification
+	(*SanitizeAction)(nil),                       // 22: lindm.agent.v1.SanitizeAction
+	(*RestartAction)(nil),                        // 23: lindm.agent.v1.RestartAction
+	(*ShutdownAction)(nil),                       // 24: lindm.agent.v1.ShutdownAction
+	(*RefreshInventoryAction)(nil),               // 25: lindm.agent.v1.RefreshInventoryAction
+	(*DeviceActionSpec)(nil),                     // 26: lindm.agent.v1.DeviceActionSpec
+	(*LUKSTokenObservation)(nil),                 // 27: lindm.agent.v1.LUKSTokenObservation
+	(*DeviceActionObservation)(nil),              // 28: lindm.agent.v1.DeviceActionObservation
+	(*DeviceActionPlan)(nil),                     // 29: lindm.agent.v1.DeviceActionPlan
+	(*DeviceActionEscrow)(nil),                   // 30: lindm.agent.v1.DeviceActionEscrow
+	(*DeviceActionVerification)(nil),             // 31: lindm.agent.v1.DeviceActionVerification
+	(*DeviceActionIntent)(nil),                   // 32: lindm.agent.v1.DeviceActionIntent
+	(*DeviceActionChallenge)(nil),                // 33: lindm.agent.v1.DeviceActionChallenge
+	(*DeviceActionApprovalBinding)(nil),          // 34: lindm.agent.v1.DeviceActionApprovalBinding
+	(*DeviceActionHumanApproval)(nil),            // 35: lindm.agent.v1.DeviceActionHumanApproval
+	(*DeviceActionStartGrant)(nil),               // 36: lindm.agent.v1.DeviceActionStartGrant
+	(*DeviceActionRecord)(nil),                   // 37: lindm.agent.v1.DeviceActionRecord
+	(*DeviceActionStatus)(nil),                   // 38: lindm.agent.v1.DeviceActionStatus
+	(*DeviceActionAttestation)(nil),              // 39: lindm.agent.v1.DeviceActionAttestation
+	(*DeviceActionEscrowReceipt)(nil),            // 40: lindm.agent.v1.DeviceActionEscrowReceipt
+	(*PrepareDeviceActionRequest)(nil),           // 41: lindm.agent.v1.PrepareDeviceActionRequest
+	(*PrepareDeviceActionResponse)(nil),          // 42: lindm.agent.v1.PrepareDeviceActionResponse
+	(*StartDeviceActionRequest)(nil),             // 43: lindm.agent.v1.StartDeviceActionRequest
+	(*StartDeviceActionResponse)(nil),            // 44: lindm.agent.v1.StartDeviceActionResponse
+	(*GetDeviceActionRequest)(nil),               // 45: lindm.agent.v1.GetDeviceActionRequest
+	(*GetDeviceActionResponse)(nil),              // 46: lindm.agent.v1.GetDeviceActionResponse
+	(*AttestDeviceActionRequest)(nil),            // 47: lindm.agent.v1.AttestDeviceActionRequest
+	(*AttestDeviceActionResponse)(nil),           // 48: lindm.agent.v1.AttestDeviceActionResponse
+	(*ConfirmDeviceActionEscrowRequest)(nil),     // 49: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	(*ConfirmDeviceActionEscrowResponse)(nil),    // 50: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	(*RecoveryKeyBinding)(nil),                   // 51: lindm.agent.v1.RecoveryKeyBinding
+	(*SupplyDeviceActionCredentialRequest)(nil),  // 52: lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	(*SupplyDeviceActionCredentialResponse)(nil), // 53: lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	(*timestamppb.Timestamp)(nil),                // 54: google.protobuf.Timestamp
+	(*ExecutionRoot)(nil),                        // 55: lindm.agent.v1.ExecutionRoot
 }
 var file_lindm_agent_v1_device_actions_proto_depIdxs = []int32{
-	6,  // 0: lindm.agent.v1.EscrowRotateAction.target:type_name -> lindm.agent.v1.StorageTarget
-	6,  // 1: lindm.agent.v1.TPM2BindAction.target:type_name -> lindm.agent.v1.StorageTarget
-	6,  // 2: lindm.agent.v1.CryptoEraseAction.target:type_name -> lindm.agent.v1.StorageTarget
-	0,  // 3: lindm.agent.v1.CryptoEraseAction.mode:type_name -> lindm.agent.v1.CryptoEraseMode
-	6,  // 4: lindm.agent.v1.CryptoEraseAction.targets:type_name -> lindm.agent.v1.StorageTarget
-	6,  // 5: lindm.agent.v1.CryptoEraseTargetPlan.target:type_name -> lindm.agent.v1.StorageTarget
-	6,  // 6: lindm.agent.v1.CryptoEraseTargetResult.target:type_name -> lindm.agent.v1.StorageTarget
-	1,  // 7: lindm.agent.v1.RecoveryBootSpec.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
-	3,  // 8: lindm.agent.v1.NVMeSanitizeIdentity.basis:type_name -> lindm.agent.v1.NvmeIdentityBasis
-	17, // 9: lindm.agent.v1.NVMeSanitizeScope.identity:type_name -> lindm.agent.v1.NVMeSanitizeIdentity
-	18, // 10: lindm.agent.v1.NVMeSanitizePlan.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	19, // 11: lindm.agent.v1.NVMeSanitizeVerification.observed_scope:type_name -> lindm.agent.v1.NVMeSanitizePlan
-	6,  // 12: lindm.agent.v1.SanitizeAction.target:type_name -> lindm.agent.v1.StorageTarget
-	2,  // 13: lindm.agent.v1.SanitizeAction.method:type_name -> lindm.agent.v1.SanitizeMethod
-	16, // 14: lindm.agent.v1.SanitizeAction.recovery:type_name -> lindm.agent.v1.RecoveryBootSpec
-	18, // 15: lindm.agent.v1.SanitizeAction.nvme_scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	7,  // 16: lindm.agent.v1.DeviceActionSpec.escrow_rotate:type_name -> lindm.agent.v1.EscrowRotateAction
-	8,  // 17: lindm.agent.v1.DeviceActionSpec.tpm2_bind:type_name -> lindm.agent.v1.TPM2BindAction
-	9,  // 18: lindm.agent.v1.DeviceActionSpec.lock_sessions:type_name -> lindm.agent.v1.LockSessionsAction
-	11, // 19: lindm.agent.v1.DeviceActionSpec.quarantine:type_name -> lindm.agent.v1.QuarantineAction
-	12, // 20: lindm.agent.v1.DeviceActionSpec.release_quarantine:type_name -> lindm.agent.v1.ReleaseQuarantineAction
-	13, // 21: lindm.agent.v1.DeviceActionSpec.crypto_erase:type_name -> lindm.agent.v1.CryptoEraseAction
-	21, // 22: lindm.agent.v1.DeviceActionSpec.sanitize:type_name -> lindm.agent.v1.SanitizeAction
-	10, // 23: lindm.agent.v1.DeviceActionSpec.release_lock:type_name -> lindm.agent.v1.ReleaseLockAction
-	22, // 24: lindm.agent.v1.DeviceActionSpec.restart:type_name -> lindm.agent.v1.RestartAction
-	23, // 25: lindm.agent.v1.DeviceActionSpec.shutdown:type_name -> lindm.agent.v1.ShutdownAction
-	24, // 26: lindm.agent.v1.DeviceActionSpec.refresh_inventory:type_name -> lindm.agent.v1.RefreshInventoryAction
-	53, // 27: lindm.agent.v1.DeviceActionObservation.observed_at:type_name -> google.protobuf.Timestamp
-	6,  // 28: lindm.agent.v1.DeviceActionObservation.target:type_name -> lindm.agent.v1.StorageTarget
-	26, // 29: lindm.agent.v1.DeviceActionObservation.luks_tokens:type_name -> lindm.agent.v1.LUKSTokenObservation
-	14, // 30: lindm.agent.v1.DeviceActionObservation.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
-	19, // 31: lindm.agent.v1.DeviceActionObservation.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizePlan
-	25, // 32: lindm.agent.v1.DeviceActionPlan.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	27, // 33: lindm.agent.v1.DeviceActionPlan.before:type_name -> lindm.agent.v1.DeviceActionObservation
-	50, // 34: lindm.agent.v1.DeviceActionPlan.recovery_binding:type_name -> lindm.agent.v1.RecoveryKeyBinding
-	14, // 35: lindm.agent.v1.DeviceActionPlan.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
-	27, // 36: lindm.agent.v1.DeviceActionVerification.after:type_name -> lindm.agent.v1.DeviceActionObservation
-	29, // 37: lindm.agent.v1.DeviceActionVerification.escrow:type_name -> lindm.agent.v1.DeviceActionEscrow
-	15, // 38: lindm.agent.v1.DeviceActionVerification.crypto_erase_results:type_name -> lindm.agent.v1.CryptoEraseTargetResult
-	20, // 39: lindm.agent.v1.DeviceActionVerification.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizeVerification
-	53, // 40: lindm.agent.v1.DeviceActionIntent.not_before:type_name -> google.protobuf.Timestamp
-	53, // 41: lindm.agent.v1.DeviceActionIntent.expires_at:type_name -> google.protobuf.Timestamp
-	25, // 42: lindm.agent.v1.DeviceActionIntent.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	53, // 43: lindm.agent.v1.DeviceActionChallenge.issued_at:type_name -> google.protobuf.Timestamp
-	53, // 44: lindm.agent.v1.DeviceActionChallenge.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 45: lindm.agent.v1.DeviceActionChallenge.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	53, // 46: lindm.agent.v1.DeviceActionApprovalBinding.expires_at:type_name -> google.protobuf.Timestamp
-	33, // 47: lindm.agent.v1.DeviceActionHumanApproval.binding:type_name -> lindm.agent.v1.DeviceActionApprovalBinding
-	32, // 48: lindm.agent.v1.DeviceActionStartGrant.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
-	53, // 49: lindm.agent.v1.DeviceActionStartGrant.not_before:type_name -> google.protobuf.Timestamp
-	53, // 50: lindm.agent.v1.DeviceActionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
-	34, // 51: lindm.agent.v1.DeviceActionStartGrant.approvals:type_name -> lindm.agent.v1.DeviceActionHumanApproval
-	31, // 52: lindm.agent.v1.DeviceActionRecord.intent:type_name -> lindm.agent.v1.DeviceActionIntent
-	28, // 53: lindm.agent.v1.DeviceActionRecord.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	54, // 54: lindm.agent.v1.DeviceActionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	53, // 55: lindm.agent.v1.DeviceActionRecord.accepted_at:type_name -> google.protobuf.Timestamp
-	4,  // 56: lindm.agent.v1.DeviceActionRecord.state:type_name -> lindm.agent.v1.DeviceActionState
-	5,  // 57: lindm.agent.v1.DeviceActionRecord.failure:type_name -> lindm.agent.v1.DeviceActionFailure
-	32, // 58: lindm.agent.v1.DeviceActionRecord.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
-	53, // 59: lindm.agent.v1.DeviceActionRecord.started_at:type_name -> google.protobuf.Timestamp
-	53, // 60: lindm.agent.v1.DeviceActionRecord.completed_at:type_name -> google.protobuf.Timestamp
-	30, // 61: lindm.agent.v1.DeviceActionRecord.verification:type_name -> lindm.agent.v1.DeviceActionVerification
-	53, // 62: lindm.agent.v1.DeviceActionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
-	53, // 63: lindm.agent.v1.DeviceActionRecord.escrow_confirmed_at:type_name -> google.protobuf.Timestamp
-	54, // 64: lindm.agent.v1.DeviceActionRecord.receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
-	54, // 65: lindm.agent.v1.DeviceActionRecord.inventory_receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
-	4,  // 66: lindm.agent.v1.DeviceActionStatus.state:type_name -> lindm.agent.v1.DeviceActionState
-	5,  // 67: lindm.agent.v1.DeviceActionStatus.failure:type_name -> lindm.agent.v1.DeviceActionFailure
-	53, // 68: lindm.agent.v1.DeviceActionStatus.accepted_at:type_name -> google.protobuf.Timestamp
-	53, // 69: lindm.agent.v1.DeviceActionStatus.started_at:type_name -> google.protobuf.Timestamp
-	53, // 70: lindm.agent.v1.DeviceActionStatus.completed_at:type_name -> google.protobuf.Timestamp
-	27, // 71: lindm.agent.v1.DeviceActionStatus.before:type_name -> lindm.agent.v1.DeviceActionObservation
-	30, // 72: lindm.agent.v1.DeviceActionStatus.verification:type_name -> lindm.agent.v1.DeviceActionVerification
-	53, // 73: lindm.agent.v1.DeviceActionAttestation.issued_at:type_name -> google.protobuf.Timestamp
-	53, // 74: lindm.agent.v1.DeviceActionAttestation.expires_at:type_name -> google.protobuf.Timestamp
-	37, // 75: lindm.agent.v1.DeviceActionAttestation.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	53, // 76: lindm.agent.v1.DeviceActionEscrowReceipt.stored_at:type_name -> google.protobuf.Timestamp
-	37, // 77: lindm.agent.v1.PrepareDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	28, // 78: lindm.agent.v1.PrepareDeviceActionResponse.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	37, // 79: lindm.agent.v1.StartDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	37, // 80: lindm.agent.v1.GetDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	37, // 81: lindm.agent.v1.ConfirmDeviceActionEscrowResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	82, // [82:82] is the sub-list for method output_type
-	82, // [82:82] is the sub-list for method input_type
-	82, // [82:82] is the sub-list for extension type_name
-	82, // [82:82] is the sub-list for extension extendee
-	0,  // [0:82] is the sub-list for field type_name
+	0,  // 0: lindm.agent.v1.StorageTarget.identity_basis:type_name -> lindm.agent.v1.StorageIdentityBasis
+	7,  // 1: lindm.agent.v1.EscrowRotateAction.target:type_name -> lindm.agent.v1.StorageTarget
+	7,  // 2: lindm.agent.v1.TPM2BindAction.target:type_name -> lindm.agent.v1.StorageTarget
+	7,  // 3: lindm.agent.v1.CryptoEraseAction.target:type_name -> lindm.agent.v1.StorageTarget
+	1,  // 4: lindm.agent.v1.CryptoEraseAction.mode:type_name -> lindm.agent.v1.CryptoEraseMode
+	7,  // 5: lindm.agent.v1.CryptoEraseAction.targets:type_name -> lindm.agent.v1.StorageTarget
+	7,  // 6: lindm.agent.v1.CryptoEraseTargetPlan.target:type_name -> lindm.agent.v1.StorageTarget
+	7,  // 7: lindm.agent.v1.CryptoEraseTargetResult.target:type_name -> lindm.agent.v1.StorageTarget
+	2,  // 8: lindm.agent.v1.RecoveryBootSpec.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	4,  // 9: lindm.agent.v1.NVMeSanitizeIdentity.basis:type_name -> lindm.agent.v1.NvmeIdentityBasis
+	18, // 10: lindm.agent.v1.NVMeSanitizeScope.identity:type_name -> lindm.agent.v1.NVMeSanitizeIdentity
+	19, // 11: lindm.agent.v1.NVMeSanitizePlan.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	20, // 12: lindm.agent.v1.NVMeSanitizeVerification.observed_scope:type_name -> lindm.agent.v1.NVMeSanitizePlan
+	7,  // 13: lindm.agent.v1.SanitizeAction.target:type_name -> lindm.agent.v1.StorageTarget
+	3,  // 14: lindm.agent.v1.SanitizeAction.method:type_name -> lindm.agent.v1.SanitizeMethod
+	17, // 15: lindm.agent.v1.SanitizeAction.recovery:type_name -> lindm.agent.v1.RecoveryBootSpec
+	19, // 16: lindm.agent.v1.SanitizeAction.nvme_scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	8,  // 17: lindm.agent.v1.DeviceActionSpec.escrow_rotate:type_name -> lindm.agent.v1.EscrowRotateAction
+	9,  // 18: lindm.agent.v1.DeviceActionSpec.tpm2_bind:type_name -> lindm.agent.v1.TPM2BindAction
+	10, // 19: lindm.agent.v1.DeviceActionSpec.lock_sessions:type_name -> lindm.agent.v1.LockSessionsAction
+	12, // 20: lindm.agent.v1.DeviceActionSpec.quarantine:type_name -> lindm.agent.v1.QuarantineAction
+	13, // 21: lindm.agent.v1.DeviceActionSpec.release_quarantine:type_name -> lindm.agent.v1.ReleaseQuarantineAction
+	14, // 22: lindm.agent.v1.DeviceActionSpec.crypto_erase:type_name -> lindm.agent.v1.CryptoEraseAction
+	22, // 23: lindm.agent.v1.DeviceActionSpec.sanitize:type_name -> lindm.agent.v1.SanitizeAction
+	11, // 24: lindm.agent.v1.DeviceActionSpec.release_lock:type_name -> lindm.agent.v1.ReleaseLockAction
+	23, // 25: lindm.agent.v1.DeviceActionSpec.restart:type_name -> lindm.agent.v1.RestartAction
+	24, // 26: lindm.agent.v1.DeviceActionSpec.shutdown:type_name -> lindm.agent.v1.ShutdownAction
+	25, // 27: lindm.agent.v1.DeviceActionSpec.refresh_inventory:type_name -> lindm.agent.v1.RefreshInventoryAction
+	54, // 28: lindm.agent.v1.DeviceActionObservation.observed_at:type_name -> google.protobuf.Timestamp
+	7,  // 29: lindm.agent.v1.DeviceActionObservation.target:type_name -> lindm.agent.v1.StorageTarget
+	27, // 30: lindm.agent.v1.DeviceActionObservation.luks_tokens:type_name -> lindm.agent.v1.LUKSTokenObservation
+	15, // 31: lindm.agent.v1.DeviceActionObservation.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
+	20, // 32: lindm.agent.v1.DeviceActionObservation.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizePlan
+	26, // 33: lindm.agent.v1.DeviceActionPlan.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	28, // 34: lindm.agent.v1.DeviceActionPlan.before:type_name -> lindm.agent.v1.DeviceActionObservation
+	51, // 35: lindm.agent.v1.DeviceActionPlan.recovery_binding:type_name -> lindm.agent.v1.RecoveryKeyBinding
+	15, // 36: lindm.agent.v1.DeviceActionPlan.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
+	28, // 37: lindm.agent.v1.DeviceActionVerification.after:type_name -> lindm.agent.v1.DeviceActionObservation
+	30, // 38: lindm.agent.v1.DeviceActionVerification.escrow:type_name -> lindm.agent.v1.DeviceActionEscrow
+	16, // 39: lindm.agent.v1.DeviceActionVerification.crypto_erase_results:type_name -> lindm.agent.v1.CryptoEraseTargetResult
+	21, // 40: lindm.agent.v1.DeviceActionVerification.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizeVerification
+	54, // 41: lindm.agent.v1.DeviceActionIntent.not_before:type_name -> google.protobuf.Timestamp
+	54, // 42: lindm.agent.v1.DeviceActionIntent.expires_at:type_name -> google.protobuf.Timestamp
+	26, // 43: lindm.agent.v1.DeviceActionIntent.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	54, // 44: lindm.agent.v1.DeviceActionChallenge.issued_at:type_name -> google.protobuf.Timestamp
+	54, // 45: lindm.agent.v1.DeviceActionChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	29, // 46: lindm.agent.v1.DeviceActionChallenge.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	54, // 47: lindm.agent.v1.DeviceActionApprovalBinding.expires_at:type_name -> google.protobuf.Timestamp
+	34, // 48: lindm.agent.v1.DeviceActionHumanApproval.binding:type_name -> lindm.agent.v1.DeviceActionApprovalBinding
+	33, // 49: lindm.agent.v1.DeviceActionStartGrant.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	54, // 50: lindm.agent.v1.DeviceActionStartGrant.not_before:type_name -> google.protobuf.Timestamp
+	54, // 51: lindm.agent.v1.DeviceActionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
+	35, // 52: lindm.agent.v1.DeviceActionStartGrant.approvals:type_name -> lindm.agent.v1.DeviceActionHumanApproval
+	32, // 53: lindm.agent.v1.DeviceActionRecord.intent:type_name -> lindm.agent.v1.DeviceActionIntent
+	29, // 54: lindm.agent.v1.DeviceActionRecord.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	55, // 55: lindm.agent.v1.DeviceActionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	54, // 56: lindm.agent.v1.DeviceActionRecord.accepted_at:type_name -> google.protobuf.Timestamp
+	5,  // 57: lindm.agent.v1.DeviceActionRecord.state:type_name -> lindm.agent.v1.DeviceActionState
+	6,  // 58: lindm.agent.v1.DeviceActionRecord.failure:type_name -> lindm.agent.v1.DeviceActionFailure
+	33, // 59: lindm.agent.v1.DeviceActionRecord.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	54, // 60: lindm.agent.v1.DeviceActionRecord.started_at:type_name -> google.protobuf.Timestamp
+	54, // 61: lindm.agent.v1.DeviceActionRecord.completed_at:type_name -> google.protobuf.Timestamp
+	31, // 62: lindm.agent.v1.DeviceActionRecord.verification:type_name -> lindm.agent.v1.DeviceActionVerification
+	54, // 63: lindm.agent.v1.DeviceActionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
+	54, // 64: lindm.agent.v1.DeviceActionRecord.escrow_confirmed_at:type_name -> google.protobuf.Timestamp
+	55, // 65: lindm.agent.v1.DeviceActionRecord.receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
+	55, // 66: lindm.agent.v1.DeviceActionRecord.inventory_receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
+	5,  // 67: lindm.agent.v1.DeviceActionStatus.state:type_name -> lindm.agent.v1.DeviceActionState
+	6,  // 68: lindm.agent.v1.DeviceActionStatus.failure:type_name -> lindm.agent.v1.DeviceActionFailure
+	54, // 69: lindm.agent.v1.DeviceActionStatus.accepted_at:type_name -> google.protobuf.Timestamp
+	54, // 70: lindm.agent.v1.DeviceActionStatus.started_at:type_name -> google.protobuf.Timestamp
+	54, // 71: lindm.agent.v1.DeviceActionStatus.completed_at:type_name -> google.protobuf.Timestamp
+	28, // 72: lindm.agent.v1.DeviceActionStatus.before:type_name -> lindm.agent.v1.DeviceActionObservation
+	31, // 73: lindm.agent.v1.DeviceActionStatus.verification:type_name -> lindm.agent.v1.DeviceActionVerification
+	54, // 74: lindm.agent.v1.DeviceActionAttestation.issued_at:type_name -> google.protobuf.Timestamp
+	54, // 75: lindm.agent.v1.DeviceActionAttestation.expires_at:type_name -> google.protobuf.Timestamp
+	38, // 76: lindm.agent.v1.DeviceActionAttestation.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	54, // 77: lindm.agent.v1.DeviceActionEscrowReceipt.stored_at:type_name -> google.protobuf.Timestamp
+	38, // 78: lindm.agent.v1.PrepareDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	29, // 79: lindm.agent.v1.PrepareDeviceActionResponse.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	38, // 80: lindm.agent.v1.StartDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	38, // 81: lindm.agent.v1.GetDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	38, // 82: lindm.agent.v1.ConfirmDeviceActionEscrowResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	83, // [83:83] is the sub-list for method output_type
+	83, // [83:83] is the sub-list for method input_type
+	83, // [83:83] is the sub-list for extension type_name
+	83, // [83:83] is the sub-list for extension extendee
+	0,  // [0:83] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_device_actions_proto_init() }
@@ -4919,7 +5004,7 @@ func file_lindm_agent_v1_device_actions_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_device_actions_proto_rawDesc), len(file_lindm_agent_v1_device_actions_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      7,
 			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   0,

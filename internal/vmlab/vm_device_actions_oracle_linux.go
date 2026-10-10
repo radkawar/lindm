@@ -59,7 +59,7 @@ func actionNativeTargets(data []byte) ([]actionNativeTarget, error) {
 				if node.Size == 0 || !strings.HasPrefix(node.Path, "/dev/") || strings.ContainsAny(node.Path, "\n\r\x00") {
 					return errors.New("invalid native block identity")
 				}
-				identity := &agentv1.StorageTarget{Wwn: parentWWN, Serial: parentSerial, SizeBytes: node.Size}
+				identity := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: parentWWN, Serial: parentSerial, SizeBytes: node.Size}
 				if node.Filesystem == "crypto_LUKS" {
 					if !vmValidID(node.UUID) {
 						return errors.New("invalid native LUKS UUID")
@@ -85,7 +85,7 @@ func actionNativeTargets(data []byte) ([]actionNativeTarget, error) {
 
 // Device node numbers are boot-local, not part of approved media identity.
 func actionWholeDiskPath(data []byte, expected *agentv1.StorageTarget) (string, error) {
-	if len(data) > 1<<20 || expected.GetLuksUuid() != "" || expected.GetWwn() == "" || expected.GetSerial() == "" || expected.GetSizeBytes() == 0 {
+	if len(data) > 1<<20 || expected.GetIdentityBasis() != agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL || expected.GetLuksUuid() != "" || expected.GetWwn() == "" || expected.GetSerial() == "" || expected.GetSizeBytes() == 0 {
 		return "", errors.New("incomplete whole-disk identity or oversized topology")
 	}
 	var topology struct {

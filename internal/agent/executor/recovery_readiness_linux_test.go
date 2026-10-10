@@ -9,6 +9,10 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 
 	"lindm/internal/agent/recoveryboot"
 )
@@ -87,5 +91,48 @@ func TestRecoveryReadinessBootFailureDoesNotProbeNativeState(t *testing.T) {
 	}
 	if err := protovalidate.Validate(got); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExecutorAdmitsCompleteRootProjectionWithPrecompiledValidation(t *testing.T) {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	s := openExecutor(t, now)
+	const unavailable = inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	root := &inventoryv1.RootObservation{
+		StartedAt: timestamppb.New(now), FinishedAt: timestamppb.New(now),
+		BootId:         "25eec0a2-bb9f-42bc-b6cc-0508320c960e",
+		HardwareSerial: &inventoryv1.ObservedString{Status: unavailable},
+		Firmware: &inventoryv1.FirmwareDetails{
+			Mode:       &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: "bios"},
+			SecureBoot: &inventoryv1.ObservedString{Status: unavailable},
+		},
+		Storage: &inventoryv1.StorageDetails{Status: unavailable},
+		Cpu: &inventoryv1.CpuDetails{
+			Model:         &inventoryv1.ObservedString{Status: unavailable},
+			ModelSource:   &inventoryv1.ObservedString{Status: unavailable},
+			LogicalCores:  &inventoryv1.ObservedUint64{Status: unavailable},
+			PhysicalCores: &inventoryv1.ObservedUint64{Status: unavailable},
+			X86_64Level:   &inventoryv1.ObservedString{Status: unavailable},
+		},
+	}
+	if err := s.admit(root); err != nil {
+		t.Fatalf("root projection rules were not precompiled: %v", err)
+	}
+	for name, mutate := range map[string]func(*inventoryv1.RootObservation){
+		"missing_serial":    func(r *inventoryv1.RootObservation) { r.HardwareSerial = nil },
+		"missing_firmware":  func(r *inventoryv1.RootObservation) { r.Firmware = nil },
+		"missing_storage":   func(r *inventoryv1.RootObservation) { r.Storage = nil },
+		"missing_cpu":       func(r *inventoryv1.RootObservation) { r.Cpu = nil },
+		"missing_cpu_model": func(r *inventoryv1.RootObservation) { r.Cpu.Model = nil },
+		"invalid_boot":      func(r *inventoryv1.RootObservation) { r.BootId = "" },
+		"reversed_times":    func(r *inventoryv1.RootObservation) { r.FinishedAt = timestamppb.New(now.Add(-time.Second)) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := proto.CloneOf(root)
+			mutate(changed)
+			if err := s.admit(changed); err == nil {
+				t.Fatal("executor admitted incomplete or unbound root evidence")
+			}
+		})
 	}
 }

@@ -4,6 +4,7 @@ import {
   NvmeIdentityBasis,
   RecoveryBootMode,
   SanitizeMethod,
+  StorageIdentityBasis,
   type DeviceActionSpec,
   type DeviceActionVerification,
   type StorageTarget,
@@ -73,10 +74,23 @@ export function StorageTargetView({ target }: { target: StorageTarget | undefine
   if (!target) return <p>No storage target reported.</p>;
   return (
     <dl className="grid gap-2 text-sm sm:grid-cols-2">
+      <Fact label="Identity basis">
+        {target.identityBasis === StorageIdentityBasis.WWN_SERIAL
+          ? "WWN + serial"
+          : target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
+            ? "Disk serial + GPT + LUKS"
+            : "Unsupported / unspecified"}
+      </Fact>
       <Fact label="LUKS UUID">{target.luksUuid || "Unencrypted target"}</Fact>
       <Fact label="WWN">{target.wwn || "Not reported"}</Fact>
       <Fact label="Serial">{target.serial || "Not reported"}</Fact>
       <Fact label="Exact size (bytes)">{target.sizeBytes.toString()}</Fact>
+      {target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS ? (
+        <>
+          <Fact label="GPT disk GUID">{target.gptDiskGuid || "Not reported"}</Fact>
+          <Fact label="Backing disk size (bytes)">{target.diskSizeBytes.toString()}</Fact>
+        </>
+      ) : null}
     </dl>
   );
 }

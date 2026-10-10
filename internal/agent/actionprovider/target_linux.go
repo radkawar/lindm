@@ -19,17 +19,19 @@ import (
 )
 
 type blockNode struct {
-	Path        string      `json:"path"`
-	Type        string      `json:"type"`
-	Size        uint64      `json:"size"`
-	WWN         string      `json:"wwn"`
-	Serial      string      `json:"serial"`
-	UUID        string      `json:"uuid"`
-	Rotational  bool        `json:"rota"`
-	Mountpoints []*string   `json:"mountpoints"`
-	Filesystem  string      `json:"fstype"`
-	Device      string      `json:"maj:min"`
-	Children    []blockNode `json:"children"`
+	Path           string      `json:"path"`
+	Type           string      `json:"type"`
+	Size           uint64      `json:"size"`
+	WWN            string      `json:"wwn"`
+	Serial         string      `json:"serial"`
+	UUID           string      `json:"uuid"`
+	PartitionTable string      `json:"pttype"`
+	DiskGUID       string      `json:"ptuuid"`
+	Rotational     bool        `json:"rota"`
+	Mountpoints    []*string   `json:"mountpoints"`
+	Filesystem     string      `json:"fstype"`
+	Device         string      `json:"maj:min"`
+	Children       []blockNode `json:"children"`
 
 	nativeWWN    bool
 	nativeSerial bool
@@ -75,7 +77,7 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 	if err != nil {
 		return nil, err
 	}
-	output, err := p.run(ctx, nativeRequest{command: lsblk, args: []string{"--json", "--tree", "--bytes", "--output", "PATH,TYPE,SIZE,WWN,SERIAL,UUID,ROTA,MOUNTPOINTS,FSTYPE,MAJ:MIN"}})
+	output, err := p.run(ctx, nativeRequest{command: lsblk, args: []string{"--json", "--tree", "--bytes", "--output", "PATH,TYPE,SIZE,WWN,SERIAL,UUID,ROTA,MOUNTPOINTS,FSTYPE,MAJ:MIN,PTTYPE,PTUUID"}})
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +92,7 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 		return nil, fmt.Errorf("%w: target_identity_ambiguous %s", ErrConflict, diagnostic.encode())
 	}
 	node := *selected
-	if target.GetWwn() == "" || target.GetSerial() == "" || filepath.Dir(node.Path) != "/dev" || filepath.Clean(node.Path) != node.Path {
+	if filepath.Dir(node.Path) != "/dev" || filepath.Clean(node.Path) != node.Path {
 		return nil, fmt.Errorf("%w: incomplete_target_identity", ErrUnsupported)
 	}
 	flags := unix.O_RDONLY
@@ -152,11 +154,17 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 			return nil, fmt.Errorf("%w: target_native_identity_changed", ErrConflict)
 		}
 	}
+	if target.GetIdentityBasis() == agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS {
+		if err := verifyFallbackDisk(*disk, node, target); err != nil {
+			return nil, err
+		}
+	}
 	return &targetHandle{file: file, node: node, qualification: qualification}, nil
 }
 
 func resolveTargetIdentity(nodes []blockNode, target *agentv1.StorageTarget, wholeDisk bool, native func(string) sysfsBlockIdentity) (selected, root *blockNode, diagnostic targetIdentityDiagnostic) {
 	diagnostic.Approved = identityDiagnosticTarget(target)
+	serialDisks := 0
 	var visit func([]blockNode, *blockNode, string)
 	visit = func(nodes []blockNode, parent *blockNode, parentError string) {
 		for i := range nodes {
@@ -168,8 +176,14 @@ func resolveTargetIdentity(nodes []blockNode, target *agentv1.StorageTarget, who
 			if n.Type == "disk" {
 				disk = n
 				evidence := native(n.Device)
+				if n.Serial == target.GetSerial() || evidence.Serial.Value == target.GetSerial() || evidence.BlockSerial.Value == target.GetSerial() || evidence.VPDSerial.Value == target.GetSerial() {
+					serialDisks++
+				}
 				candidate.Sysfs = evidence.diagnostic()
 				identityError = resolveBlockIdentity(n, evidence)
+				if target.GetIdentityBasis() == agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS && !absentNativeWWN(evidence) {
+					identityError = "fallback_wwn_not_absent"
+				}
 			} else if disk != nil {
 				if n.Type == "part" && (n.WWN != "" && n.WWN != disk.WWN || n.Serial != "" && n.Serial != disk.Serial) {
 					identityError = "partition_identity_conflict"
@@ -186,8 +200,9 @@ func resolveTargetIdentity(nodes []blockNode, target *agentv1.StorageTarget, who
 			uuidMatches := target.GetLuksUuid() == "" || n.UUID == "" || n.UUID == target.GetLuksUuid()
 			typeMatches := !wholeDisk || n.Type == "disk"
 			candidate.Matched = identityError == "" && disk != nil && typeMatches && uuidMatches &&
-				target.GetWwn() != "" && target.GetSerial() != "" && target.GetSizeBytes() != 0 &&
-				n.WWN == target.GetWwn() && n.Serial == target.GetSerial() && n.Size == target.GetSizeBytes()
+				target.GetSerial() != "" && target.GetSizeBytes() != 0 &&
+				n.Serial == target.GetSerial() && n.Size == target.GetSizeBytes() &&
+				matchesStorageBasis(n, disk, target)
 			if candidate.Matched {
 				diagnostic.MatchCount++
 				selected, root = n, disk
@@ -203,10 +218,41 @@ func resolveTargetIdentity(nodes []blockNode, target *agentv1.StorageTarget, who
 		}
 	}
 	visit(nodes, nil, "")
+	// A fallback serial must identify one physical disk even if another disk
+	// has a different GUID, size or LUKS UUID. Child inheritance is not a disk.
+	if diagnostic.MatchCount == 1 && target.GetIdentityBasis() == agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS {
+		if serialDisks != 1 {
+			diagnostic.MatchCount = 0
+		}
+	}
 	if diagnostic.MatchCount != 1 {
 		return nil, nil, diagnostic
 	}
 	return selected, root, diagnostic
+}
+
+func matchesStorageBasis(node, disk *blockNode, target *agentv1.StorageTarget) bool {
+	switch target.GetIdentityBasis() {
+	case agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL:
+		return target.GetWwn() != "" && node.WWN == target.GetWwn()
+	case agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS:
+		return target.GetWwn() == "" && node.WWN == "" && disk.WWN == "" &&
+			target.GetLuksUuid() != "" && target.GetGptDiskGuid() != "" &&
+			disk.PartitionTable == "gpt" && disk.DiskGUID == target.GetGptDiskGuid() &&
+			disk.Size == target.GetDiskSizeBytes() && disk.Size >= node.Size &&
+			node.Type == "part" && (node.Filesystem == "crypto_LUKS" || node.UUID == "" && node.Filesystem == "")
+	default:
+		return false
+	}
+}
+
+func absentNativeWWN(evidence sysfsBlockIdentity) bool {
+	for _, value := range [...]sysfsIdentityValue{evidence.WWID, evidence.DeviceWWID} {
+		if value.Value != "" || value.Error != "" && value.Error != "absent" && value.Error != "empty" {
+			return false
+		}
+	}
+	return true
 }
 
 // Identity diagnostics contain only bounded hardware identifiers, never mounts,
@@ -220,10 +266,13 @@ type targetIdentityDiagnostic struct {
 }
 
 type targetIdentityFields struct {
-	WWN    string `json:"wwn"`
-	Serial string `json:"serial"`
-	UUID   string `json:"uuid"`
-	Size   uint64 `json:"size"`
+	WWN      string                       `json:"wwn"`
+	Serial   string                       `json:"serial"`
+	UUID     string                       `json:"uuid"`
+	Size     uint64                       `json:"size"`
+	Basis    agentv1.StorageIdentityBasis `json:"identity_basis,omitempty"`
+	DiskGUID string                       `json:"gpt_disk_guid,omitempty"`
+	DiskSize uint64                       `json:"disk_size_bytes,omitempty"`
 }
 
 type targetIdentityCandidate struct {
@@ -261,12 +310,12 @@ func diagnosticIdentityText(value string) string {
 }
 
 func identityDiagnosticTarget(target *agentv1.StorageTarget) targetIdentityFields {
-	return targetIdentityFields{WWN: diagnosticIdentityText(target.GetWwn()), Serial: diagnosticIdentityText(target.GetSerial()), UUID: diagnosticIdentityText(target.GetLuksUuid()), Size: target.GetSizeBytes()}
+	return targetIdentityFields{WWN: diagnosticIdentityText(target.GetWwn()), Serial: diagnosticIdentityText(target.GetSerial()), UUID: diagnosticIdentityText(target.GetLuksUuid()), Size: target.GetSizeBytes(), Basis: target.GetIdentityBasis(), DiskGUID: diagnosticIdentityText(target.GetGptDiskGuid()), DiskSize: target.GetDiskSizeBytes()}
 }
 
 func identityDiagnosticNode(node blockNode) targetIdentityCandidate {
 	return targetIdentityCandidate{
-		targetIdentityFields: targetIdentityFields{WWN: diagnosticIdentityText(node.WWN), Serial: diagnosticIdentityText(node.Serial), UUID: diagnosticIdentityText(node.UUID), Size: node.Size},
+		targetIdentityFields: targetIdentityFields{WWN: diagnosticIdentityText(node.WWN), Serial: diagnosticIdentityText(node.Serial), UUID: diagnosticIdentityText(node.UUID), Size: node.Size, DiskGUID: diagnosticIdentityText(node.DiskGUID)},
 		Path:                 diagnosticIdentityText(node.Path),
 		Type:                 diagnosticIdentityText(node.Type),
 		Device:               diagnosticIdentityText(node.Device),

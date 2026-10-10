@@ -131,6 +131,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		ServerRelease:                buildinfo.Current().Version,
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
+		EnrollmentInstructions:       enrollmentInstructions(resources),
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)
@@ -180,6 +181,9 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	identityHandler := auth.Handler()
 	adminMux.Handle("/auth/", identityHandler)
 	adminMux.Handle("/scim/v2/", identityHandler)
+	// Initial installations have no session or device certificate. Only verified
+	// public installation documents are exposed here, never a filesystem tree.
+	adminMux.Handle("/bootstrap/", bootstrapMaterialHandler(resources.ExecutionBootstrap))
 	path, handler := devices.AdminHandler()
 	adminMux.Handle(path, auth.RequireSession(handler))
 	path, handler = devices.ReleaseManagementHandler()

@@ -16,7 +16,7 @@ import (
 
 func escrowActionSpec() *agentv1.DeviceActionSpec {
 	old := uint32(1)
-	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}, EscrowKeyId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", EscrowPublicKey: bytes.Repeat([]byte{6}, 256), RetireKeyslot: &old}}}
+	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}, EscrowKeyId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", EscrowPublicKey: bytes.Repeat([]byte{6}, 256), RetireKeyslot: &old}}}
 }
 
 func TestDeviceActionEscrowPreservesPlannedNonzeroSlot(t *testing.T) {

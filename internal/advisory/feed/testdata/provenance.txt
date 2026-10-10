@@ -177,3 +177,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Ubuntu large kernel notice, acquired 2026-10-10
+----------------------------------------------
+ubuntu-USN-8728-1.json: exact entry USN-8728-1.json from the current canonical
+https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip
+Entry SHA256 e3ac740c07cc0c15e50c63bfc71cf235070eaf1b4cc9125c15dfae0dc88f5a54
+Entry bytes 451752; distinct CVEs across aliases/related/upstream: 1416.
+Complete export SHA256 c45c2791452b55990d08ae1ba4962a712081d6e0134bc5c5c6707d09adf50aba.
+Census of all 70180 entries found maximum 1416, shared by USN-8728-1/-2/-3.
+This fixture preserves the original vendor bytes, including all release scopes.
+It is vendor advisory metadata, not an assertion that every CVE affects a host.

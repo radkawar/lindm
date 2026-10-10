@@ -1,3 +1,5 @@
+import type { GetEnrollmentInstructionsResponse } from "../../../gen/lindm/admin/v1/enrollment_instructions_pb";
+
 export const provisioningFormats = [
   { value: "cloud-init", label: "cloud-init" },
   { value: "kickstart", label: "Kickstart" },
@@ -10,24 +12,23 @@ export type ProvisioningFormat = (typeof provisioningFormats)[number]["value"];
 
 const binary = "/usr/libexec/lindm/lindm-agent";
 const tokenFile = "/etc/lindm/provisioning-token";
-const prerequisites = `# SENSITIVE ONE-TIME BOOT INPUT: contains a bounded provisioning credential.
+const prerequisites = `# SENSITIVE BOOT INPUT: contains a reusable, bounded provisioning token.
 # Deliver only to intended installations; never embed in a reusable/golden image.
-# Install the signed lindm-agent package and its systemd units/config first.
+# A signed agent package and its systemd units/config are required before bootstrap.
 # Authenticate /etc/lindm/execution-root.json and bootstrap.dsse.json out of band.
 # Protect installer/seed transport and retained copies; revoke unused credentials.
 # Enrollment waits at most 3600 seconds for independent approval, then fails visibly.
 `;
 
-function bootScript(agent: string, token: string): string {
+function bootScript(bootstrapCommand: string, resumeCommand: string): string {
   return `#!/bin/sh
 set -eu
 umask 077
-${agent} bootstrap -root /etc/lindm/execution-root.json -bundle /etc/lindm/bootstrap.dsse.json -provisioning-token-file ${token}
-${agent} resume -wait-seconds 3600
+${bootstrapCommand}
+${resumeCommand}
 `;
 }
 
-const script = bootScript(binary, tokenFile);
 const unit = `[Unit]
 Description=Lindm first-boot provisioning and bounded approval resume
 After=network-online.target lindm-executor.service
@@ -46,11 +47,12 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target`;
 
-function installerScript(secret: string): string {
+function installerScript(secret: string, installScript: string, script: string): string {
   // Base64 is not encryption; it only makes the quoted heredoc non-executable.
   // The caller keeps this entire sensitive seed only in component memory.
   return `set -eu
 umask 077
+${installScript}
 install -d -m 0755 /etc/lindm
 base64 -d > ${tokenFile} <<'LINDM_TOKEN'
 ${btoa(secret)}
@@ -65,7 +67,13 @@ LINDM_UNIT
 systemctl enable lindm-executor.service lindm-agent.service lindm-provision.service`;
 }
 
-export function provisioningSnippet(format: ProvisioningFormat, secret: string): string {
+export function provisioningSnippet(
+  format: ProvisioningFormat,
+  secret: string,
+  instructions: GetEnrollmentInstructionsResponse,
+  installScript = "",
+): string {
+  const script = bootScript(instructions.provisioningCommand, instructions.resumeCommand);
   switch (format) {
     case "cloud-init":
       return `#cloud-config
@@ -91,13 +99,14 @@ ${unit
   .map((line) => `      ${line}`)
   .join("\n")}
 runcmd:
-  - [systemctl, daemon-reload]
-  - [systemctl, enable, --now, lindm-executor.service, lindm-agent.service, lindm-provision.service]
+  - [sh, -c, ${JSON.stringify(
+    `set -eu\n${installScript}\nsystemctl daemon-reload\nsystemctl enable --now lindm-executor.service lindm-agent.service lindm-provision.service`,
+  )}]
 `;
     case "kickstart":
       return `${prerequisites}# Merge this post section into the complete trusted installer profile.
 %post --erroronfail
-${installerScript(secret)}
+${installerScript(secret, installScript, script)}
 %end
 `;
     case "autoinstall":
@@ -106,7 +115,7 @@ ${prerequisites}# Merge these fields into the complete trusted autoinstall confi
 autoinstall:
   version: 1
   user-data:
-${provisioningSnippet("cloud-init", secret)
+${provisioningSnippet("cloud-init", secret, instructions, installScript)
   .split("\n")
   .slice(1)
   .map((line) => `    ${line}`)
@@ -114,8 +123,9 @@ ${provisioningSnippet("cloud-init", secret)
 `;
     case "autoyast":
       return `<?xml version="1.0"?>
-<!-- SENSITIVE one-time installer profile. Protect seed transport/retention;
-     never embed in a golden image. Merge into your complete installer profile.
+<!-- SENSITIVE installer profile: reusable, bounded provisioning token.
+     Protect seed transport and retained installer copies; never embed in a
+     golden image. Merge into your complete installer profile.
      Signed lindm-agent package/config and authenticated deployment trust must
      already be installed. -->
 <profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
@@ -125,7 +135,7 @@ ${provisioningSnippet("cloud-init", secret)
         <chrooted config:type="boolean">true</chrooted>
         <interpreter>shell</interpreter>
         <source><![CDATA[
-${installerScript(secret)}
+${installerScript(secret, "", script)}
 ]]></source>
       </script>
     </chroot-scripts>
@@ -138,7 +148,8 @@ ${installerScript(secret)}
 # lindm-agent derivation (libexec/lindm/lindm-agent). Install the executor module
 # and authenticated deployment config/trust separately. NO SECRET belongs in Nix.
 # Download the actual token file from this page, transfer securely to this target
-# as /run/lindm/provisioning-token root:root0600, then run ON THE TARGET as root:
+# as /run/lindm/provisioning-token owned by root:root with mode 0600,
+# then run ON THE TARGET as root:
 # install -d -m 0700 /etc/credstore.encrypted
 # systemd-creds encrypt --name=lindm.provisioning-token /run/lindm/provisioning-token /etc/credstore.encrypted/lindm.provisioning-token
 # chmod 0600 /etc/credstore.encrypted/lindm.provisioning-token
@@ -169,8 +180,10 @@ let cfg = config.services.lindmEnrollment; in {
     };
     script = ''
 ${bootScript(
-  "${cfg.package}/libexec/lindm/lindm-agent",
-  '"$CREDENTIALS_DIRECTORY/lindm.provisioning-token"',
+  instructions.provisioningCommand
+    .replace(binary, "${cfg.package}/libexec/lindm/lindm-agent")
+    .replace(tokenFile, '"$CREDENTIALS_DIRECTORY/lindm.provisioning-token"'),
+  instructions.resumeCommand.replace(binary, "${cfg.package}/libexec/lindm/lindm-agent"),
 )
   .split("\n")
   .map((line) => `      ${line}`)
@@ -180,4 +193,91 @@ ${bootScript(
 }
 `;
   }
+}
+
+export const grantFormats = [
+  { value: "apt", label: "Debian / Ubuntu (APT)" },
+  { value: "dnf", label: "Fedora / RHEL (DNF)" },
+] as const;
+
+export type GrantFormat = (typeof grantFormats)[number]["value"];
+
+export function grantSnippet(
+  secret: string,
+  instructions: GetEnrollmentInstructionsResponse,
+  installScript: string,
+): string {
+  return `# SENSITIVE: single-use enrollment code for one device.
+# Run as root from protected input, not a logged shell or retained shell history.
+# Authenticate the deployment execution root and signed bootstrap bundle first.
+set -eu
+test "$(id -u)" -eq 0
+umask 077
+${installScript ? `${installScript}\n` : "# Prerequisite: install the signed lindm-agent package and deployment configuration first.\n"}install -d -o root -g root -m 0700 /run/lindm-enrollment
+base64 -d > /run/lindm-enrollment/grant <<'LINDM_GRANT'
+${btoa(secret)}
+LINDM_GRANT
+chmod 0600 /run/lindm-enrollment/grant
+systemctl enable --now lindm-executor.service lindm-agent.service
+${instructions.grantCommand}
+${instructions.resumeCommand}
+rm -f /run/lindm-enrollment/grant
+`;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+export function enrollmentInstallScript(
+  instructions: GetEnrollmentInstructionsResponse | undefined,
+  family: GrantFormat,
+): string {
+  const repository = family === "apt" ? instructions?.aptRepository : instructions?.dnfRepository;
+  if (!repository) return "";
+
+  const verifyKey = `curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' ${shellQuote(repository.signingKeyUrl)} -o "$key"
+test "$(gpg --batch --with-colons --show-keys "$key" | awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; primary = 0 }')" = ${shellQuote(repository.signingKeyFingerprint)}`;
+  const header = `# Install only from this deployment's configured signed repository.
+set -eu
+umask 077
+`;
+  if (family === "apt" && instructions?.aptRepository) {
+    const apt = instructions.aptRepository;
+    const source = `deb [signed-by=/etc/apt/keyrings/lindm.gpg] ${apt.baseUrl} ${apt.suite} ${apt.components.join(" ")}`;
+    return `${header}apt-get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
+apt-get -y -o APT::Get::AllowUnauthenticated=false install ca-certificates curl gnupg
+key="$(mktemp)"
+trap 'rm -f "$key"' EXIT
+${verifyKey}
+install -d -m 0755 /etc/apt/keyrings
+gpg --batch --yes --dearmor --output /etc/apt/keyrings/lindm.gpg "$key"
+chmod 0644 /etc/apt/keyrings/lindm.gpg
+printf '%s\\n' ${shellQuote(source)} > /etc/apt/sources.list.d/lindm.list
+chmod 0644 /etc/apt/sources.list.d/lindm.list
+apt-get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
+apt-get -y -o APT::Get::AllowUnauthenticated=false install lindm-agent
+rm -f "$key"
+trap - EXIT`;
+  }
+  const config = `[lindm]
+name=Lindm
+baseurl=${repository.baseUrl}
+enabled=1
+gpgcheck=1
+localpkg_gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/lindm`;
+  return `${header}dnf -y --setopt=gpgcheck=1 --setopt=localpkg_gpgcheck=1 install ca-certificates curl gnupg2
+key="$(mktemp)"
+trap 'rm -f "$key"' EXIT
+${verifyKey}
+install -d -m 0755 /etc/pki/rpm-gpg
+install -m 0644 "$key" /etc/pki/rpm-gpg/lindm
+rpm --import /etc/pki/rpm-gpg/lindm
+printf '%s\\n' ${shellQuote(config)} > /etc/yum.repos.d/lindm.repo
+chmod 0644 /etc/yum.repos.d/lindm.repo
+dnf -y --setopt=lindm.gpgcheck=1 --setopt=lindm.localpkg_gpgcheck=1 --setopt=lindm.repo_gpgcheck=1 install lindm-agent
+rm -f "$key"
+trap - EXIT`;
 }

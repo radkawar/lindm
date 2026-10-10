@@ -583,10 +583,26 @@ reduces exposure; it cannot withstand an already compromised kernel/root executo
 recovery rotation, TPM2 binding, session lock/release, quarantine/release, restart,
 shutdown, refresh inventory, LUKS crypto erase, and non-encrypted-media sanitization.
 Neither plan data nor a transport peer can choose an executable, shell command or
-unchecked block-device path. The root-owned
-agent configuration independently qualifies native targets by LUKS UUID, serial/
-WWN and size. Unsupported topology or missing recovery qualification is a refusal,
-not a degraded success. Inventory support is necessary but not execution authority.
+unchecked block-device path. The root-owned agent configuration independently
+qualifies the exact signed `StorageTarget.identity_basis`. `WWN_SERIAL` is
+preferred and binds WWN, serial, container/media size and applicable LUKS UUID.
+When the backing disk has no WWN, encrypted GPT partitions may instead use
+`SERIAL_GPT_LUKS`: unique physical-disk serial, whole-disk size, GPT disk GUID,
+container size and LUKS UUID. The fallback does not permit serial-only selection,
+unencrypted sanitization, ambiguous disk ancestry or duplicate physical-disk
+serials, even if those disks have different GUIDs. Missing GPT evidence remains a
+refusal. Native execution rechecks the pinned backing disk's size, serial, absence
+of WWN, CRC-checked GPT header and the selected partition's kernel ancestry.
+LUKS actions independently verify the exact UUID before effects.
+The server projects this basis in `ListDeviceStorageTargets`; the console shows
+it and the complete tuple to requesters and approvers. These fields remain in the
+immutable action specification, approval digest, signed plan and root-owned
+allowlist. A disappearing or appearing WWN, changed basis or changed tuple
+requires a new selection and approval; execution never automatically downgrades.
+Existing basis-less configurations and pending specifications fail closed and
+must be requalified, not silently assigned a basis. Unsupported topology or
+missing recovery qualification remains a refusal, not degraded success.
+Inventory support is necessary but not execution authority.
 
 The action path uses separate DSSE payload domains and exact per-action capability
 IDs. Plan-role intent authorizes preflight only. The root signs its native plan,
@@ -1002,6 +1018,19 @@ observations each retain explicit collection status. Absence, denied access and
 collection failure are not successful empty measurements. Local accounts do not
 include password hashes, home contents or login history.
 
+CPU model observations carry their native source. x86 preserves `/proc/cpuinfo`
+model identity. ARM prefers populated SMBIOS type-4 processor-version strings
+from the bounded root-read DMI table, then decodes implementer/part from procfs
+or the per-CPU MIDR sysfs interface. A small pinned-source ARM part table supplies
+known names; unknown parts retain successful exact numeric identities instead of
+becoming unavailable. Heterogeneous identities are retained deterministically.
+The network collector never opens privileged DMI tables; its interim public CPU
+evidence is replaced only by a fresh, boot-fenced executor `RootObservation.cpu`.
+Failed executor reads cannot preserve stale SMBIOS-derived model evidence.
+Malformed, denied, timed-out or oversized preferred sources remain failures,
+not fabricated hardware or silently weaker sources. Historical source absence
+remains distinct from a newly collected source.
+
 Each network interface carries independent IPv4/IPv6 default-route observations.
 Bounded native reads of `/proc/net/route` and `/proc/net/ipv6_route` mark every
 UP, non-REJECT destination-default route interface, not a guessed first interface
@@ -1011,10 +1040,15 @@ Historical records lack these fields rather than asserting no default route.
 
 Active logind sessions expose username, session class/type, seat and remote flag
 with per-field availability; only sessions whose native `Active` property is true
-are included. Collection failure is distinct from a successful empty list, and
-an absent seat is unavailable. These personal data use the existing host inventory
-admission, bounded storage and device-scoped `fleet.read` authorization, not a
-separate identity or login-history store.
+are included. Collection failure is distinct from a successful empty list.
+An absent seat is `NOT_APPLICABLE` only when successful native Class, Type and
+Remote observations prove a manager/background, remote or tty session. This
+per-session applicability is schema-validated, not a global absence exception.
+A missing seat on a local graphical user session stays `UNAVAILABLE`; malformed
+seat values and failed context reads never become non-applicability. These
+personal data use the existing host inventory admission, bounded storage and
+device-scoped `fleet.read` authorization, not a separate identity or login-history
+store.
 
 Admin `Device` exposes `agent_release`, `agent_protocol_version` and
 `agent_version_accepted_at` from the current generation's latest accepted signed
@@ -1023,7 +1057,10 @@ remain unreported; retired-generation reports never become current. Acceptance
 time is the server's time, not a claim of binary integrity or current liveness.
 
 Storage rows retain per-field observation status for transport, model, serial,
-firmware, WWN/EUI, partition UUID/type, filesystem UUID, and LUKS UUID/version.
+firmware, WWN/EUI, GPT disk GUID, partition UUID/type, filesystem UUID, and LUKS
+UUID/version. GPT disk GUID is read only from the physical disk's native GPT
+partition table and inherited through unique backing-disk ancestry, never
+substituted with a partition UUID.
 Public LUKS summaries contain keyslot/token counts and token types only: never
 keys, token payloads, salts, digests or header bytes. Unique backing-disk links
 and root ancestry come from the same bounded topology observation. Missing
@@ -1036,12 +1073,24 @@ against bounded JSON metadata from the same pinned read-only descriptor. It
 retains only counts and sorted token types; disagreement invalidates the summary.
 LUKS1 has no token capability and does not invent a successful empty token list.
 
-The network process leaves storage unavailable until it receives the executor's
-bounded read-only storage observation, combined with recovery readiness over the
-authenticated local RPC. Standalone `inspect` retains the caller's privileges
-and reports denied fields rather than inventing identities. NVMe Identify reuses
+The network process leaves storage, DMI serial and firmware observations unavailable
+until it receives the executor's bounded read-only projection, combined with recovery
+readiness over the authenticated local RPC. Serial and EFI variable reads never
+require widening the network unit's sandbox. Blank vendor serials remain unavailable;
+BIOS firmware has no Secure Boot observation. Standalone `inspect` retains the caller's
+privileges and reports denied fields rather than inventing identities. NVMe Identify reuses
 the action provider's namespace-NID or controller-serial/NSID identity basis;
 inventory never silently changes basis or grants controller-wide authority.
+
+Each protected observation runs a fresh, bounded `inventory-observe` helper in a
+short-lived systemd transient unit. Only that helper sees host device nodes:
+`DevicePolicy=closed` with `DeviceAllow=block-* r` permits block reads, not writes
+or device creation. It has no capabilities, no network, a read-only system,
+inaccessible agent/executor state and a fixed installed executable/argument vector.
+The executor itself retains `PrivateDevices=yes`. Fresh helper namespaces expose
+current mapper/LVM topology and hotplugged devices without persistent device
+allowlists or widening the network agent. Output, runtime and cancellation cleanup
+are bounded; incomplete, malformed or wrong-boot helper results are not published.
 
 `ListDeviceStorageTargets` applies scoped `fleet.read` before returning exact
 `StorageTarget` and optional `NVMeSanitizeScope` messages for the selected action
@@ -1070,11 +1119,18 @@ and collection status. Successful non-modular packages, unavailable evidence and
 historical absence remain distinct; module identity is never inferred from an EL
 version suffix. Optional platform evidence carries the native `CPE_NAME`, an
 explicit release-version lock from the native DNF configuration's effective
-variable directories, and configured enabled repository IDs. Collection does not
-load plugins, resolve package metadata or use the network, and does not export
-repository URLs or credentials. Repository configuration is not proof of
-entitlement or repository availability; absent or ambiguous product-stream
-evidence must not become an assumed standard/EUS/E4S stream.
+variable directories, the separately detected effective releasever, and enabled
+repository IDs plus configured base URLs, metalink/mirrorlist, package-signature
+checking and signing-key locations. DNF4 versus DNF5 is selected from installed
+native executable/version evidence, never an OS-name guess. Supported DNF4 and
+libdnf5 configuration APIs do not load plugins, repository metadata or the network.
+URL userinfo, full query strings and fragments are omitted because they may contain
+credentials; each repository explicitly reports whether URL data was redacted.
+Configured module enabled/disabled state is not fabricated from an empty metadata
+sack: the supported config-only DNF5 API does not enumerate it. Per-package native
+RPM module/stream evidence remains independent. Repository configuration is not
+proof of entitlement or availability; absent or ambiguous product-stream evidence
+must not become an assumed standard/EUS/E4S stream.
 
 Administrator metadata is separate from device-reported evidence: up to 32 labels,
 an assigned principal **or** free-text owner, and up to 32 typed attributes whose
@@ -1086,7 +1142,11 @@ Changing the label set also requires unrestricted `accounts.manage`, because lab
 participate in authorization scopes; scoped inventory managers can change ownership
 and attributes without gaining control over label-based authorization. Flatpak
 application inventory is system-installation-only and excludes runtimes; the agent
-does not traverse employee home directories. Snap inventory is system-wide.
+does not traverse employee home directories. Snap inventory is system-wide, using
+the fixed local snapd socket's bounded read-only installed-applications response.
+An installed daemon with no snaps is a successful empty collection, not a native
+command failure caused by the CLI's informational stderr. Missing Flatpak or snapd
+is unavailable; denied access, timeouts and malformed native evidence remain failures.
 
 Fleet search combines exact OS/version and signed-session agent release, literal
 hostname prefix, all requested labels and typed attribute equalities, and inclusive

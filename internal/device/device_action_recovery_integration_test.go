@@ -36,7 +36,7 @@ type actionRecoveryFixture struct {
 func newActionRecoveryFixture(t *testing.T) *actionRecoveryFixture {
 	t.Helper()
 	f := newDeviceActionFixture(t)
-	target := &agentv1.StorageTarget{Wwn: "isolated-original-root-wwn", Serial: "isolated-original-root", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "isolated-original-root-wwn", Serial: "isolated-original-root", SizeBytes: 1 << 30}
 	f.observeStorageTargets(t, target)
 	client, imageDigest := recoveryArtifactFixture(t, []byte("signed recovery admission fixture"))
 	f.svc.recoveryArtifacts = client

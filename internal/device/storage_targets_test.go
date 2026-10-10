@@ -16,7 +16,7 @@ import (
 )
 
 func fixtureStorageTarget(luks string) *agentv1.StorageTarget {
-	return &agentv1.StorageTarget{LuksUuid: luks, Wwn: "wwn-" + luks, Serial: "serial-" + luks, SizeBytes: 1 << 30}
+	return &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: luks, Wwn: "wwn-" + luks, Serial: "serial-" + luks, SizeBytes: 1 << 30}
 }
 
 func fixtureStorageDevice(name string, target *agentv1.StorageTarget) *inventoryv1.BlockDevice {
@@ -34,6 +34,7 @@ func fixtureStorageDevice(name string, target *agentv1.StorageTarget) *inventory
 		PartitionUuid: text(""), PartitionType: text(""), FilesystemUuid: text(""), LuksUuid: text(target.GetLuksUuid()), LuksVersion: text(""),
 		LuksKeyslotCount: number(), LuksTokenCount: number(), LuksTokenTypes: text(""), BackingDisk: text(name),
 		RootBacking: &inventoryv1.ObservedBool{Status: success}, Nvme: &inventoryv1.ObservedNVMeScope{Status: unavailable},
+		GptDiskGuid: text(target.GetGptDiskGuid()),
 	}
 	device := &inventoryv1.BlockDevice{Name: name, Type: text("disk"), Parent: text(""), SizeBytes: &inventoryv1.ObservedUint64{Status: success, Value: target.GetSizeBytes()}, Filesystem: text(""), Mountpoint: text(""), Encryption: text("none"), Identity: identity}
 	if target.GetLuksUuid() != "" {
@@ -44,6 +45,182 @@ func fixtureStorageDevice(name string, target *agentv1.StorageTarget) *inventory
 
 func fixtureStorageDetails(devices ...*inventoryv1.BlockDevice) *inventoryv1.NativeDetails {
 	return &inventoryv1.NativeDetails{Storage: &inventoryv1.StorageDetails{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Devices: devices}}
+}
+
+func fixtureVirtioStorage() (*agentv1.StorageTarget, *inventoryv1.NativeDetails) {
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS, Serial: "virtio-root", SizeBytes: 1 << 30, DiskSizeBytes: 2 << 30, GptDiskGuid: uuid.NewString(), LuksUuid: uuid.NewString()}
+	diskTarget := proto.CloneOf(target)
+	diskTarget.LuksUuid, diskTarget.SizeBytes = "", target.GetDiskSizeBytes()
+	disk := fixtureStorageDevice("vda", diskTarget)
+	container := fixtureStorageDevice("vda1", target)
+	container.Type.Value, container.Identity.BackingDisk.Value = "part", "vda"
+	container.Parent = observed(success, "vda")
+	container.Identity.RootBacking.Value = true
+	mapping := fixtureStorageDevice("crypt-root", diskTarget)
+	mapping.Type.Value, mapping.Encryption.Value, mapping.Identity.BackingDisk.Value = "crypt", "dm-crypt", "vda"
+	mapping.Parent = observed(success, "vda1")
+	mapping.SizeBytes.Value = target.GetSizeBytes() - (16 << 20)
+	details := fixtureStorageDetails(disk, container, mapping)
+	details.Tpm = &inventoryv1.TpmDetails{Present: &inventoryv1.ObservedBool{Status: success, Value: true}, Version: observed(success, "2")}
+	return target, details
+}
+
+func TestObservedStorageTargetsVirtioFallback(t *testing.T) {
+	target, details := fixtureVirtioStorage()
+	for _, kind := range []string{"escrow_rotate", "tpm2_bind", "crypto_erase"} {
+		got, reason := observedStorageTargets(details, kind)
+		if reason != "" || len(got) != 1 || !proto.Equal(got[0].GetTarget(), target) || got[0].GetName() != "vda1" || !got[0].GetRootBacking() {
+			t.Fatalf("exact virtio LUKS selection for %s: %v %s", kind, got, reason)
+		}
+	}
+	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+		t.Fatal("LUKS-only fallback exposed for sanitize")
+	}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{target}}}}
+	if err := requireObservedStorageTargets(details, spec); err != nil {
+		t.Fatalf("unique serial counted inherited child identities: %v", err)
+	}
+	details.Storage.Devices = details.Storage.Devices[:1]
+	if got, _ := observedStorageTargets(details, "sanitize"); len(got) != 0 {
+		t.Fatal("unencrypted no-WWN disk became a sanitize fallback")
+	}
+}
+
+func TestObservedStorageTargetsRefuseIncompleteFallback(t *testing.T) {
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	unavailable := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	for _, test := range []struct {
+		name   string
+		change func(*inventoryv1.BlockDevice, *inventoryv1.BlockDevice)
+	}{
+		{"unknown container type", func(_, c *inventoryv1.BlockDevice) { c.Type.Status = unavailable }},
+		{"mapping container", func(_, c *inventoryv1.BlockDevice) { c.Type.Value = "crypt" }},
+		{"whole disk container", func(d, c *inventoryv1.BlockDevice) {
+			d.Type.Value, c.Type.Value, c.Identity.BackingDisk.Value = "part", "disk", c.Name
+		}},
+		{"historical WWN", func(_, c *inventoryv1.BlockDevice) { c.Identity.Wwn = nil }},
+		{"failed WWN", func(_, c *inventoryv1.BlockDevice) {
+			c.Identity.Wwn.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED
+		}},
+		{"unknown WWN", func(_, c *inventoryv1.BlockDevice) { c.Identity.Wwn.Status = 0 }},
+		{"empty successful WWN", func(_, c *inventoryv1.BlockDevice) { c.Identity.Wwn.Status = success }},
+		{"contradictory WWN", func(_, c *inventoryv1.BlockDevice) { c.Identity.Wwn.Value = "unobserved" }},
+		{"missing serial", func(_, c *inventoryv1.BlockDevice) { c.Identity.Serial.Value = "" }},
+		{"unobserved serial", func(_, c *inventoryv1.BlockDevice) { c.Identity.Serial.Status = unavailable }},
+		{"disk serial mismatch", func(d, _ *inventoryv1.BlockDevice) { d.Identity.Serial.Value += "-other" }},
+		{"unobserved disk serial", func(d, _ *inventoryv1.BlockDevice) { d.Identity.Serial.Status = unavailable }},
+		{"disk has WWN", func(d, _ *inventoryv1.BlockDevice) { d.Identity.Wwn = observed(success, "native-wwn") }},
+		{"unobserved disk WWN", func(d, _ *inventoryv1.BlockDevice) { d.Identity.Wwn = nil }},
+		{"unknown backing", func(_, c *inventoryv1.BlockDevice) { c.Identity.BackingDisk.Status = unavailable }},
+		{"missing backing", func(_, c *inventoryv1.BlockDevice) { c.Identity.BackingDisk.Value = "missing" }},
+		{"backing not physical disk", func(d, _ *inventoryv1.BlockDevice) { d.Type.Value = "raid1" }},
+		{"unknown disk type", func(d, _ *inventoryv1.BlockDevice) { d.Type.Status = unavailable }},
+		{"unknown target size", func(_, c *inventoryv1.BlockDevice) { c.SizeBytes.Status = unavailable }},
+		{"zero target size", func(_, c *inventoryv1.BlockDevice) { c.SizeBytes.Value = 0 }},
+		{"unknown disk size", func(d, _ *inventoryv1.BlockDevice) { d.SizeBytes.Status = unavailable }},
+		{"zero disk size", func(d, _ *inventoryv1.BlockDevice) { d.SizeBytes.Value = 0 }},
+		{"smaller disk size", func(d, c *inventoryv1.BlockDevice) { d.SizeBytes.Value = c.SizeBytes.Value - 1 }},
+		{"historical GPT", func(_, c *inventoryv1.BlockDevice) { c.Identity.GptDiskGuid = nil }},
+		{"missing GPT", func(_, c *inventoryv1.BlockDevice) { c.Identity.GptDiskGuid.Value = "" }},
+		{"unknown GPT", func(_, c *inventoryv1.BlockDevice) { c.Identity.GptDiskGuid.Status = unavailable }},
+		{"invalid GPT", func(d, c *inventoryv1.BlockDevice) {
+			d.Identity.GptDiskGuid.Value, c.Identity.GptDiskGuid.Value = "not-a-guid", "not-a-guid"
+		}},
+		{"zero GPT", func(d, c *inventoryv1.BlockDevice) {
+			d.Identity.GptDiskGuid.Value, c.Identity.GptDiskGuid.Value = uuid.Nil.String(), uuid.Nil.String()
+		}},
+		{"GPT mismatch", func(d, _ *inventoryv1.BlockDevice) { d.Identity.GptDiskGuid.Value = uuid.NewString() }},
+		{"unknown disk GPT", func(d, _ *inventoryv1.BlockDevice) { d.Identity.GptDiskGuid.Status = unavailable }},
+		{"missing LUKS", func(_, c *inventoryv1.BlockDevice) { c.Identity.LuksUuid.Value = "" }},
+		{"unknown LUKS", func(_, c *inventoryv1.BlockDevice) { c.Identity.LuksUuid.Status = unavailable }},
+		{"invalid LUKS", func(_, c *inventoryv1.BlockDevice) { c.Identity.LuksUuid.Value = "not-a-uuid" }},
+		{"zero LUKS", func(_, c *inventoryv1.BlockDevice) { c.Identity.LuksUuid.Value = uuid.Nil.String() }},
+		{"not encrypted", func(_, c *inventoryv1.BlockDevice) { c.Encryption.Value, c.Filesystem.Value = "none", "ext4" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, details := fixtureVirtioStorage()
+			test.change(details.Storage.Devices[0], details.Storage.Devices[1])
+			got, reason := observedStorageTargets(details, "crypto_erase")
+			if len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
+				t.Fatalf("incomplete fallback selectable: %v %s", got, reason)
+			}
+		})
+	}
+}
+
+func TestObservedStorageTargetsFallbackRejectsDuplicatePhysicalSerial(t *testing.T) {
+	for _, wwn := range []string{"", "another-native-wwn"} {
+		t.Run(wwn, func(t *testing.T) {
+			target, details := fixtureVirtioStorage()
+			otherTarget := proto.CloneOf(target)
+			otherTarget.Wwn, otherTarget.LuksUuid, otherTarget.SizeBytes = wwn, "", target.GetDiskSizeBytes()
+			other := fixtureStorageDevice("vdb", otherTarget)
+			details.Storage.Devices = append(details.Storage.Devices, other)
+			if got, reason := observedStorageTargets(details, "crypto_erase"); len(got) != 0 || reason != "device_action_storage_identity_unavailable" {
+				t.Fatalf("duplicate physical serial selectable: %v %s", got, reason)
+			}
+			other.Identity.Serial.Value += "-distinct"
+			if got, reason := observedStorageTargets(details, "crypto_erase"); len(got) != 1 || reason != "" {
+				t.Fatalf("distinct physical disk blocked fallback: %v %s", got, reason)
+			}
+		})
+	}
+}
+
+func TestObservedStorageFallbackExactTupleAndNoDowngrade(t *testing.T) {
+	target, details := fixtureVirtioStorage()
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: target}}}
+	if err := requireObservedStorageTargets(details, spec); err != nil {
+		t.Fatal(err)
+	}
+	for name, change := range map[string]func(*agentv1.StorageTarget){
+		"unspecified basis": func(t *agentv1.StorageTarget) {
+			t.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED
+		},
+		"unknown basis": func(t *agentv1.StorageTarget) { t.IdentityBasis = agentv1.StorageIdentityBasis(99) },
+		"changed basis": func(t *agentv1.StorageTarget) {
+			t.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL
+		},
+		"WWN":         func(t *agentv1.StorageTarget) { t.Wwn = "invented-wwn" },
+		"serial":      func(t *agentv1.StorageTarget) { t.Serial += "-replacement" },
+		"target size": func(t *agentv1.StorageTarget) { t.SizeBytes++ },
+		"disk size":   func(t *agentv1.StorageTarget) { t.DiskSizeBytes++ },
+		"GPT":         func(t *agentv1.StorageTarget) { t.GptDiskGuid = uuid.NewString() },
+		"LUKS":        func(t *agentv1.StorageTarget) { t.LuksUuid = uuid.NewString() },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := proto.CloneOf(spec)
+			change(changed.GetCryptoErase().Target)
+			if err := requireObservedStorageTargets(details, changed); rpcReason(err) != "device_action_storage_target_mismatch" {
+				t.Fatalf("changed signed fallback accepted: %v", err)
+			}
+		})
+	}
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	for _, device := range details.Storage.Devices {
+		device.Identity.Wwn = observed(success, "native-wwn")
+	}
+	got, reason := observedStorageTargets(details, "crypto_erase")
+	preferred := proto.CloneOf(target)
+	preferred.IdentityBasis, preferred.Wwn = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, "native-wwn"
+	preferred.GptDiskGuid, preferred.DiskSizeBytes = "", 0
+	if reason != "" || len(got) != 1 || !proto.Equal(got[0].GetTarget(), preferred) {
+		t.Fatalf("WWN did not take precedence or retained fallback-only fields: %v %s", got, reason)
+	}
+	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
+		t.Fatalf("fallback silently accepted in place of observed WWN: %v", err)
+	}
+	spec.GetCryptoErase().Target = preferred
+	if err := requireObservedStorageTargets(details, spec); err != nil {
+		t.Fatal(err)
+	}
+	for _, device := range details.Storage.Devices {
+		device.Identity.Wwn = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, "")
+	}
+	if err := requireObservedStorageTargets(details, spec); rpcReason(err) != "device_action_storage_target_mismatch" {
+		t.Fatalf("WWN approval silently downgraded to fallback: %v", err)
+	}
 }
 
 func TestObservedStorageTargetsRejectIncompleteIdentity(t *testing.T) {
@@ -126,6 +303,14 @@ func TestObservedStorageTargetExactTupleAndLiveSet(t *testing.T) {
 	}
 	details.Storage.Devices = details.Storage.Devices[:2]
 	for _, change := range []func(*agentv1.StorageTarget){
+		func(t *agentv1.StorageTarget) {
+			t.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED
+		},
+		func(t *agentv1.StorageTarget) {
+			t.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS
+		},
+		func(t *agentv1.StorageTarget) { t.GptDiskGuid = uuid.NewString() },
+		func(t *agentv1.StorageTarget) { t.DiskSizeBytes = t.SizeBytes },
 		func(t *agentv1.StorageTarget) { t.Wwn = "different" },
 		func(t *agentv1.StorageTarget) { t.Serial = "" },
 		func(t *agentv1.StorageTarget) { t.SizeBytes++ },

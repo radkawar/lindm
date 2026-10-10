@@ -58,8 +58,11 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		now := stamp()
 		d.hostSequence++
 		d.packageSequence++
-		host := &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(d.boot), Hostname: observed(label(index)), OsId: observed("ubuntu"), OsVersion: observed("24.04"), Architecture: observed("x86_64"), KernelRelease: observed("6.8.0-90-generic"), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(label(index))}
-		host.Details = syntheticNativeDetails()
+		host := r.historicalHost
+		if index != 0 || host == nil {
+			host = &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(d.boot), Hostname: observed(label(index)), OsId: observed("ubuntu"), OsVersion: observed("24.04"), Architecture: observed("x86_64"), KernelRelease: observed("6.8.0-90-generic"), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(label(index))}
+			host.Details = syntheticNativeDetails()
+		}
 		d.inventoryUpload = &pendingInventoryUpload{
 			host:     &devicev1.ReportHostObservationRequest{EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, Sequence: d.hostSequence, Observation: host},
 			manifest: &devicev1.PackageSnapshotManifest{SnapshotId: id.String(), CreatedAt: now, EnrollmentGeneration: d.generation, Sequence: d.packageSequence, StartedAt: now, FinishedAt: now, Backend: "dpkg-query", Batches: r.packages.descriptors},

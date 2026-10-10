@@ -91,6 +91,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return verifyBootstrap(ctx, args[1:])
 	case "executor":
 		return serveExecutor(ctx, args[1:])
+	case "inventory-observe":
+		return inventoryObserveCommand(ctx, args[1:], output)
 	case "run":
 		return serveNetwork(ctx, args[1:])
 	case "bootstrap":

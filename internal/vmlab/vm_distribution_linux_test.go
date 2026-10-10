@@ -70,11 +70,11 @@ func TestSUSEOracleKeepsRPMIdentity(t *testing.T) {
 	before.Backends.Rpm.Value, before.Backends.Zypper.Value = true, true
 	after.Backends.Rpm.Value, after.Backends.Zypper.Value = true, true
 	actual.Backends.Rpm.Value, actual.Backends.Zypper.Value = true, true
-	if err := compareVMDetails(before, after, actual); err != nil {
+	if err := compareVMDetails("opensuse-leap", "x86_64", before, after, actual); err != nil {
 		t.Fatalf("independent RPM and zypper presence rejected: %v", err)
 	}
 	actual.Backends.Zypper.Value = false
-	if err := compareVMDetails(before, after, actual); err == nil {
+	if err := compareVMDetails("opensuse-leap", "x86_64", before, after, actual); err == nil {
 		t.Fatal("missing zypper backend accepted when RPM was present")
 	}
 }

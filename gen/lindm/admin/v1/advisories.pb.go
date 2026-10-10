@@ -165,6 +165,7 @@ type AdvisoryFinding struct {
 	Exception        *AdvisoryException     `protobuf:"bytes,11,opt,name=exception,proto3" json:"exception,omitempty"`
 	FeedId           string                 `protobuf:"bytes,12,opt,name=feed_id,json=feedId,proto3" json:"feed_id,omitempty"`
 	SourceUrl        string                 `protobuf:"bytes,13,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	Reason           string                 `protobuf:"bytes,14,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -286,6 +287,13 @@ func (x *AdvisoryFinding) GetFeedId() string {
 func (x *AdvisoryFinding) GetSourceUrl() string {
 	if x != nil {
 		return x.SourceUrl
+	}
+	return ""
+}
+
+func (x *AdvisoryFinding) GetReason() string {
+	if x != nil {
+		return x.Reason
 	}
 	return ""
 }
@@ -759,23 +767,24 @@ func (*ListAdvisoryFeedsRequest) Descriptor() ([]byte, []int) {
 }
 
 type AdvisoryFeedStatus struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Distro         string                 `protobuf:"bytes,2,opt,name=distro,proto3" json:"distro,omitempty"`
-	Release        string                 `protobuf:"bytes,3,opt,name=release,proto3" json:"release,omitempty"`
-	SourceUrl      string                 `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
-	SourceSha256   string                 `protobuf:"bytes,5,opt,name=source_sha256,json=sourceSha256,proto3" json:"source_sha256,omitempty"`
-	CheckedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
-	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	AttemptedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=attempted_at,json=attemptedAt,proto3" json:"attempted_at,omitempty"`
-	Error          string                 `protobuf:"bytes,9,opt,name=error,proto3" json:"error,omitempty"`
-	Fresh          bool                   `protobuf:"varint,10,opt,name=fresh,proto3" json:"fresh,omitempty"`
-	AdvisoryCount  uint64                 `protobuf:"varint,11,opt,name=advisory_count,json=advisoryCount,proto3" json:"advisory_count,omitempty"`
-	PlatformStream string                 `protobuf:"bytes,12,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
-	Artifacts      []*v1.FeedArtifact     `protobuf:"bytes,13,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
-	SnapshotAt     *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Distro          string                 `protobuf:"bytes,2,opt,name=distro,proto3" json:"distro,omitempty"`
+	Release         string                 `protobuf:"bytes,3,opt,name=release,proto3" json:"release,omitempty"`
+	SourceUrl       string                 `protobuf:"bytes,4,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
+	SourceSha256    string                 `protobuf:"bytes,5,opt,name=source_sha256,json=sourceSha256,proto3" json:"source_sha256,omitempty"`
+	CheckedAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	AttemptedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=attempted_at,json=attemptedAt,proto3" json:"attempted_at,omitempty"`
+	Error           string                 `protobuf:"bytes,9,opt,name=error,proto3" json:"error,omitempty"`
+	Fresh           bool                   `protobuf:"varint,10,opt,name=fresh,proto3" json:"fresh,omitempty"`
+	AdvisoryCount   uint64                 `protobuf:"varint,11,opt,name=advisory_count,json=advisoryCount,proto3" json:"advisory_count,omitempty"`
+	PlatformStream  string                 `protobuf:"bytes,12,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
+	Artifacts       []*v1.FeedArtifact     `protobuf:"bytes,13,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	SnapshotAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
+	RejectedRecords []*v1.RejectedRecord   `protobuf:"bytes,15,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AdvisoryFeedStatus) Reset() {
@@ -902,6 +911,13 @@ func (x *AdvisoryFeedStatus) GetArtifacts() []*v1.FeedArtifact {
 func (x *AdvisoryFeedStatus) GetSnapshotAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.SnapshotAt
+	}
+	return nil
+}
+
+func (x *AdvisoryFeedStatus) GetRejectedRecords() []*v1.RejectedRecord {
+	if x != nil {
+		return x.RejectedRecords
 	}
 	return nil
 }
@@ -1081,7 +1097,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\vaccepted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"acceptedAt\x129\n" +
 	"\n" +
-	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xff\x03\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x97\x04\n" +
 	"\x0fAdvisoryFinding\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vadvisory_id\x18\x02 \x01(\tR\n" +
@@ -1098,7 +1114,8 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\texception\x18\v \x01(\v2!.lindm.admin.v1.AdvisoryExceptionR\texception\x12\x17\n" +
 	"\afeed_id\x18\f \x01(\tR\x06feedId\x12\x1d\n" +
 	"\n" +
-	"source_url\x18\r \x01(\tR\tsourceUrl\"\xdb\x03\n" +
+	"source_url\x18\r \x01(\tR\tsourceUrl\x12\x16\n" +
+	"\x06reason\x18\x0e \x01(\tR\x06reason\"\xdb\x03\n" +
 	"\x11AdvisoryFreshness\x12:\n" +
 	"\x05state\x18\x01 \x01(\x0e2$.lindm.admin.v1.AdvisoryFindingStateR\x05state\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x1f\n" +
@@ -1138,7 +1155,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +
 	"\x0funknown_devices\x18\x03 \x01(\x04R\x0eunknownDevices\x12+\n" +
 	"\x11evaluated_devices\x18\x04 \x01(\x04R\x10evaluatedDevices\"\x1a\n" +
-	"\x18ListAdvisoryFeedsRequest\"\xc7\x04\n" +
+	"\x18ListAdvisoryFeedsRequest\"\x95\x05\n" +
 	"\x12AdvisoryFeedStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06distro\x18\x02 \x01(\tR\x06distro\x12\x18\n" +
@@ -1158,7 +1175,8 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x0fplatform_stream\x18\f \x01(\tR\x0eplatformStream\x12=\n" +
 	"\tartifacts\x18\r \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactR\tartifacts\x12;\n" +
 	"\vsnapshot_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"snapshotAt\"U\n" +
+	"snapshotAt\x12L\n" +
+	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
 	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xfd\x01\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +
@@ -1210,6 +1228,7 @@ var file_lindm_admin_v1_advisories_proto_goTypes = []any{
 	(*AcceptAdvisoryFindingResponse)(nil), // 13: lindm.admin.v1.AcceptAdvisoryFindingResponse
 	(*timestamppb.Timestamp)(nil),         // 14: google.protobuf.Timestamp
 	(*v1.FeedArtifact)(nil),               // 15: lindm.advisory.v1.FeedArtifact
+	(*v1.RejectedRecord)(nil),             // 16: lindm.advisory.v1.RejectedRecord
 }
 var file_lindm_admin_v1_advisories_proto_depIdxs = []int32{
 	14, // 0: lindm.admin.v1.AdvisoryException.accepted_at:type_name -> google.protobuf.Timestamp
@@ -1230,14 +1249,15 @@ var file_lindm_admin_v1_advisories_proto_depIdxs = []int32{
 	14, // 15: lindm.admin.v1.AdvisoryFeedStatus.attempted_at:type_name -> google.protobuf.Timestamp
 	15, // 16: lindm.admin.v1.AdvisoryFeedStatus.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
 	14, // 17: lindm.admin.v1.AdvisoryFeedStatus.snapshot_at:type_name -> google.protobuf.Timestamp
-	10, // 18: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
-	14, // 19: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 20: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
-	21, // [21:21] is the sub-list for method output_type
-	21, // [21:21] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	16, // 18: lindm.admin.v1.AdvisoryFeedStatus.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	10, // 19: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
+	14, // 20: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 21: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
+	22, // [22:22] is the sub-list for method output_type
+	22, // [22:22] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_advisories_proto_init() }

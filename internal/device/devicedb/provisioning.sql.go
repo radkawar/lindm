@@ -273,7 +273,13 @@ func (q *Queries) ListPendingProvisioningEnrollments(ctx context.Context, arg Li
 }
 
 const listProvisioningTokens = `-- name: ListProvisioningTokens :many
-SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason FROM provisioning_tokens WHERE id > $1 ORDER BY id LIMIT $2
+SELECT t.id, t.created_by, t.created_at, t.expires_at, t.max_uses,
+    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at,
+    coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name
+FROM provisioning_tokens t
+LEFT JOIN principals creator ON creator.id = t.created_by
+LEFT JOIN local_accounts account ON account.id = creator.id
+WHERE t.id > $1::uuid ORDER BY t.id LIMIT $2
 `
 
 type ListProvisioningTokensParams struct {
@@ -281,20 +287,32 @@ type ListProvisioningTokensParams struct {
 	RowLimit int32
 }
 
-func (q *Queries) ListProvisioningTokens(ctx context.Context, arg ListProvisioningTokensParams) ([]ProvisioningToken, error) {
+type ListProvisioningTokensRow struct {
+	ID                 uuid.UUID
+	CreatedBy          uuid.UUID
+	CreatedAt          pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+	MaxUses            int32
+	UsedCount          int32
+	ApprovalRequired   bool
+	Assignment         []byte
+	Reason             string
+	RevokedAt          pgtype.Timestamptz
+	CreatorDisplayName string
+}
+
+func (q *Queries) ListProvisioningTokens(ctx context.Context, arg ListProvisioningTokensParams) ([]ListProvisioningTokensRow, error) {
 	rows, err := q.db.Query(ctx, listProvisioningTokens, arg.AfterID, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ProvisioningToken{}
+	items := []ListProvisioningTokensRow{}
 	for rows.Next() {
-		var i ProvisioningToken
+		var i ListProvisioningTokensRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.TokenHash,
 			&i.CreatedBy,
-			&i.AuthorizationVersion,
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.MaxUses,
@@ -303,8 +321,7 @@ func (q *Queries) ListProvisioningTokens(ctx context.Context, arg ListProvisioni
 			&i.Assignment,
 			&i.Reason,
 			&i.RevokedAt,
-			&i.RevokedBy,
-			&i.RevokeReason,
+			&i.CreatorDisplayName,
 		); err != nil {
 			return nil, err
 		}

@@ -500,7 +500,7 @@ export function DeviceDetailView({
                     )}
                   </CardContent>
                 </Card>
-                <DeviceNativeDetails details={host?.details} />
+                <DeviceNativeDetails details={host?.details} osId={host?.osId} />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Card>
                     <CardHeader>

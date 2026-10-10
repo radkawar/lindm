@@ -5,9 +5,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 	"net/http"
 	"net/url"
@@ -189,15 +192,15 @@ func vendorChecksum(raw []byte, location string) ([]byte, error) {
 	return digest, nil
 }
 
-// fetchSignedCSAF always requires both vendor proofs, including on HTTPS mirrors.
-// Three logical requests, each with at most four redirects, share one deadline.
+// fetchSignedCSAF retains bounded SUSE acquisition; large RHEL originals use
+// consumeSignedCSAF. Both vendor proofs remain mandatory on HTTPS mirrors.
 func (c *Client) fetchSignedCSAF(ctx context.Context, config *advisoryv1.FeedSource) ([]byte, *advisoryv1.FeedArtifact, time.Time, error) {
 	fingerprint, err := signedPublisher(config)
 	if err != nil {
 		return nil, nil, time.Time{}, err
 	}
-	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
-		return nil, nil, time.Time{}, errors.New("feed: archive source requires archive acquisition")
+	if config.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF {
+		return nil, nil, time.Time{}, errors.New("feed: non-SUSE source requires streaming acquisition")
 	}
 	u, err := signedArtifactURL(config.GetUrl())
 	if err != nil {
@@ -229,6 +232,69 @@ func (c *Client) fetchSignedCSAF(ctx context.Context, config *advisoryv1.FeedSou
 		return nil, nil, time.Time{}, err
 	}
 	return raw, &advisoryv1.FeedArtifact{Url: location, Sha256: digest[:], SignerFingerprint: signer}, signedAt, nil
+}
+
+// consumeSignedCSAF stages a large RHEL document without retaining its original
+// bytes in memory. The parser receives the same file only after both vendor
+// proofs and any configured digest pin have authenticated the entire payload.
+func (c *Client) consumeSignedCSAF(ctx context.Context, config *advisoryv1.FeedSource, consume func(*os.File) error) (artifact *advisoryv1.FeedArtifact, signedAt time.Time, err error) {
+	fingerprint, err := signedPublisher(config)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if config.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || consume == nil {
+		return nil, time.Time{}, errors.New("feed: Red Hat CSAF source and consumer required")
+	}
+	u, err := signedArtifactURL(config.GetUrl())
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if !strings.HasSuffix(u.Path, ".json") {
+		return nil, time.Time{}, errors.New("feed: signed CSAF URL must name a JSON document")
+	}
+	location := u.String()
+	checksum, signature, err := c.fetchVendorProofs(ctx, location)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	file, err := os.CreateTemp("", "lindm-feed-csaf-*")
+	if err != nil {
+		return nil, time.Time{}, fmt.Errorf("feed: stage CSAF: %w", err)
+	}
+	defer func() {
+		err = errors.Join(err, file.Close(), os.Remove(file.Name()))
+		if err != nil {
+			artifact = nil
+			signedAt = time.Time{}
+		}
+	}()
+	digest, err := c.downloadArchive(ctx, location, file, redHatRecordBytes)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if !bytes.Equal(digest, checksum) {
+		return nil, time.Time{}, errors.New("feed: vendor CSAF checksum mismatch")
+	}
+	if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
+		return nil, time.Time{}, errors.New("feed: source checksum mismatch")
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, time.Time{}, fmt.Errorf("feed: rewind signed CSAF: %w", err)
+	}
+	signer, signedAt, err := c.signedTrust.verify(ctx, fingerprint, file, signature, time.Now())
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, time.Time{}, fmt.Errorf("feed: rewind verified CSAF: %w", err)
+	}
+	if err := consume(file); err != nil {
+		return nil, time.Time{}, fmt.Errorf("feed: parse verified CSAF: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, time.Time{}, err
+	}
+	return &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}, signedAt, nil
 }
 
 func signedArtifactURL(location string) (*url.URL, error) {
@@ -344,7 +410,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 			signedAt = time.Time{}
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, location, file)
+	digest, err := c.downloadArchive(ctx, location, file, maxArchiveBytes)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -370,7 +436,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 	return &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}, signedAt, nil
 }
 
-func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File) (digest []byte, err error) {
+func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File, bound int64) (digest []byte, err error) {
 	u, err := signedArtifactURL(location)
 	if err != nil {
 		return nil, err
@@ -394,14 +460,39 @@ func (c *Client) downloadArchive(ctx context.Context, location string, file *os.
 	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
 		return nil, errors.New("feed: unsupported archive HTTP content encoding")
 	}
-	if resp.ContentLength > maxArchiveBytes {
+	if resp.ContentLength > bound {
 		return nil, errors.New("feed: compressed archive byte limit exceeded")
 	}
-	hash := sha256.New()
-	if err := copyArchive(ctx, io.MultiWriter(file, hash), resp.Body, maxArchiveBytes); err != nil {
+	digestHasher := sha256.New()
+	destination := io.MultiWriter(file, digestHasher)
+	var expectedCRC []byte
+	for _, header := range resp.Header.Values("X-Goog-Hash") {
+		for _, value := range strings.Split(header, ",") {
+			if encoded, found := strings.CutPrefix(strings.TrimSpace(value), "crc32c="); found {
+				if expectedCRC != nil {
+					return nil, errors.New("feed: duplicate archive CRC32C")
+				}
+				expectedCRC, err = base64.StdEncoding.Strict().DecodeString(encoded)
+				if err != nil || len(expectedCRC) != 4 {
+					return nil, errors.New("feed: invalid archive CRC32C")
+				}
+			}
+		}
+	}
+	var checksum hash.Hash32
+	if expectedCRC != nil {
+		checksum = crc32.New(crc32.MakeTable(crc32.Castagnoli))
+		destination = io.MultiWriter(destination, checksum)
+	}
+	if err := copyArchive(ctx, destination, resp.Body, bound); err != nil {
 		return nil, err
 	}
-	return hash.Sum(nil), nil
+	// GCS transfer integrity is additional to TLS and an operator SHA-256 pin,
+	// never a substitute for a publisher signature.
+	if expectedCRC != nil && !bytes.Equal(expectedCRC, checksum.Sum(nil)) {
+		return nil, errors.New("feed: archive CRC32C mismatch")
+	}
+	return digestHasher.Sum(nil), nil
 }
 
 // copyArchive writes no more than bound bytes to disk, probing just one further

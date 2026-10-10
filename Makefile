@@ -87,3 +87,23 @@ dev-check:
 
 dev-trust:
 	go run ./cmd/dev trust
+
+.PHONY: acceptance check-web acceptance-build browser-baseline
+ACCEPTANCE_EVIDENCE ?= $(CURDIR)/artifacts/acceptance-$(shell date -u +%Y%m%dT%H%M%SZ)
+ACCEPTANCE_FLAGS ?=
+BROWSER_BASELINE_RECORD ?= $(CURDIR)/artifacts/browser-baseline-$(shell date -u +%Y%m%dT%H%M%SZ).json
+
+acceptance-build: web-assets
+	go build -trimpath -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0' -o artifacts/bin/lindmd ./cmd/lindmd
+	CGO_ENABLED=0 go build -trimpath -o artifacts/bin/lab ./cmd/lab
+
+# Browser drivers are explicit prerequisites, never silently substituted engines.
+browser-baseline:
+	go run ./cmd/lab hosts baseline-browser -record "$(BROWSER_BASELINE_RECORD)"
+	./node_modules/.bin/playwright install chromium
+
+check-web: acceptance-build
+	artifacts/bin/lab acceptance -web-only -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
+
+acceptance: acceptance-build
+	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)

@@ -1,0 +1,113 @@
+{
+  "list_sessions": {
+    "command": [
+      "busctl",
+      "--system",
+      "--json=short",
+      "--timeout=5s",
+      "--auto-start=no",
+      "call",
+      "org.freedesktop.login1",
+      "/org/freedesktop/login1",
+      "org.freedesktop.login1.Manager",
+      "ListSessions"
+    ],
+    "stdout": "{\"type\":\"a(susso)\",\"data\":[[[\"1\",1000,\"lindm-lab\",\"\",\"/org/freedesktop/login1/session/_31\"],[\"2\",1000,\"lindm-lab\",\"\",\"/org/freedesktop/login1/session/_32\"]]]}\n",
+    "stderr": "",
+    "exit_code": 0
+  },
+  "active_sessions": [
+    {
+      "busctl": {
+        "command": [
+          "busctl",
+          "--system",
+          "--json=short",
+          "--timeout=5s",
+          "--auto-start=no",
+          "call",
+          "org.freedesktop.login1",
+          "/org/freedesktop/login1/session/_31",
+          "org.freedesktop.DBus.Properties",
+          "GetAll",
+          "s",
+          "org.freedesktop.login1.Session"
+        ],
+        "stdout": "{\"type\":\"a{sv}\",\"data\":[{\"Id\":{\"type\":\"s\",\"data\":\"1\"},\"User\":{\"type\":\"(uo)\",\"data\":[1000,\"/org/freedesktop/login1/user/_1000\"]},\"Name\":{\"type\":\"s\",\"data\":\"lindm-lab\"},\"Timestamp\":{\"type\":\"t\",\"data\":1791640563486343},\"TimestampMonotonic\":{\"type\":\"t\",\"data\":7151728},\"VTNr\":{\"type\":\"u\",\"data\":0},\"Seat\":{\"type\":\"(so)\",\"data\":[\"\",\"/\"]},\"TTY\":{\"type\":\"s\",\"data\":\"\"},\"Display\":{\"type\":\"s\",\"data\":\"\"},\"Remote\":{\"type\":\"b\",\"data\":true},\"RemoteHost\":{\"type\":\"s\",\"data\":\"10.0.2.2\"},\"RemoteUser\":{\"type\":\"s\",\"data\":\"\"},\"Service\":{\"type\":\"s\",\"data\":\"sshd\"},\"Desktop\":{\"type\":\"s\",\"data\":\"\"},\"Scope\":{\"type\":\"s\",\"data\":\"session-1.scope\"},\"Leader\":{\"type\":\"u\",\"data\":1094},\"LeaderPIDFDId\":{\"type\":\"t\",\"data\":1095},\"Audit\":{\"type\":\"u\",\"data\":1},\"Type\":{\"type\":\"s\",\"data\":\"tty\"},\"Class\":{\"type\":\"s\",\"data\":\"user\"},\"Active\":{\"type\":\"b\",\"data\":true},\"State\":{\"type\":\"s\",\"data\":\"active\"},\"IdleHint\":{\"type\":\"b\",\"data\":false},\"IdleSinceHint\":{\"type\":\"t\",\"data\":0},\"IdleSinceHintMonotonic\":{\"type\":\"t\",\"data\":0},\"CanIdle\":{\"type\":\"b\",\"data\":true},\"CanLock\":{\"type\":\"b\",\"data\":true},\"LockedHint\":{\"type\":\"b\",\"data\":false}}]}\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      "loginctl": {
+        "command": [
+          "loginctl",
+          "show-session",
+          "--all",
+          "--no-pager",
+          "-p",
+          "Active",
+          "-p",
+          "Name",
+          "-p",
+          "Class",
+          "-p",
+          "Type",
+          "-p",
+          "Seat",
+          "-p",
+          "Remote",
+          "--",
+          "1"
+        ],
+        "stdout": "Name=lindm-lab\nSeat=\nRemote=yes\nType=tty\nClass=user\nActive=yes\n",
+        "stderr": "",
+        "exit_code": 0
+      }
+    },
+    {
+      "busctl": {
+        "command": [
+          "busctl",
+          "--system",
+          "--json=short",
+          "--timeout=5s",
+          "--auto-start=no",
+          "call",
+          "org.freedesktop.login1",
+          "/org/freedesktop/login1/session/_32",
+          "org.freedesktop.DBus.Properties",
+          "GetAll",
+          "s",
+          "org.freedesktop.login1.Session"
+        ],
+        "stdout": "{\"type\":\"a{sv}\",\"data\":[{\"Id\":{\"type\":\"s\",\"data\":\"2\"},\"User\":{\"type\":\"(uo)\",\"data\":[1000,\"/org/freedesktop/login1/user/_1000\"]},\"Name\":{\"type\":\"s\",\"data\":\"lindm-lab\"},\"Timestamp\":{\"type\":\"t\",\"data\":1791640563505327},\"TimestampMonotonic\":{\"type\":\"t\",\"data\":7170712},\"VTNr\":{\"type\":\"u\",\"data\":0},\"Seat\":{\"type\":\"(so)\",\"data\":[\"\",\"/\"]},\"TTY\":{\"type\":\"s\",\"data\":\"\"},\"Display\":{\"type\":\"s\",\"data\":\"\"},\"Remote\":{\"type\":\"b\",\"data\":false},\"RemoteHost\":{\"type\":\"s\",\"data\":\"\"},\"RemoteUser\":{\"type\":\"s\",\"data\":\"\"},\"Service\":{\"type\":\"s\",\"data\":\"systemd-user\"},\"Desktop\":{\"type\":\"s\",\"data\":\"\"},\"Scope\":{\"type\":\"s\",\"data\":\"\"},\"Leader\":{\"type\":\"u\",\"data\":1157},\"LeaderPIDFDId\":{\"type\":\"t\",\"data\":1158},\"Audit\":{\"type\":\"u\",\"data\":2},\"Type\":{\"type\":\"s\",\"data\":\"unspecified\"},\"Class\":{\"type\":\"s\",\"data\":\"manager\"},\"Active\":{\"type\":\"b\",\"data\":true},\"State\":{\"type\":\"s\",\"data\":\"active\"},\"IdleHint\":{\"type\":\"b\",\"data\":false},\"IdleSinceHint\":{\"type\":\"t\",\"data\":0},\"IdleSinceHintMonotonic\":{\"type\":\"t\",\"data\":0},\"CanIdle\":{\"type\":\"b\",\"data\":false},\"CanLock\":{\"type\":\"b\",\"data\":false},\"LockedHint\":{\"type\":\"b\",\"data\":false}}]}\n",
+        "stderr": "",
+        "exit_code": 0
+      },
+      "loginctl": {
+        "command": [
+          "loginctl",
+          "show-session",
+          "--all",
+          "--no-pager",
+          "-p",
+          "Active",
+          "-p",
+          "Name",
+          "-p",
+          "Class",
+          "-p",
+          "Type",
+          "-p",
+          "Seat",
+          "-p",
+          "Remote",
+          "--",
+          "2"
+        ],
+        "stdout": "Name=lindm-lab\nSeat=\nRemote=no\nType=unspecified\nClass=manager\nActive=yes\n",
+        "stderr": "",
+        "exit_code": 0
+      }
+    }
+  ]
+}

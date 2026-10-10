@@ -58,6 +58,7 @@ message ProvisioningToken {
   DeviceMetadata metadata = 10;
   repeated string group_ids = 11;
   repeated string profile_revision_ids = 12;
+  string creator_display_name = 13;
 }
 message ListProvisioningTokensRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];

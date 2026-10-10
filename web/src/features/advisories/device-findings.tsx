@@ -58,7 +58,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           >
             {state}
           </StatusBadge>
-          {freshness?.reason ? ` (${freshness.reason})` : ""}
+          {freshness?.reason ? ` (${freshness.reason.replaceAll("_", " ")})` : ""}
         </p>
         {!current ? (
           <p className="border bg-muted/30 p-3 text-sm">
@@ -113,11 +113,13 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             finding.state === AdvisoryFindingState.ACCEPTED &&
             unexpired(finding.exception?.expiresAt, now);
           const label =
-            !current || freshness?.state === AdvisoryFindingState.UNKNOWN
-              ? "Unknown"
-              : finding.state === AdvisoryFindingState.ACCEPTED && !accepted
-                ? "Affected (acceptance expired)"
-                : findingStateLabel(finding.state);
+            finding.reason === "source_record_rejected"
+              ? "Unknown (source record rejected)"
+              : !current || freshness?.state === AdvisoryFindingState.UNKNOWN
+                ? "Unknown"
+                : finding.state === AdvisoryFindingState.ACCEPTED && !accepted
+                  ? "Affected (acceptance expired)"
+                  : findingStateLabel(finding.state);
           return (
             <article key={finding.id} className="grid min-w-0 gap-4 border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -185,7 +187,8 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                   </p>
                 </div>
               ) : null}
-              {canPermission(principal, "advisory_exceptions.manage") ? (
+              {finding.reason !== "source_record_rejected" &&
+              canPermission(principal, "advisory_exceptions.manage") ? (
                 <details>
                   <summary className="cursor-pointer font-medium">
                     Record time-limited risk acceptance

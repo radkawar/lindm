@@ -171,7 +171,7 @@ func loadOSRelease(ctx context.Context, readFile func(string) ([]byte, error)) (
 	return parseOSRelease(data)
 }
 
-func collectHost(ctx context.Context, readFile func(string) ([]byte, error)) (*inventoryv1.HostObservation, map[string]string) {
+func collectHost(ctx context.Context, readFile func(string) ([]byte, error), rootObservation bool) (*inventoryv1.HostObservation, map[string]string) {
 	host := &inventoryv1.HostObservation{StartedAt: timestamppb.Now()}
 	release, releaseErr := loadOSRelease(ctx, readFile)
 	host.OsId = observed(release["ID"], releaseErr)
@@ -200,7 +200,11 @@ func collectHost(ctx context.Context, readFile func(string) ([]byte, error)) (*i
 	host.KernelRelease = observed(utsString(uts.Release[:]), err)
 	host.HardwareVendor = observedFile(ctx, readFile, "/sys/class/dmi/id/sys_vendor")
 	host.HardwareModel = observedFile(ctx, readFile, "/sys/class/dmi/id/product_name")
-	host.HardwareSerial = observedFile(ctx, readFile, "/sys/class/dmi/id/product_serial")
+	if rootObservation {
+		host.HardwareSerial = &inventoryv1.ObservedString{Status: unavailable}
+	} else {
+		host.HardwareSerial = observedFile(ctx, readFile, "/sys/class/dmi/id/product_serial")
+	}
 	host.FinishedAt = timestamppb.Now()
 	return host, release
 }

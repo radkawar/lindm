@@ -31,5 +31,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Acceptance imports the actual loaded auth client for an invalid-request
+    // origin-policy probe; preserve its named exports without a test-only API.
+    rolldownOptions: {
+      output: { minifyInternalExports: false },
+    },
   },
 });

@@ -111,6 +111,73 @@ Software keys are reported as software keys. No TPM assurance is inferred from a
 machine having `/dev/tpm*`; TPM/non-exportability claims require their separate
 provider and physical qualification.
 
+### Enrollment history and onboarding instructions
+
+`ListEnrollmentGrants` accepts bounded `page_size` (at most 200) and `page_token`
+and returns `grants` and `next_page_token`. Follow the returned cursor rather than
+inferring that the first page is the complete history. Each grant exposes its ID,
+creation/expiry times, creator principal ID and current creator display name,
+maximum/used counts, and typed `ACTIVE`, `CONSUMED`, `EXPIRED` or `REVOKED` status.
+Consumed grants also project the current device ID, hostname and labels. Labels
+are a string list from the device, not a key/value map or fixed grant assignment.
+Consumed takes precedence over revoked and expired; otherwise revoked takes
+precedence over expired. Historical consumption is not a claim that the resulting
+device still has authority. An unconsumed grant has no device projection.
+
+`ListProvisioningTokens` retains its bounded cursor pagination and includes the
+creator's current display name alongside the stable `created_by` principal ID.
+Names prefer the principal display name, with local username fallback; they are
+display context, never authority. Renames do not change credential ownership.
+Token metadata retains use counts, expiry, revocation and fixed assignments.
+Neither list exposes the bearer credential or its persisted hash. Issuance remains
+the only secret delivery opportunity; reading history cannot recover a lost secret.
+
+Enrollment metadata and `GetEnrollmentInstructions` require unrestricted
+`manage_enrollment` authority, freshly checked against persisted authorization.
+A principal scoped even to the consumed device is denied, not given a partial
+credential list. Fleet-read permission alone is insufficient. These reads do not
+weaken the existing global enrollment-management boundary.
+
+`GetEnrollmentInstructions` takes an empty request and returns deployment-owned
+onboarding metadata: `enrollment_origin`, optional `device_origin`,
+`execution_root_url` and `bootstrap_bundle_url`, and optional `apt_repository`
+and `dnf_repository` records. Both repository records contain `base_url`,
+`signing_key_url` and `signing_key_fingerprint`; APT additionally supplies `suite`
+and `components`. Missing optional fields mean not configured, not permission to
+guess a repository, trust download or endpoint from the console URL. Instructions
+are not executable authority, and this response contains no enrollment secret.
+The response also supplies `grant_command`, `provisioning_command` and
+`resume_command` templates for the installed agent. The grant template reads
+`/run/lindm-enrollment/grant`; the provisioning template reads
+`/etc/lindm/provisioning-token`. Both use the protected root and bundle paths shown
+below. The resume template waits at most 3600 seconds. These templates contain
+file paths, never bearer values, and do not establish that prerequisites exist.
+
+Configured public bootstrap resources are served by unauthenticated GET/HEAD at
+`public_url` plus `/bootstrap/execution-root.json` and
+`/bootstrap/bootstrap.dsse.json`, not by a general directory server. Independently
+authenticate the execution root before using it; downloading a root does not
+establish its trust. The bootstrap bundle remains the existing signed DSSE
+document and must verify against that authenticated root. Native package
+installation must verify the repository signing key fingerprint; DNF requires
+signed repository metadata as well as signed packages.
+
+After verified package installation and protected placement of the authenticated
+deployment material, the one-time grant path is:
+
+```sh
+/usr/libexec/lindm/lindm-agent bootstrap \
+  -root /etc/lindm/execution-root.json \
+  -bundle /etc/lindm/bootstrap.dsse.json \
+  -grant /run/lindm-enrollment/grant
+```
+
+Keep the grant file root-only; `-grant -` accepts protected standard input.
+Never substitute a bearer value into the command line or environment.
+Unattended enrollment instead uses `-provisioning-token-file FILE` as below;
+that flag does not accept standard input. Missing deployment onboarding settings
+must remain visible to the operator rather than producing fabricated commands.
+
 ### Unattended enrollment and approval
 
 Create a provisioning token in Enrollment with a bounded lifetime/use count and

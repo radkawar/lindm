@@ -123,6 +123,8 @@ func TestResolveBlockIdentityCanonicalizesOnlyNativeSerialPadding(t *testing.T) 
 		fail   bool
 	}{
 		{"NVMe padding", "serial      ", sysfsBlockIdentity{WWID: sysfsIdentityValue{Value: "eui.0011223344556677"}, Serial: sysfsIdentityValue{Value: "serial"}}, "serial", false},
+		{"virtio block serial", "", sysfsBlockIdentity{BlockSerial: sysfsIdentityValue{Value: "virtio-serial"}}, "virtio-serial", false},
+		{"conflicting virtio serial", "", sysfsBlockIdentity{BlockSerial: sysfsIdentityValue{Value: "virtio-serial"}, Serial: sysfsIdentityValue{Value: "other"}}, "", true},
 		{"without native evidence", "serial      ", sysfsBlockIdentity{}, "serial      ", false},
 		{"leading space", " serial", sysfsBlockIdentity{WWID: sysfsIdentityValue{Value: "eui.0011223344556677"}, Serial: sysfsIdentityValue{Value: "serial"}}, "", true},
 		{"tab", "serial\t", sysfsBlockIdentity{WWID: sysfsIdentityValue{Value: "eui.0011223344556677"}, Serial: sysfsIdentityValue{Value: "serial"}}, "", true},
@@ -170,5 +172,21 @@ func TestNativeBlockIdentityMustRemainPresentAfterDescriptorPin(t *testing.T) {
 				t.Fatal("state disk substituted for pinned approved target")
 			}
 		})
+	}
+}
+
+func TestReadVirtioSerialFromBlockDevice(t *testing.T) {
+	identity := readSysfsBlockIdentity("252:0", func(path string) ([]byte, error) {
+		if path == "/sys/dev/block/252:0/serial" {
+			return []byte("lindm-demo-encrypted\n"), nil
+		}
+		return nil, os.ErrNotExist
+	})
+	node := blockNode{}
+	if reason := resolveBlockIdentity(&node, identity); reason != "" || node.Serial != "lindm-demo-encrypted" || !absentNativeWWN(identity) {
+		t.Fatalf("virtio identity unavailable: %q %+v", reason, identity)
+	}
+	if !sameNativeBlockIdentity(node, identity) || sameNativeBlockIdentity(node, sysfsBlockIdentity{}) {
+		t.Fatal("pinned virtio serial was not rechecked")
 	}
 }

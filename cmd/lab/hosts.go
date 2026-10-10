@@ -21,11 +21,14 @@ import (
 )
 
 func runHosts(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) > 0 && args[0] == "baseline-browser" {
+		return runBrowserBaseline(ctx, args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "baseline" {
 		return runHostsBaseline(ctx, args[1:], stdout, stderr)
 	}
 	if len(args) != 0 {
-		return errors.New("usage: lab hosts; lab hosts baseline -host NAME [-record NEW_FILE]")
+		return errors.New("usage: lab hosts; lab hosts baseline -host NAME [-record NEW_FILE]; lab hosts baseline-browser [-host NAME] [-record NEW_FILE]")
 	}
 	cfg, err := labhost.Load()
 	if err != nil {

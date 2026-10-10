@@ -1,0 +1,9 @@
+dnf5-5.4.1.0-1.fc44.aarch64
+libdnf5-5.4.1.0-1.fc44.aarch64
+libdnf5-cli-5.4.1.0-1.fc44.aarch64
+python3-3.14.3-2.fc44.aarch64
+python3-libdnf5-5.4.1.0-1.fc44.aarch64
+python3-dnf-4.24.0-3.fc44.noarch
+python3-rpm-6.0.1-2.fc44.aarch64
+fedora-release-common-44-17.noarch
+fedora-repos-44-1.noarch

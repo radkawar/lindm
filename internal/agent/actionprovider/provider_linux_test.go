@@ -48,7 +48,7 @@ func newLUKSFixture(t *testing.T) *luksFixture {
 		t.Fatal(err)
 	}
 	f := &luksFixture{keys: map[string][]byte{"0": []byte("owner-recovery"), "1": []byte("previous-managed")}, tokens: map[string]luksToken{"0": {Type: "lindm-recovery", Keyslots: []string{"1"}, KeySHA256: strings.Repeat("a", 64), ActionID: "5639f53d-6105-478f-aaf1-347268bb22a2"}}}
-	target := &agentv1.StorageTarget{LuksUuid: fixtureLUKS, Wwn: "0x5000000000000001", Serial: "qualified-test-medium", SizeBytes: 64 << 20}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: fixtureLUKS, Wwn: "0x5000000000000001", Serial: "qualified-test-medium", SizeBytes: 64 << 20}
 	qualified := &agentv1.QualifiedActionTarget{Target: target, OwnerRecoveryKeyslot: 0, AllowRecoveryRotation: true}
 	f.p = &Provider{config: &agentv1.DeviceActionProviderConfig{Targets: []*agentv1.QualifiedActionTarget{qualified}}, validate: validator, gate: make(chan struct{}, 1), clock: func() time.Time { return time.Unix(1800000000, 0) }}
 	path := filepath.Join(t.TempDir(), "non-native-test-target")

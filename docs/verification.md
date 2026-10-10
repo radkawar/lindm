@@ -152,6 +152,79 @@ not public attachments. These unregistered image captures report no configured
 release lock and successful empty enabled-repository observations; they do not
 establish authenticated repository access or EUS/E4S stream provenance.
 
+DNF5 configuration qualification adds a separate real Fedora 44 Cloud 44-1.7
+aarch64 capture on dgx20 KVM, under its four-slot native lease admission. The
+signed image is pinned in `lab/images/fedora-44-aarch64.json`; exact commands,
+firmware, package versions, helper digest and fixture digests are in
+`internal/agent/inventory/testdata/dnf5-fedora44/provenance.json`. No packages were
+installed. DNF5, libdnf5 and python3-libdnf5 are `5.4.1.0-1.fc44`; python3-dnf4
+is also installed, so import availability is not manager selection.
+Supported bindings report effective releasever `44`, no explicit release lock,
+and successful `fedora`, `fedora-cisco-openh264`, `updates` configurations with
+signature checks and Fedora44 ARM key paths. Metadata-free native CLI JSON agrees;
+URL userinfo, queries and fragments are omitted with a redaction flag.
+
+Reproduce the opt-in fixture lane with
+`go test -tags=integration,dnfcapture -c ./internal/vmlab`, the manifest/output
+environment variables documented in `vm_dnf_integration_test.go`, and the exact
+executing host/EFI pins. The ordinary integration suite does not require these
+capture inputs. Full dnf/inventory/vmlab race suites and frontend typecheck passed.
+The subsequent full Fedora44 aarch64 `lab vm inspect` **passed**, independently
+matching all 420 native RPM records and every current native detail. Repositories
+and effective releasever are `SUCCESS`, with all three enabled configurations
+matching independent metadata-free CLI evidence. Under
+`~/.cache/lindm-dnf5-20261010/`, `fedora44-inspect-readiness.json` has SHA-256
+`24d20334344f8229c4fc975af52d53e0df93165f1d37d2d1c21f36512a4ae1af`;
+private raw `fedora44-native-readiness.json` has SHA-256
+`e63e99a41be9a332d26a6b22a7f4e67f833026973bae49d211d21790b57799ba`.
+The executed guest agent SHA-256 is
+`c19a492fd8949b6e4231d4925f4210d616319cadc39cbd85f74b1494c83ae8be`.
+This is dgx20 native aarch64 KVM with QEMU 8.2.2 and pinned AAVMF
+`2024.02-2ubuntu0.10`, virtio storage, UEFI SetupMode, Secure Boot disabled and
+no TPM—not physical hardware or desktop certification.
+
+Earlier failed gates were fixed rather than excused: `vm inspect` now invokes the
+agent as root like the production executor; standalone `inspect` retains caller
+privilege. ARM CPU model is successful `virt-8.2` with source `smbios_type4`;
+captured native MIDR `0x41/0xd85` is the lower-priority Cortex-X925 evidence.
+The bounded executor projects CPU evidence with existing boot/freshness fences.
+Captured manager/unspecified/local and user/tty/remote sessions have no seats,
+and now carry schema-validated per-session `NOT_APPLICABLE`; a missing local
+graphical seat still fails. CPU/session fixtures and provenance are under
+`internal/agent/inventory/testdata/{cpu,sessions}-fedora44-aarch64`.
+The independent storage oracle now preserves `/` among Btrfs `MOUNTPOINTS`
+instead of mistaking a later `/var` mount for the whole topology.
+
+The same final native lane also **passed RHEL9.8 x86_64**, independently matching
+all 490 RPM records. DNF4 repository/CPE/effective releasever observations are
+`SUCCESS`: effective releasever is `9`, explicit lock is absent, and enabled
+repositories are truthfully empty on this unregistered image. Record
+`rhel98-inspect-readiness.json` has SHA-256
+`43933f4c4059439c502bdb461f2ec1a9b2ac5fe5c8aa21a14ceba094cdcb3000`;
+private raw `rhel98-native-readiness.json` has SHA-256
+`570a91b99cf307db437f5bc59499991c99175e245e9511fa8b5b61837ac40043`.
+Executed x86_64 agent SHA-256 is
+`c01aa4cf516941574890ca3948cd93002b45105d2af69871cf53dc83aedfd1da`;
+the final local `lab-readiness` SHA-256 is
+`c7f4a2778633da207518c3db88cc951a4ced45feac2637ac7d3a7de3678b1535`.
+This RHEL run used local KVM, SeaBIOS, virtio storage and no TPM.
+
+Both final records include native startup proof: systemd `degraded` is settled
+startup, not all-services-health, and NetworkManager startup is `complete`.
+RHEL's proof spans `14:16:45.573515705Z`–`14:16:48.942977329Z` on 2026-10-10;
+Fedora's spans `14:19:09.706719760Z`–`14:19:09.720151061Z`.
+Earlier RHEL attempts straddled an IPv6 router advertisement and correctly gave
+no verdict. Bounded `systemctl is-system-running --wait` plus native
+`nm-online -s -q` completed before the final before/agent/after samples;
+no network exception or re-sampling fallback was needed. Local admission stayed
+at maximum three guests; no owner's demo VM was stopped and no lease bypassed.
+Successful records publish only after owned guest cleanup.
+
+Current dnf/inventory/executor/transport/spool/device/vmlab/agent race suites and
+web typecheck passed; the later readiness and multi-mount changes also passed the
+vmlab race suite. These are inventory/configuration results, not DNF5 package
+transaction, entitlement, desktop, physical-machine or whole-family certification.
+
 | Family / branch                           | Build priority      | Native host acceptance                                                     | Architecture scope                      |
 | ----------------------------------------- | ------------------- | -------------------------------------------------------------------------- | --------------------------------------- |
 | Ubuntu 24.04 and 26.04 LTS                | 1 (major releases)  | Official GNOME Desktop and Server/minimal; Kubuntu/KDE separately          | x86_64 desktop/server; aarch64 server   |
@@ -226,7 +299,10 @@ IPv4/IPv6 default routes and active-session properties. The agent already emitte
 these fields; the old independent oracle omitted them and correctly failed strict
 comparison. The replacement oracle uses iproute2 netlink JSON and `loginctl`
 properties, independently of the production proc-table and `busctl` parsers.
-Parser regressions were added; their unit/race execution is not claimed here.
+Shared-tree `go build ./...`, default and integration-tagged golangci lint on
+`internal/labhost` and `internal/vmlab`, scoped golangci formatting, both packages'
+race tests, and touched Markdown Prettier/markdownlint passed after these fixes.
+The vmlab race result was cached; no new full-repository integration claim is made.
 
 The corrected record in `~/.cache/lindm-mutabledistros3-20261010/` is
 `debian13-arm64-dgx20-inspect-complete-oracle.json`, SHA-256
@@ -274,12 +350,18 @@ does not qualify the remaining native lifecycle/dispatch cells.
 Additional completed native ARM records in the same directory use source `d303cec`
 and the exact `8c30afa7…` lab-only delta above, one `dgx20` KVM guest at a time:
 
-| Distro / lane       | Observed result                                                                                                                                                                                                                                    | Record / SHA-256                                                                                           |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Debian 13 dispatch  | Passed nine native scenarios; periodic compliant recheck and drift remediation used real five-minute intervals, ±90-second guest clocks and final revoked-device denial. Unstarted supersession remains integration-only, not a tenth native claim | `debian13-arm64-dgx20-dispatch.json` / `0973b1cf434265359808e6553f4c0766a29042c03e788ebe29996e7cf18376a0`  |
-| Debian 12 inspect   | Passed 361 native package identities and independent detail comparison                                                                                                                                                                             | `debian12-arm64-dgx20-inspect.json` / `5b872dedd2a611d7f6847b15cdacad6a0a941dd0d12c99c21ff6df7bea62bcc2`   |
-| Debian 12 lifecycle | Passed complete signed 0.7.0→0.7.1 automatic-trust lifecycle; five 362-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation and missing-journal hold                                                               | `debian12-arm64-dgx20-lifecycle.json` / `1bda2586f58dee2764b8ca69e20cf99883412ad01e9414d540d5579d0af8d95a` |
-| Debian 12 dispatch  | Passed the same nine native scenarios with real periodic intervals and final revoked-device denial; unstarted supersession explicitly integration-only                                                                                             | `debian12-arm64-dgx20-dispatch.json` / `f29b8cdf4d4342c66e3928cc2d9ff5416fb1b92f243601e01682319376c7a8b0`  |
+| Distro / lane        | Observed result                                                                                                                                                                                                                                    | Record / SHA-256                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Debian 13 dispatch   | Passed nine native scenarios; periodic compliant recheck and drift remediation used real five-minute intervals, ±90-second guest clocks and final revoked-device denial. Unstarted supersession remains integration-only, not a tenth native claim | `debian13-arm64-dgx20-dispatch.json` / `0973b1cf434265359808e6553f4c0766a29042c03e788ebe29996e7cf18376a0`  |
+| Debian 12 inspect    | Passed 361 native package identities and independent detail comparison                                                                                                                                                                             | `debian12-arm64-dgx20-inspect.json` / `5b872dedd2a611d7f6847b15cdacad6a0a941dd0d12c99c21ff6df7bea62bcc2`   |
+| Debian 12 lifecycle  | Passed complete signed 0.7.0→0.7.1 automatic-trust lifecycle; five 362-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation and missing-journal hold                                                               | `debian12-arm64-dgx20-lifecycle.json` / `1bda2586f58dee2764b8ca69e20cf99883412ad01e9414d540d5579d0af8d95a` |
+| Debian 12 dispatch   | Passed the same nine native scenarios with real periodic intervals and final revoked-device denial; unstarted supersession explicitly integration-only                                                                                             | `debian12-arm64-dgx20-dispatch.json` / `f29b8cdf4d4342c66e3928cc2d9ff5416fb1b92f243601e01682319376c7a8b0`  |
+| Rocky 9.8 inspect    | Passed 418 native RPM identities and independent detail comparison                                                                                                                                                                                 | `rocky9-arm64-dgx20-inspect.json` / `e8b1d77d1c81b02ae833afc8cd7849d37557371b019f5726a264b9159f6bf3db`     |
+| Rocky 9.8 lifecycle  | Passed full signed 0.7.0→0.7.1 lifecycle/automatic trust; five 420-package publications, denied attempt6 retained sequence5, final revocation/hold; SELinux Enforcing                                                                              | `rocky9-arm64-dgx20-lifecycle.json` / `c7b95fddeef7c28d396901993e920989c0970a56810de7b3f114ee345ad0c5d0`   |
+| Rocky 9.8 dispatch   | Passed nine native scenarios, real periodic recheck/remediation and final revocation; SELinux Enforcing; supersession integration-only                                                                                                             | `rocky9-arm64-dgx20-dispatch.json` / `bb17111467ecef3bb47d0fb2fc898a49415c411dc0fd15e2c819f2e8b7830ed4`    |
+| Rocky 10.2 inspect   | Passed 440 native RPM identities and independent detail comparison                                                                                                                                                                                 | `rocky10-arm64-dgx20-inspect.json` / `8e82dfa7570d14b8e30b8da2f77cd3b48d63650519b11d9897827cd117743049`    |
+| Rocky 10.2 lifecycle | Passed full signed 0.7.0→0.7.1 lifecycle/automatic trust; five 442-package publications, denied attempt6 retained sequence5, final revocation/hold; SELinux Enforcing                                                                              | `rocky10-arm64-dgx20-lifecycle.json` / `c4713821b59c9938a44b81fec68c5df7d6e1ad922e0641c7690a835c2de04df9`  |
+| Rocky 10.2 dispatch  | Passed nine native scenarios, real periodic recheck/remediation and final revocation; SELinux Enforcing; supersession integration-only                                                                                                             | `rocky10-arm64-dgx20-dispatch.json` / `34bd45508a999bc54cc861b8d5d9f8d31db8305b99396345a802953f47a192bc`   |
 
 Debian 12 lifecycle device `ef1dbc74-a7ed-4a68-8857-b6f6d5962280` retained
 generation `dbd9e3b5-aaa8-4963-8def-578c49ac1150`; its recorded remote lane lasted
@@ -669,7 +751,71 @@ registration and cleanup outcomes true. Public run
 `lindm-lab-606fcf750e0afb81e804ebe06d387152`, consumer UUID
 `5a20105a-218b-46bd-9840-439ac327f8f6`, retained corresponding JSONL receipt
 SHA-256 `b07c451be5b0595380fac8678b68be8454b984c63d239a31acb5db03426e0298`.
-RHEL10.2 dispatch and Fedora43 service/trust/dispatch remain unproven.
+
+RHEL 10.2 **connected dispatch passed**: `ROOT/rhel102-dispatch-receipts.json`,
+SHA-256 `0c8b04c278095080fbe43e9b388805c02fe5b74e3c34943de1d1527ad1f29783`,
+device `a5a490c8-37b8-44f3-ba51-a7d28434f95f`, generation
+`80a0be61-3135-4510-94ed-e1fc855bd3f0`. Same pinned receipt-aware lab/server;
+native RPM SHA-256
+`61fd17aacc6455b16fac5b7f7e8e1595c9e458fb8c3203982daaf4dfadc8adc3`.
+All nine native dispatch scenarios above passed; supersession remains
+integration-only. SELinux Enforcing, user-egress explicit, all5 Red Hat outcomes.
+Public run `lindm-lab-de5d9553b77cf49e1ab68c74524dddbe`, consumer UUID
+`8618a771-fa06-4c5b-8549-58c169dfb986`, corresponding retained JSONL SHA-256
+`3be7607fe1dcaf19725d2cfa7511f6d4c1d2f8ea56f7b795b76548874aaf0e26`.
+Fedora43 **signed-service lifecycle passed** after the shared-schema prerequisite
+correction below: `ROOT/fedora43-service-refreshed.json`, SHA-256
+`0ba24f41374f177eef632a3905f0bd9563d6f8aa1d11bc914d3eccca35d21667`,
+device `a0a090a5-eeed-43c7-b4b6-730f8ed0befd`, generation
+`b9413ea5-0e18-438f-ac47-1e86ef0cc97f`. Same receipt-aware pinned
+01495af lab/server and 0.7.0→0.7.1 RPM pair above; SELinux remained Enforcing,
+restricted-user networking, x86_64 KVM/SeaBIOS/virtio-blk. Five 432-package
+publications, epoch1→3, signed effects and retained history, upgrade/reboot/
+reinstall, spool/lost-issuance recovery, artifact rejection, revocation and
+missing-journal hold passed.
+
+Fedora43 **automatic control-plane trust passed**:
+`ROOT/fedora43-trust-receipts.json`, SHA-256
+`111ca61db75624529310d9622d5cbc417c924070260b9915af76e6e3a582a3e6`,
+device `ba01d7b7-1042-4968-b8de-3b3d2cc6c6a4`, generation
+`42e63e47-a1a3-4910-b59a-3168d12ab192`. Same pinned lab/server and RPM pair;
+SELinux Enforcing unchanged, restricted-user networking, five 432-package
+publications and epoch1→3. Automatic root/delegate rotation and revocation,
+quorum/delegation/epoch-rollback denial, exact restart retry, unchanged TLS,
+verified no-service-effects witness, reboot/reinstall trust retention and final
+recovery/revocation/hold checks passed. Connected dispatch remains separate.
+
+Fedora43 **connected dispatch passed**:
+`ROOT/fedora43-dispatch-receipts.json`, SHA-256
+`2a03eddaa60af6f1a921a24f9b3c73a678487e44a932d8e76c1c63c262db0e7b`,
+device `80622c4c-727d-4530-8f1d-467a997059e1`, generation
+`a4f6a110-9d3b-45ff-ae42-fc86f20357e0`. Same receipt-aware lab/server and
+build source; RPM SHA-256
+`1346b0f3640a25a0b6df5e2808fc2bf918a75f260385b0563190fb640021cfac`,
+signer `F5899883EB2A02895EBFAF72F0557B3D2F8ADD1C`.
+SELinux Enforcing, restricted-user networking; nine native scenarios cover
+active/enabled, periodic 300-second compliant checks without a start grant,
+drift repair, inactive/disabled, open-action server restart, no drift effects
+without authorization, ±90-second clocks and revoked-device denial.
+Unstarted supersession remains integration-only, not native coverage.
+All requested Ubuntu26, Fedora43, RHEL9.8 and RHEL10.2 lifecycle/trust/dispatch
+continuation lanes are now recorded passes within their stated native scope.
+
+Fedora43's first signed-service continuation failed on a **laboratory schema
+prerequisite**, before initial publication: both installed guest units were
+active and native DNF queries succeeded, but the shared development database
+lacked `device_agent_update_reports` required by the pinned server. PostgreSQL
+reported that exact missing relation 1,098 times. Device
+`75e1bd80-2b8f-4cf2-a122-68ab85f897af`, generation
+`f1854979-da4c-41ca-ab67-ccf113a06f13`; disposition record
+`ROOT/fedora43-service-shared-schema-failure.json`, SHA-256
+`926c6a14e0be040189b8f62c4a0871b1f338d3da10970fc74141007b9c8168b6`;
+private guest diagnostic `ROOT/lindm-cloud-init-3700555002.json`, SHA-256
+`b7c626be4e1ba4dcd96bd1a904696cfc4eb785bc892b10befe3c0460df40bb79`.
+The owner authorized maintained `go run ./cmd/dev recreate-database
+-confirm-delete`, which completed successfully and refreshed only `lindm`,
+preserving the live demo's separate `lindm_authority_*` database. This is not
+a Fedora defect or a native-lane pass; no product retry/suppression was added.
 
 The abort's build provenance is `ROOT/checkpoint-9138d17-build.json`, SHA-256
 `7aebb17cf8038d23e2ed9d77ac2ec218c82f92df6d3bf3bc7ec02685b88a186f`.
@@ -1245,6 +1391,20 @@ explicitly separate. This lane does not certify subscription entitlement, arbitr
 module contexts, a full live weekly corpus, full offline-bundle custody, SCAP
 tailoring or automatic package remediation.
 
+Full Ubuntu OSV publication was measured separately on 2026-10-10 using the
+maintained refresh command and owned demo database:
+[`ubuntu-advisory-stream-cve2048-20261010.json`](../artifacts/ubuntu-advisory-stream-cve2048-20261010.json)
+records 2,157,314 unique claims, four rejected malformed MinIO source records,
+213.69-second atomic publication and 102,068 KiB peak RSS without swaps.
+The six legitimate kernel notices formerly exceeding a 1,000-CVE bound now pass
+the 2,048-CVE schema; the largest real USN fixture preserves all 1,416 CVEs.
+This evidence is source publication, not authenticated console exposure or native
+remediation. Current device findings and the new rejection-status UI remain
+separate owner-session/restart gates. See [Ubuntu feed limits and evidence](platforms/ubuntu.md#advisory-feeds).
+Durable generation cleanup is covered by isolated PostgreSQL cancellation,
+concurrency, active-generation and expired-writer regressions; its forward
+migration is not yet applied to the running demo.
+
 ## 3. Acceptance scenario families
 
 Each family maps to product requirement IDs. Individual deterministic tests must
@@ -1669,6 +1829,50 @@ collector fixture test or database test does not replace either guest comparison
 
 The generated target-selection contract was delivered to ConsoleQA. A selectable
 inventory record is not destructive qualification or proof of completed erasure.
+
+WWN-less encrypted GPT storage has an explicit signed `SERIAL_GPT_LUKS` basis.
+Regression coverage includes virtio-blk selection, duplicate physical-disk serial
+refusal even with differing GUIDs, changed/absent basis, WWN appearance or
+disappearance, changed disk/container size, changed GPT/LUKS identity, unreadable
+WWN evidence and pinned GPT header integrity. `WWN_SERIAL` remains preferred.
+The native NVMe sanitize basis and authenticated `GetRecoveryTime` checks remain
+independent; this encrypted-partition fallback grants neither sanitize authority
+nor an exception to recovery-time validation. Selectability is not proof of an
+encryption mutation, crypto-erasure, TPM binding or recovery qualification.
+Focused race suites passed for actionprovider, inventory, executor, recovery,
+recoveryboot, recoverycustody, device, trust and vmlab. Real-PostgreSQL race
+selection `Test(ListDeviceStorageTargets|StorageAction|DeviceActionRecovery|RecoveryReadiness)`
+passed, including API selectability and create/start basis-change refusal.
+Buf lint, web typecheck and affected console ESLint passed.
+The independent VM oracle now reads native pairs `PTTYPE`/`PTUUID`, initializes
+GPT availability for every identity and inherits only a backing disk's GUID;
+its focused storage-identity race regressions also passed.
+
+Read-only baseline for enrolled Ubuntu 24.04 demo
+`df29accb-d575-45a0-9c1e-0a1cab8f2cdc` retains native `lsblk -b -J -O` at
+`/home/r/work/lindm-lab/console-encrypted-ubuntu-20261010/lsblk-native-baseline.json`.
+Its virtio-blk disk has serial `lindm-demo-encrypted`, no WWN, size
+25,769,803,776 bytes and GPT GUID `616f7698-4a4a-4c6c-8543-fc47d344c677`.
+The LUKS partition is 22,493,003,776 bytes with UUID
+`f393f8b5-f6bf-41a0-81fd-736cf10b6d9d`. This baseline is not a post-upgrade
+selectability pass: that requires the coordinated signed-APT agent upgrade and
+new server projection after the owner-approved bundled console restart. No
+storage mutation is authorized by this read-only qualification.
+Adjacent `native-sysfs-identity-baseline.json` independently confirms the disk's
+block-level serial, absent WWID/device-WWID attributes and the partition's exact
+kernel parent on `virtio2/block/vda`. No raw LUKS header was read for this check.
+The integrated agent `0.1.2` package (including the transient read-only inventory
+helper) is prepared under
+`/home/r/.cache/lindm-targetidentity-package-20261010/`. DEB SHA-256:
+`3585719b1c96949187d2a6c76e95977d781f528aeb44fad3e4e9e31e3daaebbf`;
+agent payload SHA-256:
+`f26caf943f5ceff7607c11aab0f75ccc411ae2ba325001c7c98791ed0a4d6ff2`.
+`package-build.json` and `apt-publish.json` retain native build and repository
+checks. Signed `InRelease` and package-index verification passed; an independent
+`gpgv` check using the previously trusted demo key also passed with fingerprint
+`F631DCC0574F0A49D747C00BAF987756B5A392C0`. This is prepared package evidence,
+not an installed-upgrade or real-VM selectability claim.
+
 The combined root-storage/readiness attachment additionally passed
 `go test -race ./internal/agent/inventory ./internal/agent/executor
 ./internal/agent/transport ./internal/agent/localrpc ./internal/vmlab` in the
@@ -2484,6 +2688,122 @@ retention/access controls; never archive grant values or encryption keys. Result
 are machine-readable JSON/JUnit plus a concise human report. Preserve reproducible
 seeds. Automatic reruns retain the first failure and cannot turn an unexplained
 flaky security/destructive scenario into a passing release gate.
+
+### Customer-journey release acceptance
+
+`make acceptance` runs the maintained `lab acceptance` command, not a composition
+of previously successful bespoke scenario records. It owns an isolated real
+local-auth server/database and fresh browser accounts. `make check-web` runs the
+same owner enrollment, fresh sign-in and one-time-code/provisioning-token UI journey
+without claiming native or vendor-feed qualification. Both commands fail on an
+unqualified browser engine; an unsupported virtual authenticator is not a pass.
+Install the recorded browser prerequisites with `make browser-baseline`.
+
+For independent native/UI diagnosis while a vendor feed defect is being repaired,
+`lab acceptance -skip-feeds` runs the same stock guests and browser assignment
+journey without advisory refresh or exposure qualification. Its record is labelled
+`diagnostic-skip-feeds-NOT-A-RELEASE-PASS`, `passed` is false and the command exits
+unsuccessfully even if every exercised native assertion passes. It cannot replace
+the mandatory full default run or silently reuse an older feed publication.
+
+The pinned Playwright Chromium lane uses its native CDP virtual authenticator.
+Firefox uses pinned Firefox/geckodriver and W3C WebDriver virtual authenticators.
+WebKitGTK uses the packaged WebKitWebDriver/MiniBrowser under Xvfb. Its exact
+package version and capabilities are recorded: if that build lacks virtual
+authenticator support, the Origin/Referrer and password phases still run, but
+the passkey phase is explicitly unqualified and the release gate remains failed.
+No JavaScript replacement for `navigator.credentials`, forged session, intercepted
+RPC or authenticated-cookie import counts as a login.
+
+The maintained runner interface is `node web/acceptance/run.mjs PRIVATE_CONFIG`.
+Its private JSON specifies `mode` (`enroll`, `grant` or `native`), `engine`, `origin`,
+`username`, `password`, `enrollmentSecret` for enrollment, `credentialPath`,
+`resultPath`, `evidenceDirectory` and a bounded `timeoutMs`. Native mode also
+specifies `deviceId`, `profileRevisionId`, `storageActions` and `requireNoWWN`.
+The grant-only mode authenticates the existing browser owner and issues a fresh
+single-use code after the native guest has its lease and installed package; queue
+time cannot consume that code's short lifetime.
+Only the owned disposable fixture permits certificate-error tolerance; this does
+not change the real browser origin, Referrer-Policy or server CSRF enforcement.
+Raw browser results and generated customer commands contain secrets and must not
+be copied into the public report. `lab acceptance` performs that separation.
+
+The native gate boots the pinned Ubuntu 24.04 and Fedora 44 cloud images, then the
+vendor-installer Ubuntu encrypted image, on virtio-blk without an invented WWN.
+Only ordinary authenticated agent installation and documented enrollment commands
+precede inventory collection. Stock background package units are not masked to
+make this gate green. Each VM retains its host lease through owned teardown, runs
+sequentially, and does not touch demonstration guests. After stock observations,
+an owned harmless service unit supplies the independent native proof for a profile
+assigned through the console.
+
+Example (firmware values must match the installed package, never guessed):
+
+```sh
+make acceptance ACCEPTANCE_EVIDENCE="$HOME/acceptance-20261010" \
+  ACCEPTANCE_FLAGS="-firmware-code /usr/share/OVMF/OVMF_CODE_4M.secboot.fd \
+  -firmware-vars /usr/share/OVMF/OVMF_VARS_4M.fd \
+  -firmware-package ovmf -firmware-version INSTALLED_VERSION"
+```
+
+Use Secure-Boot-capable code with unenrolled variables for the off tuple:
+SecureBoot=0/SetupMode=1 must be observed. The generic `OVMF_CODE_4M.fd`
+may omit the variable entirely, which is unavailable, not proof of disabled
+enforcement; the encrypted posture gate correctly rejects that prerequisite.
+
+The gate refreshes the complete Ubuntu OSV export, Fedora repository updateinfo
+and paired Red Hat CSAF archives through the production parser/publication path.
+Fedora updateinfo is not mislabeled as CSAF. The digest-addressed cache revalidates
+with the live vendor before reuse and rehashes cached bytes; offline bytes alone
+never establish current coverage. Defaults are a 2 GiB aggregate input budget and
+15-minute refresh budget, in addition to production per-source limits. Malformed
+upstream records remain explicit rejections, never cleaned fixtures. A device
+whose exposure remains unknown fails the known-exposure assertion.
+
+`acceptance.json` and engine/native screenshots are written in a new private
+evidence directory on success and failure. Browser credentials, enrollment
+secrets and authenticator state live in a separate temporary private directory
+removed at teardown; ordinary evidence never includes them. Browser failures do
+not suppress independent feed checks. The report distinguishes web-only from
+release mode and records cleanup, exact source digests and native outcomes.
+This is VM evidence, not physical-disk or hardware-authenticator qualification.
+
+The first full maintained run on 2026-10-10 failed honestly after 2786.6 seconds:
+`~/.cache/lindm-acceptance-20261010-01/acceptance.json`, SHA-256
+`5ef007bd0cc52698432d4add4bcce2bfbc13754d70a78ebcaa605250543ba252`.
+Owned fixture/guest cleanup completed. Chromium 156.0.8078.4 completed enrollment,
+two real sign-ins, grant issuance and provisioning-token issuance. WebKitGTK
+2.52.6 returned `unknown command` for native virtual-authenticator creation and
+its page lacked the required WebAuthn capability; its password phase did not
+reach a POST and is unqualified, not an Origin-policy pass. Firefox 157.0.1
+remained waiting for its native authenticator during enrollment.
+
+The same run published the real 777,941,722-byte Ubuntu export (2,157,214 claims,
+10 explicit rejections in that build) and Fedora's 4,301 claims. It rejected the
+real signed Red Hat archive at `rhsa-2006_0661.json`; later parser changes require
+a new run. Native failures exposed harness defects before product qualification:
+the initial 15-minute grant expired while queued for a host lease, and the harmless
+probe name incorrectly used the protected `lindm-` service prefix. Fresh UI grant
+issuance after guest readiness and an admissible probe name correct those paths.
+Fedora's successful provisioning additionally exposed a genuine not-applicable
+seat field on a native `manager`/`unspecified` logind session; its exception must
+remain capability-guarded. Encrypted first-boot posture failed before agent
+enrollment; subsequent diagnostics identify the exact native prerequisite instead
+of weakening the gate or silently adding a TPM. None of these failed native rows
+qualifies inventory, storage selection, profile effects or known device exposure.
+
+The corrected browser run
+`~/.cache/lindm-acceptance-origin-20261010-02/acceptance.json` (SHA-256
+`fac61c6f48c46c3420bccab821b64ef6d42fe22794e0b34af675e56afff2654a`)
+passes the complete Chromium and Firefox journeys. Firefox's disposable native
+profile selects its TestTokenManager instead of physical USB; it does not replace
+the JavaScript credential API. WebKit additionally calls the actual loaded
+console `beginLogin` client with a secret-free invalid body: the served document
+has `Referrer-Policy: same-origin` and the real CSP, and the server returns 400,
+not 403, after its Origin check. This catches the Safari `Origin: null` defect
+class without claiming WebAuthn. The packaged WebKit build still lacks
+`PublicKeyCredential` and native virtual-authenticator support, so its passkey
+phase and the overall release gate remain explicitly unqualified.
 
 ## 5. Physical qualification prerequisites
 

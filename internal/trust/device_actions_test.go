@@ -28,7 +28,7 @@ func newDeviceActionAuthorityFixture(t *testing.T, destructive bool) deviceActio
 	f := deviceActionAuthorityFixture{serviceAuthorityFixture: newServiceAuthorityFixture(t)}
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}}
 	if destructive {
-		spec.Action = &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}}}
+		spec.Action = &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}}}
 	}
 	capability, err := DeviceActionCapability(spec)
 	if err != nil {
@@ -216,7 +216,7 @@ func TestDeviceActionStartRequiresExactFreshTwoHumanBinding(t *testing.T) {
 func TestDeviceActionEscrowReceiptBindsDurableCiphertextAndSlot(t *testing.T) {
 	f := newDeviceActionAuthorityFixture(t, false)
 	luks := uuid.NewString()
-	f.intent.Spec.Action = &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{LuksUuid: luks, SizeBytes: 1 << 30}, EscrowKeyId: string(bytes.Repeat([]byte{'a'}, 64)), EscrowPublicKey: bytes.Repeat([]byte{1}, 512)}}
+	f.intent.Spec.Action = &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: luks, Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}, EscrowKeyId: string(bytes.Repeat([]byte{'a'}, 64)), EscrowPublicKey: bytes.Repeat([]byte{1}, 512)}}
 	escrow := &agentv1.DeviceActionEscrow{EscrowKeyId: f.intent.Spec.GetEscrowRotate().GetEscrowKeyId(), Ciphertext: []byte("ciphertext"), RecoveryKeySha256: bytes.Repeat([]byte{3}, 32), NewKeyslot: 3, LuksUuid: luks, MetadataSha256: bytes.Repeat([]byte{4}, 32), TokenId: 5}
 	record := &agentv1.DeviceActionRecord{Intent: f.intent, IntentSha256: bytes.Repeat([]byte{7}, 32), StartedAt: timestamppb.New(f.now), Verification: &agentv1.DeviceActionVerification{Escrow: escrow}}
 	digest, err := DeviceActionDigest(escrow)
@@ -337,7 +337,7 @@ func TestDeviceActionCapabilityIsClosedAndActionSpecific(t *testing.T) {
 
 func TestDeviceActionEscrowStartBindsSelectedUnoccupiedSlot(t *testing.T) {
 	f := newDeviceActionAuthorityFixture(t, false)
-	target := &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}
 	f.intent.Spec.Action = &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{
 		Target: target, EscrowKeyId: string(bytes.Repeat([]byte{'a'}, 64)), EscrowPublicKey: bytes.Repeat([]byte{1}, 512),
 	}}

@@ -40,6 +40,7 @@ message AdvisoryFinding {
   AdvisoryException exception = 11;
   string feed_id = 12;
   string source_url = 13;
+  string reason = 14;
 }
 
 message AdvisoryFreshness {
@@ -100,6 +101,7 @@ message AdvisoryFeedStatus {
   string platform_stream = 12;
   repeated lindm.advisory.v1.FeedArtifact artifacts = 13;
   google.protobuf.Timestamp snapshot_at = 14;
+  repeated lindm.advisory.v1.RejectedRecord rejected_records = 15;
 }
 message ListAdvisoryFeedsResponse {
   repeated AdvisoryFeedStatus feeds = 1;

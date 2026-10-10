@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+enum EnrollmentGrantStatus {
+  ENROLLMENT_GRANT_STATUS_UNSPECIFIED = 0;
+  ENROLLMENT_GRANT_STATUS_ACTIVE = 1;
+  ENROLLMENT_GRANT_STATUS_CONSUMED = 2;
+  ENROLLMENT_GRANT_STATUS_EXPIRED = 3;
+  ENROLLMENT_GRANT_STATUS_REVOKED = 4;
+}
+
+// Public administrative metadata only; bearer credentials and their hashes are never listed.
+message EnrollmentGrant {
+  string grant_id = 1;
+  EnrollmentGrantStatus status = 2;
+  uint32 max_uses = 3;
+  uint32 used_count = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string created_by = 7;
+  string creator_display_name = 8;
+  string consumed_device_id = 9;
+  string consumed_device_hostname = 10;
+  // Current consumed-device labels, not preassigned grant metadata.
+  repeated string labels = 11;
+}
+
+message ListEnrollmentGrantsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 2 [(buf.validate.field).string.max_len = 512];
+}
+message ListEnrollmentGrantsResponse {
+  repeated EnrollmentGrant grants = 1;
+  string next_page_token = 2;
+}

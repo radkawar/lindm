@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/gen/lindm/admin/v1/adminv1connect"
@@ -84,6 +85,7 @@ type Config struct {
 	EscrowRevealApprovalRequired bool
 	ReleasePublisher             *releaseupdate.Publisher
 	RecoveryArtifacts            *releaseupdate.Client
+	EnrollmentInstructions       *adminv1.GetEnrollmentInstructionsResponse
 	// Production composition always enables the release gate. Direct service
 	// fixtures must explicitly supply real build identity to exercise it.
 	RequireReleaseCompatibility bool
@@ -93,29 +95,30 @@ type Config struct {
 
 // Service implements the admin, enrollment, and device RPC surfaces.
 type Service struct {
-	pool                 *pgxpool.Pool
-	deploymentID         uuid.UUID
-	ca                   *x509.Certificate
-	caKey                crypto.Signer
-	validator            *validate.Interceptor
-	rules                protovalidate.Validator
-	slots                chan struct{}
-	clock                func() time.Time
-	authority            *trust.Authority
-	inventoryBudget      int64
-	execution            *executionauthority.Store
-	identity             *identity.Service
-	profiles             *policy.Store
-	targeting            *targeting.Store
-	signing              *config.ExecutionSigning
-	advisories           *advisory.Service
-	escrow               *escrow.Custody
-	revealApproval       bool
-	releasePublisher     *releaseupdate.Publisher
-	recoveryArtifacts    *releaseupdate.Client
-	requireCompatibility bool
-	serverRelease        string
-	serverProtocol       uint32
+	pool                   *pgxpool.Pool
+	deploymentID           uuid.UUID
+	ca                     *x509.Certificate
+	caKey                  crypto.Signer
+	validator              *validate.Interceptor
+	rules                  protovalidate.Validator
+	slots                  chan struct{}
+	clock                  func() time.Time
+	authority              *trust.Authority
+	inventoryBudget        int64
+	execution              *executionauthority.Store
+	identity               *identity.Service
+	profiles               *policy.Store
+	targeting              *targeting.Store
+	signing                *config.ExecutionSigning
+	advisories             *advisory.Service
+	escrow                 *escrow.Custody
+	revealApproval         bool
+	releasePublisher       *releaseupdate.Publisher
+	recoveryArtifacts      *releaseupdate.Client
+	requireCompatibility   bool
+	serverRelease          string
+	serverProtocol         uint32
+	enrollmentInstructions *adminv1.GetEnrollmentInstructionsResponse
 }
 
 var (
@@ -168,6 +171,9 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.ListAttributeDefinitionsRequest{},
 			&adminv1.ExportDevicesRequest{},
 			&adminv1.CreateEnrollmentGrantRequest{},
+			&adminv1.ListEnrollmentGrantsRequest{},
+			&adminv1.GetEnrollmentInstructionsRequest{},
+			&adminv1.GetEnrollmentInstructionsResponse{},
 			&adminv1.RevokeEnrollmentGrantRequest{},
 			&adminv1.CreateProvisioningTokenRequest{}, &adminv1.ListProvisioningTokensRequest{},
 			&adminv1.RevokeProvisioningTokenRequest{}, &adminv1.GetPendingEnrollmentsRequest{},
@@ -257,30 +263,38 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	var instructions *adminv1.GetEnrollmentInstructionsResponse
+	if cfg.EnrollmentInstructions != nil {
+		if err := compiled.Validate(cfg.EnrollmentInstructions); err != nil {
+			return nil, err
+		}
+		instructions = proto.CloneOf(cfg.EnrollmentInstructions)
+	}
 	return &Service{
-		pool:                 pool,
-		deploymentID:         deploymentID,
-		ca:                   cfg.CACertificate,
-		caKey:                cfg.CAKey,
-		validator:            validate.NewInterceptor(validate.WithValidator(compiled)),
-		rules:                compiled,
-		slots:                make(chan struct{}, maxInFlight),
-		clock:                time.Now,
-		authority:            authority,
-		inventoryBudget:      budget,
-		execution:            cfg.ExecutionAuthority,
-		identity:             cfg.Identity,
-		escrow:               cfg.Escrow,
-		revealApproval:       cfg.EscrowRevealApprovalRequired,
-		profiles:             profiles,
-		targeting:            targetingStore,
-		signing:              cfg.ExecutionSigning,
-		advisories:           cfg.Advisories,
-		releasePublisher:     cfg.ReleasePublisher,
-		recoveryArtifacts:    cfg.RecoveryArtifacts,
-		requireCompatibility: cfg.RequireReleaseCompatibility,
-		serverRelease:        cfg.ServerRelease,
-		serverProtocol:       cfg.ServerProtocol,
+		pool:                   pool,
+		deploymentID:           deploymentID,
+		ca:                     cfg.CACertificate,
+		caKey:                  cfg.CAKey,
+		validator:              validate.NewInterceptor(validate.WithValidator(compiled)),
+		rules:                  compiled,
+		slots:                  make(chan struct{}, maxInFlight),
+		clock:                  time.Now,
+		authority:              authority,
+		inventoryBudget:        budget,
+		execution:              cfg.ExecutionAuthority,
+		identity:               cfg.Identity,
+		escrow:                 cfg.Escrow,
+		revealApproval:         cfg.EscrowRevealApprovalRequired,
+		profiles:               profiles,
+		targeting:              targetingStore,
+		signing:                cfg.ExecutionSigning,
+		advisories:             cfg.Advisories,
+		releasePublisher:       cfg.ReleasePublisher,
+		recoveryArtifacts:      cfg.RecoveryArtifacts,
+		requireCompatibility:   cfg.RequireReleaseCompatibility,
+		serverRelease:          cfg.ServerRelease,
+		serverProtocol:         cfg.ServerProtocol,
+		enrollmentInstructions: instructions,
 	}, nil
 }
 

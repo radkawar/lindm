@@ -33,3 +33,35 @@ export function pendingEnrollmentsQueryOptions(lifetime: AuthLifetime, pageToken
     retry: false,
   });
 }
+
+export function enrollmentGrantsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
+  return queryOptions({
+    queryKey: ["enrollment-grants", lifetime.generation, pageToken] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.listEnrollmentGrants(
+        { pageSize: 50, pageToken },
+        { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+    retry: false,
+  });
+}
+
+export function enrollmentInstructionsQueryOptions(lifetime: AuthLifetime) {
+  return queryOptions({
+    queryKey: ["enrollment-instructions", lifetime.generation] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.getEnrollmentInstructions(
+        {},
+        { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+    retry: false,
+  });
+}

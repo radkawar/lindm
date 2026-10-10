@@ -208,6 +208,7 @@ type ProvisioningToken struct {
 	Metadata           *DeviceMetadata        `protobuf:"bytes,10,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	GroupIds           []string               `protobuf:"bytes,11,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
 	ProfileRevisionIds []string               `protobuf:"bytes,12,rep,name=profile_revision_ids,json=profileRevisionIds,proto3" json:"profile_revision_ids,omitempty"`
+	CreatorDisplayName string                 `protobuf:"bytes,13,opt,name=creator_display_name,json=creatorDisplayName,proto3" json:"creator_display_name,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -324,6 +325,13 @@ func (x *ProvisioningToken) GetProfileRevisionIds() []string {
 		return x.ProfileRevisionIds
 	}
 	return nil
+}
+
+func (x *ProvisioningToken) GetCreatorDisplayName() string {
+	if x != nil {
+		return x.CreatorDisplayName
+	}
+	return ""
 }
 
 type ListProvisioningTokensRequest struct {
@@ -880,7 +888,7 @@ const file_lindm_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x129\n" +
 	"\n" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x126\n" +
-	"\x17secret_delivery_unknown\x18\x04 \x01(\bR\x15secretDeliveryUnknown\"\x88\x04\n" +
+	"\x17secret_delivery_unknown\x18\x04 \x01(\bR\x15secretDeliveryUnknown\"\xba\x04\n" +
 	"\x11ProvisioningToken\x12\x19\n" +
 	"\btoken_id\x18\x01 \x01(\tR\atokenId\x12\x1d\n" +
 	"\n" +
@@ -899,7 +907,8 @@ const file_lindm_admin_v1_provisioning_proto_rawDesc = "" +
 	"\bmetadata\x18\n" +
 	" \x01(\v2\x1e.lindm.admin.v1.DeviceMetadataR\bmetadata\x12\x1b\n" +
 	"\tgroup_ids\x18\v \x03(\tR\bgroupIds\x120\n" +
-	"\x14profile_revision_ids\x18\f \x03(\tR\x12profileRevisionIds\"o\n" +
+	"\x14profile_revision_ids\x18\f \x03(\tR\x12profileRevisionIds\x120\n" +
+	"\x14creator_display_name\x18\r \x01(\tR\x12creatorDisplayName\"o\n" +
 	"\x1dListProvisioningTokensRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +

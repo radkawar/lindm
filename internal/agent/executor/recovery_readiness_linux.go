@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
-	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/recoveryboot"
 )
 
@@ -33,15 +32,26 @@ func (s *Service) GetRecoveryReadiness(ctx context.Context, req *connect.Request
 	}
 	defer s.mu.Unlock()
 	observation := s.observeRecoveryReadiness(ctx, recoveryboot.ObserveReadiness)
-	storage := inventory.CollectStorage(ctx)
-	if err := s.admit(storage); err != nil {
+	if observation.GetBootId() == "" {
 		return nil, mapError(errInternal)
 	}
-	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(storage)
+	root, err := s.observeRootInventory(ctx)
 	if err != nil {
 		return nil, mapError(errInternal)
 	}
-	response := &agentv1.GetRecoveryReadinessResponse{Observation: observation, StorageDetails: encoded, StorageObservedAt: timestamppb.New(s.now())}
+	boot, err := s.bootID()
+	if err != nil || boot != root.GetBootId() || boot != observation.GetBootId() || ctx.Err() != nil ||
+		root.GetStartedAt().AsTime().Before(observation.GetObservedAt().AsTime()) {
+		return nil, mapError(errInternal)
+	}
+	if err := s.admit(root); err != nil {
+		return nil, mapError(errInternal)
+	}
+	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(root)
+	if err != nil {
+		return nil, mapError(errInternal)
+	}
+	response := &agentv1.GetRecoveryReadinessResponse{Observation: observation, RootObservation: encoded}
 	if err := s.admit(response); err != nil {
 		return nil, mapError(errInternal)
 	}

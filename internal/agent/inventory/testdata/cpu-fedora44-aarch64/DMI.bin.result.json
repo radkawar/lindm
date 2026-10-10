@@ -1,0 +1,5 @@
+{
+  "command": "sudo -n cat /sys/firmware/dmi/tables/DMI",
+  "exit_code": 0,
+  "stderr": ""
+}

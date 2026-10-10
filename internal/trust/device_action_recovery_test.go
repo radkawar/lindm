@@ -36,7 +36,7 @@ func newRecoveryAuthorityFixture(t *testing.T) recoveryAuthorityFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := &agentv1.StorageTarget{Serial: "recovery-media-one", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "wwn-" + "recovery-media-one", Serial: "recovery-media-one", SizeBytes: 1 << 30}
 	media, err := DeviceActionDigest(target)
 	if err != nil {
 		t.Fatal(err)

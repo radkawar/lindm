@@ -36,6 +36,9 @@ const (
 	CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT         CollectionStatus = 5
 	CollectionStatus_COLLECTION_STATUS_CAPACITY_EXCEEDED      CollectionStatus = 6
 	CollectionStatus_COLLECTION_STATUS_NATIVE_COMMAND_FAILURE CollectionStatus = 7
+	// Native per-field context proves that the property does not apply.
+	// Unlike UNAVAILABLE, this is not missing or failed evidence.
+	CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE CollectionStatus = 8
 )
 
 // Enum value maps for CollectionStatus.
@@ -49,6 +52,7 @@ var (
 		5: "COLLECTION_STATUS_INVALID_OUTPUT",
 		6: "COLLECTION_STATUS_CAPACITY_EXCEEDED",
 		7: "COLLECTION_STATUS_NATIVE_COMMAND_FAILURE",
+		8: "COLLECTION_STATUS_NOT_APPLICABLE",
 	}
 	CollectionStatus_value = map[string]int32{
 		"COLLECTION_STATUS_UNSPECIFIED":            0,
@@ -59,6 +63,7 @@ var (
 		"COLLECTION_STATUS_INVALID_OUTPUT":         5,
 		"COLLECTION_STATUS_CAPACITY_EXCEEDED":      6,
 		"COLLECTION_STATUS_NATIVE_COMMAND_FAILURE": 7,
+		"COLLECTION_STATUS_NOT_APPLICABLE":         8,
 	}
 )
 
@@ -424,6 +429,100 @@ func (x *HostObservation) GetDetails() *NativeDetails {
 	return nil
 }
 
+// Read-only executor projection. No private key material or action authority.
+// Every field is required so incomplete projections cannot masquerade as evidence.
+type RootObservation struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	StartedAt      *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinishedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	BootId         string                 `protobuf:"bytes,3,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	HardwareSerial *ObservedString        `protobuf:"bytes,4,opt,name=hardware_serial,json=hardwareSerial,proto3" json:"hardware_serial,omitempty"`
+	Firmware       *FirmwareDetails       `protobuf:"bytes,5,opt,name=firmware,proto3" json:"firmware,omitempty"`
+	Storage        *StorageDetails        `protobuf:"bytes,6,opt,name=storage,proto3" json:"storage,omitempty"`
+	Cpu            *CpuDetails            `protobuf:"bytes,7,opt,name=cpu,proto3" json:"cpu,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RootObservation) Reset() {
+	*x = RootObservation{}
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RootObservation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RootObservation) ProtoMessage() {}
+
+func (x *RootObservation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RootObservation.ProtoReflect.Descriptor instead.
+func (*RootObservation) Descriptor() ([]byte, []int) {
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RootObservation) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *RootObservation) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *RootObservation) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
+func (x *RootObservation) GetHardwareSerial() *ObservedString {
+	if x != nil {
+		return x.HardwareSerial
+	}
+	return nil
+}
+
+func (x *RootObservation) GetFirmware() *FirmwareDetails {
+	if x != nil {
+		return x.Firmware
+	}
+	return nil
+}
+
+func (x *RootObservation) GetStorage() *StorageDetails {
+	if x != nil {
+		return x.Storage
+	}
+	return nil
+}
+
+func (x *RootObservation) GetCpu() *CpuDetails {
+	if x != nil {
+		return x.Cpu
+	}
+	return nil
+}
+
 type PackageObservation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
@@ -437,7 +536,7 @@ type PackageObservation struct {
 
 func (x *PackageObservation) Reset() {
 	*x = PackageObservation{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[3]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -449,7 +548,7 @@ func (x *PackageObservation) String() string {
 func (*PackageObservation) ProtoMessage() {}
 
 func (x *PackageObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[3]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +561,7 @@ func (x *PackageObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageObservation.ProtoReflect.Descriptor instead.
 func (*PackageObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{3}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PackageObservation) GetStartedAt() *timestamppb.Timestamp {
@@ -511,7 +610,7 @@ type PackageBatch struct {
 
 func (x *PackageBatch) Reset() {
 	*x = PackageBatch{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[4]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -523,7 +622,7 @@ func (x *PackageBatch) String() string {
 func (*PackageBatch) ProtoMessage() {}
 
 func (x *PackageBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[4]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -536,7 +635,7 @@ func (x *PackageBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageBatch.ProtoReflect.Descriptor instead.
 func (*PackageBatch) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{4}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PackageBatch) GetPackages() []*Package {
@@ -557,7 +656,7 @@ type NativeObservation struct {
 
 func (x *NativeObservation) Reset() {
 	*x = NativeObservation{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[5]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -569,7 +668,7 @@ func (x *NativeObservation) String() string {
 func (*NativeObservation) ProtoMessage() {}
 
 func (x *NativeObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[5]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -582,7 +681,7 @@ func (x *NativeObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NativeObservation.ProtoReflect.Descriptor instead.
 func (*NativeObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{5}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *NativeObservation) GetHost() *HostObservation {
@@ -610,7 +709,7 @@ type ObservedUint64 struct {
 
 func (x *ObservedUint64) Reset() {
 	*x = ObservedUint64{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[6]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -622,7 +721,7 @@ func (x *ObservedUint64) String() string {
 func (*ObservedUint64) ProtoMessage() {}
 
 func (x *ObservedUint64) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[6]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -635,7 +734,7 @@ func (x *ObservedUint64) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservedUint64.ProtoReflect.Descriptor instead.
 func (*ObservedUint64) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{6}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ObservedUint64) GetStatus() CollectionStatus {
@@ -662,7 +761,7 @@ type ObservedBool struct {
 
 func (x *ObservedBool) Reset() {
 	*x = ObservedBool{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[7]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -674,7 +773,7 @@ func (x *ObservedBool) String() string {
 func (*ObservedBool) ProtoMessage() {}
 
 func (x *ObservedBool) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[7]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,7 +786,7 @@ func (x *ObservedBool) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservedBool.ProtoReflect.Descriptor instead.
 func (*ObservedBool) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{7}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ObservedBool) GetStatus() CollectionStatus {
@@ -714,7 +813,7 @@ type ObservedStrings struct {
 
 func (x *ObservedStrings) Reset() {
 	*x = ObservedStrings{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[8]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +825,7 @@ func (x *ObservedStrings) String() string {
 func (*ObservedStrings) ProtoMessage() {}
 
 func (x *ObservedStrings) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[8]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +838,7 @@ func (x *ObservedStrings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservedStrings.ProtoReflect.Descriptor instead.
 func (*ObservedStrings) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{8}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ObservedStrings) GetStatus() CollectionStatus {
@@ -762,13 +861,16 @@ type CpuDetails struct {
 	LogicalCores  *ObservedUint64        `protobuf:"bytes,2,opt,name=logical_cores,json=logicalCores,proto3" json:"logical_cores,omitempty"`
 	PhysicalCores *ObservedUint64        `protobuf:"bytes,3,opt,name=physical_cores,json=physicalCores,proto3" json:"physical_cores,omitempty"`
 	X86_64Level   *ObservedString        `protobuf:"bytes,4,opt,name=x86_64_level,json=x8664Level,proto3" json:"x86_64_level,omitempty"`
+	// Absent only on historical observations. Identifies the native source, not
+	// a guessed CPU brand or a distribution-based hardware classification.
+	ModelSource   *ObservedString `protobuf:"bytes,5,opt,name=model_source,json=modelSource,proto3" json:"model_source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CpuDetails) Reset() {
 	*x = CpuDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[9]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -780,7 +882,7 @@ func (x *CpuDetails) String() string {
 func (*CpuDetails) ProtoMessage() {}
 
 func (x *CpuDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[9]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -793,7 +895,7 @@ func (x *CpuDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CpuDetails.ProtoReflect.Descriptor instead.
 func (*CpuDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{9}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CpuDetails) GetModel() *ObservedString {
@@ -824,6 +926,13 @@ func (x *CpuDetails) GetX86_64Level() *ObservedString {
 	return nil
 }
 
+func (x *CpuDetails) GetModelSource() *ObservedString {
+	if x != nil {
+		return x.ModelSource
+	}
+	return nil
+}
+
 type MemoryDetails struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TotalBytes     *ObservedUint64        `protobuf:"bytes,1,opt,name=total_bytes,json=totalBytes,proto3" json:"total_bytes,omitempty"`
@@ -835,7 +944,7 @@ type MemoryDetails struct {
 
 func (x *MemoryDetails) Reset() {
 	*x = MemoryDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[10]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -847,7 +956,7 @@ func (x *MemoryDetails) String() string {
 func (*MemoryDetails) ProtoMessage() {}
 
 func (x *MemoryDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[10]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -860,7 +969,7 @@ func (x *MemoryDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryDetails.ProtoReflect.Descriptor instead.
 func (*MemoryDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{10}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *MemoryDetails) GetTotalBytes() *ObservedUint64 {
@@ -901,7 +1010,7 @@ type BlockDevice struct {
 
 func (x *BlockDevice) Reset() {
 	*x = BlockDevice{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[11]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +1022,7 @@ func (x *BlockDevice) String() string {
 func (*BlockDevice) ProtoMessage() {}
 
 func (x *BlockDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[11]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +1035,7 @@ func (x *BlockDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockDevice.ProtoReflect.Descriptor instead.
 func (*BlockDevice) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{11}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *BlockDevice) GetName() string {
@@ -1003,16 +1112,19 @@ type StorageIdentity struct {
 	LuksTokenCount   *ObservedUint64        `protobuf:"bytes,13,opt,name=luks_token_count,json=luksTokenCount,proto3" json:"luks_token_count,omitempty"`
 	LuksTokenTypes   *ObservedString        `protobuf:"bytes,14,opt,name=luks_token_types,json=luksTokenTypes,proto3" json:"luks_token_types,omitempty"`
 	// NAME of the unique physical backing disk within this same observation.
-	BackingDisk   *ObservedString    `protobuf:"bytes,15,opt,name=backing_disk,json=backingDisk,proto3" json:"backing_disk,omitempty"`
-	RootBacking   *ObservedBool      `protobuf:"bytes,16,opt,name=root_backing,json=rootBacking,proto3" json:"root_backing,omitempty"`
-	Nvme          *ObservedNVMeScope `protobuf:"bytes,17,opt,name=nvme,proto3" json:"nvme,omitempty"`
+	BackingDisk *ObservedString    `protobuf:"bytes,15,opt,name=backing_disk,json=backingDisk,proto3" json:"backing_disk,omitempty"`
+	RootBacking *ObservedBool      `protobuf:"bytes,16,opt,name=root_backing,json=rootBacking,proto3" json:"root_backing,omitempty"`
+	Nvme        *ObservedNVMeScope `protobuf:"bytes,17,opt,name=nvme,proto3" json:"nvme,omitempty"`
+	// Native GPT PTUUID of the unique backing disk, never a partition UUID.
+	// Absent on historical observations; unavailable without a unique GPT disk.
+	GptDiskGuid   *ObservedString `protobuf:"bytes,18,opt,name=gpt_disk_guid,json=gptDiskGuid,proto3" json:"gpt_disk_guid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StorageIdentity) Reset() {
 	*x = StorageIdentity{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[12]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1024,7 +1136,7 @@ func (x *StorageIdentity) String() string {
 func (*StorageIdentity) ProtoMessage() {}
 
 func (x *StorageIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[12]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1037,7 +1149,7 @@ func (x *StorageIdentity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StorageIdentity.ProtoReflect.Descriptor instead.
 func (*StorageIdentity) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{12}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StorageIdentity) GetTransport() *ObservedString {
@@ -1159,6 +1271,13 @@ func (x *StorageIdentity) GetNvme() *ObservedNVMeScope {
 	return nil
 }
 
+func (x *StorageIdentity) GetGptDiskGuid() *ObservedString {
+	if x != nil {
+		return x.GptDiskGuid
+	}
+	return nil
+}
+
 type ObservedNVMeScope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        CollectionStatus       `protobuf:"varint,1,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
@@ -1169,7 +1288,7 @@ type ObservedNVMeScope struct {
 
 func (x *ObservedNVMeScope) Reset() {
 	*x = ObservedNVMeScope{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[13]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1181,7 +1300,7 @@ func (x *ObservedNVMeScope) String() string {
 func (*ObservedNVMeScope) ProtoMessage() {}
 
 func (x *ObservedNVMeScope) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[13]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1194,7 +1313,7 @@ func (x *ObservedNVMeScope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservedNVMeScope.ProtoReflect.Descriptor instead.
 func (*ObservedNVMeScope) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{13}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ObservedNVMeScope) GetStatus() CollectionStatus {
@@ -1221,7 +1340,7 @@ type StorageDetails struct {
 
 func (x *StorageDetails) Reset() {
 	*x = StorageDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[14]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1233,7 +1352,7 @@ func (x *StorageDetails) String() string {
 func (*StorageDetails) ProtoMessage() {}
 
 func (x *StorageDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[14]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1246,7 +1365,7 @@ func (x *StorageDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StorageDetails.ProtoReflect.Descriptor instead.
 func (*StorageDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{14}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StorageDetails) GetStatus() CollectionStatus {
@@ -1279,7 +1398,7 @@ type NetworkInterface struct {
 
 func (x *NetworkInterface) Reset() {
 	*x = NetworkInterface{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[15]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1291,7 +1410,7 @@ func (x *NetworkInterface) String() string {
 func (*NetworkInterface) ProtoMessage() {}
 
 func (x *NetworkInterface) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[15]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1304,7 +1423,7 @@ func (x *NetworkInterface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkInterface.ProtoReflect.Descriptor instead.
 func (*NetworkInterface) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{15}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *NetworkInterface) GetName() string {
@@ -1359,7 +1478,7 @@ type NetworkDetails struct {
 
 func (x *NetworkDetails) Reset() {
 	*x = NetworkDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[16]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1371,7 +1490,7 @@ func (x *NetworkDetails) String() string {
 func (*NetworkDetails) ProtoMessage() {}
 
 func (x *NetworkDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[16]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1384,7 +1503,7 @@ func (x *NetworkDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkDetails.ProtoReflect.Descriptor instead.
 func (*NetworkDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{16}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NetworkDetails) GetStatus() CollectionStatus {
@@ -1411,7 +1530,7 @@ type FirmwareDetails struct {
 
 func (x *FirmwareDetails) Reset() {
 	*x = FirmwareDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[17]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1423,7 +1542,7 @@ func (x *FirmwareDetails) String() string {
 func (*FirmwareDetails) ProtoMessage() {}
 
 func (x *FirmwareDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[17]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1436,7 +1555,7 @@ func (x *FirmwareDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FirmwareDetails.ProtoReflect.Descriptor instead.
 func (*FirmwareDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{17}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *FirmwareDetails) GetMode() *ObservedString {
@@ -1463,7 +1582,7 @@ type TpmDetails struct {
 
 func (x *TpmDetails) Reset() {
 	*x = TpmDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[18]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1475,7 +1594,7 @@ func (x *TpmDetails) String() string {
 func (*TpmDetails) ProtoMessage() {}
 
 func (x *TpmDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[18]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1488,7 +1607,7 @@ func (x *TpmDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TpmDetails.ProtoReflect.Descriptor instead.
 func (*TpmDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{18}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *TpmDetails) GetPresent() *ObservedBool {
@@ -1516,7 +1635,7 @@ type Battery struct {
 
 func (x *Battery) Reset() {
 	*x = Battery{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[19]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1528,7 +1647,7 @@ func (x *Battery) String() string {
 func (*Battery) ProtoMessage() {}
 
 func (x *Battery) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[19]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1541,7 +1660,7 @@ func (x *Battery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Battery.ProtoReflect.Descriptor instead.
 func (*Battery) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{19}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Battery) GetName() string {
@@ -1575,7 +1694,7 @@ type BatteryDetails struct {
 
 func (x *BatteryDetails) Reset() {
 	*x = BatteryDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[20]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1706,7 @@ func (x *BatteryDetails) String() string {
 func (*BatteryDetails) ProtoMessage() {}
 
 func (x *BatteryDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[20]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1719,7 @@ func (x *BatteryDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatteryDetails.ProtoReflect.Descriptor instead.
 func (*BatteryDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{20}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *BatteryDetails) GetStatus() CollectionStatus {
@@ -1627,7 +1746,7 @@ type PowerDetails struct {
 
 func (x *PowerDetails) Reset() {
 	*x = PowerDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[21]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1639,7 +1758,7 @@ func (x *PowerDetails) String() string {
 func (*PowerDetails) ProtoMessage() {}
 
 func (x *PowerDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[21]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1652,7 +1771,7 @@ func (x *PowerDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PowerDetails.ProtoReflect.Descriptor instead.
 func (*PowerDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{21}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *PowerDetails) GetChassis() *ObservedString {
@@ -1682,7 +1801,7 @@ type SessionCounts struct {
 
 func (x *SessionCounts) Reset() {
 	*x = SessionCounts{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[22]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1694,7 +1813,7 @@ func (x *SessionCounts) String() string {
 func (*SessionCounts) ProtoMessage() {}
 
 func (x *SessionCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[22]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1707,7 +1826,7 @@ func (x *SessionCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionCounts.ProtoReflect.Descriptor instead.
 func (*SessionCounts) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{22}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SessionCounts) GetUsers() *ObservedUint64 {
@@ -1736,7 +1855,8 @@ type ActiveSession struct {
 	UserName     *ObservedString        `protobuf:"bytes,1,opt,name=user_name,json=userName,proto3" json:"user_name,omitempty"`
 	SessionClass *ObservedString        `protobuf:"bytes,2,opt,name=session_class,json=sessionClass,proto3" json:"session_class,omitempty"`
 	SessionType  *ObservedString        `protobuf:"bytes,3,opt,name=session_type,json=sessionType,proto3" json:"session_type,omitempty"`
-	// No seat (for example an SSH session) is UNAVAILABLE, not an invented seat.
+	// Absent seats on proven non-graphical sessions are NOT_APPLICABLE.
+	// Missing seats on local graphical user sessions remain UNAVAILABLE.
 	Seat          *ObservedString `protobuf:"bytes,4,opt,name=seat,proto3" json:"seat,omitempty"`
 	Remote        *ObservedBool   `protobuf:"bytes,5,opt,name=remote,proto3" json:"remote,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1745,7 +1865,7 @@ type ActiveSession struct {
 
 func (x *ActiveSession) Reset() {
 	*x = ActiveSession{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[23]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1757,7 +1877,7 @@ func (x *ActiveSession) String() string {
 func (*ActiveSession) ProtoMessage() {}
 
 func (x *ActiveSession) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[23]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1770,7 +1890,7 @@ func (x *ActiveSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveSession.ProtoReflect.Descriptor instead.
 func (*ActiveSession) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{23}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ActiveSession) GetUserName() *ObservedString {
@@ -1818,7 +1938,7 @@ type ActiveSessions struct {
 
 func (x *ActiveSessions) Reset() {
 	*x = ActiveSessions{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[24]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1830,7 +1950,7 @@ func (x *ActiveSessions) String() string {
 func (*ActiveSessions) ProtoMessage() {}
 
 func (x *ActiveSessions) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[24]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1843,7 +1963,7 @@ func (x *ActiveSessions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveSessions.ProtoReflect.Descriptor instead.
 func (*ActiveSessions) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{24}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ActiveSessions) GetStatus() CollectionStatus {
@@ -1871,7 +1991,7 @@ type LocalUser struct {
 
 func (x *LocalUser) Reset() {
 	*x = LocalUser{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[25]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1883,7 +2003,7 @@ func (x *LocalUser) String() string {
 func (*LocalUser) ProtoMessage() {}
 
 func (x *LocalUser) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[25]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1896,7 +2016,7 @@ func (x *LocalUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalUser.ProtoReflect.Descriptor instead.
 func (*LocalUser) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{25}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *LocalUser) GetUid() uint64 {
@@ -1930,7 +2050,7 @@ type LocalUsers struct {
 
 func (x *LocalUsers) Reset() {
 	*x = LocalUsers{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[26]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1942,7 +2062,7 @@ func (x *LocalUsers) String() string {
 func (*LocalUsers) ProtoMessage() {}
 
 func (x *LocalUsers) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[26]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1955,7 +2075,7 @@ func (x *LocalUsers) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalUsers.ProtoReflect.Descriptor instead.
 func (*LocalUsers) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{26}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *LocalUsers) GetStatus() CollectionStatus {
@@ -1988,7 +2108,7 @@ type BackendDetails struct {
 
 func (x *BackendDetails) Reset() {
 	*x = BackendDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[27]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2000,7 +2120,7 @@ func (x *BackendDetails) String() string {
 func (*BackendDetails) ProtoMessage() {}
 
 func (x *BackendDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[27]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2013,7 +2133,7 @@ func (x *BackendDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackendDetails.ProtoReflect.Descriptor instead.
 func (*BackendDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{27}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *BackendDetails) GetDpkg() *ObservedBool {
@@ -2084,7 +2204,7 @@ type Application struct {
 
 func (x *Application) Reset() {
 	*x = Application{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[28]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2096,7 +2216,7 @@ func (x *Application) String() string {
 func (*Application) ProtoMessage() {}
 
 func (x *Application) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[28]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2109,7 +2229,7 @@ func (x *Application) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Application.ProtoReflect.Descriptor instead.
 func (*Application) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{28}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Application) GetName() string {
@@ -2150,7 +2270,7 @@ type ApplicationDetails struct {
 
 func (x *ApplicationDetails) Reset() {
 	*x = ApplicationDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[29]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2162,7 +2282,7 @@ func (x *ApplicationDetails) String() string {
 func (*ApplicationDetails) ProtoMessage() {}
 
 func (x *ApplicationDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[29]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2175,7 +2295,7 @@ func (x *ApplicationDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplicationDetails.ProtoReflect.Descriptor instead.
 func (*ApplicationDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{29}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ApplicationDetails) GetStatus() CollectionStatus {
@@ -2220,7 +2340,7 @@ type NativeDetails struct {
 
 func (x *NativeDetails) Reset() {
 	*x = NativeDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[30]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2232,7 +2352,7 @@ func (x *NativeDetails) String() string {
 func (*NativeDetails) ProtoMessage() {}
 
 func (x *NativeDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[30]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2245,7 +2365,7 @@ func (x *NativeDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NativeDetails.ProtoReflect.Descriptor instead.
 func (*NativeDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{30}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *NativeDetails) GetCpu() *CpuDetails {
@@ -2382,7 +2502,7 @@ type ModuleObservation struct {
 
 func (x *ModuleObservation) Reset() {
 	*x = ModuleObservation{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[31]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2394,7 +2514,7 @@ func (x *ModuleObservation) String() string {
 func (*ModuleObservation) ProtoMessage() {}
 
 func (x *ModuleObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[31]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2407,7 +2527,7 @@ func (x *ModuleObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModuleObservation.ProtoReflect.Descriptor instead.
 func (*ModuleObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{31}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ModuleObservation) GetStatus() CollectionStatus {
@@ -2452,18 +2572,114 @@ func (x *ModuleObservation) GetContext() string {
 	return ""
 }
 
-type RepositoryObservation struct {
+// Native enabled configuration, not evidence of network reachability or entitlement.
+// URL userinfo, queries and fragments are omitted because they may contain secrets.
+type RepositoryConfiguration struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        CollectionStatus       `protobuf:"varint,1,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
-	Ids           []string               `protobuf:"bytes,2,rep,name=ids,proto3" json:"ids,omitempty"`
-	Backend       string                 `protobuf:"bytes,3,opt,name=backend,proto3" json:"backend,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	BaseUrls      []string               `protobuf:"bytes,2,rep,name=base_urls,json=baseUrls,proto3" json:"base_urls,omitempty"`
+	Metalink      string                 `protobuf:"bytes,3,opt,name=metalink,proto3" json:"metalink,omitempty"`
+	Mirrorlist    string                 `protobuf:"bytes,4,opt,name=mirrorlist,proto3" json:"mirrorlist,omitempty"`
+	Gpgcheck      bool                   `protobuf:"varint,5,opt,name=gpgcheck,proto3" json:"gpgcheck,omitempty"`
+	GpgKeys       []string               `protobuf:"bytes,6,rep,name=gpg_keys,json=gpgKeys,proto3" json:"gpg_keys,omitempty"`
+	UrlsRedacted  bool                   `protobuf:"varint,7,opt,name=urls_redacted,json=urlsRedacted,proto3" json:"urls_redacted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *RepositoryConfiguration) Reset() {
+	*x = RepositoryConfiguration{}
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RepositoryConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RepositoryConfiguration) ProtoMessage() {}
+
+func (x *RepositoryConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RepositoryConfiguration.ProtoReflect.Descriptor instead.
+func (*RepositoryConfiguration) Descriptor() ([]byte, []int) {
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RepositoryConfiguration) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RepositoryConfiguration) GetBaseUrls() []string {
+	if x != nil {
+		return x.BaseUrls
+	}
+	return nil
+}
+
+func (x *RepositoryConfiguration) GetMetalink() string {
+	if x != nil {
+		return x.Metalink
+	}
+	return ""
+}
+
+func (x *RepositoryConfiguration) GetMirrorlist() string {
+	if x != nil {
+		return x.Mirrorlist
+	}
+	return ""
+}
+
+func (x *RepositoryConfiguration) GetGpgcheck() bool {
+	if x != nil {
+		return x.Gpgcheck
+	}
+	return false
+}
+
+func (x *RepositoryConfiguration) GetGpgKeys() []string {
+	if x != nil {
+		return x.GpgKeys
+	}
+	return nil
+}
+
+func (x *RepositoryConfiguration) GetUrlsRedacted() bool {
+	if x != nil {
+		return x.UrlsRedacted
+	}
+	return false
+}
+
+type RepositoryObservation struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Status  CollectionStatus       `protobuf:"varint,1,opt,name=status,proto3,enum=lindm.inventory.v1.CollectionStatus" json:"status,omitempty"`
+	Ids     []string               `protobuf:"bytes,2,rep,name=ids,proto3" json:"ids,omitempty"`
+	Backend string                 `protobuf:"bytes,3,opt,name=backend,proto3" json:"backend,omitempty"`
+	// Absent on historical observations. Current collectors populate one per ID.
+	Configurations []*RepositoryConfiguration `protobuf:"bytes,4,rep,name=configurations,proto3" json:"configurations,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
 func (x *RepositoryObservation) Reset() {
 	*x = RepositoryObservation{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[32]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +2691,7 @@ func (x *RepositoryObservation) String() string {
 func (*RepositoryObservation) ProtoMessage() {}
 
 func (x *RepositoryObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[32]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +2704,7 @@ func (x *RepositoryObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RepositoryObservation.ProtoReflect.Descriptor instead.
 func (*RepositoryObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{32}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RepositoryObservation) GetStatus() CollectionStatus {
@@ -2512,18 +2728,28 @@ func (x *RepositoryObservation) GetBackend() string {
 	return ""
 }
 
+func (x *RepositoryObservation) GetConfigurations() []*RepositoryConfiguration {
+	if x != nil {
+		return x.Configurations
+	}
+	return nil
+}
+
 type PlatformDetails struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Cpe            *ObservedString        `protobuf:"bytes,1,opt,name=cpe,proto3" json:"cpe,omitempty"`
 	ReleaseverLock *ObservedString        `protobuf:"bytes,2,opt,name=releasever_lock,json=releaseverLock,proto3" json:"releasever_lock,omitempty"`
 	Repositories   *RepositoryObservation `protobuf:"bytes,3,opt,name=repositories,proto3" json:"repositories,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Effective native variable after RPM detection and configured overrides.
+	// Unlike releasever_lock, this is not evidence of an explicit release pin.
+	Releasever    *ObservedString `protobuf:"bytes,4,opt,name=releasever,proto3" json:"releasever,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PlatformDetails) Reset() {
 	*x = PlatformDetails{}
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[33]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2535,7 +2761,7 @@ func (x *PlatformDetails) String() string {
 func (*PlatformDetails) ProtoMessage() {}
 
 func (x *PlatformDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[33]
+	mi := &file_lindm_inventory_v1_observation_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2548,7 +2774,7 @@ func (x *PlatformDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlatformDetails.ProtoReflect.Descriptor instead.
 func (*PlatformDetails) Descriptor() ([]byte, []int) {
-	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{33}
+	return file_lindm_inventory_v1_observation_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *PlatformDetails) GetCpe() *ObservedString {
@@ -2568,6 +2794,13 @@ func (x *PlatformDetails) GetReleaseverLock() *ObservedString {
 func (x *PlatformDetails) GetRepositories() *RepositoryObservation {
 	if x != nil {
 		return x.Repositories
+	}
+	return nil
+}
+
+func (x *PlatformDetails) GetReleasever() *ObservedString {
+	if x != nil {
+		return x.Releasever
 	}
 	return nil
 }
@@ -2611,14 +2844,24 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	" \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\rhardwareModel\x12S\n" +
 	"\x0fhardware_serial\x18\v \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x0ehardwareSerial\x12;\n" +
 	"\adetails\x18\f \x01(\v2!.lindm.inventory.v1.NativeDetailsR\adetails:p\xbaHm\x1ak\n" +
-	"\x16observation.time_order\x12,collection finish must not precede its start\x1a#this.finished_at >= this.started_at\"\xbe\x04\n" +
+	"\x16observation.time_order\x12,collection finish must not precede its start\x1a#this.finished_at >= this.started_at\"\xd1\x04\n" +
+	"\x0fRootObservation\x12A\n" +
+	"\n" +
+	"started_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tstartedAt\x12C\n" +
+	"\vfinished_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"finishedAt\x12!\n" +
+	"\aboot_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12S\n" +
+	"\x0fhardware_serial\x18\x04 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x0ehardwareSerial\x12G\n" +
+	"\bfirmware\x18\x05 \x01(\v2#.lindm.inventory.v1.FirmwareDetailsB\x06\xbaH\x03\xc8\x01\x01R\bfirmware\x12D\n" +
+	"\astorage\x18\x06 \x01(\v2\".lindm.inventory.v1.StorageDetailsB\x06\xbaH\x03\xc8\x01\x01R\astorage\x128\n" +
+	"\x03cpu\x18\a \x01(\v2\x1e.lindm.inventory.v1.CpuDetailsB\x06\xbaH\x03\xc8\x01\x01R\x03cpu:u\xbaHr\x1ap\n" +
+	"\x1broot_observation.time_order\x12,collection finish must not precede its start\x1a#this.finished_at >= this.started_at\"\xc0\x04\n" +
 	"\x12PackageObservation\x12A\n" +
 	"\n" +
 	"started_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tstartedAt\x12C\n" +
 	"\vfinished_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"finishedAt\x12H\n" +
-	"\x06status\x18\x03 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12!\n" +
+	"finishedAt\x12J\n" +
+	"\x06status\x18\x03 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\f\xbaH\t\x82\x01\x06\x10\x01 \x00 \bR\x06status\x12!\n" +
 	"\abackend\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18@R\abackend\x12C\n" +
 	"\bpackages\x18\x05 \x03(\v2\x1b.lindm.inventory.v1.PackageB\n" +
 	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\bpackages:\xed\x01\xbaH\xe9\x01\x1a}\n" +
@@ -2643,14 +2886,16 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12*\n" +
 	"\x06values\x18\x02 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\"\br\x06\x18\x80\x02\xd0\x01\x01R\x06values:k\xbaHh\x1af\n" +
-	"\x0evalues.failure\x12'failed collections have no partial rows\x1a+this.status == 1 || this.values.size() == 0\"\xc0\x02\n" +
+	"\x0evalues.failure\x12'failed collections have no partial rows\x1a+this.status == 1 || this.values.size() == 0\"\xd2\x05\n" +
 	"\n" +
 	"CpuDetails\x12@\n" +
 	"\x05model\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x05model\x12O\n" +
 	"\rlogical_cores\x18\x02 \x01(\v2\".lindm.inventory.v1.ObservedUint64B\x06\xbaH\x03\xc8\x01\x01R\flogicalCores\x12Q\n" +
 	"\x0ephysical_cores\x18\x03 \x01(\v2\".lindm.inventory.v1.ObservedUint64B\x06\xbaH\x03\xc8\x01\x01R\rphysicalCores\x12L\n" +
 	"\fx86_64_level\x18\x04 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"x8664Level\"\x87\x02\n" +
+	"x8664Level\x12E\n" +
+	"\fmodel_source\x18\x05 \x01(\v2\".lindm.inventory.v1.ObservedStringR\vmodelSource:\xc8\x02\xbaH\xc4\x02\x1a\xc1\x02\n" +
+	"\x10cpu.model_source\x12Ycurrent CPU model source matches its observation status and identifies a native interface\x1a\xd1\x01!has(this.model_source) || (this.model_source.status == this.model.status && (this.model_source.status != 1 || this.model_source.value in ['proc_cpuinfo', 'smbios_type4', 'arm_midr_procfs', 'arm_midr_sysfs']))\"\x87\x02\n" +
 	"\rMemoryDetails\x12K\n" +
 	"\vtotal_bytes\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedUint64B\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"totalBytes\x12S\n" +
@@ -2672,7 +2917,7 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\n" +
 	"encryption\x18\a \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"encryption\x12?\n" +
-	"\bidentity\x18\b \x01(\v2#.lindm.inventory.v1.StorageIdentityR\bidentity\"\x9d\n" +
+	"\bidentity\x18\b \x01(\v2#.lindm.inventory.v1.StorageIdentityR\bidentity\"\xe5\n" +
 	"\n" +
 	"\x0fStorageIdentity\x12H\n" +
 	"\ttransport\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\ttransport\x12@\n" +
@@ -2692,7 +2937,8 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x10luks_token_types\x18\x0e \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x0eluksTokenTypes\x12M\n" +
 	"\fbacking_disk\x18\x0f \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\vbackingDisk\x12K\n" +
 	"\froot_backing\x18\x10 \x01(\v2 .lindm.inventory.v1.ObservedBoolB\x06\xbaH\x03\xc8\x01\x01R\vrootBacking\x12A\n" +
-	"\x04nvme\x18\x11 \x01(\v2%.lindm.inventory.v1.ObservedNVMeScopeB\x06\xbaH\x03\xc8\x01\x01R\x04nvme\"\xb5\x03\n" +
+	"\x04nvme\x18\x11 \x01(\v2%.lindm.inventory.v1.ObservedNVMeScopeB\x06\xbaH\x03\xc8\x01\x01R\x04nvme\x12F\n" +
+	"\rgpt_disk_guid\x18\x12 \x01(\v2\".lindm.inventory.v1.ObservedStringR\vgptDiskGuid\"\xb5\x03\n" +
 	"\x11ObservedNVMeScope\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x127\n" +
@@ -2743,13 +2989,14 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\rSessionCounts\x12@\n" +
 	"\x05users\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedUint64B\x06\xbaH\x03\xc8\x01\x01R\x05users\x12F\n" +
 	"\bsessions\x18\x02 \x01(\v2\".lindm.inventory.v1.ObservedUint64B\x06\xbaH\x03\xc8\x01\x01R\bsessions\x12K\n" +
-	"\x0factive_sessions\x18\x03 \x01(\v2\".lindm.inventory.v1.ActiveSessionsR\x0eactiveSessions\"\xfa\x02\n" +
+	"\x0factive_sessions\x18\x03 \x01(\v2\".lindm.inventory.v1.ActiveSessionsR\x0eactiveSessions\"\xdc\x05\n" +
 	"\rActiveSession\x12G\n" +
 	"\tuser_name\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\buserName\x12O\n" +
 	"\rsession_class\x18\x02 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\fsessionClass\x12M\n" +
 	"\fsession_type\x18\x03 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\vsessionType\x12>\n" +
 	"\x04seat\x18\x04 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x04seat\x12@\n" +
-	"\x06remote\x18\x05 \x01(\v2 .lindm.inventory.v1.ObservedBoolB\x06\xbaH\x03\xc8\x01\x01R\x06remote\"\x9c\x02\n" +
+	"\x06remote\x18\x05 \x01(\v2 .lindm.inventory.v1.ObservedBoolB\x06\xbaH\x03\xc8\x01\x01R\x06remote:\xdf\x02\xbaH\xdb\x02\x1a\xd8\x02\n" +
+	"\x1asession.seat_applicability\x12Na non-applicable seat requires successful native non-graphical session context\x1a\xe9\x01this.seat.status != 8 || (this.session_class.status == 1 && this.session_type.status == 1 && this.remote.status == 1 && (this.session_class.value in ['manager', 'background'] || this.remote.value || this.session_type.value == 'tty'))\"\x9c\x02\n" +
 	"\x0eActiveSessions\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12H\n" +
@@ -2815,17 +3062,33 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x06stream\x18\x04 \x01(\tB*\xbaH'r%\x18\x80\x022 ^([A-Za-z0-9][A-Za-z0-9+_.-]*)?$R\x06stream\x12+\n" +
 	"\aversion\x18\x05 \x01(\tB\x11\xbaH\x0er\f\x18 2\b^[0-9]*$R\aversion\x12D\n" +
 	"\acontext\x18\x06 \x01(\tB*\xbaH'r%\x18\x80\x022 ^([A-Za-z0-9][A-Za-z0-9+_.-]*)?$R\acontext:\xc8\x02\xbaH\xc4\x02\x1a\xc1\x02\n" +
-	"\x15module.identity_shape\x12Honly a successful modular observation carries a complete native identity\x1a\xdd\x01(this.status == 1 && this.modular) ? (this.name != '' && this.stream != '' && this.version != '' && this.context != '') : (!this.modular && this.name == '' && this.stream == '' && this.version == '' && this.context == '')\"\xfd\x02\n" +
+	"\x15module.identity_shape\x12Honly a successful modular observation carries a complete native identity\x1a\xdd\x01(this.status == 1 && this.modular) ? (this.name != '' && this.stream != '' && this.version != '' && this.context != '') : (!this.modular && this.name == '' && this.stream == '' && this.version == '' && this.context == '')\"\xa4\x02\n" +
+	"\x17RepositoryConfiguration\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x02id\x12.\n" +
+	"\tbase_urls\x18\x02 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10 \"\ar\x05\x10\x01\x18\x80 R\bbaseUrls\x12$\n" +
+	"\bmetalink\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\bmetalink\x12(\n" +
+	"\n" +
+	"mirrorlist\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\n" +
+	"mirrorlist\x12\x1a\n" +
+	"\bgpgcheck\x18\x05 \x01(\bR\bgpgcheck\x12,\n" +
+	"\bgpg_keys\x18\x06 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10 \"\ar\x05\x10\x01\x18\x80 R\agpgKeys\x12#\n" +
+	"\rurls_redacted\x18\a \x01(\bR\furlsRedacted\"\xa2\x06\n" +
 	"\x15RepositoryObservation\x12H\n" +
 	"\x06status\x18\x01 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12&\n" +
 	"\x03ids\x18\x02 \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x80\x02\x18\x01\"\ar\x05\x10\x01\x18\x80\x02R\x03ids\x12!\n" +
-	"\abackend\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\abackend:\xce\x01\xbaH\xca\x01\x1a\xc7\x01\n" +
-	"\x14repositories.failure\x12Ysuccessful repositories identify their native backend; failures carry no partial evidence\x1aTthis.status == 1 ? this.backend != '' : (this.ids.size() == 0 && this.backend == '')\"\xfb\x01\n" +
+	"\abackend\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\abackend\x12^\n" +
+	"\x0econfigurations\x18\x04 \x03(\v2+.lindm.inventory.v1.RepositoryConfigurationB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\x0econfigurations:\x93\x04\xbaH\x8f\x04\x1a\xea\x01\n" +
+	"\x14repositories.failure\x12Ysuccessful repositories identify their native backend; failures carry no partial evidence\x1awthis.status == 1 ? this.backend != '' : (this.ids.size() == 0 && this.backend == '' && this.configurations.size() == 0)\x1a\x9f\x02\n" +
+	"\x1brepositories.configurations\x128repository configurations uniquely match the enabled IDs\x1a\xc5\x01this.configurations.size() == 0 || (this.configurations.size() == this.ids.size() && this.configurations.all(r, r.id in this.ids && this.configurations.filter(other, other.id == r.id).size() == 1))\"\xbf\x02\n" +
 	"\x0fPlatformDetails\x12<\n" +
 	"\x03cpe\x18\x01 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x03cpe\x12S\n" +
 	"\x0freleasever_lock\x18\x02 \x01(\v2\".lindm.inventory.v1.ObservedStringB\x06\xbaH\x03\xc8\x01\x01R\x0ereleaseverLock\x12U\n" +
-	"\frepositories\x18\x03 \x01(\v2).lindm.inventory.v1.RepositoryObservationB\x06\xbaH\x03\xc8\x01\x01R\frepositories*\xbc\x02\n" +
+	"\frepositories\x18\x03 \x01(\v2).lindm.inventory.v1.RepositoryObservationB\x06\xbaH\x03\xc8\x01\x01R\frepositories\x12B\n" +
+	"\n" +
+	"releasever\x18\x04 \x01(\v2\".lindm.inventory.v1.ObservedStringR\n" +
+	"releasever*\xe2\x02\n" +
 	"\x10CollectionStatus\x12!\n" +
 	"\x1dCOLLECTION_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19COLLECTION_STATUS_SUCCESS\x10\x01\x12!\n" +
@@ -2834,7 +3097,8 @@ const file_lindm_inventory_v1_observation_proto_rawDesc = "" +
 	"\x19COLLECTION_STATUS_TIMEOUT\x10\x04\x12$\n" +
 	" COLLECTION_STATUS_INVALID_OUTPUT\x10\x05\x12'\n" +
 	"#COLLECTION_STATUS_CAPACITY_EXCEEDED\x10\x06\x12,\n" +
-	"(COLLECTION_STATUS_NATIVE_COMMAND_FAILURE\x10\a*\xa4\x01\n" +
+	"(COLLECTION_STATUS_NATIVE_COMMAND_FAILURE\x10\a\x12$\n" +
+	" COLLECTION_STATUS_NOT_APPLICABLE\x10\b*\xa4\x01\n" +
 	"\rSnapshotState\x12\x1e\n" +
 	"\x1aSNAPSHOT_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16SNAPSHOT_STATE_STAGING\x10\x01\x12\x1c\n" +
@@ -2855,53 +3119,55 @@ func file_lindm_inventory_v1_observation_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_inventory_v1_observation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_inventory_v1_observation_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_lindm_inventory_v1_observation_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_lindm_inventory_v1_observation_proto_goTypes = []any{
 	(CollectionStatus)(0),                   // 0: lindm.inventory.v1.CollectionStatus
 	(SnapshotState)(0),                      // 1: lindm.inventory.v1.SnapshotState
 	(*Package)(nil),                         // 2: lindm.inventory.v1.Package
 	(*ObservedString)(nil),                  // 3: lindm.inventory.v1.ObservedString
 	(*HostObservation)(nil),                 // 4: lindm.inventory.v1.HostObservation
-	(*PackageObservation)(nil),              // 5: lindm.inventory.v1.PackageObservation
-	(*PackageBatch)(nil),                    // 6: lindm.inventory.v1.PackageBatch
-	(*NativeObservation)(nil),               // 7: lindm.inventory.v1.NativeObservation
-	(*ObservedUint64)(nil),                  // 8: lindm.inventory.v1.ObservedUint64
-	(*ObservedBool)(nil),                    // 9: lindm.inventory.v1.ObservedBool
-	(*ObservedStrings)(nil),                 // 10: lindm.inventory.v1.ObservedStrings
-	(*CpuDetails)(nil),                      // 11: lindm.inventory.v1.CpuDetails
-	(*MemoryDetails)(nil),                   // 12: lindm.inventory.v1.MemoryDetails
-	(*BlockDevice)(nil),                     // 13: lindm.inventory.v1.BlockDevice
-	(*StorageIdentity)(nil),                 // 14: lindm.inventory.v1.StorageIdentity
-	(*ObservedNVMeScope)(nil),               // 15: lindm.inventory.v1.ObservedNVMeScope
-	(*StorageDetails)(nil),                  // 16: lindm.inventory.v1.StorageDetails
-	(*NetworkInterface)(nil),                // 17: lindm.inventory.v1.NetworkInterface
-	(*NetworkDetails)(nil),                  // 18: lindm.inventory.v1.NetworkDetails
-	(*FirmwareDetails)(nil),                 // 19: lindm.inventory.v1.FirmwareDetails
-	(*TpmDetails)(nil),                      // 20: lindm.inventory.v1.TpmDetails
-	(*Battery)(nil),                         // 21: lindm.inventory.v1.Battery
-	(*BatteryDetails)(nil),                  // 22: lindm.inventory.v1.BatteryDetails
-	(*PowerDetails)(nil),                    // 23: lindm.inventory.v1.PowerDetails
-	(*SessionCounts)(nil),                   // 24: lindm.inventory.v1.SessionCounts
-	(*ActiveSession)(nil),                   // 25: lindm.inventory.v1.ActiveSession
-	(*ActiveSessions)(nil),                  // 26: lindm.inventory.v1.ActiveSessions
-	(*LocalUser)(nil),                       // 27: lindm.inventory.v1.LocalUser
-	(*LocalUsers)(nil),                      // 28: lindm.inventory.v1.LocalUsers
-	(*BackendDetails)(nil),                  // 29: lindm.inventory.v1.BackendDetails
-	(*Application)(nil),                     // 30: lindm.inventory.v1.Application
-	(*ApplicationDetails)(nil),              // 31: lindm.inventory.v1.ApplicationDetails
-	(*NativeDetails)(nil),                   // 32: lindm.inventory.v1.NativeDetails
-	(*ModuleObservation)(nil),               // 33: lindm.inventory.v1.ModuleObservation
-	(*RepositoryObservation)(nil),           // 34: lindm.inventory.v1.RepositoryObservation
-	(*PlatformDetails)(nil),                 // 35: lindm.inventory.v1.PlatformDetails
-	(*timestamppb.Timestamp)(nil),           // 36: google.protobuf.Timestamp
-	(*v1.NVMeSanitizeScope)(nil),            // 37: lindm.agent.v1.NVMeSanitizeScope
-	(*v1.RecoveryReadinessObservation)(nil), // 38: lindm.agent.v1.RecoveryReadinessObservation
+	(*RootObservation)(nil),                 // 5: lindm.inventory.v1.RootObservation
+	(*PackageObservation)(nil),              // 6: lindm.inventory.v1.PackageObservation
+	(*PackageBatch)(nil),                    // 7: lindm.inventory.v1.PackageBatch
+	(*NativeObservation)(nil),               // 8: lindm.inventory.v1.NativeObservation
+	(*ObservedUint64)(nil),                  // 9: lindm.inventory.v1.ObservedUint64
+	(*ObservedBool)(nil),                    // 10: lindm.inventory.v1.ObservedBool
+	(*ObservedStrings)(nil),                 // 11: lindm.inventory.v1.ObservedStrings
+	(*CpuDetails)(nil),                      // 12: lindm.inventory.v1.CpuDetails
+	(*MemoryDetails)(nil),                   // 13: lindm.inventory.v1.MemoryDetails
+	(*BlockDevice)(nil),                     // 14: lindm.inventory.v1.BlockDevice
+	(*StorageIdentity)(nil),                 // 15: lindm.inventory.v1.StorageIdentity
+	(*ObservedNVMeScope)(nil),               // 16: lindm.inventory.v1.ObservedNVMeScope
+	(*StorageDetails)(nil),                  // 17: lindm.inventory.v1.StorageDetails
+	(*NetworkInterface)(nil),                // 18: lindm.inventory.v1.NetworkInterface
+	(*NetworkDetails)(nil),                  // 19: lindm.inventory.v1.NetworkDetails
+	(*FirmwareDetails)(nil),                 // 20: lindm.inventory.v1.FirmwareDetails
+	(*TpmDetails)(nil),                      // 21: lindm.inventory.v1.TpmDetails
+	(*Battery)(nil),                         // 22: lindm.inventory.v1.Battery
+	(*BatteryDetails)(nil),                  // 23: lindm.inventory.v1.BatteryDetails
+	(*PowerDetails)(nil),                    // 24: lindm.inventory.v1.PowerDetails
+	(*SessionCounts)(nil),                   // 25: lindm.inventory.v1.SessionCounts
+	(*ActiveSession)(nil),                   // 26: lindm.inventory.v1.ActiveSession
+	(*ActiveSessions)(nil),                  // 27: lindm.inventory.v1.ActiveSessions
+	(*LocalUser)(nil),                       // 28: lindm.inventory.v1.LocalUser
+	(*LocalUsers)(nil),                      // 29: lindm.inventory.v1.LocalUsers
+	(*BackendDetails)(nil),                  // 30: lindm.inventory.v1.BackendDetails
+	(*Application)(nil),                     // 31: lindm.inventory.v1.Application
+	(*ApplicationDetails)(nil),              // 32: lindm.inventory.v1.ApplicationDetails
+	(*NativeDetails)(nil),                   // 33: lindm.inventory.v1.NativeDetails
+	(*ModuleObservation)(nil),               // 34: lindm.inventory.v1.ModuleObservation
+	(*RepositoryConfiguration)(nil),         // 35: lindm.inventory.v1.RepositoryConfiguration
+	(*RepositoryObservation)(nil),           // 36: lindm.inventory.v1.RepositoryObservation
+	(*PlatformDetails)(nil),                 // 37: lindm.inventory.v1.PlatformDetails
+	(*timestamppb.Timestamp)(nil),           // 38: google.protobuf.Timestamp
+	(*v1.NVMeSanitizeScope)(nil),            // 39: lindm.agent.v1.NVMeSanitizeScope
+	(*v1.RecoveryReadinessObservation)(nil), // 40: lindm.agent.v1.RecoveryReadinessObservation
 }
 var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
-	33,  // 0: lindm.inventory.v1.Package.module:type_name -> lindm.inventory.v1.ModuleObservation
+	34,  // 0: lindm.inventory.v1.Package.module:type_name -> lindm.inventory.v1.ModuleObservation
 	0,   // 1: lindm.inventory.v1.ObservedString.status:type_name -> lindm.inventory.v1.CollectionStatus
-	36,  // 2: lindm.inventory.v1.HostObservation.started_at:type_name -> google.protobuf.Timestamp
-	36,  // 3: lindm.inventory.v1.HostObservation.finished_at:type_name -> google.protobuf.Timestamp
+	38,  // 2: lindm.inventory.v1.HostObservation.started_at:type_name -> google.protobuf.Timestamp
+	38,  // 3: lindm.inventory.v1.HostObservation.finished_at:type_name -> google.protobuf.Timestamp
 	3,   // 4: lindm.inventory.v1.HostObservation.boot_id:type_name -> lindm.inventory.v1.ObservedString
 	3,   // 5: lindm.inventory.v1.HostObservation.hostname:type_name -> lindm.inventory.v1.ObservedString
 	3,   // 6: lindm.inventory.v1.HostObservation.os_id:type_name -> lindm.inventory.v1.ObservedString
@@ -2911,121 +3177,131 @@ var file_lindm_inventory_v1_observation_proto_depIdxs = []int32{
 	3,   // 10: lindm.inventory.v1.HostObservation.hardware_vendor:type_name -> lindm.inventory.v1.ObservedString
 	3,   // 11: lindm.inventory.v1.HostObservation.hardware_model:type_name -> lindm.inventory.v1.ObservedString
 	3,   // 12: lindm.inventory.v1.HostObservation.hardware_serial:type_name -> lindm.inventory.v1.ObservedString
-	32,  // 13: lindm.inventory.v1.HostObservation.details:type_name -> lindm.inventory.v1.NativeDetails
-	36,  // 14: lindm.inventory.v1.PackageObservation.started_at:type_name -> google.protobuf.Timestamp
-	36,  // 15: lindm.inventory.v1.PackageObservation.finished_at:type_name -> google.protobuf.Timestamp
-	0,   // 16: lindm.inventory.v1.PackageObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	2,   // 17: lindm.inventory.v1.PackageObservation.packages:type_name -> lindm.inventory.v1.Package
-	2,   // 18: lindm.inventory.v1.PackageBatch.packages:type_name -> lindm.inventory.v1.Package
-	4,   // 19: lindm.inventory.v1.NativeObservation.host:type_name -> lindm.inventory.v1.HostObservation
-	5,   // 20: lindm.inventory.v1.NativeObservation.packages:type_name -> lindm.inventory.v1.PackageObservation
-	0,   // 21: lindm.inventory.v1.ObservedUint64.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 22: lindm.inventory.v1.ObservedBool.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 23: lindm.inventory.v1.ObservedStrings.status:type_name -> lindm.inventory.v1.CollectionStatus
-	3,   // 24: lindm.inventory.v1.CpuDetails.model:type_name -> lindm.inventory.v1.ObservedString
-	8,   // 25: lindm.inventory.v1.CpuDetails.logical_cores:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 26: lindm.inventory.v1.CpuDetails.physical_cores:type_name -> lindm.inventory.v1.ObservedUint64
-	3,   // 27: lindm.inventory.v1.CpuDetails.x86_64_level:type_name -> lindm.inventory.v1.ObservedString
-	8,   // 28: lindm.inventory.v1.MemoryDetails.total_bytes:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 29: lindm.inventory.v1.MemoryDetails.available_bytes:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 30: lindm.inventory.v1.MemoryDetails.swap_total_bytes:type_name -> lindm.inventory.v1.ObservedUint64
-	3,   // 31: lindm.inventory.v1.BlockDevice.type:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 32: lindm.inventory.v1.BlockDevice.parent:type_name -> lindm.inventory.v1.ObservedString
-	8,   // 33: lindm.inventory.v1.BlockDevice.size_bytes:type_name -> lindm.inventory.v1.ObservedUint64
-	3,   // 34: lindm.inventory.v1.BlockDevice.filesystem:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 35: lindm.inventory.v1.BlockDevice.mountpoint:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 36: lindm.inventory.v1.BlockDevice.encryption:type_name -> lindm.inventory.v1.ObservedString
-	14,  // 37: lindm.inventory.v1.BlockDevice.identity:type_name -> lindm.inventory.v1.StorageIdentity
-	3,   // 38: lindm.inventory.v1.StorageIdentity.transport:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 39: lindm.inventory.v1.StorageIdentity.model:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 40: lindm.inventory.v1.StorageIdentity.serial:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 41: lindm.inventory.v1.StorageIdentity.firmware:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 42: lindm.inventory.v1.StorageIdentity.wwn:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 43: lindm.inventory.v1.StorageIdentity.eui:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 44: lindm.inventory.v1.StorageIdentity.partition_uuid:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 45: lindm.inventory.v1.StorageIdentity.partition_type:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 46: lindm.inventory.v1.StorageIdentity.filesystem_uuid:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 47: lindm.inventory.v1.StorageIdentity.luks_uuid:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 48: lindm.inventory.v1.StorageIdentity.luks_version:type_name -> lindm.inventory.v1.ObservedString
-	8,   // 49: lindm.inventory.v1.StorageIdentity.luks_keyslot_count:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 50: lindm.inventory.v1.StorageIdentity.luks_token_count:type_name -> lindm.inventory.v1.ObservedUint64
-	3,   // 51: lindm.inventory.v1.StorageIdentity.luks_token_types:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 52: lindm.inventory.v1.StorageIdentity.backing_disk:type_name -> lindm.inventory.v1.ObservedString
-	9,   // 53: lindm.inventory.v1.StorageIdentity.root_backing:type_name -> lindm.inventory.v1.ObservedBool
-	15,  // 54: lindm.inventory.v1.StorageIdentity.nvme:type_name -> lindm.inventory.v1.ObservedNVMeScope
-	0,   // 55: lindm.inventory.v1.ObservedNVMeScope.status:type_name -> lindm.inventory.v1.CollectionStatus
-	37,  // 56: lindm.inventory.v1.ObservedNVMeScope.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	0,   // 57: lindm.inventory.v1.StorageDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
-	13,  // 58: lindm.inventory.v1.StorageDetails.devices:type_name -> lindm.inventory.v1.BlockDevice
-	3,   // 59: lindm.inventory.v1.NetworkInterface.mac:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 60: lindm.inventory.v1.NetworkInterface.link:type_name -> lindm.inventory.v1.ObservedString
-	10,  // 61: lindm.inventory.v1.NetworkInterface.addresses:type_name -> lindm.inventory.v1.ObservedStrings
-	9,   // 62: lindm.inventory.v1.NetworkInterface.default_route_ipv4:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 63: lindm.inventory.v1.NetworkInterface.default_route_ipv6:type_name -> lindm.inventory.v1.ObservedBool
-	0,   // 64: lindm.inventory.v1.NetworkDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
-	17,  // 65: lindm.inventory.v1.NetworkDetails.interfaces:type_name -> lindm.inventory.v1.NetworkInterface
-	3,   // 66: lindm.inventory.v1.FirmwareDetails.mode:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 67: lindm.inventory.v1.FirmwareDetails.secure_boot:type_name -> lindm.inventory.v1.ObservedString
-	9,   // 68: lindm.inventory.v1.TpmDetails.present:type_name -> lindm.inventory.v1.ObservedBool
-	3,   // 69: lindm.inventory.v1.TpmDetails.version:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 70: lindm.inventory.v1.Battery.status:type_name -> lindm.inventory.v1.ObservedString
-	8,   // 71: lindm.inventory.v1.Battery.capacity_percent:type_name -> lindm.inventory.v1.ObservedUint64
-	0,   // 72: lindm.inventory.v1.BatteryDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
-	21,  // 73: lindm.inventory.v1.BatteryDetails.items:type_name -> lindm.inventory.v1.Battery
-	3,   // 74: lindm.inventory.v1.PowerDetails.chassis:type_name -> lindm.inventory.v1.ObservedString
-	22,  // 75: lindm.inventory.v1.PowerDetails.batteries:type_name -> lindm.inventory.v1.BatteryDetails
-	8,   // 76: lindm.inventory.v1.SessionCounts.users:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 77: lindm.inventory.v1.SessionCounts.sessions:type_name -> lindm.inventory.v1.ObservedUint64
-	26,  // 78: lindm.inventory.v1.SessionCounts.active_sessions:type_name -> lindm.inventory.v1.ActiveSessions
-	3,   // 79: lindm.inventory.v1.ActiveSession.user_name:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 80: lindm.inventory.v1.ActiveSession.session_class:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 81: lindm.inventory.v1.ActiveSession.session_type:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 82: lindm.inventory.v1.ActiveSession.seat:type_name -> lindm.inventory.v1.ObservedString
-	9,   // 83: lindm.inventory.v1.ActiveSession.remote:type_name -> lindm.inventory.v1.ObservedBool
-	0,   // 84: lindm.inventory.v1.ActiveSessions.status:type_name -> lindm.inventory.v1.CollectionStatus
-	25,  // 85: lindm.inventory.v1.ActiveSessions.sessions:type_name -> lindm.inventory.v1.ActiveSession
-	0,   // 86: lindm.inventory.v1.LocalUsers.status:type_name -> lindm.inventory.v1.CollectionStatus
-	27,  // 87: lindm.inventory.v1.LocalUsers.users:type_name -> lindm.inventory.v1.LocalUser
-	9,   // 88: lindm.inventory.v1.BackendDetails.dpkg:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 89: lindm.inventory.v1.BackendDetails.rpm:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 90: lindm.inventory.v1.BackendDetails.pacman:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 91: lindm.inventory.v1.BackendDetails.zypper:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 92: lindm.inventory.v1.BackendDetails.rpm_ostree:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 93: lindm.inventory.v1.BackendDetails.nix:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 94: lindm.inventory.v1.BackendDetails.flatpak:type_name -> lindm.inventory.v1.ObservedBool
-	9,   // 95: lindm.inventory.v1.BackendDetails.snap:type_name -> lindm.inventory.v1.ObservedBool
-	3,   // 96: lindm.inventory.v1.Application.version:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 97: lindm.inventory.v1.Application.architecture:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 98: lindm.inventory.v1.Application.scope:type_name -> lindm.inventory.v1.ObservedString
-	0,   // 99: lindm.inventory.v1.ApplicationDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
-	30,  // 100: lindm.inventory.v1.ApplicationDetails.applications:type_name -> lindm.inventory.v1.Application
-	11,  // 101: lindm.inventory.v1.NativeDetails.cpu:type_name -> lindm.inventory.v1.CpuDetails
-	12,  // 102: lindm.inventory.v1.NativeDetails.memory:type_name -> lindm.inventory.v1.MemoryDetails
-	16,  // 103: lindm.inventory.v1.NativeDetails.storage:type_name -> lindm.inventory.v1.StorageDetails
-	18,  // 104: lindm.inventory.v1.NativeDetails.network:type_name -> lindm.inventory.v1.NetworkDetails
-	19,  // 105: lindm.inventory.v1.NativeDetails.firmware:type_name -> lindm.inventory.v1.FirmwareDetails
-	20,  // 106: lindm.inventory.v1.NativeDetails.tpm:type_name -> lindm.inventory.v1.TpmDetails
-	23,  // 107: lindm.inventory.v1.NativeDetails.power:type_name -> lindm.inventory.v1.PowerDetails
-	24,  // 108: lindm.inventory.v1.NativeDetails.sessions:type_name -> lindm.inventory.v1.SessionCounts
-	28,  // 109: lindm.inventory.v1.NativeDetails.local_users:type_name -> lindm.inventory.v1.LocalUsers
-	8,   // 110: lindm.inventory.v1.NativeDetails.kernel_module_count:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 111: lindm.inventory.v1.NativeDetails.uptime_seconds:type_name -> lindm.inventory.v1.ObservedUint64
-	8,   // 112: lindm.inventory.v1.NativeDetails.boot_time_unix_seconds:type_name -> lindm.inventory.v1.ObservedUint64
-	29,  // 113: lindm.inventory.v1.NativeDetails.backends:type_name -> lindm.inventory.v1.BackendDetails
-	31,  // 114: lindm.inventory.v1.NativeDetails.flatpak:type_name -> lindm.inventory.v1.ApplicationDetails
-	31,  // 115: lindm.inventory.v1.NativeDetails.snap:type_name -> lindm.inventory.v1.ApplicationDetails
-	35,  // 116: lindm.inventory.v1.NativeDetails.platform:type_name -> lindm.inventory.v1.PlatformDetails
-	38,  // 117: lindm.inventory.v1.NativeDetails.recovery_readiness:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	0,   // 118: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	0,   // 119: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
-	3,   // 120: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
-	3,   // 121: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
-	34,  // 122: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
-	123, // [123:123] is the sub-list for method output_type
-	123, // [123:123] is the sub-list for method input_type
-	123, // [123:123] is the sub-list for extension type_name
-	123, // [123:123] is the sub-list for extension extendee
-	0,   // [0:123] is the sub-list for field type_name
+	33,  // 13: lindm.inventory.v1.HostObservation.details:type_name -> lindm.inventory.v1.NativeDetails
+	38,  // 14: lindm.inventory.v1.RootObservation.started_at:type_name -> google.protobuf.Timestamp
+	38,  // 15: lindm.inventory.v1.RootObservation.finished_at:type_name -> google.protobuf.Timestamp
+	3,   // 16: lindm.inventory.v1.RootObservation.hardware_serial:type_name -> lindm.inventory.v1.ObservedString
+	20,  // 17: lindm.inventory.v1.RootObservation.firmware:type_name -> lindm.inventory.v1.FirmwareDetails
+	17,  // 18: lindm.inventory.v1.RootObservation.storage:type_name -> lindm.inventory.v1.StorageDetails
+	12,  // 19: lindm.inventory.v1.RootObservation.cpu:type_name -> lindm.inventory.v1.CpuDetails
+	38,  // 20: lindm.inventory.v1.PackageObservation.started_at:type_name -> google.protobuf.Timestamp
+	38,  // 21: lindm.inventory.v1.PackageObservation.finished_at:type_name -> google.protobuf.Timestamp
+	0,   // 22: lindm.inventory.v1.PackageObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	2,   // 23: lindm.inventory.v1.PackageObservation.packages:type_name -> lindm.inventory.v1.Package
+	2,   // 24: lindm.inventory.v1.PackageBatch.packages:type_name -> lindm.inventory.v1.Package
+	4,   // 25: lindm.inventory.v1.NativeObservation.host:type_name -> lindm.inventory.v1.HostObservation
+	6,   // 26: lindm.inventory.v1.NativeObservation.packages:type_name -> lindm.inventory.v1.PackageObservation
+	0,   // 27: lindm.inventory.v1.ObservedUint64.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 28: lindm.inventory.v1.ObservedBool.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 29: lindm.inventory.v1.ObservedStrings.status:type_name -> lindm.inventory.v1.CollectionStatus
+	3,   // 30: lindm.inventory.v1.CpuDetails.model:type_name -> lindm.inventory.v1.ObservedString
+	9,   // 31: lindm.inventory.v1.CpuDetails.logical_cores:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 32: lindm.inventory.v1.CpuDetails.physical_cores:type_name -> lindm.inventory.v1.ObservedUint64
+	3,   // 33: lindm.inventory.v1.CpuDetails.x86_64_level:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 34: lindm.inventory.v1.CpuDetails.model_source:type_name -> lindm.inventory.v1.ObservedString
+	9,   // 35: lindm.inventory.v1.MemoryDetails.total_bytes:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 36: lindm.inventory.v1.MemoryDetails.available_bytes:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 37: lindm.inventory.v1.MemoryDetails.swap_total_bytes:type_name -> lindm.inventory.v1.ObservedUint64
+	3,   // 38: lindm.inventory.v1.BlockDevice.type:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 39: lindm.inventory.v1.BlockDevice.parent:type_name -> lindm.inventory.v1.ObservedString
+	9,   // 40: lindm.inventory.v1.BlockDevice.size_bytes:type_name -> lindm.inventory.v1.ObservedUint64
+	3,   // 41: lindm.inventory.v1.BlockDevice.filesystem:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 42: lindm.inventory.v1.BlockDevice.mountpoint:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 43: lindm.inventory.v1.BlockDevice.encryption:type_name -> lindm.inventory.v1.ObservedString
+	15,  // 44: lindm.inventory.v1.BlockDevice.identity:type_name -> lindm.inventory.v1.StorageIdentity
+	3,   // 45: lindm.inventory.v1.StorageIdentity.transport:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 46: lindm.inventory.v1.StorageIdentity.model:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 47: lindm.inventory.v1.StorageIdentity.serial:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 48: lindm.inventory.v1.StorageIdentity.firmware:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 49: lindm.inventory.v1.StorageIdentity.wwn:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 50: lindm.inventory.v1.StorageIdentity.eui:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 51: lindm.inventory.v1.StorageIdentity.partition_uuid:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 52: lindm.inventory.v1.StorageIdentity.partition_type:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 53: lindm.inventory.v1.StorageIdentity.filesystem_uuid:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 54: lindm.inventory.v1.StorageIdentity.luks_uuid:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 55: lindm.inventory.v1.StorageIdentity.luks_version:type_name -> lindm.inventory.v1.ObservedString
+	9,   // 56: lindm.inventory.v1.StorageIdentity.luks_keyslot_count:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 57: lindm.inventory.v1.StorageIdentity.luks_token_count:type_name -> lindm.inventory.v1.ObservedUint64
+	3,   // 58: lindm.inventory.v1.StorageIdentity.luks_token_types:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 59: lindm.inventory.v1.StorageIdentity.backing_disk:type_name -> lindm.inventory.v1.ObservedString
+	10,  // 60: lindm.inventory.v1.StorageIdentity.root_backing:type_name -> lindm.inventory.v1.ObservedBool
+	16,  // 61: lindm.inventory.v1.StorageIdentity.nvme:type_name -> lindm.inventory.v1.ObservedNVMeScope
+	3,   // 62: lindm.inventory.v1.StorageIdentity.gpt_disk_guid:type_name -> lindm.inventory.v1.ObservedString
+	0,   // 63: lindm.inventory.v1.ObservedNVMeScope.status:type_name -> lindm.inventory.v1.CollectionStatus
+	39,  // 64: lindm.inventory.v1.ObservedNVMeScope.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	0,   // 65: lindm.inventory.v1.StorageDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
+	14,  // 66: lindm.inventory.v1.StorageDetails.devices:type_name -> lindm.inventory.v1.BlockDevice
+	3,   // 67: lindm.inventory.v1.NetworkInterface.mac:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 68: lindm.inventory.v1.NetworkInterface.link:type_name -> lindm.inventory.v1.ObservedString
+	11,  // 69: lindm.inventory.v1.NetworkInterface.addresses:type_name -> lindm.inventory.v1.ObservedStrings
+	10,  // 70: lindm.inventory.v1.NetworkInterface.default_route_ipv4:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 71: lindm.inventory.v1.NetworkInterface.default_route_ipv6:type_name -> lindm.inventory.v1.ObservedBool
+	0,   // 72: lindm.inventory.v1.NetworkDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
+	18,  // 73: lindm.inventory.v1.NetworkDetails.interfaces:type_name -> lindm.inventory.v1.NetworkInterface
+	3,   // 74: lindm.inventory.v1.FirmwareDetails.mode:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 75: lindm.inventory.v1.FirmwareDetails.secure_boot:type_name -> lindm.inventory.v1.ObservedString
+	10,  // 76: lindm.inventory.v1.TpmDetails.present:type_name -> lindm.inventory.v1.ObservedBool
+	3,   // 77: lindm.inventory.v1.TpmDetails.version:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 78: lindm.inventory.v1.Battery.status:type_name -> lindm.inventory.v1.ObservedString
+	9,   // 79: lindm.inventory.v1.Battery.capacity_percent:type_name -> lindm.inventory.v1.ObservedUint64
+	0,   // 80: lindm.inventory.v1.BatteryDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
+	22,  // 81: lindm.inventory.v1.BatteryDetails.items:type_name -> lindm.inventory.v1.Battery
+	3,   // 82: lindm.inventory.v1.PowerDetails.chassis:type_name -> lindm.inventory.v1.ObservedString
+	23,  // 83: lindm.inventory.v1.PowerDetails.batteries:type_name -> lindm.inventory.v1.BatteryDetails
+	9,   // 84: lindm.inventory.v1.SessionCounts.users:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 85: lindm.inventory.v1.SessionCounts.sessions:type_name -> lindm.inventory.v1.ObservedUint64
+	27,  // 86: lindm.inventory.v1.SessionCounts.active_sessions:type_name -> lindm.inventory.v1.ActiveSessions
+	3,   // 87: lindm.inventory.v1.ActiveSession.user_name:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 88: lindm.inventory.v1.ActiveSession.session_class:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 89: lindm.inventory.v1.ActiveSession.session_type:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 90: lindm.inventory.v1.ActiveSession.seat:type_name -> lindm.inventory.v1.ObservedString
+	10,  // 91: lindm.inventory.v1.ActiveSession.remote:type_name -> lindm.inventory.v1.ObservedBool
+	0,   // 92: lindm.inventory.v1.ActiveSessions.status:type_name -> lindm.inventory.v1.CollectionStatus
+	26,  // 93: lindm.inventory.v1.ActiveSessions.sessions:type_name -> lindm.inventory.v1.ActiveSession
+	0,   // 94: lindm.inventory.v1.LocalUsers.status:type_name -> lindm.inventory.v1.CollectionStatus
+	28,  // 95: lindm.inventory.v1.LocalUsers.users:type_name -> lindm.inventory.v1.LocalUser
+	10,  // 96: lindm.inventory.v1.BackendDetails.dpkg:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 97: lindm.inventory.v1.BackendDetails.rpm:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 98: lindm.inventory.v1.BackendDetails.pacman:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 99: lindm.inventory.v1.BackendDetails.zypper:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 100: lindm.inventory.v1.BackendDetails.rpm_ostree:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 101: lindm.inventory.v1.BackendDetails.nix:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 102: lindm.inventory.v1.BackendDetails.flatpak:type_name -> lindm.inventory.v1.ObservedBool
+	10,  // 103: lindm.inventory.v1.BackendDetails.snap:type_name -> lindm.inventory.v1.ObservedBool
+	3,   // 104: lindm.inventory.v1.Application.version:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 105: lindm.inventory.v1.Application.architecture:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 106: lindm.inventory.v1.Application.scope:type_name -> lindm.inventory.v1.ObservedString
+	0,   // 107: lindm.inventory.v1.ApplicationDetails.status:type_name -> lindm.inventory.v1.CollectionStatus
+	31,  // 108: lindm.inventory.v1.ApplicationDetails.applications:type_name -> lindm.inventory.v1.Application
+	12,  // 109: lindm.inventory.v1.NativeDetails.cpu:type_name -> lindm.inventory.v1.CpuDetails
+	13,  // 110: lindm.inventory.v1.NativeDetails.memory:type_name -> lindm.inventory.v1.MemoryDetails
+	17,  // 111: lindm.inventory.v1.NativeDetails.storage:type_name -> lindm.inventory.v1.StorageDetails
+	19,  // 112: lindm.inventory.v1.NativeDetails.network:type_name -> lindm.inventory.v1.NetworkDetails
+	20,  // 113: lindm.inventory.v1.NativeDetails.firmware:type_name -> lindm.inventory.v1.FirmwareDetails
+	21,  // 114: lindm.inventory.v1.NativeDetails.tpm:type_name -> lindm.inventory.v1.TpmDetails
+	24,  // 115: lindm.inventory.v1.NativeDetails.power:type_name -> lindm.inventory.v1.PowerDetails
+	25,  // 116: lindm.inventory.v1.NativeDetails.sessions:type_name -> lindm.inventory.v1.SessionCounts
+	29,  // 117: lindm.inventory.v1.NativeDetails.local_users:type_name -> lindm.inventory.v1.LocalUsers
+	9,   // 118: lindm.inventory.v1.NativeDetails.kernel_module_count:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 119: lindm.inventory.v1.NativeDetails.uptime_seconds:type_name -> lindm.inventory.v1.ObservedUint64
+	9,   // 120: lindm.inventory.v1.NativeDetails.boot_time_unix_seconds:type_name -> lindm.inventory.v1.ObservedUint64
+	30,  // 121: lindm.inventory.v1.NativeDetails.backends:type_name -> lindm.inventory.v1.BackendDetails
+	32,  // 122: lindm.inventory.v1.NativeDetails.flatpak:type_name -> lindm.inventory.v1.ApplicationDetails
+	32,  // 123: lindm.inventory.v1.NativeDetails.snap:type_name -> lindm.inventory.v1.ApplicationDetails
+	37,  // 124: lindm.inventory.v1.NativeDetails.platform:type_name -> lindm.inventory.v1.PlatformDetails
+	40,  // 125: lindm.inventory.v1.NativeDetails.recovery_readiness:type_name -> lindm.agent.v1.RecoveryReadinessObservation
+	0,   // 126: lindm.inventory.v1.ModuleObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	0,   // 127: lindm.inventory.v1.RepositoryObservation.status:type_name -> lindm.inventory.v1.CollectionStatus
+	35,  // 128: lindm.inventory.v1.RepositoryObservation.configurations:type_name -> lindm.inventory.v1.RepositoryConfiguration
+	3,   // 129: lindm.inventory.v1.PlatformDetails.cpe:type_name -> lindm.inventory.v1.ObservedString
+	3,   // 130: lindm.inventory.v1.PlatformDetails.releasever_lock:type_name -> lindm.inventory.v1.ObservedString
+	36,  // 131: lindm.inventory.v1.PlatformDetails.repositories:type_name -> lindm.inventory.v1.RepositoryObservation
+	3,   // 132: lindm.inventory.v1.PlatformDetails.releasever:type_name -> lindm.inventory.v1.ObservedString
+	133, // [133:133] is the sub-list for method output_type
+	133, // [133:133] is the sub-list for method input_type
+	133, // [133:133] is the sub-list for extension type_name
+	133, // [133:133] is the sub-list for extension extendee
+	0,   // [0:133] is the sub-list for field type_name
 }
 
 func init() { file_lindm_inventory_v1_observation_proto_init() }
@@ -3039,7 +3315,7 @@ func file_lindm_inventory_v1_observation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_inventory_v1_observation_proto_rawDesc), len(file_lindm_inventory_v1_observation_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   34,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1,8 +1,8 @@
 package feed
 
 import (
-	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
@@ -88,49 +89,7 @@ func parseOSV(config *advisoryv1.FeedSource, raw []byte, validator protovalidate
 			return nil, err
 		}
 	} else {
-		archive, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
-		if err != nil {
-			return nil, fmt.Errorf("feed: open OSV ZIP: %w", err)
-		}
-		if len(archive.File) == 0 || len(archive.File) > maxEntries {
-			return nil, errors.New("feed: OSV ZIP entry limit")
-		}
-		var expanded uint64
-		names := make(map[string]bool, len(archive.File))
-		for _, file := range archive.File {
-			if file.FileInfo().IsDir() {
-				continue
-			}
-			if !strings.HasSuffix(file.Name, ".json") || names[file.Name] || file.UncompressedSize64 > maxRecordBytes {
-				return nil, errors.New("feed: unsupported or duplicate OSV ZIP entry")
-			}
-			names[file.Name] = true
-			expanded += file.UncompressedSize64
-			if expanded > maxExpandedBytes {
-				return nil, errors.New("feed: OSV ZIP expansion limit")
-			}
-			reader, err := file.Open()
-			if err != nil {
-				return nil, fmt.Errorf("feed: open OSV ZIP entry: %w", err)
-			}
-			parseErr := consume(reader)
-			if err := errors.Join(parseErr, reader.Close()); err != nil {
-				return nil, err
-			}
-		}
-		// Only the canonical OSV ecosystem export asserts full coverage;
-		// naming a selected archive all.zip must not manufacture that claim.
-		u, err := url.Parse(config.GetUrl())
-		if err != nil {
-			return nil, err
-		}
-		vendor, _, _ := strings.Cut(ecosystem, ":")
-		doc.CompleteSnapshot = u.Host == "osv-vulnerabilities.storage.googleapis.com" && u.Path == "/"+vendor+"/all.zip" && u.RawQuery == ""
-		// Rocky's export names source packages without a complete binary map.
-		// Findings for named packages are useful; absence cannot prove clean.
-		if config.GetDistro() == "rocky" {
-			doc.CompleteSnapshot = false
-		}
+		return parseOSVArchive(context.Background(), config, bytes.NewReader(raw), int64(len(raw)), validator, nil)
 	}
 	if !matched {
 		return nil, errors.New("feed: OSV contains no matching supported product")
@@ -219,6 +178,14 @@ func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecos
 		}
 	}
 	matched := false
+	normalizedBytes := 0
+	add := func(advisory *advisoryv1.Advisory) error {
+		normalizedBytes += proto.Size(advisory)
+		if normalizedBytes > maxBytes {
+			return errors.New("feed: OSV entry normalized byte limit exceeded")
+		}
+		return addRecord(doc, advisory, managerFor(config.GetDistro()), validator)
+	}
 	for _, affected := range record.Affected {
 		if affected.Package.Ecosystem == "" {
 			return false, errors.New("feed: OSV missing ecosystem")
@@ -253,7 +220,7 @@ func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecos
 			open := false
 			emit := func(fixed, last string) error {
 				advisory := &advisoryv1.Advisory{Id: record.ID, Cves: cves, PackageName: affected.Package.Name, SourcePackage: source, Architecture: arch, IntroducedVersion: lower, FixedVersion: fixed, LastAffectedVersion: last, Severity: severity, PublishedAt: published, SourceUrl: sourceURL}
-				if err := addRecord(doc, advisory, managerFor(config.GetDistro()), validator); err != nil {
+				if err := add(advisory); err != nil {
 					return err
 				}
 				// Ubuntu explicitly supplies binary fixed versions. A source
@@ -264,7 +231,7 @@ func appendOSV(doc *advisoryv1.FeedDocument, config *advisoryv1.FeedSource, ecos
 							return errors.New("feed: binary mapping lacks version")
 						}
 						binaryAdvisory := &advisoryv1.Advisory{Id: record.ID, Cves: cves, PackageName: binary.Name, Architecture: arch, FixedVersion: binary.Version, Severity: severity, PublishedAt: published, SourceUrl: sourceURL}
-						if err := addRecord(doc, binaryAdvisory, managerFor(config.GetDistro()), validator); err != nil {
+						if err := add(binaryAdvisory); err != nil {
 							return err
 						}
 					}

@@ -25,7 +25,7 @@ func recoveryPreflightFixture(t *testing.T) (*Provider, *agentv1.DeviceActionSpe
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := &agentv1.StorageTarget{Wwn: "test-wwn", Serial: "test-serial", SizeBytes: 64 << 20}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "test-wwn", Serial: "test-serial", SizeBytes: 64 << 20}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(target)
 	if err != nil {
 		t.Fatal(err)

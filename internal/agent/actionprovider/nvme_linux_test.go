@@ -14,7 +14,7 @@ import (
 
 func nvmeActionFixture(method agentv1.SanitizeMethod, controllerWide bool) *agentv1.SanitizeAction {
 	return &agentv1.SanitizeAction{
-		Target: &agentv1.StorageTarget{Serial: "test-controller", Wwn: "eui.1200000000000034", SizeBytes: 4 << 20},
+		Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Serial: "test-controller", Wwn: "eui.1200000000000034", SizeBytes: 4 << 20},
 		Method: method,
 		NvmeScope: &agentv1.NVMeSanitizeScope{
 			NamespaceId:    1,
@@ -232,7 +232,7 @@ func TestNVMeIdentityBasisRequiresExactNativeEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			target := &agentv1.StorageTarget{Serial: tc.serial, Wwn: tc.wwn, SizeBytes: 4 << 20}
+			target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Serial: tc.serial, Wwn: tc.wwn, SizeBytes: 4 << 20}
 			basis, err := nvmeIdentityBasis(target, tc.nsid, controller, namespace)
 			if tc.basis == 0 {
 				if !errors.Is(err, ErrConflict) {

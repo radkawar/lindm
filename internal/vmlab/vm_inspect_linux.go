@@ -55,6 +55,7 @@ type VMInspectResult struct {
 	InventoryRecordPath    string
 	InventoryRecordSHA256  string
 	Runtime                *vmRuntimeEvidence
+	NativeReadiness        *vmInspectReadiness
 }
 
 // InspectVM fetches/reverifies the pinned image, boots a disposable guest overlay,
@@ -179,11 +180,18 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 		return nil, errors.New("uploaded agent digest mismatch")
 	}
 
+	readiness, err := collectInspectReadiness(ctx, vm.runResult)
+	if err != nil {
+		return nil, err
+	}
 	before, err := collectVMTruth(ctx, vm, manifest.Distribution)
 	if err != nil {
 		return nil, err
 	}
-	inspected, inspectErr := vm.runResult(ctx, "env -i PATH=/usr/bin:/bin HOME=/home/"+labUser+" LANG=C LC_ALL=C "+guestAgent+" inspect", nil, maxGuestOutput, 90*time.Second)
+	// Full native inventory includes root-only sysfs/DMI and storage metadata.
+	// Match the production executor's privilege rather than weakening health
+	// checks for a direct unprivileged inspection's expected permission failures.
+	inspected, inspectErr := vm.runResult(ctx, "sudo -n env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C "+guestAgent+" inspect", nil, maxGuestOutput, 90*time.Second)
 	actual = inspected.Stdout
 	after, err := collectVMTruth(ctx, vm, manifest.Distribution)
 	if err != nil {
@@ -216,9 +224,9 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 		return nil, errors.New("guest OS identity does not match the selected manifest")
 	}
 	if err := compareVMObservation(before, observation); err != nil {
-		return nil, err
+		return nil, saveInspectComparisonFailure(ctx, vm, options.DiagnosticsDir, before.details, after.details, observation.GetHost().GetDetails(), err)
 	}
-	if err := compareVMDetails(before.details, after.details, observation.Host.Details); err != nil {
+	if err := compareVMDetails(before.host[0], before.host[2], before.details, after.details, observation.Host.Details); err != nil {
 		return nil, saveInspectComparisonFailure(ctx, vm, options.DiagnosticsDir, before.details, after.details, observation.Host.Details, err)
 	}
 	if err := compareInspectHardware(&hardware, observation.Host.Details); err != nil {
@@ -234,7 +242,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if err := compareInspectEncryption(fixture, observation.Host.Details); err != nil {
 		return nil, err
 	}
-	return &VMInspectResult{Distribution: manifest.Distribution, Version: manifest.Version, RepositorySnapshotDate: manifest.GetRepositorySnapshotDate(), ImageID: manifest.Id, ImageSHA256: verified.SHA256, AgentSHA256: agentDigest, MatchedPackages: len(observation.Packages.Packages), NativeDetailStatuses: vmDetailStatuses(observation.Host.Details), FirmwareSetupMode: runtimeEvidence.FirmwareSetupMode, EncryptionFixture: fixture, Runtime: runtimeEvidence}, nil
+	return &VMInspectResult{Distribution: manifest.Distribution, Version: manifest.Version, RepositorySnapshotDate: manifest.GetRepositorySnapshotDate(), ImageID: manifest.Id, ImageSHA256: verified.SHA256, AgentSHA256: agentDigest, MatchedPackages: len(observation.Packages.Packages), NativeDetailStatuses: vmDetailStatuses(observation.Host.Details), FirmwareSetupMode: runtimeEvidence.FirmwareSetupMode, EncryptionFixture: fixture, Runtime: runtimeEvidence, NativeReadiness: readiness}, nil
 }
 
 func publishVMInventoryRecord(path string, data []byte, result *VMInspectResult, prior error) error {
@@ -598,6 +606,13 @@ func compareVMObservation(expected *vmTruth, actual *inventoryv1.NativeObservati
 	}
 	if actual.Packages.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS || actual.Packages.Backend != expected.manager {
 		return errors.New("agent package collection did not succeed with the native manager")
+	}
+	if err := CheckInventoryPackageHealth(expected.host[0], actual.Packages); err != nil {
+		return err
+	}
+	context := inventoryHealthContext{distro: expected.host[0], host: actual.Host, details: actual.Host.Details}
+	if err := checkInventoryMessage(actual.Host.ProtoReflect(), "host", context, false); err != nil {
+		return err
 	}
 	got := make(map[nativePackage]int, len(actual.Packages.Packages))
 	for _, pkg := range actual.Packages.Packages {

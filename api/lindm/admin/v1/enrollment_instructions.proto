@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+message GetEnrollmentInstructionsRequest {}
+
+// Deployment configuration, not inferred browser/listener addresses. Missing
+// optional fields and repository messages mean explicitly not configured.
+message GetEnrollmentInstructionsResponse {
+  option (buf.validate.message).cel = {
+    id: "enrollment_instructions.bootstrap_pair"
+    message: "execution root and signed bootstrap URLs must be configured together"
+    expression: "has(this.execution_root_url) == has(this.bootstrap_bundle_url)"
+  };
+  string enrollment_origin = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  optional string device_origin = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  // Public download is delivery only. Authenticate the initial execution root
+  // through the deployment owner's independent trusted installation channel.
+  optional string execution_root_url = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  // Exact verified DSSE envelope; never an unsigned replacement bundle.
+  optional string bootstrap_bundle_url = 4 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  EnrollmentAPTRepository apt_repository = 5;
+  EnrollmentDNFRepository dnf_repository = 6;
+  // Exact installed agent CLI, with protected local filenames, never credentials.
+  // Commands are templates, not proof that the optional prerequisites are ready.
+  string grant_command = 7 [(buf.validate.field).string.max_len = 4096];
+  string provisioning_command = 8 [(buf.validate.field).string.max_len = 4096];
+  string resume_command = 9 [(buf.validate.field).string.max_len = 4096];
+}
+
+message EnrollmentAPTRepository {
+  string base_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  string suite = 4 [
+    (buf.validate.field).string.max_len = 128,
+    (buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+  ];
+  repeated string components = 5 [
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 16
+      unique: true
+    },
+    (buf.validate.field).repeated.items.string = {
+      max_len: 128
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    }
+  ];
+}
+
+// Requires signatures for both RPM packages and repository metadata.
+message EnrollmentDNFRepository {
+  string base_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+}

@@ -56,7 +56,7 @@ func prepareLiveRootFixture(t *testing.T) (*deviceActionFixture, *agentv1.Device
 	f := newDeviceActionFixture(t)
 	f.svc.actionProvider = &liveRootBoundary{f.actionNative}
 	f.svc.pinLiveRoot = func() error { return nil } // no process-global mlock in unit tests
-	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{{LuksUuid: uuid.NewString(), Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 1 << 30}, {LuksUuid: uuid.NewString(), Wwn: "data-wwn", Serial: "data-serial", SizeBytes: 1 << 30}}}}}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 1 << 30}, {IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "data-wwn", Serial: "data-serial", SizeBytes: 1 << 30}}}}}
 	i := f.actionIntent(t, 1, spec)
 	intent := f.actionPrepare(t, i)
 	binding := &agentv1.DeviceActionApprovalBinding{DeviceId: i.GetDeviceId(), EnrollmentGeneration: i.GetEnrollmentGeneration(), SpecSha256: i.GetSpecSha256(), ExpiresAt: i.GetExpiresAt()}
@@ -149,7 +149,7 @@ func TestLiveRootCannotConsumeWithoutPinnedMemory(t *testing.T) {
 }
 
 func TestLiveRootCompletionRejectsMissingAggregateProof(t *testing.T) {
-	plan := &agentv1.DeviceActionPlan{CryptoEraseTargets: []*agentv1.CryptoEraseTargetPlan{{Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}, LuksHeaderBytes: 16 << 20}}}
+	plan := &agentv1.DeviceActionPlan{CryptoEraseTargets: []*agentv1.CryptoEraseTargetPlan{{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}, LuksHeaderBytes: 16 << 20}}}
 	for _, result := range []*agentv1.DeviceActionVerification{{Verified: true}, {Verified: true, CryptoEraseResults: []*agentv1.CryptoEraseTargetResult{{Target: plan.CryptoEraseTargets[0].Target, HeaderBytes: 16 << 20, MetadataAbsent: true}}}} {
 		if liveRootComplete(plan, result) {
 			t.Fatal("partial aggregate evidence claimed success")

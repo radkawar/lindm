@@ -1,0 +1,275 @@
+# Fedora
+
+## Versions, architectures and qualification
+
+This page covers mutable Fedora, not Silverblue or Kinoite. Fedora 43 and 44,
+x86_64 desktop/server and aarch64 server are qualification targets, not blanket
+support claims. [Verification](../verification.md#1-launch-platform-qualification)
+is authoritative: no complete matrix cell is certified. A cloud-server result
+neither qualifies Workstation/KDE nor another architecture.
+
+The pinned Fedora 43 Cloud Base Generic 43-1.6 input, exact size, digest and signer
+are in [`lab/images/fedora-43-x86_64.json:2-17`](../../lab/images/fedora-43-x86_64.json#L2-L17).
+Fedora 44 encrypted Server with added GNOME packages is a distinct installation,
+not proof of the stock Workstation installer.
+
+## Packaging, signing, repositories, paths and LSM
+
+Use native signed RPM delivery. The builder signs and independently verifies the
+RPM before publishing its digest
+([`internal/packaging/rpm.go:50-79`](../../internal/packaging/rpm.go#L50-L79)).
+Configuration uses RPM `%config(noreplace)` and lifecycle scriptlets
+([`rpm.go:83-112`](../../internal/packaging/rpm.go#L83-L112)). Repository generation
+retains package/local-package checks and records whether metadata is signed;
+do not describe an unsigned repository as authenticated
+([`publish.go:43-58`](../../internal/packaging/publish.go#L43-L58)).
+
+The binary is `/usr/libexec/lindm/lindm-agent`; protected configuration is
+`/etc/lindm/executor.json`, network configuration `/etc/lindm/agent.json`.
+State is separated between `/var/lib/lindm/executor` and `/var/lib/lindm/agent`.
+Keep SELinux Enforcing. The native Fedora update evidence below retained it;
+disabling SELinux to make a lane work invalidates that qualification.
+
+## Agent services and sandbox
+
+[`lindm-executor.service:10-61`](../../internal/packaging/assets/lindm-executor.service#L10-L61)
+runs root with AF_UNIX only, strict filesystem protection, private devices,
+no-new-privileges, no core dumps and no swap. Exact action targets require the
+owned `action-sandbox -install` drop-in; do not disable PrivateDevices or expose
+all disks. [`lindm-agent.service:11-50`](../../internal/packaging/assets/lindm-agent.service#L11-L50)
+runs as `lindm`, has no capabilities, owns network transport and cannot read root
+executor state. Service start limits remain part of the installed contract.
+
+## Inventory and per-field quirks
+
+Installed packages come from `rpm --query --all`, including epoch, version,
+release, architecture and modularity label; DNF CLI output is not the installed
+package oracle. Exact OS identity and a real RPM database are required. Unknown
+Fedora variants and OSTree/transactional markers are rejected by the mutable
+selector ([`packages_linux.go:46-85`](../../internal/agent/inventory/packages_linux.go#L46-L85)).
+A native warning is not an empty successful inventory
+([`packages_linux.go:148-152`](../../internal/agent/inventory/packages_linux.go#L148-L152)).
+
+Fedora switched its default CLI to DNF5 in Fedora 41
+([Fedora 41 change](https://fedoraproject.org/wiki/Changes/SwitchToDnf5)).
+DNF4 Python configuration APIs are not evidence of DNF5 repository state; both
+Python bindings are installed in the captured Fedora 44 Cloud image. The
+[`dnf` identity helper](../../internal/agent/dnf/manager.go) selects installed
+executables and parses their native version, independently of the distribution.
+The [inventory probe](../../internal/agent/inventory/platform_dnf.py) then uses
+supported `libdnf5` bindings for DNF5 configuration without plugins, repository
+metadata or network access. An unset optional native `OptionString` must be tested
+with `empty()` before reading its value; it is not a failed repository observation.
+
+The native API capture in
+[`testdata/dnf5-fedora44`](../../internal/agent/inventory/testdata/dnf5-fedora44)
+comes from untouched Fedora 44 Cloud 44-1.7 aarch64 under KVM: DNF5, libdnf5 and
+python3-libdnf5 `5.4.1.0-1.fc44`, Python `3.14.3-2.fc44`. The reference source is
+[DNF5 5.4.1.0](https://github.com/rpm-software-management/dnf5/tree/d413edbb78a9160274b80c8ec23ac9b1c69073fe),
+cloned at `~/dev/minor/clones/linux-flavour/dnf5`.
+
+Enabled repository evidence includes IDs, base URLs, metalink/mirrorlist, package
+signature-check setting and signing-key locations. URL userinfo, whole queries
+and fragments are omitted and marked `urls_redacted`, not leaked as inventory.
+Effective releasever is distinct from an explicit configured releasever lock;
+neither repository configuration nor releasever proves entitled/reachable content.
+CPE stays independent os-release evidence. Native RPM `MODULARITYLABEL` continues
+to report per-package module/stream identities. The supported config-only DNF5
+API does not enumerate persisted enabled/disabled module states; never report a
+successful empty module-state list from an unloaded metadata sack. `dnf5 module
+list --json` is unsupported in the captured version.
+
+ARM `/proc/cpuinfo` commonly lacks `model name`. The
+[CPU model collector](../../internal/agent/inventory/cpu_model_linux.go) prefers
+populated SMBIOS type-4 processor-version evidence, read by the protected executor,
+then decodes native procfs/sysfs MIDR implementer/part. Model source is explicit.
+Its small ARM-name table is based on
+[util-linux v2.41](https://github.com/util-linux/util-linux/blob/caa26876bc75041833c9644491cc2670d623f750/sys-utils/lscpu-arm.c);
+unlisted pairs produce exact `ARM implementer 0x.. part 0x...` labels, not a guessed
+brand or unavailable observation. x86 keeps native procfs model identity.
+The real dgx20 Fedora44 guest
+[CPU fixtures](../../internal/agent/inventory/testdata/cpu-fedora44-aarch64)
+contain QEMU SMBIOS processor version `virt-8.2`, which correctly takes precedence
+over MIDR `0x41/0xd85` (`Cortex-X925`). This is virtual firmware identity, not a
+claim that SMBIOS identifies the physical host's marketing CPU model.
+
+Fedora44 logind has active user-manager sessions without seats. Captured native
+[session fixtures](../../internal/agent/inventory/testdata/sessions-fedora44-aarch64)
+show both `user/tty/Remote=yes` and `manager/unspecified/Remote=no`, each with an
+empty seat. The [session collector](../../internal/agent/inventory/sessions_linux.go)
+reports `NOT_APPLICABLE` only with successful per-session Class/Type/Remote evidence
+of manager/background, remote or tty context. Local graphical user sessions with
+missing seats still fail as `UNAVAILABLE`; malformed or failed reads are never
+hidden by this classification. See the schema's `session.seat_applicability` rule,
+not a distro-wide absence exception.
+
+On this Cloud image, Btrfs uses the same device for `/` and `/var`.
+The independent inventory oracle must read `lsblk MOUNTPOINTS`, not only the last
+selected `MOUNTPOINT`; otherwise it loses root-backing ancestry. The agent already
+preserves the complete native mount list and prefers `/` for its scalar display.
+
+## Updates
+
+Agent self-update is distinct from generic managed-package resources. Existing
+self-update verifies the installed native RPM identity and refuses immutable
+systems ([`update/native_linux.go:111-147`](../../internal/agent/update/native_linux.go#L111-L147)).
+Fedora 44 unattended agent update passed signed hold/negative phases, interrupted
+unpack, boot-helper completion, retained identity and downgrade refusal with
+SELinux Enforcing. Evidence:
+`$HOME/.cache/lindm-updatequal-20261010/fedora44-updates-06.json`, SHA-256
+`ae15ffd9663b050455c4e46a313038dd3dfaf7f88320d231908c0a665b0841e6`.
+This is QEMU/development-signing evidence, not historical release compatibility or
+physical power-loss proof; see [verification](../verification.md).
+
+The separately developed generic DNF5 package provider is not qualified by that
+self-update result. Its pending strict stored/replayed transaction design requires
+both signed repository metadata and signed RPMs, not a DNF4 alias fallback.
+Official Fedora metadata may not satisfy that policy; qualification needs an
+approved signed repository, never a signature-check bypass. Private-worktree
+implementation is not a landed capability claim.
+
+## Encryption and recovery
+
+Fedora 44 Server GNOME, TPM-capable dracut, Secure Boot on and software TPM2 passed
+two passphrase cold boots and independent stopped-disk LUKS2 header comparison:
+`artifacts/encrypted-fedora44-x86_64-secureboot-qualified-20261010.json`, SHA-256
+`f8b5fe1c35c8cbb242628aa26d5760b9234e36ee5f3b6991b450d5b8209f9866`.
+The later complete encryption run proved escrow/reveal, rotation and retired-key
+rejection, crash recovery, TPM bind, PCR7 mismatch and revealed-key recovery:
+`$HOME/.cache/lindm-encryptionqual-20261010/fedora44-encryption-11.json`, SHA-256
+`33ae1246cc71ec97a83e7b7ccf319103d0fc46513cd089760155285ad9eb71a5`.
+These exact tuples do not qualify physical TPMs or ARM.
+
+Fedora dracut 108 separates the `systemd-cryptsetup` module from `crypt`
+([`encrypted_installer_linux.go:205-213`](../../internal/vmlab/encrypted_installer_linux.go#L205-L213)).
+Incorrect-passphrase diagnostics can stay in the initramfs journal without a
+repeated serial prompt. The lab includes a disposable-clone service drop-in with
+`dracut --force --include` to route those diagnostics to the console; a timeout
+never counts as rejection
+([`vm_device_actions_linux.go:133-139`](../../internal/vmlab/vm_device_actions_linux.go#L133-L139),
+[systemd v259.5 source](https://github.com/systemd/systemd/blob/b3d8fc43e9cb531d958c17ef2cd93b374bc14e8a/src/cryptsetup/cryptsetup.c)).
+
+The stock Fedora 44 cloud ESP is an explicit **unsupported: ESP capacity** cell
+for original-device signed recovery. Available space was 14,888,960 bytes; the
+unaltered vendor kernel alone was 18,479,464 bytes. Evidence under
+`$HOME/.cache/lindm-recovery-time-20261010/`:
+
+- `fedora-vendor-kernel-capacity.json`, SHA-256
+  `71b98e75098a7fed49322457d7b644455117122ef39d97ff2e5b1e174c598eed`.
+- `fedora44-recovery-sata-02.json`, SHA-256
+  `90d08fb2c7ac139e520bdfd0087e62081fcbb2b25031510a5eca4cf6f26ca008`.
+- `fedora44-recovery-nvme-02.json`, SHA-256
+  `39ee001297527b4d1e762b5a93160956e2b75f6c0ac203dc38f29663f16420cb`.
+
+Both recovery records refuse before sanitize approval/action. Do not resize the
+ESP, delete vendor boot files or substitute a kernel to relabel this stock cell
+as passed. Separately qualified external recovery is a different capability.
+
+## Device actions
+
+Encryption success does not imply power, desktop lock, account lock, quarantine
+or sanitize success. Follow the per-action records in [verification](../verification.md#encryption-and-imperative-action-evidence-l10-l13-l15).
+The historical Fedora credential-helper SELinux denial used D-Bus forwarding of
+an SSH-session FIFO; the corrected lab uses a no-swap/no-core scope without
+relaxing policy. Failed record
+`$HOME/.cache/lindm-wipequal-20261010/fedora-live-erase-02.json`, SHA-256
+`14b3f2416533882ef77632d5cdf8fd4bf5ba2948dc6ebbdfe4ac3c0aa3c5a78e`,
+is not erase proof. Later action records, not this historical failure or encryption
+result, determine the current capability status.
+
+## Advisory feeds
+
+Fedora uses repository **updateinfo**, not Red Hat CSAF/VEX. The adapter requires
+`distro=fedora`, a supported explicit architecture and bounded compressed XML
+([`advisory/feed/rpm.go:51-79`](../../internal/advisory/feed/rpm.go#L51-L79)).
+Parser architecture acceptance is not machine qualification. Stale or absent feed
+coverage must not become a clean exposure report.
+
+On 2026-10-10, complete current `updates/Everything` metadata for Fedora 43 and 44
+was fetched separately for x86_64 and aarch64. Compressed SHA256 values matched
+the corresponding primary-vendor `repomd.xml` over verified HTTPS; this is not a
+Fedora signing-key verification. Counting distinct CVEs from structured references
+plus exact tokens disclosed in summary/description, as the provider does, found:
+
+| Release | Update entries per architecture | Eligible security advisories (x86_64 / aarch64) | Maximum CVEs per advisory | Advisory                 |
+| ------- | ------------------------------- | ----------------------------------------------- | ------------------------- | ------------------------ |
+| 43      | 4,382                           | 501 / 498                                       | 23                        | `FEDORA-2026-ec8e535c6e` |
+| 44      | 3,114                           | 407 / 405                                       | 21                        | `FEDORA-2026-83fdfd7e0e` |
+
+Eligibility requires stable security metadata, the exact release label and a
+matching-architecture or `noarch` package. These are measured snapshot maxima,
+not an all-time or future Fedora bound; testing, release media, other repositories
+and removed historical advisories are outside the measured scope. Structured
+references alone disclosed no CVEs in these security records, so omitting vendor
+summary/description tokens would lose the measured CVEs.
+
+The retained [measurement record](../../artifacts/rpm-advisory-cve-cardinality-20261010.json)
+contains source URLs, acquisition timestamps, artifact sizes/digests, counts and
+the extraction method. Its SHA256 is
+`b3b78c5a21511a7a08fa96eede3b42d198cc2791dbb6bdd4948ca0e44b532085`.
+
+## Lab
+
+Use maintained `lab images fetch` and `lab images verify`, then the exact
+`vm inspect`, `vm lifecycle`, `vm dispatch`, `vm updates` or encrypted/action lane
+from [verification](../verification.md) and [agent enrollment](../agent-enrollment.md).
+Record the image, binary/source digest, firmware, architecture, SELinux mode and
+capability-specific result. Fedora 43 inventory matched 430 RPM records:
+`$HOME/.cache/lindm-platformlanes-20261009/fedora43-inspect.json`, SHA-256
+`3972591860a7edc1b876d4670880fb0ef13856904878bd6c08e281f32ab6e8ba`.
+The subsequent service attempt failed on an out-of-date shared laboratory database,
+not a demonstrated Fedora defect:
+`fedora43-service-shared-schema-failure.json` in that directory, SHA-256
+`926c6a14e0be040189b8f62c4a0871b1f338d3da10970fc74141007b9c8168b6`.
+The corrected Fedora 43 signed-service lifecycle subsequently passed:
+`fedora43-service-refreshed.json` in that directory, SHA-256
+`0ba24f41374f177eef632a3905f0bd9563d6f8aa1d11bc914d3eccca35d21667`.
+This x86_64 KVM/SeaBIOS/virtio-blk run retained SELinux Enforcing and restricted
+user networking, matched five 432-package publications, and exercised signed
+service effects, upgrade, reboot/reinstall retention, rejection cases, spool
+recovery, revocation and missing-journal hold.
+
+Fedora 43 automatic control-plane trust also passed with the same pinned
+01495af+receipt-patch lab/server and 0.7.0→0.7.1 RPM pair:
+`fedora43-trust-receipts.json` in that directory, SHA-256
+`111ca61db75624529310d9622d5cbc417c924070260b9915af76e6e3a582a3e6`,
+device `ba01d7b7-1042-4968-b8de-3b3d2cc6c6a4`, generation
+`42e63e47-a1a3-4910-b59a-3168d12ab192`. SELinux remained Enforcing with
+restricted user networking. Automatic authority rotation/revocation, rollback
+denial, exact retry after restart, unchanged TLS, no service effects, and
+reboot/reinstall retention passed alongside lifecycle recovery checks.
+The separate connected-dispatch lane also passed:
+`fedora43-dispatch-receipts.json`, SHA-256
+`2a03eddaa60af6f1a921a24f9b3c73a678487e44a932d8e76c1c63c262db0e7b`,
+device `80622c4c-727d-4530-8f1d-467a997059e1`, generation
+`a4f6a110-9d3b-45ff-ae42-fc86f20357e0`. Same pinned source and binaries;
+RPM SHA-256 `1346b0f3640a25a0b6df5e2808fc2bf918a75f260385b0563190fb640021cfac`.
+SELinux remained Enforcing with restricted user networking. Nine native
+scenarios cover signed convergence, periodic 300-second compliance without
+a start grant, drift remediation, restart, ±90-second clocks and revocation.
+Unstarted supersession is integration-only evidence, not native coverage.
+
+The stock customer-journey gate is separate:
+[`lab acceptance`](../verification.md#customer-journey-release-acceptance) leaves
+vendor timers unchanged, uses signed native package installation and a provisioning
+token issued through the real console. Its first x86_64 virtio-blk/no-WWN run
+enrolled successfully but failed strict inventory on a seatless native logind
+session with successful class `manager`, type `unspecified` and remote `false`.
+The before/after native and agent observations agreed; matching `UNAVAILABLE`
+alone was correctly not treated as success. Any not-applicable exception must
+require that actual session-class context, not permit arbitrary missing seats.
+The later profile phase was blocked by the harness's protected service-name prefix;
+it did not prove a Fedora service-provider failure. Evidence:
+`~/.cache/lindm-acceptance-20261010-01/acceptance.json`, SHA-256
+`5ef007bd0cc52698432d4add4bcce2bfbc13754d70a78ebcaa605250543ba252`.
+See [`acceptance_observation_linux.go`](../../internal/vmlab/acceptance_observation_linux.go)
+and [`inventory_unavailable_linux.go`](../../internal/vmlab/inventory_unavailable_linux.go).
+
+## Gaps
+
+Full desktop/edition coverage, native aarch64, physical TPM/media, air-gap lifecycle
+and production signing custody remain separate obligations. Fedora 43
+inspection/signed-service lifecycle, Fedora 44 self-update and Fedora 44 encryption
+cover different cells. DNF5 package
+resource work is not qualified by any of them; the stock small-ESP refusal is an
+explicit capability boundary rather than missing permission to bypass a gate.

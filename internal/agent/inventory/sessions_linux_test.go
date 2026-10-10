@@ -61,6 +61,138 @@ func TestParseActiveSession(t *testing.T) {
 	}
 }
 
+func TestActiveSessionSeatApplicability(t *testing.T) {
+	for _, context := range []struct {
+		name         string
+		class        string
+		sessionType  string
+		remote       bool
+		absentStatus inventoryv1.CollectionStatus
+	}{
+		{"manager", "manager", "unspecified", false, inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE},
+		{"background", "background", "unspecified", false, inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE},
+		{"remote", "user", "wayland", true, inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE},
+		{"tty", "user", "tty", false, inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE},
+		{"local wayland", "user", "wayland", false, unavailable},
+		{"local x11", "user", "x11", false, unavailable},
+		{"unspecified user", "user", "unspecified", false, unavailable},
+		{"unknown class", "other", "unspecified", false, unavailable},
+	} {
+		t.Run(context.name, func(t *testing.T) {
+			for _, seat := range []struct {
+				name     string
+				property string
+				status   inventoryv1.CollectionStatus
+				value    string
+			}{
+				{"missing", "", context.absentStatus, ""},
+				{"empty", `,"Seat":{"type":"(so)","data":["","/"]}`, context.absentStatus, ""},
+				{"actual seat", `,"Seat":{"type":"(so)","data":["seat0","/org/freedesktop/login1/seat/seat0"]}`, success, "seat0"},
+				{"whitespace is not native empty", `,"Seat":{"type":"(so)","data":[" ","/"]}`, unavailable, ""},
+				{"wrong signature", `,"Seat":{"type":"s","data":["","/"]}`, invalid, ""},
+				{"wrong tuple size", `,"Seat":{"type":"(so)","data":[""]}`, invalid, ""},
+				{"wrong tuple type", `,"Seat":{"type":"(so)","data":{}}`, invalid, ""},
+				{"null seat", `,"Seat":null`, invalid, ""},
+				{"null tuple", `,"Seat":{"type":"(so)","data":null}`, invalid, ""},
+				{"null name", `,"Seat":{"type":"(so)","data":[null,"/"]}`, invalid, ""},
+				{"null path", `,"Seat":{"type":"(so)","data":["",null]}`, invalid, ""},
+				{"invalid name type", `,"Seat":{"type":"(so)","data":[false,"/"]}`, invalid, ""},
+				{"invalid path type", `,"Seat":{"type":"(so)","data":["",false]}`, invalid, ""},
+				{"invalid nonempty name", `,"Seat":{"type":"(so)","data":["bad\nseat","/"]}`, invalid, ""},
+			} {
+				t.Run(seat.name, func(t *testing.T) {
+					reply := fmt.Sprintf(`{"type":"a{sv}","data":[{"Active":{"type":"b","data":true},"Name":{"type":"s","data":"alice"},"Class":{"type":"s","data":%q},"Type":{"type":"s","data":%q},"Remote":{"type":"b","data":%t}%s}]}`, context.class, context.sessionType, context.remote, seat.property)
+					got, status := parseActiveSession(strings.NewReader(reply))
+					if status != success || got == nil {
+						t.Fatalf("session = %v, status = %v", got, status)
+					}
+					if got.Seat.Status != seat.status || got.Seat.Value != seat.value {
+						t.Fatalf("seat = %v, want status %v value %q", got.Seat, seat.status, seat.value)
+					}
+					if got.SessionClass.Status != success || got.SessionClass.Value != context.class ||
+						got.SessionType.Status != success || got.SessionType.Value != context.sessionType ||
+						got.Remote.Status != success || got.Remote.Value != context.remote {
+						t.Fatalf("classification facts changed: %v", got)
+					}
+					if err := protovalidate.Validate(got); err != nil {
+						t.Fatal(err)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestActiveSessionSeatRequiresSuccessfulContext(t *testing.T) {
+	for _, field := range []string{"Class", "Type", "Remote"} {
+		t.Run(field, func(t *testing.T) {
+			for _, property := range []struct {
+				name   string
+				value  string
+				status inventoryv1.CollectionStatus
+			}{
+				{"missing", "", unavailable},
+				{"wrong signature", `{"type":"u","data":1}`, invalid},
+				{"null property", `null`, invalid},
+				{"null value", `{"type":"%s","data":null}`, invalid},
+				{"invalid value", `{"type":"%s","data":[]}`, invalid},
+				{"empty value", `{"type":"%s","data":""}`, unavailable},
+			} {
+				t.Run(property.name, func(t *testing.T) {
+					fields := map[string]string{
+						"Class":  `,"Class":{"type":"s","data":"manager"}`,
+						"Type":   `,"Type":{"type":"s","data":"tty"}`,
+						"Remote": `,"Remote":{"type":"b","data":true}`,
+					}
+					value := property.value
+					wantStatus := property.status
+					signature := "s"
+					if field == "Remote" {
+						signature = "b"
+						if property.name == "empty value" {
+							wantStatus = invalid
+						}
+					}
+					value = strings.ReplaceAll(value, "%s", signature)
+					fields[field] = ""
+					if value != "" {
+						fields[field] = fmt.Sprintf(",%q:%s", field, value)
+					}
+					for _, seat := range []struct {
+						property string
+						status   inventoryv1.CollectionStatus
+						value    string
+					}{
+						{"", unavailable, ""},
+						{`,"Seat":{"type":"(so)","data":["","/"]}`, unavailable, ""},
+						{`,"Seat":{"type":"(so)","data":["seat0","/org/freedesktop/login1/seat/seat0"]}`, success, "seat0"},
+						{`,"Seat":{"type":"(so)","data":["",null]}`, invalid, ""},
+					} {
+						reply := `{"type":"a{sv}","data":[{"Active":{"type":"b","data":true}` + fields["Class"] + fields["Type"] + fields["Remote"] + seat.property + `}]}`
+						got, status := parseActiveSession(strings.NewReader(reply))
+						if status != success || got == nil {
+							t.Fatalf("session = %v, status = %v", got, status)
+						}
+						gotStatus := got.SessionClass.Status
+						switch field {
+						case "Type":
+							gotStatus = got.SessionType.Status
+						case "Remote":
+							gotStatus = got.Remote.Status
+						}
+						if gotStatus != wantStatus || got.Seat.Status != seat.status || got.Seat.Value != seat.value {
+							t.Fatalf("unproven %s context = %v, want classifier status %v and seat status %v value %q", field, got, wantStatus, seat.status, seat.value)
+						}
+						if err := protovalidate.Validate(got); err != nil {
+							t.Fatal(err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestCollectActiveSessions(t *testing.T) {
 	for _, tc := range []struct {
 		name           string

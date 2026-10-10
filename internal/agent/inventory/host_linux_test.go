@@ -101,7 +101,7 @@ func TestTypedHostEvidence(t *testing.T) {
 			return nil, fs.ErrNotExist
 		}
 	}
-	host, _ := collectHost(context.Background(), read)
+	host, _ := collectHost(context.Background(), read, false)
 	if host.BootId.Status != success || host.HardwareVendor.Value != "Fixture Vendor" ||
 		host.HardwareModel.Status != unavailable || host.HardwareModel.Value != "" ||
 		host.HardwareSerial.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED || host.HardwareSerial.Value != "" {
@@ -116,7 +116,7 @@ func TestTypedHostEvidence(t *testing.T) {
 		}
 		return read(path)
 	}
-	host, _ = collectHost(context.Background(), badBoot)
+	host, _ = collectHost(context.Background(), badBoot, false)
 	if host.BootId.Status != invalid || host.BootId.Value != "" {
 		t.Fatalf("invented boot identity: %v", host.BootId)
 	}

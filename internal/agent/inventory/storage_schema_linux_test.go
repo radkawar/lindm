@@ -24,7 +24,8 @@ func TestStorageIdentitySchemaAvailability(t *testing.T) {
 		LuksKeyslotCount: &inventoryv1.ObservedUint64{Status: unavailable},
 		LuksTokenCount:   &inventoryv1.ObservedUint64{Status: unavailable},
 		BackingDisk:      unavailableText(), RootBacking: &inventoryv1.ObservedBool{Status: unavailable},
-		Nvme: &inventoryv1.ObservedNVMeScope{Status: unavailable},
+		Nvme:        &inventoryv1.ObservedNVMeScope{Status: unavailable},
+		GptDiskGuid: unavailableText(),
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(identity))
 	if err != nil {
@@ -37,6 +38,8 @@ func TestStorageIdentitySchemaAvailability(t *testing.T) {
 		"missing field":                 func(v *inventoryv1.StorageIdentity) { v.Serial = nil },
 		"unavailable serial with value": func(v *inventoryv1.StorageIdentity) { v.Serial.Value = "invented" },
 		"empty successful UUID":         func(v *inventoryv1.StorageIdentity) { v.LuksUuid.Status = success },
+		"unavailable GPT with value":    func(v *inventoryv1.StorageIdentity) { v.GptDiskGuid.Value = "49865c36-1e3a-4d2b-b719-89144a6e179e" },
+		"empty successful GPT":          func(v *inventoryv1.StorageIdentity) { v.GptDiskGuid.Status = success },
 		"permission denied with slots": func(v *inventoryv1.StorageIdentity) {
 			v.LuksKeyslotCount.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED
 			v.LuksKeyslotCount.Value = 1
@@ -50,6 +53,11 @@ func TestStorageIdentitySchemaAvailability(t *testing.T) {
 				t.Fatal("invalid identity admitted")
 			}
 		})
+	}
+	historical := proto.CloneOf(identity)
+	historical.GptDiskGuid = nil
+	if err := validator.Validate(historical); err != nil {
+		t.Fatalf("historical missing GPT observation: %v", err)
 	}
 }
 
@@ -88,7 +96,7 @@ func TestStorageNVMeObservationRequiresExactReadOnlyScope(t *testing.T) {
 
 func TestUploadCollectionDefersStorageToRoot(t *testing.T) {
 	sources := fixtureDetails(t.TempDir())
-	sources.rootStorage = true
+	sources.rootObservation = true
 	run := sources.run
 	sources.run = func(ctx context.Context, command backend, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
 		if command.name == "lsblk" || command.name == "cryptsetup" || command.name == "nvme" {

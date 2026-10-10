@@ -54,7 +54,7 @@ func TestRecoveryReadinessBlocksApprovalAndRechecksCreation(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	client, digest := recoveryArtifactFixture(t, bytes.Repeat([]byte{0x5a}, 8193))
 	f.svc.recoveryArtifacts = client
-	target := &agentv1.StorageTarget{Wwn: "readiness-test-wwn", Serial: "readiness-test-serial", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "readiness-test-wwn", Serial: "readiness-test-serial", SizeBytes: 1 << 30}
 	f.observeStorageTargets(t, target)
 	media, err := trust.DeviceActionDigest(target)
 	if err != nil {

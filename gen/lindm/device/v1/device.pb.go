@@ -1443,7 +1443,7 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x1dReportHostObservationResponse\x12+\n" +
 	"\x11accepted_sequence\x18\x01 \x01(\x04R\x10acceptedSequence\x12;\n" +
 	"\vserver_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"serverTime\"\xa8\x04\n" +
+	"serverTime\"\xaa\x04\n" +
 	"\x1bReportPackageAttemptRequest\x12=\n" +
 	"\x15enrollment_generation\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x126\n" +
 	"\rsession_epoch\x18\x02 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12-\n" +
@@ -1451,8 +1451,8 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\n" +
 	"started_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tstartedAt\x12C\n" +
 	"\vfinished_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"finishedAt\x12J\n" +
-	"\x06status\x18\x06 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\f\xbaH\t\x82\x01\x06\x10\x01 \x00 \x01R\x06status\x12!\n" +
+	"finishedAt\x12L\n" +
+	"\x06status\x18\x06 \x01(\x0e2$.lindm.inventory.v1.CollectionStatusB\x0e\xbaH\v\x82\x01\b\x10\x01 \x00 \x01 \bR\x06status\x12!\n" +
 	"\abackend\x18\a \x01(\tB\a\xbaH\x04r\x02\x18@R\abackend:l\xbaHi\x1ag\n" +
 	"\x12attempt.time_order\x12,collection finish must not precede its start\x1a#this.finished_at >= this.started_at\"\x88\x01\n" +
 	"\x1cReportPackageAttemptResponse\x12+\n" +

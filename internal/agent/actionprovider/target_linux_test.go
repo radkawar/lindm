@@ -14,7 +14,7 @@ import (
 )
 
 func TestOpenTargetExplicitlyRequestsBlockTree(t *testing.T) {
-	target := &agentv1.StorageTarget{LuksUuid: fixtureLUKS, Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 64 << 20}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: fixtureLUKS, Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 64 << 20}
 	stopped := errors.New("stop before opening any device")
 	observed := false
 	p := &Provider{config: &agentv1.DeviceActionProviderConfig{Targets: []*agentv1.QualifiedActionTarget{{Target: target}}}}
@@ -34,7 +34,7 @@ func TestOpenTargetExplicitlyRequestsBlockTree(t *testing.T) {
 func TestOpenTargetIdentityRefusalRetainsApprovedAndObservedTuples(t *testing.T) {
 	for _, duplicate := range []bool{false, true} {
 		t.Run(map[bool]string{false: "no matches", true: "duplicate matches"}[duplicate], func(t *testing.T) {
-			target := &agentv1.StorageTarget{Wwn: "approved-wwn", Serial: "approved-serial", SizeBytes: 4096}
+			target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "approved-wwn", Serial: "approved-serial", SizeBytes: 4096}
 			nodes := []blockNode{{Path: "/dev/sda", Type: "disk", Size: 4096, Device: "4294967295:0"}, {Path: "/dev/sdb", Type: "disk", Size: 4096, Device: "4294967295:16"}}
 			if duplicate {
 				for i := range nodes {
@@ -62,7 +62,7 @@ func TestOpenTargetIdentityRefusalRetainsApprovedAndObservedTuples(t *testing.T)
 }
 
 func TestOpenTargetIdentityDiagnosticIsBoundedAndEscaped(t *testing.T) {
-	target := &agentv1.StorageTarget{Wwn: "approved", Serial: "serial", SizeBytes: 4096}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "approved", Serial: "serial", SizeBytes: 4096}
 	nodes := make([]blockNode, 20)
 	for i := range nodes {
 		nodes[i] = blockNode{Path: "/dev/\n\"injected\"", Type: "disk", Size: 4096, WWN: strings.Repeat("w", 1024), Serial: "public-serial", Filesystem: "private-filesystem", Mountpoints: []*string{new("private-mount")}}
@@ -107,7 +107,7 @@ func refusedIdentityDiagnostic(t *testing.T, target *agentv1.StorageTarget, node
 // 2026-10-10 Ubuntu SATA/NVMe signed-recovery diagnostic boots. Both original
 // match counts were zero, not duplicates. NVMe changed from nvme0n1 to nvme1n1.
 func recoveryIdentityFixture(bus string) (*agentv1.StorageTarget, []blockNode, map[string]sysfsBlockIdentity) {
-	target := &agentv1.StorageTarget{Wwn: "0x5000000000000001", Serial: "lindm-lab-0", SizeBytes: 3758096384}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "0x5000000000000001", Serial: "lindm-lab-0", SizeBytes: 3758096384}
 	disk := blockNode{Path: "/dev/sda", Type: "disk", Size: target.SizeBytes, Device: "8:0"}
 	state := blockNode{Path: "/dev/sdb", Type: "disk", Size: 1073741824, Device: "8:16"}
 	seed := blockNode{Path: "/dev/vda", Type: "disk", Size: 374784, Device: "253:0"}
@@ -224,7 +224,7 @@ func TestResolveTargetIdentitySurvivesBootLocalRenumbering(t *testing.T) {
 }
 
 func TestResolveTargetIdentityInheritsOnlyWithinPhysicalBranch(t *testing.T) {
-	target := &agentv1.StorageTarget{Wwn: "wwn", Serial: "serial", LuksUuid: fixtureLUKS, SizeBytes: 4096}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "wwn", Serial: "serial", LuksUuid: fixtureLUKS, SizeBytes: 4096}
 	absent := func(string) sysfsBlockIdentity { return sysfsBlockIdentity{} }
 	for _, variant := range []string{"one-uuid", "no-uuid-after-erase", "wrong-uuid", "duplicate", "orphan-sibling", "mapped-device", "conflicting-child"} {
 		t.Run(variant, func(t *testing.T) {

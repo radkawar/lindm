@@ -1,0 +1,38 @@
+{
+  "dnf5-version": {
+    "command": "dnf5 --version",
+    "exit_code": 0,
+    "stdout": "dnf5 version 5.4.1.0\ndnf5 plugin API version 2.0\nlibdnf5 version 5.4.1.0\nlibdnf5 plugin API version 2.2\n\nLoaded dnf5 plugins:\n  name: builddep\n  version: 1.0.0\n  API version: 2.0\n\n  name: changelog\n  version: 1.0.0\n  API version: 2.0\n\n  name: config-manager\n  version: 0.1.0\n  API version: 2.0\n\n  name: copr\n  version: 0.1.0\n  API version: 2.0\n\n  name: needs_restarting\n  version: 1.0.0\n  API version: 2.0\n\n  name: repoclosure\n  version: 1.0.0\n  API version: 2.0\n\n  name: repomanage\n  version: 1.0.0\n  API version: 2.0\n\n  name: reposync\n  version: 1.0.0\n  API version: 2.0\n",
+    "stderr": ""
+  },
+  "module-help": {
+    "command": "dnf5 module --help",
+    "exit_code": 0,
+    "stdout": "Usage:\n  dnf5 [GLOBAL OPTIONS] module <COMMAND> ...\n                                \nQuery Commands:                 \n  list                          List module streams\n  info                          List module streams\n                                \nStream Management Commands:     \n  enable                        Enable module streams and make their packages available.\n  reset                         Reset module state so it's no longer enabled or disabled.\n  disable                       Disable modules including all their streams.\n",
+    "stderr": ""
+  },
+  "module-list-json": {
+    "command": "dnf5 --cacheonly module list --enabled --json",
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Unknown argument \"--json\" for command \"list\". Add \"--help\" for more information about the arguments.\nThe argument is available for commands: advisory info, advisory list, repo info, repo list, repoclosure, history info, needs-restarting, history list, check-upgrade, info, list. (It has to be placed after the command.)\n"
+  },
+  "module-list": {
+    "command": "dnf5 --cacheonly module list --enabled",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "Updating and loading repositories:\nCache-only enabled but no cache for repository \"fedora\"\n"
+  },
+  "repo-info": {
+    "command": "dnf5 repo info --json",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "Failed to download metadata (metalink: \"https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=aarch64\") for repository \"updates\": Cannot prepare internal mirrorlist: Curl error (6): Could not resolve hostname for https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=aarch64 [Could not resolve host: mirrors.fedoraproject.org]\n"
+  },
+  "repo-info-cacheonly": {
+    "command": "dnf5 --cacheonly repo info --json",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "Cache-only enabled but no cache for repository \"fedora\"\n"
+  }
+}

@@ -192,7 +192,7 @@ func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTar
 		if node.Type != "disk" || node.WWN == "" || node.Size == 0 || !strings.HasPrefix(node.Path, "/dev/") {
 			return nil, nil, errors.New("owned cloud disk has incomplete native identity")
 		}
-		target := &actionNativeTarget{Identity: &agentv1.StorageTarget{Wwn: node.WWN, Serial: node.Serial, SizeBytes: node.Size}, Path: node.Path, Type: node.Type}
+		target := &actionNativeTarget{Identity: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: node.WWN, Serial: node.Serial, SizeBytes: node.Size}, Path: node.Path, Type: node.Type}
 		if node.Serial == "lindm-lab-0" {
 			if root != nil || len(node.Children) == 0 || node.Filesystem == "crypto_LUKS" {
 				return nil, nil, errors.New("ambiguous original unencrypted cloud root")

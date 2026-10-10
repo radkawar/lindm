@@ -34,7 +34,7 @@ func recoveryProofFixtureAt(t *testing.T, now time.Time) (*trust.Authority, ed25
 		t.Fatal(err)
 	}
 	image := bytes.Repeat([]byte{3}, 32)
-	target := &agentv1.StorageTarget{Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 4096}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 4096}
 	mediaDigest, err := trust.DeviceActionDigest(target)
 	if err != nil {
 		t.Fatal(err)

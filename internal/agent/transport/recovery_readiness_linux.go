@@ -18,8 +18,9 @@ import (
 )
 
 // collectNativeObservation attaches root-only public evidence before ownership
-// passes to the immutable spool. Direct inventory.Collect remains unprivileged
-// and never claims recovery readiness. Both publication paths use this boundary.
+// passes to the immutable spool. Direct inventory.Collect retains caller
+// privileges and never claims recovery readiness. Both publication paths use
+// this boundary; invalid root projections are discarded in their entirety.
 func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	collect := r.collectInventory
 	if collect == nil {
@@ -43,6 +44,18 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 			ObservedAt: timestamppb.Now(), BootId: boot, Reason: reason,
 		}
 		host.Details.Storage = &inventoryv1.StorageDetails{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
+		if cpu := host.Details.Cpu; cpu.GetModelSource().GetValue() == "smbios_type4" {
+			// Never retain a previous privileged model after a failed current
+			// observation. Public procfs/sysfs facts and historical evidence
+			// without source metadata remain independent of this projection.
+			cpu.Model = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
+			cpu.ModelSource = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
+		}
+		host.HardwareSerial = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
+		host.Details.Firmware = &inventoryv1.FirmwareDetails{
+			Mode:       &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},
+			SecureBoot: &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},
+		}
 	}
 	defer func() { host.FinishedAt = timestamppb.Now() }()
 	response, err := rpc(ctx, r.executor.GetRecoveryReadiness, &agentv1.GetRecoveryReadinessRequest{})
@@ -54,20 +67,24 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 		failed("recovery_readiness_executor_invalid")
 		return observation, nil
 	}
-	readiness := response.GetObservation()
-	now, started := time.Now(), host.GetStartedAt().AsTime()
-	if (readiness.GetBootId() != "" && readiness.GetBootId() != host.GetBootId().GetValue()) ||
-		readiness.GetObservedAt().AsTime().Before(started) || readiness.GetObservedAt().AsTime().After(now) ||
-		response.GetStorageObservedAt().AsTime().Before(started) || response.GetStorageObservedAt().AsTime().After(now) {
-		failed("recovery_readiness_executor_stale")
-		return observation, nil
-	}
-	storage := new(inventoryv1.StorageDetails)
-	if err := proto.Unmarshal(response.GetStorageDetails(), storage); err != nil || protodata.ValidateClosed(storage.ProtoReflect()) != nil || protovalidate.Validate(storage) != nil {
+	root := new(inventoryv1.RootObservation)
+	if err := proto.Unmarshal(response.GetRootObservation(), root); err != nil || protodata.ValidateClosed(root.ProtoReflect()) != nil || protovalidate.Validate(root) != nil {
 		failed("recovery_readiness_executor_invalid")
 		return observation, nil
 	}
+	readiness := response.GetObservation()
+	now, started := time.Now(), host.GetStartedAt().AsTime()
+	if host.GetBootId().GetStatus() != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS ||
+		root.GetBootId() != host.GetBootId().GetValue() || readiness.GetBootId() != root.GetBootId() ||
+		readiness.GetObservedAt().AsTime().Before(started) || readiness.GetObservedAt().AsTime().After(now) ||
+		root.GetStartedAt().AsTime().Before(readiness.GetObservedAt().AsTime()) || root.GetFinishedAt().AsTime().After(now) {
+		failed("recovery_readiness_executor_stale")
+		return observation, nil
+	}
 	host.Details.RecoveryReadiness = readiness
-	host.Details.Storage = storage
+	host.Details.Storage = root.GetStorage()
+	host.Details.Cpu = root.GetCpu()
+	host.HardwareSerial = root.GetHardwareSerial()
+	host.Details.Firmware = root.GetFirmware()
 	return observation, nil
 }

@@ -180,7 +180,19 @@ func TestSignedCSAFTLSAcquisition(t *testing.T) {
 			}
 			config := source(test.distro, test.release, test.format)
 			config.Url = server.URL + "/" + test.basename
-			got, artifact, signedAt, err := client.fetchSignedCSAF(t.Context(), config)
+			acquire := func() ([]byte, *advisoryv1.FeedArtifact, time.Time, error) {
+				if config.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF {
+					return client.fetchSignedCSAF(t.Context(), config)
+				}
+				var got []byte
+				artifact, signedAt, err := client.consumeSignedCSAF(t.Context(), config, func(file *os.File) error {
+					var err error
+					got, err = boundedRead(file, redHatRecordBytes)
+					return err
+				})
+				return got, artifact, signedAt, err
+			}
+			got, artifact, signedAt, err := acquire()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -189,12 +201,12 @@ func TestSignedCSAFTLSAcquisition(t *testing.T) {
 				t.Fatalf("lost authenticated source provenance: %v %s requests=%d", artifact, signedAt, requests.Load())
 			}
 			config.ExpectedSha256 = make([]byte, sha256.Size)
-			if _, _, _, err := client.fetchSignedCSAF(t.Context(), config); err == nil {
+			if _, _, _, err := acquire(); err == nil {
 				t.Fatal("incorrect out-of-band pin accepted")
 			}
 			config.Url = strings.Replace(config.Url, "https://", "http://", 1)
 			before := requests.Load()
-			if _, _, _, err := client.fetchSignedCSAF(t.Context(), config); err == nil || requests.Load() != before {
+			if _, _, _, err := acquire(); err == nil || requests.Load() != before {
 				t.Fatal("HTTP source bypassed signing/TLS policy")
 			}
 		})

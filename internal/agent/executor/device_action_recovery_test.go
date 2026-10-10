@@ -126,7 +126,7 @@ func newRecoveryBootFixtureWithSetup(t *testing.T, setup func(*deviceActionFixtu
 	if setup != nil {
 		setup(f)
 	}
-	target := &agentv1.StorageTarget{Wwn: "original-whole-disk", Serial: "original-disk-serial", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "original-whole-disk", Serial: "original-disk-serial", SizeBytes: 1 << 30}
 	media, err := digestMessage(target)
 	if err != nil {
 		t.Fatal(err)

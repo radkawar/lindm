@@ -37,11 +37,12 @@ message GetRecoveryReadinessRequest {}
 
 message GetRecoveryReadinessResponse {
   RecoveryReadinessObservation observation = 1 [(buf.validate.field).required = true];
-  // Canonical inventory.StorageDetails protobuf from the same root observer.
+  reserved 2, 3;
+  reserved "storage_details", "storage_observed_at";
+  // Canonical inventory.RootObservation protobuf from the same root observer.
   // Kept opaque here to avoid the inventory-to-agent schema import cycle.
-  bytes storage_details = 2 [(buf.validate.field).bytes = {
+  bytes root_observation = 4 [(buf.validate.field).bytes = {
     min_len: 1
-    max_len: 65536
+    max_len: 81920
   }];
-  google.protobuf.Timestamp storage_observed_at = 3 [(buf.validate.field).required = true];
 }

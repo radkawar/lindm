@@ -1,0 +1,342 @@
+# Ubuntu
+
+## Versions, architectures and qualification
+
+[Verification](../verification.md#1-launch-platform-qualification) is authoritative for
+qualification, including later evidence and failures. This page describes implementation
+and narrowly identified observations, not general production readiness or all-resource support.
+Ubuntu 24.04 and 26.04 LTS are required launch branches: official GNOME Desktop and
+Server/minimal, x86_64 desktop/server and aarch64 server; Kubuntu/KDE needs separate
+qualification. Ubuntu 22.04 is a separate legacy row. Ubuntu Core is not this platform.
+
+Pinned cloud inputs are [Noble 20260926](../../lab/images/ubuntu-noble-amd64.json#L1)
+and [Resolute release-20260927](../../lab/images/ubuntu-resolute-amd64.json#L1).
+The latter is generic amd64, not amd64v3. Image manifests bind exact vendor URL,
+architecture, size, SHA-256 and the Ubuntu cloud-image signing fingerprint
+`D2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81`. A verified image is an input, not a
+successful installation, desktop, encryption or agent lifecycle result.
+
+Observed Ubuntu 26.04 x86_64 cloud lanes, under
+`$HOME/.cache/lindm-platformlanes-20261009/`:
+
+| Lane                                                        | Evidence file                      | SHA-256                                                            |
+| ----------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
+| Automatic control-plane trust, signed 0.5.0→0.5.1 lifecycle | `ubuntu26-trust-platform2.json`    | `8a53652f7a2068710ce07726cb9b337709e6a67091a93b387bb9d4dcb33b6148` |
+| Connected service dispatch                                  | `ubuntu26-dispatch-platform2.json` | `a255d80d4df67104f017c4262f3adb8f62a0c681df0d975d50d153ba0ee8e441` |
+
+The trust record contains five 679-package publications, collection-denial retention,
+authority rotation/revocation, reboot/reinstall retention, spool recovery and final
+revocation/missing-journal hold. These supersede the earlier failed reboot/trust
+attempts only for that lane. They do not qualify the later resource-provider cutover,
+physical machines, ARM, desktops or air-gap operation; consult verification before reuse.
+
+## Packaging, signing, repositories, paths and LSM
+
+Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
+signature check. Authentication is signed `InRelease` → hashed `Packages` → archive
+SHA-256; the DEB does not carry an embedded package signature. The generated deb822
+source uses a dedicated `Signed-By` key and rejects system `trusted.gpg` locations
+([packaging contract](../../internal/packaging/doc.go#L14),
+[source generation](../../internal/packaging/publish.go#L19)). Independently verify
+the package-signing fingerprint; the image-signing key is not the agent repository key.
+The lab archive coordinates `stable/main` are lindm-owned coordinates, not an Ubuntu
+release upgrade channel ([layout](../../internal/packaging/layout.go#L32)).
+
+Packaged executables live at `/usr/libexec/lindm/lindm-agent`; configuration is
+`/etc/lindm/{executor,agent}.json`. Root journal/identity state lives under
+`/var/lib/lindm/executor`, transport state under `/var/lib/lindm/agent`, and the
+root-owned runtime socket directory is `/run/lindm` (0750 root:lindm).
+See [executor unit](../../internal/packaging/assets/lindm-executor.service#L8),
+[network unit](../../internal/packaging/assets/lindm-agent.service#L9) and
+[tmpfiles](../../internal/packaging/assets/tmpfiles.conf#L1).
+
+Do not disable AppArmor or systemd confinement to make a lane pass. The evidence
+below establishes the recorded systemd boundaries, not an AppArmor profile/enforcement
+qualification. Record native LSM state separately in any new installation acceptance run;
+neither an Ubuntu name nor absence of logged denials proves that boundary.
+
+## Agent services and sandbox
+
+`lindm-executor.service` runs as root and owns privileged observation/execution;
+`lindm-agent.service` runs as `lindm`, has empty capability sets and owns outbound TLS.
+Both retain `PrivateDevices=yes`, `ProtectSystem=strict`, `ProtectHome=yes` and
+`ProtectProc=invisible`. The executor normally allows only AF_UNIX; the network
+unit permits its specified IP/resolver families. The units exclude each other's
+private state directories (unit references above).
+
+An encrypted-root observation exposed a real boundary: executor `PrivateDevices`
+hid block nodes, so ordinary `lsblk` could see sysfs mappings but omit device-mapper
+children; reading public LUKS metadata also failed. The correction is a fresh,
+fixed-command transient `inventory-observe` service, **not** weaker persistent units.
+Only this helper uses `PrivateDevices=no`, with `DevicePolicy=closed`, `block-* r`,
+empty capabilities, private networking, strict filesystem protection and inaccessible
+lindm config/state. It has a 10-second runtime limit, 80-KiB stdout/8-KiB diagnostic
+bounds and strict typed output, boot and timestamp admission. Cancellation stops and
+joins the transient unit ([implementation](../../internal/agent/executor/root_inventory_linux.go#L21),
+[exact properties](../../internal/agent/executor/root_inventory_linux.go#L89)).
+This read-only observer is distinct from action-sandbox provisioning: imperative
+actions require their own qualified exact-device drop-in, not `block-*` write access
+([executor unit](../../internal/packaging/assets/lindm-executor.service#L17)).
+
+## Inventory and per-field quirks
+
+Inventory reports status per observation. A successful empty collection, absent
+capability, permission denial and failed command are different outcomes. The native
+oracle's [capability-guarded allowlist](../../internal/vmlab/inventory_unavailable_linux.go#L7)
+accepts only exact `UNAVAILABLE` cases; it never turns other failure statuses into a pass.
+
+| Field or backend          | Ubuntu interpretation                                                                                                                                                                                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native packages           | `dpkg` identities and versions; no RPM module label. The module exception requires an actual dpkg record.                                                                                                                                                                               |
+| Snap                      | Query local `/run/snapd.socket`, `GET /v2/snaps`. HTTP 200 with typed `sync`/`OK` and `result: []` is successful empty inventory. `snap list`'s informational stderr is not an installed application. Missing/null results, malformed output and native failures are not empty success. |
+| Flatpak                   | Absent backend permits unavailable application inventory only when backend detection itself succeeded with false. Installed-but-failing Flatpak or Snap must fail visibly.                                                                                                              |
+| CPE                       | Stock Ubuntu os-release need not provide `CPE_NAME`; absent CPE is unavailable, not an invented identifier.                                                                                                                                                                             |
+| Release lock/repositories | Optional releasever lock and RPM/DNF repository observations are not an APT package failure. Non-DNF exemption requires dpkg present and RPM absent.                                                                                                                                    |
+| DMI serial                | A root-only blank QEMU serial remains unavailable after privileged observation. Do not fabricate one or retain a network-process permission error as truth.                                                                                                                             |
+| Firmware/TPM              | BIOS cannot supply UEFI Secure Boot; an EFI partition does not prove UEFI boot. TPM version is unavailable only when successful TPM presence is false.                                                                                                                                  |
+| Sessions                  | Remote/tty sessions may lack a graphical seat; logind collection must still succeed.                                                                                                                                                                                                    |
+| Storage                   | Unmounted media, whole-disk partition IDs, virtio WWNs and non-NVMe sanitize identity have separate applicability rules. LUKS metadata cannot be excused as absent when LUKS is present.                                                                                                |
+
+Sources: [Snap collector/parser](../../internal/agent/inventory/snap_linux.go#L22),
+[platform/backend exceptions](../../internal/vmlab/inventory_unavailable_linux.go#L20),
+[storage capability predicates](../../internal/vmlab/inventory_unavailable_linux.go#L33).
+
+The real Ubuntu24 console guest was upgraded through signed APT 0.1.0→0.1.1.
+Among 220 status-bearing fields only two changed: Snap native-command failure became
+successful empty inventory, and root-observed blank hardware serial became unavailable
+instead of permission denied. Other fields remained successful or truthfully unavailable;
+identity/generation and persistent sandbox settings were retained, and host/package
+sequence 3 was published. Evidence:
+`/home/r/work/lindm-lab/console-ubuntu-20261010/inventory/diagnosis.txt`, SHA-256
+`b534ff1c979aa1b7336c0d54b568a7605771e5b1515c8d09756e5eebd69a6e4b`.
+That record identifies the before/after JSON, exhaustive CSV and native APT transcript.
+
+Encrypted observer prerequisites separately passed read-only transient `lsblk` and
+public LUKS inspection: `vda→vda3→dm_crypt-0→ubuntu--vg-ubuntu--lv` mounted at `/`,
+one keyslot and zero tokens. Raw LUKS JSON was not retained.
+`/home/r/work/lindm-lab/console-encrypted-ubuntu-20261010/transient-observer-fix.txt`,
+SHA-256 `fed3b8d980d86db1d92e5f0348e7bf48c68101d7e3aa0c7e7636440dad38eabc`,
+records this narrower proof. At this handoff the combined signed 0.1.2 package awaits
+owner-authorized server restart/guest upgrade: accepted post-upgrade encrypted
+projection and target selectability are **not yet established**.
+
+## Updates
+
+Agent self-update is not a general Ubuntu distribution upgrade. APT staging must use
+`lindm-agent_<native-version>_<architecture>.deb`, with `:` escaped as `%3a` and `_`
+as `%5f` in the version. The protected transaction directory itself is
+`Dir::Cache::archives`; staging a generic `agent.deb` outside a separate empty cache
+breaks `--no-download` with “Pathname to install is not absolute”. Do not work around
+that by allowing downloads. The provider simulates the bounded operation, admits
+only the owned package, uses no repositories/downloads/removals/recommends and
+fails on missing dependencies. Interrupted recovery re-unpacks/configures only the
+admitted agent package ([naming](../../internal/agent/update/native_linux.go#L83),
+[APT transaction](../../internal/agent/update/native_linux.go#L407)).
+
+Pinned upstream explanation: APT 2.8.3
+[canonical archive resolution](https://salsa.debian.org/apt-team/apt/-/blob/2.8.3/apt-pkg/acquire-item.cc#L3464)
+and [no-download acquisition handling](https://salsa.debian.org/apt-team/apt/-/blob/2.8.3/apt-private/private-install.cc#L183).
+
+Ubuntu24's unattended native lane passed six signed negative/hold phases, an actual
+interrupted unpack witness, boot-helper completion at 0.2.0, retained identity,
+fresh authenticated inventory/session and signed downgrade refusal:
+`$HOME/.cache/lindm-updatequal-20261010/ubuntu24-updates-05.json`, SHA-256
+`7716aa65b6d846dd935f2b087fa7a019563d33f124efda2e39ee81adc5da860c`.
+This is one-source, differently stamped package qualification, not historical release
+compatibility, arbitrary dependency management or physical power-loss evidence.
+
+## Encryption and recovery
+
+Ubuntu's stock encrypted installer uses `cryptsetup-initramfs`, `CRYPTSETUP=y` and
+`update-initramfs -u -k all`. TPM boot is a distinct lab variant: after curtin finishes,
+it installs dracut/systemd/TPM dependencies, removes `cryptsetup-initramfs` and rebuilds
+initrds with dracut. Noble's dracut conflicts with initramfs-tools; do not silently
+reinterpret a stock-initramfs pass as TPM-token unlock qualification
+([installer](../../internal/vmlab/encrypted_installer_linux.go#L85)).
+
+Ubuntu 24.04.5 amd64 encrypted UEFI installation, Secure Boot with enrolled keys,
+swtpm and virtio-blk passed two passphrase cold boots and independent LUKS-header
+equality. `artifacts/encrypted-ubuntu2404-amd64-secureboot-20261010.json`, SHA-256
+`e21191c8b7b149299f6f51b1e7164d239271c047772ced0d8114d4a2c5e1dc69`, explicitly
+uses stock initramfs and no desktop. It does not qualify TPM-token unlock, key
+rotation, wipe, ARM or Secure Boot off. The ARM encrypted installer timeout remains
+a failed qualification attempt in [verification](../verification.md).
+Consult that document's current encryption/recovery rows for subsequent action evidence.
+
+Stable storage selection is hardware-dependent, not an Ubuntu guarantee. The encrypted
+demo's virtio disk supplies serial `lindm-demo-encrypted` at
+`/sys/dev/block/253:0/serial`, but no WWID or `device/serial`. Native evidence under
+`/home/r/work/lindm-lab/console-encrypted-ubuntu-20261010/`:
+
+| Record                                | SHA-256                                                            |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `lsblk-native-baseline.json`          | `ac845af43a0e65e0323d7f8c54887e89bc771d4ccde64dc70f454aad723595ba` |
+| `native-sysfs-identity-baseline.json` | `6f9cc1c2af109de2c275665c2d151ec74e765e1c5f405583d5f97e4bda445b55` |
+
+The signed identity basis prefers `WWN_SERIAL`. An explicitly absent WWN may permit
+`SERIAL_GPT_LUKS` only for an encrypted GPT partition with unique physical serial,
+exact GPT/LUKS UUIDs and both disk/target sizes. Failed or contradictory WWN evidence
+cannot downgrade. Paths are not authority, and the fallback does not qualify NVMe
+sanitize ([target construction](../../internal/device/storage_targets.go#L111),
+[native revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
+
+## Device actions
+
+Logind is the session/power boundary, not a shell wrapper. Lock requests require
+remaining graphical sessions to acknowledge `LockedHint`; acknowledgment is not
+physical desktop visibility or boot lock. Termination is irreversible. The lab's
+Ubuntu GNOME setup uses `/etc/gdm3/custom.conf`, `gdm3` and session `ubuntu`; KDE needs
+its own observation ([sessions](../../internal/agent/actionprovider/sessions_linux.go#L38),
+[lock evidence](../../internal/agent/actionprovider/network_linux.go#L229),
+[GDM recipe](../../internal/vmlab/encrypted_installer_linux.go#L232)).
+
+Power operations inspect native capability, pending schedules and inhibitors; they
+do not replace an existing schedule or fall back to inhibitor-bypassing calls
+([power provider](../../internal/agent/actionprovider/power_linux.go#L172)).
+Nftables quarantine uses an automatically expiring kernel active-set fence; transport
+loss remains unknown, not successful containment/reachability proof
+([network provider](../../internal/agent/actionprovider/network_linux.go#L232)).
+Use the exact Ubuntu24 power/refresh and device-action evidence in
+[verification](../verification.md); service dispatch alone does not qualify account
+lock, desktop lock, encryption, recovery or wipe. Destructive targets require fresh
+inventory, exact signed identity and separately authorized provisioning.
+
+## Advisory feeds
+
+Ubuntu assessments use native dpkg versions and vendor backports, not upstream
+version ordering alone. The maintained full archive is
+`https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip`; a stale
+`Ubuntu:24.04:LTS` export or an arbitrary mirror named `all.zip` is not a replacement
+for canonical complete-source coverage. Completeness remains scoped to configured
+product/release/architecture and source mapping
+([coverage decision](../../internal/advisory/feed/osv_archive.go#L190)).
+
+A real upstream malformed record, `UBUNTU-CVE-2023-25812`, contains
+`pkg:deb/ubuntu/golang-github-minio-minio-go?arch=src?distro=noble`.
+The second `?` must not be repaired into a new package identity. The parser rejects
+that **record atomically**, retains explicit ID/reason/package-name rejection metadata
+and conservative unknown source/binary markers. Valid siblings can publish; a rejected
+record is not evidence that the affected package is clean. Unscoped rejection degrades
+snapshot completeness. See [record atomicity](../../internal/advisory/feed/osv_archive.go#L146)
+and [exact regression](../../internal/advisory/feed/osv_rejections_test.go#L17).
+
+A complete 70,180-entry Ubuntu export census found 1,416 distinct CVEs per
+advisory at the maximum (`USN-8728-1`, `-2`, `-3`). The former 1,000-CVE ceiling
+incorrectly rejected legitimate kernel notices. The shared ceiling is now 2,048,
+44.6% above that observed maximum; the per-entry and normalized byte limits still
+bound memory. The exact 451,752-byte vendor notice is preserved as
+[`ubuntu-USN-8728-1.json`](../../internal/advisory/feed/testdata/ubuntu-USN-8728-1.json),
+SHA-256 `e3ac740c07cc0c15e50c63bfc71cf235070eaf1b4cc9125c15dfae0dc88f5a54`,
+and [the regression](../../internal/advisory/feed/large_cves_test.go) requires all
+1,416 CVEs without rejection or unknown classification. Census:
+[`ubuntu-osv-cve-cardinality-20261010.json`](../../artifacts/ubuntu-osv-cve-cardinality-20261010.json).
+SHA-256 `a10f81832aaed3921eb996a766aff5d47f0b88648db4580b66bdc3ceba14a384`.
+
+An initial measured full-source publication completed on 2026-10-10: 2,157,214
+unique claims, ten rejected records, 217.64 seconds wall time and 99,948 KiB peak
+RSS, with no swaps. Publication was atomic with zero remaining batch rows and
+reported complete **scoped** coverage; rejected packages carried unknown assessments.
+This initial performance record predates correction of six legitimate kernel notices
+incorrectly rejected by the former CVE-count bound.
+Evidence: `artifacts/ubuntu-advisory-stream-20261010.json`, SHA-256
+`87cc2dedc998bbd4214caa371a6c960710139a91a49c968d15c423d4b09c6aa4`.
+The source archive digest is
+`c45c2791452b55990d08ae1ba4962a712081d6e0134bc5c5c6707d09adf50aba`.
+Corrected republication admitted 2,157,314 unique claims with only the four malformed
+MinIO records rejected, zero legitimate kernel-notice rejections, current complete
+scoped coverage and zero batch rows. Publication took 213.69 seconds with
+102,068 KiB peak RSS and no swaps. Retired-generation cleanup reached its separate
+30-second deadline after the successful switch; invisible retired rows require
+the maintained cleanup continuation. Corrected evidence:
+[`ubuntu-advisory-stream-cve2048-20261010.json`](../../artifacts/ubuntu-advisory-stream-cve2048-20261010.json),
+SHA-256 `17f2bb24327bcfc6e2bbe45cb217ac8ffa6b9eadb2adbcc6ebe6c0d2703b1c9b`.
+The maintained follow-up uses migration `00013` and a durable cleanup queue:
+5,000-row transactions resume on startup, explicit refresh and the periodic worker.
+Ten-minute staging leases fence expired writers; historical inactive generations
+receive 35 minutes' migration grace. Isolated PostgreSQL integration coverage
+exercises cancellation/resumption, active-generation protection, concurrent cleanup
+and expired-writer publication refusal
+([regressions](../../internal/advisory/publication_cleanup_integration_test.go)).
+Applying the migration and draining this demo's old rows remains gated on its
+owner-approved bundled migration/restart; no direct row deletion was used.
+This proves feed publication, not authenticated device-findings evaluation or
+scheduled refresh in the already running server. The record explicitly leaves those
+and new rejection UI fields pending the approved bundled restart. Keep feed and
+inventory freshness independent, as required by [verification](../verification.md).
+
+## Lab
+
+Use maintained `lab images fetch` and `lab images verify` with the exact manifests,
+then the relevant `lab vm inspect`, `lifecycle`, `dispatch`, `updates` or `encrypted`
+lane. Keep runner/source/package/image hashes and native firmware/TPM/storage/desktop
+settings with each record. Cloud smoke is not installer acceptance. The ordinary
+cloud fixture masks native automatic-update timers; stock acceptance removes this
+fixture override ([fixture distinction](../../internal/vmlab/vm_linux.go#L221)).
+The encrypted golden's first-boot posture check permits an explicitly absent TPM;
+that is separate from installing the TPM-capable boot stack. Failed native checks
+now identify root ancestry, TPM version, SecureBoot or SetupMode independently
+and retain recognized native stderr reasons while redacting guest paths
+([posture checks](../../internal/vmlab/encrypted_smoke_linux.go#L116)).
+The 2026-10-10 acceptance attempt at
+`$HOME/.cache/lindm-acceptance-20261010-01/acceptance.json` failed the earlier
+combined posture check (exit 1, 105 stderr bytes); it does not identify which
+prerequisite failed or establish an encrypted-guest acceptance pass. The improved
+diagnostics have not yet been exercised by that record.
+A browser dependency installation or prepared browser baseline does not qualify a
+native desktop journey. Preserve explicit egress/air-gap mode and owned guest cleanup;
+never reuse development credentials as deployment instructions.
+
+The browser-only correction record
+`$HOME/.cache/lindm-acceptance-browser-correction-20261010-01/acceptance.json`
+(SHA-256 `e846e5944651f2c8926a2593ef847a267b08ccd680c1ddf8aee71b513a00f2db`)
+passed real owner enrollment, sign-in/sign-out/fresh sign-in, one-time grant and
+provisioning-token issuance in Chromium 156.0.8078.4 and Firefox 157.0.1 with
+geckodriver 0.37.1. Owned fixture cleanup passed. Firefox's native WebDriver
+authenticator requires disabling `security.webauth.webauthn_enable_usbtoken`
+and enabling `security.webauth.webauthn_enable_softtoken` in its disposable
+automation profile: the
+[157.0.1 native dispatcher](https://hg.mozilla.org/releases/mozilla-release/raw-file/FIREFOX_157_0_1_RELEASE/dom/webauthn/authrs_bridge/src/lib.rs)
+otherwise chooses physical USB before the native test-token manager.
+The [runner](../../web/acceptance/drivers.mjs) uses native CTAP2 with user
+verification, not an injected page credential implementation.
+
+That record deliberately remains failed overall: Ubuntu's WebKitGTK
+`2.52.6-0ubuntu0.24.04.1` driver returned `unknown command` for the native
+virtual-authenticator endpoint. Its secure HTTPS page reported
+`PublicKeyCredential` and both JSON option parsers absent. The real console
+capability guard therefore prevented even the password POST; the password
+phase is explicitly unqualified, not an Origin/Referrer or sign-in pass.
+Masked failure screenshots and these capability flags are retained in the
+record's evidence directory. Installing the maintained
+[browser prerequisites](../../web/acceptance/install-browsers.sh) does not
+remove that native WebKit build prerequisite or qualify Ubuntu desktop,
+native profile application, storage selection, or a full release.
+
+A subsequent maintained browser-only run at
+`$HOME/.cache/lindm-acceptance-origin-20261010-02/acceptance.json`
+(SHA-256 `fac61c6f48c46c3420bccab821b64ef6d42fe22794e0b34af675e56afff2654a`)
+again passed the Chromium and Firefox journeys, with owned cleanup complete.
+WebKit additionally passed the separate
+[same-origin invalid-request diagnostic](../../web/acceptance/origin-post.mjs):
+the real document returned HTTP 200, `Referrer-Policy: same-origin` and its
+actual self-only connection CSP. The console's own loaded `beginLogin` client
+sent a secret-free invalid request and received HTTP 400, not the origin
+gate's HTTP 403. This establishes that browser's origin-policy acceptance,
+not valid-password or passkey authentication. Its native authenticator remains
+unavailable, its ordinary sign-in UI still makes no password POST, and the
+overall gate deliberately exits unsuccessfully. No credential API, request
+headers, referrer setting, or application capability guard was replaced.
+
+## Gaps
+
+- Desktop GNOME/KDE, aarch64, physical hardware and air-gap gates remain independent;
+  do not extrapolate from the cited x86_64 cloud/installer records.
+- The encrypted read-only transient prerequisite is not yet a published 0.1.2 inventory
+  or selectable-target proof at this handoff.
+- Agent self-update and systemd service lanes do not qualify the new generic native
+  package provider, whole-OS upgrades, rollback, all device actions or LSM policy.
+- Stock initramfs/passphrase, TPM-token unlock, recovery rotation and wipe require
+  separate evidence. Missing target identity is a safety refusal, not permission to
+  choose `/dev/vda` manually.
+- Feed freshness and malformed-record coverage must remain visible. Successful
+  full-source publication is not proof of authenticated device exposure evaluation.

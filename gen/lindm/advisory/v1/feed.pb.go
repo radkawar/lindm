@@ -110,8 +110,14 @@ type FeedSource struct {
 	ExpectedSha256 []byte `protobuf:"bytes,8,opt,name=expected_sha256,json=expectedSha256,proto3" json:"expected_sha256,omitempty"`
 	// Exact product servicing stream, never inferred from RPM compatibility.
 	PlatformStream string `protobuf:"bytes,9,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// OSV ZIP is staged on disk. Defaults to 1 GiB; never a memory allocation.
+	MaxArchiveBytes *uint64 `protobuf:"varint,10,opt,name=max_archive_bytes,json=maxArchiveBytes,proto3,oneof" json:"max_archive_bytes,omitempty"`
+	// Reject the refresh when malformed OSV records exceed this count. Default 1000.
+	MaxRejectedRecords *uint32 `protobuf:"varint,11,opt,name=max_rejected_records,json=maxRejectedRecords,proto3,oneof" json:"max_rejected_records,omitempty"`
+	// Sanity ceiling on emitted normalized claims, including duplicates. Default 5M.
+	TotalClaimsLimit *uint64 `protobuf:"varint,12,opt,name=total_claims_limit,json=totalClaimsLimit,proto3,oneof" json:"total_claims_limit,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *FeedSource) Reset() {
@@ -207,6 +213,27 @@ func (x *FeedSource) GetPlatformStream() string {
 	return ""
 }
 
+func (x *FeedSource) GetMaxArchiveBytes() uint64 {
+	if x != nil && x.MaxArchiveBytes != nil {
+		return *x.MaxArchiveBytes
+	}
+	return 0
+}
+
+func (x *FeedSource) GetMaxRejectedRecords() uint32 {
+	if x != nil && x.MaxRejectedRecords != nil {
+		return *x.MaxRejectedRecords
+	}
+	return 0
+}
+
+func (x *FeedSource) GetTotalClaimsLimit() uint64 {
+	if x != nil && x.TotalClaimsLimit != nil {
+		return *x.TotalClaimsLimit
+	}
+	return 0
+}
+
 type Advisory struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -223,14 +250,16 @@ type Advisory struct {
 	PublishedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
 	SourceUrl   string                 `protobuf:"bytes,11,opt,name=source_url,json=sourceUrl,proto3" json:"source_url,omitempty"`
 	// Vendor uncertainty is not equivalent to a known vulnerable version range.
-	AssessmentUnknown bool   `protobuf:"varint,12,opt,name=assessment_unknown,json=assessmentUnknown,proto3" json:"assessment_unknown,omitempty"`
-	NotAffected       bool   `protobuf:"varint,13,opt,name=not_affected,json=notAffected,proto3" json:"not_affected,omitempty"`
-	PlatformRelease   string `protobuf:"bytes,14,opt,name=platform_release,json=platformRelease,proto3" json:"platform_release,omitempty"`
-	PlatformStream    string `protobuf:"bytes,15,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
-	ModuleName        string `protobuf:"bytes,16,opt,name=module_name,json=moduleName,proto3" json:"module_name,omitempty"`
-	ModuleStream      string `protobuf:"bytes,17,opt,name=module_stream,json=moduleStream,proto3" json:"module_stream,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	AssessmentUnknown bool `protobuf:"varint,12,opt,name=assessment_unknown,json=assessmentUnknown,proto3" json:"assessment_unknown,omitempty"`
+	// Conservative unknown assessment, not a normalized malformed vendor identity.
+	SourceRecordRejected bool   `protobuf:"varint,18,opt,name=source_record_rejected,json=sourceRecordRejected,proto3" json:"source_record_rejected,omitempty"`
+	NotAffected          bool   `protobuf:"varint,13,opt,name=not_affected,json=notAffected,proto3" json:"not_affected,omitempty"`
+	PlatformRelease      string `protobuf:"bytes,14,opt,name=platform_release,json=platformRelease,proto3" json:"platform_release,omitempty"`
+	PlatformStream       string `protobuf:"bytes,15,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
+	ModuleName           string `protobuf:"bytes,16,opt,name=module_name,json=moduleName,proto3" json:"module_name,omitempty"`
+	ModuleStream         string `protobuf:"bytes,17,opt,name=module_stream,json=moduleStream,proto3" json:"module_stream,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Advisory) Reset() {
@@ -347,6 +376,13 @@ func (x *Advisory) GetAssessmentUnknown() bool {
 	return false
 }
 
+func (x *Advisory) GetSourceRecordRejected() bool {
+	if x != nil {
+		return x.SourceRecordRejected
+	}
+	return false
+}
+
 func (x *Advisory) GetNotAffected() bool {
 	if x != nil {
 		return x.NotAffected
@@ -392,9 +428,10 @@ type FeedDocument struct {
 	CompleteSnapshot bool            `protobuf:"varint,3,opt,name=complete_snapshot,json=completeSnapshot,proto3" json:"complete_snapshot,omitempty"`
 	Artifacts        []*FeedArtifact `protobuf:"bytes,4,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
 	// Verified vendor snapshot signing time, where available; bounds freshness.
-	SnapshotAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	SnapshotAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
+	RejectedRecords []*RejectedRecord      `protobuf:"bytes,6,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *FeedDocument) Reset() {
@@ -462,6 +499,13 @@ func (x *FeedDocument) GetSnapshotAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *FeedDocument) GetRejectedRecords() []*RejectedRecord {
+	if x != nil {
+		return x.RejectedRecords
+	}
+	return nil
+}
+
 type FeedArtifact struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Url               string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
@@ -523,10 +567,11 @@ func (x *FeedArtifact) GetSignerFingerprint() string {
 }
 
 type FeedManifest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Artifacts     []*FeedArtifact        `protobuf:"bytes,1,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Artifacts       []*FeedArtifact        `protobuf:"bytes,1,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	RejectedRecords []*RejectedRecord      `protobuf:"bytes,2,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *FeedManifest) Reset() {
@@ -566,11 +611,87 @@ func (x *FeedManifest) GetArtifacts() []*FeedArtifact {
 	return nil
 }
 
+func (x *FeedManifest) GetRejectedRecords() []*RejectedRecord {
+	if x != nil {
+		return x.RejectedRecords
+	}
+	return nil
+}
+
+type RejectedRecord struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason       string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	PackageNames []string               `protobuf:"bytes,3,rep,name=package_names,json=packageNames,proto3" json:"package_names,omitempty"`
+	// No trustworthy package names: absence cannot establish clean coverage.
+	Unscoped      bool `protobuf:"varint,4,opt,name=unscoped,proto3" json:"unscoped,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectedRecord) Reset() {
+	*x = RejectedRecord{}
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectedRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectedRecord) ProtoMessage() {}
+
+func (x *RejectedRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectedRecord.ProtoReflect.Descriptor instead.
+func (*RejectedRecord) Descriptor() ([]byte, []int) {
+	return file_lindm_advisory_v1_feed_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RejectedRecord) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RejectedRecord) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RejectedRecord) GetPackageNames() []string {
+	if x != nil {
+		return x.PackageNames
+	}
+	return nil
+}
+
+func (x *RejectedRecord) GetUnscoped() bool {
+	if x != nil {
+		return x.Unscoped
+	}
+	return false
+}
+
 var File_lindm_advisory_v1_feed_proto protoreflect.FileDescriptor
 
 const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\r\n" +
+	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x0f\n" +
 	"\n" +
 	"FeedSource\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
@@ -584,14 +705,22 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\farchitecture\x18\a \x01(\tB\a\xbaH\x04r\x02\x18@R\farchitecture\x123\n" +
 	"\x0fexpected_sha256\x18\b \x01(\fB\n" +
 	"\xbaH\a\xd8\x01\x01z\x02h R\x0eexpectedSha256\x121\n" +
-	"\x0fplatform_stream\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x0eplatformStream:\x97\t\xbaH\x93\t\x1a\xad\x03\n" +
+	"\x0fplatform_stream\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x0eplatformStream\x12@\n" +
+	"\x11max_archive_bytes\x18\n" +
+	" \x01(\x04B\x0f\xbaH\f2\n" +
+	"\x18\x80\x80\x80\x80\x10(\x80\x80@H\x00R\x0fmaxArchiveBytes\x88\x01\x01\x12?\n" +
+	"\x14max_rejected_records\x18\v \x01(\rB\b\xbaH\x05*\x03\x18\x90NH\x01R\x12maxRejectedRecords\x88\x01\x01\x12?\n" +
+	"\x12total_claims_limit\x18\f \x01(\x04B\f\xbaH\t2\a\x18\x80\xda\xc4\t(\x01H\x02R\x10totalClaimsLimit\x88\x01\x01:\x97\t\xbaH\x93\t\x1a\xad\x03\n" +
 	"\x13feed_source.release\x12]release must identify a numeric distro release, Ubuntu noble, or an explicitly rolling distro\x1a\xb6\x02(this.distro == 'ubuntu' && this.release == 'noble') || (this.distro in ['arch', 'opensuse-tumbleweed'] && this.release == 'rolling') || (!(this.distro in ['arch', 'opensuse-tumbleweed']) && this.release.matches('^[0-9]+(\\\\.[0-9]+)?$') && (this.distro != 'fedora' || this.release.matches('^[1-9][0-9]{1,2}$')))\x1a\xbb\x03\n" +
 	"\x12feed_source.format\x123format must belong to the selected vendor ecosystem\x1a\xef\x02(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian')\x1a\xa2\x02\n" +
-	"\x1bfeed_source.platform_stream\x12SRHEL requires standard, eus or e4s; extended streams require an exact minor release\x1a\xad\x01this.distro == 'rhel' ? (this.platform_stream in ['standard','eus','e4s'] && (this.platform_stream == 'standard' || this.release.contains('.'))) : this.platform_stream == ''\"\xeb\a\n" +
+	"\x1bfeed_source.platform_stream\x12SRHEL requires standard, eus or e4s; extended streams require an exact minor release\x1a\xad\x01this.distro == 'rhel' ? (this.platform_stream in ['standard','eus','e4s'] && (this.platform_stream == 'standard' || this.release.contains('.'))) : this.platform_stream == ''B\x14\n" +
+	"\x12_max_archive_bytesB\x17\n" +
+	"\x15_max_rejected_recordsB\x15\n" +
+	"\x13_total_claims_limit\"\xa1\b\n" +
 	"\bAdvisory\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x02id\x12?\n" +
-	"\x04cves\x18\x02 \x03(\tB+\xbaH(\x92\x01%\x10\xe8\a\x18\x01\"\x1er\x1c\x18@2\x18^CVE-[0-9]{4}-[0-9]{4,}$R\x04cves\x128\n" +
+	"\x04cves\x18\x02 \x03(\tB+\xbaH(\x92\x01%\x10\x80\x10\x18\x01\"\x1er\x1c\x18@2\x18^CVE-[0-9]{4}-[0-9]{4,}$R\x04cves\x128\n" +
 	"\fpackage_name\x18\x03 \x01(\tB\x15\xbaH\x12r\x10\x10\x01\x18\x80\x042\t^[^\\s/]+$R\vpackageName\x12%\n" +
 	"\x0esource_package\x18\x04 \x01(\bR\rsourcePackage\x12+\n" +
 	"\farchitecture\x18\x05 \x01(\tB\a\xbaH\x04r\x02\x18@R\farchitecture\x12-\n" +
@@ -603,14 +732,15 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\x12G\n" +
 	"\n" +
 	"source_url\x18\v \x01(\tB(\xbaH%r#\x18\x80\x102\x1b^https://[^/@?#]+(/[^#]*)?$\x88\x01\x01R\tsourceUrl\x12-\n" +
-	"\x12assessment_unknown\x18\f \x01(\bR\x11assessmentUnknown\x12!\n" +
+	"\x12assessment_unknown\x18\f \x01(\bR\x11assessmentUnknown\x124\n" +
+	"\x16source_record_rejected\x18\x12 \x01(\bR\x14sourceRecordRejected\x12!\n" +
 	"\fnot_affected\x18\r \x01(\bR\vnotAffected\x122\n" +
 	"\x10platform_release\x18\x0e \x01(\tB\a\xbaH\x04r\x02\x18@R\x0fplatformRelease\x121\n" +
 	"\x0fplatform_stream\x18\x0f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x0eplatformStream\x12)\n" +
 	"\vmodule_name\x18\x10 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\n" +
 	"moduleName\x12-\n" +
 	"\rmodule_stream\x18\x11 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\fmoduleStream:\x8d\x01\xbaH\x89\x01\x1a\x86\x01\n" +
-	"\x13advisory.assessment\x12>an advisory cannot be both unknown and explicitly not affected\x1a/!(this.assessment_unknown && this.not_affected)\"\x99\x02\n" +
+	"\x13advisory.assessment\x12>an advisory cannot be both unknown and explicitly not affected\x1a/!(this.assessment_unknown && this.not_affected)\"\xe7\x02\n" +
 	"\fFeedDocument\x12;\n" +
 	"\n" +
 	"advisories\x18\x01 \x03(\v2\x1b.lindm.advisory.v1.AdvisoryR\n" +
@@ -619,13 +749,20 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x11complete_snapshot\x18\x03 \x01(\bR\x10completeSnapshot\x12=\n" +
 	"\tartifacts\x18\x04 \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactR\tartifacts\x12;\n" +
 	"\vsnapshot_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"snapshotAt\"\x86\x01\n" +
+	"snapshotAt\x12L\n" +
+	"\x10rejected_records\x18\x06 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"\x86\x01\n" +
 	"\fFeedArtifact\x12\x1d\n" +
 	"\x03url\x18\x01 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\x03url\x12\x1f\n" +
 	"\x06sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x06sha256\x126\n" +
-	"\x12signer_fingerprint\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\x11signerFingerprint\"W\n" +
+	"\x12signer_fingerprint\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\x11signerFingerprint\"\xa5\x01\n" +
 	"\fFeedManifest\x12G\n" +
-	"\tartifacts\x18\x01 \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactB\b\xbaH\x05\x92\x01\x02\x10\x10R\tartifacts*\xb6\x02\n" +
+	"\tartifacts\x18\x01 \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactB\b\xbaH\x05\x92\x01\x02\x10\x10R\tartifacts\x12L\n" +
+	"\x10rejected_records\x18\x02 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"y\n" +
+	"\x0eRejectedRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12#\n" +
+	"\rpackage_names\x18\x03 \x03(\tR\fpackageNames\x12\x1a\n" +
+	"\bunscoped\x18\x04 \x01(\bR\bunscoped*\xb6\x02\n" +
 	"\n" +
 	"FeedFormat\x12\x1b\n" +
 	"\x17FEED_FORMAT_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -652,7 +789,7 @@ func file_lindm_advisory_v1_feed_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_advisory_v1_feed_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_advisory_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_lindm_advisory_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_lindm_advisory_v1_feed_proto_goTypes = []any{
 	(FeedFormat)(0),               // 0: lindm.advisory.v1.FeedFormat
 	(*FeedSource)(nil),            // 1: lindm.advisory.v1.FeedSource
@@ -660,20 +797,23 @@ var file_lindm_advisory_v1_feed_proto_goTypes = []any{
 	(*FeedDocument)(nil),          // 3: lindm.advisory.v1.FeedDocument
 	(*FeedArtifact)(nil),          // 4: lindm.advisory.v1.FeedArtifact
 	(*FeedManifest)(nil),          // 5: lindm.advisory.v1.FeedManifest
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*RejectedRecord)(nil),        // 6: lindm.advisory.v1.RejectedRecord
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
 }
 var file_lindm_advisory_v1_feed_proto_depIdxs = []int32{
 	0, // 0: lindm.advisory.v1.FeedSource.format:type_name -> lindm.advisory.v1.FeedFormat
-	6, // 1: lindm.advisory.v1.Advisory.published_at:type_name -> google.protobuf.Timestamp
+	7, // 1: lindm.advisory.v1.Advisory.published_at:type_name -> google.protobuf.Timestamp
 	2, // 2: lindm.advisory.v1.FeedDocument.advisories:type_name -> lindm.advisory.v1.Advisory
 	4, // 3: lindm.advisory.v1.FeedDocument.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	6, // 4: lindm.advisory.v1.FeedDocument.snapshot_at:type_name -> google.protobuf.Timestamp
-	4, // 5: lindm.advisory.v1.FeedManifest.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	7, // 4: lindm.advisory.v1.FeedDocument.snapshot_at:type_name -> google.protobuf.Timestamp
+	6, // 5: lindm.advisory.v1.FeedDocument.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	4, // 6: lindm.advisory.v1.FeedManifest.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
+	6, // 7: lindm.advisory.v1.FeedManifest.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_advisory_v1_feed_proto_init() }
@@ -681,13 +821,14 @@ func file_lindm_advisory_v1_feed_proto_init() {
 	if File_lindm_advisory_v1_feed_proto != nil {
 		return
 	}
+	file_lindm_advisory_v1_feed_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_advisory_v1_feed_proto_rawDesc), len(file_lindm_advisory_v1_feed_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

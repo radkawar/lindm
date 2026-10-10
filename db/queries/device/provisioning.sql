@@ -12,7 +12,13 @@ SELECT * FROM provisioning_tokens WHERE id = $1;
 SELECT * FROM provisioning_tokens WHERE id = $1 FOR UPDATE;
 
 -- name: ListProvisioningTokens :many
-SELECT * FROM provisioning_tokens WHERE id > sqlc.arg(after_id) ORDER BY id LIMIT sqlc.arg(row_limit);
+SELECT t.id, t.created_by, t.created_at, t.expires_at, t.max_uses,
+    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at,
+    coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name
+FROM provisioning_tokens t
+LEFT JOIN principals creator ON creator.id = t.created_by
+LEFT JOIN local_accounts account ON account.id = creator.id
+WHERE t.id > sqlc.arg(after_id)::uuid ORDER BY t.id LIMIT sqlc.arg(row_limit);
 
 -- name: ConsumeProvisioningToken :execrows
 UPDATE provisioning_tokens SET used_count = used_count + 1

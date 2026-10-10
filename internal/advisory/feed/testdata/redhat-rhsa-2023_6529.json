@@ -1,0 +1,801 @@
+{
+  "document": {
+    "aggregate_severity": {
+      "namespace": "https://access.redhat.com/security/updates/classification/",
+      "text": "Low"
+    },
+    "category": "csaf_informational_advisory",
+    "csaf_version": "2.0",
+    "distribution": {
+      "text": "Copyright © Red Hat, Inc. All rights reserved.",
+      "tlp": {
+        "label": "WHITE",
+        "url": "https://www.first.org/tlp/"
+      }
+    },
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "An update for the nodejs:20 module is now available for Red Hat Enterprise Linux 9.",
+        "title": "Topic"
+      },
+      {
+        "category": "general",
+        "text": "For detailed information on changes in this release, see the Red Hat Enterprise Linux 9.3 Release Notes linked from the References section.",
+        "title": "Details"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "This content is licensed under the Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/). If you distribute this content, or a modified version of it, you must provide attribution to Red Hat Inc. and provide a link to the original.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "https://access.redhat.com/security/team/contact/",
+      "issuing_authority": "Red Hat Product Security is responsible for vulnerability handling across all Red Hat products and services.",
+      "name": "Red Hat Product Security",
+      "namespace": "https://www.redhat.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "https://access.redhat.com/errata/RHSA-2023:6529",
+        "url": "https://access.redhat.com/errata/RHSA-2023:6529"
+      },
+      {
+        "category": "external",
+        "summary": "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/9.3_release_notes/index",
+        "url": "https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/9.3_release_notes/index"
+      },
+      {
+        "category": "external",
+        "summary": "2186717",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2186717"
+      },
+      {
+        "category": "self",
+        "summary": "Canonical URL",
+        "url": "https://security.access.redhat.com/data/csaf/v2/advisories/2023/rhsa-2023_6529.json"
+      }
+    ],
+    "title": "Red Hat Security Advisory: nodejs:20 bug fix and enhancement update",
+    "tracking": {
+      "current_release_date": "2024-11-06T04:10:32+00:00",
+      "generator": {
+        "date": "2024-11-06T04:10:32+00:00",
+        "engine": {
+          "name": "Red Hat SDEngine",
+          "version": "4.1.1"
+        }
+      },
+      "id": "RHSA-2023:6529",
+      "initial_release_date": "2023-11-07T08:36:16+00:00",
+      "revision_history": [
+        {
+          "date": "2023-11-07T08:36:16+00:00",
+          "number": "1",
+          "summary": "Initial version"
+        },
+        {
+          "date": "2023-11-07T08:36:16+00:00",
+          "number": "2",
+          "summary": "Last updated version"
+        },
+        {
+          "date": "2024-11-06T04:10:32+00:00",
+          "number": "3",
+          "summary": "Last generated version"
+        }
+      ],
+      "status": "final",
+      "version": "3"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                  "product_id": "AppStream-9.3.0.GA",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/a:redhat:enterprise_linux:9::appstream"
+                  }
+                }
+              }
+            ],
+            "category": "product_family",
+            "name": "Red Hat Enterprise Linux"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs:20:9030020231019173628:rhel9",
+                "product": {
+                  "name": "nodejs:20:9030020231019173628:rhel9",
+                  "product_id": "nodejs:20:9030020231019173628:rhel9",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpmmod/redhat/nodejs@20:9030020231019173628:rhel9"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                "product": {
+                  "name": "nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                  "product_id": "nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-docs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=noarch&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                "product": {
+                  "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                  "product_id": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-nodemon@3.0.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=noarch"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                "product": {
+                  "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                  "product_id": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging@2021.06-4.module%2Bel9.3.0%2B19518%2B63aad52d?arch=noarch"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                "product": {
+                  "name": "nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                  "product_id": "nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging-bundler@2021.06-4.module%2Bel9.3.0%2B19518%2B63aad52d?arch=noarch"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "noarch"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                "product": {
+                  "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_id": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.1.0-1.20.8.1.1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=aarch64&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "aarch64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                "product": {
+                  "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                  "product_id": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=src&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                "product": {
+                  "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                  "product_id": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-nodemon@3.0.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=src"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src",
+                "product": {
+                  "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src",
+                  "product_id": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging@2021.06-4.module%2Bel9.3.0%2B19518%2B63aad52d?arch=src"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "src"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                "product": {
+                  "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_id": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.1.0-1.20.8.1.1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=ppc64le&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "ppc64le"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x",
+                "product": {
+                  "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_id": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.1.0-1.20.8.1.1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=s390x&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "s390x"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@20.8.1-1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                "product": {
+                  "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_id": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.1.0-1.20.8.1.1.module%2Bel9.3.0.z%2B20478%2B84a9f781?arch=x86_64&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "x86_64"
+          }
+        ],
+        "category": "vendor",
+        "name": "Red Hat"
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+        },
+        "product_reference": "nodejs:20:9030020231019173628:rhel9",
+        "relates_to_product_reference": "AppStream-9.3.0.GA"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src"
+        },
+        "product_reference": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.src",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "nodejs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "nodejs-debuginfo-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "nodejs-debugsource-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "nodejs-devel-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch"
+        },
+        "product_reference": "nodejs-docs-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "nodejs-full-i18n-1:20.8.1-1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch"
+        },
+        "product_reference": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.noarch",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src"
+        },
+        "product_reference": "nodejs-nodemon-0:3.0.1-1.module+el9.3.0.z+20478+84a9f781.src",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch"
+        },
+        "product_reference": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src"
+        },
+        "product_reference": "nodejs-packaging-0:2021.06-4.module+el9.3.0+19518+63aad52d.src",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch"
+        },
+        "product_reference": "nodejs-packaging-bundler-0:2021.06-4.module+el9.3.0+19518+63aad52d.noarch",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64"
+        },
+        "product_reference": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.aarch64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le"
+        },
+        "product_reference": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.ppc64le",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x"
+        },
+        "product_reference": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.s390x",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64 as a component of nodejs:20:9030020231019173628:rhel9 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9:npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64"
+        },
+        "product_reference": "npm-1:10.1.0-1.20.8.1.1.module+el9.3.0.z+20478+84a9f781.x86_64",
+        "relates_to_product_reference": "AppStream-9.3.0.GA:nodejs:20:9030020231019173628:rhel9"
+      }
+    ]
+  }
+}

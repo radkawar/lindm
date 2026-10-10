@@ -9,13 +9,13 @@ import (
 	"context"
 )
 
-// iteratorForInsertAdvisoryRecords implements pgx.CopyFromSource.
-type iteratorForInsertAdvisoryRecords struct {
-	rows                 []InsertAdvisoryRecordsParams
+// iteratorForInsertAdvisoryPublicationBatch implements pgx.CopyFromSource.
+type iteratorForInsertAdvisoryPublicationBatch struct {
+	rows                 []InsertAdvisoryPublicationBatchParams
 	skippedFirstNextCall bool
 }
 
-func (r *iteratorForInsertAdvisoryRecords) Next() bool {
+func (r *iteratorForInsertAdvisoryPublicationBatch) Next() bool {
 	if len(r.rows) == 0 {
 		return false
 	}
@@ -27,8 +27,10 @@ func (r *iteratorForInsertAdvisoryRecords) Next() bool {
 	return len(r.rows) > 0
 }
 
-func (r iteratorForInsertAdvisoryRecords) Values() ([]interface{}, error) {
+func (r iteratorForInsertAdvisoryPublicationBatch) Values() ([]interface{}, error) {
 	return []interface{}{
+		r.rows[0].PublicationID,
+		r.rows[0].Position,
 		r.rows[0].ID,
 		r.rows[0].FeedID,
 		r.rows[0].AdvisoryID,
@@ -39,10 +41,10 @@ func (r iteratorForInsertAdvisoryRecords) Values() ([]interface{}, error) {
 	}, nil
 }
 
-func (r iteratorForInsertAdvisoryRecords) Err() error {
+func (r iteratorForInsertAdvisoryPublicationBatch) Err() error {
 	return nil
 }
 
-func (q *Queries) InsertAdvisoryRecords(ctx context.Context, arg []InsertAdvisoryRecordsParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"advisory_records"}, []string{"id", "feed_id", "advisory_id", "package_name", "source_package", "architecture", "record_bytes"}, &iteratorForInsertAdvisoryRecords{rows: arg})
+func (q *Queries) InsertAdvisoryPublicationBatch(ctx context.Context, arg []InsertAdvisoryPublicationBatchParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"advisory_publication_batch"}, []string{"publication_id", "position", "id", "feed_id", "advisory_id", "package_name", "source_package", "architecture", "record_bytes"}, &iteratorForInsertAdvisoryPublicationBatch{rows: arg})
 }

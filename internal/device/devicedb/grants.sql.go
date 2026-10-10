@@ -202,6 +202,69 @@ func (q *Queries) InsertEnrollmentGrant(ctx context.Context, arg InsertEnrollmen
 	return err
 }
 
+const listEnrollmentGrants = `-- name: ListEnrollmentGrants :many
+SELECT g.id, g.created_by, g.created_at, g.expires_at, g.consumed_at,
+    g.revoked_at, g.device_id,
+    coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name,
+    coalesce(d.hostname, '')::text AS consumed_device_hostname,
+    ARRAY(SELECT l.label FROM device_labels l WHERE l.device_id = g.device_id ORDER BY l.label)::text[] AS labels
+FROM enrollment_grants g
+LEFT JOIN principals creator ON creator.id = g.created_by
+LEFT JOIN local_accounts account ON account.id = creator.id
+LEFT JOIN devices d ON d.id = g.device_id
+WHERE g.id > $1::uuid
+ORDER BY g.id LIMIT $2
+`
+
+type ListEnrollmentGrantsParams struct {
+	AfterID  uuid.UUID
+	RowLimit int32
+}
+
+type ListEnrollmentGrantsRow struct {
+	ID                     uuid.UUID
+	CreatedBy              uuid.UUID
+	CreatedAt              pgtype.Timestamptz
+	ExpiresAt              pgtype.Timestamptz
+	ConsumedAt             pgtype.Timestamptz
+	RevokedAt              pgtype.Timestamptz
+	DeviceID               *uuid.UUID
+	CreatorDisplayName     string
+	ConsumedDeviceHostname string
+	Labels                 []string
+}
+
+func (q *Queries) ListEnrollmentGrants(ctx context.Context, arg ListEnrollmentGrantsParams) ([]ListEnrollmentGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listEnrollmentGrants, arg.AfterID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEnrollmentGrantsRow{}
+	for rows.Next() {
+		var i ListEnrollmentGrantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.ConsumedAt,
+			&i.RevokedAt,
+			&i.DeviceID,
+			&i.CreatorDisplayName,
+			&i.ConsumedDeviceHostname,
+			&i.Labels,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeEnrollmentGrant = `-- name: RevokeEnrollmentGrant :execrows
 UPDATE enrollment_grants
 SET

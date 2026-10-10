@@ -1,0 +1,2360 @@
+{
+  "document": {
+    "aggregate_severity": {
+      "namespace": "https://access.redhat.com/security/updates/classification/",
+      "text": "Moderate"
+    },
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "distribution": {
+      "text": "Copyright © Red Hat, Inc. All rights reserved.",
+      "tlp": {
+        "label": "WHITE",
+        "url": "https://www.first.org/tlp/"
+      }
+    },
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "An update for gnutls and nettle is now available for Red Hat Enterprise Linux 9.\n\nRed Hat Product Security has rated this update as having a security impact of Moderate. A Common Vulnerability Scoring System (CVSS) base score, which gives a detailed severity rating, is available for each vulnerability from the CVE link(s) in the References section.",
+        "title": "Topic"
+      },
+      {
+        "category": "general",
+        "text": "The gnutls packages provide the GNU Transport Layer Security (GnuTLS) library, which implements cryptographic algorithms and protocols such as SSL, TLS, and DTLS.\n\nNettle is a cryptographic library that is designed to fit easily in almost any context: In crypto toolkits for object-oriented languages, such as C++, Python, or Pike, in applications like LSH or GNUPG, or even in kernel space.\n\nThe following packages have been upgraded to a later upstream version: gnutls (3.7.6), nettle (3.8).\n\nSecurity Fix(es):\n\n* gnutls: Double free during gnutls_pkcs7_verify. (CVE-2022-2509)\n\nFor more details about the security issue(s), including the impact, a CVSS score, acknowledgments, and other related information, refer to the CVE page(s) listed in the References section.\n\nBug Fix(es):\n\n* [IBM 9.1] [P10] POWER10 performance enhancements for cryptography: nettle - incremental work (BZ#2102589)\n\n* Allow enabling KTLS in RHEL 9.1 (BZ#2108532)\n\n* DES-CBC bag is decryptable under FIPS (BZ#2115314)\n\n* allow signature verification using RSA keys <2k in FIPS mode (BZ#2119770)",
+        "title": "Details"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "This content is licensed under the Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/). If you distribute this content, or a modified version of it, you must provide attribution to Red Hat Inc. and provide a link to the original.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "https://access.redhat.com/security/team/contact/",
+      "issuing_authority": "Red Hat Product Security is responsible for vulnerability handling across all Red Hat products and services.",
+      "name": "Red Hat Product Security",
+      "namespace": "https://www.redhat.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "https://access.redhat.com/errata/RHSA-2022:6854",
+        "url": "https://access.redhat.com/errata/RHSA-2022:6854"
+      },
+      {
+        "category": "external",
+        "summary": "https://access.redhat.com/security/updates/classification/#moderate",
+        "url": "https://access.redhat.com/security/updates/classification/#moderate"
+      },
+      {
+        "category": "external",
+        "summary": "2076626",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2076626"
+      },
+      {
+        "category": "external",
+        "summary": "2108635",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2108635"
+      },
+      {
+        "category": "external",
+        "summary": "2108977",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2108977"
+      },
+      {
+        "category": "external",
+        "summary": "2119770",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2119770"
+      },
+      {
+        "category": "self",
+        "summary": "Canonical URL",
+        "url": "https://security.access.redhat.com/data/csaf/v2/advisories/2022/rhsa-2022_6854.json"
+      }
+    ],
+    "title": "Red Hat Security Advisory: gnutls and nettle security, bug fix, and enhancement update",
+    "tracking": {
+      "current_release_date": "2026-06-25T11:00:45+00:00",
+      "generator": {
+        "date": "2026-06-25T11:00:45+00:00",
+        "engine": {
+          "name": "Red Hat SDEngine",
+          "version": "5.1.0"
+        }
+      },
+      "id": "RHSA-2022:6854",
+      "initial_release_date": "2022-10-11T07:31:24+00:00",
+      "revision_history": [
+        {
+          "date": "2022-10-11T07:31:24+00:00",
+          "number": "1",
+          "summary": "Initial version"
+        },
+        {
+          "date": "2022-10-11T07:31:24+00:00",
+          "number": "2",
+          "summary": "Last updated version"
+        },
+        {
+          "date": "2026-06-25T11:00:45+00:00",
+          "number": "3",
+          "summary": "Last generated version"
+        }
+      ],
+      "status": "final",
+      "version": "3"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                  "product_id": "AppStream-9.0.0.Z.MAIN.EUS",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/a:redhat:enterprise_linux:9::appstream"
+                  }
+                }
+              },
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux BaseOS (v. 9)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux BaseOS (v. 9)",
+                  "product_id": "BaseOS-9.0.0.Z.MAIN.EUS",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/o:redhat:enterprise_linux:9::baseos"
+                  }
+                }
+              }
+            ],
+            "category": "product_family",
+            "name": "Red Hat Enterprise Linux"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.src",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.src",
+                  "product_id": "nettle-0:3.8-3.el9_0.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=src"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.src",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.src",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=src"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "src"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.aarch64",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.aarch64",
+                  "product_id": "nettle-0:3.8-3.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debugsource-0:3.8-3.el9_0.aarch64",
+                "product": {
+                  "name": "nettle-debugsource-0:3.8-3.el9_0.aarch64",
+                  "product_id": "nettle-debugsource-0:3.8-3.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debugsource@3.8-3.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+                "product": {
+                  "name": "nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+                  "product_id": "nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debuginfo@3.8-3.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-devel-0:3.8-3.el9_0.aarch64",
+                "product": {
+                  "name": "nettle-devel-0:3.8-3.el9_0.aarch64",
+                  "product_id": "nettle-devel-0:3.8-3.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-devel@3.8-3.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debugsource@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B-debuginfo@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane-debuginfo@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debuginfo@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils-debuginfo@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-devel@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+                "product": {
+                  "name": "gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+                  "product_id": "gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils@3.7.6-12.el9_0?arch=aarch64"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "aarch64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.ppc64le",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.ppc64le",
+                  "product_id": "nettle-0:3.8-3.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+                "product": {
+                  "name": "nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+                  "product_id": "nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debugsource@3.8-3.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+                "product": {
+                  "name": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+                  "product_id": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debuginfo@3.8-3.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-devel-0:3.8-3.el9_0.ppc64le",
+                "product": {
+                  "name": "nettle-devel-0:3.8-3.el9_0.ppc64le",
+                  "product_id": "nettle-devel-0:3.8-3.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-devel@3.8-3.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debugsource@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B-debuginfo@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane-debuginfo@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debuginfo@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils-debuginfo@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-devel@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+                "product": {
+                  "name": "gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+                  "product_id": "gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils@3.7.6-12.el9_0?arch=ppc64le"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "ppc64le"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.i686",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.i686",
+                  "product_id": "nettle-0:3.8-3.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debugsource-0:3.8-3.el9_0.i686",
+                "product": {
+                  "name": "nettle-debugsource-0:3.8-3.el9_0.i686",
+                  "product_id": "nettle-debugsource-0:3.8-3.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debugsource@3.8-3.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debuginfo-0:3.8-3.el9_0.i686",
+                "product": {
+                  "name": "nettle-debuginfo-0:3.8-3.el9_0.i686",
+                  "product_id": "nettle-debuginfo-0:3.8-3.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debuginfo@3.8-3.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-devel-0:3.8-3.el9_0.i686",
+                "product": {
+                  "name": "nettle-devel-0:3.8-3.el9_0.i686",
+                  "product_id": "nettle-devel-0:3.8-3.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-devel@3.8-3.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debugsource@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B-debuginfo@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane-debuginfo@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debuginfo@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils-debuginfo@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-c++-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-c++-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-dane-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-dane-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-devel-0:3.7.6-12.el9_0.i686",
+                "product": {
+                  "name": "gnutls-devel-0:3.7.6-12.el9_0.i686",
+                  "product_id": "gnutls-devel-0:3.7.6-12.el9_0.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-devel@3.7.6-12.el9_0?arch=i686"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "i686"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.x86_64",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.x86_64",
+                  "product_id": "nettle-0:3.8-3.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debugsource-0:3.8-3.el9_0.x86_64",
+                "product": {
+                  "name": "nettle-debugsource-0:3.8-3.el9_0.x86_64",
+                  "product_id": "nettle-debugsource-0:3.8-3.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debugsource@3.8-3.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+                "product": {
+                  "name": "nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+                  "product_id": "nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debuginfo@3.8-3.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-devel-0:3.8-3.el9_0.x86_64",
+                "product": {
+                  "name": "nettle-devel-0:3.8-3.el9_0.x86_64",
+                  "product_id": "nettle-devel-0:3.8-3.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-devel@3.8-3.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debugsource@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B-debuginfo@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane-debuginfo@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debuginfo@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils-debuginfo@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-devel@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+                "product": {
+                  "name": "gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+                  "product_id": "gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils@3.7.6-12.el9_0?arch=x86_64"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "x86_64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nettle-0:3.8-3.el9_0.s390x",
+                "product": {
+                  "name": "nettle-0:3.8-3.el9_0.s390x",
+                  "product_id": "nettle-0:3.8-3.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle@3.8-3.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debugsource-0:3.8-3.el9_0.s390x",
+                "product": {
+                  "name": "nettle-debugsource-0:3.8-3.el9_0.s390x",
+                  "product_id": "nettle-debugsource-0:3.8-3.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debugsource@3.8-3.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-debuginfo-0:3.8-3.el9_0.s390x",
+                "product": {
+                  "name": "nettle-debuginfo-0:3.8-3.el9_0.s390x",
+                  "product_id": "nettle-debuginfo-0:3.8-3.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-debuginfo@3.8-3.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nettle-devel-0:3.8-3.el9_0.s390x",
+                "product": {
+                  "name": "nettle-devel-0:3.8-3.el9_0.s390x",
+                  "product_id": "nettle-devel-0:3.8-3.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nettle-devel@3.8-3.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debugsource@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B-debuginfo@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane-debuginfo@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-debuginfo@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils-debuginfo@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-c++-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-c++-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-c++-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-c%2B%2B@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-dane-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-dane-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-dane-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-dane@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-devel-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-devel-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-devel-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-devel@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "gnutls-utils-0:3.7.6-12.el9_0.s390x",
+                "product": {
+                  "name": "gnutls-utils-0:3.7.6-12.el9_0.s390x",
+                  "product_id": "gnutls-utils-0:3.7.6-12.el9_0.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/gnutls-utils@3.7.6-12.el9_0?arch=s390x"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "s390x"
+          }
+        ],
+        "category": "vendor",
+        "name": "Red Hat"
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-c++-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-c++-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-dane-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-dane-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-devel-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-devel-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-devel-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-devel-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-devel-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-devel-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-devel-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-utils-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-devel-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-devel-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-devel-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-devel-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-devel-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-devel-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-devel-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-devel-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-devel-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-devel-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "AppStream-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.src as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.src"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.src",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        },
+        "product_reference": "gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.src as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.src"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.src",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debuginfo-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.aarch64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.i686",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.s390x",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nettle-debugsource-0:3.8-3.el9_0.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64"
+        },
+        "product_reference": "nettle-debugsource-0:3.8-3.el9_0.x86_64",
+        "relates_to_product_reference": "BaseOS-9.0.0.Z.MAIN.EUS"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2022-2509",
+      "discovery_date": "2022-07-20T00:00:00+00:00",
+      "flags": [
+        {
+          "label": "vulnerable_code_not_present",
+          "product_ids": [
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.src",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64"
+          ]
+        }
+      ],
+      "ids": [
+        {
+          "system_name": "Red Hat Bugzilla ID",
+          "text": "2108977"
+        }
+      ],
+      "notes": [
+        {
+          "category": "description",
+          "text": "A vulnerability was found in gnutls. This issue is due to a double-free error that occurs during the verification of pkcs7 signatures in the gnutls_pkcs7_verify function.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "gnutls: Double free during gnutls_pkcs7_verify",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "This flaw is rated as moderate because the flaw is more difficult to exploit but could still lead to some compromise of the availability of resources under certain circumstances. This is the type of vulnerability that could have had an important impact but is less easily exploited based on a technical evaluation of the flaw, and affect unlikely configurations.",
+          "title": "Statement"
+        },
+        {
+          "category": "general",
+          "text": "The CVSS score(s) listed for this vulnerability do not reflect the associated product's status, and are included for informational purposes to better understand the severity of this vulnerability.",
+          "title": "CVSS score applicability"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.src",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64"
+        ],
+        "known_not_affected": [
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.aarch64",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.i686",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.ppc64le",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.s390x",
+          "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.src",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+          "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64"
+        ]
+      },
+      "references": [
+        {
+          "category": "self",
+          "summary": "Canonical URL",
+          "url": "https://access.redhat.com/security/cve/CVE-2022-2509"
+        },
+        {
+          "category": "external",
+          "summary": "RHBZ#2108977",
+          "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2108977"
+        },
+        {
+          "category": "external",
+          "summary": "https://www.cve.org/CVERecord?id=CVE-2022-2509",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2022-2509"
+        },
+        {
+          "category": "external",
+          "summary": "https://nvd.nist.gov/vuln/detail/CVE-2022-2509",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2022-2509"
+        },
+        {
+          "category": "external",
+          "summary": "https://gnutls.org/security-new.html#GNUTLS-SA-2022-07-07",
+          "url": "https://gnutls.org/security-new.html#GNUTLS-SA-2022-07-07"
+        },
+        {
+          "category": "external",
+          "summary": "https://lists.gnupg.org/pipermail/gnutls-help/2022-July/004746.html",
+          "url": "https://lists.gnupg.org/pipermail/gnutls-help/2022-July/004746.html"
+        }
+      ],
+      "release_date": "2022-07-29T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2022-10-11T07:31:24+00:00",
+          "details": "For details on how to apply this update, which includes the changes described in this advisory, refer to:\n\nhttps://access.redhat.com/articles/11258",
+          "product_ids": [
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.src",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64"
+          ],
+          "restart_required": {
+            "category": "none"
+          },
+          "url": "https://access.redhat.com/errata/RHSA-2022:6854"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "LOW",
+            "attackVector": "NETWORK",
+            "availabilityImpact": "HIGH",
+            "baseScore": 7.5,
+            "baseSeverity": "HIGH",
+            "confidentialityImpact": "NONE",
+            "integrityImpact": "NONE",
+            "privilegesRequired": "NONE",
+            "scope": "UNCHANGED",
+            "userInteraction": "NONE",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+            "version": "3.1"
+          },
+          "products": [
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-devel-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.aarch64",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.i686",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.ppc64le",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.s390x",
+            "AppStream-9.0.0.Z.MAIN.EUS:nettle-devel-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.src",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-c++-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-dane-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-debugsource-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:gnutls-utils-debuginfo-0:3.7.6-12.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.src",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debuginfo-0:3.8-3.el9_0.x86_64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.aarch64",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.i686",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.ppc64le",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.s390x",
+            "BaseOS-9.0.0.Z.MAIN.EUS:nettle-debugsource-0:3.8-3.el9_0.x86_64"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "Moderate"
+        }
+      ],
+      "title": "gnutls: Double free during gnutls_pkcs7_verify"
+    }
+  ]
+}

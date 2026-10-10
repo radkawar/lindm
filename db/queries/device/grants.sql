@@ -73,3 +73,16 @@ SET
     revoke_reason = sqlc.arg('revoke_reason')
 WHERE id = sqlc.arg('id')
   AND revoked_at IS NULL;
+
+-- name: ListEnrollmentGrants :many
+SELECT g.id, g.created_by, g.created_at, g.expires_at, g.consumed_at,
+    g.revoked_at, g.device_id,
+    coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name,
+    coalesce(d.hostname, '')::text AS consumed_device_hostname,
+    ARRAY(SELECT l.label FROM device_labels l WHERE l.device_id = g.device_id ORDER BY l.label)::text[] AS labels
+FROM enrollment_grants g
+LEFT JOIN principals creator ON creator.id = g.created_by
+LEFT JOIN local_accounts account ON account.id = creator.id
+LEFT JOIN devices d ON d.id = g.device_id
+WHERE g.id > sqlc.arg(after_id)::uuid
+ORDER BY g.id LIMIT sqlc.arg(row_limit);

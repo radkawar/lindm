@@ -11,6 +11,7 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  source_manifest=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_manifest ELSE ''::bytea END,
  snapshot_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.snapshot_at END,
  complete_snapshot=advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.complete_snapshot,
+ advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END;
 
@@ -23,19 +24,60 @@ SELECT * FROM advisory_feeds WHERE id=$1 FOR UPDATE;
 -- name: ListAdvisoryFeeds :many
 SELECT * FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32;
 
--- name: PublishAdvisoryFeed :exec
+-- name: PublishAdvisoryFeed :execrows
 UPDATE advisory_feeds SET revision=$2,source_sha256=$3,checked_at=$4,expires_at=$5,
- attempted_at=$4,error='',advisory_count=$6,complete_snapshot=$7,source_manifest=$8,snapshot_at=$9 WHERE id=$1;
+ attempted_at=$4,error='',advisory_count=$6,complete_snapshot=$7,source_manifest=$8,snapshot_at=$9
+WHERE id=$1 AND enabled AND config_bytes=$10 AND (checked_at IS NULL OR checked_at<=$4);
 
 -- name: FailAdvisoryFeed :exec
-UPDATE advisory_feeds SET attempted_at=$2,error=$3 WHERE id=$1;
+UPDATE advisory_feeds SET attempted_at=$2,error=$3
+WHERE id=$1 AND enabled AND config_bytes=$4
+ AND (checked_at IS NULL OR checked_at<=$2)
+ AND (attempted_at IS NULL OR attempted_at<=$2);
 
--- name: DeleteAdvisoryRecords :exec
-DELETE FROM advisory_records WHERE feed_id=$1;
+-- name: InsertAdvisoryPublicationBatch :copyfrom
+INSERT INTO advisory_publication_batch(publication_id,position,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
--- name: InsertAdvisoryRecords :copyfrom
-INSERT INTO advisory_records(id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes)
-VALUES($1,$2,$3,$4,$5,$6,$7);
+-- name: MergeAdvisoryPublicationBatch :execrows
+INSERT INTO advisory_record_generations(generation,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes)
+SELECT publication_id,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes
+FROM advisory_publication_batch WHERE publication_id=$1
+ON CONFLICT(feed_id,generation,id) DO NOTHING;
+
+-- name: DeleteAdvisoryPublicationBatch :exec
+DELETE FROM advisory_publication_batch WHERE publication_id=$1;
+
+-- name: DeleteInactiveAdvisoryGenerationBatch :execrows
+WITH doomed AS (
+ SELECT r.id FROM advisory_record_generations r
+ WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
+  AND NOT EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.id=sqlc.arg('feed_id') AND f.revision=sqlc.arg('generation'))
+ ORDER BY r.id LIMIT 5000
+)
+DELETE FROM advisory_record_generations r USING doomed
+WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation') AND r.id=doomed.id;
+
+-- name: StartAdvisoryGeneration :exec
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
+VALUES($1,$2,clock_timestamp()+interval '10 minutes');
+
+-- name: RenewAdvisoryGeneration :execrows
+UPDATE advisory_generation_cleanup SET cleanup_after=clock_timestamp()+interval '10 minutes'
+WHERE generation=$1 AND cleanup_after>clock_timestamp();
+
+-- name: QueueAdvisoryGenerationCleanup :exec
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
+VALUES($1,$2,clock_timestamp())
+ON CONFLICT(feed_id,generation) DO UPDATE SET cleanup_after=EXCLUDED.cleanup_after;
+
+-- name: FinishAdvisoryGeneration :exec
+DELETE FROM advisory_generation_cleanup WHERE feed_id=$1 AND generation=$2;
+
+-- name: LockAdvisoryGenerationCleanup :one
+SELECT feed_id,generation FROM advisory_generation_cleanup
+WHERE cleanup_after<=clock_timestamp()
+ORDER BY cleanup_after,feed_id,generation LIMIT 1 FOR UPDATE SKIP LOCKED;
 
 -- name: GetAdvisoryDevice :one
 SELECT d.id,d.state,d.os_id,d.os_version,d.architecture,d.current_generation_id,
@@ -89,7 +131,20 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT(id) DO NOTHING;
 
 -- name: ListDeviceAdvisoryFindings :many
-SELECT * FROM advisory_finding_status WHERE device_id=$1 AND id>$2 ORDER BY id LIMIT $3;
+SELECT f.*, EXISTS (
+ SELECT 1 FROM unnest(sqlc.arg('rejected_ids')::text[]) WITH ORDINALITY AS r(advisory_id,ordinal)
+ WHERE r.advisory_id=f.advisory_id AND (
+  (sqlc.arg('rejected_packages')::text[])[r.ordinal]=f.package_name OR EXISTS (
+   SELECT 1 FROM snapshot_packages p
+   WHERE p.snapshot_id=sqlc.narg('snapshot_id')::uuid
+    AND p.name=f.package_name AND p.version=f.installed_version
+    AND p.architecture=f.architecture AND p.source_name=(sqlc.arg('rejected_packages')::text[])[r.ordinal]
+  )
+ )
+) AS source_record_rejected
+FROM advisory_finding_status f
+WHERE f.device_id=sqlc.arg('device_id') AND f.id>sqlc.arg('id')
+ORDER BY f.id LIMIT sqlc.arg('row_limit');
 
 -- name: GetAdvisoryFinding :one
 SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;

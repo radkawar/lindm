@@ -8,6 +8,12 @@ import "lindm/agent/v1/trust.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
+// The basis is approved and signed, never inferred again at execution.
+enum StorageIdentityBasis {
+  STORAGE_IDENTITY_BASIS_UNSPECIFIED = 0;
+  STORAGE_IDENTITY_BASIS_WWN_SERIAL = 1;
+  STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS = 2;
+}
 // Stable native identity, never a caller-selected device path. Providers require
 // all applicable identity facts to match before touching the exact signed target.
 message StorageTarget {
@@ -18,10 +24,21 @@ message StorageTarget {
   string wwn = 2 [(buf.validate.field).string.max_len = 256];
   string serial = 3 [(buf.validate.field).string.max_len = 256];
   uint64 size_bytes = 4 [(buf.validate.field).uint64.gt = 0];
+  StorageIdentityBasis identity_basis = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string gpt_disk_guid = 6 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  // Whole backing-disk size, distinct from the selected LUKS container size.
+  uint64 disk_size_bytes = 7;
   option (buf.validate.message).cel = {
     id: "storage_target.identity"
-    message: "a stable storage identity is required"
-    expression: "this.luks_uuid != '' || this.wwn != '' || this.serial != ''"
+    message: "the explicit storage identity basis requires its complete exact tuple"
+    expression: "this.serial != '' && ((this.identity_basis == 1 && this.wwn != '' && this.gpt_disk_guid == '' && this.disk_size_bytes == 0u) || (this.identity_basis == 2 && this.wwn == '' && this.gpt_disk_guid != '' && this.disk_size_bytes >= this.size_bytes && this.luks_uuid != '' && this.luks_uuid != '00000000-0000-0000-0000-000000000000'))"
   };
 }
 message EscrowRotateAction {

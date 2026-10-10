@@ -1,0 +1,5 @@
+{
+  "command": "sudo -n dmidecode --type 4",
+  "exit_code": 1,
+  "stderr": "sudo: dmidecode: command not found\n"
+}

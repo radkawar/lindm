@@ -16,6 +16,14 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -26,28 +34,17 @@ import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { provisioningTokensQueryOptions } from "./queries";
-import { ProvisioningTokenResult } from "./token-result";
 import { enrollmentFailure, validateEnrollment } from "./validation";
 
 export function ProvisioningTokens() {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
-  // Neither the credential nor its response enters a Query/mutation cache.
-  const [issued, setIssued] = useState<CreateProvisioningTokenResponse | null>(null);
   const list = useQuery(provisioningTokensQueryOptions(lifetime, pageToken));
   return (
-    <section className="grid gap-4" aria-label="Unattended provisioning">
-      <IssueProvisioningToken onIssued={setIssued} />
-      {issued ? (
-        <ProvisioningTokenResult
-          key={issued.tokenId}
-          result={issued}
-          onDismiss={() => setIssued(null)}
-        />
-      ) : null}
+    <section className="grid gap-4" aria-label="Provisioning tokens">
       <Card>
         <CardHeader>
-          <CardTitle>Scoped provisioning tokens</CardTitle>
+          <CardTitle>Provisioning tokens</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <p className="text-sm text-muted-foreground">
@@ -68,16 +65,14 @@ export function ProvisioningTokens() {
           {!list.error && list.data?.tokens.length === 0 ? (
             <EmptyState title="No provisioning tokens in your scope" />
           ) : null}
-          {!list.error &&
-            list.data?.tokens.map((token) => (
-              <TokenRow
-                key={token.tokenId}
-                token={token}
-                onRevoked={() => {
-                  if (issued?.tokenId === token.tokenId) setIssued(null);
-                }}
-              />
-            ))}
+          {list.error && list.data ? (
+            <p className="text-sm text-muted-foreground">
+              Showing the last loaded tokens. Refresh to get their current status.
+            </p>
+          ) : null}
+          {list.data?.tokens.map((token) => (
+            <TokenRow key={token.tokenId} token={token} />
+          ))}
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -100,10 +95,12 @@ export function ProvisioningTokens() {
   );
 }
 
-function IssueProvisioningToken({
+export function IssueProvisioningToken({
   onIssued,
+  onCancel,
 }: {
   onIssued: (result: CreateProvisioningTokenResponse) => void;
+  onCancel?: () => void;
 }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
@@ -177,37 +174,57 @@ function IssueProvisioningToken({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create unattended provisioning token</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void issue(new FormData(event.currentTarget));
-          }}
-        >
-          <p className="text-sm text-muted-foreground">
-            Use this token during installation. Its expiry, use limit and assignments are fixed when
-            issued. You can assign only labels, groups and profiles you are authorized to manage.
-          </p>
-          <fieldset className="grid gap-3" disabled={busy || captured !== null || completed}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1.5 text-sm font-medium">
-                Lifetime (seconds)
-                <Input name="lifetime" type="number" defaultValue="3600" required />
-              </label>
-              <label className="grid gap-1.5 text-sm font-medium">
-                Maximum uses
-                <Input name="maxUses" type="number" defaultValue="1" required />
-              </label>
-            </div>
-            <label className="flex items-start gap-2 text-sm">
-              <input name="approval" type="checkbox" defaultChecked />
-              Require independent approval before device credentials are issued
-            </label>
+    <form
+      className="grid gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void issue(new FormData(event.currentTarget));
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Automatic enrollment (provisioning token)</DialogTitle>
+        <DialogDescription>
+          Enroll a fleet during installation with a reusable token bounded by expiry and use limit.
+        </DialogDescription>
+      </DialogHeader>
+      <fieldset className="grid gap-4" disabled={busy || captured !== null || completed}>
+        <label className="grid gap-1.5 text-sm font-medium">
+          Purpose / audit reason
+          <Textarea name="reason" placeholder="For example, October laptop deployment" required />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="token-lifetime">Expires after</Label>
+            <SelectField
+              id="token-lifetime"
+              name="lifetime"
+              defaultValue="86400"
+              disabled={busy || captured !== null || completed}
+              required
+              options={[
+                { value: "3600", label: "1 hour" },
+                { value: "14400", label: "4 hours" },
+                { value: "43200", label: "12 hours" },
+                { value: "86400", label: "24 hours" },
+              ]}
+            />
+          </div>
+          <label className="grid gap-1.5 text-sm font-medium">
+            Maximum uses
+            <Input name="maxUses" type="number" defaultValue="100" required />
+          </label>
+        </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input name="approval" type="checkbox" defaultChecked />
+          Require independent approval before device credentials are issued
+        </label>
+        <details className="border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Advanced assignments</summary>
+          <div className="mt-3 grid gap-3">
+            <p className="text-sm text-muted-foreground">
+              Assignments are fixed at issuance. Choose only labels, groups and profiles you are
+              authorized to manage.
+            </p>
             <label className="grid gap-1.5 text-sm font-medium">
               Labels (space separated)
               <Input name="labels" />
@@ -238,70 +255,65 @@ function IssueProvisioningToken({
               Service profile revision ID
               <Input name="profile" spellCheck={false} />
             </label>
-            <details className="grid gap-2 border p-3">
-              <summary className="cursor-pointer text-sm font-medium">
-                Typed custom attributes
-              </summary>
-              <p className="my-2 text-sm text-muted-foreground">
-                Protobuf JSON metadata attributes, using existing attribute definitions. Example:{" "}
-                {`{"attributes":{"site":{"stringValue":"east"}}}`}. Labels and owner are set by the
-                fields above.
-              </p>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Custom attributes (protobuf JSON)
               <Textarea
                 name="metadata"
-                aria-label="Typed metadata JSON"
                 defaultValue={'{"attributes":{}}'}
                 spellCheck={false}
                 className="font-mono text-xs"
               />
-            </details>
-            <label className="grid gap-1.5 text-sm font-medium">
-              Audit reason
-              <Textarea name="reason" required />
             </label>
-          </fieldset>
-          {captured ? (
-            <p className="break-all text-xs text-muted-foreground">
-              Request {captured.requestId}. Retries retain this exact scope and assignments.
+            <p className="text-sm text-muted-foreground">
+              Use existing attribute definitions. Example:{" "}
+              {`{"attributes":{"site":{"stringValue":"east"}}}`}. Labels and owner come from the
+              fields above.
             </p>
-          ) : null}
-          {failure ? <RpcError failure={failure} /> : null}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={busy || completed}>
-              {busy ? "Creating…" : captured ? "Retry exact request" : "Create provisioning token"}
-            </Button>
-            {completed ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setCaptured(null);
-                  setCompleted(false);
-                }}
-              >
-                Prepare another token
-              </Button>
-            ) : null}
-            {failure?.ambiguous ? (
-              <p className="text-sm text-muted-foreground">
-                Inspect the token list before replacing this request. A retry can identify the
-                token, but cannot recover its secret.
-              </p>
-            ) : null}
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </details>
+      </fieldset>
+      {captured ? (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Request details</summary>
+          <p className="mt-2 break-all">
+            Request {captured.requestId}. Retries retain this exact scope and assignments.
+          </p>
+        </details>
+      ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
+      {failure?.ambiguous ? (
+        <p className="text-sm text-muted-foreground">
+          The token may have been created. Retry this exact request to resolve its status; a retry
+          cannot recover its secret.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={busy || completed}>
+          {busy ? "Creating…" : captured ? "Retry exact request" : "Create provisioning token"}
+        </Button>
+        {onCancel ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || (captured !== null && !completed)}
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+        ) : null}
+      </div>
+    </form>
   );
 }
 
-function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: () => void }) {
+function TokenRow({ token }: { token: ProvisioningToken }) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const inFlight = useRef(false);
   const [captured, setCaptured] = useState<RevokeProvisioningTokenRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [revoked, setRevoked] = useState(false);
+  const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState<RpcFailure | null>(null);
   const expired = !token.expiresAt || timestampDate(token.expiresAt).getTime() <= Date.now();
   const state =
@@ -310,8 +322,8 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
       : expired
         ? "Expired"
         : token.usedCount >= token.maxUses
-          ? "Exhausted"
-          : "Available";
+          ? "Used"
+          : "Active";
   async function revoke(data: FormData) {
     if (inFlight.current || lifetime.signal.aborted) return;
     inFlight.current = true;
@@ -319,8 +331,6 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
     setFailure(null);
     let submitted = false;
     try {
-      if (!captured && String(data.get("confirmation") ?? "").trim() !== token.tokenId)
-        throw new Error("Retype the exact token ID to confirm revocation.");
       const request =
         captured ??
         create(RevokeProvisioningTokenRequestSchema, {
@@ -337,7 +347,7 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
       });
       lifetime.signal.throwIfAborted();
       setRevoked(true);
-      onRevoked();
+      setOpen(false);
       void client.invalidateQueries({ queryKey: ["provisioning-tokens", lifetime.generation] });
       void client.invalidateQueries({ queryKey: ["pending-enrollments", lifetime.generation] });
     } catch (error) {
@@ -354,61 +364,127 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
   return (
     <article className="grid gap-3 border p-4">
       <div className="flex flex-wrap justify-between gap-2">
-        <h3 className="break-all font-mono text-sm">{token.tokenId}</h3>
-        <StatusBadge status={state === "Available" ? "success" : "neutral"}>{state}</StatusBadge>
+        <h3 className="min-w-0 break-words text-sm font-medium">
+          {token.reason || "Provisioning token"}
+        </h3>
+        <StatusBadge
+          status={state === "Active" ? "success" : state === "Revoked" ? "destructive" : "neutral"}
+        >
+          {state}
+        </StatusBadge>
       </div>
       <p className="text-sm">
-        {token.usedCount} / {token.maxUses} uses ·{" "}
-        {token.approvalRequired ? "Approval required" : "Automatic issuance"} · Expires{" "}
-        {formatTimestamp(token.expiresAt).local}
+        {token.usedCount} / {token.maxUses} uses · Expires {formatTimestamp(token.expiresAt).local}
       </p>
-      <dl className="grid gap-1 break-all text-sm">
-        <dt className="text-muted-foreground">Issued by</dt>
-        <dd>{token.createdBy}</dd>
-        <dt className="text-muted-foreground">Reason</dt>
-        <dd>{token.reason}</dd>
-        <dt className="text-muted-foreground">Groups</dt>
-        <dd>{token.groupIds.join(", ") || "None"}</dd>
-        <dt className="text-muted-foreground">Profile revisions</dt>
-        <dd>{token.profileRevisionIds.join(", ") || "None"}</dd>
-      </dl>
-      {token.metadata ? (
-        <details>
-          <summary className="cursor-pointer text-sm">Preassigned metadata</summary>
-          <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
-            {toJsonString(DeviceMetadataSchema, token.metadata, { prettySpaces: 2 })}
-          </pre>
-        </details>
-      ) : null}
-      {!token.revokedAt && !revoked ? (
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-destructive">
-            Revoke token
-          </summary>
+      <p className="text-sm text-muted-foreground">
+        Created by {token.creatorDisplayName || "unavailable"} ·{" "}
+        {token.approvalRequired ? "Independent approval required" : "No independent approval"}
+      </p>
+      <details>
+        <summary className="cursor-pointer text-sm">Details</summary>
+        <dl className="mt-3 grid gap-1 break-all text-sm">
+          <dt className="text-muted-foreground">Credential type</dt>
+          <dd>Reusable provisioning token</dd>
+          <dt className="text-muted-foreground">Token ID</dt>
+          <dd className="font-mono text-xs">{token.tokenId}</dd>
+          <dt className="text-muted-foreground">Creator principal ID</dt>
+          <dd className="font-mono text-xs">{token.createdBy || "Unavailable"}</dd>
+          <dt className="text-muted-foreground">Created</dt>
+          <dd>{formatTimestamp(token.createdAt).local}</dd>
+          {token.revokedAt ? (
+            <>
+              <dt className="text-muted-foreground">Revoked</dt>
+              <dd>{formatTimestamp(token.revokedAt).local}</dd>
+            </>
+          ) : null}
+          <dt className="text-muted-foreground">Group IDs</dt>
+          <dd>{token.groupIds.join(", ") || "None"}</dd>
+          <dt className="text-muted-foreground">Profile revision IDs</dt>
+          <dd>{token.profileRevisionIds.join(", ") || "None"}</dd>
+          <dt className="text-muted-foreground">Assigned metadata</dt>
+          <dd>
+            {token.metadata ? (
+              <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
+                {toJsonString(DeviceMetadataSchema, token.metadata, { prettySpaces: 2 })}
+              </pre>
+            ) : (
+              "None"
+            )}
+          </dd>
+        </dl>
+      </details>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next && (busy || (captured !== null && !revoked))) return;
+          setOpen(next);
+        }}
+      >
+        {!token.revokedAt && !revoked ? (
+          <DialogTrigger render={<Button className="w-fit" variant="outline" />}>
+            Revoke provisioning token
+          </DialogTrigger>
+        ) : null}
+        <DialogContent
+          keepMounted
+          showCloseButton={!busy && (captured === null || revoked)}
+          className="sm:max-w-lg"
+        >
+          <DialogHeader>
+            <DialogTitle>Revoke provisioning token?</DialogTitle>
+            <DialogDescription>
+              Stop new enrollments using this reusable provisioning token. Already enrolled devices
+              are not revoked.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="break-words text-sm font-medium">{token.reason || "Provisioning token"}</p>
           <form
-            className="mt-3 grid gap-3"
+            className="grid gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void revoke(new FormData(event.currentTarget));
             }}
           >
-            <fieldset className="grid gap-3" disabled={busy || captured !== null}>
-              <label className="grid gap-1.5 text-sm">
-                Retype token ID
-                <Input name="confirmation" required autoComplete="off" />
-              </label>
+            <fieldset className="grid gap-3" disabled={busy || captured !== null || revoked}>
               <label className="grid gap-1.5 text-sm">
                 Revocation reason
                 <Textarea name="reason" required />
               </label>
             </fieldset>
+            {captured ? (
+              <details className="text-xs text-muted-foreground">
+                <summary className="cursor-pointer">Request details</summary>
+                <p className="mt-2 break-all">
+                  Request {captured.requestId}. Token {captured.tokenId}.
+                </p>
+              </details>
+            ) : null}
             {failure ? <RpcError failure={failure} /> : null}
-            <Button type="submit" className="w-fit" variant="destructive" disabled={busy}>
-              {busy ? "Revoking…" : captured ? "Retry exact revocation" : "Revoke token"}
-            </Button>
+            {failure?.ambiguous ? (
+              <p className="text-sm text-muted-foreground">
+                Revocation may have succeeded. Retry the exact request to resolve its status.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" variant="destructive" disabled={busy || revoked}>
+                {busy
+                  ? "Revoking…"
+                  : captured
+                    ? "Retry exact revocation"
+                    : "Revoke provisioning token"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy || (captured !== null && !revoked)}
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
-        </details>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }

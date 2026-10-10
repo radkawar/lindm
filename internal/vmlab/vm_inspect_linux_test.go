@@ -3,14 +3,17 @@
 package vmlab
 
 import (
+	"context"
 	"crypto/sha256"
 	"debug/elf"
 	"encoding/hex"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
@@ -311,6 +314,58 @@ func TestInspectDiskIdentitiesRetainGuestCreatedDisks(t *testing.T) {
 	} {
 		if err := compareInspectDiskIdentities([]byte(malformed), hardware, details); err == nil {
 			t.Fatal("accepted missing, duplicate or substituted configured disk")
+		}
+	}
+}
+
+func TestInspectReadinessRequiresNativeSettledSignals(t *testing.T) {
+	for _, test := range []struct {
+		name, system, network   string
+		systemExit, networkExit int
+		wantError               bool
+	}{
+		{"running", "running\n", "complete\n", 0, 0, false},
+		{"degraded", "degraded\n", "complete\n", 1, 0, false},
+		{"non-NetworkManager", "running\n", "not-installed\n", 0, 0, false},
+		{"starting", "starting\n", "complete\n", 1, 0, true},
+		{"inconsistent-system-exit", "degraded\n", "complete\n", 0, 0, true},
+		{"network-timeout", "running\n", "", 0, 1, true},
+		{"truncated-system", "running", "complete\n", 0, 0, true},
+		{"invalid-network-proof", "running\n", "maybe\n", 0, 0, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			proof, err := collectInspectReadiness(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+				calls++
+				if _, bounded := ctx.Deadline(); !bounded || input != nil || limit != 1024 || timeout > 35*time.Second {
+					t.Fatal("readiness probe lost its subprocess bounds")
+				}
+				if calls == 1 && command == inspectSystemReadinessCommand {
+					return guestCommandResult{Stdout: []byte(test.system), ExitCode: test.systemExit}, nil
+				}
+				if calls == 2 && command == inspectNetworkReadinessCommand {
+					return guestCommandResult{Stdout: []byte(test.network), ExitCode: test.networkExit}, nil
+				}
+				t.Fatal("unexpected readiness probe")
+				return guestCommandResult{}, nil
+			})
+			if (err != nil) != test.wantError {
+				t.Fatalf("readiness result: %v", err)
+			}
+			if err == nil && (calls != 2 || proof.SystemState == "" || proof.NetworkManagerStartup == "" || proof.CompletedAt.Before(proof.StartedAt)) {
+				t.Fatalf("incomplete readiness proof: %v", proof)
+			}
+		})
+	}
+}
+
+func TestInspectReadinessPreservesNativeFailures(t *testing.T) {
+	for _, nativeError := range []error{context.DeadlineExceeded, errors.New("native SSH failure")} {
+		proof, err := collectInspectReadiness(t.Context(), func(context.Context, string, io.Reader, int, time.Duration) (guestCommandResult, error) {
+			return guestCommandResult{}, nativeError
+		})
+		if proof != nil || !errors.Is(err, nativeError) {
+			t.Fatalf("native readiness failure hidden: %v", err)
 		}
 	}
 }

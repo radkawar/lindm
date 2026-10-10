@@ -58,27 +58,3 @@ type AdvisoryFinding struct {
 	FeedID           string
 	SourceUrl        string
 }
-
-type AdvisoryFindingStatus struct {
-	ID                 uuid.UUID
-	DeviceID           uuid.UUID
-	AdvisoryID         string
-	PackageName        string
-	InstalledVersion   string
-	FixedVersion       string
-	Architecture       string
-	Severity           string
-	PublishedAt        pgtype.Timestamptz
-	Cves               []string
-	FeedID             string
-	SourceUrl          string
-	EvaluatedAt        pgtype.Timestamptz
-	InventoryAt        pgtype.Timestamptz
-	FeedCheckedAt      pgtype.Timestamptz
-	FeedExpiresAt      pgtype.Timestamptz
-	ExceptionActorID   *uuid.UUID
-	ExceptionReason    pgtype.Text
-	AcceptedAt         pgtype.Timestamptz
-	ExceptionExpiresAt pgtype.Timestamptz
-	State              string
-}

@@ -1,0 +1,25 @@
+{
+  "captured_at": "2026-10-10T13:56:03Z",
+  "firmware_code": "/usr/share/AAVMF/AAVMF_CODE.secboot.fd",
+  "firmware_package": "qemu-efi-aarch64",
+  "firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+  "firmware_version": "2024.02-2ubuntu0.10",
+  "host": "dgx20",
+  "image_id": "fedora-cloud-44-1.7-aarch64",
+  "image_sha256": "55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b",
+  "manifest": "/home/r/lindm-lab/runs/session-capture-tb91zILwjn/fedora-44-aarch64.json",
+  "package_changes": "none",
+  "purpose": "native interface research, not agent qualification",
+  "capture_mode": "LINDM_SESSION_CAPTURE=1; TestDNFNativeCapture; integration,dnfcapture",
+  "capture_result": "PASS, 14.45 seconds; owned guest and lease closed",
+  "build_command": "env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration,dnfcapture -c -o /tmp/lindm-session-capture-arm64.test ./internal/vmlab",
+  "guest_command": "sudo -n env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/ LANG=C LC_ALL=C python3 -I -",
+  "native_commands": "Exact argument arrays and unmodified stdout, stderr, exit_code are recorded in sessions.json. Script is maintained as sessionCaptureScript in internal/vmlab/vm_dnf_capture_test.go.",
+  "admission": {"namespace": "/home/r/lindm-lab/.leases/dgx20", "capacity": 4, "vcpus": 2, "memory_mib": 2048, "accelerator": "kvm"},
+  "privacy": "Only this owned ephemeral guest's lab user, session IDs, runtime process IDs, timestamps and QEMU private guest address are retained; no operator sessions or persistent host identities.",
+  "observed_context": [
+    {"class": "user", "type": "tty", "remote": true, "seat": ""},
+    {"class": "manager", "type": "unspecified", "remote": false, "seat": ""}
+  ],
+  "interpretation": "Both native active sessions have an empty Seat tuple. The systemd-user manager is local but non-graphical, so empty Seat is NOT_APPLICABLE rather than a collection failure. Local graphical user sessions without a seat remain UNAVAILABLE."
+}

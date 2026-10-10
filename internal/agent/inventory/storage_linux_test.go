@@ -21,7 +21,7 @@ import (
 )
 
 // Synthetic util-linux/cryptsetup-format inputs, not VM/native qualification.
-const syntheticStorage = `{"blockdevices":[{"name":"sda","kname":"sda","type":"disk","size":1000,"tran":"sata","model":"Synthetic disk","serial":"disk-serial","wwn":"0x5000000000000001","rev":"1.0","mountpoints":[null],"children":[{"name":"sda1","kname":"sda1","type":"part","size":900,"pkname":"sda","fstype":"crypto_LUKS","fsver":"2","uuid":"32cfd1cf-6a1c-4d7c-a792-664b3a0f4508","partuuid":"6f638c1f-2e3f-496e-9450-12b596d31cf0","parttype":"0fc63daf-8483-4772-8e79-3d69d8477de4","children":[{"name":"cryptroot","kname":"dm-0","type":"crypt","size":800,"pkname":"sda1","fstype":"ext4","uuid":"e9e97724-b8b0-4b3b-8d61-297b038a9758","mountpoints":["/var","/"]}]}]},{"name":"sdb","type":"disk","size":2000,"mountpoints":[null]}]}`
+const syntheticStorage = `{"blockdevices":[{"name":"sda","kname":"sda","type":"disk","size":1000,"tran":"sata","model":"Synthetic disk","serial":"disk-serial","wwn":"0x5000000000000001","pttype":"gpt","ptuuid":"49865c36-1e3a-4d2b-b719-89144a6e179e","rev":"1.0","mountpoints":[null],"children":[{"name":"sda1","kname":"sda1","type":"part","size":900,"pkname":"sda","fstype":"crypto_LUKS","fsver":"2","uuid":"32cfd1cf-6a1c-4d7c-a792-664b3a0f4508","partuuid":"6f638c1f-2e3f-496e-9450-12b596d31cf0","parttype":"0fc63daf-8483-4772-8e79-3d69d8477de4","children":[{"name":"cryptroot","kname":"dm-0","type":"crypt","size":800,"pkname":"sda1","fstype":"ext4","uuid":"e9e97724-b8b0-4b3b-8d61-297b038a9758","mountpoints":["/var","/"]}]}]},{"name":"sdb","type":"disk","size":2000,"mountpoints":[null]}]}`
 
 const syntheticLUKS2 = "LUKS header information\nVersion:       \t2\nUUID:          \t32cfd1cf-6a1c-4d7c-a792-664b3a0f4508\nData segments:\n  0: crypt\nKeyslots:\n  0: luks2\n\tSalt: synthetic-header-salt-not-for-publication\n  2: luks2\nTokens:\n  0: systemd-tpm2\n\tKeyslot: 2\n\tPayload: forbidden-token-payload\nDigests:\n  0: pbkdf2\n\tDigest: forbidden-digest\n"
 
@@ -37,7 +37,7 @@ func TestStorageIdentityAndRootTopology(t *testing.T) {
 	}
 	for _, device := range got.Devices[:3] {
 		id := device.Identity
-		if id.BackingDisk.Value != "sda" || id.Serial.Value != "disk-serial" || id.Wwn.Value != "0x5000000000000001" || !id.RootBacking.Value {
+		if id.BackingDisk.Value != "sda" || id.Serial.Value != "disk-serial" || id.Wwn.Value != "0x5000000000000001" || id.GptDiskGuid.Status != success || id.GptDiskGuid.Value != "49865c36-1e3a-4d2b-b719-89144a6e179e" || !id.RootBacking.Value {
 			t.Fatalf("ancestry/identity: %v", device)
 		}
 	}
@@ -48,8 +48,88 @@ func TestStorageIdentityAndRootTopology(t *testing.T) {
 	if filesystem.Identity.FilesystemUuid.Value == "" || filesystem.Mountpoint.Value != "/" || filesystem.Identity.LuksUuid.Status != unavailable {
 		t.Fatalf("filesystem identity: %v", filesystem)
 	}
-	if other.Identity.RootBacking.Status != success || other.Identity.RootBacking.Value || other.Identity.Serial.Status != unavailable || other.Identity.Wwn.Status != unavailable {
+	if other.Identity.RootBacking.Status != success || other.Identity.RootBacking.Value || other.Identity.Serial.Status != unavailable || other.Identity.Wwn.Status != unavailable || other.Identity.GptDiskGuid.Status != unavailable {
 		t.Fatalf("invented identity/root: %v", other)
+	}
+}
+
+func TestStorageGPTDiskGUIDRequiresUniqueGPTBackingDisk(t *testing.T) {
+	const guid = "49865c36-1e3a-4d2b-b719-89144a6e179e"
+	for _, test := range []struct {
+		name, fields string
+		status       inventoryv1.CollectionStatus
+		value        string
+	}{
+		{"GPT", `"pttype":"gpt","ptuuid":"` + guid + `"`, success, guid},
+		{"missing type", `"ptuuid":"` + guid + `"`, unavailable, ""},
+		{"MBR", `"pttype":"dos","ptuuid":"12345678"`, unavailable, ""},
+		{"missing GUID", `"pttype":"gpt"`, unavailable, ""},
+		{"null GUID", `"pttype":"gpt","ptuuid":null`, unavailable, ""},
+		{"invalid GUID", `"pttype":"gpt","ptuuid":"not-a-guid"`, invalid, ""},
+		{"zero GUID", `"pttype":"gpt","ptuuid":"00000000-0000-0000-0000-000000000000"`, invalid, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// A partition's own table UUID or PARTUUID never substitutes for the
+			// physical disk GUID, even when the disk field is unavailable.
+			data := `{"blockdevices":[{"name":"vda","type":"disk","size":1000,` + test.fields + `,"children":[{"name":"vda1","type":"part","size":900,"pttype":"gpt","ptuuid":"11111111-2222-4333-8444-555555555555","partuuid":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"}]}]}`
+			got := parseStorage(strings.NewReader(data))
+			if got.Status != success || len(got.Devices) != 2 {
+				t.Fatalf("storage: %v", got)
+			}
+			for _, device := range got.Devices {
+				if field := device.Identity.GptDiskGuid; field.GetStatus() != test.status || field.GetValue() != test.value {
+					t.Fatalf("incorrect GPT disk identity: %v", device)
+				}
+			}
+			if err := protovalidate.Validate(got); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	for _, data := range []string{
+		`{"blockdevices":[{"name":"vda1","type":"part","size":900,"pkname":"missing","pttype":"gpt","ptuuid":"` + guid + `"}]}`,
+		`{"blockdevices":[{"name":"vda","type":"disk","size":1000,"pttype":"gpt","ptuuid":"` + guid + `","children":[{"name":"md0","type":"raid1","size":900}]},{"name":"vdb","type":"disk","size":1000,"pttype":"gpt","ptuuid":"` + guid + `","children":[{"name":"md0","type":"raid1","size":900}]}]}`,
+	} {
+		got := parseStorage(strings.NewReader(data))
+		if got.Status != success || len(got.Devices) == 0 {
+			t.Fatalf("storage: %v", got)
+		}
+		for _, device := range got.Devices {
+			if device.Type.Value != "disk" && (device.Identity.GptDiskGuid.GetStatus() != unavailable || device.Identity.BackingDisk.GetStatus() != unavailable) {
+				t.Fatalf("ambiguous or missing backing disk supplied GPT identity: %v", device)
+			}
+		}
+	}
+}
+
+func TestStorageVirtioGPTNativeCollection(t *testing.T) {
+	const guid = "49865c36-1e3a-4d2b-b719-89144a6e179e"
+	const data = `{"blockdevices":[{"name":"vda","type":"disk","size":1000,"serial":"virtio-root","wwn":null,"pttype":"gpt","ptuuid":"` + guid + `","children":[{"name":"vda1","type":"part","size":900,"fstype":"crypto_LUKS","fsver":"2","uuid":"32cfd1cf-6a1c-4d7c-a792-664b3a0f4508"}]}]}`
+	sources := detailSources{run: func(_ context.Context, selected backend, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
+		if selected.name != "lsblk" {
+			t.Fatalf("unexpected native request: %+v", selected)
+		}
+		fields := "," + selected.args[len(selected.args)-1] + ","
+		if !strings.Contains(fields, ",PTTYPE,") || !strings.Contains(fields, ",PTUUID,") {
+			t.Fatalf("native storage observation omitted GPT identity fields: %+v", selected)
+		}
+		return consume(strings.NewReader(data))
+	}}
+	got := collectStorage(t.Context(), sources)
+	if got.Status != success || len(got.Devices) != 2 {
+		t.Fatalf("storage: %v", got)
+	}
+	for _, device := range got.Devices {
+		id := device.Identity
+		if id.GptDiskGuid.GetStatus() != success || id.GptDiskGuid.GetValue() != guid || id.Serial.GetValue() != "virtio-root" || id.Wwn.GetStatus() != unavailable || id.BackingDisk.GetValue() != "vda" {
+			t.Fatalf("no-WWN disk identity lost or invented: %v", device)
+		}
+	}
+	if got.Devices[0].SizeBytes.Value != 1000 || got.Devices[1].SizeBytes.Value != 900 || got.Devices[1].Identity.LuksUuid.Value != "32cfd1cf-6a1c-4d7c-a792-664b3a0f4508" {
+		t.Fatalf("disk size replaced container identity: %v", got)
+	}
+	if err := protovalidate.Validate(got); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -244,7 +324,7 @@ func TestNVMeScopeUsesExactReadOnlyTargetSeam(t *testing.T) {
 		},
 		nvmeScope: func(_ context.Context, file *os.File, target *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error) {
 			called = true
-			if file == nil || target.Serial != "native-serial" || target.Wwn != "native-wwn" || target.SizeBytes != 4096 || target.LuksUuid != "" {
+			if file == nil || target.GetIdentityBasis() != agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL || target.Serial != "native-serial" || target.Wwn != "native-wwn" || target.SizeBytes != 4096 || target.LuksUuid != "" || target.GetGptDiskGuid() != "" || target.GetDiskSizeBytes() != 0 {
 				t.Fatalf("identity fork: %v", target)
 			}
 			return nil, fs.ErrPermission

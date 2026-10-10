@@ -1,0 +1,256 @@
+# Debian
+
+## Versions, architectures and qualification
+
+[Verification](../verification.md#1-launch-platform-qualification) is the authoritative
+qualification ledger; the [shared platform contract](README.md) separates implementation,
+recorded operation and complete release certification. Debian 13 is a required launch
+branch, with GNOME/KDE and minimal installations requiring separate qualification on
+x86_64 desktop/server and aarch64 server. Debian 12 LTS is a separate legacy branch, not
+an inherited Debian 13 pass. No Debian whole-family or all-resource support is claimed.
+
+The pinned installation inputs are Debian **13.7.0** and **12.15.0** netinst, each
+with separate [amd64 13](../../lab/images/debian-13-amd64.json),
+[amd64 12](../../lab/images/debian-12-amd64.json),
+[arm64 13](../../lab/images/debian-13-arm64.json#L1) and
+[arm64 12](../../lab/images/debian-12-arm64.json#L1) manifests. Version-pinned vendor
+metadata lives at [13.7.0 arm64](https://cdimage.debian.org/debian-cd/13.7.0/arm64/iso-cd/)
+and [12.15.0 arm64](https://cdimage.debian.org/cdimage/archive/12.15.0/arm64/iso-cd/).
+The manifests require detached signed SHA512SUMS, exact image size, SHA-512
+verification and the separately pinned SHA-256 cache identity, with signer
+`DF9B9C49EAA9298432589D76DA87E80D6294BE9B`.
+
+Debian 12/13 native **ARM KVM** inspection, packaged automatic-trust lifecycle and
+connected service dispatch passed on `dgx20`. These are aarch64, QEMU 8.2.2,
+AAVMF `2024.02-2ubuntu0.10`, Secure Boot disabled/SetupMode true, virtio-blk,
+no TPM, no desktop, user-egress observations. They do not qualify the aborted x86_64
+lifecycle or encrypted/desktop installs. Exact records appear in the lab section below.
+
+## Packaging, signing, repositories, paths and LSM
+
+Agent packaging uses DEB/APT, not an RPM-derived path. Authentication is repository
+`InRelease` signature → `Packages` hashes → exact archive digest; a built `.deb` is
+not independently signed. Use a dedicated independently trusted `Signed-By` key, not
+global `trusted.gpg` or an unauthenticated `dpkg -i` shortcut
+([packaging contract](../../internal/packaging/doc.go#L14),
+[deb822 source](../../internal/packaging/publish.go#L19)). The agent repository and
+Debian installer-image signing keys have different purposes. The lab's `stable/main`
+coordinates belong to lindm, not a request to change the vendor suite
+([layout](../../internal/packaging/layout.go#L32)).
+
+The shared binary is `/usr/libexec/lindm/lindm-agent`, with strict root/network
+configuration at `/etc/lindm/executor.json` and `/etc/lindm/agent.json`.
+`/var/lib/lindm/executor` owns root identity/journal, `/var/lib/lindm/agent` owns
+transport state, and `/run/lindm` is root:lindm 0750. See the
+[shared paths/sandbox contract](README.md#shared-implementation-boundaries),
+[executor unit](../../internal/packaging/assets/lindm-executor.service#L8),
+[network unit](../../internal/packaging/assets/lindm-agent.service#L9) and
+[tmpfiles](../../internal/packaging/assets/tmpfiles.conf#L1).
+
+Preserve the installation's LSM and capture its actual enforcement/profile state.
+The cited Debian ARM records establish their recorded native operations and systemd
+privilege boundaries, not an AppArmor profile or SELinux-enforcing qualification.
+Do not infer either from family resemblance or weaken policy to obtain a pass.
+
+## Agent services and sandbox
+
+`lindm-executor.service` runs as root; `lindm-agent.service` runs as `lindm` with
+empty capabilities. Both use `PrivateDevices=yes`, `NoNewPrivileges=yes`,
+`ProtectSystem=strict`, `ProtectHome=yes` and `ProtectProc=invisible`. The executor's
+AF_UNIX boundary and the transport's configured IP/resolver families remain separate
+([executor](../../internal/packaging/assets/lindm-executor.service#L17),
+[transport](../../internal/packaging/assets/lindm-agent.service#L18)).
+
+Current privileged inventory uses the fixed `inventory-observe` transient helper:
+read-only block-device access, empty capabilities, no network, inaccessible lindm
+configuration/state, bounded lifetime/output and boot/timestamp validation
+([root observer](../../internal/agent/executor/root_inventory_linux.go#L28),
+[properties](../../internal/agent/executor/root_inventory_linux.go#L89)). This is a
+shared implementation, not a retroactive claim that historical Debian ARM packages
+contained the later Ubuntu-driven helper correction. Native Debian encrypted
+publication must qualify that topology independently. Imperative actions need their
+own exact-device provisioning; do not disable the persistent sandbox.
+
+## Inventory and per-field quirks
+
+Debian 13 ARM inspection matched **353** installed native dpkg identities; Debian 12
+matched **361**. The packaged lifecycle adds the agent, producing five **354** and
+**362** package publications respectively. Package equality is not sufficient by
+itself: the complete native oracle compares routes, active-session properties and
+field health, rejecting identical failures.
+
+The Debian 13 initial ARM oracle omitted per-interface IPv4/IPv6 default routes and
+active-session properties. Correcting the independent oracle yielded the explicitly
+named `inspect-complete-oracle` pass; it did not change absent observations into
+success. [Verification](../verification.md) retains that history and the exact runner
+provenance.
+
+The maintained [unavailability rules](../../internal/vmlab/inventory_unavailable_linux.go#L7)
+are exact, capability-backed and accept only `UNAVAILABLE`, never permission denied,
+timeout, invalid output or native command failure:
+
+| Observation             | Debian-specific or capability-dependent interpretation                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OS CPE                  | Debian os-release need not supply `CPE_NAME`; absent means unavailable, not a synthesized CPE.                                                                                                    |
+| dpkg module             | RPM modularity is inapplicable only for actual `dpkg` package records.                                                                                                                            |
+| Repository/release lock | Releasever override is optional; RPM/DNF repository inventory is inapplicable only with successful dpkg-present/RPM-absent observations. This says nothing about APT repository authentication.   |
+| Snap/Flatpak            | An absent backend permits unavailable application inventory only after successful backend detection. An installed backend failure cannot be excused.                                              |
+| aarch64 CPU             | x86-64 ISA level is inapplicable; ARM execution evidence does not certify an x86 CPU baseline.                                                                                                    |
+| Secure Boot/TPM         | BIOS lacks UEFI state; a present UEFI must be observed. TPM version may be unavailable only with a successful false presence observation. The ARM lanes explicitly observed disabled Secure Boot. |
+| Sessions                | Remote/tty sessions may lack a seat; active-session properties still require real logind observations.                                                                                            |
+| Storage                 | Missing virtio serial/WWN/model, unmounted devices and non-LUKS/non-NVMe fields have individual rules. Present LUKS metadata failure is not an absence exception.                                 |
+
+Sources: [field rules](../../internal/vmlab/inventory_unavailable_linux.go#L20),
+[storage rules](../../internal/vmlab/inventory_unavailable_linux.go#L33),
+[non-DNF predicate](../../internal/vmlab/inventory_unavailable_linux.go#L62).
+
+## Updates
+
+Debian's authenticated 0.7.0→0.7.1 agent package lifecycle is qualified on the cited
+ARM images. It includes reboot/reinstall, retained purge identity, spool recovery,
+automatic authority rotation, final revocation and missing-journal hold. The signed
+collection-denial attempt preserves the previous accepted snapshot rather than
+publishing an empty successful inventory. Different stamps from one source tree
+are not historical-release compatibility evidence.
+
+The shared unattended agent updater has an APT-specific requirement: put the exact
+verified archive at `lindm-agent_<version>_<architecture>.deb` inside the protected
+transaction cache; percent-escape `:`/`_` in the version as `%3a`/`%5f`.
+Use that directory for `Dir::Cache::archives`, including its private `partial`
+directory. A generic filename outside an empty cache can fail under `--no-download`.
+The native transaction simulates, restricts effects to the admitted agent, disables
+repositories/downloads/removals/recommends and recovers only that package's interrupted
+unpack/configure ([archive naming](../../internal/agent/update/native_linux.go#L83),
+[APT transaction](../../internal/agent/update/native_linux.go#L407)).
+APT 2.8.3's [canonical resolution](https://salsa.debian.org/apt-team/apt/-/blob/2.8.3/apt-pkg/acquire-item.cc#L3464)
+explains this constraint; it is not a claim that every Debian image has that APT version.
+
+Ubuntu's separately measured unattended update/interruption pass is not Debian
+qualification. Neither the ARM agent lifecycle nor this implementation qualifies
+Debian major upgrades, whole-system rollback, arbitrary package dependency plans or
+the new generic package resource provider. These need their own native evidence.
+
+## Encryption and recovery
+
+The maintained Debian netinst recipe explicitly uses regular partitioning, not an
+encrypted installation (`partman-auto/method string regular`), and installs standard
+plus SSH-server tasks. The successful ARM records explicitly use no TPM and no
+encryption fixture ([preseed](../../internal/vmlab/debian_installer_linux.go#L77)).
+Do not relabel that as LUKS-root, initramfs recovery, TPM-token unlock or key-rotation
+qualification. Ubuntu's initramfs-tools/dracut recipes are not a Debian boot-stack
+qualification either.
+
+Stable targeting requires server-returned signed identities and native revalidation,
+not a device path. Shared target construction prefers WWN+serial; the explicitly
+absent-WWN encrypted GPT fallback requires a unique serial, disk/target sizes,
+GPT disk GUID and LUKS UUID. The ordinary unencrypted Debian virtio fixture cannot
+acquire this fallback just because its disk lacks a WWN
+([construction](../../internal/device/storage_targets.go#L111),
+[revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
+Recovery media capacity, independent cold boots, escrow/rotation and destructive
+wipe remain separately gated by [verification](../verification.md).
+
+## Device actions
+
+The two ARM dispatch records qualify nine connected **systemd service** scenarios,
+including real five-minute compliant/drift checks, ±90-second clock skew and final
+revoked-device denial. Unstarted supersession is integration-only, not a tenth native
+scenario. Service dispatch is not session lock, firewall quarantine, power, account
+lock, encryption or sanitize qualification.
+
+The shared session provider uses authenticated root-owned logind over the fixed
+system bus; lock acknowledgment is not physical desktop visibility
+([session provider](../../internal/agent/actionprovider/sessions_linux.go#L38),
+[evidence semantics](../../internal/agent/actionprovider/network_linux.go#L229)).
+Power checks native capabilities, schedules and inhibitors without an unsafe fallback
+([power](../../internal/agent/actionprovider/power_linux.go#L172)). Nftables quarantine
+has kernel expiry and reports lost management delivery as unknown
+([quarantine](../../internal/agent/actionprovider/network_linux.go#L232)).
+None of those implementation paths supplies missing Debian GNOME/KDE/GDM or native
+action evidence. Preserve authorization, exact target identity and irreversible-effect
+warnings rather than using Ubuntu's action pass as a Debian substitute.
+
+## Advisory feeds
+
+Debian's security-tracker export is **source-package** data. `repositories` describes
+current archive source versions, not a binary mapping and not the first fixed version;
+source/binary version divergence matters. The parser selects the exact configured
+Debian release and rejects unsupported/contradictory shapes
+([tracker contract](../../internal/advisory/feed/debian_tracker.go#L17),
+[release filtering](../../internal/advisory/feed/debian_tracker.go#L99)).
+
+- `resolved` requires a fixed version; fixed version `0` means not affected.
+- `open` is not fixed; `undetermined` carries an explicit unknown assessment.
+- No-DSA, ignored/postponed and next-point-update policy do not make a package fixed.
+- Architecture and publication date remain absent when upstream supplies neither.
+- Even the full export is not a package-universe completeness claim: untracked or
+  removed source packages are not proven clean.
+
+These are [native parser semantics](../../internal/advisory/feed/debian_tracker.go#L123),
+not inferred vulnerability counts. Preserve native dpkg ordering, source mapping,
+feed and inventory freshness independently. The verification ledger's source/binary
+backport regressions are controlled applicability tests, not historical Debian
+installations. Ubuntu USNs and malformed Ubuntu OSV purl handling do not substitute
+for Debian tracker coverage.
+
+A complete 2026-10-10 census of the separate canonical Debian OSV export
+(`https://osv-vulnerabilities.storage.googleapis.com/Debian/all.zip`) inspected
+70,305 records and found a maximum of 838 distinct CVEs in `DLA-4008-1`
+(Debian 11). This is an OSV-export cardinality measurement, not a claim about every
+historical Debian format or device exposure. The shared 2,048-CVE bound also
+admits Ubuntu's measured 1,416-CVE kernel notices while retaining byte limits.
+Source SHA-256: `4e1ad05000a2f1dcc0729e33ac80086ec2e5125ce20bcf31a83cf52d626c221f`.
+Evidence: [`debian-osv-cve-cardinality-20261010.json`](../../artifacts/debian-osv-cve-cardinality-20261010.json),
+SHA-256 `3688a041de7c2b3c3fb3287ce5bbefcdf5ff63465ea44a878645ded4c3dd9900`.
+
+## Lab
+
+The Debian path deliberately avoids pretending current cloud checksums have a vendor
+signature. It authenticates the signed netinst ISO, remasters only boot/preseed inputs,
+installs from signed Debian repositories, integrity-pins the resulting local ext4
+golden disk and rechecks it before disposable overlays. The derived disk is neither
+vendor-signed nor a reproducible archive snapshot
+([verification provenance](../verification.md),
+[installer recipe](../../internal/vmlab/debian_installer_linux.go#L17)).
+The recipe maps 12→bookworm and 13→trixie and permits only owned guest disk types;
+preseed disables root login and uses the native installer rather than relabeling an ISO
+as a cloud disk ([suite and target selection](../../internal/vmlab/debian_installer_linux.go#L19)).
+
+Run maintained `lab images fetch`/`verify` against the chosen manifest before
+`lab vm inspect`, `lifecycle` or `dispatch`. Native ARM uses the separately pinned
+ARM input and native KVM, not cross-architecture inference. Preserve firmware package,
+Secure Boot, storage, egress, source, agent and runner hashes in each record.
+
+Records under `$HOME/.cache/lindm-mutabledistros3-20261010/`:
+
+| Version / native operation                                    | Record                                              | SHA-256                                                            |
+| ------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| 13 / inspection, 353 packages                                 | `debian13-arm64-dgx20-inspect-complete-oracle.json` | `a67af59b3846199900abff8744dd078c36ccc0e1de0b4ad579632c54ade98f23` |
+| 13 / automatic-trust lifecycle, five 354-package publications | `debian13-arm64-dgx20-lifecycle-stagingfix.json`    | `be19db1bcf1197a534d6425d8944d3e68173e3cd9245dd0c9abac452abce8c05` |
+| 13 / nine service dispatch scenarios                          | `debian13-arm64-dgx20-dispatch.json`                | `0973b1cf434265359808e6553f4c0766a29042c03e788ebe29996e7cf18376a0` |
+| 12 / inspection, 361 packages                                 | `debian12-arm64-dgx20-inspect.json`                 | `5b872dedd2a611d7f6847b15cdacad6a0a941dd0d12c99c21ff6df7bea62bcc2` |
+| 12 / automatic-trust lifecycle, five 362-package publications | `debian12-arm64-dgx20-lifecycle.json`               | `1bda2586f58dee2764b8ca69e20cf99883412ad01e9414d540d5579d0af8d95a` |
+| 12 / nine service dispatch scenarios                          | `debian12-arm64-dgx20-dispatch.json`                | `f29b8cdf4d4342c66e3928cc2d9ff5416fb1b92f243601e01682319376c7a8b0` |
+
+The ARM passes include real isolated local password/WebAuthn authority and independent
+final revocation. Both lifecycle records retain snapshot 5 after denied attempt 6,
+with epoch 1→3. They do not erase x86_64 history: Debian 13's older packaged lane
+failed final approval after earlier successful stages; the subsequent local automatic-
+trust attempt was owner-cancelled for host contention after enrolled/upgraded/rebooted
+publications. [Verification](../verification.md) retains exact failure/cancellation
+records. Debian 12 amd64 remains separate from the successful ARM record.
+
+## Gaps
+
+- No complete Debian release matrix cell is certified. Architecture/edition,
+  physical hardware and air-gap claims require their own evidence.
+- Debian 13 amd64's final-approval failure and later host-contention cancellation
+  are not a native lifecycle pass; ARM success does not retroactively change them.
+- Debian encrypted installation, Secure Boot enabled, TPM, GNOME/KDE and recovery/
+  destructive-action paths are not qualified by unencrypted headless ARM lanes.
+- The new read-only transient inventory helper and generic native package resources
+  need matching-version Debian runtime evidence, not historical package counts.
+- Agent lifecycle upgrades do not establish Debian major upgrades, unattended
+  interruption recovery, arbitrary dependency plans or system rollback.
+- Security-tracker source records and no-DSA policy cannot establish complete clean
+  binary-package coverage without native applicability/source mapping and freshness.

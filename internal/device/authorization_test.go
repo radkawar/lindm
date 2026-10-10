@@ -47,6 +47,8 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ListAttributeDefinitions":             {identity.PermissionReadFleet, readers, true},
 		"ExportDevices":                        {identity.PermissionReadFleet, readers, false},
 		"CreateEnrollmentGrant":                {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
+		"ListEnrollmentGrants":                 {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
+		"GetEnrollmentInstructions":            {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
 		"RevokeEnrollmentGrant":                {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
 		"RevokeDevice":                         {identity.PermissionRevokeDevice, admins, false},
 		"CreateApproval":                       {},

@@ -57,8 +57,30 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		}
 		copy(after[:], data[32:])
 	}
+	// Project rejection reasons only for the exact evaluated revision and
+	// implicated binary/source package. Device-wide UNKNOWN is not evidence
+	// that every otherwise valid finding came from a rejected record.
+	var rejectedIDs, rejectedPackages []string
+	if e.FeedID != "" {
+		source, err := q.GetAdvisoryFeed(ctx, e.FeedID)
+		if err != nil {
+			return nil, err
+		}
+		if e.FeedRevision != nil && source.Revision == *e.FeedRevision {
+			var manifest advisoryv1.FeedManifest
+			if err := proto.Unmarshal(source.SourceManifest, &manifest); err != nil {
+				return nil, err
+			}
+			for _, rejected := range manifest.GetRejectedRecords() {
+				for _, name := range rejected.GetPackageNames() {
+					rejectedIDs = append(rejectedIDs, rejected.GetId())
+					rejectedPackages = append(rejectedPackages, name)
+				}
+			}
+		}
+	}
 	limit := pageSize(req.GetPageSize())
-	rows, err := q.ListDeviceAdvisoryFindings(ctx, advisorydb.ListDeviceAdvisoryFindingsParams{DeviceID: deviceID, ID: after, Limit: limit + 1})
+	rows, err := q.ListDeviceAdvisoryFindings(ctx, advisorydb.ListDeviceAdvisoryFindingsParams{DeviceID: deviceID, ID: after, RowLimit: limit + 1, SnapshotID: e.SnapshotID, RejectedIds: rejectedIDs, RejectedPackages: rejectedPackages})
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +97,10 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		f := &adminv1.AdvisoryFinding{Id: row.ID.String(), AdvisoryId: row.AdvisoryID, Cves: row.Cves, PackageName: row.PackageName, InstalledVersion: row.InstalledVersion, FixedVersion: row.FixedVersion, Architecture: row.Architecture, Severity: row.Severity, PublishedAt: protoTime(row.PublishedAt), State: findingState(row.State), FeedId: row.FeedID, SourceUrl: row.SourceUrl}
 		if fresh.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
 			f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN
+		}
+		if row.SourceRecordRejected {
+			f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN
+			f.Reason = "source_record_rejected"
 		}
 		if row.ExceptionActorID != nil {
 			f.Exception = &adminv1.AdvisoryException{ActorId: row.ExceptionActorID.String(), Reason: row.ExceptionReason.String, AcceptedAt: protoTime(row.AcceptedAt), ExpiresAt: protoTime(row.ExceptionExpiresAt)}
@@ -176,7 +202,7 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 		if err := proto.Unmarshal(row.SourceManifest, &manifest); err != nil {
 			return nil, err
 		}
-		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
+		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, RejectedRecords: manifest.RejectedRecords, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
 	}
 	return out, nil
 }

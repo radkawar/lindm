@@ -158,6 +158,7 @@ func parseActiveSession(reader io.Reader) (*inventoryv1.ActiveSession, inventory
 		Remote:       sessionBoolProperty(properties, "Remote"),
 		Seat:         &inventoryv1.ObservedString{Status: unavailable},
 	}
+	seatAbsent := true
 	if seat, ok := properties["Seat"]; ok {
 		var fields []json.RawMessage
 		var name, path string
@@ -167,7 +168,16 @@ func parseActiveSession(reader io.Reader) (*inventoryv1.ActiveSession, inventory
 			result.Seat.Status = invalid
 		} else {
 			result.Seat = observed(name, nil)
+			seatAbsent = name == ""
 		}
+	}
+	// Only native, successfully decoded context proves that a seat does not
+	// apply. A local graphical user's missing seat remains a collection failure.
+	if seatAbsent && result.Seat.Status == unavailable &&
+		result.SessionClass.Status == success && result.SessionType.Status == success && result.Remote.Status == success &&
+		(result.SessionClass.Value == "manager" || result.SessionClass.Value == "background" ||
+			result.Remote.Value || result.SessionType.Value == "tty") {
+		result.Seat.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE
 	}
 	return result, success
 }

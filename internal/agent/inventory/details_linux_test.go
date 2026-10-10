@@ -143,18 +143,11 @@ func TestStorageEncryptionAndNetworkBoundaries(t *testing.T) {
 }
 
 func TestApplicationsAndSessionCounts(t *testing.T) {
-	flatpak := parseApplications(strings.NewReader("org.example.App\t1.2\tx86_64\n"), "flatpak")
+	flatpak := parseFlatpak(strings.NewReader("org.example.App\t1.2\tx86_64\n"))
 	if flatpak.Status != success || len(flatpak.Applications) != 1 || flatpak.Applications[0].Scope.Value != "system" {
 		t.Fatalf("flatpak: %v", flatpak)
 	}
-	snap := parseApplications(strings.NewReader("Name Version Rev Tracking Publisher Notes\ncore22 20260901 123 latest/stable canonical base\n"), "snap")
-	if snap.Status != success || len(snap.Applications) != 1 || snap.Applications[0].Architecture.Status != unavailable {
-		t.Fatalf("snap: %v", snap)
-	}
-	if got := parseApplications(strings.NewReader("Name Version\n"), "snap"); got.Status != invalid {
-		t.Fatalf("bad header: %v", got)
-	}
-	if got := parseApplications(strings.NewReader(strings.Repeat("a\t1\tx86_64\n", 2049)), "flatpak"); got.Status != capacity || len(got.Applications) != 0 {
+	if got := parseFlatpak(strings.NewReader(strings.Repeat("a\t1\tx86_64\n", 2049))); got.Status != capacity || len(got.Applications) != 0 {
 		t.Fatalf("app limit: %v", got)
 	}
 	rows, status := parseSessionRows(strings.NewReader(`{"type":"a(uso)","data":[[[1000,"private-user","/org/freedesktop/login1/user/_1000"]]]}`), "a(uso)")
@@ -179,6 +172,9 @@ func fixtureDetails(root string) detailSources {
 		stat:     func(name string) (fs.FileInfo, error) { return os.Stat(path(name)) },
 		run: func(context.Context, backend, func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
 			return unavailable
+		},
+		snap: func(context.Context) *inventoryv1.ApplicationDetails {
+			return &inventoryv1.ApplicationDetails{Status: unavailable}
 		},
 		sessions: func(context.Context) *inventoryv1.SessionCounts {
 			return &inventoryv1.SessionCounts{Users: number(0, fs.ErrNotExist), Sessions: number(0, fs.ErrNotExist)}
@@ -319,7 +315,7 @@ func TestNativeFailuresDiscardPartialDetails(t *testing.T) {
 	if got := collectNetwork(context.Background(), run); got.Status != commandFailure || len(got.Interfaces) != 0 {
 		t.Fatalf("partial network: %v", got)
 	}
-	if got := collectApplications(context.Background(), run, "flatpak"); got.Status != commandFailure || len(got.Applications) != 0 {
+	if got := collectFlatpak(context.Background(), run); got.Status != commandFailure || len(got.Applications) != 0 {
 		t.Fatalf("partial applications: %v", got)
 	}
 }
@@ -366,7 +362,7 @@ func TestApplicationNativeFailurePrecedence(t *testing.T) {
 	}{
 		{"empty-failure", commandFailure},
 		{"empty-warning", commandFailure},
-		{"empty-clean", invalid},
+		{"empty-clean", success},
 		{"invalid-failure", commandFailure},
 		{"invalid-clean", invalid},
 		{"valid-warning", commandFailure},
@@ -386,7 +382,7 @@ func TestApplicationNativeFailurePrecedence(t *testing.T) {
 				cmd.WaitDelay = time.Second
 				return runCommand(ctx, cmd, consume)
 			}
-			got := collectApplications(ctx, run, "snap")
+			got := collectFlatpak(ctx, run)
 			if got.Status != tc.want || len(got.Applications) != 0 {
 				t.Fatalf("status=%s want=%s applications=%v", got.Status, tc.want, got.Applications)
 			}
@@ -412,7 +408,7 @@ func TestApplicationSubprocessHelper(t *testing.T) {
 	case "invalid-clean":
 		output = "malformed native output\n"
 	case "valid-warning":
-		output = "Name Version Rev Tracking Publisher Notes\napp 1 1 latest/stable publisher -\n"
+		output = "org.example.App\t1\tx86_64\n"
 		diagnostic = "native record ignored\n"
 	case "capacity":
 		output = strings.Repeat("x", maxDetailFile+1)
@@ -442,7 +438,7 @@ func TestApplicationReadFailureIsNotDeferred(t *testing.T) {
 		}
 		return status
 	}
-	if got := collectApplications(t.Context(), run, "snap"); got.Status != invalid || len(got.Applications) != 0 {
+	if got := collectFlatpak(t.Context(), run); got.Status != invalid || len(got.Applications) != 0 {
 		t.Fatalf("read failure observation: %v", got)
 	}
 }

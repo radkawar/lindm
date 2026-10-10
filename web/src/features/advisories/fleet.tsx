@@ -31,7 +31,13 @@ export function AdvisoryFleet() {
   const feedUnknown =
     !feeds.data?.feeds.length ||
     !!feeds.error ||
-    feeds.data.feeds.some((feed) => !!feed.error || !feed.fresh || !unexpired(feed.expiresAt, now));
+    feeds.data.feeds.some(
+      (feed) =>
+        !!feed.error ||
+        !feed.fresh ||
+        !unexpired(feed.expiresAt, now) ||
+        feed.rejectedRecords.length > 0,
+    );
   return (
     <div className="grid min-w-0 gap-6">
       <PageHeader
@@ -175,7 +181,9 @@ export function AdvisoryFleet() {
                       : feed.error
                         ? "destructive"
                         : feed.fresh && unexpired(feed.expiresAt, now)
-                          ? "success"
+                          ? feed.rejectedRecords.length > 0
+                            ? "warning"
+                            : "success"
                           : feed.checkedAt
                             ? "warning"
                             : "neutral"
@@ -186,7 +194,9 @@ export function AdvisoryFleet() {
                     : feed.error
                       ? "Refresh failed"
                       : feed.fresh && unexpired(feed.expiresAt, now)
-                        ? "Current"
+                        ? feed.rejectedRecords.length > 0
+                          ? `Current, ${feed.rejectedRecords.length} records rejected`
+                          : "Current"
                         : !feed.checkedAt
                           ? "Awaiting refresh"
                           : unexpired(feed.expiresAt, now)
@@ -217,18 +227,43 @@ export function AdvisoryFleet() {
                   : feed.error === "refresh_failed"
                     ? "The source refresh failed. Check control-plane logs for details."
                     : feed.error ||
-                      (feed.fresh && unexpired(feed.expiresAt, now)
-                        ? "The source snapshot is complete and within its freshness window."
-                        : !feed.checkedAt
-                          ? "No successful refresh is recorded for this source configuration."
-                          : !unexpired(feed.expiresAt, now)
-                            ? "The last successful refresh is outside its freshness window."
-                            : "The source snapshot has incomplete coverage.")}
+                      (feed.rejectedRecords.length > 0
+                        ? "Some source records could not be evaluated. Exposure counts may be incomplete."
+                        : feed.fresh && unexpired(feed.expiresAt, now)
+                          ? "The source is current."
+                          : !feed.checkedAt
+                            ? "No successful refresh is recorded."
+                            : !unexpired(feed.expiresAt, now)
+                              ? "The last successful refresh is out of date."
+                              : "The source snapshot has incomplete coverage.")}
               </p>
               {feed.error ? (
                 <p className="break-all text-xs text-muted-foreground">
                   Reported reason: {feed.error}
                 </p>
+              ) : null}
+              {feed.rejectedRecords.length > 0 ? (
+                <details>
+                  <summary className="cursor-pointer font-medium">
+                    Rejected source records ({feed.rejectedRecords.length})
+                  </summary>
+                  <ul className="mt-3 grid gap-3">
+                    {feed.rejectedRecords.map((record, index) => (
+                      <li
+                        key={`${record.id}:${index}`}
+                        className="grid gap-1 break-words border-l-2 border-warning pl-3"
+                      >
+                        <p className="font-medium">{record.id || "Record without an ID"}</p>
+                        <p>{record.reason}</p>
+                        <p className="text-muted-foreground">
+                          {record.unscoped
+                            ? "Affected packages could not be identified."
+                            : `Packages: ${record.packageNames.join(", ")}`}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               ) : null}
               <p className="break-all font-mono">
                 Snapshot SHA-256: {feed.sourceSha256 || "Unavailable"}

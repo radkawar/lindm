@@ -13,8 +13,8 @@ import (
 
 func TestLiveRootStartRequiresCompleteFrozenEncryptedScope(t *testing.T) {
 	f := newDeviceActionAuthorityFixture(t, true)
-	rootTarget := &agentv1.StorageTarget{LuksUuid: uuid.NewString(), Serial: "root-disk", SizeBytes: 1 << 30}
-	escrowTarget := &agentv1.StorageTarget{LuksUuid: uuid.NewString(), Serial: "escrow-data-disk", SizeBytes: 2 << 30}
+	rootTarget := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "wwn-" + "root-disk", Serial: "root-disk", SizeBytes: 1 << 30}
+	escrowTarget := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: uuid.NewString(), Wwn: "wwn-" + "escrow-data-disk", Serial: "escrow-data-disk", SizeBytes: 2 << 30}
 	f.intent.Spec.Action = &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{rootTarget, escrowTarget}}}
 	specDigest, err := DeviceActionDigest(f.intent.Spec)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestNativeSanitizeGrantRequiresExactObservedNamespace(t *testing.T) {
 			LbaDataSizeShift:   9,
 		},
 	}
-	f.intent.Spec.Action = &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{Serial: "native-nvme", SizeBytes: 1 << 30}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, NvmeScope: scope}}
+	f.intent.Spec.Action = &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "wwn-" + "native-nvme", Serial: "native-nvme", SizeBytes: 1 << 30}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, NvmeScope: scope}}
 	specDigest, err := DeviceActionDigest(f.intent.Spec)
 	if err != nil {
 		t.Fatal(err)

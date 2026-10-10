@@ -126,6 +126,7 @@ type Service struct {
 	pinLiveRoot           func() error
 	recoveryConfig        *RecoveryBootConfig
 	recoveryBoot          recoveryBootPlatform
+	rootInventoryCommand  func(context.Context, string, ...string) ([]byte, error)
 	recoveryPending       *recoveryPendingAction
 	recoveryTPM           func() (recoveryTPMPending, error)
 	updateConfig          *agentv1.AgentUpdateConfig
@@ -182,7 +183,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
-		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.StorageDetails{},
+		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
 		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},

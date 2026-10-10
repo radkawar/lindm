@@ -10,6 +10,11 @@ lindm is a self-hosted, single-tenant Linux device management (MDM) system. It i
 
 The documents in `docs/*.md` are the delivery contract. `docs/engineering.md` is binding: read §1–5 before making non-trivial changes.
 
+Any change touching distribution-specific behavior must update the matching
+`docs/platforms/` page in the same change, including implementation quirks, native
+prerequisites and qualification limits; link new qualification claims to evidence
+in `docs/verification.md`.
+
 ## Architecture & Data Flow
 
 The codebase is a modular Go monolith in a single module named `lindm`. Postgres is both the authoritative store and the work queue.
@@ -141,3 +146,11 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
   - Poll with deadlines instead of sleeping.
   - Do not mock OS package transactions or OIDC in tests that claim to cover them.
 - Rules from `docs/verification.md`: a skipped test is not a pass, and VM results do not count as physical validation.
+- Before landing any change in the shared checkout, run in that same tree:
+  - `go build ./...`
+  - `.tools/bin/golangci-lint run` on every touched package, for both default and `integration` build tags
+  - `.tools/bin/golangci-lint fmt`
+  - `.tools/bin/buf format -w` and `buf lint` if protos changed
+  - prettier and markdownlint on touched Markdown/web files
+  - the touched packages' race tests
+- A change that leaves `make check` red is not landed.

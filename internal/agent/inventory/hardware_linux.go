@@ -17,6 +17,9 @@ import (
 // without guessing one physical core per logical processor.
 func collectCPU(ctx context.Context, s detailSources, data []byte, err error) *inventoryv1.CpuDetails {
 	result := parseCPU(data, err)
+	if result.LogicalCores.Status == success {
+		collectCPUModel(ctx, s, data, result)
+	}
 	if result.LogicalCores.Status != success || result.PhysicalCores.Status != unavailable {
 		return result
 	}
@@ -50,8 +53,9 @@ func collectCPU(ctx context.Context, s detailSources, data []byte, err error) *i
 	return result
 }
 
-func parseCPU(data []byte, err error) *inventoryv1.CpuDetails {
-	result := &inventoryv1.CpuDetails{Model: observed("", err), LogicalCores: number(0, err), PhysicalCores: number(0, err), X86_64Level: observed("", err)}
+func parseCPU(data []byte, err error) (result *inventoryv1.CpuDetails) {
+	result = &inventoryv1.CpuDetails{Model: observed("", err), LogicalCores: number(0, err), PhysicalCores: number(0, err), X86_64Level: observed("", err)}
+	defer func() { result.ModelSource = cpuModelSource(result.Model, "proc_cpuinfo") }()
 	if err != nil {
 		return result
 	}

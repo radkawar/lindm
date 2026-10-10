@@ -39,6 +39,8 @@ type VMHardwareOptions struct {
 	// Recovery boots reserve a separate controller before QEMU starts: q35's
 	// root PCIe bus cannot accept the controller itself through QMP hotplug.
 	recoveryTarget bool
+	// Acceptance preserves vendor timers rather than quiescing inventory fixtures.
+	stockAcceptance bool
 }
 
 func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareOptions, error) {

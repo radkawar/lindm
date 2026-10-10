@@ -1,0 +1,18 @@
+{
+  "id": "fedora-cloud-44-1.7-aarch64",
+  "distribution": "fedora",
+  "version": "44",
+  "architecture": "aarch64",
+  "edition": "Cloud-Base-Generic",
+  "release": "44-1.7",
+  "imageFilename": "Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2",
+  "imageUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2",
+  "checksumUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-44-1.7-aarch64-CHECKSUM",
+  "keyUrl": "https://fedoraproject.org/fedora.gpg",
+  "sha256": "55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b",
+  "signerFingerprint": "36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6",
+  "imageSizeBytes": "528154624",
+  "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+  "signerProvenanceUrl": "https://fedoraproject.org/security/",
+  "releaseProvenanceUrl": "https://fedoraproject.org/cloud/download/"
+}

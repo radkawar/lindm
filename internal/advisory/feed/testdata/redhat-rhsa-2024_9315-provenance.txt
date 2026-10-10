@@ -1,0 +1,52 @@
+Red Hat RHSA-2024:9315 exact-byte large CSAF regression fixture
+=============================================================
+
+Attribution: Red Hat, Inc., Red Hat Product Security. The original document
+includes Creative Commons Attribution 4.0 International terms:
+https://creativecommons.org/licenses/by/4.0/
+
+Canonical document and retained verbatim proof sources:
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_9315.json
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_9315.json.sha256
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_9315.json.asc
+
+The exact JSON bytes were extracted, without normalization or JSON reserialization,
+from member 2024/rhsa-2024_9315.json of the authenticated weekly archive:
+https://security.access.redhat.com/data/csaf/v2/advisories/csaf_advisories_2026-10-04.tar.zst
+Archive acquired 2026-10-10T13:16:50.944654Z; compressed archive 113835796 bytes;
+SHA-256 708b53eff66e7150fd95e1649457d26987e9c88e8e7f92405c0f695354afc1ee.
+The archive's published .sha256 and .asc were checked by the source measurement.
+
+Local fixture: redhat-rhsa-2024_9315.json.gz
+Local packaging: gzip level 9, empty filename and mtime 0; 2050278 bytes.
+Expanded original: 46707671 bytes (44.54 MiB).
+Original SHA-256:
+18f042e9fe16fd0312fd79b71aa8f78e8baeb4c60e9cf2a11274a30475d41214
+The separately acquired individual .sha256 matches these exact archive-member
+bytes. Its individual detached .asc was verified over the decompressed bytes by
+gpgv against the repository-pinned Red Hat Product Security certificate:
+77E79ABE93673533ED09EBE2DCE3823597F5EAC4.
+Signature creation: 2026-10-02T14:45:42Z (Unix 1790952342).
+Proof acquisition and authentication: 2026-10-10. Regression tests use that fixed
+verification date, not the wall clock, and require both digest and signature.
+
+This was the largest document in the measured complete weekly advisory archive,
+with 594 distinct vulnerability CVEs. Four archive documents exceeded 32 MiB.
+The 128 MiB admission bound is 2.87 times this observed maximum; this finite
+snapshot is not a vendor all-time/future maximum or freshness qualification.
+The compressed fixture is streamed through a size-limited gzip reader; no test
+loads the complete expanded JSON into memory.
+
+Primary semantic assertion (unmodified vendor evidence):
+CVE-2019-25162 has fixed product
+BaseOS-9.5.0.GA:kernel-core-0:5.14.0-503.11.1.el9_5.x86_64.
+Its default_component_of relationship joins the exact kernel-core RPM to
+BaseOS-9.5.0.GA, whose normative CPE is
+cpe:/o:redhat:enterprise_linux:9::baseos.
+The component purl is
+pkg:rpm/redhat/kernel-core@5.14.0-503.11.1.el9_5?arch=x86_64.
+The normalized record therefore targets native RHEL 9 standard x86_64, binary
+kernel-core, fixed EVR 0:5.14.0-503.11.1.el9_5, without a module stream.
+
+The fixture establishes actual large-document ingestion, not complete source
+coverage, publication freshness, entitlement, or a full production republish.

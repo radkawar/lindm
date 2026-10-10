@@ -54,7 +54,7 @@ func (p *Provider) liveRootScope(spec *agentv1.DeviceActionSpec) error {
 		return ErrConflict
 	}
 	for index, target := range targets {
-		if target.GetLuksUuid() == "" || target.GetWwn() == "" || target.GetSerial() == "" {
+		if target.GetLuksUuid() == "" || target.GetIdentityBasis() == agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED {
 			return ErrConflict
 		}
 		for _, previous := range targets[:index] {

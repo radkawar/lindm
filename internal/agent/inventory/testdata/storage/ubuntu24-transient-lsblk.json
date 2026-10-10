@@ -1,0 +1,128 @@
+{
+   "blockdevices": [
+      {
+         "name": "vda",
+         "kname": "vda",
+         "type": "disk",
+         "size": 25769803776,
+         "fstype": null,
+         "fsver": null,
+         "uuid": null,
+         "partuuid": null,
+         "parttype": null,
+         "tran": "virtio",
+         "model": null,
+         "serial": "lindm-demo-encrypted",
+         "wwn": null,
+         "rev": null,
+         "mountpoints": [
+             null
+         ],
+         "pkname": null,
+         "children": [
+            {
+               "name": "vda1",
+               "kname": "vda1",
+               "type": "part",
+               "size": 1127219200,
+               "fstype": "vfat",
+               "fsver": "FAT32",
+               "uuid": "BE73-6040",
+               "partuuid": "fe0ddd3f-1541-46af-88f7-980bf5398174",
+               "parttype": "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
+               "tran": "virtio",
+               "model": null,
+               "serial": null,
+               "wwn": null,
+               "rev": null,
+               "mountpoints": [
+                   "/boot/efi"
+               ],
+               "pkname": "vda"
+            },{
+               "name": "vda2",
+               "kname": "vda2",
+               "type": "part",
+               "size": 2147483648,
+               "fstype": "ext4",
+               "fsver": "1.0",
+               "uuid": "679a8412-23c9-469a-bdeb-32012285d6b3",
+               "partuuid": "5d5fc853-3be2-4326-9e4c-cd23570a766d",
+               "parttype": "0fc63daf-8483-4772-8e79-3d69d8477de4",
+               "tran": "virtio",
+               "model": null,
+               "serial": null,
+               "wwn": null,
+               "rev": null,
+               "mountpoints": [
+                   "/boot"
+               ],
+               "pkname": "vda"
+            },{
+               "name": "vda3",
+               "kname": "vda3",
+               "type": "part",
+               "size": 22493003776,
+               "fstype": "crypto_LUKS",
+               "fsver": "2",
+               "uuid": "f393f8b5-f6bf-41a0-81fd-736cf10b6d9d",
+               "partuuid": "4ad7342a-a892-460b-9f86-346e1f374060",
+               "parttype": "0fc63daf-8483-4772-8e79-3d69d8477de4",
+               "tran": "virtio",
+               "model": null,
+               "serial": null,
+               "wwn": null,
+               "rev": null,
+               "mountpoints": [
+                   null
+               ],
+               "pkname": "vda",
+               "children": [
+                  {
+                     "name": "dm_crypt-0",
+                     "kname": "dm-0",
+                     "type": "crypt",
+                     "size": 22476226560,
+                     "fstype": "LVM2_member",
+                     "fsver": "LVM2 001",
+                     "uuid": "Uq6z6t-EEon-3zO9-xgbz-Xxv6-7YJw-zZSDDa",
+                     "partuuid": null,
+                     "parttype": null,
+                     "tran": null,
+                     "model": null,
+                     "serial": null,
+                     "wwn": null,
+                     "rev": null,
+                     "mountpoints": [
+                         null
+                     ],
+                     "pkname": "vda3",
+                     "children": [
+                        {
+                           "name": "ubuntu--vg-ubuntu--lv",
+                           "kname": "dm-1",
+                           "type": "lvm",
+                           "size": 22473080832,
+                           "fstype": "ext4",
+                           "fsver": "1.0",
+                           "uuid": "2efb93fb-96a8-42dd-a0ed-3ba24dd2eba6",
+                           "partuuid": null,
+                           "parttype": null,
+                           "tran": null,
+                           "model": null,
+                           "serial": null,
+                           "wwn": null,
+                           "rev": null,
+                           "mountpoints": [
+                               "/var/tmp", "/tmp", "/"
+                           ],
+                           "pkname": "dm-0"
+                        }
+                     ]
+                  }
+               ]
+            }
+         ]
+      }
+   ]
+}

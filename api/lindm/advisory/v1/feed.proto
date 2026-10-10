@@ -83,6 +83,18 @@ message FeedSource {
   ];
   // Exact product servicing stream, never inferred from RPM compatibility.
   string platform_stream = 9 [(buf.validate.field).string.max_len = 128];
+  // OSV ZIP is staged on disk. Defaults to 1 GiB; never a memory allocation.
+  optional uint64 max_archive_bytes = 10 [(buf.validate.field).uint64 = {
+    gte: 1048576
+    lte: 4294967296
+  }];
+  // Reject the refresh when malformed OSV records exceed this count. Default 1000.
+  optional uint32 max_rejected_records = 11 [(buf.validate.field).uint32.lte = 10000];
+  // Sanity ceiling on emitted normalized claims, including duplicates. Default 5M.
+  optional uint64 total_claims_limit = 12 [(buf.validate.field).uint64 = {
+    gte: 1
+    lte: 20000000
+  }];
 }
 
 message Advisory {
@@ -91,7 +103,8 @@ message Advisory {
     max_len: 256
   }];
   repeated string cves = 2 [(buf.validate.field).repeated = {
-    max_items: 1000
+    // Current full Ubuntu kernel export reaches 1416 CVEs (2026-10-10).
+    max_items: 2048
     unique: true
     items: {
       string: {
@@ -121,6 +134,8 @@ message Advisory {
   }];
   // Vendor uncertainty is not equivalent to a known vulnerable version range.
   bool assessment_unknown = 12;
+  // Conservative unknown assessment, not a normalized malformed vendor identity.
+  bool source_record_rejected = 18;
   bool not_affected = 13;
   string platform_release = 14 [(buf.validate.field).string.max_len = 64];
   string platform_stream = 15 [(buf.validate.field).string.max_len = 128];
@@ -143,6 +158,7 @@ message FeedDocument {
   repeated FeedArtifact artifacts = 4;
   // Verified vendor snapshot signing time, where available; bounds freshness.
   google.protobuf.Timestamp snapshot_at = 5;
+  repeated RejectedRecord rejected_records = 6;
 }
 
 message FeedArtifact {
@@ -156,4 +172,13 @@ message FeedArtifact {
 
 message FeedManifest {
   repeated FeedArtifact artifacts = 1 [(buf.validate.field).repeated.max_items = 16];
+  repeated RejectedRecord rejected_records = 2;
+}
+
+message RejectedRecord {
+  string id = 1;
+  string reason = 2;
+  repeated string package_names = 3;
+  // No trustworthy package names: absence cannot establish clean coverage.
+  bool unscoped = 4;
 }

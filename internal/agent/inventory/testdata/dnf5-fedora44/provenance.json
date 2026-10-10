@@ -1,0 +1,100 @@
+{
+  "image_manifest": {
+    "id": "fedora-cloud-44-1.7-aarch64",
+    "distribution": "fedora",
+    "version": "44",
+    "architecture": "aarch64",
+    "edition": "Cloud-Base-Generic",
+    "release": "44-1.7",
+    "imageFilename": "Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2",
+    "imageUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2",
+    "checksumUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-44-1.7-aarch64-CHECKSUM",
+    "keyUrl": "https://fedoraproject.org/fedora.gpg",
+    "sha256": "55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b",
+    "signerFingerprint": "36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6",
+    "imageSizeBytes": "528154624",
+    "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+    "signerProvenanceUrl": "https://fedoraproject.org/security/",
+    "releaseProvenanceUrl": "https://fedoraproject.org/cloud/download/"
+  },
+  "architecture": "aarch64",
+  "native_host": "dgx20",
+  "reference_source": {
+    "repository": "https://github.com/rpm-software-management/dnf5",
+    "tag": "5.4.1.0",
+    "commit": "d413edbb78a9160274b80c8ec23ac9b1c69073fe"
+  },
+  "build_command": "env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration,dnfcapture -c -o /tmp/lindm-dnf-capture-arm64.test ./internal/vmlab",
+  "capture_command": "ssh -T -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 dgx20 'env LINDM_LAB_CONFIG=/home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/lindm-dnf-capture-dgx20.json LINDM_DNF_CAPTURE_MANIFEST=/home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/fedora-44-aarch64.json LINDM_DNF_CAPTURE_OUTPUT=/home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/records-helper LINDM_DNF_CAPTURE_CACHE=/home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/images LINDM_DNF_CAPTURE_HELPER=/home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/platform_dnf.py LINDM_DNF_CAPTURE_FIRMWARE_CODE=/usr/share/AAVMF/AAVMF_CODE.fd LINDM_DNF_CAPTURE_FIRMWARE_VARS=/usr/share/AAVMF/AAVMF_VARS.fd LINDM_DNF_CAPTURE_FIRMWARE_PACKAGE=qemu-efi-aarch64 LINDM_DNF_CAPTURE_FIRMWARE_VERSION=2024.02-2ubuntu0.10 /home/r/lindm-lab/runs/dnf-capture-95IkfXZpIq/lindm-dnf-capture-arm64.test -test.run TestDNFNativeCapture -test.v -test.timeout 50m -host dgx20'",
+  "guest_command_prefix": "env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/home/lindm-lab LANG=C LC_ALL=C",
+  "dnf5_nevra": "dnf5-5.4.1.0-1.fc44.aarch64",
+  "python_binding_nevra": "python3-libdnf5-5.4.1.0-1.fc44.aarch64",
+  "admission": {
+    "namespace": "/home/r/lindm-lab/.leases/dgx20",
+    "max_guests": 4,
+    "vcpu": 2,
+    "memory_mib": 2048,
+    "accelerator": "kvm"
+  },
+  "firmware": {
+    "package": "qemu-efi-aarch64",
+    "version": "2024.02-2ubuntu0.10",
+    "code": "/usr/share/AAVMF/AAVMF_CODE.fd",
+    "vars": "/usr/share/AAVMF/AAVMF_VARS.fd"
+  },
+  "captures": [
+    {
+      "captured_at": "2026-10-10T13:27:18Z",
+      "duration_seconds": 109.18,
+      "files": [
+        "versions.txt",
+        "variables.txt",
+        "repo-config.txt",
+        "cli-capabilities.json"
+      ]
+    },
+    {
+      "captured_at": "2026-10-10T13:29:34Z",
+      "duration_seconds": 14.77,
+      "files": [
+        "collector-helper.json",
+        "python-bindings.jsonl",
+        "repo-info-config-only.json",
+        "repo-list-enabled.json"
+      ]
+    }
+  ],
+  "fixture_metadata": {
+    "collector-helper.json": {
+      "command": "python3 -I - dnf5",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "f585363365f592f1cdf8c735d34fc6af77f4e7ffee6ed5033d7ae4b422eea6b7",
+      "stdin_sha256": "8eb26510d30998901d4830cd342b5eea8a84c06fb67b925faea3f9e7495107c0"
+    },
+    "python-bindings.jsonl": {
+      "command": "python3 -I -",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "660d2a27e0979655eaa80ee5b666f9170b265cb8d22b87af74ce25dc892bb2a8",
+      "stdin_sha256": "de4527b75785a614b854e9bcb71e840de8504d26a09323ae263c23b48fecf3b6"
+    },
+    "repo-info-config-only.json": {
+      "command": "dnf5 --noplugins --cacheonly --disable-repo='*' repo info --all --json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "f920fcb5d0ea47be6e8ea3afb153aeb1935350021c415b57634063675584d7fe"
+    },
+    "repo-list-enabled.json": {
+      "command": "dnf5 --noplugins --cacheonly repo list --enabled --json",
+      "exit_code": 0,
+      "stderr": "",
+      "sha256": "60c1a98e332760d07edd72d163eeff6325f162e07e84af3ba54471a33febe09a"
+    }
+  },
+  "package_changes": "none",
+  "evidence_boundary": "Native interface and collector-helper capture, not full agent or physical qualification. x86_64 capture was canceled while waiting for a lease; no x86_64 result is claimed.",
+  "module_state": "DNF5 module CLI exists but module list --json is unsupported. Stock Python libdnf5 exposes no module namespace and returns an opaque get_module_sack pointer, not a readable state interface. No successful empty module-state observation is claimed.",
+  "repository_metadata": "Plain repo info attempted a metadata fetch and failed guest DNS; cache-only repo info with enabled repositories failed missing cache. These are recorded failures, not acceptable repository-unavailable inventory. Configuration-only repo info with all repositories temporarily disabled for that command succeeds and must be joined with separate enabled repo list.",
+  "credentials": "Fresh pinned image without enrollment or supplied credentials. Native config password/proxy credential fields are empty. Raw Fedora mirror query parameters contain only public repository and architecture selectors. Collector-helper output removes all URL query strings and marks urlsRedacted true."
+}

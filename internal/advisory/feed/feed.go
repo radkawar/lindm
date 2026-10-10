@@ -69,6 +69,8 @@ func New(client *http.Client) (*Client, error) {
 	return &Client{http: &copyClient, validator: validator, signedTrust: signedTrust}, nil
 }
 
+// Fetch materializes a bounded document. Publication of complete OSV ecosystems
+// uses FetchStream instead so normalized memory does not grow with the export.
 func (c *Client) Fetch(ctx context.Context, config *advisoryv1.FeedSource) (*advisoryv1.FeedDocument, error) {
 	if config == nil {
 		return nil, errors.New("feed: source required")
@@ -77,15 +79,19 @@ func (c *Client) Fetch(ctx context.Context, config *advisoryv1.FeedSource) (*adv
 		return nil, fmt.Errorf("feed: validate source: %w", err)
 	}
 	deadline := 2 * time.Minute
-	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
+	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES || config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
 		deadline = 5 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 	switch config.GetFormat() {
-	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES:
-		return c.fetchRedHatSnapshot(ctx, config)
-	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF:
+	case advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP:
+		return c.fetchOSVArchive(ctx, config, nil)
+	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF:
+		return collectBoundedClaims(func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			return c.fetchRedHatStream(ctx, config, emit)
+		})
+	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF:
 		raw, artifact, signedAt, err := c.fetchSignedCSAF(ctx, config)
 		if err != nil {
 			return nil, err
@@ -188,6 +194,8 @@ func httpsURL(u *url.URL) error {
 // Parse is the common online and air-gap parser. RPM_REPOMD imports contain the
 // referenced updateinfo bytes, not a repomd document without its companion data.
 // Custody/authenticity of offline input remains the importing administrator's job.
+// Large OSV publication uses ParseStream; this materialized API retains the
+// bounded document limit for callers that need an in-memory normalized snapshot.
 func Parse(config *advisoryv1.FeedSource, raw io.Reader) (*advisoryv1.FeedDocument, error) {
 	if config == nil || raw == nil {
 		return nil, errors.New("feed: source and reader required")
@@ -198,6 +206,9 @@ func Parse(config *advisoryv1.FeedSource, raw io.Reader) (*advisoryv1.FeedDocume
 	}
 	if err := validator.Validate(config); err != nil {
 		return nil, fmt.Errorf("feed: validate source: %w", err)
+	}
+	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
+		return stageOSVArchive(context.Background(), config, validator, raw, nil)
 	}
 	data, err := boundedRead(raw, maxBytes)
 	if err != nil {

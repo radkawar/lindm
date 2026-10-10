@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/google/uuid"
+
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
 
@@ -24,6 +26,8 @@ type nativeBlock struct {
 	UUID          *string       `json:"uuid"`
 	PartUUID      *string       `json:"partuuid"`
 	PartType      *string       `json:"parttype"`
+	PTType        *string       `json:"pttype"`
+	PTUUID        *string       `json:"ptuuid"`
 	Transport     *string       `json:"tran"`
 	Model         *string       `json:"model"`
 	Serial        *string       `json:"serial"`
@@ -214,6 +218,15 @@ func (g *storageGraph) observation() *inventoryv1.StorageDetails {
 			LuksUuid: observed("", nil), LuksVersion: observed("", nil),
 			LuksKeyslotCount: number(0, fs.ErrNotExist), LuksTokenCount: number(0, fs.ErrNotExist), LuksTokenTypes: observed("", nil),
 			BackingDisk: observed("", nil), RootBacking: boolean(false, fs.ErrNotExist), Nvme: &inventoryv1.ObservedNVMeScope{Status: unavailable},
+			GptDiskGuid: observed("", nil),
+		}
+		if n.Type == "disk" && n.PTType != nil && *n.PTType == "gpt" {
+			identity.GptDiskGuid = nullableText(n.PTUUID)
+			if identity.GptDiskGuid.Status == success {
+				if guid, err := uuid.Parse(identity.GptDiskGuid.Value); err != nil || guid == uuid.Nil {
+					identity.GptDiskGuid = observed("", errInvalid)
+				}
+			}
 		}
 		if rootKnown && topologyComplete {
 			identity.RootBacking = boolean(rootAncestors[name], nil)
@@ -291,6 +304,7 @@ func inheritStorageIdentity(result *inventoryv1.StorageDetails) {
 			{&id.Serial, disk.Identity.Serial}, {&id.Wwn, disk.Identity.Wwn},
 			{&id.Transport, disk.Identity.Transport}, {&id.Model, disk.Identity.Model},
 			{&id.Firmware, disk.Identity.Firmware}, {&id.Eui, disk.Identity.Eui},
+			{&id.GptDiskGuid, disk.Identity.GptDiskGuid},
 		} {
 			if (*field.dst).Status == unavailable {
 				*field.dst = field.src
@@ -309,7 +323,7 @@ func parseStorage(reader io.Reader) *inventoryv1.StorageDetails {
 
 func collectStorage(ctx context.Context, s detailSources) *inventoryv1.StorageDetails {
 	var graph *storageGraph
-	status := s.run(ctx, backend{name: "lsblk", path: "/usr/bin/lsblk", args: []string{"--json", "--bytes", "--tree", "--output", "NAME,KNAME,TYPE,SIZE,FSTYPE,FSVER,UUID,PARTUUID,PARTTYPE,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME"}}, func(reader io.Reader) inventoryv1.CollectionStatus {
+	status := s.run(ctx, backend{name: "lsblk", path: "/usr/bin/lsblk", args: []string{"--json", "--bytes", "--tree", "--output", "NAME,KNAME,TYPE,SIZE,FSTYPE,FSVER,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME"}}, func(reader io.Reader) inventoryv1.CollectionStatus {
 		var parsedStatus inventoryv1.CollectionStatus
 		graph, parsedStatus = readStorageGraph(reader)
 		return parsedStatus

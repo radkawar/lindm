@@ -25,19 +25,21 @@ func Collect(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	return collect(ctx, false)
 }
 
-// CollectForUpload leaves storage explicitly unavailable for replacement by
-// the executor's bounded read-only observation. It avoids repeating privileged
-// native probes from the network process.
+// CollectForUpload leaves storage, hardware serial and firmware unavailable for
+// replacement by the executor's bounded read-only observation. Public CPU facts
+// are collected locally, then replaced by the executor's complete CPU observation
+// (including ARM SMBIOS model evidence). The network process never attempts these
+// privileged probes; Collect retains the standalone caller's own privileges.
 func CollectForUpload(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	return collect(ctx, true)
 }
 
-func collect(ctx context.Context, rootStorage bool) (*inventoryv1.NativeObservation, error) {
-	host, release := collectHost(ctx, readHostFile)
+func collect(ctx context.Context, rootObservation bool) (*inventoryv1.NativeObservation, error) {
+	host, release := collectHost(ctx, readHostFile, rootObservation)
 	host.Details = collectDetails(ctx, detailSources{
 		readFile: readDetailFile, readDir: readDetailDir, stat: os.Stat,
 		run: runNative, sessions: collectSessions, openBlock: openStorageBlock, nvmeScope: actionprovider.ReadNVMeSanitizeScope,
-		rootStorage: rootStorage,
+		snap: collectSnap, rootObservation: rootObservation,
 	})
 	host.FinishedAt = timestamppb.Now()
 	if err := boundHostDetails(host); err != nil {

@@ -1,0 +1,6 @@
+======== Variables: ========
+arch = aarch64
+basearch = aarch64
+releasever = 44
+releasever_major = 
+releasever_minor = 

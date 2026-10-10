@@ -20,7 +20,7 @@ import (
 
 func TestPlatformCanonicalEvidence(t *testing.T) {
 	// Constructed canonical helper output, not a claim of installed RHEL or
-	// live subscription qualification. IDs are evidence; URLs never belong here.
+	// live subscription qualification. Historical ID-only evidence stays valid.
 	data := []byte(`{"cpe":{"status":2},"releaseverLock":{"status":1,"value":"9.4"},"repositories":{"status":1,"ids":["rhel-9-for-x86_64-appstream-eus-rpms","rhel-9-for-x86_64-baseos-eus-rpms"],"backend":"dnf4"}}`)
 	got := parsePlatform(data)
 	if got.ReleaseverLock.Status != success || got.ReleaseverLock.Value != "9.4" || got.Repositories.Status != success || len(got.Repositories.Ids) != 2 || got.Repositories.Backend != "dnf4" {
@@ -33,6 +33,10 @@ func TestPlatformCanonicalEvidence(t *testing.T) {
 		`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":1,"ids":["duplicate","duplicate"],"backend":"dnf4"}}`,
 		`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":1,"ids":[],"backend":""}}`,
 		`{"cpe":{"status":2},"releaseverLock":{"status":1},"repositories":{"status":2}}`,
+		`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":1,"ids":["repo"],"backend":"dnf5","configurations":[{"id":"other"}]}}`,
+		`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":1,"ids":["a","b"],"backend":"dnf5","configurations":[{"id":"a"},{"id":"a"}]}}`,
+		`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":7,"configurations":[{"id":"partial"}]}}`,
+		`{"cpe":{"status":2},"releaseverLock":{"status":2},"releasever":{"status":2,"value":"44"},"repositories":{"status":2}}`,
 	} {
 		got := parsePlatform([]byte(data))
 		if got.Repositories.Status != invalid || len(got.Repositories.Ids) != 0 || got.ReleaseverLock.Status != invalid {
@@ -42,6 +46,10 @@ func TestPlatformCanonicalEvidence(t *testing.T) {
 	zero := parsePlatform([]byte(`{"cpe":{"status":2},"releaseverLock":{"status":2},"repositories":{"status":1,"ids":[],"backend":"dnf4"}}`))
 	if zero.Repositories.Status != success || len(zero.Repositories.Ids) != 0 || zero.ReleaseverLock.Status != unavailable {
 		t.Fatalf("explicit empty native repository list: %v", zero)
+	}
+	modern := parsePlatform([]byte(`{"cpe":{"status":2},"releaseverLock":{"status":2},"releasever":{"status":1,"value":"44"},"repositories":{"status":1,"ids":["updates"],"backend":"dnf5","configurations":[{"id":"updates","metalink":"https://mirrors.example.test/metalink","gpgcheck":true,"gpgKeys":["file:///etc/pki/rpm-gpg/vendor"],"urlsRedacted":true}]}}`))
+	if modern.GetReleasever().GetValue() != "44" || modern.GetReleaseverLock().GetStatus() != unavailable || len(modern.GetRepositories().GetConfigurations()) != 1 || !modern.GetRepositories().GetConfigurations()[0].GetGpgcheck() {
+		t.Fatalf("effective version/configuration lost or guessed as lock: %v", modern)
 	}
 }
 
@@ -73,6 +81,7 @@ func TestPlatformBoundsAndHistoricalAbsence(t *testing.T) {
 
 func TestPlatformFailureDoesNotEraseNativeCPE(t *testing.T) {
 	sources := fixtureDetails(t.TempDir())
+	sources.stat = func(string) (fs.FileInfo, error) { return nil, fs.ErrPermission }
 	sources.readFile = func(path string) ([]byte, error) {
 		if path == "/etc/os-release" {
 			return []byte("ID=rhel\nVERSION_ID=9.4\nCPE_NAME=\"cpe:/o:redhat:enterprise_linux:9::baseos\"\n"), nil
@@ -112,6 +121,18 @@ def rejects(operation, status):
         assert error.status == status
     else:
         raise AssertionError("unbounded or invalid config accepted")
+repository = scope["repository"]
+repo = repository("updates", ["https://user:secret@example.test/repo?token=secret#secret"],
+                  "https://mirrors.example.test/metalink?repo=updates&arch=x86_64",
+                  "", True, ["file:///etc/pki/rpm-gpg/vendor"])
+assert repo["baseUrls"] == ["https://example.test/repo"]
+assert repo["metalink"] == "https://mirrors.example.test/metalink"
+assert repo["urlsRedacted"] and repo["gpgcheck"]
+assert repo["gpgKeys"] == ["file:///etc/pki/rpm-gpg/vendor"]
+assert not repository("base", [], "", "", False, [])["urlsRedacted"]
+rejects(lambda: repository("bad id", [], "", "", True, []), 5)
+rejects(lambda: repository("repo", ["https://example.test"] * 33, "", "", True, []), 6)
+rejects(lambda: repository("repo", ["https://example.test/\nsecret"], "", "", True, []), 5)
 with tempfile.TemporaryDirectory(prefix="lindm-config-reader-") as root:
     config = os.path.join(root, "native.repo")
     with open(config, "wb") as target:
@@ -144,5 +165,25 @@ with tempfile.TemporaryDirectory(prefix="lindm-config-reader-") as root:
 	})
 	if status != success {
 		t.Fatalf("native config file-bound assertions: %s", status)
+	}
+}
+
+func TestDNF5CapturedFedora44Configuration(t *testing.T) {
+	data, err := os.ReadFile("testdata/dnf5-fedora44/collector-helper.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := parsePlatform(data)
+	if got.GetReleasever().GetStatus() != success || got.GetReleasever().GetValue() != "44" || got.GetReleaseverLock().GetStatus() != unavailable {
+		t.Fatalf("effective releasever confused with explicit release lock: %v", got)
+	}
+	repos := got.GetRepositories()
+	if repos.GetStatus() != success || repos.GetBackend() != "dnf5" || strings.Join(repos.GetIds(), ",") != "fedora,fedora-cisco-openh264,updates" || len(repos.GetConfigurations()) != 3 {
+		t.Fatalf("captured enabled repository identity lost: %v", repos)
+	}
+	for i, config := range repos.GetConfigurations() {
+		if config.GetId() != repos.GetIds()[i] || len(config.GetBaseUrls()) != 0 || config.GetMetalink() != "https://mirrors.fedoraproject.org/metalink" || config.GetMirrorlist() != "" || !config.GetGpgcheck() || !config.GetUrlsRedacted() || strings.Join(config.GetGpgKeys(), ",") != "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-aarch64" {
+			t.Fatalf("captured native configuration lost: %v", config)
+		}
 	}
 }

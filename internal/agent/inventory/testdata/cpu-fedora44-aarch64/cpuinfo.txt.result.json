@@ -1,0 +1,5 @@
+{
+  "command": "cat /proc/cpuinfo",
+  "exit_code": 0,
+  "stderr": ""
+}

@@ -89,12 +89,88 @@ func TestListDeviceStorageTargetsPublishedFreshnessAndHistoricalIdentity(t *test
 	}
 }
 
+func TestListDeviceStorageTargetsVirtioFallbackAndDuplicateSerial(t *testing.T) {
+	f := newDeviceActionFixture(t)
+	target, virtio := fixtureVirtioStorage()
+	details := nativeDetailsFixture()
+	details.Storage, details.Tpm = virtio.Storage, virtio.Tpm
+	f.observeStorageDetails(t, details)
+	for _, kind := range []string{"escrow_rotate", "tpm2_bind", "crypto_erase"} {
+		got := f.storageTargets(t, kind)
+		if !got.GetFresh() || got.GetUnavailableReason() != "" || len(got.GetTargets()) != 1 || !proto.Equal(got.GetTargets()[0].GetTarget(), target) {
+			t.Fatalf("published exact fallback missing for %s: %v", kind, got)
+		}
+	}
+	if got := f.storageTargets(t, "sanitize"); len(got.GetTargets()) != 0 {
+		t.Fatalf("fallback weakened sanitize identity: %v", got)
+	}
+	duplicate := proto.CloneOf(details.Storage.Devices[0])
+	duplicate.Name, duplicate.Identity.BackingDisk.Value = "vdb", "vdb"
+	duplicate.Identity.GptDiskGuid.Value = uuid.NewString()
+	details.Storage.Devices = append(details.Storage.Devices, duplicate)
+	f.observeStorageDetails(t, details)
+	got := f.storageTargets(t, "crypto_erase")
+	if !got.GetFresh() || len(got.GetTargets()) != 0 || got.GetUnavailableReason() != "device_action_storage_identity_unavailable" {
+		t.Fatalf("duplicate physical serial remained selectable: %v", got)
+	}
+}
+
+func TestStorageActionFallbackBasisChangesRejectedAtCreateAndStart(t *testing.T) {
+	for _, downgrade := range []bool{false, true} {
+		t.Run(fmt.Sprintf("downgrade=%t", downgrade), func(t *testing.T) {
+			f := newDeviceActionFixture(t)
+			fallback, virtio := fixtureVirtioStorage()
+			details := nativeDetailsFixture()
+			details.Storage = virtio.Storage
+			wwn := proto.CloneOf(fallback)
+			wwn.IdentityBasis, wwn.Wwn = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, "native-wwn"
+			wwn.GptDiskGuid, wwn.DiskSizeBytes = "", 0
+			observeBasis := func(withWWN bool) {
+				for _, device := range details.Storage.Devices {
+					device.Identity.Wwn = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE, "")
+					if withWWN {
+						device.Identity.Wwn = observed(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, wwn.GetWwn())
+					}
+				}
+				f.observeStorageDetails(t, details)
+			}
+			observeBasis(downgrade)
+			approved, changed := fallback, wwn
+			if downgrade {
+				approved, changed = wwn, fallback
+			}
+			mismatch := f.request(storageActionSpecs(f, changed)["escrow_rotate"])
+			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(mismatch)); rpcReason(err) != "device_action_storage_target_mismatch" {
+				t.Fatalf("create accepted a different valid basis: %v", err)
+			}
+			request := f.request(storageActionSpecs(f, approved)["escrow_rotate"])
+			action := f.create(t, request)
+			start, _ := f.startRequest(t, f.work(t))
+			observeBasis(!downgrade)
+			if replay := f.create(t, request); replay.GetActionId() != action.GetActionId() {
+				t.Fatal("basis change replaced durable approved action")
+			}
+			if _, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start)); rpcReason(err) != "device_action_storage_target_mismatch" {
+				t.Fatalf("start silently changed signed identity basis: %v", err)
+			}
+			var grant []byte
+			if err := f.svc.pool.QueryRow(t.Context(), "SELECT start_grant_envelope FROM device_actions WHERE id=$1", action.GetActionId()).Scan(&grant); err != nil || len(grant) != 0 {
+				t.Fatalf("basis mismatch signed start authority: %v", err)
+			}
+			observeBasis(downgrade)
+			if _, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start)); err != nil {
+				t.Fatalf("restored exact basis could not recover: %v", err)
+			}
+		})
+	}
+}
+
 func storageActionSpecs(f *deviceActionFixture, target *agentv1.StorageTarget) map[string]*agentv1.DeviceActionSpec {
 	return map[string]*agentv1.DeviceActionSpec{
 		"escrow_rotate": {Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{Target: target, EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}}},
 		"tpm2_bind":     {Action: &agentv1.DeviceActionSpec_Tpm2Bind{Tpm2Bind: &agentv1.TPM2BindAction{Target: target, Pcrs: []uint32{7}}}},
 		"crypto_erase":  {Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Target: target, Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE}}},
-		"sanitize":      {Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{Wwn: target.GetWwn(), Serial: target.GetSerial(), SizeBytes: target.GetSizeBytes()}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE}}},
+		"sanitize":      {Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: target.GetWwn(), Serial: target.GetSerial(), SizeBytes: target.GetSizeBytes()}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE}}},
 	}
 }
 

@@ -93,9 +93,6 @@ func New(options Options) (*Provider, error) {
 		}
 	}
 	for i, target := range config.GetTargets() {
-		if target.GetTarget().GetWwn() == "" || target.GetTarget().GetSerial() == "" {
-			return nil, fmt.Errorf("%w: complete_media_identity_required", ErrUnsupported)
-		}
 		for _, prior := range config.GetTargets()[:i] {
 			if proto.Equal(prior.GetTarget(), target.GetTarget()) {
 				return nil, fmt.Errorf("%w: duplicate_target", ErrUnsupported)

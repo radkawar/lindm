@@ -191,6 +191,7 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  source_manifest=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_manifest ELSE ''::bytea END,
  snapshot_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.snapshot_at END,
  complete_snapshot=advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.complete_snapshot,
+ advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END
 `
@@ -258,13 +259,37 @@ func (q *Queries) DeleteAdvisoryFindings(ctx context.Context, deviceID uuid.UUID
 	return err
 }
 
-const deleteAdvisoryRecords = `-- name: DeleteAdvisoryRecords :exec
-DELETE FROM advisory_records WHERE feed_id=$1
+const deleteAdvisoryPublicationBatch = `-- name: DeleteAdvisoryPublicationBatch :exec
+DELETE FROM advisory_publication_batch WHERE publication_id=$1
 `
 
-func (q *Queries) DeleteAdvisoryRecords(ctx context.Context, feedID string) error {
-	_, err := q.db.Exec(ctx, deleteAdvisoryRecords, feedID)
+func (q *Queries) DeleteAdvisoryPublicationBatch(ctx context.Context, publicationID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAdvisoryPublicationBatch, publicationID)
 	return err
+}
+
+const deleteInactiveAdvisoryGenerationBatch = `-- name: DeleteInactiveAdvisoryGenerationBatch :execrows
+WITH doomed AS (
+ SELECT r.id FROM advisory_record_generations r
+ WHERE r.feed_id=$1 AND r.generation=$2
+  AND NOT EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.id=$1 AND f.revision=$2)
+ ORDER BY r.id LIMIT 5000
+)
+DELETE FROM advisory_record_generations r USING doomed
+WHERE r.feed_id=$1 AND r.generation=$2 AND r.id=doomed.id
+`
+
+type DeleteInactiveAdvisoryGenerationBatchParams struct {
+	FeedID     string
+	Generation uuid.UUID
+}
+
+func (q *Queries) DeleteInactiveAdvisoryGenerationBatch(ctx context.Context, arg DeleteInactiveAdvisoryGenerationBatchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInactiveAdvisoryGenerationBatch, arg.FeedID, arg.Generation)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const disableAdvisoryFeeds = `-- name: DisableAdvisoryFeeds :exec
@@ -277,17 +302,40 @@ func (q *Queries) DisableAdvisoryFeeds(ctx context.Context, enabledIds []string)
 }
 
 const failAdvisoryFeed = `-- name: FailAdvisoryFeed :exec
-UPDATE advisory_feeds SET attempted_at=$2,error=$3 WHERE id=$1
+UPDATE advisory_feeds SET attempted_at=$2,error=$3
+WHERE id=$1 AND enabled AND config_bytes=$4
+ AND (checked_at IS NULL OR checked_at<=$2)
+ AND (attempted_at IS NULL OR attempted_at<=$2)
 `
 
 type FailAdvisoryFeedParams struct {
 	ID          string
 	AttemptedAt pgtype.Timestamptz
 	Error       string
+	ConfigBytes []byte
 }
 
 func (q *Queries) FailAdvisoryFeed(ctx context.Context, arg FailAdvisoryFeedParams) error {
-	_, err := q.db.Exec(ctx, failAdvisoryFeed, arg.ID, arg.AttemptedAt, arg.Error)
+	_, err := q.db.Exec(ctx, failAdvisoryFeed,
+		arg.ID,
+		arg.AttemptedAt,
+		arg.Error,
+		arg.ConfigBytes,
+	)
+	return err
+}
+
+const finishAdvisoryGeneration = `-- name: FinishAdvisoryGeneration :exec
+DELETE FROM advisory_generation_cleanup WHERE feed_id=$1 AND generation=$2
+`
+
+type FinishAdvisoryGenerationParams struct {
+	FeedID     string
+	Generation uuid.UUID
+}
+
+func (q *Queries) FinishAdvisoryGeneration(ctx context.Context, arg FinishAdvisoryGenerationParams) error {
+	_, err := q.db.Exec(ctx, finishAdvisoryGeneration, arg.FeedID, arg.Generation)
 	return err
 }
 
@@ -534,7 +582,9 @@ func (q *Queries) InsertAdvisoryFinding(ctx context.Context, arg InsertAdvisoryF
 	return err
 }
 
-type InsertAdvisoryRecordsParams struct {
+type InsertAdvisoryPublicationBatchParams struct {
+	PublicationID uuid.UUID
+	Position      int16
 	ID            uuid.UUID
 	FeedID        string
 	AdvisoryID    string
@@ -670,24 +720,72 @@ func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySumma
 }
 
 const listDeviceAdvisoryFindings = `-- name: ListDeviceAdvisoryFindings :many
-SELECT id, device_id, advisory_id, package_name, installed_version, fixed_version, architecture, severity, published_at, cves, feed_id, source_url, evaluated_at, inventory_at, feed_checked_at, feed_expires_at, exception_actor_id, exception_reason, accepted_at, exception_expires_at, state FROM advisory_finding_status WHERE device_id=$1 AND id>$2 ORDER BY id LIMIT $3
+SELECT f.id, f.device_id, f.advisory_id, f.package_name, f.installed_version, f.fixed_version, f.architecture, f.severity, f.published_at, f.cves, f.feed_id, f.source_url, f.evaluated_at, f.inventory_at, f.feed_checked_at, f.feed_expires_at, f.exception_actor_id, f.exception_reason, f.accepted_at, f.exception_expires_at, f.state, EXISTS (
+ SELECT 1 FROM unnest($1::text[]) WITH ORDINALITY AS r(advisory_id,ordinal)
+ WHERE r.advisory_id=f.advisory_id AND (
+  ($2::text[])[r.ordinal]=f.package_name OR EXISTS (
+   SELECT 1 FROM snapshot_packages p
+   WHERE p.snapshot_id=$3::uuid
+    AND p.name=f.package_name AND p.version=f.installed_version
+    AND p.architecture=f.architecture AND p.source_name=($2::text[])[r.ordinal]
+  )
+ )
+) AS source_record_rejected
+FROM advisory_finding_status f
+WHERE f.device_id=$4 AND f.id>$5
+ORDER BY f.id LIMIT $6
 `
 
 type ListDeviceAdvisoryFindingsParams struct {
-	DeviceID uuid.UUID
-	ID       uuid.UUID
-	Limit    int32
+	RejectedIds      []string
+	RejectedPackages []string
+	SnapshotID       *uuid.UUID
+	DeviceID         uuid.UUID
+	ID               uuid.UUID
+	RowLimit         int32
 }
 
-func (q *Queries) ListDeviceAdvisoryFindings(ctx context.Context, arg ListDeviceAdvisoryFindingsParams) ([]AdvisoryFindingStatus, error) {
-	rows, err := q.db.Query(ctx, listDeviceAdvisoryFindings, arg.DeviceID, arg.ID, arg.Limit)
+type ListDeviceAdvisoryFindingsRow struct {
+	ID                   uuid.UUID
+	DeviceID             uuid.UUID
+	AdvisoryID           string
+	PackageName          string
+	InstalledVersion     string
+	FixedVersion         string
+	Architecture         string
+	Severity             string
+	PublishedAt          pgtype.Timestamptz
+	Cves                 []string
+	FeedID               string
+	SourceUrl            string
+	EvaluatedAt          pgtype.Timestamptz
+	InventoryAt          pgtype.Timestamptz
+	FeedCheckedAt        pgtype.Timestamptz
+	FeedExpiresAt        pgtype.Timestamptz
+	ExceptionActorID     *uuid.UUID
+	ExceptionReason      pgtype.Text
+	AcceptedAt           pgtype.Timestamptz
+	ExceptionExpiresAt   pgtype.Timestamptz
+	State                string
+	SourceRecordRejected bool
+}
+
+func (q *Queries) ListDeviceAdvisoryFindings(ctx context.Context, arg ListDeviceAdvisoryFindingsParams) ([]ListDeviceAdvisoryFindingsRow, error) {
+	rows, err := q.db.Query(ctx, listDeviceAdvisoryFindings,
+		arg.RejectedIds,
+		arg.RejectedPackages,
+		arg.SnapshotID,
+		arg.DeviceID,
+		arg.ID,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AdvisoryFindingStatus{}
+	items := []ListDeviceAdvisoryFindingsRow{}
 	for rows.Next() {
-		var i AdvisoryFindingStatus
+		var i ListDeviceAdvisoryFindingsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.DeviceID,
@@ -710,6 +808,7 @@ func (q *Queries) ListDeviceAdvisoryFindings(ctx context.Context, arg ListDevice
 			&i.AcceptedAt,
 			&i.ExceptionExpiresAt,
 			&i.State,
+			&i.SourceRecordRejected,
 		); err != nil {
 			return nil, err
 		}
@@ -759,6 +858,39 @@ func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed
 	return i, err
 }
 
+const lockAdvisoryGenerationCleanup = `-- name: LockAdvisoryGenerationCleanup :one
+SELECT feed_id,generation FROM advisory_generation_cleanup
+WHERE cleanup_after<=clock_timestamp()
+ORDER BY cleanup_after,feed_id,generation LIMIT 1 FOR UPDATE SKIP LOCKED
+`
+
+type LockAdvisoryGenerationCleanupRow struct {
+	FeedID     string
+	Generation uuid.UUID
+}
+
+func (q *Queries) LockAdvisoryGenerationCleanup(ctx context.Context) (LockAdvisoryGenerationCleanupRow, error) {
+	row := q.db.QueryRow(ctx, lockAdvisoryGenerationCleanup)
+	var i LockAdvisoryGenerationCleanupRow
+	err := row.Scan(&i.FeedID, &i.Generation)
+	return i, err
+}
+
+const mergeAdvisoryPublicationBatch = `-- name: MergeAdvisoryPublicationBatch :execrows
+INSERT INTO advisory_record_generations(generation,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes)
+SELECT publication_id,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes
+FROM advisory_publication_batch WHERE publication_id=$1
+ON CONFLICT(feed_id,generation,id) DO NOTHING
+`
+
+func (q *Queries) MergeAdvisoryPublicationBatch(ctx context.Context, publicationID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, mergeAdvisoryPublicationBatch, publicationID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const pruneAdvisoryExceptionRequests = `-- name: PruneAdvisoryExceptionRequests :exec
 DELETE FROM advisory_exception_requests WHERE (actor_id,request_id) IN
  (SELECT actor_id,request_id FROM advisory_exception_requests
@@ -781,9 +913,10 @@ func (q *Queries) PruneAdvisoryExceptions(ctx context.Context) error {
 	return err
 }
 
-const publishAdvisoryFeed = `-- name: PublishAdvisoryFeed :exec
+const publishAdvisoryFeed = `-- name: PublishAdvisoryFeed :execrows
 UPDATE advisory_feeds SET revision=$2,source_sha256=$3,checked_at=$4,expires_at=$5,
- attempted_at=$4,error='',advisory_count=$6,complete_snapshot=$7,source_manifest=$8,snapshot_at=$9 WHERE id=$1
+ attempted_at=$4,error='',advisory_count=$6,complete_snapshot=$7,source_manifest=$8,snapshot_at=$9
+WHERE id=$1 AND enabled AND config_bytes=$10 AND (checked_at IS NULL OR checked_at<=$4)
 `
 
 type PublishAdvisoryFeedParams struct {
@@ -796,10 +929,11 @@ type PublishAdvisoryFeedParams struct {
 	CompleteSnapshot bool
 	SourceManifest   []byte
 	SnapshotAt       pgtype.Timestamptz
+	ConfigBytes      []byte
 }
 
-func (q *Queries) PublishAdvisoryFeed(ctx context.Context, arg PublishAdvisoryFeedParams) error {
-	_, err := q.db.Exec(ctx, publishAdvisoryFeed,
+func (q *Queries) PublishAdvisoryFeed(ctx context.Context, arg PublishAdvisoryFeedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, publishAdvisoryFeed,
 		arg.ID,
 		arg.Revision,
 		arg.SourceSha256,
@@ -809,7 +943,55 @@ func (q *Queries) PublishAdvisoryFeed(ctx context.Context, arg PublishAdvisoryFe
 		arg.CompleteSnapshot,
 		arg.SourceManifest,
 		arg.SnapshotAt,
+		arg.ConfigBytes,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const queueAdvisoryGenerationCleanup = `-- name: QueueAdvisoryGenerationCleanup :exec
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
+VALUES($1,$2,clock_timestamp())
+ON CONFLICT(feed_id,generation) DO UPDATE SET cleanup_after=EXCLUDED.cleanup_after
+`
+
+type QueueAdvisoryGenerationCleanupParams struct {
+	FeedID     string
+	Generation uuid.UUID
+}
+
+func (q *Queries) QueueAdvisoryGenerationCleanup(ctx context.Context, arg QueueAdvisoryGenerationCleanupParams) error {
+	_, err := q.db.Exec(ctx, queueAdvisoryGenerationCleanup, arg.FeedID, arg.Generation)
+	return err
+}
+
+const renewAdvisoryGeneration = `-- name: RenewAdvisoryGeneration :execrows
+UPDATE advisory_generation_cleanup SET cleanup_after=clock_timestamp()+interval '10 minutes'
+WHERE generation=$1 AND cleanup_after>clock_timestamp()
+`
+
+func (q *Queries) RenewAdvisoryGeneration(ctx context.Context, generation uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, renewAdvisoryGeneration, generation)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const startAdvisoryGeneration = `-- name: StartAdvisoryGeneration :exec
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
+VALUES($1,$2,clock_timestamp()+interval '10 minutes')
+`
+
+type StartAdvisoryGenerationParams struct {
+	FeedID     string
+	Generation uuid.UUID
+}
+
+func (q *Queries) StartAdvisoryGeneration(ctx context.Context, arg StartAdvisoryGenerationParams) error {
+	_, err := q.db.Exec(ctx, startAdvisoryGeneration, arg.FeedID, arg.Generation)
 	return err
 }
 

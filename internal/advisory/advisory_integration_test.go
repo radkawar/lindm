@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -299,6 +300,166 @@ func TestUncoveredMultilibArchitectureIsUnknown(t *testing.T) {
 	}
 	if len(out.Findings) != 0 || out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Freshness.Reason != "package_architecture_uncovered" {
 		t.Fatalf("x86_64 repository cleared an uncovered multilib package: %v", out)
+	}
+}
+
+func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	before, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Controlled parser output deliberately shares an ID with a valid notice
+	// for another package. Rejection labels must bind package identity too.
+	rejected := &advisoryv1.RejectedRecord{Id: doc.Advisories[0].Id, Reason: "advisory: malformed package identity", PackageNames: []string{"openssl"}}
+	doc.RejectedRecords = []*advisoryv1.RejectedRecord{rejected}
+	for _, sourcePackage := range []bool{false, true} {
+		doc.Advisories = append(doc.Advisories, &advisoryv1.Advisory{Id: rejected.Id, PackageName: "openssl", SourcePackage: sourcePackage, SourceUrl: source.Url, AssessmentUnknown: true, SourceRecordRejected: true})
+	}
+	// The same raw digest with new rejection metadata must invalidate old
+	// evaluations and publish the synthetic records atomically.
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	after, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Revision == after.Revision {
+		t.Fatal("changed rejection metadata reused the old feed revision")
+	}
+	// Reconstruct the service to prove this is a persisted manifest projection,
+	// not transient parser state.
+	s, err = New(t.Context(), pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.Feeds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Feeds) != 1 || !status.Feeds[0].Fresh || len(status.Feeds[0].RejectedRecords) != 1 || !proto.Equal(status.Feeds[0].RejectedRecords[0], rejected) {
+		t.Fatalf("scoped rejection metadata or current coverage lost: %v", status)
+	}
+	id := seedInventory(t, pool, "fedora", "44",
+		&inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"},
+		&inventoryv1.Package{Name: "openssl", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm", SourceName: "openssl", SourceVersion: "1:3.0.7-27.el9_4"},
+		&inventoryv1.Package{Name: "openssl-libs", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm", SourceName: "openssl", SourceVersion: "1:3.0.7-27.el9_4"})
+	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}
+	found := make(map[string]*adminv1.AdvisoryFinding)
+	for {
+		out, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Freshness.Reason != "source_record_rejected" || len(out.Findings) != 1 {
+			t.Fatalf("rejected source exposure was not unknown: %v", out)
+		}
+		finding := out.Findings[0]
+		if _, exists := found[finding.PackageName]; exists {
+			t.Fatalf("duplicate finding across rejection pages: %v", finding)
+		}
+		found[finding.PackageName] = finding
+		if finding.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
+			t.Fatalf("device uncertainty did not dominate finding state: %v", finding)
+		}
+		if finding.PackageName == "sudo" {
+			if finding.Reason != "" || finding.FixedVersion == "" {
+				t.Fatalf("valid unrelated finding mislabeled as rejected: %v", finding)
+			}
+		} else if finding.Reason != "source_record_rejected" || finding.FixedVersion != "" {
+			t.Fatalf("rejected binary/source mapping lost its reason: %v", finding)
+		}
+		if out.NextPageToken == "" {
+			break
+		}
+		request.PageToken = out.NextPageToken
+	}
+	if len(found) != 3 {
+		t.Fatalf("lost implicated source or binary package: %v", found)
+	}
+	if _, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, false, []byte("[]")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("rejected findings escaped device scope: %v", err)
+	}
+	actor := uuid.New()
+	mustExec(t, t.Context(), pool, "INSERT INTO principals(id,issuer,subject) VALUES($1,'https://advisory.test',$2)", actor, uuid.NewString())
+	acceptFinding(t, s, actor, &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: id.String(), FindingId: found["openssl"].Id, Reason: "Documented temporary source uncertainty", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))})
+	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range out.Findings {
+		if finding.PackageName == "openssl" && (finding.Exception == nil || finding.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || finding.Reason != "source_record_rejected") {
+			t.Fatalf("risk acceptance overrode rejected-source uncertainty: %v", finding)
+		}
+	}
+	unrelated := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	unaffected, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: unrelated.String()}, true, []byte("[]"))
+	if err != nil || unaffected.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR || len(unaffected.GetFindings()) != 0 {
+		t.Fatalf("scoped rejection contaminated unrelated device: %v %v", unaffected, err)
+	}
+	summary, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, true, []byte("[]"))
+	if err != nil || summary.GetUnknownDevices() != 1 || summary.GetEvaluatedDevices() != 1 {
+		t.Fatalf("rejected exposure became evaluated fleet coverage: %v %v", summary, err)
+	}
+	hidden, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, false, []byte("[]"))
+	if err != nil || hidden.GetUnknownDevices() != 0 || hidden.GetEvaluatedDevices() != 0 || len(hidden.GetAdvisories()) != 0 {
+		t.Fatalf("rejected exposure leaked through scoped summary: %v %v", hidden, err)
+	}
+}
+
+func TestAdvisoryUnscopedRejectionAndManifestCapacity(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	doc.RejectedRecords = []*advisoryv1.RejectedRecord{{Id: "malformed-record", Reason: "advisory: package identity unavailable", Unscoped: true}}
+	// Publication must not assert complete coverage even if its caller leaves
+	// CompleteSnapshot set on a record with no trustworthy package scope.
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.Feeds(t.Context())
+	if err != nil || len(status.GetFeeds()) != 1 || status.Feeds[0].Fresh || len(status.Feeds[0].RejectedRecords) != 1 {
+		t.Fatalf("unscoped rejection asserted complete coverage: %v %v", status, err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_partial_coverage" || len(out.GetFindings()) != 0 {
+		t.Fatalf("unscoped rejection cleared a device: %v %v", out, err)
+	}
+	before, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc.RejectedRecords[0].Reason = strings.Repeat("x", 64<<10)
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); !errors.Is(err, ErrCapacity) {
+		t.Fatalf("oversized manifest did not fail before SQL publication: %v", err)
+	}
+	after, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Revision != after.Revision || !bytes.Equal(before.SourceManifest, after.SourceManifest) || before.ExpiresAt != after.ExpiresAt {
+		t.Fatal("oversized manifest replaced or renewed the last valid publication")
+	}
+}
+
+func TestAdvisoryRejectedRecordLegacyAssessmentRemainsUnknown(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	// Simulate the fields an older server understands. The new rejection flag
+	// and manifest are not needed to preserve the existing unknown assessment.
+	doc.Advisories = []*advisoryv1.Advisory{{Id: "rejected-record", PackageName: "openssl", SourceUrl: source.Url, AssessmentUnknown: true}}
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "openssl", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm"})
+	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "vendor_assessment_unknown" || len(out.GetFindings()) != 1 || out.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
+		t.Fatalf("legacy assessment fields failed closed compatibility: %v %v", out, err)
 	}
 }
 

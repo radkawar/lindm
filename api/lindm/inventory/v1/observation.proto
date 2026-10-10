@@ -45,6 +45,9 @@ enum CollectionStatus {
   COLLECTION_STATUS_INVALID_OUTPUT = 5;
   COLLECTION_STATUS_CAPACITY_EXCEEDED = 6;
   COLLECTION_STATUS_NATIVE_COMMAND_FAILURE = 7;
+  // Native per-field context proves that the property does not apply.
+  // Unlike UNAVAILABLE, this is not missing or failed evidence.
+  COLLECTION_STATUS_NOT_APPLICABLE = 8;
 }
 
 message ObservedString {
@@ -80,12 +83,32 @@ message HostObservation {
   };
 }
 
+// Read-only executor projection. No private key material or action authority.
+// Every field is required so incomplete projections cannot masquerade as evidence.
+message RootObservation {
+  google.protobuf.Timestamp started_at = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp finished_at = 2 [(buf.validate.field).required = true];
+  string boot_id = 3 [(buf.validate.field).string.uuid = true];
+  ObservedString hardware_serial = 4 [(buf.validate.field).required = true];
+  FirmwareDetails firmware = 5 [(buf.validate.field).required = true];
+  StorageDetails storage = 6 [(buf.validate.field).required = true];
+  CpuDetails cpu = 7 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "root_observation.time_order"
+    message: "collection finish must not precede its start"
+    expression: "this.finished_at >= this.started_at"
+  };
+}
+
 message PackageObservation {
   google.protobuf.Timestamp started_at = 1 [(buf.validate.field).required = true];
   google.protobuf.Timestamp finished_at = 2 [(buf.validate.field).required = true];
   CollectionStatus status = 3 [(buf.validate.field).enum = {
     defined_only: true
-    not_in: [0]
+    not_in: [
+      0,
+      8
+    ]
   }];
   string backend = 4 [(buf.validate.field).string.max_len = 64];
   repeated Package packages = 5 [(buf.validate.field).repeated.max_items = 100000];
@@ -175,6 +198,14 @@ message CpuDetails {
   ObservedUint64 logical_cores = 2 [(buf.validate.field).required = true];
   ObservedUint64 physical_cores = 3 [(buf.validate.field).required = true];
   ObservedString x86_64_level = 4 [(buf.validate.field).required = true];
+  // Absent only on historical observations. Identifies the native source, not
+  // a guessed CPU brand or a distribution-based hardware classification.
+  ObservedString model_source = 5;
+  option (buf.validate.message).cel = {
+    id: "cpu.model_source"
+    message: "current CPU model source matches its observation status and identifies a native interface"
+    expression: "!has(this.model_source) || (this.model_source.status == this.model.status && (this.model_source.status != 1 || this.model_source.value in ['proc_cpuinfo', 'smbios_type4', 'arm_midr_procfs', 'arm_midr_sysfs']))"
+  };
 }
 
 message MemoryDetails {
@@ -218,6 +249,9 @@ message StorageIdentity {
   ObservedString backing_disk = 15 [(buf.validate.field).required = true];
   ObservedBool root_backing = 16 [(buf.validate.field).required = true];
   ObservedNVMeScope nvme = 17 [(buf.validate.field).required = true];
+  // Native GPT PTUUID of the unique backing disk, never a partition UUID.
+  // Absent on historical observations; unavailable without a unique GPT disk.
+  ObservedString gpt_disk_guid = 18;
 }
 
 message ObservedNVMeScope {
@@ -327,9 +361,15 @@ message ActiveSession {
   ObservedString user_name = 1 [(buf.validate.field).required = true];
   ObservedString session_class = 2 [(buf.validate.field).required = true];
   ObservedString session_type = 3 [(buf.validate.field).required = true];
-  // No seat (for example an SSH session) is UNAVAILABLE, not an invented seat.
+  // Absent seats on proven non-graphical sessions are NOT_APPLICABLE.
+  // Missing seats on local graphical user sessions remain UNAVAILABLE.
   ObservedString seat = 4 [(buf.validate.field).required = true];
   ObservedBool remote = 5 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "session.seat_applicability"
+    message: "a non-applicable seat requires successful native non-graphical session context"
+    expression: "this.seat.status != 8 || (this.session_class.status == 1 && this.session_type.status == 1 && this.remote.status == 1 && (this.session_class.value in ['manager', 'background'] || this.remote.value || this.session_type.value == 'tty'))"
+  };
 }
 
 message ActiveSessions {
@@ -454,6 +494,37 @@ message ModuleObservation {
   };
 }
 
+// Native enabled configuration, not evidence of network reachability or entitlement.
+// URL userinfo, queries and fragments are omitted because they may contain secrets.
+message RepositoryConfiguration {
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  repeated string base_urls = 2 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 4096
+      }
+    }
+  }];
+  string metalink = 3 [(buf.validate.field).string.max_len = 4096];
+  string mirrorlist = 4 [(buf.validate.field).string.max_len = 4096];
+  bool gpgcheck = 5;
+  repeated string gpg_keys = 6 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 4096
+      }
+    }
+  }];
+  bool urls_redacted = 7;
+}
+
 message RepositoryObservation {
   CollectionStatus status = 1 [(buf.validate.field).enum = {
     defined_only: true
@@ -470,10 +541,17 @@ message RepositoryObservation {
     }
   }];
   string backend = 3 [(buf.validate.field).string.max_len = 64];
+  // Absent on historical observations. Current collectors populate one per ID.
+  repeated RepositoryConfiguration configurations = 4 [(buf.validate.field).repeated.max_items = 256];
   option (buf.validate.message).cel = {
     id: "repositories.failure"
     message: "successful repositories identify their native backend; failures carry no partial evidence"
-    expression: "this.status == 1 ? this.backend != '' : (this.ids.size() == 0 && this.backend == '')"
+    expression: "this.status == 1 ? this.backend != '' : (this.ids.size() == 0 && this.backend == '' && this.configurations.size() == 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "repositories.configurations"
+    message: "repository configurations uniquely match the enabled IDs"
+    expression: "this.configurations.size() == 0 || (this.configurations.size() == this.ids.size() && this.configurations.all(r, r.id in this.ids && this.configurations.filter(other, other.id == r.id).size() == 1))"
   };
 }
 
@@ -481,4 +559,7 @@ message PlatformDetails {
   ObservedString cpe = 1 [(buf.validate.field).required = true];
   ObservedString releasever_lock = 2 [(buf.validate.field).required = true];
   RepositoryObservation repositories = 3 [(buf.validate.field).required = true];
+  // Effective native variable after RPM detection and configured overrides.
+  // Unlike releasever_lock, this is not evidence of an explicit release pin.
+  ObservedString releasever = 4;
 }

@@ -221,6 +221,9 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		// This changes the disposable guest only; it installs nothing.
 		"runcmd": []any{[]string{"sh", "-c", "for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat \"$unit\" >/dev/null 2>&1; then systemctl mask --now \"$unit\" || exit; fi; done"}},
 	}
+	if h.stockAcceptance {
+		delete(config, "runcmd")
+	}
 	if enrollment != nil {
 		enrollment.apply(config)
 	}

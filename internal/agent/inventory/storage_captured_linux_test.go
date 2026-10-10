@@ -112,3 +112,35 @@ func TestCapturedEncryptedStorageIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestCapturedTransientObserverRetainsEncryptedRootTopology(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "storage", "ubuntu24-transient-lsblk.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := parseStorage(bytes.NewReader(data))
+	if got.Status != success || len(got.Devices) != 6 {
+		t.Fatalf("incomplete encrypted root topology: %v", got)
+	}
+	byName := make(map[string]*inventoryv1.BlockDevice)
+	for _, device := range got.Devices {
+		byName[device.Name] = device
+	}
+	for _, name := range []string{"vda", "vda3", "dm_crypt-0", "ubuntu--vg-ubuntu--lv"} {
+		device := byName[name]
+		if device == nil || device.Identity.RootBacking.Status != success || !device.Identity.RootBacking.Value {
+			t.Fatalf("lost root ancestor %s: %v", name, device)
+		}
+	}
+	container := byName["vda3"]
+	if container.Identity.LuksUuid.Value != "f393f8b5-f6bf-41a0-81fd-736cf10b6d9d" || container.Identity.LuksVersion.Value != "2" {
+		t.Fatal("lost observed LUKS identity")
+	}
+	root := byName["ubuntu--vg-ubuntu--lv"]
+	if root.Mountpoint.Value != "/" || root.Parent.Value != "dm_crypt-0" || root.Encryption.Value != "inherited-dm-crypt" {
+		t.Fatalf("lost LVM root encryption ancestry: %v", root)
+	}
+	if err := protovalidate.Validate(got); err != nil {
+		t.Fatal(err)
+	}
+}

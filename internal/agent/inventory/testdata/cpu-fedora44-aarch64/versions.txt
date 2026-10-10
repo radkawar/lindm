@@ -1,0 +1,5 @@
+kernel-core-6.19.10-300.fc44.aarch64
+util-linux-2.41.3-12.fc44.aarch64
+package dmidecode is not installed
+fedora-release-common-44-17.noarch
+Linux localhost.localdomain 6.19.10-300.fc44.aarch64 #1 SMP PREEMPT_DYNAMIC Wed Mar 25 17:45:07 UTC 2026 aarch64 GNU/Linux

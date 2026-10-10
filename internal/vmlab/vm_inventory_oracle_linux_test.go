@@ -4,6 +4,7 @@ package vmlab
 
 import (
 	"math"
+	"os"
 	"strings"
 	"testing"
 
@@ -92,9 +93,110 @@ func TestCPUTruthSupportsFlatAndHierarchicalJSON(t *testing.T) {
 	}
 }
 
+func TestCPUMIDRTruthKeepsUnknownIdentity(t *testing.T) {
+	for _, test := range []struct{ implementer, part, native, want string }{
+		{"0x41", "0xd4f", "Neoverse-V2", "Neoverse-V2"},
+		{"0x41", "0xfff", "0xfff", "ARM implementer 0x41 part 0xfff"},
+		{"0xfe", "0x123", "unknown", "ARM implementer 0xfe part 0x123"},
+		{"0xfe", "0x123", "A future native model", "ARM implementer 0xfe part 0x123"},
+	} {
+		got, err := cpuMIDRTruth(test.implementer, test.part, test.native)
+		if err != nil || got != test.want {
+			t.Fatalf("MIDR model = %q, %v; want %q", got, err, test.want)
+		}
+	}
+	for _, pair := range [][2]string{{"0x100", "0xd4f"}, {"0x41", "0x1000"}, {"", "0xd4f"}, {"0x41", "bad"}} {
+		if _, err := cpuMIDRTruth(pair[0], pair[1], "Neoverse-V2"); err == nil {
+			t.Fatal("accepted malformed MIDR identity")
+		}
+	}
+}
+
+func TestCPUSMBIOSTruthDecodesProcessorVersion(t *testing.T) {
+	record := make([]byte, 0x19)
+	record[0], record[1], record[0x10], record[0x18] = 4, 0x19, 2, 0x41
+	record = append(record, []byte("Vendor\x00Guest ARM Processor\x00\x00")...)
+	got, err := parseCPUTableTruth(record)
+	if err != nil || got != "Guest ARM Processor" {
+		t.Fatalf("SMBIOS model = %q, %v", got, err)
+	}
+	if got := parseCPUVersionTruth("Processor Information\n\tManufacturer: Vendor\n\tVersion: Guest ARM Processor\n"); got != "Guest ARM Processor" {
+		t.Fatalf("dmidecode model = %q", got)
+	}
+	record[0x10] = 3
+	for _, malformed := range [][]byte{record, {4, 3, 0, 0}, {4, 0x11, 0, 0}, {4, 4, 0, 0, 'x'}} {
+		if _, err := parseCPUTableTruth(malformed); err == nil {
+			t.Fatal("accepted malformed SMBIOS processor truth")
+		}
+	}
+}
+
+func TestCPUX86TruthPreservesProcModel(t *testing.T) {
+	cpuinfo := []byte("processor : 0\nmodel name : Exact native model\nflags : sse sse2\n\nprocessor : 1\nmodel name : Other model\n")
+	model, source, err := (vmInventoryOracle{}).cpuModel(map[string]string{"Architecture": "x86_64", "Model name": "enriched model"}, cpuinfo)
+	if err != nil || model.Value != "Exact native model" || source.Value != "proc_cpuinfo" || model.Status != source.Status {
+		t.Fatalf("x86 model/source = %v/%v, %v", model, source, err)
+	}
+	model, source, err = (vmInventoryOracle{}).cpuModel(map[string]string{"Architecture": "x86_64"}, nil)
+	if err != nil || model.Status != truthUnavailable || source.Status != truthUnavailable {
+		t.Fatalf("missing x86 model/source = %v/%v, %v", model, source, err)
+	}
+}
+
+func TestCPUCapturedFedoraARMTruth(t *testing.T) {
+	const fixture = "../agent/inventory/testdata/cpu-fedora44-aarch64/"
+	read := func(name string) []byte {
+		t.Helper()
+		data, err := os.ReadFile(fixture + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	firmware, err := parseCPUTableTruth(read("DMI.bin"))
+	if err != nil || firmware != "virt-8.2" {
+		t.Fatalf("captured preferred firmware model = %q, %v", firmware, err)
+	}
+	proc := parseCPUProcTruth(read("cpuinfo.txt"))
+	native, err := parseCPUTruth(read("lscpu.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	model, err := cpuMIDRTruth(proc["CPU implementer"], proc["CPU part"], native["Model name"])
+	if err != nil || model != "Cortex-X925" || proc["CPU implementer"] != "0x41" || proc["CPU part"] != "0xd85" {
+		t.Fatalf("captured MIDR fallback = %q, %v", model, err)
+	}
+	if strings.TrimSpace(string(read("midr_el1.txt"))) != "0x00000000410fd851" {
+		t.Fatal("captured sysfs MIDR changed")
+	}
+}
+
+func TestCPUSMBIOSTruthPreservesMixedSockets(t *testing.T) {
+	record := func(model string) []byte {
+		data := make([]byte, 0x19)
+		data[0], data[1], data[0x10], data[0x18] = 4, 0x19, 1, 0x41
+		return append(data, []byte(model+"\x00\x00")...)
+	}
+	data := append(record("Socket B"), record("Socket A")...)
+	if got, err := parseCPUTableTruth(data); err != nil || got != "Socket A; Socket B" {
+		t.Fatalf("mixed socket model = %q, %v", got, err)
+	}
+	data = append(data, record("Unknown")...)
+	if got, err := parseCPUTableTruth(data); err != nil || got != "" {
+		t.Fatalf("partial populated socket identity accepted: %q, %v", got, err)
+	}
+	text := "Processor Information\n\tVersion: Socket B\n\tStatus: Populated, Enabled\n\nProcessor Information\n\tVersion: Socket A\n\tStatus: Populated, Enabled\n"
+	if got := parseCPUVersionTruth(text); got != "Socket A; Socket B" {
+		t.Fatalf("mixed dmidecode socket model = %q", got)
+	}
+	if got := parseCPUVersionTruth(text + "\nProcessor Information\n\tVersion: Unknown\n\tStatus: Populated, Enabled\n"); got != "" {
+		t.Fatalf("partial dmidecode identity accepted: %q", got)
+	}
+}
+
 func nativeDetailsFixture() *inventoryv1.NativeDetails {
 	return &inventoryv1.NativeDetails{
-		Cpu:               &inventoryv1.CpuDetails{Model: truthString("private-model"), LogicalCores: truthUint(4), PhysicalCores: truthUint(2), X86_64Level: truthString("x86-64-v3")},
+		Cpu:               &inventoryv1.CpuDetails{Model: truthString("private-model"), ModelSource: truthString("proc_cpuinfo"), LogicalCores: truthUint(4), PhysicalCores: truthUint(2), X86_64Level: truthString("x86-64-v3")},
 		Memory:            &inventoryv1.MemoryDetails{TotalBytes: truthUint(2 << 30), AvailableBytes: truthUint(1 << 30), SwapTotalBytes: truthUint(0)},
 		Storage:           &inventoryv1.StorageDetails{Status: truthSuccess, Devices: []*inventoryv1.BlockDevice{{Name: "private-disk", Type: truthString("part"), Parent: truthString("vda"), SizeBytes: truthUint(10 << 30), Filesystem: truthString("ext4"), Mountpoint: truthString("/"), Encryption: truthString("none")}}},
 		Network:           &inventoryv1.NetworkDetails{Status: truthSuccess, Interfaces: []*inventoryv1.NetworkInterface{{Name: "private-interface", Mac: truthString("02:00:00:00:00:01"), Link: truthString("UP"), Addresses: &inventoryv1.ObservedStrings{Status: truthSuccess, Values: []string{"192.0.2.1/24", "2001:db8::1/64"}}}}},
@@ -115,6 +217,9 @@ func TestNativeDetailsComparisonChecksValuesAndStatuses(t *testing.T) {
 		mutate func(*inventoryv1.NativeDetails)
 	}{
 		{"cpu", func(d *inventoryv1.NativeDetails) { d.Cpu.PhysicalCores.Value++ }},
+		{"CPU model", func(d *inventoryv1.NativeDetails) { d.Cpu.Model.Value = "different-model" }},
+		{"CPU model source", func(d *inventoryv1.NativeDetails) { d.Cpu.ModelSource.Value = "arm_midr_procfs" }},
+		{"missing CPU model source", func(d *inventoryv1.NativeDetails) { d.Cpu.ModelSource = nil }},
 		{"feature level", func(d *inventoryv1.NativeDetails) { d.Cpu.X86_64Level.Value = "x86-64-v2" }},
 		{"memory", func(d *inventoryv1.NativeDetails) { d.Memory.TotalBytes.Value++ }},
 		{"disk", func(d *inventoryv1.NativeDetails) { d.Storage.Devices[0].SizeBytes.Value++ }},
@@ -134,7 +239,7 @@ func TestNativeDetailsComparisonChecksValuesAndStatuses(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			before, after, actual := nativeDetailsFixture(), nativeDetailsFixture(), nativeDetailsFixture()
 			test.mutate(actual)
-			err := compareVMDetails(before, after, actual)
+			err := compareVMDetails("ubuntu", "x86_64", before, after, actual)
 			if err == nil {
 				t.Fatal("accepted mismatched native detail")
 			}
@@ -152,16 +257,16 @@ func TestNativeDetailsComparisonAllowsOnlyBoundedChanges(t *testing.T) {
 	actual.Memory.AvailableBytes.Value += 64 << 20
 	actual.LocalUsers.Users[0], actual.LocalUsers.Users[1] = actual.LocalUsers.Users[1], actual.LocalUsers.Users[0]
 	actual.Network.Interfaces[0].Addresses.Values[0], actual.Network.Interfaces[0].Addresses.Values[1] = actual.Network.Interfaces[0].Addresses.Values[1], actual.Network.Interfaces[0].Addresses.Values[0]
-	if err := compareVMDetails(before, after, actual); err != nil {
+	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.UptimeSeconds.Value = 83
-	if err := compareVMDetails(before, after, actual); err == nil {
+	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
 		t.Fatal("accepted out-of-window uptime")
 	}
 	actual.UptimeSeconds.Value = 70
 	after.KernelModuleCount.Value++
-	if err := compareVMDetails(before, after, actual); err == nil || !strings.Contains(err.Error(), "no collector verdict") {
+	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil || !strings.Contains(err.Error(), "no collector verdict") {
 		t.Fatalf("unstable truth = %v", err)
 	}
 	if truthWithin(math.MaxUint64, 0, 1, 2) || truthWithin(0, math.MaxUint64-1, math.MaxUint64, 2) {
@@ -210,11 +315,11 @@ func TestNativeApplicationsCompareArchitectureAndVersion(t *testing.T) {
 		}}
 	}
 	actual.Flatpak.Applications[0], actual.Flatpak.Applications[1] = actual.Flatpak.Applications[1], actual.Flatpak.Applications[0]
-	if err := compareVMDetails(before, after, actual); err != nil {
+	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err != nil {
 		t.Fatal(err)
 	}
 	actual.Flatpak.Applications[0].Version.Value = "wrong"
-	if err := compareVMDetails(before, after, actual); err == nil {
+	if err := compareVMDetails("ubuntu", "x86_64", before, after, actual); err == nil {
 		t.Fatal("accepted wrong application version")
 	}
 }
@@ -224,7 +329,7 @@ func TestNativeStatusMismatchIdentifiesEnumsWithoutGuestValues(t *testing.T) {
 	before.Snap.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_NATIVE_COMMAND_FAILURE
 	after.Snap.Status = before.Snap.Status
 	actual.Snap.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT
-	err := compareVMDetails(before, after, actual)
+	err := compareVMDetails("ubuntu", "x86_64", before, after, actual)
 	if err == nil || !strings.Contains(err.Error(), "COLLECTION_STATUS_NATIVE_COMMAND_FAILURE") || !strings.Contains(err.Error(), "COLLECTION_STATUS_INVALID_OUTPUT") {
 		t.Fatalf("status mismatch omitted enum evidence: %v", err)
 	}

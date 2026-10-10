@@ -32,7 +32,7 @@ func TestActionNativeTargetsInheritExactParentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(targets) != 2 || targets[0].Identity.GetSerial() != "lindm-lab-0" || targets[0].Identity.GetWwn() != "0x5000000000000001" || targets[0].Identity.GetSizeBytes() != 1000000000 || targets[0].Identity.GetLuksUuid() == "" || targets[1].Identity.GetLuksUuid() != "" {
+	if len(targets) != 2 || targets[0].Identity.GetIdentityBasis() != agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL || targets[1].Identity.GetIdentityBasis() != agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL || targets[0].Identity.GetSerial() != "lindm-lab-0" || targets[0].Identity.GetWwn() != "0x5000000000000001" || targets[0].Identity.GetSizeBytes() != 1000000000 || targets[0].Identity.GetLuksUuid() == "" || targets[1].Identity.GetLuksUuid() != "" {
 		t.Fatalf("wrong native identity selection: %+v", targets)
 	}
 	if _, err := actionNativeTargets([]byte(`{"blockdevices":[{"path":"/dev/vda","type":"disk","size":1000,"serial":"no-wwn"}]}`)); err == nil {
@@ -41,7 +41,7 @@ func TestActionNativeTargetsInheritExactParentIdentity(t *testing.T) {
 }
 
 func TestActionWholeDiskPathFollowsIdentityAcrossRenumbering(t *testing.T) {
-	target := &agentv1.StorageTarget{Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 4 << 30}
+	target := &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 4 << 30}
 	root := actionBlockNode{Path: "/dev/nvme1n1", Type: "disk", WWN: target.Wwn, Serial: target.Serial, Size: target.SizeBytes}
 	state := actionBlockNode{Path: "/dev/nvme0n1", Type: "disk", WWN: "state-wwn", Serial: "state-serial", Size: 1 << 30, Filesystem: "ext4"}
 	encode := func(nodes ...actionBlockNode) []byte {
@@ -57,6 +57,12 @@ func TestActionWholeDiskPathFollowsIdentityAcrossRenumbering(t *testing.T) {
 		t.Fatalf("renumbered approved root not resolved: %q %v", path, err)
 	}
 	for _, change := range []func(*agentv1.StorageTarget){
+		func(target *agentv1.StorageTarget) {
+			target.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_UNSPECIFIED
+		},
+		func(target *agentv1.StorageTarget) {
+			target.IdentityBasis = agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS
+		},
 		func(target *agentv1.StorageTarget) { target.Wwn = "changed" },
 		func(target *agentv1.StorageTarget) { target.Serial = "changed" },
 		func(target *agentv1.StorageTarget) { target.SizeBytes++ },
@@ -96,7 +102,7 @@ func TestActionHeaderSlotsRequireExactUniqueUUID(t *testing.T) {
 }
 
 func TestLiveEraseResultsRequireEveryFrozenTargetAndNativeProof(t *testing.T) {
-	targets := []*agentv1.StorageTarget{{Wwn: "root", Serial: "root", SizeBytes: 4096, LuksUuid: "root-uuid"}, {Wwn: "data", Serial: "data", SizeBytes: 8192, LuksUuid: "data-uuid"}}
+	targets := []*agentv1.StorageTarget{{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "root", Serial: "root", SizeBytes: 4096, LuksUuid: "root-uuid"}, {IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, Wwn: "data", Serial: "data", SizeBytes: 8192, LuksUuid: "data-uuid"}}
 	root := &agentv1.CryptoEraseTargetResult{Target: targets[0], HeaderBytes: 4096, NativeLuksErase: true, RawZeroVerified: true, MetadataAbsent: true}
 	data := &agentv1.CryptoEraseTargetResult{Target: targets[1], HeaderBytes: 4096, NativeLuksErase: true, RawZeroVerified: true, MetadataAbsent: true}
 	if err := validateLiveEraseResults(targets, []*agentv1.CryptoEraseTargetResult{data, root}); err != nil {

@@ -85,6 +85,55 @@ message ServerConfig {
   ProfilingConfig profiling = 19;
   // Public signed repository; private signing keys are outside this directory.
   ReleaseRepositoryConfig release_repository = 20;
+  // Optional native installation repositories advertised by the enrollment console.
+  EnrollmentInstructionsConfig enrollment_instructions = 21;
+}
+
+// Absent repositories are explicitly not configured, never inferred from a host.
+message EnrollmentInstructionsConfig {
+  EnrollmentAPTRepositoryConfig apt_repository = 1;
+  EnrollmentDNFRepositoryConfig dnf_repository = 2;
+}
+
+message EnrollmentAPTRepositoryConfig {
+  string base_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  // Full uppercase OpenPGP v4 or v6 fingerprint, not a short key ID.
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  string suite = 4 [
+    (buf.validate.field).string.max_len = 128,
+    (buf.validate.field).string.pattern = "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+  ];
+  repeated string components = 5 [
+    (buf.validate.field).repeated = {
+      min_items: 1
+      max_items: 16
+      unique: true
+    },
+    (buf.validate.field).repeated.items.string = {
+      max_len: 128
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    }
+  ];
+}
+
+// Both package and repository metadata signatures must be published and checked.
+message EnrollmentDNFRepositoryConfig {
+  string base_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_url = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string signing_key_fingerprint = 3 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
 }
 
 message ReleaseRepositoryConfig {

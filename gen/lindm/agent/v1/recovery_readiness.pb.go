@@ -197,12 +197,11 @@ func (*GetRecoveryReadinessRequest) Descriptor() ([]byte, []int) {
 type GetRecoveryReadinessResponse struct {
 	state       protoimpl.MessageState        `protogen:"open.v1"`
 	Observation *RecoveryReadinessObservation `protobuf:"bytes,1,opt,name=observation,proto3" json:"observation,omitempty"`
-	// Canonical inventory.StorageDetails protobuf from the same root observer.
+	// Canonical inventory.RootObservation protobuf from the same root observer.
 	// Kept opaque here to avoid the inventory-to-agent schema import cycle.
-	StorageDetails    []byte                 `protobuf:"bytes,2,opt,name=storage_details,json=storageDetails,proto3" json:"storage_details,omitempty"`
-	StorageObservedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=storage_observed_at,json=storageObservedAt,proto3" json:"storage_observed_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	RootObservation []byte `protobuf:"bytes,4,opt,name=root_observation,json=rootObservation,proto3" json:"root_observation,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetRecoveryReadinessResponse) Reset() {
@@ -242,16 +241,9 @@ func (x *GetRecoveryReadinessResponse) GetObservation() *RecoveryReadinessObserv
 	return nil
 }
 
-func (x *GetRecoveryReadinessResponse) GetStorageDetails() []byte {
+func (x *GetRecoveryReadinessResponse) GetRootObservation() []byte {
 	if x != nil {
-		return x.StorageDetails
-	}
-	return nil
-}
-
-func (x *GetRecoveryReadinessResponse) GetStorageObservedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.StorageObservedAt
+		return x.RootObservation
 	}
 	return nil
 }
@@ -282,11 +274,10 @@ const file_lindm_agent_v1_recovery_readiness_proto_rawDesc = "" +
 	"\x1frecovery_readiness.availability\x12Ravailable observations need native identity and capability; failures need a reason\x1a\xc7\x01this.available ? (this.boot_id != '' && this.reason == '' && this.esp_uuid != '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && this.uki_capable) : this.reason != ''B\x1a\n" +
 	"\x18_configured_image_sha256B\x18\n" +
 	"\x16_configured_image_size\"\x1d\n" +
-	"\x1bGetRecoveryReadinessRequest\"\x80\x02\n" +
+	"\x1bGetRecoveryReadinessRequest\"\xe0\x01\n" +
 	"\x1cGetRecoveryReadinessResponse\x12V\n" +
-	"\vobservation\x18\x01 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x124\n" +
-	"\x0fstorage_details\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x04R\x0estorageDetails\x12R\n" +
-	"\x13storage_observed_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x11storageObservedAtB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\vobservation\x18\x01 \x01(\v2,.lindm.agent.v1.RecoveryReadinessObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x126\n" +
+	"\x10root_observation\x18\x04 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x05R\x0frootObservationJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x0fstorage_detailsR\x13storage_observed_atB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_recovery_readiness_proto_rawDescOnce sync.Once
@@ -310,12 +301,11 @@ var file_lindm_agent_v1_recovery_readiness_proto_goTypes = []any{
 var file_lindm_agent_v1_recovery_readiness_proto_depIdxs = []int32{
 	3, // 0: lindm.agent.v1.RecoveryReadinessObservation.observed_at:type_name -> google.protobuf.Timestamp
 	0, // 1: lindm.agent.v1.GetRecoveryReadinessResponse.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	3, // 2: lindm.agent.v1.GetRecoveryReadinessResponse.storage_observed_at:type_name -> google.protobuf.Timestamp
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_recovery_readiness_proto_init() }

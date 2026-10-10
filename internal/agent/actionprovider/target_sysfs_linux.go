@@ -17,10 +17,11 @@ type sysfsIdentityValue struct {
 }
 
 type sysfsBlockIdentity struct {
-	WWID       sysfsIdentityValue `json:"wwid"`
-	DeviceWWID sysfsIdentityValue `json:"device_wwid"`
-	Serial     sysfsIdentityValue `json:"device_serial"`
-	VPDSerial  sysfsIdentityValue `json:"vpd_pg80_serial"`
+	WWID        sysfsIdentityValue `json:"wwid"`
+	DeviceWWID  sysfsIdentityValue `json:"device_wwid"`
+	Serial      sysfsIdentityValue `json:"device_serial"`
+	VPDSerial   sysfsIdentityValue `json:"vpd_pg80_serial"`
+	BlockSerial sysfsIdentityValue `json:"serial"`
 }
 
 func nativeBlockIdentity(device string) sysfsBlockIdentity {
@@ -40,6 +41,12 @@ func resolveBlockIdentity(node *blockNode, identity sysfsBlockIdentity) string {
 		wwn = deviceWWN
 	}
 	serial := identity.Serial.Value
+	if identity.BlockSerial.Value != "" {
+		if serial != "" && serial != identity.BlockSerial.Value {
+			return "native_serial_conflict"
+		}
+		serial = identity.BlockSerial.Value
+	}
 	if identity.VPDSerial.Value != "" {
 		if serial != "" && serial != identity.VPDSerial.Value {
 			return "native_serial_conflict"
@@ -135,10 +142,11 @@ func readSysfsBlockIdentity(device string, readFile func(string) ([]byte, error)
 		return sysfsIdentityValue{Value: value}
 	}
 	return sysfsBlockIdentity{
-		WWID:       read("wwid", false),
-		DeviceWWID: read("device/wwid", false),
-		Serial:     read("device/serial", false),
-		VPDSerial:  read("device/vpd_pg80", true),
+		WWID:        read("wwid", false),
+		DeviceWWID:  read("device/wwid", false),
+		Serial:      read("device/serial", false),
+		VPDSerial:   read("device/vpd_pg80", true),
+		BlockSerial: read("serial", false),
 	}
 }
 
@@ -170,5 +178,6 @@ func (identity sysfsBlockIdentity) diagnostic() *sysfsBlockIdentity {
 	identity.DeviceWWID.Value = diagnosticIdentityText(identity.DeviceWWID.Value)
 	identity.Serial.Value = diagnosticIdentityText(identity.Serial.Value)
 	identity.VPDSerial.Value = diagnosticIdentityText(identity.VPDSerial.Value)
+	identity.BlockSerial.Value = diagnosticIdentityText(identity.BlockSerial.Value)
 	return &identity
 }

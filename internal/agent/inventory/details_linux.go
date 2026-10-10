@@ -27,14 +27,15 @@ const maxDetailFile = 4 << 20
 // same bounded native runner as package inventory. Reads never access shadow,
 // home directories, process environments, or login history.
 type detailSources struct {
-	readFile    func(string) ([]byte, error)
-	readDir     func(string) ([]fs.DirEntry, error)
-	stat        func(string) (fs.FileInfo, error)
-	run         nativeRunner
-	openBlock   func(string) (*os.File, error)
-	nvmeScope   func(context.Context, *os.File, *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error)
-	sessions    func(context.Context) *inventoryv1.SessionCounts
-	rootStorage bool
+	readFile        func(string) ([]byte, error)
+	readDir         func(string) ([]fs.DirEntry, error)
+	stat            func(string) (fs.FileInfo, error)
+	run             nativeRunner
+	openBlock       func(string) (*os.File, error)
+	nvmeScope       func(context.Context, *os.File, *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error)
+	sessions        func(context.Context) *inventoryv1.SessionCounts
+	snap            func(context.Context) *inventoryv1.ApplicationDetails
+	rootObservation bool
 }
 
 func readDetailFile(path string) (_ []byte, err error) {
@@ -140,18 +141,23 @@ func collectDetails(ctx context.Context, s detailSources) *inventoryv1.NativeDet
 	modules, modulesErr := s.file(ctx, "/proc/modules")
 	uptime, uptimeErr := s.file(ctx, "/proc/uptime")
 	stat, statErr := s.file(ctx, "/proc/stat")
-	storage := &inventoryv1.StorageDetails{Status: unavailable}
-	if !s.rootStorage {
+	var storage *inventoryv1.StorageDetails
+	var firmware *inventoryv1.FirmwareDetails
+	if s.rootObservation {
+		storage = &inventoryv1.StorageDetails{Status: unavailable}
+		firmware = &inventoryv1.FirmwareDetails{Mode: observed("", nil), SecureBoot: observed("", nil)}
+	} else {
 		storage = collectStorage(ctx, s)
+		firmware = collectFirmware(ctx, s)
 	}
 	result := &inventoryv1.NativeDetails{
 		Cpu: collectCPU(ctx, s, cpu, cpuErr), Memory: parseMemory(memory, memoryErr),
 		Storage: storage, Network: collectNetwork(ctx, s.run),
-		Firmware: collectFirmware(ctx, s), Tpm: collectTPM(ctx, s), Power: collectPower(ctx, s),
+		Firmware: firmware, Tpm: collectTPM(ctx, s), Power: collectPower(ctx, s),
 		Sessions: s.sessions(ctx), LocalUsers: parseLocalUsers(users, usersErr),
 		KernelModuleCount: parseModuleCount(modules, modulesErr),
 		UptimeSeconds:     parseUptime(uptime, uptimeErr), BootTimeUnixSeconds: parseBootTime(stat, statErr),
-		Backends: collectBackends(ctx, s), Flatpak: collectApplications(ctx, s.run, "flatpak"), Snap: collectApplications(ctx, s.run, "snap"),
+		Backends: collectBackends(ctx, s), Flatpak: collectFlatpak(ctx, s.run), Snap: s.snap(ctx),
 		Platform: collectPlatform(ctx, s),
 	}
 	markDefaultRoutes(ctx, s, result.Network)

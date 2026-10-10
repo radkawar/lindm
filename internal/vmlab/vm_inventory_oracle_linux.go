@@ -3,10 +3,12 @@
 package vmlab
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -302,26 +304,17 @@ func (o vmInventoryOracle) cpu() (*inventoryv1.CpuDetails, error) {
 	if err != nil {
 		return nil, err
 	}
-	// lscpu can enrich ARM model names from sysfs. The inventory contract
-	// reports models only when cpuinfo exposes them; prove that source
-	// capability independently rather than inventing a marketing model.
-	capabilities, err := o.command(`test -r /proc/cpuinfo; for key in 'model name|Processor' 'flags'; do if grep -Eq "^($key)[[:space:]]*:" /proc/cpuinfo; then printf '1\n'; else printf '0\n'; fi; done`)
+	cpuinfo, err := o.command("cat /proc/cpuinfo")
 	if err != nil {
 		return nil, err
 	}
-	capabilityLines, err := truthLines(capabilities)
-	if err != nil || len(capabilityLines) != 2 {
-		return nil, errors.New("invalid CPU source capability truth")
-	}
-	model := truthString("")
-	if capabilityLines[0] == "1" {
-		model = truthString(fields["Model name"])
-		if model.Status != truthSuccess {
-			return nil, errors.New("CPU model truth unavailable from lscpu")
-		}
+	procFields := parseCPUProcTruth(cpuinfo)
+	model, source, err := o.cpuModel(fields, cpuinfo)
+	if err != nil {
+		return nil, err
 	}
 	level := truthString("")
-	if fields["Architecture"] == "x86_64" && capabilityLines[1] == "1" {
+	if fields["Architecture"] == "x86_64" && procFields["flags"] != "" {
 		level = truthString(truthX86Level(fields["Flags"]))
 		if level.Status != truthSuccess {
 			return nil, errors.New("x86 CPU flags truth unavailable from lscpu")
@@ -368,7 +361,241 @@ func (o vmInventoryOracle) cpu() (*inventoryv1.CpuDetails, error) {
 	if physical.Status == truthSuccess {
 		physical.Value = uint64(len(cores))
 	}
-	return &inventoryv1.CpuDetails{Model: model, LogicalCores: truthUint(logical), PhysicalCores: physical, X86_64Level: level}, nil
+	return &inventoryv1.CpuDetails{Model: model, ModelSource: source, LogicalCores: truthUint(logical), PhysicalCores: physical, X86_64Level: level}, nil
+}
+
+func parseCPUProcTruth(data []byte) map[string]string {
+	fields := make(map[string]string)
+	for _, line := range strings.Split(string(data), "\n") {
+		key, value, ok := strings.Cut(line, ":")
+		if ok {
+			key = strings.TrimSpace(key)
+			if _, exists := fields[key]; !exists {
+				fields[key] = strings.TrimSpace(value)
+			}
+		}
+	}
+	return fields
+}
+
+func (o vmInventoryOracle) cpuModel(fields map[string]string, cpuinfo []byte) (*inventoryv1.ObservedString, *inventoryv1.ObservedString, error) {
+	procFields := parseCPUProcTruth(cpuinfo)
+	model, source := "", ""
+	architecture := fields["Architecture"]
+	if architecture == "aarch64" || strings.HasPrefix(architecture, "arm") {
+		// Prefer the firmware processor identity. dmidecode is an independent
+		// decoder; kernels without that tool still expose the SMBIOS table.
+		data, err := o.command(`if ! test -e /sys/firmware/dmi/tables/DMI; then printf 'absent\n'; elif command -v dmidecode >/dev/null 2>&1; then printf 'dmidecode\n'; sudo -n dmidecode --type 4; else printf 'sysfs\n'; sudo -n cat /sys/firmware/dmi/tables/DMI; fi`)
+		if err != nil {
+			return nil, nil, err
+		}
+		kind, body, ok := bytes.Cut(data, []byte{'\n'})
+		if !ok {
+			return nil, nil, errors.New("truncated CPU firmware truth")
+		}
+		switch string(kind) {
+		case "dmidecode":
+			model = parseCPUVersionTruth(string(body))
+		case "sysfs":
+			model, err = parseCPUTableTruth(body)
+			if err != nil {
+				return nil, nil, err
+			}
+		case "absent":
+		default:
+			return nil, nil, errors.New("invalid CPU firmware truth")
+		}
+		if model != "" {
+			source = "smbios_type4"
+		} else {
+			model, source, err = o.armMIDRModel(cpuinfo)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	} else {
+		model = procFields["model name"]
+		if model == "" {
+			model = procFields["Processor"]
+		}
+		source = "proc_cpuinfo"
+	}
+	if model == "" {
+		return truthString(""), truthString(""), nil
+	}
+	return truthString(model), truthString(source), nil
+}
+
+func (o vmInventoryOracle) armMIDRModel(cpuinfo []byte) (string, string, error) {
+	data, err := o.command("lscpu --json --extended=CPU,MODELNAME --online")
+	if err != nil {
+		return "", "", err
+	}
+	var native struct {
+		CPUs []struct {
+			CPU   uint64 `json:"cpu"`
+			Model string `json:"modelname"`
+		} `json:"cpus"`
+	}
+	if err := json.Unmarshal(data, &native); err != nil {
+		return "", "", errors.New("invalid per-CPU model truth")
+	}
+	proc := make(map[uint64]map[string]string)
+	for _, stanza := range strings.Split(strings.TrimSpace(string(cpuinfo)), "\n\n") {
+		fields := parseCPUProcTruth([]byte(stanza))
+		id, err := strconv.ParseUint(fields["processor"], 10, 32)
+		if err != nil {
+			return "", "", errors.New("invalid proc CPU index truth")
+		}
+		proc[id] = fields
+	}
+	var models []string
+	source := "arm_midr_procfs"
+	for _, cpu := range native.CPUs {
+		fields, ok := proc[cpu.CPU]
+		if !ok {
+			return "", "", errors.New("missing proc CPU truth")
+		}
+		implementer, part := fields["CPU implementer"], fields["CPU part"]
+		if implementer == "" && part == "" {
+			path := fmt.Sprintf("/sys/devices/system/cpu/cpu%d/regs/identification/midr_el1", cpu.CPU)
+			data, err := o.command("if test -e " + path + "; then printf 'success\\n'; cat " + path + "; else printf 'unavailable\\n'; fi")
+			if err != nil {
+				return "", "", err
+			}
+			value, status, err := parseTruthStatus(data)
+			if err != nil {
+				return "", "", err
+			}
+			if status != truthSuccess {
+				return "", "", nil
+			}
+			midr, err := strconv.ParseUint(strings.TrimSpace(string(value)), 0, 64)
+			if err != nil || midr > 0xffffffff {
+				return "", "", errors.New("invalid CPU sysfs MIDR truth")
+			}
+			implementer, part = fmt.Sprintf("0x%x", (midr>>24)&0xff), fmt.Sprintf("0x%x", (midr>>4)&0xfff)
+			source = "arm_midr_sysfs"
+		}
+		model, err := cpuMIDRTruth(implementer, part, cpu.Model)
+		if err != nil {
+			return "", "", err
+		}
+		models = append(models, model)
+	}
+	return joinCPUTruthModels(models), source, nil
+}
+
+func joinCPUTruthModels(models []string) string {
+	slices.Sort(models)
+	return strings.Join(slices.Compact(models), "; ")
+}
+
+func cpuMIDRTruth(implementer, part, nativeModel string) (string, error) {
+	i, err := strconv.ParseUint(implementer, 0, 8)
+	if err != nil {
+		return "", errors.New("invalid CPU implementer truth")
+	}
+	p, err := strconv.ParseUint(part, 0, 12)
+	if err != nil {
+		return "", errors.New("invalid CPU part truth")
+	}
+	nativeModel = strings.TrimSpace(nativeModel)
+	if cpuMIDRNativeNameSupported(i, p) && nativeModel != "" && !strings.HasPrefix(nativeModel, "0x") && !strings.EqualFold(nativeModel, "unknown") {
+		return nativeModel, nil
+	}
+	return fmt.Sprintf("ARM implementer 0x%02x part 0x%03x", i, p), nil
+}
+
+// The supported identity boundary is pinned to util-linux v2.41,
+// caa26876bc75041833c9644491cc2670d623f750, sys-utils/lscpu-arm.c.
+// Names come from the guest's independent native lscpu, not the agent's table.
+func cpuMIDRNativeNameSupported(implementer, part uint64) bool {
+	if implementer != 0x41 {
+		return false
+	}
+	switch part {
+	case 0xd03, 0xd04, 0xd05, 0xd07, 0xd08, 0xd09, 0xd0a, 0xd0b,
+		0xd0c, 0xd0d, 0xd40, 0xd41, 0xd44, 0xd46, 0xd47, 0xd48,
+		0xd49, 0xd4a, 0xd4d, 0xd4e, 0xd4f, 0xd80, 0xd81, 0xd82,
+		0xd84, 0xd85, 0xd87, 0xd8e:
+		return true
+	}
+	return false
+}
+
+func cpuVersionTruth(value string) string {
+	value = strings.TrimSpace(value)
+	switch strings.ToLower(value) {
+	case "", "unknown", "not specified", "not available", "not applicable", "to be filled by o.e.m.", "to be filled by oem", "default string", "none", "n/a":
+		return ""
+	}
+	return value
+}
+
+func parseCPUVersionTruth(data string) string {
+	var models []string
+	for _, record := range strings.Split(data, "\n\n") {
+		if !strings.Contains(record, "Processor Information") || strings.Contains(record, "Status: Unpopulated") {
+			continue
+		}
+		model := ""
+		for _, line := range strings.Split(record, "\n") {
+			key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+			if ok && key == "Version" {
+				model = cpuVersionTruth(value)
+			}
+		}
+		if model == "" {
+			return ""
+		}
+		models = append(models, model)
+	}
+	return joinCPUTruthModels(models)
+}
+
+func parseCPUTableTruth(data []byte) (string, error) {
+	var models []string
+	incomplete := false
+	for len(data) != 0 {
+		if len(data) < 4 || int(data[1]) < 4 || int(data[1]) > len(data) {
+			return "", errors.New("invalid SMBIOS record truth")
+		}
+		length := int(data[1])
+		end := bytes.Index(data[length:], []byte{0, 0})
+		if end < 0 {
+			return "", errors.New("unterminated SMBIOS strings truth")
+		}
+		if data[0] == 4 {
+			if length <= 0x18 {
+				return "", errors.New("truncated SMBIOS processor truth")
+			}
+			if data[0x18]&0x40 != 0 {
+				index := int(data[0x10])
+				model := ""
+				if index != 0 {
+					values := bytes.Split(data[length:length+end], []byte{0})
+					if index > len(values) || len(values[index-1]) == 0 {
+						return "", errors.New("invalid SMBIOS processor version index truth")
+					}
+					model = cpuVersionTruth(string(values[index-1]))
+				}
+				if model == "" {
+					incomplete = true
+				} else {
+					models = append(models, model)
+				}
+			}
+		}
+		if data[0] == 127 {
+			break
+		}
+		data = data[length+end+2:]
+	}
+	if incomplete {
+		return "", nil
+	}
+	return joinCPUTruthModels(models), nil
 }
 
 func truthX86Level(flags string) string {
@@ -431,7 +658,7 @@ func parseTruthMemory(data []byte) (*inventoryv1.MemoryDetails, error) {
 
 // Pairs is already a flat, shell-safe presentation; lsblk rejects combining
 // --pairs with --list (or --raw/--tree).
-const storageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE"
+const storageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,MOUNTPOINTS,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE,PTTYPE,PTUUID"
 
 func (o vmInventoryOracle) storage() (*inventoryv1.StorageDetails, error) {
 	data, status, err := o.optional("lsblk", storageTruthCommand)
@@ -464,15 +691,24 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 		if err != nil {
 			return nil, err
 		}
-		if (len(fields) != 6 && len(fields) != 16) || fields["NAME"] == "" || fields["TYPE"] == "" {
+		if (len(fields) != 6 && len(fields) != 19) || fields["NAME"] == "" || fields["TYPE"] == "" {
 			return nil, errors.New("incomplete lsblk truth")
 		}
 		size, err := parseTruthUint(fields["SIZE"])
 		if err != nil {
 			return nil, err
 		}
-		device := &inventoryv1.BlockDevice{Name: fields["NAME"], Type: truthString(fields["TYPE"]), Parent: truthString(fields["PKNAME"]), SizeBytes: truthUint(size), Filesystem: truthString(fields["FSTYPE"]), Mountpoint: truthString(fields["MOUNTPOINT"]), Encryption: truthString("")}
-		if len(fields) == 16 {
+		// MOUNTPOINT is only one mount, not necessarily the root mount.
+		// In particular, Fedora Btrfs subvolumes also mount the root device at
+		// /var. Preserve the selected native mount except when "/" is present.
+		mountpoint := fields["MOUNTPOINT"]
+		for mount := range strings.SplitSeq(fields["MOUNTPOINTS"], "\n") {
+			if mount != "" && (mountpoint == "" || mount == "/") {
+				mountpoint = mount
+			}
+		}
+		device := &inventoryv1.BlockDevice{Name: fields["NAME"], Type: truthString(fields["TYPE"]), Parent: truthString(fields["PKNAME"]), SizeBytes: truthUint(size), Filesystem: truthString(fields["FSTYPE"]), Mountpoint: truthString(mountpoint), Encryption: truthString("")}
+		if len(fields) == 19 {
 			device.Identity = storageTruthIdentity(fields)
 		}
 		if _, duplicate := byName[device.Name]; duplicate {
@@ -825,12 +1061,21 @@ func (o vmInventoryOracle) applications(backend string) (*inventoryv1.Applicatio
 
 // compareVMDetails checks every schema field. Repeated identities are compared as
 // multisets, not by count or native presentation order. Only explicitly changing
-// measurements have a tolerance; all status transitions remain exact.
-func compareVMDetails(before, after, actual *inventoryv1.NativeDetails) error {
+// measurements have a tolerance; matching errors are never a passing verdict.
+func compareVMDetails(distro, architecture string, before, after, actual *inventoryv1.NativeDetails) error {
 	if before == nil || after == nil || actual == nil {
 		return errors.New("native inventory details omitted")
 	}
-	return compareTruthMessage(before.ProtoReflect(), after.ProtoReflect(), actual.ProtoReflect(), "details", before.GetMemory().GetTotalBytes().GetValue())
+	if err := compareTruthMessage(before.ProtoReflect(), after.ProtoReflect(), actual.ProtoReflect(), "details", before.GetMemory().GetTotalBytes().GetValue()); err != nil {
+		return err
+	}
+	for _, details := range []*inventoryv1.NativeDetails{before, after, actual} {
+		context := inventoryHealthContext{distro: distro, host: &inventoryv1.HostObservation{Architecture: truthString(architecture)}, details: details}
+		if err := checkInventoryMessage(details.ProtoReflect(), "host.details", context, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func compareTruthMessage(before, after, actual protoreflect.Message, path string, memory uint64) error {
@@ -917,6 +1162,9 @@ func truthListIndex(value protoreflect.Value, list protoreflect.List, used []boo
 			continue
 		}
 		identity := value.Message().Descriptor().Fields().ByName("name")
+		if value.Message().Descriptor().FullName() == "lindm.inventory.v1.RepositoryConfiguration" {
+			identity = value.Message().Descriptor().Fields().ByName("id")
+		}
 		if identity != nil && value.Message().Get(identity).String() == list.Get(i).Message().Get(identity).String() {
 			if value.Message().Descriptor().FullName() == "lindm.inventory.v1.Application" {
 				architecture := value.Message().Descriptor().Fields().ByName("architecture")
