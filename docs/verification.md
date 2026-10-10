@@ -2804,7 +2804,8 @@ of previously successful bespoke scenario records. It owns an isolated real
 local-auth server/database and fresh browser accounts. `make check-web` runs the
 same owner enrollment, fresh sign-in and one-time-code/provisioning-token UI journey
 without claiming native or vendor-feed qualification. Both commands fail on an
-unqualified browser engine; an unsupported virtual authenticator is not a pass.
+unqualified browser engine; an unsupported virtual authenticator is not a pass,
+except for the WebKit upstream prerequisite below.
 Install the recorded browser prerequisites with `make browser-baseline`.
 
 For independent native/UI diagnosis while a vendor feed defect is being repaired,
@@ -2817,9 +2818,12 @@ the mandatory full default run or silently reuse an older feed publication.
 The pinned Playwright Chromium lane uses its native CDP virtual authenticator.
 Firefox uses pinned Firefox/geckodriver and W3C WebDriver virtual authenticators.
 WebKitGTK uses the packaged WebKitWebDriver/MiniBrowser under Xvfb. Its exact
-package version and capabilities are recorded: if that build lacks virtual
-authenticator support, the Origin/Referrer and password phases still run, but
-the passkey phase is explicitly unqualified and the release gate remains failed.
+package version and capabilities are recorded. When that build answers the
+virtual-authenticator command with WebDriver `unknown command`, the passkey phase
+is recorded as `passkeyPhase.reason: unqualified_upstream_prerequisite` and does
+not fail the release gate. This is release policy for an upstream gap, not a
+passkey qualification. The WebKit Origin/Referrer regression step remains
+mandatory and must pass first; any other WebKit authenticator failure still fails.
 No JavaScript replacement for `navigator.credentials`, forged session, intercepted
 RPC or authenticated-cookie import counts as a login.
 
@@ -2838,6 +2842,8 @@ be copied into the public report. `lab acceptance` performs that separation.
 
 The native gate boots the pinned Ubuntu 24.04 and Fedora 44 cloud images, then the
 vendor-installer Ubuntu encrypted image, on virtio-blk without an invented WWN.
+The encrypted guest has an swtpm TPM 2.0 so the escrow-rotation, encrypted-wipe
+and TPM-bind target pickers are each observable; no TPM unlock is enrolled.
 Only ordinary authenticated agent installation and documented enrollment commands
 precede inventory collection. Stock background package units are not masked to
 make this gate green. Each VM retains its host lease through owned teardown, runs
@@ -2912,6 +2918,35 @@ not 403, after its Origin check. This catches the Safari `Origin: null` defect
 class without claiming WebAuthn. The packaged WebKit build still lacks
 `PublicKeyCredential` and native virtual-authenticator support, so its passkey
 phase and the overall release gate remain explicitly unqualified.
+
+The `-skip-feeds` diagnostic `~/acceptance-skipfeeds-20261010T150048Z` (not a
+release pass) and three later full runs exposed and corrected further harness
+defects: the session oracle ignored the not-applicable seat rule; the LUKS and
+NVMe oracles probed without the inspected agent's root privilege; the snap oracle
+treated `snap list`'s informational no-snaps stderr as a command failure; the
+guest forwarded the device listener at its allocated port instead of the signed
+bundle's `https://localhost:18445` device origin, so the agent never synchronized;
+the profile picker read options before the popup mounted and per-guest profiles
+shared one label; the fixture had no execution signing or admitted delegation, so
+an accepted assignment never became device work; and the encrypted guest lacked
+the TPM that makes the TPM-bind target observable. Inventory-timeout, health and
+profile-effect failures now save private guest unit, journal, kernel and audit
+diagnostics under the lab work directory.
+
+The full run `~/acceptance-full-20261010T183751Z/acceptance.json` (SHA-256
+`97d77ecb28dc17e2d9f4faee5cb335c4494f16f280c7b686e48df996c3eaee46`) **failed**.
+Feed refresh, including Red Hat CSAF, completed in 570 s. Chromium and Firefox
+passed. All three guests enrolled through UI-issued credentials, matched strict
+native inventory and verified the console-assigned service profile natively. The
+encrypted guest's escrow-rotation, encrypted-wipe and TPM-bind targets were
+selectable. WebKit's missing virtual authenticator failed that run; it predates
+the upstream-prerequisite policy above. Remaining product failures:
+`ListDeviceFindings` exceeding its response deadline because the read path
+re-evaluates against about 2.16 million Ubuntu records after a refresh; Fedora
+exposure `package_architecture_uncovered` from `gpg-pubkey` rows with an empty
+architecture; and Fedora's published storage `UNAVAILABLE` because the
+executor's root inventory observation failed (`recovery_readiness_executor_unavailable`)
+while the same root `inspect` collection succeeded.
 
 ## 5. Physical qualification prerequisites
 

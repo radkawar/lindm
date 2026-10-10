@@ -309,10 +309,17 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err != nil {
 		return "", err
 	}
-	grubPath := "/boot/grub/grub.cfg"
-	if distribution == "fedora" {
+	grubPath, recipeFile := "/boot/grub/grub.cfg", "ks.cfg"
+	switch distribution {
+	case "fedora":
 		grubPath = "/EFI/BOOT/grub.cfg"
-	} else if distribution != "ubuntu" && distribution != "debian" {
+	case "ubuntu":
+		recipeFile = "user-data"
+	case "debian":
+		recipeFile = "preseed.cfg"
+	case "opensuse-tumbleweed":
+		grubPath, recipeFile = "/EFI/BOOT/grub.cfg", "autoinst.xml"
+	default:
 		return "", errors.New("encrypted installer: unsupported distribution")
 	}
 	if len(recipe) == 0 || len(recipe) > maxMetadataBytes {
@@ -353,15 +360,10 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err := os.Mkdir(seed, 0700); err != nil {
 		return "", err
 	}
-	recipeFile := "ks.cfg"
 	if distribution == "ubuntu" {
-		recipeFile = "user-data"
 		if err := os.WriteFile(filepath.Join(seed, "meta-data"), []byte("instance-id: lindm-encrypted-installer\n"), 0600); err != nil {
 			return "", err
 		}
-	}
-	if distribution == "debian" {
-		recipeFile = "preseed.cfg"
 	}
 	if err := os.WriteFile(filepath.Join(seed, recipeFile), recipe, 0600); err != nil {
 		return "", err
@@ -374,10 +376,19 @@ func prepareInstallerFileForMachine(ctx context.Context, dir string, input *os.F
 	if err := f.Close(); err != nil {
 		return "", err
 	}
-	if _, err := encryptedInstallerCommand(ctx, stage, []*os.File{input}, "xorriso", "-no_rc", "-abort_on", "FAILURE", "-indev", "stdio:/dev/fd/3", "-outdev", output, "-map", grubFile, grubPath, "-map", seed, "/lindm-seed", "-boot_image", "any", "replay", "-commit", "-end"); err != nil {
+	boot := []string{"-boot_image", "any", "replay"}
+	if distribution == "opensuse-tumbleweed" {
+		// openSUSE's ARM DVD catalogs its EFI FAT image with platform 0 and
+		// points a hybrid MBR partition at that file, which xorriso cannot
+		// replay. Optical boot needs only the El Torito entry: re-declare the
+		// unchanged vendor FAT image as the UEFI entry, without the USB MBR.
+		boot = []string{"-boot_image", "any", "discard", "-boot_image", "any", "system_area=/dev/zero", "-boot_image", "any", "efi_path=/boot/" + architecture + "/efi"}
+	}
+	args := append([]string{"-no_rc", "-abort_on", "FAILURE", "-indev", "stdio:/dev/fd/3", "-outdev", output, "-map", grubFile, grubPath, "-map", seed, "/lindm-seed"}, boot...)
+	if _, err := encryptedInstallerCommand(ctx, stage, []*os.File{input}, "xorriso", append(args, "-commit", "-end")...); err != nil {
 		return "", err
 	}
-	if distribution == "fedora" {
+	if distribution == "fedora" || distribution == "opensuse-tumbleweed" {
 		report, err := encryptedInstallerCommand(ctx, stage, nil, "xorriso", "-no_rc", "-abort_on", "FAILURE", "-indev", output, "-report_el_torito", "plain")
 		if err != nil {
 			return "", err
@@ -416,6 +427,12 @@ func encryptedInstallerGRUBForMachine(original []byte, distribution, architectur
 		// Debian's first entry uses the graphical initrd. Select the vendor's
 		// text installer by title rather than replacing its kernel or initrd.
 		defaultEntry = "'Install'"
+	case "opensuse-tumbleweed":
+		// linuxrc reads the profile from the installation DVD itself and
+		// configures DHCP for the snapshot-bound online repository. The
+		// installer self-update would fetch content outside both pins.
+		args = "autoyast=cd:/lindm-seed/autoinst.xml textmode=1 self_update=0 net.ifnames=0 ifcfg=eth0=dhcp console=tty0 console=" + serialConsole
+		defaultEntry = "'Installation'"
 	default:
 		return nil, errors.New("encrypted installer: unsupported distribution")
 	}
@@ -441,6 +458,18 @@ func encryptedInstallerGRUBForMachine(original []byte, distribution, architectur
 				lines[i] = "set timeout=1"
 			} else if strings.HasPrefix(fields[1], "default=") {
 				lines[i] = "set default=" + defaultEntry
+			}
+		}
+		// openSUSE assigns menu variables without "set" and enables a
+		// graphical theme that would replace the serial-capable console.
+		if len(fields) == 1 {
+			switch {
+			case strings.HasPrefix(fields[0], "timeout="):
+				lines[i] = "timeout=1"
+			case strings.HasPrefix(fields[0], "default="):
+				lines[i] = "default=" + defaultEntry
+			case strings.HasPrefix(fields[0], "with_gfx="):
+				lines[i] = "with_gfx=0"
 			}
 		}
 		if fields[0] != "linux" && fields[0] != "linuxefi" {

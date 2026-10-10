@@ -30,16 +30,20 @@ func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, 
 	if err := checkVMAcceleration(h); err != nil {
 		return nil, nil, err
 	}
-	if manifest.Distribution == "debian" && manifest.Edition == "netinst" && h.Firmware == nil {
-		return nil, nil, errors.New("debian netinst requires explicit UEFI firmware")
+	installer, err := installerImageFor(manifest)
+	if err != nil {
+		return nil, nil, err
+	}
+	if installer != nil && h.Firmware == nil {
+		return nil, nil, fmt.Errorf("%s installer requires explicit UEFI firmware", installer.label)
 	}
 	verified, err = (Fetcher{}).Fetch(ctx, manifest, cacheDir)
 	if err != nil {
 		return nil, nil, err
 	}
 	image := verified
-	if manifest.Distribution == "debian" && manifest.Edition == "netinst" {
-		image, err = debianInstalledImage(ctx, manifest, verified, cacheDir, workDir, h)
+	if installer != nil {
+		image, err = installedImage(ctx, manifest, installer, verified, cacheDir, workDir, h)
 		if err != nil {
 			return nil, nil, err
 		}

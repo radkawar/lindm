@@ -340,9 +340,15 @@ actual self-only connection CSP. The console's own loaded `beginLogin` client
 sent a secret-free invalid request and received HTTP 400, not the origin
 gate's HTTP 403. This establishes that browser's origin-policy acceptance,
 not valid-password or passkey authentication. Its native authenticator remains
-unavailable, its ordinary sign-in UI still makes no password POST, and the
-overall gate deliberately exits unsuccessfully. No credential API, request
-headers, referrer setting, or application capability guard was replaced.
+unavailable and its ordinary sign-in UI still makes no password POST. No
+credential API, request headers, referrer setting, or application capability
+guard was replaced.
+
+Release policy since 2026-10-10: that missing WebDriver virtual-authenticator
+command is an upstream WebKitGTK prerequisite. The record marks WebKit's passkey
+phase `unqualified_upstream_prerequisite` and it no longer fails the release
+gate. The WebKit Origin/Referrer diagnostic remains mandatory; any other WebKit
+authenticator failure still fails the gate.
 
 ## Gaps
 

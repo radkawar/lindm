@@ -27,6 +27,7 @@ type acceptanceBrowser struct {
 	Versions             json.RawMessage `json:"versions,omitempty"`
 	Screenshots          []string        `json:"screenshots,omitempty"`
 	PasswordPhase        json.RawMessage `json:"passwordPhase,omitempty"`
+	PasskeyPhase         json.RawMessage `json:"passkeyPhase,omitempty"`
 	OriginPost           json.RawMessage `json:"originPost,omitempty"`
 	Storage              json.RawMessage `json:"storage,omitempty"`
 	StorageNotApplicable json.RawMessage `json:"storageNotApplicable,omitempty"`
@@ -173,6 +174,12 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 		record.OwnedCleanupComplete = err == nil
 		resultErr = errors.Join(resultErr, err)
 	}()
+	if !options.webOnly {
+		// Before browser sessions: configuring signing restarts the server.
+		if err := configureAcceptanceDispatch(ctx, fixture); err != nil {
+			return err
+		}
+	}
 	var chromium acceptanceBrowser
 	var chromiumConfig acceptanceBrowserConfig
 	for _, engine := range []string{"chromium", "webkit", "firefox"} {

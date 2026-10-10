@@ -72,7 +72,9 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 		}
 		guestOptions := vmlab.AcceptanceGuestOptions{Manifest: manifest, Repository: options.repository, LabBinary: options.labBinary, CacheDir: options.cache, WorkDir: options.work}
 		if i == 2 {
-			guestOptions.Encrypted = &vmlab.EncryptedVMOptions{CacheDir: options.cache, GoldenDir: options.golden, WorkDir: options.work, Firmware: vmlab.EncryptedFirmwareOptions{Code: options.firmwareCode, Vars: options.firmwareVars, Package: options.firmwarePackage, Version: options.firmwareVersion}, Hardware: &vmlab.VMHardwareOptions{Accelerator: "kvm", StorageBus: "virtio-blk"}}
+			// swtpm TPM 2.0 makes the TPM-bind target observable; TPM boot
+			// enrollment remains forbidden stock-image preconditioning.
+			guestOptions.Encrypted = &vmlab.EncryptedVMOptions{CacheDir: options.cache, GoldenDir: options.golden, WorkDir: options.work, Firmware: vmlab.EncryptedFirmwareOptions{Code: options.firmwareCode, Vars: options.firmwareVars, Package: options.firmwarePackage, Version: options.firmwareVersion}, Hardware: &vmlab.VMHardwareOptions{Accelerator: "kvm", StorageBus: "virtio-blk", TPM: true}}
 		}
 		lease, err := slots.Acquire(ctx)
 		if err != nil {
@@ -115,6 +117,9 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 			if observation != nil {
 				healthErr := errors.Join(vmlab.CheckInventoryHealth(observation.Host, observation.Packages), vmlab.CheckInventoryHealth(observation.Detail.GetHost().GetObservation(), observation.Packages))
 				record.InventoryHealthy = healthErr == nil
+				if healthErr != nil {
+					healthErr = errors.Join(healthErr, guest.SaveFailureDiagnostics(ctx))
+				}
 				resultErr = errors.Join(resultErr, healthErr)
 			}
 			if _, err := guest.PrepareServiceProbe(ctx); err != nil {
@@ -142,6 +147,9 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 			if nativeBrowser.Assignment != nil {
 				effectErr := guest.VerifyServiceEffect(ctx, true, true)
 				record.ProfileNativeEffect = effectErr == nil
+				if effectErr != nil {
+					effectErr = errors.Join(effectErr, guest.SaveFailureDiagnostics(ctx))
+				}
 				resultErr = errors.Join(resultErr, effectErr)
 			}
 			if options.skipFeeds {
@@ -168,6 +176,29 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 		records = append(records, record)
 	}
 	return records, failures
+}
+
+// configureAcceptanceDispatch gives the isolated server real execution signing
+// keys and admits their delegation, exactly as the native dispatch lanes do.
+// Without it an accepted console assignment never becomes signed device work.
+func configureAcceptanceDispatch(ctx context.Context, fixture *devlab.AuthorityFixture) (resultErr error) {
+	delegation, err := fixture.ConfigureServiceDispatch(ctx)
+	if err != nil {
+		return fmt.Errorf("configure acceptance execution signing: %w", err)
+	}
+	owner, err := fixture.OpenOwnerSession(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		resultErr = errors.Join(resultErr, owner.Close(cleanup))
+	}()
+	if _, err := owner.Admin.UpdateExecutionAuthority(ctx, connect.NewRequest(&adminv1.UpdateExecutionAuthorityRequest{Update: delegation, Reason: "release acceptance execution authority"})); err != nil {
+		return fmt.Errorf("admit acceptance execution authority: %w", err)
+	}
+	return nil
 }
 
 // Each guest publishes its own profile head; the image-qualified name keeps the

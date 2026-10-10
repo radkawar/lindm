@@ -135,24 +135,35 @@ func (r contextReader) Read(p []byte) (int, error) {
 }
 
 func verifyMetadata(ctx context.Context, m *labv1.ImageManifest, checksum, signature, key []byte) (result verifiedMetadata, err error) {
-	keyring, err := publicKeyring(key)
-	if err != nil {
-		return result, fmt.Errorf("decode public key: %w", err)
-	}
-	dir, err := os.MkdirTemp("", "lindm-image-verify-")
+	result.signing, result.primary, checksum, err = verifySignedBytes(ctx, m.SignerFingerprint, m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_CLEARSIGNED, checksum, signature, key)
 	if err != nil {
 		return result, err
 	}
+	result.digest, err = selectedChecksum(checksum, m)
+	return result, err
+}
+
+// verifySignedBytes checks a detached or clear signature by the pinned full
+// fingerprint and returns the signed plaintext.
+func verifySignedBytes(ctx context.Context, fingerprint string, clearsigned bool, data, signature, key []byte) (signing, primary string, plaintext []byte, err error) {
+	keyring, err := publicKeyring(key)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("decode public key: %w", err)
+	}
+	dir, err := os.MkdirTemp("", "lindm-image-verify-")
+	if err != nil {
+		return "", "", nil, err
+	}
 	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
-	for name, data := range map[string][]byte{"keyring.gpg": keyring, "checksums": checksum, "signature": signature} {
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {
-			return result, err
+	for name, content := range map[string][]byte{"keyring.gpg": keyring, "checksums": data, "signature": signature} {
+		if err := os.WriteFile(filepath.Join(dir, name), content, 0600); err != nil {
+			return "", "", nil, err
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	args := []string{"--homedir", dir, "--keyring", filepath.Join(dir, "keyring.gpg"), "--status-fd", "2"}
-	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_CLEARSIGNED {
+	if clearsigned {
 		args = append(args, "--output", "-", filepath.Join(dir, "checksums"))
 	} else {
 		args = append(args, filepath.Join(dir, "signature"), filepath.Join(dir, "checksums"))
@@ -164,17 +175,16 @@ func verifyMetadata(ctx context.Context, m *labv1.ImageManifest, checksum, signa
 	stderr := boundedBuffer{limit: 64 << 10}
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		return result, fmt.Errorf("verify checksum signature with gpgv: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return "", "", nil, fmt.Errorf("verify checksum signature with gpgv: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	result.signing, result.primary, err = validSigner(stderr.String(), m.SignerFingerprint)
+	signing, primary, err = validSigner(stderr.String(), fingerprint)
 	if err != nil {
-		return result, err
+		return "", "", nil, err
 	}
-	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_CLEARSIGNED {
-		checksum = stdout.Bytes()
+	if clearsigned {
+		return signing, primary, stdout.Bytes(), nil
 	}
-	result.digest, err = selectedChecksum(checksum, m)
-	return result, err
+	return signing, primary, data, nil
 }
 
 type boundedBuffer struct {

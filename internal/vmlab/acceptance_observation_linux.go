@@ -32,6 +32,16 @@ type AcceptanceObservation struct {
 	NativeAfter  *inventoryv1.NativeDetails      `json:"native_after"`
 }
 
+// SaveFailureDiagnostics writes the installed units' status, journals, kernel
+// and audit records to the caller's private work directory. The returned error
+// names that file; guest output never enters public evidence.
+func (g *AcceptanceGuest) SaveFailureDiagnostics(ctx context.Context) error {
+	if g.vm == nil {
+		return nil
+	}
+	return saveLifecycleFailure(ctx, g.vm, g.diagnostics)
+}
+
 // Observe compares every installed package (including duplicate multiplicity)
 // and host identity against independent native queries, then waits for the same
 // complete snapshot through the real control plane. Native mutation is a failure,
@@ -81,7 +91,7 @@ func (g *AcceptanceGuest) Observe(ctx context.Context, owner *devlab.OwnerSessio
 	control := &vmControlPlane{session: owner}
 	publication, err := control.WaitSnapshot(ctx, g.evidence.DeviceID, after, nil, 10*time.Minute)
 	if err != nil {
-		return result, errors.Join(comparisonErr, err, saveLifecycleFailure(ctx, g.vm, g.diagnostics))
+		return result, errors.Join(comparisonErr, err, g.SaveFailureDiagnostics(ctx))
 	}
 	result.Publication = publication
 	detail, err := owner.Admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: g.evidence.DeviceID}))

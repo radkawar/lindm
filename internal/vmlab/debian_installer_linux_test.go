@@ -144,25 +144,25 @@ func TestDebianInstalledCacheRejectsCorruptionAndSymlinks(t *testing.T) {
 	if err := root.WriteFile("entry/sha256", []byte(fmt.Sprintf("%x\n", digest)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if result, err := loadDebianInstalledImage(t.Context(), root, "entry"); err != nil || result.Size != int64(len(data)) {
+	if result, err := loadInstalledImage(t.Context(), root, "entry"); err != nil || result.Size != int64(len(data)) {
 		t.Fatalf("load integrity-bound local image: %v", err)
 	}
 	data[0] ^= 1
 	if err := root.WriteFile("entry/image", data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadDebianInstalledImage(t.Context(), root, "entry"); err == nil {
+	if _, err := loadInstalledImage(t.Context(), root, "entry"); err == nil {
 		t.Fatal("same-size cache corruption accepted")
 	}
 	if err := root.Symlink("entry", "link"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadDebianInstalledImage(t.Context(), root, "link"); err == nil {
+	if _, err := loadInstalledImage(t.Context(), root, "link"); err == nil {
 		t.Fatal("symlink cache entry accepted")
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := loadDebianInstalledImage(ctx, root, "entry"); err == nil {
+	if _, err := loadInstalledImage(ctx, root, "entry"); err == nil {
 		t.Fatal("cancelled cache verification accepted")
 	}
 }
@@ -185,7 +185,7 @@ func TestDebianSourceMarkerProbePreservesPrivateMarker(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Execute the actual probe under the marker-owning account. Runtime
 			// obtains that authority with sudo, not by making the marker public.
-			cmd := exec.Command("/bin/sh", "-eu", "-c", debianSourceMarkerProbe(test.path, test.digest))
+			cmd := exec.Command("/bin/sh", "-eu", "-c", installerSourceMarkerProbe(test.path, test.digest))
 			if output, err := cmd.CombinedOutput(); (err == nil) != test.accepted {
 				t.Fatalf("accepted=%t: %v: %s", test.accepted, err, output)
 			}
