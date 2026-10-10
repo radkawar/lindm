@@ -13,10 +13,10 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
-// AttestServiceExecution authenticates a protected snapshot, not a new native
+// AttestResourceExecution authenticates a protected snapshot, not a new native
 // observation. The relay selects only an existing action and opaque nonce; all
 // signed facts, identity, session and key material come from protected state.
-func (s *Service) AttestServiceExecution(ctx context.Context, req *connect.Request[agentv1.AttestServiceExecutionRequest]) (*connect.Response[agentv1.AttestServiceExecutionResponse], error) {
+func (s *Service) AttestResourceExecution(ctx context.Context, req *connect.Request[agentv1.AttestResourceExecutionRequest]) (*connect.Response[agentv1.AttestResourceExecutionResponse], error) {
 	ctx, cancel := s.bounded(ctx)
 	defer cancel()
 	if req == nil || s.admit(req.Msg) != nil {
@@ -33,10 +33,10 @@ func (s *Service) AttestServiceExecution(ctx context.Context, req *connect.Reque
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if err := s.serviceIdentitySession(loaded); err != nil {
+	if err := s.resourceIdentitySession(loaded); err != nil {
 		return nil, mapError(err)
 	}
-	record, revision, err := s.loadServiceAction(ctx, loaded, req.Msg.GetActionId())
+	record, revision, err := s.loadResourceAction(ctx, loaded, req.Msg.GetActionId())
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -54,7 +54,7 @@ func (s *Service) AttestServiceExecution(ctx context.Context, req *connect.Reque
 	if loaded.cert.NotAfter.Before(expires) {
 		expires = loaded.cert.NotAfter
 	}
-	attestation := &agentv1.ServiceExecutionAttestation{
+	attestation := &agentv1.ResourceExecutionAttestation{
 		DeploymentId:         loaded.bootstrap.Root.GetDeploymentId(),
 		DeviceId:             loaded.state.GetDeviceId(),
 		EnrollmentGeneration: loaded.state.GetEnrollmentGeneration(),
@@ -62,13 +62,13 @@ func (s *Service) AttestServiceExecution(ctx context.Context, req *connect.Reque
 		ActionRevision:       uint64(revision),
 		Nonce:                bytes.Clone(req.Msg.GetNonce()),
 		IssuedAt:             protoTimestamp(now), ExpiresAt: protoTimestamp(expires),
-		Status: serviceStatus(record),
+		Status: resourceStatus(record),
 	}
 	envelope, err := s.authority.Sign(ctx, attestation, loaded.identityKey)
 	if err != nil {
 		return nil, mapError(err)
 	}
-	return noStore(&agentv1.AttestServiceExecutionResponse{
+	return noStore(&agentv1.AttestResourceExecutionResponse{
 		AttestationEnvelope: envelope,
 		CertificatePem:      pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: loaded.cert.Raw}),
 	}), nil

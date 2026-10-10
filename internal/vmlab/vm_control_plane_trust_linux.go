@@ -74,7 +74,7 @@ func exerciseVMControlPlaneTrust(ctx context.Context, packages *nativeGuestPacka
 	}
 	// systemd may unload an inactive unit and discard its start statistics.
 	// A root-owned persistent marker detects even a completed start/stop cycle.
-	unit := devlab.ServiceExecutionProbeUnit
+	unit := devlab.ResourceExecutionProbeUnit
 	path := "/etc/systemd/system/" + unit
 	if err := lifecycleCommand(ctx, vm, "reserve trust synchronization probe", "test ! -e "+nativeQuote(path)+" && test ! -L "+nativeQuote(path)+" && test ! -e "+nativeQuote(trustSyncProbeMarker)+" && test ! -L "+nativeQuote(trustSyncProbeMarker)); err != nil {
 		return nil, err

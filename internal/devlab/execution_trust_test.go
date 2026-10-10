@@ -19,8 +19,8 @@ func TestDefaultExecutionCapabilitiesCoverClosedDeviceActions(t *testing.T) {
 		t.Fatal("default delegation lost service execution")
 	}
 	fields := (&agentv1.DeviceActionSpec{}).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
-	if len(capabilities) != fields.Len()+1 {
-		t.Fatalf("default delegation has %d capabilities for %d actions plus services", len(capabilities), fields.Len())
+	if len(capabilities) != fields.Len()+len(executableResourceKinds) {
+		t.Fatalf("default delegation has %d capabilities for %d actions plus %d resource kinds", len(capabilities), fields.Len(), len(executableResourceKinds))
 	}
 	for i := range fields.Len() {
 		spec := new(agentv1.DeviceActionSpec)

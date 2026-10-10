@@ -201,15 +201,13 @@ func (o vmInventoryOracle) storageLUKSIdentity(name string, id *inventoryv1.Stor
 	var data []byte
 	status := truthDenied
 	if readable {
-		data, status, err = o.optional("cryptsetup", "cryptsetup luksDump "+nativeQuote("/dev/"+name))
+		data, status, err = o.optional("cryptsetup", "sudo -n cryptsetup luksDump "+nativeQuote("/dev/"+name))
 		if err != nil {
 			return err
 		}
 	}
 	if status != truthSuccess {
-		id.LuksKeyslotCount = &inventoryv1.ObservedUint64{Status: status}
-		id.LuksTokenCount = &inventoryv1.ObservedUint64{Status: status}
-		id.LuksTokenTypes = &inventoryv1.ObservedString{Status: status}
+		truthLUKSUnobserved(id, status)
 		return nil
 	}
 	var slots, tokens uint64
@@ -261,8 +259,23 @@ func (o vmInventoryOracle) storageLUKSIdentity(name string, id *inventoryv1.Stor
 	return nil
 }
 
+// truthLUKSUnobserved records a failed header read on the header fields and on
+// any LUKS UUID/version lsblk did not supply (legacy lsblk has no FSVER).
+func truthLUKSUnobserved(id *inventoryv1.StorageIdentity, status inventoryv1.CollectionStatus) {
+	id.LuksKeyslotCount = &inventoryv1.ObservedUint64{Status: status}
+	id.LuksTokenCount = &inventoryv1.ObservedUint64{Status: status}
+	id.LuksTokenTypes = &inventoryv1.ObservedString{Status: status}
+	for _, field := range []*inventoryv1.ObservedString{id.LuksUuid, id.LuksVersion} {
+		if field.Status == truthUnavailable {
+			field.Status = status
+		}
+	}
+}
+
+// Storage identity oracles match the inspected agent's root privilege; an
+// unprivileged probe would only observe its own permission failure.
 func (o vmInventoryOracle) storageBlockReadable(name string) (bool, error) {
-	data, err := o.command("if [ -r " + nativeQuote("/dev/"+name) + " ]; then printf yes; else printf no; fi")
+	data, err := o.command("if sudo -n test -r " + nativeQuote("/dev/"+name) + "; then printf yes; else printf no; fi")
 	return string(data) == "yes", err
 }
 
@@ -277,7 +290,7 @@ func (o vmInventoryOracle) storageNVMeIdentity(name string, id *inventoryv1.Stor
 		return result, nil
 	}
 	device := nativeQuote("/dev/" + name)
-	data, status, err := o.optional("nvme", "nvme id-ctrl --output-format=json "+device)
+	data, status, err := o.optional("nvme", "sudo -n nvme id-ctrl --output-format=json "+device)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +308,7 @@ func (o vmInventoryOracle) storageNVMeIdentity(name string, id *inventoryv1.Stor
 	if err := json.Unmarshal(data, &controller); err != nil {
 		return nil, errors.New("invalid NVMe controller oracle")
 	}
-	data, err = o.command("nvme id-ns --output-format=json " + device)
+	data, err = o.command("sudo -n nvme id-ns --output-format=json " + device)
 	if err != nil {
 		return nil, err
 	}

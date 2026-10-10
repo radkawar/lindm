@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/connectivity_guard.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Explicit root provisioning on a dedicated external peer. Never an agent profile
+// or a control-plane listener privilege expansion. File references are resolved
+// from the protected executor configuration and opened with root custody checks.
+message ConnectivityProbeServerConfig {
+  string origin = 1 [(buf.validate.field).string = {
+    uri: true
+    max_bytes: 2048
+    pattern: "^https://[^/?#@]+/?$"
+  }];
+  string deployment_id = 2 [(buf.validate.field).string.uuid = true];
+  string listen_address = 3 [(buf.validate.field).string.ip = true];
+  uint32 listen_port = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  string tls_certificate_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string tls_private_key_file = 6 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string device_ca_file = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string proof_key_file = 8 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  repeated ConnectivityProbeTarget targets = 9 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  option (buf.validate.message).cel = {
+    id: "connectivity_probe_server.exact_peer"
+    message: "each unique target must name this approved external peer"
+    expression: "this.targets.all(t, this.targets.filter(q, q.id == t.id).size() == 1 && ((has(t.sender) && t.sender.origin == this.origin) || (has(t.receiver) && t.receiver.origin == this.origin)))"
+  };
+}

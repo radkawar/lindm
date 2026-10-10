@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 import "lindm/resource/v1/accounts.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/credentials.proto";
+import "lindm/resource/v1/host.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/network.proto";
 import "lindm/resource/v1/observations.proto";
@@ -256,10 +257,20 @@ message FirewallZonePlan {
   FirewallZoneDesired desired = 1 [(buf.validate.field).required = true];
   bytes compiled_ruleset_sha256 = 2 [(buf.validate.field).bytes.len = 32];
   repeated FirewallObjectDelta objects = 3 [(buf.validate.field).repeated.max_items = 256];
-  CheckpointRef checkpoint = 4 [(buf.validate.field).required = true];
+  // The native backend's protected supervisor owns the durable checkpoint and
+  // deadline; this optional public reference is not rollback authority.
+  CheckpointRef checkpoint = 4;
   bytes expected_persistent_sha256 = 5 [(buf.validate.field).bytes.len = 32];
   bytes expected_kernel_sha256 = 6 [(buf.validate.field).bytes.len = 32];
   OwnershipInverseBinding inverse = 7;
+  FirewallZoneObservation before = 8 [(buf.validate.field).required = true];
+  NativeObjectChange change = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string generation = 10 [(buf.validate.field).string.uuid = true];
+  bytes target_persistent_sha256 = 11 [(buf.validate.field).bytes.len = 32];
+  bytes configuration_sha256 = 12 [(buf.validate.field).bytes.len = 32];
 }
 enum ConnectionStep {
   CONNECTION_STEP_UNSPECIFIED = 0;
@@ -366,17 +377,16 @@ message PackageTransactionEntry {
   ResourceRef source = 6 [(buf.validate.field).required = true];
   bool direct_request = 7;
   bool owned_installation = 8;
+  optional bytes signer_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  optional bytes metadata_revision_sha256 = 10 [(buf.validate.field).bytes.len = 32];
   option (buf.validate.message).cel = {
     id: "package_transaction_entry.shape"
     message: "install/upgrade entries bind exact bytes and versions; removal binds owned prior state"
-    expression: "this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact))"
+    expression: "this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))"
   };
 }
 message PackageTransactionManifest {
-  repeated PackageTransactionEntry entries = 1 [(buf.validate.field).repeated = {
-    min_items: 1
-    max_items: 4096
-  }];
+  repeated PackageTransactionEntry entries = 1 [(buf.validate.field).repeated = {max_items: 4096}];
   bytes native_database_revision = 2 [(buf.validate.field).bytes.len = 32];
   SourceSnapshot sources = 3 [(buf.validate.field).required = true];
   string native_lock_identity = 4 [(buf.validate.field).string = {
@@ -394,6 +404,10 @@ message PackageTransactionManifest {
       bytes: {len: 32}
     }
   }];
+  // Native solver/replay bytes are immutable alongside the normalized entries.
+  ArtifactRef native_transaction = 7 [(buf.validate.field).required = true];
+  optional bytes candidate_pin_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  FileIdentity original_pin = 9;
   option (buf.validate.message).cel = {
     id: "package_manifest.bindings"
     message: "every affected resource binds a desired digest"
@@ -410,6 +424,13 @@ message NativePackagePlan {
     max_len: 256
   }];
   OwnershipInverseBinding inverse = 5;
+  // Exact provider-rendered pin, or empty to remove its owned pin. Bind the
+  // candidate separately from the baseline retained by the ownership journal.
+  bytes pin_contents = 6 [(buf.validate.field).bytes.max_len = 32768];
+  bool change_pin = 7;
+  uint32 pin_mode = 8 [(buf.validate.field).uint32.lte = 4095];
+  // Derived from the complete digest-bound manifest, never from desired state alone.
+  bool change_packages = 9;
 }
 message RepositoryPlan {
   RepositoryDesired desired = 1 [(buf.validate.field).required = true];
@@ -704,4 +725,62 @@ message DeploymentTransactionManifest {
   }];
   bool retains_previous_deployment = 8;
   bool rolls_back_user_data = 9 [(buf.validate.field).bool.const = false];
+}
+
+message ManagedFilePlan {
+  ManagedFileDesired desired = 1 [(buf.validate.field).required = true];
+  ManagedFileObservation before = 2 [(buf.validate.field).required = true];
+  NativeObjectChange change = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  OwnershipInverseBinding inverse = 4;
+  // The content baseline is private journal data, not public plan evidence.
+  option (buf.validate.message).cel = {
+    id: "managed_file_plan.identity"
+    message: "file plans bind the same path before mutation"
+    expression: "this.desired.path == this.before.path"
+  };
+}
+message SysctlPlan {
+  SysctlDesired desired = 1 [(buf.validate.field).required = true];
+  SysctlObservation before = 2 [(buf.validate.field).required = true];
+  NativeObjectChange change = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4,
+      5
+    ]
+  }];
+  OwnershipInverseBinding inverse = 4;
+  option (buf.validate.message).cel = {
+    id: "sysctl_plan.identity"
+    message: "sysctl plans bind the same live and persistent kernel key"
+    expression: "this.desired.key == this.before.key"
+  };
+}
+message SystemdDefinitionPlan {
+  SystemdDefinitionDesired desired = 1 [(buf.validate.field).required = true];
+  SystemdDefinitionObservation before = 2 [(buf.validate.field).required = true];
+  NativeObjectChange change = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  OwnershipInverseBinding inverse = 4;
+  bytes rendered_candidate_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bool daemon_reload = 6;
+  option (buf.validate.message).cel = {
+    id: "systemd_definition_plan.identity"
+    message: "definition plans bind the same canonical unit and definition type"
+    expression: "this.before.canonical_key == (has(this.desired.timer) ? 'timer/' + this.desired.timer.unit : 'drop-in/' + this.desired.drop_in.unit)"
+  };
+}
+message EncryptionCompliancePlan {
+  EncryptionComplianceDesired desired = 1 [(buf.validate.field).required = true];
+  EncryptionComplianceObservation before = 2 [(buf.validate.field).required = true];
+  // Compliance never authorizes a native effect, including during release.
+  NativeObjectChange change = 3 [(buf.validate.field).enum.const = 5];
+  reserved 4;
+  reserved "inverse";
 }

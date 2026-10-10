@@ -35,17 +35,20 @@ const (
 	// RPMRelease is the RPM release used for every upstream version.
 	RPMRelease = "1"
 
-	stateParent   = "/var/lib/lindm"
-	configDir     = "/etc/lindm"
-	lifecyclePath = "/usr/libexec/lindm/lifecycle"
-	unitDir       = "/usr/lib/systemd/system"
-	executorUnit  = "lindm-executor.service"
-	agentUnit     = "lindm-agent.service"
-	poweroffUnit  = "lindm-live-root-poweroff.service"
-	sysusersPath  = "/usr/lib/sysusers.d/lindm.conf"
-	tmpfilesPath  = "/usr/lib/tmpfiles.d/lindm.conf"
-	copyrightPath = "/usr/share/doc/lindm-agent/copyright"
-	purposeText   = "development-package-signing\n"
+	stateParent           = "/var/lib/lindm"
+	configDir             = "/etc/lindm"
+	lifecyclePath         = "/usr/libexec/lindm/lifecycle"
+	unitDir               = "/usr/lib/systemd/system"
+	executorUnit          = "lindm-executor.service"
+	agentUnit             = "lindm-agent.service"
+	poweroffUnit          = "lindm-live-root-poweroff.service"
+	firewallRestoreUnit   = "lindm-firewall-restore.service"
+	connectivityGuardUnit = "lindm-connectivity-guard.service"
+	connectivityProbeUnit = "lindm-connectivity-probe.service"
+	sysusersPath          = "/usr/lib/sysusers.d/lindm.conf"
+	tmpfilesPath          = "/usr/lib/tmpfiles.d/lindm.conf"
+	copyrightPath         = "/usr/share/doc/lindm-agent/copyright"
+	purposeText           = "development-package-signing\n"
 )
 
 //go:embed assets/*

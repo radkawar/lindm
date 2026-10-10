@@ -27,24 +27,52 @@ type DeviceAction struct {
 	Record               []byte
 }
 
-type ServiceAction struct {
+type ResourceAction struct {
 	ActionID             string
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 	ResourceSequence     int64
 	Revision             int64
 	State                int64
 	Record               []byte
-	ReadOnlySuccess      int64
+	ReadOnlyTerminal     int64
 }
 
-type ServiceResourceFloor struct {
+type ResourceFloor struct {
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 	ResourceSequence     int64
 	ActionID             string
+}
+
+type ResourceOwnership struct {
+	LedgerID             int64
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+	Revision             int64
+	Record               []byte
+}
+
+type ResourceOwnershipReservation struct {
+	ActionID             string
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+}
+
+type ResourcePreparationCancellation struct {
+	ActionID             string
+	EnrollmentGeneration string
+	IntentSha256         []byte
 }

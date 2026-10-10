@@ -492,6 +492,9 @@ const (
 	Backend_BACKEND_SSSD               Backend = 33
 	Backend_BACKEND_NSS_TRUST          Backend = 34
 	Backend_BACKEND_JAVA_TRUST         Backend = 35
+	Backend_BACKEND_POSIX_FILE         Backend = 36
+	Backend_BACKEND_PROC_SYSCTL        Backend = 37
+	Backend_BACKEND_LUKS_COMPLIANCE    Backend = 38
 )
 
 // Enum value maps for Backend.
@@ -533,6 +536,9 @@ var (
 		33: "BACKEND_SSSD",
 		34: "BACKEND_NSS_TRUST",
 		35: "BACKEND_JAVA_TRUST",
+		36: "BACKEND_POSIX_FILE",
+		37: "BACKEND_PROC_SYSCTL",
+		38: "BACKEND_LUKS_COMPLIANCE",
 	}
 	Backend_value = map[string]int32{
 		"BACKEND_UNSPECIFIED":        0,
@@ -571,6 +577,9 @@ var (
 		"BACKEND_SSSD":               33,
 		"BACKEND_NSS_TRUST":          34,
 		"BACKEND_JAVA_TRUST":         35,
+		"BACKEND_POSIX_FILE":         36,
+		"BACKEND_PROC_SYSCTL":        37,
+		"BACKEND_LUKS_COMPLIANCE":    38,
 	}
 )
 
@@ -1817,11 +1826,13 @@ func (x *VerificationPolicy) GetChecks() []HealthCheck {
 }
 
 type PlatformProduct struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OsId          string                 `protobuf:"bytes,1,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
-	Product       string                 `protobuf:"bytes,2,opt,name=product,proto3" json:"product,omitempty"`
-	Version       string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	Architecture  string                 `protobuf:"bytes,4,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	OsId    string                 `protobuf:"bytes,1,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
+	Product string                 `protobuf:"bytes,2,opt,name=product,proto3" json:"product,omitempty"`
+	// Empty only when native VERSION_ID is unavailable; not a wildcard or
+	// evidence of a successful version match.
+	Version       string `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	Architecture  string `protobuf:"bytes,4,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2166,25 +2177,24 @@ const file_lindm_resource_v1_common_proto_rawDesc = "" +
 	"\x14CertificateTrustRefs\x12N\n" +
 	"\fcertificates\x18\x01 \x03(\v2\x1e.lindm.resource.v1.ResourceRefB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10 R\fcertificates:v\xbaHs\x1aq\n" +
-	"\x1bcertificate_trust_refs.kind\x12+trust references must identify CA resources\x1a%this.certificates.all(r, r.kind == 7)\"\xb8\x03\n" +
+	"\x1bcertificate_trust_refs.kind\x12+trust references must identify CA resources\x1a%this.certificates.all(r, r.kind == 7)\"\xcc\x03\n" +
 	"\x0fOwnershipPolicy\x12@\n" +
 	"\x04mode\x18\x01 \x01(\x0e2 .lindm.resource.v1.OwnershipModeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04mode\x12H\n" +
 	"\arelease\x18\x02 \x01(\x0e2\".lindm.resource.v1.ReleaseBehaviorB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\arelease\x12?\n" +
 	"\x14adoption_approval_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\x12adoptionApprovalId\x88\x01\x01\x12B\n" +
-	"\x1dcomplete_membership_dimension\x18\x04 \x01(\bR\x1bcompleteMembershipDimension:{\xbaHx\x1av\n" +
-	"\x19ownership_policy.approval\x12%adoption requires an approval binding\x1a2(this.mode == 2) == has(this.adoption_approval_id)B\x17\n" +
+	"\x1dcomplete_membership_dimension\x18\x04 \x01(\bR\x1bcompleteMembershipDimension:\x8e\x01\xbaH\x8a\x01\x1a\x87\x01\n" +
+	"\x19ownership_policy.approval\x127an approval binding is only valid for approved adoption\x1a1!has(this.adoption_approval_id) || this.mode == 2B\x17\n" +
 	"\x15_adoption_approval_id\"\x98\x01\n" +
 	"\x12VerificationPolicy\x123\n" +
 	"\x0fmax_age_seconds\x18\x01 \x01(\rB\v\xbaH\b*\x06\x18\x80\xf5$(\x1eR\rmaxAgeSeconds\x12M\n" +
-	"\x06checks\x18\x02 \x03(\x0e2\x1e.lindm.resource.v1.HealthCheckB\x15\xbaH\x12\x92\x01\x0f\b\x01\x10\x10\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x06checks\"\xcf\x01\n" +
+	"\x06checks\x18\x02 \x03(\x0e2\x1e.lindm.resource.v1.HealthCheckB\x15\xbaH\x12\x92\x01\x0f\b\x01\x10\x10\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x06checks\"\xcd\x01\n" +
 	"\x0fPlatformProduct\x12.\n" +
 	"\x05os_id\x18\x01 \x01(\tB\x19\xbaH\x16r\x14\x10\x01\x18@2\x0e^[a-z0-9_.-]+$R\x04osId\x12$\n" +
 	"\aproduct\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\aproduct\x12$\n" +
-	"\aversion\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\aversion\x12@\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\aproduct\x12\"\n" +
+	"\aversion\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\aversion\x12@\n" +
 	"\farchitecture\x18\x04 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18@2\x11^[a-zA-Z0-9_.-]+$R\farchitecture\"\xae\x01\n" +
 	"\rApplicability\x12H\n" +
 	"\bproducts\x18\x01 \x03(\v2\".lindm.resource.v1.PlatformProductB\b\xbaH\x05\x92\x01\x02\x10@R\bproducts\x12S\n" +
@@ -2262,7 +2272,7 @@ const file_lindm_resource_v1_common_proto_rawDesc = "" +
 	"\x1cRESOURCE_FEATURE_PAM_LOCKOUT\x10\x0f\x12(\n" +
 	"$RESOURCE_FEATURE_SECURITY_ADVISORIES\x10\x10\x12\x1c\n" +
 	"\x18RESOURCE_FEATURE_TPM_KEY\x10\x11\x12\x1f\n" +
-	"\x1bRESOURCE_FEATURE_PKCS11_KEY\x10\x12*\xa1\x06\n" +
+	"\x1bRESOURCE_FEATURE_PKCS11_KEY\x10\x12*\xef\x06\n" +
 	"\aBackend\x12\x17\n" +
 	"\x13BACKEND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fBACKEND_SYSTEMD\x10\x01\x12\x12\n" +
@@ -2300,7 +2310,10 @@ const file_lindm_resource_v1_common_proto_rawDesc = "" +
 	"\x13BACKEND_REALMD_SSSD\x10 \x12\x10\n" +
 	"\fBACKEND_SSSD\x10!\x12\x15\n" +
 	"\x11BACKEND_NSS_TRUST\x10\"\x12\x16\n" +
-	"\x12BACKEND_JAVA_TRUST\x10#B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
+	"\x12BACKEND_JAVA_TRUST\x10#\x12\x16\n" +
+	"\x12BACKEND_POSIX_FILE\x10$\x12\x17\n" +
+	"\x13BACKEND_PROC_SYSCTL\x10%\x12\x1b\n" +
+	"\x17BACKEND_LUKS_COMPLIANCE\x10&B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
 
 var (
 	file_lindm_resource_v1_common_proto_rawDescOnce sync.Once

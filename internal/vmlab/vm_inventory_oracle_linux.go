@@ -660,8 +660,13 @@ func parseTruthMemory(data []byte) (*inventoryv1.MemoryDetails, error) {
 // --pairs with --list (or --raw/--tree).
 const storageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,MOUNTPOINTS,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE,PTTYPE,PTUUID"
 
+// util-linux added PTTYPE/PTUUID in v2.33, FSVER in v2.35 and MOUNTPOINTS in
+// v2.37. Older lsblk (EL8: 2.32.1) is read without them; their identity fields
+// remain UNAVAILABLE rather than empty successful values.
+const legacyStorageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,PARTUUID,PARTTYPE"
+
 func (o vmInventoryOracle) storage() (*inventoryv1.StorageDetails, error) {
-	data, status, err := o.optional("lsblk", storageTruthCommand)
+	data, status, err := storageTruthPairs(o.optional)
 	if err != nil {
 		return nil, err
 	}
@@ -673,6 +678,40 @@ func (o vmInventoryOracle) storage() (*inventoryv1.StorageDetails, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// storageTruthPairs uses the legacy columns only after the full set failed
+// natively and lsblk reports a release before util-linux 2.37. Every other
+// failure, including an unrecognized release, stands.
+func storageTruthPairs(optional func(tool, command string) ([]byte, inventoryv1.CollectionStatus, error)) ([]byte, inventoryv1.CollectionStatus, error) {
+	data, status, err := optional("lsblk", storageTruthCommand)
+	if err != nil || status != inventoryv1.CollectionStatus_COLLECTION_STATUS_NATIVE_COMMAND_FAILURE {
+		return data, status, err
+	}
+	version, versionStatus, err := optional("lsblk", "lsblk --version")
+	if err != nil {
+		return nil, 0, err
+	}
+	if versionStatus != truthSuccess || !truthLsblkPredatesColumns(string(version)) {
+		return data, status, nil
+	}
+	return optional("lsblk", legacyStorageTruthCommand)
+}
+
+// truthLsblkPredatesColumns reads "lsblk from util-linux MAJOR.MINOR[.PATCH|-rcN]".
+func truthLsblkPredatesColumns(version string) bool {
+	release, prefixed := strings.CutPrefix(version, "lsblk from util-linux ")
+	release, terminated := strings.CutSuffix(release, "\n")
+	major, minor, dotted := strings.Cut(release, ".")
+	if end := strings.IndexAny(minor, ".-"); end >= 0 {
+		minor = minor[:end]
+	}
+	majorValue, majorErr := strconv.ParseUint(major, 10, 32)
+	minorValue, minorErr := strconv.ParseUint(minor, 10, 32)
+	if !prefixed || !terminated || !dotted || majorErr != nil || minorErr != nil || strings.ContainsAny(release, " \t\r\n\x00") {
+		return false
+	}
+	return majorValue < 2 || (majorValue == 2 && minorValue < 37)
 }
 
 func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inventoryv1.StorageDetails, error) {
@@ -691,8 +730,15 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 		if err != nil {
 			return nil, err
 		}
-		if (len(fields) != 6 && len(fields) != 19) || fields["NAME"] == "" || fields["TYPE"] == "" {
+		if (len(fields) != 6 && len(fields) != 15 && len(fields) != 19) || fields["NAME"] == "" || fields["TYPE"] == "" {
 			return nil, errors.New("incomplete lsblk truth")
+		}
+		// The legacy set omits exactly the columns added after util-linux 2.32;
+		// storageTruthIdentity leaves their identity fields UNAVAILABLE.
+		for _, column := range []string{"MOUNTPOINTS", "FSVER", "PTTYPE", "PTUUID"} {
+			if _, present := fields[column]; len(fields) != 6 && present != (len(fields) == 19) {
+				return nil, errors.New("incomplete lsblk truth")
+			}
 		}
 		size, err := parseTruthUint(fields["SIZE"])
 		if err != nil {
@@ -708,7 +754,7 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 			}
 		}
 		device := &inventoryv1.BlockDevice{Name: fields["NAME"], Type: truthString(fields["TYPE"]), Parent: truthString(fields["PKNAME"]), SizeBytes: truthUint(size), Filesystem: truthString(fields["FSTYPE"]), Mountpoint: truthString(mountpoint), Encryption: truthString("")}
-		if len(fields) == 19 {
+		if len(fields) != 6 {
 			device.Identity = storageTruthIdentity(fields)
 		}
 		if _, duplicate := byName[device.Name]; duplicate {
@@ -1021,7 +1067,9 @@ func (o vmInventoryOracle) backends() (*inventoryv1.BackendDetails, error) {
 func (o vmInventoryOracle) applications(backend string) (*inventoryv1.ApplicationDetails, error) {
 	command := "flatpak list --system --app --columns=application,version,arch"
 	if backend == "snap" {
-		command = "snap list"
+		// An installed daemon with no snaps reports only this informational
+		// stderr; that is an empty collection. Any other stderr still fails.
+		command = `if [ -z "$(snap list 2>/dev/null)" ] && [ "$(snap list 2>&1 >/dev/null)" = "No snaps are installed yet. Try 'snap install hello-world'." ]; then :; else snap list; fi`
 	}
 	data, status, err := o.optional(backend, command)
 	if err != nil {

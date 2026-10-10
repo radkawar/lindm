@@ -118,7 +118,7 @@ func breached(rpc map[string]RPCResult) bool {
 		if r.NonRetryableErrors > 0 {
 			return true
 		}
-		if (name == "GetSyncState" || name == "GetServiceWork") && r.P99Milliseconds >= 1000 {
+		if (name == "GetSyncState" || name == "GetResourceWork") && r.P99Milliseconds >= 1000 {
 			return true
 		}
 	}

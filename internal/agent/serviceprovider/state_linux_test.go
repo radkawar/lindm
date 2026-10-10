@@ -13,19 +13,20 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
 )
 
-func testDesired() *agentv1.ServiceDesiredState {
-	return &agentv1.ServiceDesiredState{
+func testDesired() *resourcev1.SystemdServiceDesired {
+	return &resourcev1.SystemdServiceDesired{
 		Unit:       "example.service",
-		Runtime:    agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE,
-		Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED,
+		Runtime:    resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE,
+		Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED,
 	}
 }
 
-func testObservation() *agentv1.ServiceObservation {
-	o := &agentv1.ServiceObservation{
+func testObservation() *resourcev1.SystemdServiceObservation {
+	o := &resourcev1.SystemdServiceObservation{
 		Unit: "example.service", BootId: "11111111-2222-4333-8444-555555555555",
 		ObservedAt: timestamppb.New(time.Unix(1700000000, 0)),
 		LoadState:  "loaded", ActiveState: "inactive", SubState: "dead",
@@ -35,52 +36,92 @@ func testObservation() *agentv1.ServiceObservation {
 	return o
 }
 
-func testPlan(t *testing.T) *agentv1.ServicePlan {
+func testPlan(t *testing.T) *resourcev1.ResourcePlan {
 	t.Helper()
-	plan, err := planFor(testDesired(), testObservation())
+	plan, err := planFor(testResourceDesired(testDesired()), testResourceObservation(testObservation()), bytes.Repeat([]byte{2}, 32))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return plan
 }
 
+func testResourceDesired(native *resourcev1.SystemdServiceDesired) *resourcev1.ResourceDesiredState {
+	return &resourcev1.ResourceDesiredState{
+		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: native.GetUnit()},
+		State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: native},
+	}
+}
+
+func testResourceObservation(native *resourcev1.SystemdServiceObservation) *resourcev1.ResourceObservation {
+	return observationEnvelope(native, "33333333-2222-4333-8444-555555555555", &resourcev1.BackendSelection{
+		Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "257", ProviderVersion: "systemd.service.v1",
+		Product: &resourcev1.PlatformProduct{OsId: "debian", Product: "Debian GNU/Linux", Version: "13", Architecture: "x86_64"},
+	})
+}
+
+func testVerification(t *testing.T, plan *resourcev1.ResourcePlan, after *resourcev1.SystemdServiceObservation) *resourcev1.ResourceVerification {
+	t.Helper()
+	result, err := verification(plan, after, plan.GetBefore().GetMetadata().GetExecutorIncarnation())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
 // Exercise the production input boundary with an unopened Provider. Invalid
 // messages must be rejected before connection access, not echoed by a fake bus.
 func TestInvalidDesiredBeforeNativeAccess(t *testing.T) {
-	cases := map[string]func(*agentv1.ServiceDesiredState){
-		"empty unit":          func(d *agentv1.ServiceDesiredState) { d.Unit = "" },
-		"path":                func(d *agentv1.ServiceDesiredState) { d.Unit = "../example.service" },
-		"template":            func(d *agentv1.ServiceDesiredState) { d.Unit = "example@.service" },
-		"escaped unit":        func(d *agentv1.ServiceDesiredState) { d.Unit = `example\x2dother.service` },
-		"protected agent":     func(d *agentv1.ServiceDesiredState) { d.Unit = "lindm-agent.service" },
-		"protected authority": func(d *agentv1.ServiceDesiredState) { d.Unit = "lindm.service" },
-		"unknown runtime":     func(d *agentv1.ServiceDesiredState) { d.Runtime = 99 },
-		"unspecified runtime": func(d *agentv1.ServiceDesiredState) { d.Runtime = 0 },
-		"unknown enablement":  func(d *agentv1.ServiceDesiredState) { d.Enablement = 99 },
-		"both unmanaged":      func(d *agentv1.ServiceDesiredState) { d.Runtime = 1; d.Enablement = 1 },
-		"unknown wire field":  func(d *agentv1.ServiceDesiredState) { d.ProtoReflect().SetUnknown([]byte{0x78, 0x01}) },
+	cases := map[string]func(*resourcev1.SystemdServiceDesired){
+		"empty unit":          func(d *resourcev1.SystemdServiceDesired) { d.Unit = "" },
+		"path":                func(d *resourcev1.SystemdServiceDesired) { d.Unit = "../example.service" },
+		"template":            func(d *resourcev1.SystemdServiceDesired) { d.Unit = "example@.service" },
+		"escaped unit":        func(d *resourcev1.SystemdServiceDesired) { d.Unit = `example\x2dother.service` },
+		"protected agent":     func(d *resourcev1.SystemdServiceDesired) { d.Unit = "lindm-agent.service" },
+		"protected authority": func(d *resourcev1.SystemdServiceDesired) { d.Unit = "lindm.service" },
+		"unknown runtime":     func(d *resourcev1.SystemdServiceDesired) { d.Runtime = 99 },
+		"unspecified runtime": func(d *resourcev1.SystemdServiceDesired) { d.Runtime = 0 },
+		"unknown enablement":  func(d *resourcev1.SystemdServiceDesired) { d.Enablement = 99 },
+		"both unmanaged":      func(d *resourcev1.SystemdServiceDesired) { d.Runtime = 1; d.Enablement = 1 },
+		"unknown wire field":  func(d *resourcev1.SystemdServiceDesired) { d.ProtoReflect().SetUnknown([]byte{0x78, 0x01}) },
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
 			desired := testDesired()
 			change(desired)
-			if _, err := (&Provider{}).Plan(context.Background(), desired); !errors.Is(err, ErrUnsupported) {
+			if _, err := (&Provider{}).Plan(context.Background(), testResourceDesired(desired), resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrUnsupported) {
 				t.Fatalf("invalid desired reached native boundary: %v", err)
 			}
 		})
 	}
-	if _, err := (&Provider{}).Plan(context.Background(), nil); !errors.Is(err, ErrUnsupported) {
+	if _, err := (&Provider{}).Plan(context.Background(), nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("nil desired: %v", err)
 	}
 }
 
 func TestFabricatedPlansBeforeNativeAccess(t *testing.T) {
-	cases := map[string]func(*agentv1.ServicePlan){
-		"runtime drift":           func(p *agentv1.ServicePlan) { p.ChangeRuntime = false },
-		"enablement drift":        func(p *agentv1.ServicePlan) { p.ChangeEnablement = false },
-		"observation fingerprint": func(p *agentv1.ServicePlan) { p.Before.RefuseManualStart = true },
-		"unit mismatch":           func(p *agentv1.ServicePlan) { p.Desired.Unit = "other.service" },
-		"nested unknown":          func(p *agentv1.ServicePlan) { p.Before.ObservedAt.ProtoReflect().SetUnknown([]byte{0x78, 0x01}) },
+	cases := map[string]func(*resourcev1.ResourcePlan){
+		"runtime drift":           func(p *resourcev1.ResourcePlan) { p.GetSystemdService().ChangeRuntime = false },
+		"enablement drift":        func(p *resourcev1.ResourcePlan) { p.GetSystemdService().ChangeEnablement = false },
+		"observation fingerprint": func(p *resourcev1.ResourcePlan) { p.GetSystemdService().Before.RefuseManualStart = true },
+		"unit mismatch":           func(p *resourcev1.ResourcePlan) { p.GetSystemdService().Desired.Unit = "other.service" },
+		"nested unknown": func(p *resourcev1.ResourcePlan) {
+			p.GetSystemdService().Before.ObservedAt.ProtoReflect().SetUnknown([]byte{0x78, 0x01})
+		},
+		"resource kind":      func(p *resourcev1.ResourcePlan) { p.Ref.Kind = resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP },
+		"resource key":       func(p *resourcev1.ResourcePlan) { p.Ref.CanonicalKey = "other.service" },
+		"desired digest":     func(p *resourcev1.ResourcePlan) { p.DesiredSha256[0] ^= 1 },
+		"observation digest": func(p *resourcev1.ResourcePlan) { p.ObservationSha256[0] ^= 1 },
+		"native envelope": func(p *resourcev1.ResourcePlan) {
+			p.Before = testResourceObservation(testObservation())
+			p.Before.Metadata.NativeRevision[0] ^= 1
+		},
+		"claims": func(p *resourcev1.ResourcePlan) { p.Claims = nil },
+		"rollback claim": func(p *resourcev1.ResourcePlan) {
+			p.Safety.RollbackScope = resourcev1.RollbackScope_ROLLBACK_SCOPE_OWNED_DIMENSIONS
+		},
+		"release": func(p *resourcev1.ResourcePlan) {
+			p.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+		},
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -113,27 +154,37 @@ func TestRetainedVerificationRejectsFabricatedCompliance(t *testing.T) {
 	after := testObservation()
 	after.ActiveState, after.SubState, after.UnitFileState = "active", "running", "enabled"
 	after.FingerprintSha256 = fingerprint(after)
-	result := &agentv1.ServiceVerification{Observation: after, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true}
+	result := testVerification(t, plan, after)
 	if err := ValidateVerification(plan, result); err != nil {
 		t.Fatalf("consistent convergence rejected: %v", err)
 	}
-	for name, mutate := range map[string]func(*agentv1.ServiceVerification){
-		"unbound observation": func(v *agentv1.ServiceVerification) { v.Observation.ActiveState = "inactive" },
-		"false runtime": func(v *agentv1.ServiceVerification) {
-			v.Observation.ActiveState, v.Observation.SubState = "inactive", "dead"
-			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+	for name, mutate := range map[string]func(*resourcev1.ResourceVerification){
+		"unbound observation": func(v *resourcev1.ResourceVerification) { v.GetAfter().GetSystemdService().ActiveState = "inactive" },
+		"false runtime": func(v *resourcev1.ResourceVerification) {
+			o := v.GetAfter().GetSystemdService()
+			o.ActiveState, o.SubState = "inactive", "dead"
+			o.FingerprintSha256 = fingerprint(o)
 		},
-		"foreign unit": func(v *agentv1.ServiceVerification) {
-			v.Observation.Unit = "other.service"
-			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		"foreign unit": func(v *resourcev1.ResourceVerification) {
+			o := v.GetAfter().GetSystemdService()
+			o.Unit = "other.service"
+			o.FingerprintSha256 = fingerprint(o)
 		},
-		"false definition": func(v *agentv1.ServiceVerification) {
-			v.Observation.DefinitionSha256[0] ^= 1
-			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		"false definition": func(v *resourcev1.ResourceVerification) {
+			o := v.GetAfter().GetSystemdService()
+			o.DefinitionSha256[0] ^= 1
+			o.FingerprintSha256 = fingerprint(o)
 		},
-		"false boot": func(v *agentv1.ServiceVerification) {
-			v.Observation.BootId = "22222222-2222-4333-8444-555555555555"
-			v.Observation.FingerprintSha256 = fingerprint(v.Observation)
+		"false boot": func(v *resourcev1.ResourceVerification) {
+			o := v.GetAfter().GetSystemdService()
+			o.BootId = "22222222-2222-4333-8444-555555555555"
+			o.FingerprintSha256 = fingerprint(o)
+		},
+		"desired digest":      func(v *resourcev1.ResourceVerification) { v.DesiredSha256[0] ^= 1 },
+		"plan digest":         func(v *resourcev1.ResourceVerification) { v.PlanSha256[0] ^= 1 },
+		"invalid incarnation": func(v *resourcev1.ResourceVerification) { v.After.Metadata.ExecutorIncarnation = "invalid" },
+		"disposition": func(v *resourcev1.ResourceVerification) {
+			v.Disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -154,21 +205,26 @@ func TestFingerprintBindsEveryPreconditionExceptTime(t *testing.T) {
 	if !bytes.Equal(fingerprint(before), fingerprint(later)) {
 		t.Fatal("observation time or stored digest changed fingerprint")
 	}
-	cases := map[string]func(*agentv1.ServiceObservation){
-		"unit":         func(o *agentv1.ServiceObservation) { o.Unit = "other.service" },
-		"boot":         func(o *agentv1.ServiceObservation) { o.BootId = "22222222-2222-4333-8444-555555555555" },
-		"load":         func(o *agentv1.ServiceObservation) { o.LoadState = "masked" },
-		"active":       func(o *agentv1.ServiceObservation) { o.ActiveState = "active" },
-		"substate":     func(o *agentv1.ServiceObservation) { o.SubState = "running" },
-		"enablement":   func(o *agentv1.ServiceObservation) { o.UnitFileState = "enabled" },
-		"type":         func(o *agentv1.ServiceObservation) { o.ServiceType = "oneshot" },
-		"remain":       func(o *agentv1.ServiceObservation) { o.RemainAfterExit = true },
-		"refuse start": func(o *agentv1.ServiceObservation) { o.RefuseManualStart = true },
-		"refuse stop":  func(o *agentv1.ServiceObservation) { o.RefuseManualStop = true },
-		"reload":       func(o *agentv1.ServiceObservation) { o.NeedDaemonReload = true },
-		"transient":    func(o *agentv1.ServiceObservation) { o.Transient = true },
-		"definition":   func(o *agentv1.ServiceObservation) { o.DefinitionSha256[0] ^= 1 },
-		"job":          func(o *agentv1.ServiceObservation) { o.JobPending = true },
+	cases := map[string]func(*resourcev1.SystemdServiceObservation){
+		"unit":         func(o *resourcev1.SystemdServiceObservation) { o.Unit = "other.service" },
+		"boot":         func(o *resourcev1.SystemdServiceObservation) { o.BootId = "22222222-2222-4333-8444-555555555555" },
+		"load":         func(o *resourcev1.SystemdServiceObservation) { o.LoadState = "masked" },
+		"active":       func(o *resourcev1.SystemdServiceObservation) { o.ActiveState = "active" },
+		"substate":     func(o *resourcev1.SystemdServiceObservation) { o.SubState = "running" },
+		"enablement":   func(o *resourcev1.SystemdServiceObservation) { o.UnitFileState = "enabled" },
+		"type":         func(o *resourcev1.SystemdServiceObservation) { o.ServiceType = "oneshot" },
+		"remain":       func(o *resourcev1.SystemdServiceObservation) { o.RemainAfterExit = true },
+		"refuse start": func(o *resourcev1.SystemdServiceObservation) { o.RefuseManualStart = true },
+		"refuse stop":  func(o *resourcev1.SystemdServiceObservation) { o.RefuseManualStop = true },
+		"reload":       func(o *resourcev1.SystemdServiceObservation) { o.NeedDaemonReload = true },
+		"transient":    func(o *resourcev1.SystemdServiceObservation) { o.Transient = true },
+		"definition":   func(o *resourcev1.SystemdServiceObservation) { o.DefinitionSha256[0] ^= 1 },
+		"job":          func(o *resourcev1.SystemdServiceObservation) { o.JobPending = true },
+		"invocation":   func(o *resourcev1.SystemdServiceObservation) { o.InvocationId = bytes.Repeat([]byte{3}, 16) },
+		"projection":   func(o *resourcev1.SystemdServiceObservation) { o.InstallProjectionComplete = true },
+		"install links": func(o *resourcev1.SystemdServiceObservation) {
+			o.InstallLinks = []*resourcev1.InstallLink{{Path: "/etc/systemd/system/multi-user.target.wants/example.service", Target: "/usr/lib/systemd/system/example.service", Device: 1, Inode: 2, AncestrySha256: bytes.Repeat([]byte{4}, 32)}}
+		},
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -187,26 +243,40 @@ func TestFingerprintBindsEveryPreconditionExceptTime(t *testing.T) {
 
 func TestUnsupportedAndConflictingNativeStates(t *testing.T) {
 	cases := map[string]struct {
-		change func(*agentv1.ServiceDesiredState, *agentv1.ServiceObservation)
+		change func(*resourcev1.SystemdServiceDesired, *resourcev1.SystemdServiceObservation)
 		want   error
 	}{
-		"pending":      {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.JobPending = true }, ErrConflict},
-		"transition":   {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.ActiveState = "activating" }, ErrConflict},
-		"oneshot":      {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.ServiceType = "oneshot" }, ErrUnsupported},
-		"reload":       {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.NeedDaemonReload = true }, ErrUnsupported},
-		"transient":    {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.Transient = true }, ErrUnsupported},
-		"refuse start": {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.RefuseManualStart = true }, ErrUnsupported},
-		"refuse stop": {func(d *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) {
+		"pending": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.JobPending = true
+		}, ErrConflict},
+		"transition": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.ActiveState = "activating"
+		}, ErrConflict},
+		"oneshot": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.ServiceType = "oneshot"
+		}, ErrUnsupported},
+		"reload": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.NeedDaemonReload = true
+		}, ErrUnsupported},
+		"transient": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) { o.Transient = true }, ErrUnsupported},
+		"refuse start": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.RefuseManualStart = true
+		}, ErrUnsupported},
+		"refuse stop": {func(d *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
 			d.Runtime = 3
 			o.ActiveState = "active"
 			o.SubState = "running"
 			o.RefuseManualStop = true
 		}, ErrUnsupported},
-		"static managed": {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.UnitFileState = "static" }, ErrUnsupported},
-		"runtime enabled": {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) {
+		"static managed": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.UnitFileState = "static"
+		}, ErrUnsupported},
+		"runtime enabled": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
 			o.UnitFileState = "enabled-runtime"
 		}, ErrUnsupported},
-		"unknown active": {func(_ *agentv1.ServiceDesiredState, o *agentv1.ServiceObservation) { o.ActiveState = "future-state" }, ErrUnsupported},
+		"unknown active": {func(_ *resourcev1.SystemdServiceDesired, o *resourcev1.SystemdServiceObservation) {
+			o.ActiveState = "future-state"
+		}, ErrUnsupported},
 	}
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -218,7 +288,7 @@ func TestUnsupportedAndConflictingNativeStates(t *testing.T) {
 		})
 	}
 	desired, before := testDesired(), testObservation()
-	desired.Enablement = agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
+	desired.Enablement = resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
 	before.UnitFileState = "static"
 	if runtime, enablement, err := drift(desired, before); err != nil || !runtime || enablement {
 		t.Fatalf("ordinary static unit with unmanaged enablement: %t %t %v", runtime, enablement, err)
@@ -227,36 +297,46 @@ func TestUnsupportedAndConflictingNativeStates(t *testing.T) {
 
 func TestVerificationDefinitionAndUnmanagedInvariants(t *testing.T) {
 	plan := testPlan(t)
-	after := proto.CloneOf(plan.GetBefore())
+	after := proto.CloneOf(plan.GetSystemdService().GetBefore())
 	after.ActiveState, after.SubState, after.UnitFileState = "active", "running", "enabled"
 	after.FingerprintSha256 = fingerprint(after)
-	result := verification(plan, after)
-	if !result.GetConverged() || !result.GetDefinitionMatches() {
+	result := testVerification(t, plan, after)
+	if !result.GetSystemdService().GetConverged() || !result.GetSystemdService().GetDefinitionMatches() {
 		t.Fatal("runtime/enablement drift incorrectly treated as definition drift")
 	}
-	for _, change := range []func(*agentv1.ServiceObservation){
-		func(o *agentv1.ServiceObservation) { o.DefinitionSha256[0] ^= 1 },
-		func(o *agentv1.ServiceObservation) { o.JobPending = true },
-		func(o *agentv1.ServiceObservation) { o.NeedDaemonReload = true },
-		func(o *agentv1.ServiceObservation) { o.Transient = true },
-		func(o *agentv1.ServiceObservation) { o.ActiveState = "future-state" },
-		func(o *agentv1.ServiceObservation) { o.SubState = "future-state" },
-		func(o *agentv1.ServiceObservation) { o.BootId = "22222222-2222-4333-8444-555555555555" },
+	for _, change := range []func(*resourcev1.SystemdServiceObservation){
+		func(o *resourcev1.SystemdServiceObservation) { o.DefinitionSha256[0] ^= 1 },
+		func(o *resourcev1.SystemdServiceObservation) { o.JobPending = true },
+		func(o *resourcev1.SystemdServiceObservation) { o.NeedDaemonReload = true },
+		func(o *resourcev1.SystemdServiceObservation) { o.Transient = true },
+		func(o *resourcev1.SystemdServiceObservation) { o.ActiveState = "future-state" },
+		func(o *resourcev1.SystemdServiceObservation) { o.SubState = "future-state" },
+		func(o *resourcev1.SystemdServiceObservation) { o.BootId = "22222222-2222-4333-8444-555555555555" },
 	} {
 		changed := proto.CloneOf(after)
 		change(changed)
-		if verification(plan, changed).GetConverged() {
+		if testVerification(t, plan, changed).GetSystemdService().GetConverged() {
 			t.Fatal("unsafe state reported converged")
 		}
 	}
-	plan.Desired.Runtime = agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED
+	desired := testDesired()
+	desired.Runtime = resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED
+	plan, err := planFor(testResourceDesired(desired), testResourceObservation(testObservation()), bytes.Repeat([]byte{2}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
 	after.ActiveState, after.SubState = "inactive", "dead"
-	if !verification(plan, after).GetRuntimeMatches() {
+	if !testVerification(t, plan, after).GetSystemdService().GetRuntimeMatches() {
 		t.Fatal("unmanaged runtime reported drift")
 	}
-	plan.Desired.Enablement = agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
+	desired.Runtime = resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE
+	desired.Enablement = resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
+	plan, err = planFor(testResourceDesired(desired), testResourceObservation(testObservation()), bytes.Repeat([]byte{2}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
 	after.UnitFileState = "static"
-	if !verification(plan, after).GetEnablementMatches() {
+	if !testVerification(t, plan, after).GetSystemdService().GetEnablementMatches() {
 		t.Fatal("unmanaged enablement reported drift")
 	}
 }
@@ -289,5 +369,145 @@ func TestExactNativeJobCompletion(t *testing.T) {
 	signal.Body[3] = "failed"
 	if result, matches := jobResult(signal, owner, job, unit); !matches || result != "failed" {
 		t.Fatal("failed job result was lost")
+	}
+}
+
+func TestResourceEnvelopeBindings(t *testing.T) {
+	plan := testPlan(t)
+	desired := testResourceDesired(testDesired())
+	desiredDigest, err := resource.DesiredDigest(desired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observationDigest, err := resource.ObservationDigest(plan.GetBefore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(plan.GetDesiredSha256(), desiredDigest[:]) || !bytes.Equal(plan.GetObservationSha256(), observationDigest[:]) {
+		t.Fatal("plan did not bind exact resource envelope digests")
+	}
+	if plan.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE || !resource.RefEqual(plan.GetRef(), desired.GetRef()) {
+		t.Fatal("plan lost canonical resource identity or operation")
+	}
+	if err := ValidatePlan(plan); err != nil {
+		t.Fatal(err)
+	}
+	result := testVerification(t, plan, testObservation())
+	if result.GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED {
+		t.Fatal("unchanged native drift reported convergence")
+	}
+	if err := ValidateVerification(plan, result); err != nil {
+		t.Fatal(err)
+	}
+	planDigest, err := resource.PlanDigest(plan)
+	if err != nil || !bytes.Equal(result.GetPlanSha256(), planDigest[:]) {
+		t.Fatalf("verification did not bind exact plan: %v", err)
+	}
+}
+
+func TestResourceAdmissionAndUnknownOwnershipRelease(t *testing.T) {
+	for _, operation := range []resourcev1.ResourceOperation{
+		resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE,
+		resourcev1.ResourceOperation_RESOURCE_OPERATION_UNSPECIFIED,
+		resourcev1.ResourceOperation(99),
+	} {
+		plan, err := (&Provider{}).Plan(t.Context(), testResourceDesired(testDesired()), operation)
+		if !errors.Is(err, ErrUnsupported) || plan != nil {
+			t.Fatalf("unsupported operation %v reached native access or fabricated restoration: %v", operation, err)
+		}
+		if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && !errors.Is(err, ErrBaselineUnknown) {
+			t.Fatalf("release hid unknown ownership: %v", err)
+		}
+		if operation != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && errors.Is(err, ErrBaselineUnknown) {
+			t.Fatalf("invalid operation misclassified as unknown baseline: %v", err)
+		}
+	}
+	for name, mutate := range map[string]func(*resourcev1.ResourceDesiredState){
+		"missing ref": func(d *resourcev1.ResourceDesiredState) { d.Ref = nil },
+		"foreign key": func(d *resourcev1.ResourceDesiredState) { d.Ref.CanonicalKey = "other.service" },
+		"foreign kind": func(d *resourcev1.ResourceDesiredState) {
+			d.Ref.Kind = resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP
+		},
+		"unknown field": func(d *resourcev1.ResourceDesiredState) { d.ProtoReflect().SetUnknown([]byte{0xf8, 0x07, 0x01}) },
+		"other resource": func(d *resourcev1.ResourceDesiredState) {
+			d.Ref = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "example"}
+			d.State = &resourcev1.ResourceDesiredState_LocalGroup{LocalGroup: &resourcev1.LocalGroupDesired{
+				Name: "example", Presence: resourcev1.Presence_PRESENCE_PRESENT,
+			}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			desired := testResourceDesired(testDesired())
+			mutate(desired)
+			if _, err := (&Provider{}).Plan(t.Context(), desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrUnsupported) {
+				t.Fatalf("invalid resource reached native access: %v", err)
+			}
+		})
+	}
+}
+
+func TestExecutorAndOwnershipBinding(t *testing.T) {
+	plan := testPlan(t)
+	provider := &Provider{
+		incarnation:       plan.GetBefore().GetMetadata().GetExecutorIncarnation(),
+		backend:           proto.CloneOf(plan.GetBackend()),
+		ownershipRevision: bytes.Clone(plan.GetOwnershipRevisionSha256()),
+	}
+	if err := provider.checkBinding(plan, true); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*resourcev1.ResourcePlan){
+		"incarnation": func(p *resourcev1.ResourcePlan) {
+			p.Before.Metadata.ExecutorIncarnation = "44444444-2222-4333-8444-555555555555"
+		},
+		"native backend": func(p *resourcev1.ResourcePlan) { p.Backend.NativeVersion = "258" },
+		"ownership":      func(p *resourcev1.ResourcePlan) { p.OwnershipRevisionSha256[0] ^= 1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := proto.CloneOf(plan)
+			mutate(changed)
+			if err := provider.checkBinding(changed, true); !errors.Is(err, ErrConflict) {
+				t.Fatalf("foreign executor/ownership context accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestReadOnlyVerificationAcrossExecutorRestart(t *testing.T) {
+	plan := testPlan(t)
+	const restarted = "44444444-2222-4333-8444-555555555555"
+	provider := &Provider{
+		incarnation:       restarted,
+		backend:           proto.CloneOf(plan.GetBackend()),
+		ownershipRevision: bytes.Clone(plan.GetOwnershipRevisionSha256()),
+	}
+	if err := provider.checkBinding(plan, false); err != nil {
+		t.Fatalf("read-only restart reconciliation rejected: %v", err)
+	}
+	if err := provider.checkBinding(plan, true); !errors.Is(err, ErrConflict) {
+		t.Fatalf("previous incarnation authorized another effect: %v", err)
+	}
+	after := testObservation()
+	after.ActiveState, after.SubState, after.UnitFileState = "active", "running", "enabled"
+	after.FingerprintSha256 = fingerprint(after)
+	result, err := verification(plan, after, provider.incarnation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.GetAfter().GetMetadata().GetExecutorIncarnation() != restarted ||
+		result.GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED {
+		t.Fatal("restart verification lost current observer or native convergence")
+	}
+	if err := ValidateVerification(plan, result); err != nil {
+		t.Fatalf("retained restart evidence rejected: %v", err)
+	}
+	after.BootId = "55555555-2222-4333-8444-555555555555"
+	after.FingerprintSha256 = fingerprint(after)
+	result, err = verification(plan, after, provider.incarnation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED {
+		t.Fatal("restart verification bypassed boot fence")
 	}
 }

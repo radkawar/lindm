@@ -165,6 +165,23 @@ Both recovery records refuse before sanitize approval/action. Do not resize the
 ESP, delete vendor boot files or substitute a kernel to relabel this stock cell
 as passed. Separately qualified external recovery is a different capability.
 
+## Resource providers
+
+The agent executes only generic signed resource intents. Systemd service is
+dispatched; Fedora 44 post-cutover service dispatch is not yet re-recorded.
+Every other kind has an agent provider but is dispatched only after the server's
+per-kind qualification table lists it with native Ubuntu 24.04 and Fedora 44
+records; until then its assignments show `resource_executor_not_available`.
+
+Native mechanisms on Fedora: packages require DNF5 (detected by the shared
+[`dnf`](../../internal/agent/dnf/manager.go) helper; DNF4 is refused) in
+asynchronously staged transient units, with an owned
+`/etc/dnf/versionlock.toml` entry for exact versions; password policy uses
+authselect feature transactions; sysctl persistence is an
+owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
+tools against the exact host `/etc` bound into a private account root.
+Firewall restoration and its rollback supervisor units ship disabled.
+
 ## Device actions
 
 Encryption success does not imply power, desktop lock, account lock, quarantine

@@ -2,15 +2,23 @@
 
 package vmlab
 
-import "testing"
+import (
+	"testing"
+
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
+)
 
 func TestTruthActiveSession(t *testing.T) {
 	got, err := parseTruthActiveSession([]byte("Name=lindm-lab\nClass=user\nType=tty\nSeat=\nRemote=yes\nActive=yes\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil || got.UserName.Value != "lindm-lab" || got.SessionClass.Value != "user" || got.SessionType.Value != "tty" || got.Seat.Status != truthUnavailable || got.Remote.Status != truthSuccess || !got.Remote.Value {
+	if got == nil || got.UserName.Value != "lindm-lab" || got.SessionClass.Value != "user" || got.SessionType.Value != "tty" || got.Seat.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE || got.Remote.Status != truthSuccess || !got.Remote.Value {
 		t.Fatalf("incorrect active remote-session truth: %v", got)
+	}
+	got, err = parseTruthActiveSession([]byte("Active=yes\nName=lindm-lab\nClass=user\nType=x11\nSeat=\nRemote=no\n"))
+	if err != nil || got == nil || got.Seat.Status != truthUnavailable {
+		t.Fatalf("local graphical session without seat must stay unavailable: %v, %v", got, err)
 	}
 	got, err = parseTruthActiveSession([]byte("Active=yes\nName=lindm-lab\nClass=manager\nType=unspecified\nSeat=seat0\nRemote=no\n"))
 	if err != nil || got == nil || got.SessionClass.Value != "manager" || got.Seat.Value != "seat0" || got.Remote.Status != truthSuccess || got.Remote.Value {

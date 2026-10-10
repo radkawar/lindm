@@ -11,6 +11,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	v1 "lindm/gen/lindm/resource/v1"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
 	sync "sync"
@@ -53,9 +54,19 @@ type AgentConfig struct {
 	ActionProvider *DeviceActionProviderConfig `protobuf:"bytes,6,opt,name=action_provider,json=actionProvider,proto3" json:"action_provider,omitempty"`
 	RecoveryBoot   *RecoveryBootConfig         `protobuf:"bytes,7,opt,name=recovery_boot,json=recoveryBoot,proto3" json:"recovery_boot,omitempty"`
 	// Only the executor's copy grants update authority. Absent means disabled.
-	Updates       *AgentUpdateConfig `protobuf:"bytes,8,opt,name=updates,proto3" json:"updates,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Updates *AgentUpdateConfig `protobuf:"bytes,8,opt,name=updates,proto3" json:"updates,omitempty"`
+	// Root-approved native repository sources. Absent means package effects disabled.
+	// Native package effects run in a distinct protected transaction helper.
+	PackageProvider   *NativePackageProviderConfig   `protobuf:"bytes,9,opt,name=package_provider,json=packageProvider,proto3" json:"package_provider,omitempty"`
+	FileProvider      *NativeFileProviderConfig      `protobuf:"bytes,10,opt,name=file_provider,json=fileProvider,proto3" json:"file_provider,omitempty"`
+	SysctlProvider    *NativeSysctlProviderConfig    `protobuf:"bytes,11,opt,name=sysctl_provider,json=sysctlProvider,proto3" json:"sysctl_provider,omitempty"`
+	AccountProvider   *NativeAccountProviderConfig   `protobuf:"bytes,12,opt,name=account_provider,json=accountProvider,proto3" json:"account_provider,omitempty"`
+	FirewallProvider  *NativeFirewallProviderConfig  `protobuf:"bytes,13,opt,name=firewall_provider,json=firewallProvider,proto3" json:"firewall_provider,omitempty"`
+	PasswordProvider  *NativePasswordProviderConfig  `protobuf:"bytes,14,opt,name=password_provider,json=passwordProvider,proto3" json:"password_provider,omitempty"`
+	ConnectivityGuard *ConnectivityGuardConfig       `protobuf:"bytes,15,opt,name=connectivity_guard,json=connectivityGuard,proto3" json:"connectivity_guard,omitempty"`
+	ConnectivityProbe *ConnectivityProbeServerConfig `protobuf:"bytes,16,opt,name=connectivity_probe,json=connectivityProbe,proto3" json:"connectivity_probe,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AgentConfig) Reset() {
@@ -144,6 +155,175 @@ func (x *AgentConfig) GetUpdates() *AgentUpdateConfig {
 	return nil
 }
 
+func (x *AgentConfig) GetPackageProvider() *NativePackageProviderConfig {
+	if x != nil {
+		return x.PackageProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetFileProvider() *NativeFileProviderConfig {
+	if x != nil {
+		return x.FileProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetSysctlProvider() *NativeSysctlProviderConfig {
+	if x != nil {
+		return x.SysctlProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetAccountProvider() *NativeAccountProviderConfig {
+	if x != nil {
+		return x.AccountProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetFirewallProvider() *NativeFirewallProviderConfig {
+	if x != nil {
+		return x.FirewallProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetPasswordProvider() *NativePasswordProviderConfig {
+	if x != nil {
+		return x.PasswordProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetConnectivityGuard() *ConnectivityGuardConfig {
+	if x != nil {
+		return x.ConnectivityGuard
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetConnectivityProbe() *ConnectivityProbeServerConfig {
+	if x != nil {
+		return x.ConnectivityProbe
+	}
+	return nil
+}
+
+type NativePackageProviderConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sources       []*NativePackageSource `protobuf:"bytes,1,rep,name=sources,proto3" json:"sources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NativePackageProviderConfig) Reset() {
+	*x = NativePackageProviderConfig{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NativePackageProviderConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NativePackageProviderConfig) ProtoMessage() {}
+
+func (x *NativePackageProviderConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NativePackageProviderConfig.ProtoReflect.Descriptor instead.
+func (*NativePackageProviderConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *NativePackageProviderConfig) GetSources() []*NativePackageSource {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+// Locally provisioned signing material, never a remotely supplied filesystem path.
+type NativePackageSource struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Repository               *v1.RepositoryDesired  `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
+	SigningKeyFile           string                 `protobuf:"bytes,2,opt,name=signing_key_file,json=signingKeyFile,proto3" json:"signing_key_file,omitempty"`
+	SigningKeySha256         []byte                 `protobuf:"bytes,3,opt,name=signing_key_sha256,json=signingKeySha256,proto3" json:"signing_key_sha256,omitempty"`
+	RpmSigningKeyFingerprint string                 `protobuf:"bytes,4,opt,name=rpm_signing_key_fingerprint,json=rpmSigningKeyFingerprint,proto3" json:"rpm_signing_key_fingerprint,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *NativePackageSource) Reset() {
+	*x = NativePackageSource{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NativePackageSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NativePackageSource) ProtoMessage() {}
+
+func (x *NativePackageSource) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NativePackageSource.ProtoReflect.Descriptor instead.
+func (*NativePackageSource) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *NativePackageSource) GetRepository() *v1.RepositoryDesired {
+	if x != nil {
+		return x.Repository
+	}
+	return nil
+}
+
+func (x *NativePackageSource) GetSigningKeyFile() string {
+	if x != nil {
+		return x.SigningKeyFile
+	}
+	return ""
+}
+
+func (x *NativePackageSource) GetSigningKeySha256() []byte {
+	if x != nil {
+		return x.SigningKeySha256
+	}
+	return nil
+}
+
+func (x *NativePackageSource) GetRpmSigningKeyFingerprint() string {
+	if x != nil {
+		return x.RpmSigningKeyFingerprint
+	}
+	return ""
+}
+
 // Root-owned local qualification, never remotely supplied execution authority.
 type DeviceActionProviderConfig struct {
 	state               protoimpl.MessageState   `protogen:"open.v1"`
@@ -172,7 +352,7 @@ type DeviceActionProviderConfig struct {
 
 func (x *DeviceActionProviderConfig) Reset() {
 	*x = DeviceActionProviderConfig{}
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -184,7 +364,7 @@ func (x *DeviceActionProviderConfig) String() string {
 func (*DeviceActionProviderConfig) ProtoMessage() {}
 
 func (x *DeviceActionProviderConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -197,7 +377,7 @@ func (x *DeviceActionProviderConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionProviderConfig.ProtoReflect.Descriptor instead.
 func (*DeviceActionProviderConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{1}
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DeviceActionProviderConfig) GetTargets() []*QualifiedActionTarget {
@@ -311,7 +491,7 @@ type QualifiedActionTarget struct {
 
 func (x *QualifiedActionTarget) Reset() {
 	*x = QualifiedActionTarget{}
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -323,7 +503,7 @@ func (x *QualifiedActionTarget) String() string {
 func (*QualifiedActionTarget) ProtoMessage() {}
 
 func (x *QualifiedActionTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -336,7 +516,7 @@ func (x *QualifiedActionTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QualifiedActionTarget.ProtoReflect.Descriptor instead.
 func (*QualifiedActionTarget) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{2}
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *QualifiedActionTarget) GetTarget() *StorageTarget {
@@ -425,7 +605,7 @@ type RecoveryRuntimeConfig struct {
 
 func (x *RecoveryRuntimeConfig) Reset() {
 	*x = RecoveryRuntimeConfig{}
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -437,7 +617,7 @@ func (x *RecoveryRuntimeConfig) String() string {
 func (*RecoveryRuntimeConfig) ProtoMessage() {}
 
 func (x *RecoveryRuntimeConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -450,7 +630,7 @@ func (x *RecoveryRuntimeConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryRuntimeConfig.ProtoReflect.Descriptor instead.
 func (*RecoveryRuntimeConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RecoveryRuntimeConfig) GetStateDirectory() string {
@@ -540,7 +720,7 @@ type RecoveryBootConfig struct {
 
 func (x *RecoveryBootConfig) Reset() {
 	*x = RecoveryBootConfig{}
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -552,7 +732,7 @@ func (x *RecoveryBootConfig) String() string {
 func (*RecoveryBootConfig) ProtoMessage() {}
 
 func (x *RecoveryBootConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -565,7 +745,7 @@ func (x *RecoveryBootConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryBootConfig.ProtoReflect.Descriptor instead.
 func (*RecoveryBootConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RecoveryBootConfig) GetImageFile() string {
@@ -635,7 +815,7 @@ var File_lindm_agent_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1blindm/agent/v1/update.proto\x1a&lindm/validation/v1/string_rules.proto\"\x95\x04\n" +
+	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a.lindm/agent/v1/connectivity_probe_config.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/native_password.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/resource/v1/software.proto\x1a&lindm/validation/v1/string_rules.proto\"\xd5\t\n" +
 	"\vAgentConfig\x122\n" +
 	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x126\n" +
 	"\x11runtime_directory\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10runtimeDirectory\x12=\n" +
@@ -645,7 +825,29 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x0fspool_directory\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0espoolDirectory\x12S\n" +
 	"\x0faction_provider\x18\x06 \x01(\v2*.lindm.agent.v1.DeviceActionProviderConfigR\x0eactionProvider\x12G\n" +
 	"\rrecovery_boot\x18\a \x01(\v2\".lindm.agent.v1.RecoveryBootConfigR\frecoveryBoot\x12;\n" +
-	"\aupdates\x18\b \x01(\v2!.lindm.agent.v1.AgentUpdateConfigR\aupdates\"\x91\x06\n" +
+	"\aupdates\x18\b \x01(\v2!.lindm.agent.v1.AgentUpdateConfigR\aupdates\x12V\n" +
+	"\x10package_provider\x18\t \x01(\v2+.lindm.agent.v1.NativePackageProviderConfigR\x0fpackageProvider\x12M\n" +
+	"\rfile_provider\x18\n" +
+	" \x01(\v2(.lindm.agent.v1.NativeFileProviderConfigR\ffileProvider\x12S\n" +
+	"\x0fsysctl_provider\x18\v \x01(\v2*.lindm.agent.v1.NativeSysctlProviderConfigR\x0esysctlProvider\x12V\n" +
+	"\x10account_provider\x18\f \x01(\v2+.lindm.agent.v1.NativeAccountProviderConfigR\x0faccountProvider\x12Y\n" +
+	"\x11firewall_provider\x18\r \x01(\v2,.lindm.agent.v1.NativeFirewallProviderConfigR\x10firewallProvider\x12Y\n" +
+	"\x11password_provider\x18\x0e \x01(\v2,.lindm.agent.v1.NativePasswordProviderConfigR\x10passwordProvider\x12V\n" +
+	"\x12connectivity_guard\x18\x0f \x01(\v2'.lindm.agent.v1.ConnectivityGuardConfigR\x11connectivityGuard\x12\\\n" +
+	"\x12connectivity_probe\x18\x10 \x01(\v2-.lindm.agent.v1.ConnectivityProbeServerConfigR\x11connectivityProbe\"\xce\x02\n" +
+	"\x1bNativePackageProviderConfig\x12I\n" +
+	"\asources\x18\x01 \x03(\v2#.lindm.agent.v1.NativePackageSourceB\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10 R\asources:\xe3\x01\xbaH\xdf\x01\x1a\xdc\x01\n" +
+	"&native_package_provider.unique_sources\x12?approved package sources must have unique repository identities\x1aqthis.sources.all(s, this.sources.filter(o, o.repository.repository_id == s.repository.repository_id).size() == 1)\"\xda\a\n" +
+	"\x13NativePackageSource\x12L\n" +
+	"\n" +
+	"repository\x18\x01 \x01(\v2$.lindm.resource.v1.RepositoryDesiredB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"repository\x123\n" +
+	"\x10signing_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0esigningKeyFile\x125\n" +
+	"\x12signing_key_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x10signingKeySha256\x12d\n" +
+	"\x1brpm_signing_key_fingerprint\x18\x04 \x01(\tB%\xbaH\"r 2\x1e^([0-9A-F]{40}|[0-9A-F]{64})?$R\x18rpmSigningKeyFingerprint:\xa2\x05\xbaH\x9e\x05\x1a\xea\x01\n" +
+	"\x1enative_package_source.approved\x12Gnative package sources must be present approved APT or RPM repositories\x1a\x7fthis.repository.presence == 1 && !has(this.repository.authentication) && (has(this.repository.apt) || has(this.repository.rpm))\x1a\xae\x03\n" +
+	"\x1cnative_package_source.signer\x12Athe local key must match the approved repository signing artifact\x1a\xca\x02(has(this.repository.apt) && this.rpm_signing_key_fingerprint == '' && this.repository.apt.signing_key.sha256 == this.signing_key_sha256) || (has(this.repository.rpm) && this.rpm_signing_key_fingerprint != '' && this.repository.rpm.signing_keys.size() == 1 && this.repository.rpm.signing_keys[0].sha256 == this.signing_key_sha256)\"\x91\x06\n" +
 	"\x1aDeviceActionProviderConfig\x12I\n" +
 	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
 	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +
@@ -716,35 +918,55 @@ func file_lindm_agent_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_config_proto_rawDescData
 }
 
-var file_lindm_agent_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_lindm_agent_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_lindm_agent_v1_config_proto_goTypes = []any{
-	(*AgentConfig)(nil),                // 0: lindm.agent.v1.AgentConfig
-	(*DeviceActionProviderConfig)(nil), // 1: lindm.agent.v1.DeviceActionProviderConfig
-	(*QualifiedActionTarget)(nil),      // 2: lindm.agent.v1.QualifiedActionTarget
-	(*RecoveryRuntimeConfig)(nil),      // 3: lindm.agent.v1.RecoveryRuntimeConfig
-	(*RecoveryBootConfig)(nil),         // 4: lindm.agent.v1.RecoveryBootConfig
-	(*AgentUpdateConfig)(nil),          // 5: lindm.agent.v1.AgentUpdateConfig
-	(*StorageTarget)(nil),              // 6: lindm.agent.v1.StorageTarget
-	(SanitizeMethod)(0),                // 7: lindm.agent.v1.SanitizeMethod
-	(RecoveryCustody)(0),               // 8: lindm.agent.v1.RecoveryCustody
-	(*timestamppb.Timestamp)(nil),      // 9: google.protobuf.Timestamp
+	(*AgentConfig)(nil),                   // 0: lindm.agent.v1.AgentConfig
+	(*NativePackageProviderConfig)(nil),   // 1: lindm.agent.v1.NativePackageProviderConfig
+	(*NativePackageSource)(nil),           // 2: lindm.agent.v1.NativePackageSource
+	(*DeviceActionProviderConfig)(nil),    // 3: lindm.agent.v1.DeviceActionProviderConfig
+	(*QualifiedActionTarget)(nil),         // 4: lindm.agent.v1.QualifiedActionTarget
+	(*RecoveryRuntimeConfig)(nil),         // 5: lindm.agent.v1.RecoveryRuntimeConfig
+	(*RecoveryBootConfig)(nil),            // 6: lindm.agent.v1.RecoveryBootConfig
+	(*AgentUpdateConfig)(nil),             // 7: lindm.agent.v1.AgentUpdateConfig
+	(*NativeFileProviderConfig)(nil),      // 8: lindm.agent.v1.NativeFileProviderConfig
+	(*NativeSysctlProviderConfig)(nil),    // 9: lindm.agent.v1.NativeSysctlProviderConfig
+	(*NativeAccountProviderConfig)(nil),   // 10: lindm.agent.v1.NativeAccountProviderConfig
+	(*NativeFirewallProviderConfig)(nil),  // 11: lindm.agent.v1.NativeFirewallProviderConfig
+	(*NativePasswordProviderConfig)(nil),  // 12: lindm.agent.v1.NativePasswordProviderConfig
+	(*ConnectivityGuardConfig)(nil),       // 13: lindm.agent.v1.ConnectivityGuardConfig
+	(*ConnectivityProbeServerConfig)(nil), // 14: lindm.agent.v1.ConnectivityProbeServerConfig
+	(*v1.RepositoryDesired)(nil),          // 15: lindm.resource.v1.RepositoryDesired
+	(*StorageTarget)(nil),                 // 16: lindm.agent.v1.StorageTarget
+	(SanitizeMethod)(0),                   // 17: lindm.agent.v1.SanitizeMethod
+	(RecoveryCustody)(0),                  // 18: lindm.agent.v1.RecoveryCustody
+	(*timestamppb.Timestamp)(nil),         // 19: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_config_proto_depIdxs = []int32{
-	1,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
-	4,  // 1: lindm.agent.v1.AgentConfig.recovery_boot:type_name -> lindm.agent.v1.RecoveryBootConfig
-	5,  // 2: lindm.agent.v1.AgentConfig.updates:type_name -> lindm.agent.v1.AgentUpdateConfig
-	2,  // 3: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
-	6,  // 4: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
-	7,  // 5: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
-	1,  // 6: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
-	8,  // 7: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	9,  // 8: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	8,  // 9: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	3,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	6,  // 1: lindm.agent.v1.AgentConfig.recovery_boot:type_name -> lindm.agent.v1.RecoveryBootConfig
+	7,  // 2: lindm.agent.v1.AgentConfig.updates:type_name -> lindm.agent.v1.AgentUpdateConfig
+	1,  // 3: lindm.agent.v1.AgentConfig.package_provider:type_name -> lindm.agent.v1.NativePackageProviderConfig
+	8,  // 4: lindm.agent.v1.AgentConfig.file_provider:type_name -> lindm.agent.v1.NativeFileProviderConfig
+	9,  // 5: lindm.agent.v1.AgentConfig.sysctl_provider:type_name -> lindm.agent.v1.NativeSysctlProviderConfig
+	10, // 6: lindm.agent.v1.AgentConfig.account_provider:type_name -> lindm.agent.v1.NativeAccountProviderConfig
+	11, // 7: lindm.agent.v1.AgentConfig.firewall_provider:type_name -> lindm.agent.v1.NativeFirewallProviderConfig
+	12, // 8: lindm.agent.v1.AgentConfig.password_provider:type_name -> lindm.agent.v1.NativePasswordProviderConfig
+	13, // 9: lindm.agent.v1.AgentConfig.connectivity_guard:type_name -> lindm.agent.v1.ConnectivityGuardConfig
+	14, // 10: lindm.agent.v1.AgentConfig.connectivity_probe:type_name -> lindm.agent.v1.ConnectivityProbeServerConfig
+	2,  // 11: lindm.agent.v1.NativePackageProviderConfig.sources:type_name -> lindm.agent.v1.NativePackageSource
+	15, // 12: lindm.agent.v1.NativePackageSource.repository:type_name -> lindm.resource.v1.RepositoryDesired
+	4,  // 13: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
+	16, // 14: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	17, // 15: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
+	3,  // 16: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	18, // 17: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	19, // 18: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	18, // 19: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_config_proto_init() }
@@ -752,8 +974,13 @@ func file_lindm_agent_v1_config_proto_init() {
 	if File_lindm_agent_v1_config_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_connectivity_guard_proto_init()
+	file_lindm_agent_v1_connectivity_probe_config_proto_init()
 	file_lindm_agent_v1_device_action_recovery_proto_init()
 	file_lindm_agent_v1_device_actions_proto_init()
+	file_lindm_agent_v1_native_firewall_proto_init()
+	file_lindm_agent_v1_native_password_proto_init()
+	file_lindm_agent_v1_resource_native_proto_init()
 	file_lindm_agent_v1_update_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -761,7 +988,7 @@ func file_lindm_agent_v1_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_config_proto_rawDesc), len(file_lindm_agent_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -90,7 +90,7 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 			t.Fatal("read-only trust delivery lost the signed update")
 		}
 	}
-	response, err := reader.GetServiceWork(ctx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	response, err := reader.GetResourceWork(ctx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	if err != nil || response.Msg.GetWork() != nil {
 		t.Fatalf("empty work poll needed a write or waited for the device lock: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestPollingConcurrentAssignmentAndWriteRecheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	go func() {
-		_, err := f.service.GetServiceWork(ctx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+		_, err := f.service.GetResourceWork(ctx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 		result <- err
 	}()
 	waitPollingQuery(t, ctx, f.pool, lock.Conn().PgConn().PID(), "GetDeviceForUpdate", false, result)
@@ -282,7 +282,7 @@ func pollingCall(s *Service, ctx context.Context, method string) error {
 		_, err := s.GetExecutionTrust(ctx, connect.NewRequest(&devicev1.GetExecutionTrustRequest{SessionEpoch: 1, RootVersion: 1, RootSha256: make([]byte, sha256.Size)}))
 		return err
 	}
-	response, err := s.GetServiceWork(ctx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	response, err := s.GetResourceWork(ctx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	if err == nil && response.Msg.GetWork() != nil {
 		return errors.New("expected an empty poll")
 	}

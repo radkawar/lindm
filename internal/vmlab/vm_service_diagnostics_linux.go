@@ -18,10 +18,10 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
-// ServiceExecutionStatus is the public journal projection, not retained authority.
+// ResourceExecutionStatus is the public journal projection, not retained authority.
 // Keeping it in the error preserves observations which cleanup otherwise destroys.
 type vmServiceStatusFailure struct {
-	status  *agentv1.ServiceExecutionStatus
+	status  *agentv1.ResourceExecutionStatus
 	started bool
 }
 
@@ -111,6 +111,6 @@ func serviceJournalProjection(data []byte, action string) ([]byte, error) {
 	return json.Marshal(entries)
 }
 
-func newServiceStatusFailure(status *agentv1.ServiceExecutionStatus, started bool) error {
+func newServiceStatusFailure(status *agentv1.ResourceExecutionStatus, started bool) error {
 	return &vmServiceStatusFailure{status: proto.CloneOf(status), started: started}
 }

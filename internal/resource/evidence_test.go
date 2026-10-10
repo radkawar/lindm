@@ -37,9 +37,14 @@ func serviceEvidence(t *testing.T) (*resourcev1.ResourceDesiredState, *resourcev
 	if err != nil {
 		t.Fatal(err)
 	}
+	observationDigest, err := ObservationDigest(observation)
+	if err != nil {
+		t.Fatal(err)
+	}
 	plan := &resourcev1.ResourcePlan{
 		Ref: proto.CloneOf(desired.GetRef()), Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE,
-		DesiredSha256: digest[:], ObservationSha256: make([]byte, 32), Backend: backend,
+		DesiredSha256: digest[:], ObservationSha256: observationDigest[:], Backend: backend,
+		Before:                  observation,
 		OwnershipRevisionSha256: make([]byte, 32),
 		Safety: &resourcev1.PlanSafety{
 			LockDomains:   []resourcev1.ClaimDomain{resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME},

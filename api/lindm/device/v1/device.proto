@@ -25,12 +25,12 @@ service DeviceService {
   rpc RenewIdentity(RenewIdentityRequest) returns (RenewIdentityResponse);
   // Returns the current server-owned service action, minting it only when no
   // open action exists. Never implies the device is compliant.
-  rpc GetServiceWork(GetServiceWorkRequest) returns (GetServiceWorkResponse);
+  rpc GetResourceWork(GetResourceWorkRequest) returns (GetResourceWorkResponse);
   // Reauthorizes the original actor, desired head and device fences before
   // signing a start grant for the exact device challenge.
-  rpc AuthorizeServiceStart(AuthorizeServiceStartRequest) returns (AuthorizeServiceStartResponse);
+  rpc AuthorizeResourceStart(AuthorizeResourceStartRequest) returns (AuthorizeResourceStartResponse);
   // Admits a nonce-bound device attestation of protected action history.
-  rpc ReportServiceResult(ReportServiceResultRequest) returns (ReportServiceResultResponse);
+  rpc ReportResourceResult(ReportResourceResultRequest) returns (ReportResourceResultResponse);
   rpc GetDeviceActionWork(GetDeviceActionWorkRequest) returns (GetDeviceActionWorkResponse);
   rpc AuthorizeDeviceActionStart(AuthorizeDeviceActionStartRequest) returns (AuthorizeDeviceActionStartResponse);
   rpc ReportDeviceActionResult(ReportDeviceActionResultRequest) returns (ReportDeviceActionResultResponse);

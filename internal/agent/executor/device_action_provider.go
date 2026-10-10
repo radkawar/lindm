@@ -119,7 +119,7 @@ func (s *Service) SupplyDeviceActionCredential(ctx context.Context, req *connect
 		return nil, mapError(err)
 	}
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED && record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW {
-		return nil, mapError(errServiceRejected)
+		return nil, mapError(errResourceRejected)
 	}
 	s.clearActionCredential()
 	s.actionCredential = deviceActionCredential{actionID: req.Msg.GetActionId(), value: value, expires: s.now().Add(30 * time.Second)}

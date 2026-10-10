@@ -31,10 +31,10 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent trust-status
        lindm-agent update-status
        lindm-agent trust-update -file FILE
-       lindm-agent service-prepare -file FILE
-       lindm-agent service-start -file FILE
-       lindm-agent service-status -file FILE
-       lindm-agent service-attest -file FILE
+       lindm-agent resource-prepare -file FILE
+       lindm-agent resource-start -file FILE
+       lindm-agent resource-status -file FILE
+       lindm-agent resource-attest -file FILE
        lindm-agent action-prepare -file FILE
        lindm-agent action-start -file FILE
        lindm-agent action-status -file FILE
@@ -59,10 +59,10 @@ using /etc/lindm/agent.json. Only root or the configured network UID may submit 
 It never changes TLS enrollment pins or starts an operation.
 trust-status reads the protected root/delegation counters, digests and historical
 expiry through that socket. It does not collect native evidence or mutate trust.
-service-prepare/start/status/attest use the same socket and network configuration.
+resource-prepare/start/status/attest use the same socket and network configuration.
 Prepare verifies signed intent and returns preflight evidence; start relays a
 separately signed short-lived grant. Start acceptance is not native completion:
-read service-status for the durable result. service-attest returns a nonce-bound
+read resource-status for the durable result. resource-attest returns a nonce-bound
 device-signed snapshot of that history, not a fresh native observation or current
 compliance. These commands cannot sign execution authority.
 action-* commands relay the separate imperative-action protocol. action-credential
@@ -107,14 +107,26 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return executionTrustStatusCommand(ctx, args[1:], output)
 	case "trust-update":
 		return executionTrustCommand(ctx, args[1:], output)
-	case "service-prepare", "service-start", "service-status", "service-attest":
-		return serviceExecutionCommand(ctx, args[0], args[1:], output)
+	case "resource-prepare", "resource-start", "resource-status", "resource-attest":
+		return resourceExecutionCommand(ctx, args[0], args[1:], output)
 	case "action-prepare", "action-start", "action-status", "action-attest", "action-confirm":
 		return deviceActionCommand(ctx, args[0], args[1:], output)
 	case "action-credential":
 		return actionCredentialCommand(ctx, args[1:])
 	case "action-sandbox":
 		return actionSandboxCommand(ctx, args[1:], output)
+	case "package-transaction":
+		return packageTransactionCommand(ctx, args[1:])
+	case "resource-transaction":
+		return resourceTransactionCommand(ctx, args[1:], false)
+	case "resource-observe":
+		return resourceTransactionCommand(ctx, args[1:], true)
+	case "firewall-restore":
+		return serveFirewallRestore(ctx, args[1:])
+	case "connectivity-guard":
+		return serveConnectivityGuard(ctx, args[1:])
+	case "connectivity-probe":
+		return serveConnectivityProbe(ctx, args[1:])
 	case "live-root-poweroff":
 		return liveRootPoweroff(ctx, args[1:])
 	case "recovery-run":

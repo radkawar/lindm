@@ -16,6 +16,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
 
@@ -50,7 +52,29 @@ func defaultExecutionCapabilities() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(actions, "systemd.service.v1"), nil
+	for _, kind := range executableResourceKinds {
+		capability, err := resource.Capability(kind)
+		if err != nil {
+			return nil, err
+		}
+		actions = append(actions, capability)
+	}
+	return actions, nil
+}
+
+// executableResourceKinds are the kinds with an agent provider. Server-side
+// per-kind qualification gates still decide which ones are dispatched.
+var executableResourceKinds = []resourcev1.ResourceKind{
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE,
+	resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE,
+	resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE,
+	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP,
+	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER,
+	resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY,
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL,
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION,
+	resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE,
+	resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE,
 }
 
 func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabilities []string) (result *ExecutionTrustExercise, err error) {

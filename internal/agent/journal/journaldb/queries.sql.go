@@ -31,6 +31,28 @@ func (q *Queries) AccountLockOwnerCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countResourceOwnershipReservations = `-- name: CountResourceOwnershipReservations :one
+SELECT count(*) FROM resource_ownership_reservations
+`
+
+func (q *Queries) CountResourceOwnershipReservations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countResourceOwnershipReservations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countResourcePreparationCancellations = `-- name: CountResourcePreparationCancellations :one
+SELECT count(*) FROM resource_preparation_cancellations
+`
+
+func (q *Queries) CountResourcePreparationCancellations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countResourcePreparationCancellations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteAccountLockOwner = `-- name: DeleteAccountLockOwner :execrows
 DELETE FROM account_lock_owners WHERE username = ? AND lock_action_id = ?
 `
@@ -48,13 +70,25 @@ func (q *Queries) DeleteAccountLockOwner(ctx context.Context, arg DeleteAccountL
 	return result.RowsAffected()
 }
 
-const deleteReadOnlyServiceAction = `-- name: DeleteReadOnlyServiceAction :execrows
-DELETE FROM service_actions WHERE service_actions.action_id = ? AND service_actions.read_only_success = 1
-AND NOT EXISTS (SELECT 1 FROM service_resource_floors f WHERE f.action_id = service_actions.action_id)
+const deleteReadOnlyResourceAction = `-- name: DeleteReadOnlyResourceAction :execrows
+DELETE FROM resource_actions WHERE resource_actions.action_id = ? AND resource_actions.read_only_terminal = 1
+AND NOT EXISTS (SELECT 1 FROM resource_floors f WHERE f.action_id = resource_actions.action_id)
 `
 
-func (q *Queries) DeleteReadOnlyServiceAction(ctx context.Context, actionID string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteReadOnlyServiceAction, actionID)
+func (q *Queries) DeleteReadOnlyResourceAction(ctx context.Context, actionID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteReadOnlyResourceAction, actionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteResourceOwnershipReservation = `-- name: DeleteResourceOwnershipReservation :execrows
+DELETE FROM resource_ownership_reservations WHERE action_id = ?
+`
+
+func (q *Queries) DeleteResourceOwnershipReservation(ctx context.Context, actionID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteResourceOwnershipReservation, actionID)
 	if err != nil {
 		return 0, err
 	}
@@ -114,6 +148,18 @@ func (q *Queries) IncrementDeviceActionUsage(ctx context.Context, recordCount in
 	return result.RowsAffected()
 }
 
+const incrementResourceOwnershipUsage = `-- name: IncrementResourceOwnershipUsage :execrows
+UPDATE resource_ownership_usage SET record_count = record_count + 1 WHERE id = 1 AND record_count = ?
+`
+
+func (q *Queries) IncrementResourceOwnershipUsage(ctx context.Context, recordCount int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, incrementResourceOwnershipUsage, recordCount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const initializeAccountLockUsage = `-- name: InitializeAccountLockUsage :exec
 INSERT INTO account_lock_usage (id, record_count) VALUES (1, 0)
 `
@@ -141,12 +187,21 @@ func (q *Queries) InitializeExecutionTrust(ctx context.Context, state []byte) er
 	return err
 }
 
-const initializeServiceActionUsage = `-- name: InitializeServiceActionUsage :exec
-INSERT INTO service_action_usage (id, record_count, record_bytes) VALUES (1, 0, 0)
+const initializeResourceActionUsage = `-- name: InitializeResourceActionUsage :exec
+INSERT INTO resource_action_usage (id, record_count, record_bytes) VALUES (1, 0, 0)
 `
 
-func (q *Queries) InitializeServiceActionUsage(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, initializeServiceActionUsage)
+func (q *Queries) InitializeResourceActionUsage(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, initializeResourceActionUsage)
+	return err
+}
+
+const initializeResourceOwnershipUsage = `-- name: InitializeResourceOwnershipUsage :exec
+INSERT INTO resource_ownership_usage (id, record_count) VALUES (1, 0)
+`
+
+func (q *Queries) InitializeResourceOwnershipUsage(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, initializeResourceOwnershipUsage)
 	return err
 }
 
@@ -216,47 +271,146 @@ func (q *Queries) InsertDeviceAction(ctx context.Context, arg InsertDeviceAction
 	return err
 }
 
-const insertServiceAction = `-- name: InsertServiceAction :exec
-INSERT INTO service_actions (action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success)
-VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+const insertResourceAction = `-- name: InsertResourceAction :exec
+INSERT INTO resource_actions (action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, revision, state, record, read_only_terminal)
+VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
 `
 
-type InsertServiceActionParams struct {
+type InsertResourceActionParams struct {
 	ActionID             string
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 	ResourceSequence     int64
 	State                int64
 	Record               []byte
-	ReadOnlySuccess      int64
+	ReadOnlyTerminal     int64
 }
 
-func (q *Queries) InsertServiceAction(ctx context.Context, arg InsertServiceActionParams) error {
-	_, err := q.db.ExecContext(ctx, insertServiceAction,
+func (q *Queries) InsertResourceAction(ctx context.Context, arg InsertResourceActionParams) error {
+	_, err := q.db.ExecContext(ctx, insertResourceAction,
 		arg.ActionID,
 		arg.DeploymentID,
 		arg.DeviceID,
 		arg.EnrollmentGeneration,
-		arg.Unit,
+		arg.Kind,
+		arg.CanonicalKey,
 		arg.ResourceSequence,
 		arg.State,
 		arg.Record,
-		arg.ReadOnlySuccess,
+		arg.ReadOnlyTerminal,
 	)
 	return err
 }
 
-const invalidServiceResourceFloorCount = `-- name: InvalidServiceResourceFloorCount :one
-SELECT count(*) FROM service_resource_floors AS f
-LEFT JOIN service_actions AS a ON a.action_id = f.action_id
-WHERE a.action_id IS NULL OR a.deployment_id != f.deployment_id OR a.device_id != f.device_id
-    OR a.enrollment_generation != f.enrollment_generation OR a.unit != f.unit OR a.resource_sequence != f.resource_sequence
+const insertResourceOwnership = `-- name: InsertResourceOwnership :exec
+INSERT INTO resource_ownership (deployment_id, device_id, enrollment_generation, kind, canonical_key, revision, record)
+VALUES (?, ?, ?, ?, ?, 1, ?)
 `
 
-func (q *Queries) InvalidServiceResourceFloorCount(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, invalidServiceResourceFloorCount)
+type InsertResourceOwnershipParams struct {
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+	Record               []byte
+}
+
+func (q *Queries) InsertResourceOwnership(ctx context.Context, arg InsertResourceOwnershipParams) error {
+	_, err := q.db.ExecContext(ctx, insertResourceOwnership,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.Kind,
+		arg.CanonicalKey,
+		arg.Record,
+	)
+	return err
+}
+
+const insertResourceOwnershipReservation = `-- name: InsertResourceOwnershipReservation :exec
+INSERT INTO resource_ownership_reservations (action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key)
+VALUES (?, ?, ?, ?, ?, ?)
+`
+
+type InsertResourceOwnershipReservationParams struct {
+	ActionID             string
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+}
+
+func (q *Queries) InsertResourceOwnershipReservation(ctx context.Context, arg InsertResourceOwnershipReservationParams) error {
+	_, err := q.db.ExecContext(ctx, insertResourceOwnershipReservation,
+		arg.ActionID,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.Kind,
+		arg.CanonicalKey,
+	)
+	return err
+}
+
+const insertResourcePreparationCancellation = `-- name: InsertResourcePreparationCancellation :exec
+INSERT INTO resource_preparation_cancellations (action_id, enrollment_generation, intent_sha256) VALUES (?, ?, ?)
+`
+
+type InsertResourcePreparationCancellationParams struct {
+	ActionID             string
+	EnrollmentGeneration string
+	IntentSha256         []byte
+}
+
+func (q *Queries) InsertResourcePreparationCancellation(ctx context.Context, arg InsertResourcePreparationCancellationParams) error {
+	_, err := q.db.ExecContext(ctx, insertResourcePreparationCancellation, arg.ActionID, arg.EnrollmentGeneration, arg.IntentSha256)
+	return err
+}
+
+const invalidResourceFloorCount = `-- name: InvalidResourceFloorCount :one
+SELECT count(*) FROM resource_floors AS f
+LEFT JOIN resource_actions AS a ON a.action_id = f.action_id
+WHERE a.action_id IS NULL OR a.deployment_id != f.deployment_id OR a.device_id != f.device_id
+    OR a.enrollment_generation != f.enrollment_generation OR a.kind != f.kind OR a.canonical_key != f.canonical_key OR a.resource_sequence != f.resource_sequence
+`
+
+func (q *Queries) InvalidResourceFloorCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, invalidResourceFloorCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const invalidResourceOwnershipReservations = `-- name: InvalidResourceOwnershipReservations :one
+SELECT count(*) FROM resource_ownership_reservations r
+LEFT JOIN resource_actions a ON a.action_id = r.action_id
+WHERE a.action_id IS NULL OR a.deployment_id != r.deployment_id OR a.device_id != r.device_id
+    OR a.enrollment_generation != r.enrollment_generation OR a.kind != r.kind OR a.canonical_key != r.canonical_key
+    OR a.state NOT IN (1, 2, 3, 9)
+    OR EXISTS (SELECT 1 FROM resource_ownership o WHERE o.deployment_id = r.deployment_id AND o.device_id = r.device_id
+        AND o.enrollment_generation = r.enrollment_generation AND o.kind = r.kind AND o.canonical_key = r.canonical_key)
+`
+
+func (q *Queries) InvalidResourceOwnershipReservations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, invalidResourceOwnershipReservations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const invalidResourcePreparationCancellationCount = `-- name: InvalidResourcePreparationCancellationCount :one
+SELECT count(*) FROM resource_preparation_cancellations c
+WHERE length(c.action_id) != 36 OR length(c.enrollment_generation) != 36
+    OR EXISTS (SELECT 1 FROM resource_actions a WHERE a.action_id = c.action_id)
+`
+
+func (q *Queries) InvalidResourcePreparationCancellationCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, invalidResourcePreparationCancellationCount)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -293,24 +447,45 @@ func (q *Queries) NextDeviceAction(ctx context.Context, actionID string) (Device
 	return i, err
 }
 
-const nextServiceAction = `-- name: NextServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id > ? ORDER BY action_id LIMIT 1
+const nextResourceAction = `-- name: NextResourceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, revision, state, record, read_only_terminal FROM resource_actions WHERE action_id > ? ORDER BY action_id LIMIT 1
 `
 
-func (q *Queries) NextServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
-	row := q.db.QueryRowContext(ctx, nextServiceAction, actionID)
-	var i ServiceAction
+func (q *Queries) NextResourceAction(ctx context.Context, actionID string) (ResourceAction, error) {
+	row := q.db.QueryRowContext(ctx, nextResourceAction, actionID)
+	var i ResourceAction
 	err := row.Scan(
 		&i.ActionID,
 		&i.DeploymentID,
 		&i.DeviceID,
 		&i.EnrollmentGeneration,
-		&i.Unit,
+		&i.Kind,
+		&i.CanonicalKey,
 		&i.ResourceSequence,
 		&i.Revision,
 		&i.State,
 		&i.Record,
-		&i.ReadOnlySuccess,
+		&i.ReadOnlyTerminal,
+	)
+	return i, err
+}
+
+const nextResourceOwnership = `-- name: NextResourceOwnership :one
+SELECT ledger_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, revision, record FROM resource_ownership WHERE ledger_id > ? ORDER BY ledger_id LIMIT 1
+`
+
+func (q *Queries) NextResourceOwnership(ctx context.Context, ledgerID int64) (ResourceOwnership, error) {
+	row := q.db.QueryRowContext(ctx, nextResourceOwnership, ledgerID)
+	var i ResourceOwnership
+	err := row.Scan(
+		&i.LedgerID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.Kind,
+		&i.CanonicalKey,
+		&i.Revision,
+		&i.Record,
 	)
 	return i, err
 }
@@ -335,24 +510,25 @@ func (q *Queries) NextUnfinishedDeviceAction(ctx context.Context, actionID strin
 	return i, err
 }
 
-const nextUnfinishedServiceAction = `-- name: NextUnfinishedServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id > ? AND state IN (1, 2, 3) ORDER BY action_id LIMIT 1
+const nextUnfinishedResourceAction = `-- name: NextUnfinishedResourceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, revision, state, record, read_only_terminal FROM resource_actions WHERE action_id > ? AND state IN (1, 2, 3, 9) ORDER BY action_id LIMIT 1
 `
 
-func (q *Queries) NextUnfinishedServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
-	row := q.db.QueryRowContext(ctx, nextUnfinishedServiceAction, actionID)
-	var i ServiceAction
+func (q *Queries) NextUnfinishedResourceAction(ctx context.Context, actionID string) (ResourceAction, error) {
+	row := q.db.QueryRowContext(ctx, nextUnfinishedResourceAction, actionID)
+	var i ResourceAction
 	err := row.Scan(
 		&i.ActionID,
 		&i.DeploymentID,
 		&i.DeviceID,
 		&i.EnrollmentGeneration,
-		&i.Unit,
+		&i.Kind,
+		&i.CanonicalKey,
 		&i.ResourceSequence,
 		&i.Revision,
 		&i.State,
 		&i.Record,
-		&i.ReadOnlySuccess,
+		&i.ReadOnlyTerminal,
 	)
 	return i, err
 }
@@ -377,52 +553,55 @@ func (q *Queries) NextUpdateInterlockDeviceAction(ctx context.Context, actionID 
 	return i, err
 }
 
-const oldReadOnlyServiceAction = `-- name: OldReadOnlyServiceAction :one
-SELECT a.action_id, a.deployment_id, a.device_id, a.enrollment_generation, a.unit, a.resource_sequence, a.revision, a.state, a.record, a.read_only_success FROM service_actions a
-WHERE a.read_only_success = 1 AND NOT EXISTS (SELECT 1 FROM service_resource_floors f WHERE f.action_id = a.action_id)
+const oldReadOnlyResourceAction = `-- name: OldReadOnlyResourceAction :one
+SELECT a.action_id, a.deployment_id, a.device_id, a.enrollment_generation, a.kind, a.canonical_key, a.resource_sequence, a.revision, a.state, a.record, a.read_only_terminal FROM resource_actions a
+WHERE a.read_only_terminal = 1 AND NOT EXISTS (SELECT 1 FROM resource_floors f WHERE f.action_id = a.action_id)
 ORDER BY a.rowid DESC LIMIT 1 OFFSET 256
 `
 
-func (q *Queries) OldReadOnlyServiceAction(ctx context.Context) (ServiceAction, error) {
-	row := q.db.QueryRowContext(ctx, oldReadOnlyServiceAction)
-	var i ServiceAction
+func (q *Queries) OldReadOnlyResourceAction(ctx context.Context) (ResourceAction, error) {
+	row := q.db.QueryRowContext(ctx, oldReadOnlyResourceAction)
+	var i ResourceAction
 	err := row.Scan(
 		&i.ActionID,
 		&i.DeploymentID,
 		&i.DeviceID,
 		&i.EnrollmentGeneration,
-		&i.Unit,
+		&i.Kind,
+		&i.CanonicalKey,
 		&i.ResourceSequence,
 		&i.Revision,
 		&i.State,
 		&i.Record,
-		&i.ReadOnlySuccess,
+		&i.ReadOnlyTerminal,
 	)
 	return i, err
 }
 
-const raiseServiceResourceFloor = `-- name: RaiseServiceResourceFloor :exec
-INSERT INTO service_resource_floors (deployment_id, device_id, enrollment_generation, unit, resource_sequence, action_id)
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT (deployment_id, device_id, enrollment_generation, unit)
+const raiseResourceFloor = `-- name: RaiseResourceFloor :exec
+INSERT INTO resource_floors (deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, action_id)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (deployment_id, device_id, enrollment_generation, kind, canonical_key)
 DO UPDATE SET resource_sequence = excluded.resource_sequence, action_id = excluded.action_id
 `
 
-type RaiseServiceResourceFloorParams struct {
+type RaiseResourceFloorParams struct {
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 	ResourceSequence     int64
 	ActionID             string
 }
 
-func (q *Queries) RaiseServiceResourceFloor(ctx context.Context, arg RaiseServiceResourceFloorParams) error {
-	_, err := q.db.ExecContext(ctx, raiseServiceResourceFloor,
+func (q *Queries) RaiseResourceFloor(ctx context.Context, arg RaiseResourceFloorParams) error {
+	_, err := q.db.ExecContext(ctx, raiseResourceFloor,
 		arg.DeploymentID,
 		arg.DeviceID,
 		arg.EnrollmentGeneration,
-		arg.Unit,
+		arg.Kind,
+		arg.CanonicalKey,
 		arg.ResourceSequence,
 		arg.ActionID,
 	)
@@ -530,72 +709,151 @@ func (q *Queries) ReadExecutionTrust(ctx context.Context) (ReadExecutionTrustRow
 	return i, err
 }
 
-const readServiceAction = `-- name: ReadServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id = ?
+const readResourceAction = `-- name: ReadResourceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, revision, state, record, read_only_terminal FROM resource_actions WHERE action_id = ?
 `
 
-func (q *Queries) ReadServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
-	row := q.db.QueryRowContext(ctx, readServiceAction, actionID)
-	var i ServiceAction
+func (q *Queries) ReadResourceAction(ctx context.Context, actionID string) (ResourceAction, error) {
+	row := q.db.QueryRowContext(ctx, readResourceAction, actionID)
+	var i ResourceAction
 	err := row.Scan(
 		&i.ActionID,
 		&i.DeploymentID,
 		&i.DeviceID,
 		&i.EnrollmentGeneration,
-		&i.Unit,
+		&i.Kind,
+		&i.CanonicalKey,
 		&i.ResourceSequence,
 		&i.Revision,
 		&i.State,
 		&i.Record,
-		&i.ReadOnlySuccess,
+		&i.ReadOnlyTerminal,
 	)
 	return i, err
 }
 
-const readServiceActionUsage = `-- name: ReadServiceActionUsage :one
-SELECT record_count, record_bytes FROM service_action_usage WHERE id = 1
+const readResourceActionUsage = `-- name: ReadResourceActionUsage :one
+SELECT record_count, record_bytes FROM resource_action_usage WHERE id = 1
 `
 
-type ReadServiceActionUsageRow struct {
+type ReadResourceActionUsageRow struct {
 	RecordCount int64
 	RecordBytes int64
 }
 
-func (q *Queries) ReadServiceActionUsage(ctx context.Context) (ReadServiceActionUsageRow, error) {
-	row := q.db.QueryRowContext(ctx, readServiceActionUsage)
-	var i ReadServiceActionUsageRow
+func (q *Queries) ReadResourceActionUsage(ctx context.Context) (ReadResourceActionUsageRow, error) {
+	row := q.db.QueryRowContext(ctx, readResourceActionUsage)
+	var i ReadResourceActionUsageRow
 	err := row.Scan(&i.RecordCount, &i.RecordBytes)
 	return i, err
 }
 
-const readServiceResourceFloor = `-- name: ReadServiceResourceFloor :one
-SELECT deployment_id, device_id, enrollment_generation, unit, resource_sequence, action_id FROM service_resource_floors
-WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND unit = ?
+const readResourceFloor = `-- name: ReadResourceFloor :one
+SELECT deployment_id, device_id, enrollment_generation, kind, canonical_key, resource_sequence, action_id FROM resource_floors
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND kind = ? AND canonical_key = ?
 `
 
-type ReadServiceResourceFloorParams struct {
+type ReadResourceFloorParams struct {
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 }
 
-func (q *Queries) ReadServiceResourceFloor(ctx context.Context, arg ReadServiceResourceFloorParams) (ServiceResourceFloor, error) {
-	row := q.db.QueryRowContext(ctx, readServiceResourceFloor,
+func (q *Queries) ReadResourceFloor(ctx context.Context, arg ReadResourceFloorParams) (ResourceFloor, error) {
+	row := q.db.QueryRowContext(ctx, readResourceFloor,
 		arg.DeploymentID,
 		arg.DeviceID,
 		arg.EnrollmentGeneration,
-		arg.Unit,
+		arg.Kind,
+		arg.CanonicalKey,
 	)
-	var i ServiceResourceFloor
+	var i ResourceFloor
 	err := row.Scan(
 		&i.DeploymentID,
 		&i.DeviceID,
 		&i.EnrollmentGeneration,
-		&i.Unit,
+		&i.Kind,
+		&i.CanonicalKey,
 		&i.ResourceSequence,
 		&i.ActionID,
 	)
+	return i, err
+}
+
+const readResourceOwnership = `-- name: ReadResourceOwnership :one
+SELECT ledger_id, deployment_id, device_id, enrollment_generation, kind, canonical_key, revision, record FROM resource_ownership
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND kind = ? AND canonical_key = ?
+`
+
+type ReadResourceOwnershipParams struct {
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+}
+
+func (q *Queries) ReadResourceOwnership(ctx context.Context, arg ReadResourceOwnershipParams) (ResourceOwnership, error) {
+	row := q.db.QueryRowContext(ctx, readResourceOwnership,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.Kind,
+		arg.CanonicalKey,
+	)
+	var i ResourceOwnership
+	err := row.Scan(
+		&i.LedgerID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.Kind,
+		&i.CanonicalKey,
+		&i.Revision,
+		&i.Record,
+	)
+	return i, err
+}
+
+const readResourceOwnershipReservation = `-- name: ReadResourceOwnershipReservation :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, kind, canonical_key FROM resource_ownership_reservations WHERE action_id = ?
+`
+
+func (q *Queries) ReadResourceOwnershipReservation(ctx context.Context, actionID string) (ResourceOwnershipReservation, error) {
+	row := q.db.QueryRowContext(ctx, readResourceOwnershipReservation, actionID)
+	var i ResourceOwnershipReservation
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.Kind,
+		&i.CanonicalKey,
+	)
+	return i, err
+}
+
+const readResourceOwnershipUsage = `-- name: ReadResourceOwnershipUsage :one
+SELECT record_count FROM resource_ownership_usage WHERE id = 1
+`
+
+func (q *Queries) ReadResourceOwnershipUsage(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, readResourceOwnershipUsage)
+	var record_count int64
+	err := row.Scan(&record_count)
+	return record_count, err
+}
+
+const readResourcePreparationCancellation = `-- name: ReadResourcePreparationCancellation :one
+SELECT action_id, enrollment_generation, intent_sha256 FROM resource_preparation_cancellations WHERE action_id = ?
+`
+
+func (q *Queries) ReadResourcePreparationCancellation(ctx context.Context, actionID string) (ResourcePreparationCancellation, error) {
+	row := q.db.QueryRowContext(ctx, readResourcePreparationCancellation, actionID)
+	var i ResourcePreparationCancellation
+	err := row.Scan(&i.ActionID, &i.EnrollmentGeneration, &i.IntentSha256)
 	return i, err
 }
 
@@ -674,21 +932,23 @@ func (q *Queries) ReplaceExecutionTrust(ctx context.Context, arg ReplaceExecutio
 	return result.RowsAffected()
 }
 
-const replaceServiceAction = `-- name: ReplaceServiceAction :execrows
-UPDATE service_actions SET revision = revision + 1, state = ?, record = ? WHERE action_id = ? AND revision = ?
+const replaceResourceAction = `-- name: ReplaceResourceAction :execrows
+UPDATE resource_actions SET revision = revision + 1, state = ?, record = ?, read_only_terminal = ? WHERE action_id = ? AND revision = ?
 `
 
-type ReplaceServiceActionParams struct {
-	State    int64
-	Record   []byte
-	ActionID string
-	Revision int64
+type ReplaceResourceActionParams struct {
+	State            int64
+	Record           []byte
+	ReadOnlyTerminal int64
+	ActionID         string
+	Revision         int64
 }
 
-func (q *Queries) ReplaceServiceAction(ctx context.Context, arg ReplaceServiceActionParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, replaceServiceAction,
+func (q *Queries) ReplaceResourceAction(ctx context.Context, arg ReplaceResourceActionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceResourceAction,
 		arg.State,
 		arg.Record,
+		arg.ReadOnlyTerminal,
 		arg.ActionID,
 		arg.Revision,
 	)
@@ -698,17 +958,48 @@ func (q *Queries) ReplaceServiceAction(ctx context.Context, arg ReplaceServiceAc
 	return result.RowsAffected()
 }
 
-const replaceServiceActionUsage = `-- name: ReplaceServiceActionUsage :execrows
-UPDATE service_action_usage SET record_count = ?, record_bytes = ? WHERE id = 1
+const replaceResourceActionUsage = `-- name: ReplaceResourceActionUsage :execrows
+UPDATE resource_action_usage SET record_count = ?, record_bytes = ? WHERE id = 1
 `
 
-type ReplaceServiceActionUsageParams struct {
+type ReplaceResourceActionUsageParams struct {
 	RecordCount int64
 	RecordBytes int64
 }
 
-func (q *Queries) ReplaceServiceActionUsage(ctx context.Context, arg ReplaceServiceActionUsageParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, replaceServiceActionUsage, arg.RecordCount, arg.RecordBytes)
+func (q *Queries) ReplaceResourceActionUsage(ctx context.Context, arg ReplaceResourceActionUsageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceResourceActionUsage, arg.RecordCount, arg.RecordBytes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const replaceResourceOwnership = `-- name: ReplaceResourceOwnership :execrows
+UPDATE resource_ownership SET revision = revision + 1, record = ?
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND kind = ? AND canonical_key = ? AND revision = ?
+`
+
+type ReplaceResourceOwnershipParams struct {
+	Record               []byte
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+	Revision             int64
+}
+
+func (q *Queries) ReplaceResourceOwnership(ctx context.Context, arg ReplaceResourceOwnershipParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceResourceOwnership,
+		arg.Record,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.Kind,
+		arg.CanonicalKey,
+		arg.Revision,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -732,42 +1023,82 @@ func (q *Queries) ReplaceState(ctx context.Context, arg ReplaceStateParams) (int
 	return result.RowsAffected()
 }
 
-const serviceActionTotals = `-- name: ServiceActionTotals :one
-SELECT count(*) AS record_count,
-    CAST(coalesce(sum(CASE WHEN state IN (1, 2, 3) THEN 131072 ELSE length(record) END), 0) AS INTEGER) AS record_bytes
-FROM service_actions
+const resourceActionCount = `-- name: ResourceActionCount :one
+SELECT count(*) FROM resource_actions
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND kind = ? AND canonical_key = ?
 `
 
-type ServiceActionTotalsRow struct {
+type ResourceActionCountParams struct {
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	Kind                 int64
+	CanonicalKey         string
+}
+
+func (q *Queries) ResourceActionCount(ctx context.Context, arg ResourceActionCountParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, resourceActionCount,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.Kind,
+		arg.CanonicalKey,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const resourceActionTotals = `-- name: ResourceActionTotals :one
+SELECT count(*) AS record_count,
+    CAST(coalesce(sum(CASE WHEN state IN (1, 2, 3, 9) THEN 1048576 ELSE length(record) END), 0) AS INTEGER) AS record_bytes
+FROM resource_actions
+`
+
+type ResourceActionTotalsRow struct {
 	RecordCount int64
 	RecordBytes int64
 }
 
-func (q *Queries) ServiceActionTotals(ctx context.Context) (ServiceActionTotalsRow, error) {
-	row := q.db.QueryRowContext(ctx, serviceActionTotals)
-	var i ServiceActionTotalsRow
+func (q *Queries) ResourceActionTotals(ctx context.Context) (ResourceActionTotalsRow, error) {
+	row := q.db.QueryRowContext(ctx, resourceActionTotals)
+	var i ResourceActionTotalsRow
 	err := row.Scan(&i.RecordCount, &i.RecordBytes)
 	return i, err
 }
 
-const serviceResourceActionCount = `-- name: ServiceResourceActionCount :one
-SELECT count(*) FROM service_actions
-WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND unit = ?
+const resourceOwnershipCount = `-- name: ResourceOwnershipCount :one
+SELECT count(*) FROM resource_ownership
 `
 
-type ServiceResourceActionCountParams struct {
+func (q *Queries) ResourceOwnershipCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, resourceOwnershipCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const resourceOwnershipHistoricalEffects = `-- name: ResourceOwnershipHistoricalEffects :one
+SELECT count(*) FROM resource_actions
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ? AND kind = ? AND canonical_key = ?
+    AND state IN (3, 4, 5, 6) AND read_only_terminal = 0
+`
+
+type ResourceOwnershipHistoricalEffectsParams struct {
 	DeploymentID         string
 	DeviceID             string
 	EnrollmentGeneration string
-	Unit                 string
+	Kind                 int64
+	CanonicalKey         string
 }
 
-func (q *Queries) ServiceResourceActionCount(ctx context.Context, arg ServiceResourceActionCountParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, serviceResourceActionCount,
+func (q *Queries) ResourceOwnershipHistoricalEffects(ctx context.Context, arg ResourceOwnershipHistoricalEffectsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, resourceOwnershipHistoricalEffects,
 		arg.DeploymentID,
 		arg.DeviceID,
 		arg.EnrollmentGeneration,
-		arg.Unit,
+		arg.Kind,
+		arg.CanonicalKey,
 	)
 	var count int64
 	err := row.Scan(&count)

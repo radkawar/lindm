@@ -190,6 +190,40 @@ func (f *dispatchDirectory) request(ctx context.Context, method, path string, pa
 	return response.Header, data, nil
 }
 
+// reviewer creates a distinct owned directory user in the fixture group, so an
+// independent approval is authorized by the same fresh directory policy.
+func (f *dispatchDirectory) reviewer(t *testing.T, pool *pgxpool.Pool) context.Context {
+	t.Helper()
+	name := f.name + "-reviewer"
+	header, _, err := f.request(t.Context(), http.MethodPost, "/users", map[string]any{"username": name, "enabled": true}, http.StatusCreated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	location, err := url.Parse(header.Get("Location"))
+	if err != nil || location.Scheme != "https" || location.Host != "localhost:18443" || !strings.HasPrefix(location.Path, "/admin/realms/lindm/users/") {
+		t.Fatal("invalid reviewer creation location")
+	}
+	id := strings.TrimPrefix(location.Path, "/admin/realms/lindm/users/")
+	if parsed, err := uuid.Parse(id); err != nil || parsed == uuid.Nil {
+		t.Fatal("invalid reviewer ID")
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, _, err := f.request(ctx, http.MethodDelete, "/users/"+id, nil, http.StatusNoContent); err != nil {
+			t.Error(err)
+		}
+	})
+	if _, _, err := f.request(t.Context(), http.MethodPut, "/users/"+id+"/groups/"+f.group, nil, http.StatusNoContent); err != nil {
+		t.Fatal(err)
+	}
+	reviewer := identity.Principal{ID: uuid.New(), Issuer: "https://localhost:18443/realms/lindm", Subject: id, Role: identity.RoleAdmin}
+	if _, err := pool.Exec(t.Context(), "INSERT INTO principals(id,issuer,subject) VALUES($1,$2,$3)", reviewer.ID, reviewer.Issuer, reviewer.Subject); err != nil {
+		t.Fatal(err)
+	}
+	return identity.WithPrincipal(t.Context(), reviewer)
+}
+
 func (f *dispatchDirectory) membership(t *testing.T, enabled bool) {
 	t.Helper()
 	method := http.MethodDelete

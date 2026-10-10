@@ -18,6 +18,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 )
 
@@ -59,8 +60,16 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 	dispatchError(t, err, connect.CodeNotFound, "not_found")
 	work := f.work(t)
 	intent := f.intent(t, work)
-	if intent.GetDesired().GetUnit() != "zzz-first.service" || intent.GetResourceSequence() != 1 {
+	if intent.GetDesired().GetRef().GetCanonicalKey() != "zzz-first.service" || intent.GetResourceSequence() != 1 {
 		t.Fatalf("dependency order/initial sequence: %v", intent)
+	}
+	ownership := intent.GetOwnership()
+	if intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE || ownership.GetAssignmentId() != first.Msg.GetAssignment().GetAssignmentId() || len(ownership.GetSources()) != 1 {
+		t.Fatal("intent lost exact operation, assignment or ownership source")
+	}
+	source := ownership.GetSources()[0]
+	if source.GetProfileId() != first.Msg.GetAssignment().GetProfileId() || source.GetProfileRevision() != first.Msg.GetAssignment().GetRevisionId() || source.GetResourceId() != ownership.GetResourceId() || ownership.GetPolicy().GetRelease() != resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN {
+		t.Fatal("intent ownership differs from assigned immutable profile resource")
 	}
 	replayWork := f.work(t)
 	if replayWork.GetActionId() != work.GetActionId() || !bytes.Equal(replayWork.GetIntentEnvelope(), work.GetIntentEnvelope()) || bytes.Equal(replayWork.GetResultNonce(), work.GetResultNonce()) {
@@ -103,14 +112,21 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.work(t) != nil {
-		t.Fatal("cleared assignment issued work")
+	for range len(f.revision.GetSpec().GetResources()) {
+		release := f.work(t)
+		if f.intent(t, release).GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+			t.Fatal("clear did not issue exact release work")
+		}
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(resourceRefusalResult(t, f, release))); err != nil {
+			t.Fatal(err)
+		}
 	}
+	assertNoResourceWork(t, f)
 	saved := f.service.signing
 	f.service.signing = nil
 	clearedID := cleared.Msg.GetAssignment().GetAssignmentId()
 	f.assign(t, &clearedID)
-	_, err = f.service.GetServiceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	_, err = f.service.GetResourceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	dispatchError(t, err, connect.CodeFailedPrecondition, "execution_signing_unconfigured")
 	f.service.signing = saved
 	if f.work(t) == nil {
@@ -124,27 +140,38 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	work := f.work(t)
 	challenge := f.challenge(t, work)
 	challenge.IntentSha256 = make([]byte, sha256.Size)
-	_, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, challenge, f.key)}))
+	_, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, challenge, f.key)}))
 	dispatchError(t, err, connect.CodePermissionDenied, "service_challenge_binding_rejected")
+	for _, change := range []func(*agentv1.ResourceExecutionChallenge){
+		func(c *agentv1.ResourceExecutionChallenge) { c.Ref.CanonicalKey = "different.service" },
+		func(c *agentv1.ResourceExecutionChallenge) {
+			c.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+		},
+	} {
+		mismatch := f.challenge(t, work)
+		change(mismatch)
+		_, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, mismatch, f.key)}))
+		dispatchError(t, err, connect.CodePermissionDenied, "service_challenge_binding_rejected")
+	}
 	startRequest, grant := f.start(t, work)
-	replay, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(startRequest))
+	replay, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(startRequest))
 	if err != nil || !bytes.Equal(replay.Msg.GetStartGrantEnvelope(), grant) {
 		t.Fatalf("exact start retry: %v", err)
 	}
 	other := f.challenge(t, work)
-	_, err = f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, other, f.key)}))
+	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, other, f.key)}))
 	dispatchError(t, err, connect.CodeAlreadyExists, "service_start_conflict")
-	running := f.result(t, work, 2, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING, true)
-	admitted, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(running))
+	running := f.result(t, work, 2, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
+	admitted, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(running))
 	if err != nil || admitted.Msg.GetClosed() {
 		t.Fatalf("nonterminal report closed action: %v", err)
 	}
-	again, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(running))
+	again, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(running))
 	if err != nil || again.Msg.GetClosed() {
 		t.Fatalf("exact consumed-nonce retry: %v", err)
 	}
-	consumed := f.result(t, work, 3, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING, true)
-	_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(consumed))
+	consumed := f.result(t, work, 3, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
+	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(consumed))
 	dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
 	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
@@ -158,17 +185,17 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 		t.Fatal("poll lost exact start grant")
 	}
 	for _, revision := range []uint64{1, 2} {
-		stale := f.result(t, work, revision, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING, true)
-		_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(stale))
+		stale := f.result(t, work, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
+		_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(stale))
 		dispatchError(t, err, connect.CodeAlreadyExists, "service_result_conflict")
 	}
-	success := f.result(t, work, 3, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, true)
-	admitted, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(success))
+	success := f.result(t, work, 3, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true)
+	admitted, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(success))
 	if err != nil || !admitted.Msg.GetClosed() {
 		t.Fatalf("terminal report not closed: %v", err)
 	}
 	dependent := f.work(t)
-	if f.intent(t, dependent).GetDesired().GetUnit() != "aaa-dependent.service" {
+	if f.intent(t, dependent).GetDesired().GetRef().GetCanonicalKey() != "aaa-dependent.service" {
 		t.Fatal("verified dependency success did not release dependent")
 	}
 	f.start(t, dependent)
@@ -182,8 +209,8 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	if held.GetActionId() != dependent.GetActionId() || len(held.GetStartGrantEnvelope()) == 0 {
 		t.Fatal("granted action was replaced before terminal evidence")
 	}
-	terminal := f.result(t, held, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED, true)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(terminal)); err != nil {
+	terminal := f.result(t, held, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, true)
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(terminal)); err != nil {
 		t.Fatal(err)
 	}
 	fresh := f.work(t)
@@ -223,8 +250,8 @@ func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
 	f.assign(t, &old)
 	work := f.work(t)
 	f.directory.membership(t, false)
-	request := &devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}
-	_, err = f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(request))
+	request := &devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}
+	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
 	dispatchError(t, err, connect.CodePermissionDenied, "authority_changed")
 	assertDispatchClosure(t, f, work.GetActionId(), "authority_changed")
 }
@@ -238,14 +265,14 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, false)
-	message := new(agentv1.ServiceExecutionAttestation)
+	request := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false)
+	message := new(agentv1.ResourceExecutionAttestation)
 	if err := f.service.authority.Verify(t.Context(), request.GetAttestationEnvelope(), message, 1, f.principal.PublicKey); err != nil {
 		t.Fatal(err)
 	}
 	request.CertificatePem = unknown.PEM
 	request.AttestationEnvelope = f.sign(t, message, unknownKey)
-	_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(request))
+	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
 	dispatchError(t, err, connect.CodePermissionDenied, "certificate_rejected")
 	// Renew transport identity, then explicitly revoke the old overlapping signer.
 	newKey := ed25519Key(t)
@@ -258,9 +285,9 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.deviceCtx = withDevicePrincipal(t.Context(), newPrincipal)
-	request = f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, false)
+	request = f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false)
 	// An overlapping registered certificate is accepted, not just the TLS key.
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
 		t.Fatal(err)
 	}
 	replacement := f.work(t)
@@ -270,12 +297,12 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	if _, err := f.pool.Exec(t.Context(), "UPDATE device_certificates SET status='revoked', revoked_at=clock_timestamp(), revoke_reason='test signer revocation', overlap_until=NULL WHERE id=$1", f.principal.CertificateID); err != nil {
 		t.Fatal(err)
 	}
-	request = f.result(t, replacement, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, false)
-	_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(request))
+	request = f.result(t, replacement, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false)
+	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
 	dispatchError(t, err, connect.CodePermissionDenied, "certificate_rejected")
 	f.key, f.certificate, f.principal = newKey, renewed.Msg.GetCertificatePem(), newPrincipal
-	request = f.result(t, replacement, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED, true)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
+	request = f.result(t, replacement, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, true)
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
 		t.Fatal(err)
 	}
 	if f.work(t) != nil {
@@ -305,5 +332,34 @@ func assertDispatchClosure(t *testing.T, f *dispatchFixture, id, expected string
 	var reason string
 	if err := f.pool.QueryRow(t.Context(), "SELECT closed_reason FROM resource_actions WHERE id=$1", id).Scan(&reason); err != nil || reason != expected {
 		t.Fatalf("closure=%s want=%s err=%v", reason, expected, err)
+	}
+}
+
+func TestResourceResultBindsExactDesiredEvidence(t *testing.T) {
+	f := newDispatchFixture(t)
+	f.assign(t, nil)
+	work := f.work(t)
+	valid := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false)
+	for _, change := range []func(*agentv1.ResourceExecutionStatus){
+		func(status *agentv1.ResourceExecutionStatus) {
+			status.Before.Ref.CanonicalKey = "different.service"
+			status.Before.GetSystemdService().Unit = "different.service"
+		},
+		func(status *agentv1.ResourceExecutionStatus) {
+			status.Verification.DesiredSha256[0] ^= 1
+		},
+	} {
+		attestation := new(agentv1.ResourceExecutionAttestation)
+		if err := f.service.authority.Verify(t.Context(), valid.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
+			t.Fatal(err)
+		}
+		change(attestation.Status)
+		request := proto.CloneOf(valid)
+		request.AttestationEnvelope = f.sign(t, attestation, f.key)
+		_, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
+		dispatchError(t, err, connect.CodePermissionDenied, "resource_result_binding_rejected")
+	}
+	if response, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(valid)); err != nil || !response.Msg.GetClosed() {
+		t.Fatalf("binding denials consumed valid result authority: %v", err)
 	}
 }

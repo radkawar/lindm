@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AES-256-GCM encrypted private native evidence. The fixed consumer supplies
+// domain-separated installation/object/revision/type binding as authenticated
+// additional data. Keys are stored outside SQLite and ordinary state exports.
+message PrivateCustodyEnvelope {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  bytes key_id = 2 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 3 [(buf.validate.field).bytes.len = 12];
+  bytes ciphertext = 4 [(buf.validate.field).bytes = {
+    min_len: 16
+    max_len: 4194320
+  }];
+  // HMAC-SHA256 with an independent random key; never an unkeyed secret hash.
+  bytes equality_tag = 5 [(buf.validate.field).bytes.len = 32];
+}

@@ -280,7 +280,7 @@ func TestRecoveryCheckpointReceiptBindsConsumedEffect(t *testing.T) {
 
 func TestRecoveryHandoffAuthenticatesOriginalDeviceAndExactIntent(t *testing.T) {
 	f := newRecoveryAuthorityFixture(t)
-	certificate := newServiceAttestationFixture(t)
+	certificate := newResourceAttestationFixture(t)
 	var err error
 	certificate.binding.DeploymentID, err = uuid.Parse(f.intent.GetDeploymentId())
 	if err != nil {

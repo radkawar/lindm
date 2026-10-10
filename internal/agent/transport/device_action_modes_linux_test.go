@@ -182,11 +182,11 @@ func (e *deviceActionRelayExecutor) GetExecutionTrust(ctx context.Context, req *
 	return e.dispatchExecutor.GetExecutionTrust(ctx, req)
 }
 
-func (s *deviceActionRelayServer) GetServiceWork(ctx context.Context, req *connect.Request[devicev1.GetServiceWorkRequest]) (*connect.Response[devicev1.GetServiceWorkResponse], error) {
+func (s *deviceActionRelayServer) GetResourceWork(ctx context.Context, req *connect.Request[devicev1.GetResourceWorkRequest]) (*connect.Response[devicev1.GetResourceWorkResponse], error) {
 	if s.action.connection.GetDeviceActionReportOnly() {
 		s.action.t.Fatal("service dispatch attempted during report-only window")
 	}
-	return s.dispatchServer.GetServiceWork(ctx, req)
+	return s.dispatchServer.GetResourceWork(ctx, req)
 }
 
 func (e *deviceActionRelayExecutor) PrepareDeviceActionRecovery(ctx context.Context, req *connect.Request[agentv1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[agentv1.PrepareDeviceActionRecoveryResponse], error) {

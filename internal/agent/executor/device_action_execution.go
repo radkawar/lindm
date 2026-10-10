@@ -84,12 +84,12 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 	}
 	if s.agentUpdateBusy() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if confirm {
 		if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW {
 			s.mu.Unlock()
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		if err := s.authorizeDeviceActionReceipt(ctx, loaded, record, envelope); err != nil {
 			s.mu.Unlock()
@@ -102,7 +102,7 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 		}
 		if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
 			s.mu.Unlock()
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		if _, err := s.authorizeDeviceActionStart(ctx, loaded, record, envelope); err != nil {
 			s.mu.Unlock()
@@ -111,7 +111,7 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 	}
 	if s.actionProvider == nil || !s.actionMu.TryLock() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	credential := s.takeActionCredential(actionID)
 	s.operations.Add(1)
@@ -131,7 +131,7 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 				if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
 					return s.recheckPowerActionStart(gateCtx, record, envelope)
 				}
-				return errServiceRejected
+				return errResourceRejected
 			}
 			status, err := s.consumeDeviceAction(gateCtx, record, envelope, confirm)
 			if err != nil {
@@ -175,7 +175,7 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	loaded, err := s.enrolled(ctx)
 	if err != nil {
@@ -186,13 +186,13 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 		return nil, err
 	}
 	if !proto.Equal(record.GetNativePlan(), expected.GetNativePlan()) {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	next := proto.CloneOf(record)
 	var grant *agentv1.DeviceActionStartGrant
 	if confirm {
 		if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW || !proto.Equal(record.GetVerification(), expected.GetVerification()) {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		if err := s.authorizeDeviceActionReceipt(ctx, loaded, record, envelope); err != nil {
 			return nil, err
@@ -204,7 +204,7 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 		next.ReceiptDelegationEnvelope = bytes.Clone(loaded.execution.state.GetDelegationEnvelope())
 	} else {
 		if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		grant, err = s.authorizeDeviceActionStart(ctx, loaded, record, envelope)
 		if err != nil {
@@ -239,7 +239,7 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 			return nil, err
 		}
 		if s.now().Before(grant.GetNotBefore().AsTime()) || !s.now().Before(grant.GetExpiresAt().AsTime()) {
-			return nil, errServiceExpired
+			return nil, errResourceExpired
 		}
 	}
 	if actionprovider.LiveRootHeaderErase(next.GetIntent().GetSpec()) {
@@ -251,7 +251,7 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 			return nil, err
 		}
 		if !certUsable(loaded.cert, s.now()) || !s.now().Before(grant.GetExpiresAt().AsTime()) {
-			return nil, errServiceExpired
+			return nil, errResourceExpired
 		}
 		return s.liveRootStatus(next.GetIntent().GetActionId())
 	}
@@ -259,14 +259,14 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 }
 
 func (s *Service) authorizeDeviceActionReceipt(ctx context.Context, loaded *bound, record *agentv1.DeviceActionRecord, envelope []byte) error {
-	if err := s.serviceIdentitySession(loaded); err != nil {
+	if err := s.resourceIdentitySession(loaded); err != nil {
 		return err
 	}
 	if record.GetChallenge().GetExecutorIncarnation() != s.incarnation || loaded.execution.delegation == nil {
-		return errServiceRejected
+		return errResourceRejected
 	}
 	if _, err := loaded.execution.verifier.VerifyDeviceActionEscrowReceipt(ctx, loaded.execution.root, loaded.execution.delegation, envelope, record, s.now()); err != nil {
-		return serviceAuthorityError(ctx, err)
+		return resourceAuthorityError(ctx, err)
 	}
 	return nil
 }
@@ -325,7 +325,7 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 	next.CompletedAt = protoTimestamp(s.now())
 	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
 		next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_PRECONDITION
-		if errors.Is(operationErr, errServiceExpired) || errors.Is(operationErr, context.Canceled) || errors.Is(operationErr, context.DeadlineExceeded) {
+		if errors.Is(operationErr, errResourceExpired) || errors.Is(operationErr, context.Canceled) || errors.Is(operationErr, context.DeadlineExceeded) {
 			next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED
 		}
 	} else if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
@@ -375,7 +375,7 @@ func (s *Service) recoverDeviceActions(ctx context.Context) error {
 			return nil
 		}
 		if err != nil {
-			return s.serviceStoreError(err)
+			return s.resourceStoreError(err)
 		}
 		if err := s.verifyDeviceActionRecord(ctx, loaded, record); err != nil {
 			s.noteTrustDamage()
@@ -430,7 +430,7 @@ func (s *Service) recheckPowerActionStart(ctx context.Context, expected *agentv1
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return errServiceRejected
+		return errResourceRejected
 	}
 	loaded, err := s.enrolled(ctx)
 	if err != nil {
@@ -441,7 +441,7 @@ func (s *Service) recheckPowerActionStart(ctx context.Context, expected *agentv1
 		return err
 	}
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || !bytes.Equal(record.GetStartGrantEnvelope(), envelope) || !proto.Equal(record.GetNativePlan(), expected.GetNativePlan()) {
-		return errServiceRejected
+		return errResourceRejected
 	}
 	_, err = s.authorizeDeviceActionStart(ctx, loaded, record, envelope)
 	return err

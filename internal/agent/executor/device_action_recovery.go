@@ -61,7 +61,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	}
 	if s.agentUpdateBusy() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	intent, err := s.currentDeviceActionIntent(ctx, loaded, envelope)
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		}
 		if prior.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED {
 			s.mu.Unlock()
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		pending := s.recoveryPending
 		s.recoveryPending = nil
@@ -92,7 +92,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	planner, ok := s.actionProvider.(recoveryPlanner)
 	if !ok || s.recoveryConfig == nil || intent.GetSpec().GetSanitize().GetRecovery() == nil || !s.actionMu.TryLock() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	s.operations.Add(1)
 	ctx, cancel := context.WithCancel(ctx)
@@ -107,7 +107,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, err
 	}
 	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !plan.GetBefore().GetSupported() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	plan.ActionId = intent.GetActionId()
 	if s.admit(plan) != nil {
@@ -158,12 +158,12 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		if found, err := offTarget.Load(new(agentv1.RecoveryJournal)); err != nil {
 			return nil, err
 		} else if found {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		if consumed, err := offTarget.Consumed(); err != nil {
 			return nil, err
 		} else if consumed {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		key, err := platform.ProvisionKey(filepath.Join(stage.StateDirectory, "action.key"))
 		if err != nil {
@@ -181,7 +181,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	loaded, err = s.enrolled(ctx)
 	if err != nil {
@@ -196,7 +196,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, err
 	}
 	if record.GetChallenge().GetBootId() != boot {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	planDigest, err := trust.RecoveryPlanDigest(plan)
 	if err != nil {
@@ -215,7 +215,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		return nil, errInternal
 	}
 	if _, err := s.store.AcceptDeviceAction(ctx, loaded.revision, loaded.execution.revision, record); err != nil {
-		return nil, s.serviceStoreError(err)
+		return nil, s.resourceStoreError(err)
 	}
 	if pending != nil {
 		s.recoveryPending = &recoveryPendingAction{actionID: actionID, key: pending}
@@ -261,13 +261,13 @@ func (s *Service) commitDeviceActionRecovery(ctx context.Context, request *agent
 		return deviceActionStatus(record), nil
 	}
 	if s.agentUpdateBusy() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if err := s.expireDeviceAction(ctx, loaded, record, revision); err != nil {
 		return nil, err
 	}
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED || s.recoveryConfig == nil {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	handoff, err := protectedRecoveryHandoff(record)
 	if err != nil {
@@ -285,25 +285,25 @@ func (s *Service) commitDeviceActionRecovery(ctx context.Context, request *agent
 		return nil, err
 	}
 	if ns >= record.GetChallengeBoottimeNs() {
-		return nil, errServiceExpired
+		return nil, errResourceExpired
 	}
 	remaining := min(grant.GetGrant().GetExpiresAt().AsTime().Sub(s.now()), time.Duration(record.GetChallengeBoottimeNs()-ns))
 	if remaining <= 0 {
-		return nil, errServiceExpired
+		return nil, errResourceExpired
 	}
 	nativeDeadline := nativeStart.Add(remaining)
 	if handoff.GetCustody() != s.recoveryConfig.Custody {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	var pending recoveryTPMPending
 	if handoff.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_TPM {
 		if s.recoveryPending == nil || s.recoveryPending.actionID != request.GetActionId() || !bytes.Equal(s.recoveryPending.key.PublicKey(), handoff.GetRecoveryPublicKey()) {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		pending = s.recoveryPending.key
 	}
 	if _, ok := s.actionProvider.(recoveryPlanner); !ok || !s.actionMu.TryLock() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	next := proto.CloneOf(record)
 	next.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING
@@ -346,11 +346,11 @@ func (s *Service) authorizeRecoveryBoot(ctx context.Context, loaded *bound, reco
 		return nil, err
 	}
 	if _, err := loaded.execution.verifier.VerifyDeviceActionRecoveryCredential(ctx, loaded.execution.root, loaded.execution.delegation, credential, handoff, s.now()); err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
 	verified, err := loaded.execution.verifier.VerifyDeviceActionRecoveryBoot(ctx, loaded.execution.root, loaded.execution.delegation, grant, handoff, s.now())
 	if err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
 	return verified, nil
 }
@@ -361,7 +361,7 @@ func (s *Service) checkRecoveryBootGate(ctx context.Context, expected *agentv1.D
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return errServiceRejected
+		return errResourceRejected
 	}
 	loaded, err := s.enrolled(ctx)
 	if err != nil {
@@ -372,7 +372,7 @@ func (s *Service) checkRecoveryBootGate(ctx context.Context, expected *agentv1.D
 		return err
 	}
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || !bytes.Equal(record.GetRecoveryCredentialEnvelope(), expected.GetRecoveryCredentialEnvelope()) || !bytes.Equal(record.GetRecoveryBootGrantEnvelope(), expected.GetRecoveryBootGrantEnvelope()) {
-		return errServiceRejected
+		return errResourceRejected
 	}
 	_, err = s.authorizeRecoveryBoot(ctx, loaded, record, handoff, record.GetRecoveryCredentialEnvelope(), record.GetRecoveryBootGrantEnvelope())
 	return err
@@ -403,7 +403,7 @@ func (s *Service) runRecoveryBoot(ctx context.Context, record *agentv1.DeviceAct
 	var offTarget *recovery.Journal
 	if handoff.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_TPM {
 		if pending == nil {
-			return errServiceRejected
+			return errResourceRejected
 		}
 		if err := s.checkRecoveryBootGate(ctx, record, handoff); err != nil {
 			return err
@@ -440,12 +440,12 @@ func (s *Service) runRecoveryBoot(ctx context.Context, record *agentv1.DeviceAct
 		if found, err := offTarget.Load(new(agentv1.RecoveryJournal)); err != nil {
 			return err
 		} else if found {
-			return errServiceRejected
+			return errResourceRejected
 		}
 		if consumed, err := offTarget.Consumed(); err != nil {
 			return err
 		} else if consumed {
-			return errServiceRejected
+			return errResourceRejected
 		}
 		if err := offTarget.Save(checkpoint); err != nil {
 			return err
@@ -524,7 +524,7 @@ func protectedRecoveryHandoff(record *agentv1.DeviceActionRecord) (*agentv1.Devi
 func (s *Service) verifyRecoveryHandoff(ctx context.Context, record *agentv1.DeviceActionRecord, public ed25519.PublicKey) (*agentv1.DeviceActionRecoveryHandoff, error) {
 	handoff := new(agentv1.DeviceActionRecoveryHandoff)
 	if err := s.authority.Verify(ctx, record.GetHandoffProof(), handoff, 1, public); err != nil {
-		return nil, historicalServiceError(ctx)
+		return nil, historicalResourceError(ctx)
 	}
 	planDigest, err := trust.RecoveryPlanDigest(record.GetNativePlan())
 	if err != nil || !bytes.Equal(handoff.GetNativePlanSha256(), planDigest[:]) || !proto.Equal(handoff.GetIntent(), record.GetIntent()) || !proto.Equal(handoff.GetChallenge(), record.GetChallenge()) || !bytes.Equal(handoff.GetIntentSha256(), record.GetIntentSha256()) || handoff.GetOriginalBootId() != record.GetChallenge().GetBootId() {
@@ -546,10 +546,10 @@ func (s *Service) verifyRecoveryBootHistory(ctx context.Context, loaded *bound, 
 	}
 	at := record.GetStartedAt().AsTime()
 	if _, err := loaded.execution.verifier.VerifyDeviceActionRecoveryCredential(ctx, record.GetAcceptedRoot(), delegation, record.GetRecoveryCredentialEnvelope(), handoff, at); err != nil {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	if _, err := loaded.execution.verifier.VerifyDeviceActionRecoveryBoot(ctx, record.GetAcceptedRoot(), delegation, record.GetRecoveryBootGrantEnvelope(), handoff, at); err != nil {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	return nil
 }

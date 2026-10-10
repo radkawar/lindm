@@ -197,7 +197,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "inspect", "inspect-storage", "lifecycle", "dispatch", "encrypted", "device-actions":
+	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -259,7 +259,7 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 		}
 	}
 	args = labhost.SetFlag(args, "cache", persistentCache)
-	if lane == "dispatch" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" {
+	if lane == "dispatch" || lane == "resources" || lane == "device-actions" || lane == "updates" || lane == "enroll-unattended" || lane == "lifecycle" {
 		repo := labhost.FlagValue(args, "repo")
 		if repo == "" {
 			return errors.New("remote control-plane lane requires staged -repo")

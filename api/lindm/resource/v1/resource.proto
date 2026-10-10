@@ -7,6 +7,7 @@ import "lindm/resource/v1/accounts.proto";
 import "lindm/resource/v1/checks.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/credentials.proto";
+import "lindm/resource/v1/host.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/network.proto";
 import "lindm/resource/v1/observations.proto";
@@ -15,7 +16,7 @@ import "lindm/resource/v1/software.proto";
 
 option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
 
-// Phase 1 is a control-plane vocabulary, not an expansion of executor authority.
+// Closed vocabulary; execution authority separately binds exact capabilities.
 // Supplied refs are compared to the domain-derived identity. Unknown fields are
 // rejected recursively; serialized limits are enforced by internal/resource.
 message ResourceDesiredState {
@@ -42,11 +43,15 @@ message ResourceDesiredState {
     SnapAppDesired snap_app = 27;
     CertificateEnrollmentDesired certificate_enrollment = 28;
     DirectoryClientDesired directory_client = 29;
+    ManagedFileDesired managed_file = 30;
+    SysctlDesired sysctl = 31;
+    SystemdDefinitionDesired systemd_definition = 32;
+    EncryptionComplianceDesired encryption_compliance = 33;
   }
   option (buf.validate.message).cel = {
     id: "resource_desired.kind"
     message: "resource kind must match the desired arm"
-    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))"
+    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))"
   };
 }
 message ResourceObservation {
@@ -74,11 +79,15 @@ message ResourceObservation {
     SnapAppObservation snap_app = 27;
     CertificateEnrollmentObservation certificate_enrollment = 28;
     DirectoryClientObservation directory_client = 29;
+    ManagedFileObservation managed_file = 30;
+    SysctlObservation sysctl = 31;
+    SystemdDefinitionObservation systemd_definition = 32;
+    EncryptionComplianceObservation encryption_compliance = 33;
   }
   option (buf.validate.message).cel = {
     id: "resource_observation.kind"
     message: "resource kind must match the observed arm"
-    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))"
+    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))"
   };
 }
 message ResourcePlan {
@@ -93,6 +102,7 @@ message ResourcePlan {
   repeated ResourceClaim claims = 6 [(buf.validate.field).repeated.max_items = 4096];
   bytes ownership_revision_sha256 = 7 [(buf.validate.field).bytes.len = 32];
   PlanSafety safety = 8 [(buf.validate.field).required = true];
+  ResourceObservation before = 9 [(buf.validate.field).required = true];
   oneof plan {
     option (buf.validate.oneof).required = true;
     SystemdServicePlan systemd_service = 10;
@@ -115,16 +125,20 @@ message ResourcePlan {
     SnapAppPlan snap_app = 27;
     CertificateEnrollmentPlan certificate_enrollment = 28;
     DirectoryClientPlan directory_client = 29;
+    ManagedFilePlan managed_file = 30;
+    SysctlPlan sysctl = 31;
+    SystemdDefinitionPlan systemd_definition = 32;
+    EncryptionCompliancePlan encryption_compliance = 33;
   }
   option (buf.validate.message).cel = {
     id: "resource_plan.kind"
     message: "resource kind must match the plan arm"
-    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))"
+    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))"
   };
   option (buf.validate.message).cel = {
     id: "resource_plan.release_inverse"
-    message: "release requires a ledger-bound executor-computed typed inverse"
-    expression: "this.operation != 2 || (has(this.systemd_service) && has(this.systemd_service.inverse)) || (has(this.local_group) && has(this.local_group.inverse)) || (has(this.local_user) && has(this.local_user.inverse)) || (has(this.sudo_rule) && has(this.sudo_rule.inverse)) || (has(this.ssh_server) && has(this.ssh_server.inverse)) || (has(this.time_sync) && has(this.time_sync.inverse)) || (has(this.trust_ca) && has(this.trust_ca.inverse)) || (has(this.firewall_zone) && has(this.firewall_zone.inverse)) || (has(this.network_connection) && has(this.network_connection.inverse)) || (has(this.dns) && has(this.dns.inverse)) || (has(this.proxy) && has(this.proxy.inverse)) || (has(this.native_package) && has(this.native_package.inverse)) || (has(this.repository) && has(this.repository.inverse)) || (has(this.flatpak_app) && has(this.flatpak_app.inverse)) || (has(this.os_update) && has(this.os_update.inverse)) || (has(this.session_policy) && has(this.session_policy.inverse)) || (has(this.password_policy) && has(this.password_policy.inverse)) || (has(this.snap_app) && has(this.snap_app.inverse)) || (has(this.certificate_enrollment) && has(this.certificate_enrollment.inverse)) || (has(this.directory_client) && has(this.directory_client.inverse))"
+    message: "mutating resource release requires a ledger-bound inverse; compliance release is observation only"
+    expression: "this.operation != 2 || (has(this.systemd_service) && has(this.systemd_service.inverse)) || (has(this.local_group) && has(this.local_group.inverse)) || (has(this.local_user) && has(this.local_user.inverse)) || (has(this.sudo_rule) && has(this.sudo_rule.inverse)) || (has(this.ssh_server) && has(this.ssh_server.inverse)) || (has(this.time_sync) && has(this.time_sync.inverse)) || (has(this.trust_ca) && has(this.trust_ca.inverse)) || (has(this.firewall_zone) && has(this.firewall_zone.inverse)) || (has(this.network_connection) && has(this.network_connection.inverse)) || (has(this.dns) && has(this.dns.inverse)) || (has(this.proxy) && has(this.proxy.inverse)) || (has(this.native_package) && has(this.native_package.inverse)) || (has(this.repository) && has(this.repository.inverse)) || (has(this.flatpak_app) && has(this.flatpak_app.inverse)) || (has(this.os_update) && has(this.os_update.inverse)) || (has(this.session_policy) && has(this.session_policy.inverse)) || (has(this.password_policy) && has(this.password_policy.inverse)) || (has(this.snap_app) && has(this.snap_app.inverse)) || (has(this.certificate_enrollment) && has(this.certificate_enrollment.inverse)) || (has(this.directory_client) && has(this.directory_client.inverse)) || (has(this.managed_file) && has(this.managed_file.inverse)) || (has(this.sysctl) && has(this.sysctl.inverse)) || (has(this.systemd_definition) && has(this.systemd_definition.inverse)) || (has(this.encryption_compliance) && this.encryption_compliance.change == 5)"
   };
 }
 enum VerificationDisposition {
@@ -169,11 +183,15 @@ message ResourceVerification {
     SnapAppChecks snap_app = 27;
     CertificateEnrollmentChecks certificate_enrollment = 28;
     DirectoryClientChecks directory_client = 29;
+    ManagedFileChecks managed_file = 30;
+    SysctlChecks sysctl = 31;
+    SystemdDefinitionChecks systemd_definition = 32;
+    EncryptionComplianceChecks encryption_compliance = 33;
   }
   option (buf.validate.message).cel = {
     id: "resource_verification.kind"
     message: "resource kind must match the checks arm"
-    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))"
+    expression: "(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))"
   };
   option (buf.validate.message).cel = {
     id: "resource_verification.observation"
@@ -183,6 +201,11 @@ message ResourceVerification {
   option (buf.validate.message).cel = {
     id: "resource_verification.converged"
     message: "convergence requires successful native observation and all kind-specific checks"
-    expression: "this.disposition != 1 || (this.after.metadata.observation_status == 1 && ((has(this.systemd_service) && this.systemd_service.converged) || (has(this.local_group) && this.local_group.converged) || (has(this.local_user) && this.local_user.converged) || (has(this.sudo_rule) && this.sudo_rule.converged) || (has(this.ssh_server) && this.ssh_server.converged) || (has(this.time_sync) && this.time_sync.converged) || (has(this.trust_ca) && this.trust_ca.converged) || (has(this.firewall_zone) && this.firewall_zone.converged) || (has(this.network_connection) && this.network_connection.converged) || (has(this.dns) && this.dns.converged) || (has(this.proxy) && this.proxy.converged) || (has(this.native_package) && this.native_package.converged) || (has(this.repository) && this.repository.converged) || (has(this.flatpak_app) && this.flatpak_app.converged) || (has(this.os_update) && this.os_update.converged) || (has(this.session_policy) && this.session_policy.converged) || (has(this.password_policy) && this.password_policy.converged) || (has(this.snap_app) && this.snap_app.converged) || (has(this.certificate_enrollment) && this.certificate_enrollment.converged) || (has(this.directory_client) && this.directory_client.converged)))"
+    expression: "this.disposition != 1 || (this.after.metadata.observation_status == 1 && ((has(this.systemd_service) && this.systemd_service.converged) || (has(this.local_group) && this.local_group.converged) || (has(this.local_user) && this.local_user.converged) || (has(this.sudo_rule) && this.sudo_rule.converged) || (has(this.ssh_server) && this.ssh_server.converged) || (has(this.time_sync) && this.time_sync.converged) || (has(this.trust_ca) && this.trust_ca.converged) || (has(this.firewall_zone) && this.firewall_zone.converged) || (has(this.network_connection) && this.network_connection.converged) || (has(this.dns) && this.dns.converged) || (has(this.proxy) && this.proxy.converged) || (has(this.native_package) && this.native_package.converged) || (has(this.repository) && this.repository.converged) || (has(this.flatpak_app) && this.flatpak_app.converged) || (has(this.os_update) && this.os_update.converged) || (has(this.session_policy) && this.session_policy.converged) || (has(this.password_policy) && this.password_policy.converged) || (has(this.snap_app) && this.snap_app.converged) || (has(this.certificate_enrollment) && this.certificate_enrollment.converged) || (has(this.directory_client) && this.directory_client.converged) || (has(this.managed_file) && this.managed_file.converged) || (has(this.sysctl) && this.sysctl.converged) || (has(this.systemd_definition) && this.systemd_definition.converged) || (has(this.encryption_compliance) && this.encryption_compliance.converged)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_verification.encryption_evidence"
+    message: "encryption convergence cannot be inferred from absent root evidence"
+    expression: "this.disposition != 1 || !has(this.encryption_compliance) || (has(this.after.encryption_compliance.luks_root) && this.after.encryption_compliance.luks_root)"
   };
 }

@@ -249,6 +249,11 @@ func TestProvisioningPendingApprovalAndAssignments(t *testing.T) {
 	if _, err := f.conn.Exec(t.Context(), "INSERT INTO device_groups(id,name) VALUES ($1,'provisioning')", group); err != nil {
 		t.Fatal(err)
 	}
+	adopted := qualifiedServiceResource()
+	adopted.ResourceId = uuid.NewString()
+	adopted.Desired.Ref.CanonicalKey = "adopted.service"
+	adopted.Desired.GetSystemdService().Unit = "adopted.service"
+	adopted.Ownership.Mode = resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION
 	profile, err := f.service.PublishProfileRevision(f.ownerCtx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{
 		RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "enrollment policy",
 		Spec: &policyv1.ResourceProfile{Name: "enrollment", Resources: []*policyv1.ProfileResource{{
@@ -261,7 +266,7 @@ func TestProvisioningPendingApprovalAndAssignments(t *testing.T) {
 			},
 			Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},
 			Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
-		}}},
+		}, adopted}},
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -323,6 +328,14 @@ func TestProvisioningPendingApprovalAndAssignments(t *testing.T) {
 	}
 	if used != 1 || owner != f.owner.ID || labels != 1 || members != 1 || assignments != 1 {
 		t.Fatalf("assignment replay changed fixed reservation: %d %v %d %d %d", used, owner, labels, members, assignments)
+	}
+	var disposition int16
+	var reason string
+	if err := f.conn.QueryRow(t.Context(), "SELECT disposition, reason FROM resource_assignment_resources WHERE resource_id=$1", adopted.GetResourceId()).Scan(&disposition, &reason); err != nil {
+		t.Fatal(err)
+	}
+	if disposition != int16(adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED) || reason != "adoption_approval_required" {
+		t.Fatalf("enrollment approval incorrectly authorized resource adoption: %d %s", disposition, reason)
 	}
 }
 

@@ -7,12 +7,24 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { ConnectivityGuardConfig } from "./connectivity_guard_pb.js";
+import { file_lindm_agent_v1_connectivity_guard } from "./connectivity_guard_pb.js";
+import type { ConnectivityProbeServerConfig } from "./connectivity_probe_config_pb.js";
+import { file_lindm_agent_v1_connectivity_probe_config } from "./connectivity_probe_config_pb.js";
 import type { RecoveryCustody } from "./device_action_recovery_pb.js";
 import { file_lindm_agent_v1_device_action_recovery } from "./device_action_recovery_pb.js";
 import type { SanitizeMethod, StorageTarget } from "./device_actions_pb.js";
 import { file_lindm_agent_v1_device_actions } from "./device_actions_pb.js";
+import type { NativeFirewallProviderConfig } from "./native_firewall_pb.js";
+import { file_lindm_agent_v1_native_firewall } from "./native_firewall_pb.js";
+import type { NativePasswordProviderConfig } from "./native_password_pb.js";
+import { file_lindm_agent_v1_native_password } from "./native_password_pb.js";
+import type { NativeAccountProviderConfig, NativeFileProviderConfig, NativeSysctlProviderConfig } from "./resource_native_pb.js";
+import { file_lindm_agent_v1_resource_native } from "./resource_native_pb.js";
 import type { AgentUpdateConfig } from "./update_pb.js";
 import { file_lindm_agent_v1_update } from "./update_pb.js";
+import type { RepositoryDesired } from "../../resource/v1/software_pb.js";
+import { file_lindm_resource_v1_software } from "../../resource/v1/software_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -20,7 +32,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/agent/v1/config.proto.
  */
 export const file_lindm_agent_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChtsaW5kbS9hZ2VudC92MS9jb25maWcucHJvdG8SDmxpbmRtLmFnZW50LnYxIqMDCgtBZ2VudENvbmZpZxIiCg9zdGF0ZV9kaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARIkChFydW50aW1lX2RpcmVjdG9yeRgCIAEoCUIJukgGcgSQtRgBEjEKC3NvY2tldF9uYW1lGAMgASgJQhy6SBlyFxABGEAyEV5bQS1aYS16MC05Ll8tXSskEj8KDG5ldHdvcmtfdXNlchgEIAEoCUIpukgmciQQARggMhheW2Etel9dW2EtejAtOV8tXXswLDMxfSRaBHJvb3QSIgoPc3Bvb2xfZGlyZWN0b3J5GAUgASgJQgm6SAZyBJC1GAESQwoPYWN0aW9uX3Byb3ZpZGVyGAYgASgLMioubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uUHJvdmlkZXJDb25maWcSOQoNcmVjb3ZlcnlfYm9vdBgHIAEoCzIiLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Qm9vdENvbmZpZxIyCgd1cGRhdGVzGAggASgLMiEubGluZG0uYWdlbnQudjEuQWdlbnRVcGRhdGVDb25maWcimwQKGkRldmljZUFjdGlvblByb3ZpZGVyQ29uZmlnEkAKB3RhcmdldHMYASADKAsyJS5saW5kbS5hZ2VudC52MS5RdWFsaWZpZWRBY3Rpb25UYXJnZXRCCLpIBZIBAhAgEhoKEmFsbG93X3Nlc3Npb25fbG9jaxgCIAEoCBIYChBhbGxvd19xdWFyYW50aW5lGAMgASgIEiwKFG1hbmFnZW1lbnRfZW5kcG9pbnRzGAQgAygJQg66SAuSAQgQICIEcgJwARIjCgtkbnNfc2VydmVycxgFIAMoCUIOukgLkgEIEAgiBHICcAESJAoScXVhcmFudGluZV9zZWNvbmRzGAYgASgNQgi6SAUqAxisAhIhChlwcm90ZWN0ZWRfc3RhdGVfZGlyZWN0b3J5GAcgASgJEhwKFHJlY292ZXJ5X2Vudmlyb25tZW50GAggASgIEiQKHGFsbG93X2xpdmVfcm9vdF9jcnlwdG9fZXJhc2UYCSABKAgSHgoWYWxsb3dfcmVjb3ZlcnlfaGFuZG9mZhgKIAEoCBIaChJhbGxvd19hY2NvdW50X2xvY2sYCyABKAgSTAoScHJvdGVjdGVkX2FjY291bnRzGAwgAygJQjC6SC2SASoQgAEYASIjciEyH15bYS16QS1aX11bYS16QS1aMC05Xy4tXXswLDMxfSQSGwoTYWxsb3dfcG93ZXJfYWN0aW9ucxgNIAEoCCKAAwoVUXVhbGlmaWVkQWN0aW9uVGFyZ2V0EjUKBnRhcmdldBgBIAEoCzIdLmxpbmRtLmFnZW50LnYxLlN0b3JhZ2VUYXJnZXRCBrpIA8gBARInChZvd25lcl9yZWNvdmVyeV9rZXlzbG90GAIgASgNQge6SAQqAhgfEh8KF2FsbG93X3JlY292ZXJ5X3JvdGF0aW9uGAMgASgIEhoKEmFsbG93X3RwbTJfYmluZGluZxgEIAEoCBIaChJhbGxvd19jcnlwdG9fZXJhc2UYBSABKAgSFwoPYWxsb3dfb3ZlcndyaXRlGAYgASgIEhUKDWFsbG93X2Rpc2NhcmQYByABKAgSIgoQcXVhbGlmaWNhdGlvbl9pZBgIIAEoCUIIukgFcgMYgAISWgoXbmF0aXZlX3Nhbml0aXplX21ldGhvZHMYCSADKA4yHi5saW5kbS5hZ2VudC52MS5TYW5pdGl6ZU1ldGhvZEIZukgWkgETEAQYASINggEKEAEYAxgEGAUYBiK4BQoVUmVjb3ZlcnlSdW50aW1lQ29uZmlnEiIKD3N0YXRlX2RpcmVjdG9yeRgBIAEoCUIJukgGcgSQtRgBEh4KCGtleV9maWxlGAIgASgJQgy6SAnYAQFyBJC1GAESIAoKc2VydmVyX3VybBgDIAEoCUIMukgJcgeAtRgBiAEBEiEKDnNlcnZlcl9jYV9maWxlGAQgASgJQgm6SAZyBJC1GAESRAoIcHJvdmlkZXIYBiABKAsyKi5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25Qcm92aWRlckNvbmZpZ0IGukgDyAEBEhwKCXJvb3RfZmlsZRgHIAEoCUIJukgGcgSQtRgBEiEKDmJvb3RzdHJhcF9maWxlGAggASgJQgm6SAZyBJC1GAESIwoSY2VydGlmaWNhdGVfc2hhMjU2GAkgASgMQge6SAR6AmggEjwKB2N1c3RvZHkYCiABKA4yHy5saW5kbS5hZ2VudC52MS5SZWNvdmVyeUN1c3RvZHlCCrpIB4IBBBABIAASQQoVYm9vdHN0cmFwX3ZlcmlmaWVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBOssBukjHARrEAQoYcmVjb3ZlcnlfcnVudGltZS5jdXN0b2R5Ek5vZmYtdGFyZ2V0IGN1c3RvZHkgcmVxdWlyZXMgaXRzIGtleSBmaWxlOyBUUE0gY3VzdG9keSBjYW5ub3Qgc2VsZWN0IGEga2V5IGZpbGUaWCh0aGlzLmN1c3RvZHkgPT0gMSAmJiB0aGlzLmtleV9maWxlICE9ICcnKSB8fCAodGhpcy5jdXN0b2R5ID09IDIgJiYgdGhpcy5rZXlfZmlsZSA9PSAnJylKBAgFEAZSFXJlY292ZXJ5X2ltYWdlX3NoYTI1NiK7BAoSUmVjb3ZlcnlCb290Q29uZmlnEh0KCmltYWdlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIdCgxpbWFnZV9zaGEyNTYYAiABKAxCB7pIBHoCaCASIQoKaW1hZ2Vfc2l6ZRgDIAEoBEINukgKMggYgICAgAQgABIqChdzaWduZXJfY2VydGlmaWNhdGVfZmlsZRgEIAEoCUIJukgGcgSQtRgBEioKGXNpZ25lcl9jZXJ0aWZpY2F0ZV9zaGEyNTYYBSABKAxCB7pIBHoCaCASIAoNZXNwX2RpcmVjdG9yeRgGIAEoCUIJukgGcgSQtRgBEiIKD3N0YXRlX2RpcmVjdG9yeRgHIAEoCUIJukgGcgSQtRgBEjwKB2N1c3RvZHkYCCABKA4yHy5saW5kbS5hZ2VudC52MS5SZWNvdmVyeUN1c3RvZHlCCrpIB4IBBBABIAASJgoVZXhwZWN0ZWRfcGNyMTFfc2hhMjU2GAkgASgMQge6SAR6AhggOr8Buki7ARq4AQoVcmVjb3ZlcnlfYm9vdC5jdXN0b2R5EjdUUE0gY3VzdG9keSByZXF1aXJlcyB0aGUgZXhhY3QgcXVhbGlmaWVkIHJlY292ZXJ5IFBDUjExGmYodGhpcy5jdXN0b2R5ID09IDIgPyB0aGlzLmV4cGVjdGVkX3BjcjExX3NoYTI1Ni5zaXplKCkgPT0gMzIgOiB0aGlzLmV4cGVjdGVkX3BjcjExX3NoYTI1Ni5zaXplKCkgPT0gMClCIlogbGluZG0vZ2VuL2xpbmRtL2FnZW50L3YxO2FnZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_device_action_recovery, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_update, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChtsaW5kbS9hZ2VudC92MS9jb25maWcucHJvdG8SDmxpbmRtLmFnZW50LnYxItkHCgtBZ2VudENvbmZpZxIiCg9zdGF0ZV9kaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARIkChFydW50aW1lX2RpcmVjdG9yeRgCIAEoCUIJukgGcgSQtRgBEjEKC3NvY2tldF9uYW1lGAMgASgJQhy6SBlyFxABGEAyEV5bQS1aYS16MC05Ll8tXSskEj8KDG5ldHdvcmtfdXNlchgEIAEoCUIpukgmciQQARggMhheW2Etel9dW2EtejAtOV8tXXswLDMxfSRaBHJvb3QSIgoPc3Bvb2xfZGlyZWN0b3J5GAUgASgJQgm6SAZyBJC1GAESQwoPYWN0aW9uX3Byb3ZpZGVyGAYgASgLMioubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uUHJvdmlkZXJDb25maWcSOQoNcmVjb3ZlcnlfYm9vdBgHIAEoCzIiLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Qm9vdENvbmZpZxIyCgd1cGRhdGVzGAggASgLMiEubGluZG0uYWdlbnQudjEuQWdlbnRVcGRhdGVDb25maWcSRQoQcGFja2FnZV9wcm92aWRlchgJIAEoCzIrLmxpbmRtLmFnZW50LnYxLk5hdGl2ZVBhY2thZ2VQcm92aWRlckNvbmZpZxI/Cg1maWxlX3Byb3ZpZGVyGAogASgLMigubGluZG0uYWdlbnQudjEuTmF0aXZlRmlsZVByb3ZpZGVyQ29uZmlnEkMKD3N5c2N0bF9wcm92aWRlchgLIAEoCzIqLmxpbmRtLmFnZW50LnYxLk5hdGl2ZVN5c2N0bFByb3ZpZGVyQ29uZmlnEkUKEGFjY291bnRfcHJvdmlkZXIYDCABKAsyKy5saW5kbS5hZ2VudC52MS5OYXRpdmVBY2NvdW50UHJvdmlkZXJDb25maWcSRwoRZmlyZXdhbGxfcHJvdmlkZXIYDSABKAsyLC5saW5kbS5hZ2VudC52MS5OYXRpdmVGaXJld2FsbFByb3ZpZGVyQ29uZmlnEkcKEXBhc3N3b3JkX3Byb3ZpZGVyGA4gASgLMiwubGluZG0uYWdlbnQudjEuTmF0aXZlUGFzc3dvcmRQcm92aWRlckNvbmZpZxJDChJjb25uZWN0aXZpdHlfZ3VhcmQYDyABKAsyJy5saW5kbS5hZ2VudC52MS5Db25uZWN0aXZpdHlHdWFyZENvbmZpZxJJChJjb25uZWN0aXZpdHlfcHJvYmUYECABKAsyLS5saW5kbS5hZ2VudC52MS5Db25uZWN0aXZpdHlQcm9iZVNlcnZlckNvbmZpZyLFAgobTmF0aXZlUGFja2FnZVByb3ZpZGVyQ29uZmlnEkAKB3NvdXJjZXMYASADKAsyIy5saW5kbS5hZ2VudC52MS5OYXRpdmVQYWNrYWdlU291cmNlQgq6SAeSAQQIARAgOuMBukjfARrcAQombmF0aXZlX3BhY2thZ2VfcHJvdmlkZXIudW5pcXVlX3NvdXJjZXMSP2FwcHJvdmVkIHBhY2thZ2Ugc291cmNlcyBtdXN0IGhhdmUgdW5pcXVlIHJlcG9zaXRvcnkgaWRlbnRpdGllcxpxdGhpcy5zb3VyY2VzLmFsbChzLCB0aGlzLnNvdXJjZXMuZmlsdGVyKG8sIG8ucmVwb3NpdG9yeS5yZXBvc2l0b3J5X2lkID09IHMucmVwb3NpdG9yeS5yZXBvc2l0b3J5X2lkKS5zaXplKCkgPT0gMSkikgcKE05hdGl2ZVBhY2thZ2VTb3VyY2USQAoKcmVwb3NpdG9yeRgBIAEoCzIkLmxpbmRtLnJlc291cmNlLnYxLlJlcG9zaXRvcnlEZXNpcmVkQga6SAPIAQESIwoQc2lnbmluZ19rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBEiMKEnNpZ25pbmdfa2V5X3NoYTI1NhgDIAEoDEIHukgEegJoIBJKChtycG1fc2lnbmluZ19rZXlfZmluZ2VycHJpbnQYBCABKAlCJbpIInIgMh5eKFswLTlBLUZdezQwfXxbMC05QS1GXXs2NH0pPyQ6ogW6SJ4FGuoBCh5uYXRpdmVfcGFja2FnZV9zb3VyY2UuYXBwcm92ZWQSR25hdGl2ZSBwYWNrYWdlIHNvdXJjZXMgbXVzdCBiZSBwcmVzZW50IGFwcHJvdmVkIEFQVCBvciBSUE0gcmVwb3NpdG9yaWVzGn90aGlzLnJlcG9zaXRvcnkucHJlc2VuY2UgPT0gMSAmJiAhaGFzKHRoaXMucmVwb3NpdG9yeS5hdXRoZW50aWNhdGlvbikgJiYgKGhhcyh0aGlzLnJlcG9zaXRvcnkuYXB0KSB8fCBoYXModGhpcy5yZXBvc2l0b3J5LnJwbSkpGq4DChxuYXRpdmVfcGFja2FnZV9zb3VyY2Uuc2lnbmVyEkF0aGUgbG9jYWwga2V5IG11c3QgbWF0Y2ggdGhlIGFwcHJvdmVkIHJlcG9zaXRvcnkgc2lnbmluZyBhcnRpZmFjdBrKAihoYXModGhpcy5yZXBvc2l0b3J5LmFwdCkgJiYgdGhpcy5ycG1fc2lnbmluZ19rZXlfZmluZ2VycHJpbnQgPT0gJycgJiYgdGhpcy5yZXBvc2l0b3J5LmFwdC5zaWduaW5nX2tleS5zaGEyNTYgPT0gdGhpcy5zaWduaW5nX2tleV9zaGEyNTYpIHx8IChoYXModGhpcy5yZXBvc2l0b3J5LnJwbSkgJiYgdGhpcy5ycG1fc2lnbmluZ19rZXlfZmluZ2VycHJpbnQgIT0gJycgJiYgdGhpcy5yZXBvc2l0b3J5LnJwbS5zaWduaW5nX2tleXMuc2l6ZSgpID09IDEgJiYgdGhpcy5yZXBvc2l0b3J5LnJwbS5zaWduaW5nX2tleXNbMF0uc2hhMjU2ID09IHRoaXMuc2lnbmluZ19rZXlfc2hhMjU2KSKbBAoaRGV2aWNlQWN0aW9uUHJvdmlkZXJDb25maWcSQAoHdGFyZ2V0cxgBIAMoCzIlLmxpbmRtLmFnZW50LnYxLlF1YWxpZmllZEFjdGlvblRhcmdldEIIukgFkgECECASGgoSYWxsb3dfc2Vzc2lvbl9sb2NrGAIgASgIEhgKEGFsbG93X3F1YXJhbnRpbmUYAyABKAgSLAoUbWFuYWdlbWVudF9lbmRwb2ludHMYBCADKAlCDrpIC5IBCBAgIgRyAnABEiMKC2Ruc19zZXJ2ZXJzGAUgAygJQg66SAuSAQgQCCIEcgJwARIkChJxdWFyYW50aW5lX3NlY29uZHMYBiABKA1CCLpIBSoDGKwCEiEKGXByb3RlY3RlZF9zdGF0ZV9kaXJlY3RvcnkYByABKAkSHAoUcmVjb3ZlcnlfZW52aXJvbm1lbnQYCCABKAgSJAocYWxsb3dfbGl2ZV9yb290X2NyeXB0b19lcmFzZRgJIAEoCBIeChZhbGxvd19yZWNvdmVyeV9oYW5kb2ZmGAogASgIEhoKEmFsbG93X2FjY291bnRfbG9jaxgLIAEoCBJMChJwcm90ZWN0ZWRfYWNjb3VudHMYDCADKAlCMLpILZIBKhCAARgBIiNyITIfXlthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9JBIbChNhbGxvd19wb3dlcl9hY3Rpb25zGA0gASgIIoADChVRdWFsaWZpZWRBY3Rpb25UYXJnZXQSNQoGdGFyZ2V0GAEgASgLMh0ubGluZG0uYWdlbnQudjEuU3RvcmFnZVRhcmdldEIGukgDyAEBEicKFm93bmVyX3JlY292ZXJ5X2tleXNsb3QYAiABKA1CB7pIBCoCGB8SHwoXYWxsb3dfcmVjb3Zlcnlfcm90YXRpb24YAyABKAgSGgoSYWxsb3dfdHBtMl9iaW5kaW5nGAQgASgIEhoKEmFsbG93X2NyeXB0b19lcmFzZRgFIAEoCBIXCg9hbGxvd19vdmVyd3JpdGUYBiABKAgSFQoNYWxsb3dfZGlzY2FyZBgHIAEoCBIiChBxdWFsaWZpY2F0aW9uX2lkGAggASgJQgi6SAVyAxiAAhJaChduYXRpdmVfc2FuaXRpemVfbWV0aG9kcxgJIAMoDjIeLmxpbmRtLmFnZW50LnYxLlNhbml0aXplTWV0aG9kQhm6SBaSARMQBBgBIg2CAQoQARgDGAQYBRgGIrgFChVSZWNvdmVyeVJ1bnRpbWVDb25maWcSIgoPc3RhdGVfZGlyZWN0b3J5GAEgASgJQgm6SAZyBJC1GAESHgoIa2V5X2ZpbGUYAiABKAlCDLpICdgBAXIEkLUYARIgCgpzZXJ2ZXJfdXJsGAMgASgJQgy6SAlyB4C1GAGIAQESIQoOc2VydmVyX2NhX2ZpbGUYBCABKAlCCbpIBnIEkLUYARJECghwcm92aWRlchgGIAEoCzIqLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvblByb3ZpZGVyQ29uZmlnQga6SAPIAQESHAoJcm9vdF9maWxlGAcgASgJQgm6SAZyBJC1GAESIQoOYm9vdHN0cmFwX2ZpbGUYCCABKAlCCbpIBnIEkLUYARIjChJjZXJ0aWZpY2F0ZV9zaGEyNTYYCSABKAxCB7pIBHoCaCASPAoHY3VzdG9keRgKIAEoDjIfLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Q3VzdG9keUIKukgHggEEEAEgABJBChVib290c3RyYXBfdmVyaWZpZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQE6ywG6SMcBGsQBChhyZWNvdmVyeV9ydW50aW1lLmN1c3RvZHkSTm9mZi10YXJnZXQgY3VzdG9keSByZXF1aXJlcyBpdHMga2V5IGZpbGU7IFRQTSBjdXN0b2R5IGNhbm5vdCBzZWxlY3QgYSBrZXkgZmlsZRpYKHRoaXMuY3VzdG9keSA9PSAxICYmIHRoaXMua2V5X2ZpbGUgIT0gJycpIHx8ICh0aGlzLmN1c3RvZHkgPT0gMiAmJiB0aGlzLmtleV9maWxlID09ICcnKUoECAUQBlIVcmVjb3ZlcnlfaW1hZ2Vfc2hhMjU2IrsEChJSZWNvdmVyeUJvb3RDb25maWcSHQoKaW1hZ2VfZmlsZRgBIAEoCUIJukgGcgSQtRgBEh0KDGltYWdlX3NoYTI1NhgCIAEoDEIHukgEegJoIBIhCgppbWFnZV9zaXplGAMgASgEQg26SAoyCBiAgICABCAAEioKF3NpZ25lcl9jZXJ0aWZpY2F0ZV9maWxlGAQgASgJQgm6SAZyBJC1GAESKgoZc2lnbmVyX2NlcnRpZmljYXRlX3NoYTI1NhgFIAEoDEIHukgEegJoIBIgCg1lc3BfZGlyZWN0b3J5GAYgASgJQgm6SAZyBJC1GAESIgoPc3RhdGVfZGlyZWN0b3J5GAcgASgJQgm6SAZyBJC1GAESPAoHY3VzdG9keRgIIAEoDjIfLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Q3VzdG9keUIKukgHggEEEAEgABImChVleHBlY3RlZF9wY3IxMV9zaGEyNTYYCSABKAxCB7pIBHoCGCA6vwG6SLsBGrgBChVyZWNvdmVyeV9ib290LmN1c3RvZHkSN1RQTSBjdXN0b2R5IHJlcXVpcmVzIHRoZSBleGFjdCBxdWFsaWZpZWQgcmVjb3ZlcnkgUENSMTEaZih0aGlzLmN1c3RvZHkgPT0gMiA/IHRoaXMuZXhwZWN0ZWRfcGNyMTFfc2hhMjU2LnNpemUoKSA9PSAzMiA6IHRoaXMuZXhwZWN0ZWRfcGNyMTFfc2hhMjU2LnNpemUoKSA9PSAwKUIiWiBsaW5kbS9nZW4vbGluZG0vYWdlbnQvdjE7YWdlbnR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_connectivity_guard, file_lindm_agent_v1_connectivity_probe_config, file_lindm_agent_v1_device_action_recovery, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_native_firewall, file_lindm_agent_v1_native_password, file_lindm_agent_v1_resource_native, file_lindm_agent_v1_update, file_lindm_resource_v1_software, file_lindm_validation_v1_string_rules]);
 
 /**
  * AgentConfig is the serialized configuration for the privileged executor and
@@ -93,6 +105,49 @@ export type AgentConfig = Message<"lindm.agent.v1.AgentConfig"> & {
    * @generated from field: lindm.agent.v1.AgentUpdateConfig updates = 8;
    */
   updates?: AgentUpdateConfig | undefined;
+
+  /**
+   * Root-approved native repository sources. Absent means package effects disabled.
+   * Native package effects run in a distinct protected transaction helper.
+   *
+   * @generated from field: lindm.agent.v1.NativePackageProviderConfig package_provider = 9;
+   */
+  packageProvider?: NativePackageProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.NativeFileProviderConfig file_provider = 10;
+   */
+  fileProvider?: NativeFileProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.NativeSysctlProviderConfig sysctl_provider = 11;
+   */
+  sysctlProvider?: NativeSysctlProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.NativeAccountProviderConfig account_provider = 12;
+   */
+  accountProvider?: NativeAccountProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.NativeFirewallProviderConfig firewall_provider = 13;
+   */
+  firewallProvider?: NativeFirewallProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.NativePasswordProviderConfig password_provider = 14;
+   */
+  passwordProvider?: NativePasswordProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.ConnectivityGuardConfig connectivity_guard = 15;
+   */
+  connectivityGuard?: ConnectivityGuardConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.ConnectivityProbeServerConfig connectivity_probe = 16;
+   */
+  connectivityProbe?: ConnectivityProbeServerConfig | undefined;
 };
 
 /**
@@ -101,6 +156,57 @@ export type AgentConfig = Message<"lindm.agent.v1.AgentConfig"> & {
  */
 export const AgentConfigSchema: GenMessage<AgentConfig> = /*@__PURE__*/
   messageDesc(file_lindm_agent_v1_config, 0);
+
+/**
+ * @generated from message lindm.agent.v1.NativePackageProviderConfig
+ */
+export type NativePackageProviderConfig = Message<"lindm.agent.v1.NativePackageProviderConfig"> & {
+  /**
+   * @generated from field: repeated lindm.agent.v1.NativePackageSource sources = 1;
+   */
+  sources: NativePackageSource[];
+};
+
+/**
+ * Describes the message lindm.agent.v1.NativePackageProviderConfig.
+ * Use `create(NativePackageProviderConfigSchema)` to create a new message.
+ */
+export const NativePackageProviderConfigSchema: GenMessage<NativePackageProviderConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 1);
+
+/**
+ * Locally provisioned signing material, never a remotely supplied filesystem path.
+ *
+ * @generated from message lindm.agent.v1.NativePackageSource
+ */
+export type NativePackageSource = Message<"lindm.agent.v1.NativePackageSource"> & {
+  /**
+   * @generated from field: lindm.resource.v1.RepositoryDesired repository = 1;
+   */
+  repository?: RepositoryDesired | undefined;
+
+  /**
+   * @generated from field: string signing_key_file = 2;
+   */
+  signingKeyFile: string;
+
+  /**
+   * @generated from field: bytes signing_key_sha256 = 3;
+   */
+  signingKeySha256: Uint8Array;
+
+  /**
+   * @generated from field: string rpm_signing_key_fingerprint = 4;
+   */
+  rpmSigningKeyFingerprint: string;
+};
+
+/**
+ * Describes the message lindm.agent.v1.NativePackageSource.
+ * Use `create(NativePackageSourceSchema)` to create a new message.
+ */
+export const NativePackageSourceSchema: GenMessage<NativePackageSource> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 2);
 
 /**
  * Root-owned local qualification, never remotely supplied execution authority.
@@ -190,7 +296,7 @@ export type DeviceActionProviderConfig = Message<"lindm.agent.v1.DeviceActionPro
  * Use `create(DeviceActionProviderConfigSchema)` to create a new message.
  */
 export const DeviceActionProviderConfigSchema: GenMessage<DeviceActionProviderConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_agent_v1_config, 1);
+  messageDesc(file_lindm_agent_v1_config, 3);
 
 /**
  * @generated from message lindm.agent.v1.QualifiedActionTarget
@@ -252,7 +358,7 @@ export type QualifiedActionTarget = Message<"lindm.agent.v1.QualifiedActionTarge
  * Use `create(QualifiedActionTargetSchema)` to create a new message.
  */
 export const QualifiedActionTargetSchema: GenMessage<QualifiedActionTarget> = /*@__PURE__*/
-  messageDesc(file_lindm_agent_v1_config, 2);
+  messageDesc(file_lindm_agent_v1_config, 4);
 
 /**
  * Authenticated recovery-image configuration. Every path is resolved locally
@@ -322,7 +428,7 @@ export type RecoveryRuntimeConfig = Message<"lindm.agent.v1.RecoveryRuntimeConfi
  * Use `create(RecoveryRuntimeConfigSchema)` to create a new message.
  */
 export const RecoveryRuntimeConfigSchema: GenMessage<RecoveryRuntimeConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_agent_v1_config, 3);
+  messageDesc(file_lindm_agent_v1_config, 5);
 
 /**
  * @generated from message lindm.agent.v1.RecoveryBootConfig
@@ -379,5 +485,5 @@ export type RecoveryBootConfig = Message<"lindm.agent.v1.RecoveryBootConfig"> & 
  * Use `create(RecoveryBootConfigSchema)` to create a new message.
  */
 export const RecoveryBootConfigSchema: GenMessage<RecoveryBootConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_agent_v1_config, 4);
+  messageDesc(file_lindm_agent_v1_config, 6);
 

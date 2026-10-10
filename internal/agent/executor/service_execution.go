@@ -19,21 +19,117 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/accountprovider"
+	"lindm/internal/agent/actionprovider"
+	"lindm/internal/agent/definitionprovider"
+	"lindm/internal/agent/encryptionprovider"
+	"lindm/internal/agent/fileprovider"
+	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/packageprovider"
+	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/serviceprovider"
+	"lindm/internal/agent/sysctlprovider"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
 
-// nativeService is a process-local seam, never caller-supplied execution data.
-// Production always opens the protected native systemd provider.
-type nativeService interface {
-	Plan(context.Context, *agentv1.ServiceDesiredState) (*agentv1.ServicePlan, error)
-	Verify(context.Context, *agentv1.ServicePlan) (*agentv1.ServiceVerification, error)
-	Apply(context.Context, *agentv1.ServicePlan, func(context.Context) error) (*agentv1.ServiceVerification, error)
+// nativeResource is a process-local seam, never caller-supplied execution data.
+// Production selects a native provider by the signed, canonical resource kind.
+type nativeResource interface {
+	Plan(context.Context, *resourcev1.ResourceDesiredState, resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error)
+	Verify(context.Context, *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error)
+	Apply(context.Context, *resourcev1.ResourcePlan, func(context.Context) error) (*resourcev1.ResourceVerification, error)
 	Close() error
 }
 
-func openNativeService(ctx context.Context) (nativeService, error) { return serviceprovider.Open(ctx) }
+func (s *Service) openNativeResource(ctx context.Context, intent *agentv1.ResourceExecutionIntent) (nativeResource, error) {
+	if err := resource.ValidateDesired(intent.GetDesired()); err != nil {
+		return nil, err
+	}
+	platform, err := inventory.HostPlatform(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if intent.GetDesired().GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE {
+		record, _, err := s.store.LoadResourceAction(ctx, intent.GetActionId())
+		if err != nil {
+			return nil, err
+		}
+		if !proto.Equal(record.GetIntent(), intent) || !bytes.Equal(digestBytes(record.GetIntentEnvelope()), record.GetIntentSha256()) {
+			return nil, errRecoveryHold
+		}
+		return packageprovider.Open(ctx, packageprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), StateDirectory: s.directory, Native: s.packageProvider,
+			Preparation: intent.GetPreparation(), IntentDigest: record.GetIntentSha256(),
+			NativeStage: s.packageNativeStage, NativeStageCancel: s.packageNativeCancel, NativeTransaction: s.packageNativeTransaction,
+		})
+	}
+	switch intent.GetDesired().GetRef().GetKind() {
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE:
+		return serviceprovider.Open(ctx, serviceprovider.Config{
+			ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
+		return fileprovider.Open(ctx, fileprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Files,
+			ProtectedPaths: s.nativeResources.ProtectedPaths, ExecuteNative: s.resourceNativeTransaction,
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:
+		return accountprovider.Open(ctx, accountprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Accounts,
+			NativeTransaction: s.resourceNativeApply, NativeDigest: s.store.PrivateDigest,
+			NativeObserve: func(ctx context.Context, desired *resourcev1.ResourceDesiredState) (*agentv1.ResourceOwnershipSnapshot, error) {
+				result, err := s.observeNativeResource(ctx, desired, platform, nil)
+				if err != nil {
+					return nil, err
+				}
+				return result.GetAfter(), nil
+			},
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
+		return sysctlprovider.Open(ctx, sysctlprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Sysctl, NativeApply: s.resourceNativeApply,
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
+		return definitionprovider.Open(ctx, definitionprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), ExecuteNative: s.resourceNativeTransaction,
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:
+		return s.openFirewallResource(ctx, intent, platform)
+	case resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE:
+		return encryptionprovider.Open(ctx, encryptionprovider.Config{
+			ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			AuthenticatedEscrow: s.authenticatedResourceEscrow,
+			Observe: func(ctx context.Context) (*actionprovider.RootEncryptionEvidence, error) {
+				result, err := s.observeNativeResource(ctx, intent.GetDesired(), platform, nil)
+				if err != nil {
+					return nil, err
+				}
+				return rootEncryptionEvidence(result)
+			},
+		})
+	case resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:
+		return passwordprovider.Open(ctx, passwordprovider.Config{
+			Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: platform,
+			ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+			EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.Password, ExecuteNative: s.resourceNativeTransaction,
+		})
+	default:
+		return nil, serviceprovider.ErrUnsupported
+	}
+}
 
 func readBoottime() (uint64, error) {
 	var ts unix.Timespec
@@ -47,33 +143,33 @@ func readBoottime() (uint64, error) {
 	return uint64(ns), nil
 }
 
-func (s *Service) PrepareServiceExecution(ctx context.Context, req *connect.Request[agentv1.PrepareServiceExecutionRequest]) (*connect.Response[agentv1.PrepareServiceExecutionResponse], error) {
+func (s *Service) PrepareResourceExecution(ctx context.Context, req *connect.Request[agentv1.PrepareResourceExecutionRequest]) (*connect.Response[agentv1.PrepareResourceExecutionResponse], error) {
 	ctx, cancel := s.bounded(ctx)
 	defer cancel()
 	if req == nil {
 		return nil, mapError(errInvalid)
 	}
-	msg, err := s.prepareServiceExecution(ctx, req.Msg)
+	msg, err := s.prepareResourceExecution(ctx, req.Msg)
 	if err != nil {
 		return nil, mapError(err)
 	}
 	return noStore(msg), nil
 }
 
-func (s *Service) StartServiceExecution(ctx context.Context, req *connect.Request[agentv1.StartServiceExecutionRequest]) (*connect.Response[agentv1.StartServiceExecutionResponse], error) {
+func (s *Service) StartResourceExecution(ctx context.Context, req *connect.Request[agentv1.StartResourceExecutionRequest]) (*connect.Response[agentv1.StartResourceExecutionResponse], error) {
 	ctx, cancel := s.bounded(ctx)
 	defer cancel()
 	if req == nil {
 		return nil, mapError(errInvalid)
 	}
-	msg, err := s.startServiceExecution(ctx, req.Msg)
+	msg, err := s.startResourceExecution(ctx, req.Msg)
 	if err != nil {
 		return nil, mapError(err)
 	}
 	return noStore(msg), nil
 }
 
-func (s *Service) GetServiceExecution(ctx context.Context, req *connect.Request[agentv1.GetServiceExecutionRequest]) (*connect.Response[agentv1.GetServiceExecutionResponse], error) {
+func (s *Service) GetResourceExecution(ctx context.Context, req *connect.Request[agentv1.GetResourceExecutionRequest]) (*connect.Response[agentv1.GetResourceExecutionResponse], error) {
 	ctx, cancel := s.bounded(ctx)
 	defer cancel()
 	if req == nil || s.admit(req.Msg) != nil {
@@ -90,33 +186,33 @@ func (s *Service) GetServiceExecution(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, mapError(err)
 	}
-	record, revision, err := s.loadServiceAction(ctx, loaded, req.Msg.GetActionId())
+	record, revision, err := s.loadResourceAction(ctx, loaded, req.Msg.GetActionId())
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if err := s.expireServiceAction(ctx, loaded, record, revision); err != nil {
+	if err := s.expireResourceAction(ctx, loaded, record, revision); err != nil {
 		return nil, mapError(err)
 	}
-	return noStore(&agentv1.GetServiceExecutionResponse{Status: serviceStatus(record)}), nil
+	return noStore(&agentv1.GetResourceExecutionResponse{Status: resourceStatus(record)}), nil
 }
 
-// lookupServiceIntent extracts a bounded routing key only. Neither this payload
+// lookupResourceIntent extracts a bounded routing key only. Neither this payload
 // nor its envelope is authority until current or historical verification below.
-func (s *Service) lookupServiceIntent(encoded []byte) (string, error) {
-	if len(encoded) == 0 || len(encoded) > 16384 {
+func (s *Service) lookupResourceIntent(encoded []byte) (string, error) {
+	if len(encoded) == 0 || len(encoded) > 131072 {
 		return "", errInvalid
 	}
 	var envelope dsse.Envelope
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.PayloadType != trust.ServiceIntentType || len(envelope.Signatures) == 0 || len(envelope.Signatures) > 16 {
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF || envelope.PayloadType != trust.ResourceIntentType || len(envelope.Signatures) == 0 || len(envelope.Signatures) > 16 {
 		return "", errInvalid
 	}
 	payload, err := base64.StdEncoding.DecodeString(envelope.Payload)
-	if err != nil || len(payload) == 0 || len(payload) > 16384 {
+	if err != nil || len(payload) == 0 || len(payload) > 131072 {
 		return "", errInvalid
 	}
-	intent := new(agentv1.ServiceExecutionIntent)
+	intent := new(agentv1.ResourceExecutionIntent)
 	if proto.Unmarshal(payload, intent) != nil || s.admit(intent) != nil {
 		return "", errInvalid
 	}
@@ -126,11 +222,11 @@ func (s *Service) lookupServiceIntent(encoded []byte) (string, error) {
 	return intent.GetActionId(), nil
 }
 
-func (s *Service) prepareServiceExecution(ctx context.Context, req *agentv1.PrepareServiceExecutionRequest) (*agentv1.PrepareServiceExecutionResponse, error) {
+func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.PrepareResourceExecutionRequest) (*agentv1.PrepareResourceExecutionResponse, error) {
 	if err := s.admit(req); err != nil {
 		return nil, err
 	}
-	actionID, err := s.lookupServiceIntent(req.GetIntentEnvelope())
+	actionID, err := s.lookupResourceIntent(req.GetIntentEnvelope())
 	if err != nil {
 		return nil, err
 	}
@@ -142,20 +238,27 @@ func (s *Service) prepareServiceExecution(ctx context.Context, req *agentv1.Prep
 		s.mu.Unlock()
 		return nil, err
 	}
-	if old, _, err := s.loadServiceAction(ctx, loaded, actionID); err == nil {
-		s.mu.Unlock()
+	if old, revision, err := s.loadResourceAction(ctx, loaded, actionID); err == nil {
 		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) {
+			s.mu.Unlock()
 			return nil, errIdempotencyConflict
 		}
-		return servicePreparation(old), nil
-	} else if !errors.Is(err, journal.ErrServiceActionNotFound) {
+		if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+			return s.pollResourcePreparationLocked(ctx, loaded, old, revision)
+		}
+		s.mu.Unlock()
+		return resourcePreparation(old), nil
+	} else if !errors.Is(err, journal.ErrResourceActionNotFound) {
 		s.mu.Unlock()
 		return nil, err
 	}
-	intent, err := s.currentServiceIntent(ctx, loaded, req.GetIntentEnvelope())
+	intent, err := s.currentResourceIntent(ctx, loaded, req.GetIntentEnvelope())
 	if err != nil {
 		s.mu.Unlock()
 		return nil, err
+	}
+	if intent.GetPreparation() != nil {
+		return s.admitResourcePreparationLocked(ctx, loaded, intent, req.GetIntentEnvelope())
 	}
 	// Admission and Add are serialized with Close. Native preflight never holds
 	// the authority mutex and is canceled by either the RPC or service lifetime.
@@ -166,26 +269,23 @@ func (s *Service) prepareServiceExecution(ctx context.Context, req *agentv1.Prep
 	defer s.operations.Done()
 	defer cancel()
 	defer stop()
-	provider, err := s.openService(ctx)
+	provider, err := s.openResource(ctx, intent)
 	if err != nil {
-		return nil, err
+		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}
 	defer func() { _ = provider.Close() }()
-	plan, err := provider.Plan(ctx, intent.GetDesired())
+	plan, err := provider.Plan(ctx, intent.GetDesired(), intent.GetOperation())
 	if err != nil {
-		return nil, err
+		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}
-	if serviceprovider.ValidatePlan(plan) != nil || !proto.Equal(plan.GetDesired(), intent.GetDesired()) {
+	if validateResourcePlan(plan) != nil || !proto.Equal(resource.PlanDesired(plan), intent.GetDesired()) || plan.GetOperation() != intent.GetOperation() {
 		return nil, errInternal
 	}
-	var verification *agentv1.ServiceVerification
-	if !serviceDrift(plan) {
+	var verification *resourcev1.ResourceVerification
+	if !resourceDrift(plan) {
 		verification, err = provider.Verify(ctx, plan)
-		if err != nil {
+		if err := validateReadOnlyResourceResult(plan, verification, err); err != nil {
 			return nil, err
-		}
-		if serviceprovider.ValidateVerification(plan, verification) != nil || !verification.GetConverged() {
-			return nil, errInternal
 		}
 	}
 	if err := s.lock(ctx); err != nil {
@@ -197,50 +297,50 @@ func (s *Service) prepareServiceExecution(ctx context.Context, req *agentv1.Prep
 		return nil, err
 	}
 	// A concurrent identical request may have completed preflight first.
-	if old, _, err := s.loadServiceAction(ctx, loaded, actionID); err == nil {
+	if old, _, err := s.loadResourceAction(ctx, loaded, actionID); err == nil {
 		if !bytes.Equal(old.GetIntentEnvelope(), req.GetIntentEnvelope()) {
 			return nil, errIdempotencyConflict
 		}
-		return servicePreparation(old), nil
-	} else if !errors.Is(err, journal.ErrServiceActionNotFound) {
+		return resourcePreparation(old), nil
+	} else if !errors.Is(err, journal.ErrResourceActionNotFound) {
 		return nil, err
 	}
-	intent, err = s.currentServiceIntent(ctx, loaded, req.GetIntentEnvelope())
+	intent, err = s.currentResourceIntent(ctx, loaded, req.GetIntentEnvelope())
 	if err != nil {
 		return nil, err
 	}
 	now := s.now()
-	record := &agentv1.ServiceExecutionRecord{
+	record := &agentv1.ResourceExecutionRecord{
 		FormatVersion: 1, InstallationId: loaded.state.GetInstallationId(),
 		IntentEnvelope: bytes.Clone(req.GetIntentEnvelope()), IntentSha256: digestBytes(req.GetIntentEnvelope()),
 		Intent: intent, NativePlan: plan, AcceptedRoot: loaded.execution.root,
 		AcceptedDelegationEnvelope: bytes.Clone(loaded.execution.state.GetDelegationEnvelope()),
-		AcceptedAt:                 protoTimestamp(now), State: agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED,
-		Failure: agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE,
+		AcceptedAt:                 protoTimestamp(now), State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED,
+		Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE,
 	}
-	if plan.GetBefore().GetBootId() != loaded.state.GetSessionBootId() {
-		return nil, errServiceRejected
+	if plan.GetBefore().GetMetadata().GetBootId() != loaded.state.GetSessionBootId() || plan.GetBefore().GetMetadata().GetExecutorIncarnation() != s.incarnation {
+		return nil, errResourceRejected
 	}
-	if serviceDrift(plan) {
-		if err := s.makeServiceChallenge(ctx, loaded, record); err != nil {
+	if resourceDrift(plan) {
+		if err := s.makeResourceChallenge(ctx, loaded, record); err != nil {
 			return nil, err
 		}
 	} else {
-		record.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
-		record.Verification = verification
+		recordReadOnlyResourceResult(record, verification)
+		record.FirewallEvidence = nativeFirewallEvidence(provider)
 		record.CompletedAt = protoTimestamp(now)
 	}
 	// Validate protected generated evidence before it can become a receipt.
-	if err := s.verifyServiceRecord(ctx, loaded, record); err != nil {
+	if err := s.verifyResourceRecord(ctx, loaded, record); err != nil {
 		return nil, errInternal
 	}
-	if _, err := s.store.AcceptServiceAction(ctx, loaded.revision, loaded.execution.revision, record); err != nil {
-		return nil, s.serviceStoreError(err)
+	if _, err := s.store.AcceptResourceAction(ctx, loaded.revision, loaded.execution.revision, record); err != nil {
+		return nil, s.resourceStoreError(err)
 	}
-	return servicePreparation(record), nil
+	return resourcePreparation(record), nil
 }
 
-func (s *Service) startServiceExecution(ctx context.Context, req *agentv1.StartServiceExecutionRequest) (*agentv1.StartServiceExecutionResponse, error) {
+func (s *Service) startResourceExecution(ctx context.Context, req *agentv1.StartResourceExecutionRequest) (*agentv1.StartResourceExecutionResponse, error) {
 	if err := s.admit(req); err != nil {
 		return nil, err
 	}
@@ -255,7 +355,7 @@ func (s *Service) startServiceExecution(ctx context.Context, req *agentv1.StartS
 	if err != nil {
 		return nil, err
 	}
-	record, revision, err := s.loadServiceAction(ctx, loaded, req.GetActionId())
+	record, revision, err := s.loadResourceAction(ctx, loaded, req.GetActionId())
 	if err != nil {
 		return nil, err
 	}
@@ -265,30 +365,30 @@ func (s *Service) startServiceExecution(ctx context.Context, req *agentv1.StartS
 		if !bytes.Equal(record.GetStartGrantEnvelope(), req.GetStartGrantEnvelope()) {
 			return nil, errIdempotencyConflict
 		}
-		return &agentv1.StartServiceExecutionResponse{Status: serviceStatus(record)}, nil
+		return &agentv1.StartResourceExecutionResponse{Status: resourceStatus(record)}, nil
 	}
-	if err := s.expireServiceAction(ctx, loaded, record, revision); err != nil {
+	if err := s.expireResourceAction(ctx, loaded, record, revision); err != nil {
 		return nil, err
 	}
-	if record.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED {
-		return nil, errServiceRejected
+	if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
+		return nil, errResourceRejected
 	}
-	if _, err := s.authorizeServiceStart(ctx, loaded, record, req.GetStartGrantEnvelope()); err != nil {
+	if _, err := s.authorizeResourceStart(ctx, loaded, record, req.GetStartGrantEnvelope()); err != nil {
 		return nil, err
 	}
 	next := proto.CloneOf(record)
-	next.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED
+	next.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED
 	next.StartGrantEnvelope = bytes.Clone(req.GetStartGrantEnvelope())
 	next.StartGrantSha256 = digestBytes(req.GetStartGrantEnvelope())
 	next.GrantAcceptedAt = protoTimestamp(s.now())
-	if err := s.updateServiceAction(ctx, loaded, revision, next); err != nil {
+	if err := s.updateResourceAction(ctx, loaded, revision, next); err != nil {
 		return nil, err
 	}
-	s.wakeServiceWorker()
-	return &agentv1.StartServiceExecutionResponse{Status: serviceStatus(next)}, nil
+	s.wakeResourceWorker()
+	return &agentv1.StartResourceExecutionResponse{Status: resourceStatus(next)}, nil
 }
 
-func (s *Service) serviceIdentitySession(loaded *bound) error {
+func (s *Service) resourceIdentitySession(loaded *bound) error {
 	if !certUsable(loaded.cert, s.now()) {
 		return errIdentityExpired
 	}
@@ -311,24 +411,24 @@ func (s *Service) serviceIdentitySession(loaded *bound) error {
 	return nil
 }
 
-func (s *Service) currentServiceIntent(ctx context.Context, loaded *bound, envelope []byte) (*agentv1.ServiceExecutionIntent, error) {
-	if err := s.serviceIdentitySession(loaded); err != nil {
+func (s *Service) currentResourceIntent(ctx context.Context, loaded *bound, envelope []byte) (*agentv1.ResourceExecutionIntent, error) {
+	if err := s.resourceIdentitySession(loaded); err != nil {
 		return nil, err
 	}
 	if loaded.execution.delegation == nil || s.now().Before(loaded.execution.state.GetAcceptedAt().AsTime()) {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
-	intent, err := loaded.execution.verifier.VerifyServiceIntent(ctx, loaded.execution.root, loaded.execution.delegation, envelope, s.now())
+	intent, err := loaded.execution.verifier.VerifyResourceIntent(ctx, loaded.execution.root, loaded.execution.delegation, envelope, s.now())
 	if err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
-	if !serviceTarget(loaded, intent) {
-		return nil, errServiceRejected
+	if !resourceTarget(loaded, intent) {
+		return nil, errResourceRejected
 	}
 	return intent, nil
 }
 
-func serviceTarget(loaded *bound, intent *agentv1.ServiceExecutionIntent) bool {
+func resourceTarget(loaded *bound, intent *agentv1.ResourceExecutionIntent) bool {
 	if intent.GetDeploymentId() != loaded.bootstrap.Root.GetDeploymentId() || intent.GetDeviceId() != loaded.state.GetDeviceId() || intent.GetEnrollmentGeneration() != loaded.state.GetEnrollmentGeneration() {
 		return false
 	}
@@ -340,28 +440,34 @@ func serviceTarget(loaded *bound, intent *agentv1.ServiceExecutionIntent) bool {
 	return true
 }
 
-func (s *Service) makeServiceChallenge(ctx context.Context, loaded *bound, record *agentv1.ServiceExecutionRecord) error {
+func (s *Service) makeResourceChallenge(ctx context.Context, loaded *bound, record *agentv1.ResourceExecutionRecord) error {
 	boot, err := s.bootID()
 	if err != nil {
 		return err
 	}
-	if boot != record.GetNativePlan().GetBefore().GetBootId() {
-		return errServiceRejected
+	if boot != record.GetNativePlan().GetBefore().GetMetadata().GetBootId() {
+		return errResourceRejected
 	}
 	ns, err := s.boottime()
 	if err != nil {
 		return err
 	}
 	now := record.GetAcceptedAt().AsTime()
+	if record.GetIntent().GetPreparation() != nil {
+		now = s.now()
+	}
 	expires := now.Add(30 * time.Second)
 	if intentEnd := record.GetIntent().GetExpiresAt().AsTime(); intentEnd.Before(expires) {
 		expires = intentEnd
 	}
+	if preparation := record.GetIntent().GetPreparation(); preparation != nil && preparation.GetDeadline().AsTime().Before(expires) {
+		expires = preparation.GetDeadline().AsTime()
+	}
 	lifetime := expires.Sub(now)
 	if lifetime <= 0 || ns > math.MaxInt64-uint64(lifetime) {
-		return errServiceExpired
+		return errResourceExpired
 	}
-	planDigest, err := digestMessage(record.GetNativePlan())
+	planDigest, err := resource.PlanDigest(record.GetNativePlan())
 	if err != nil {
 		return err
 	}
@@ -370,11 +476,12 @@ func (s *Service) makeServiceChallenge(ctx context.Context, loaded *bound, recor
 		return err
 	}
 	intent := record.GetIntent()
-	challenge := &agentv1.ServiceExecutionChallenge{
+	challenge := &agentv1.ResourceExecutionChallenge{
 		DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(),
 		ActionId: intent.GetActionId(), DesiredRevision: intent.GetDesiredRevision(), ResourceSequence: intent.GetResourceSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(),
-		IntentSha256: bytes.Clone(record.GetIntentSha256()), NativePlanSha256: planDigest, Nonce: nonce,
+		IntentSha256: bytes.Clone(record.GetIntentSha256()), NativePlanSha256: planDigest[:], Nonce: nonce,
 		BootId: boot, ExecutorIncarnation: s.incarnation, IssuedAt: protoTimestamp(now), ExpiresAt: protoTimestamp(expires),
+		Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(),
 	}
 	proof, err := s.authority.Sign(ctx, challenge, loaded.identityKey)
 	if err != nil {
@@ -386,31 +493,31 @@ func (s *Service) makeServiceChallenge(ctx context.Context, loaded *bound, recor
 	return nil
 }
 
-func (s *Service) authorizeServiceStart(ctx context.Context, loaded *bound, record *agentv1.ServiceExecutionRecord, grant []byte) (*agentv1.ServiceExecutionStartGrant, error) {
-	if _, err := s.currentServiceIntent(ctx, loaded, record.GetIntentEnvelope()); err != nil {
+func (s *Service) authorizeResourceStart(ctx context.Context, loaded *bound, record *agentv1.ResourceExecutionRecord, grant []byte) (*agentv1.ResourceExecutionStartGrant, error) {
+	if _, err := s.currentResourceIntent(ctx, loaded, record.GetIntentEnvelope()); err != nil {
 		return nil, err
 	}
-	if err := s.serviceDeadline(record); err != nil {
+	if err := s.resourceDeadline(record); err != nil {
 		return nil, err
 	}
-	verified, err := loaded.execution.verifier.VerifyServiceStart(ctx, loaded.execution.root, loaded.execution.delegation, grant, record.GetIntent(), record.GetChallenge(), s.now())
+	verified, err := loaded.execution.verifier.VerifyResourceStart(ctx, loaded.execution.root, loaded.execution.delegation, grant, record.GetIntent(), record.GetChallenge(), s.now())
 	if err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
 	return verified, nil
 }
 
-func (s *Service) serviceDeadline(record *agentv1.ServiceExecutionRecord) error {
+func (s *Service) resourceDeadline(record *agentv1.ResourceExecutionRecord) error {
 	challenge := record.GetChallenge()
 	if challenge == nil || challenge.GetExecutorIncarnation() != s.incarnation || s.now().Before(challenge.GetIssuedAt().AsTime()) || !s.now().Before(challenge.GetExpiresAt().AsTime()) {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	boot, err := s.bootID()
 	if err != nil {
 		return err
 	}
 	if boot != challenge.GetBootId() {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	ns, err := s.boottime()
 	if err != nil {
@@ -419,25 +526,31 @@ func (s *Service) serviceDeadline(record *agentv1.ServiceExecutionRecord) error 
 	lifetime := uint64(challenge.GetExpiresAt().AsTime().Sub(challenge.GetIssuedAt().AsTime()))
 	deadline := record.GetChallengeBoottimeNs()
 	if deadline < lifetime || ns < deadline-lifetime || ns >= deadline {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	return nil
 }
 
-func (s *Service) expireServiceAction(ctx context.Context, loaded *bound, record *agentv1.ServiceExecutionRecord, revision int64) error {
-	if record.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED && record.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED {
+func (s *Service) expireResourceAction(ctx context.Context, loaded *bound, record *agentv1.ResourceExecutionRecord, revision int64) error {
+	if record.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+		return s.checkResourcePreparation(ctx, loaded, record, revision)
+	}
+	if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED && record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
 		return nil
 	}
-	if err := s.serviceDeadline(record); err == nil {
+	if err := s.resourceDeadline(record); err == nil {
 		return nil
-	} else if !errors.Is(err, errServiceExpired) {
+	} else if !errors.Is(err, errResourceExpired) {
 		return err
 	}
+	if record.GetIntent().GetPreparation() != nil {
+		return s.endResourcePreparation(ctx, loaded, record, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED)
+	}
 	next := proto.CloneOf(record)
-	next.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED
-	next.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_EXPIRED
+	next.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
+	next.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED
 	next.CompletedAt = protoTimestamp(s.now())
-	if err := s.updateServiceAction(ctx, loaded, revision, next); err != nil {
+	if err := s.updateResourceAction(ctx, loaded, revision, next); err != nil {
 		return err
 	}
 	proto.Reset(record)
@@ -445,8 +558,8 @@ func (s *Service) expireServiceAction(ctx context.Context, loaded *bound, record
 	return nil
 }
 
-func serviceDrift(plan *agentv1.ServicePlan) bool {
-	return plan.GetChangeRuntime() || plan.GetChangeEnablement()
+func resourceDrift(plan *resourcev1.ResourcePlan) bool {
+	return resource.PlanRequiresEffect(plan)
 }
 
 func digestBytes(encoded []byte) []byte {
@@ -462,21 +575,53 @@ func digestMessage(msg proto.Message) ([]byte, error) {
 	return digestBytes(encoded), nil
 }
 
-func serviceAuthorityError(ctx context.Context, _ error) error {
+func resourceAuthorityError(ctx context.Context, _ error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return errServiceRejected
+	return errResourceRejected
 }
 
-func serviceStatus(record *agentv1.ServiceExecutionRecord) *agentv1.ServiceExecutionStatus {
-	return &agentv1.ServiceExecutionStatus{
+func resourceStatus(record *agentv1.ResourceExecutionRecord) *agentv1.ResourceExecutionStatus {
+	return &agentv1.ResourceExecutionStatus{
 		ActionId: record.GetIntent().GetActionId(), IntentSha256: bytes.Clone(record.GetIntentSha256()), State: record.GetState(), Failure: record.GetFailure(),
 		AcceptedAt: proto.CloneOf(record.GetAcceptedAt()), StartedAt: proto.CloneOf(record.GetStartedAt()), CompletedAt: proto.CloneOf(record.GetCompletedAt()),
 		Before: proto.CloneOf(record.GetNativePlan().GetBefore()), Verification: proto.CloneOf(record.GetVerification()),
+		PreparationOutcome: proto.CloneOf(record.GetPreparationOutcome()),
+		AdmissionRefusal:   proto.CloneOf(record.GetAdmissionRefusal()),
+		ReadOnly:           record.GetNativePlan() != nil && !resourceDrift(record.GetNativePlan()),
+		Remediations:       encryptionprovider.Remediations(record.GetVerification()),
 	}
 }
 
-func servicePreparation(record *agentv1.ServiceExecutionRecord) *agentv1.PrepareServiceExecutionResponse {
-	return &agentv1.PrepareServiceExecutionResponse{Status: serviceStatus(record), NativePlan: proto.CloneOf(record.GetNativePlan()), ChallengeProof: bytes.Clone(record.GetChallengeProof())}
+func resourcePreparation(record *agentv1.ResourceExecutionRecord) *agentv1.PrepareResourceExecutionResponse {
+	return &agentv1.PrepareResourceExecutionResponse{Status: resourceStatus(record), NativePlan: proto.CloneOf(record.GetNativePlan()), ChallengeProof: bytes.Clone(record.GetChallengeProof())}
+}
+
+func validateResourcePlan(plan *resourcev1.ResourcePlan) error {
+	if err := resource.ValidatePlan(plan); err != nil {
+		return err
+	}
+	if plan.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE {
+		return serviceprovider.ValidatePlan(plan)
+	}
+	return nil
+}
+
+func validateResourceVerification(plan *resourcev1.ResourcePlan, verification *resourcev1.ResourceVerification) error {
+	if err := resource.ValidatePlanVerification(plan, verification); err != nil {
+		return err
+	}
+	if plan.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE {
+		return serviceprovider.ValidateVerification(plan, verification)
+	}
+	return nil
+}
+
+// WithPackageProvider retains root-owned source authorization. An RPC cannot
+// enable package management or replace its approved repositories and signing keys.
+func WithPackageProvider(config *agentv1.NativePackageProviderConfig) Option {
+	return func(s *Service) {
+		s.packageProvider = proto.CloneOf(config)
+	}
 }

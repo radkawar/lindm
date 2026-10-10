@@ -31,9 +31,10 @@ repository or air-gap lifecycle support.
 The binary is `/usr/libexec/lindm/lindm-agent`; configuration is
 `/etc/lindm/executor.json` and `/etc/lindm/agent.json`, with separate state below
 `/var/lib/lindm/executor` and `/var/lib/lindm/agent`. Keep vendor SELinux Enforcing.
-AlmaLinux 9.8 x86_64 dispatch and the independent Rocky 9.8/10.2 ARM lifecycle
-and dispatch records below retained Enforcing. AlmaLinux 10 inherits none of those
-results. RHEL subscription-manager registration and Red Hat entitlement evidence
+AlmaLinux 9.8 x86_64 dispatch and the independent Rocky 9.8/10.2 and AlmaLinux
+8.10/9.8/10.2 ARM lifecycle and dispatch records below retained Enforcing; each
+row stands only for its own release and architecture. RHEL subscription-manager
+registration and Red Hat entitlement evidence
 do not describe derivative repository access.
 
 ## Agent services and sandbox
@@ -127,16 +128,18 @@ Use each vendor's pinned manifest with maintained `lab images fetch`, offline
 Retain image, architecture, firmware, SELinux, native versions, source and result
 digests. The current independent status is:
 
-| Vendor/image          | Observed evidence boundary                                                                                                                                                                         |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rocky 9.8 x86_64      | Native inspection matched 422 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
-| Rocky 10.2 x86_64     | Native inspection matched 443 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
-| AlmaLinux 9.8 x86_64  | Native inspection matched 387 RPM records. Earlier packaged lifecycle failed signed service; corrected connected dispatch passed independently. A full packaged lifecycle rerun is still required. |
-| AlmaLinux 10.2 x86_64 | Authenticated acquisition is not a native inspection/lifecycle pass.                                                                                                                               |
-| Legacy 8              | Consult each vendor's separate acquisition/native rows; do not inherit 9/10 results.                                                                                                               |
-| Rocky 9.8 aarch64     | Passed inspect (418 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 420-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
-| Rocky 10.2 aarch64    | Passed inspect (440 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 442-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
-| AlmaLinux aarch64     | Signed acquisition/offline verification does not qualify native lifecycle; await each completed machine record independently of Rocky.                                                             |
+| Vendor/image           | Observed evidence boundary                                                                                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rocky 9.8 x86_64       | Native inspection matched 422 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
+| Rocky 10.2 x86_64      | Native inspection matched 443 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
+| AlmaLinux 9.8 x86_64   | Native inspection matched 387 RPM records. Earlier packaged lifecycle failed signed service; corrected connected dispatch passed independently. A full packaged lifecycle rerun is still required. |
+| AlmaLinux 10.2 x86_64  | Authenticated acquisition is not a native inspection/lifecycle pass.                                                                                                                               |
+| Legacy 8               | Consult each vendor's separate acquisition/native rows; do not inherit 9/10 results.                                                                                                               |
+| Rocky 9.8 aarch64      | Passed inspect (418 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 420-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
+| Rocky 10.2 aarch64     | Passed inspect (440 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 442-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
+| AlmaLinux 9.8 aarch64  | Passed inspect (384 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 386-package publications) and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                   |
+| AlmaLinux 10.2 aarch64 | Passed inspect (379 RPMs), full signed lifecycle (five 381-package publications) and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                               |
+| AlmaLinux 8.10 aarch64 | Passed inspect (430 RPMs), full signed lifecycle (five 432-package publications) and nine native dispatch scenarios on dgx20 KVM after the EL8 fixes below; SELinux Enforcing. Not Rocky/RHEL 8.   |
 
 The AlmaLinux corrected dispatch record is
 `$HOME/.cache/lindm-alma-servicefix-20261010/alma9-dispatch-after.json`, SHA-256
@@ -165,14 +168,46 @@ air-gap, desktop or physical capability is inherited.
 
 Records below are under `$HOME/.cache/lindm-mutabledistros3-20261010/`:
 
-| Record                               | SHA-256                                                            |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| `rocky9-arm64-dgx20-inspect.json`    | `e8b1d77d1c81b02ae833afc8cd7849d37557371b019f5726a264b9159f6bf3db` |
-| `rocky9-arm64-dgx20-lifecycle.json`  | `c7b95fddeef7c28d396901993e920989c0970a56810de7b3f114ee345ad0c5d0` |
-| `rocky9-arm64-dgx20-dispatch.json`   | `bb17111467ecef3bb47d0fb2fc898a49415c411dc0fd15e2c819f2e8b7830ed4` |
-| `rocky10-arm64-dgx20-inspect.json`   | `8e82dfa7570d14b8e30b8da2f77cd3b48d63650519b11d9897827cd117743049` |
-| `rocky10-arm64-dgx20-lifecycle.json` | `c4713821b59c9938a44b81fec68c5df7d6e1ad922e0641c7690a835c2de04df9` |
-| `rocky10-arm64-dgx20-dispatch.json`  | `34bd45508a999bc54cc861b8d5d9f8d31db8305b99396345a802953f47a192bc` |
+| Record                                    | SHA-256                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `rocky9-arm64-dgx20-inspect.json`         | `e8b1d77d1c81b02ae833afc8cd7849d37557371b019f5726a264b9159f6bf3db` |
+| `rocky9-arm64-dgx20-lifecycle.json`       | `c7b95fddeef7c28d396901993e920989c0970a56810de7b3f114ee345ad0c5d0` |
+| `rocky9-arm64-dgx20-dispatch.json`        | `bb17111467ecef3bb47d0fb2fc898a49415c411dc0fd15e2c819f2e8b7830ed4` |
+| `rocky10-arm64-dgx20-inspect.json`        | `8e82dfa7570d14b8e30b8da2f77cd3b48d63650519b11d9897827cd117743049` |
+| `rocky10-arm64-dgx20-lifecycle.json`      | `c4713821b59c9938a44b81fec68c5df7d6e1ad922e0641c7690a835c2de04df9` |
+| `rocky10-arm64-dgx20-dispatch.json`       | `34bd45508a999bc54cc861b8d5d9f8d31db8305b99396345a802953f47a192bc` |
+| `alma9-arm64-dgx20-inspect.json`          | `4b27eebefe3cf6c4f0987f076c8e3d8cb36d8c3c0c83980b17b5d562fad3f525` |
+| `alma9-arm64-dgx20-lifecycle.json`        | `3c76a258e81a63333f9e0937331ba2f70b0508392480505c77a77aad21d8827a` |
+| `alma9-arm64-dgx20-dispatch.json`         | `8df0e0271385e3220bce78f9dcae62fa5cb9a2cfbd05ea2b694f8f3e7a4cb665` |
+| `alma10-arm64-dgx20-inspect.json`         | `50fa3dd6a71b1b0d963a36a57dfcfe35cf30695ad26e286199e2d84980c4e1f6` |
+| `alma10-arm64-dgx20-lifecycle.json`       | `5a8056cbeb509530f9f6aa053a775c7310055fbb36baf773d6b3d8559ee94498` |
+| `alma10-arm64-dgx20-dispatch.json`        | `822336a8bcf022589772ea04a31247555b67dcf62146e989f7b0be8cc8e05830` |
+| `alma8-arm64-dgx20-inspect-el8fix.json`   | `9e314b95621a350cb0c6c76029abfed18250f61dc3128442d705e9f08c816567` |
+| `alma8-arm64-dgx20-lifecycle-el8fix.json` | `f336e9018b6682531f402db6e33b62bd42657cdb240bdad21eeb4f29481e400c` |
+| `alma8-arm64-dgx20-dispatch-el8fix.json`  | `1e645149636351a18613562e197da23babd58602c364477686fb93952b88ad88` |
+
+AlmaLinux 9.8/10.2 use the same `d303cec` + `8c30afa7…` source as Rocky.
+AlmaLinux 8.10 required three EL8 compatibility fixes, each with regressions,
+and ran from `d303cec` plus that delta and these fixes (lane-recorded source diff
+SHA-256 `e10d895312dfb0bc99b139f6222ac07087ec7698321bc1d7b6df6e2ff0233de8`),
+with 0.7.0/0.7.1 RPMs rebuilt from that source (`5e6043f9…`/`ac143d42…`):
+
+- **util-linux 2.32.1 lsblk** lacks `FSVER`, `PTTYPE`, `PTUUID` and `MOUNTPOINTS`
+  and exits 1 (`unknown column`). Agent and independent oracle now, only after that
+  native failure, probe `lsblk --version` once and use a legacy column set for
+  releases before 2.37; uncollected identity fields stay `UNAVAILABLE`
+  ([`storage_linux.go`](../../internal/agent/inventory/storage_linux.go);
+  captured fixture `testdata/lsblk-almalinux810-aarch64`).
+- **Native exit status** was lost: the runner killed lsblk in the window after it
+  closed stdout, reporting `INVALID_OUTPUT` instead of `NATIVE_COMMAND_FAILURE`.
+  A drained tool is now waited for, not killed
+  ([`packages_linux.go`](../../internal/agent/inventory/packages_linux.go):117-183;
+  `TestNativeExitPrecedesParserRejection`).
+- **systemd 239 busctl** has no `--json`. After a native busctl failure the agent
+  reads `busctl --version` once; before v240 it parses busctl's fixed text output
+  (`call ListUsers/ListSessions`, `get-property` per session) through the same
+  logind validation ([`sessions_text_linux.go`](../../internal/agent/inventory/sessions_text_linux.go);
+  `TestLegacyBusctlTextSessions`).
 
 The original x86 records are under `$HOME/.cache/lindm-mutabledistros-20261010/`,
 indexed by its `evidence-index.json`:
@@ -186,8 +221,11 @@ indexed by its `evidence-index.json`:
 
 ## Gaps
 
-Rocky x86_64 and AlmaLinux still require the separate complete lifecycle cells
-not passed above. Desktop, legacy, air-gap, actions and physical-machine evidence
+Rocky x86_64, AlmaLinux 10.2/8.10 x86_64 and a rerun AlmaLinux 9.8 x86_64
+lifecycle still require the separate complete cells. Rocky 8 and RHEL 8 inherit
+nothing from AlmaLinux 8.10 ARM. EL8 device actions are not covered: the action
+provider still requests `PTTYPE`/`PTUUID`/`MOUNTPOINTS`. Desktop, other legacy
+rows, air-gap, actions and physical-machine evidence
 remain exact-scope requirements. The dbus-broker fix closes a demonstrated AlmaLinux
 signal-delivery issue, not the entire derivative matrix. Derivative advisory
 coverage and generic package resources must not be inferred from RHEL/Fedora.

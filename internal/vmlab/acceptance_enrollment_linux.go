@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"time"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -32,12 +33,23 @@ func (g *AcceptanceGuest) Enroll(ctx context.Context, fixture *devlab.AuthorityF
 	default:
 		return "", errors.New("acceptance credential kind must be grant or provisioning")
 	}
-	for _, address := range []string{fixture.AdminAddress, fixture.DeviceAddress} {
-		host, port, err := net.SplitHostPort(address)
+	origin, err := url.Parse(fixture.DeviceOrigin)
+	if err != nil || origin.Scheme != "https" || origin.Hostname() != "localhost" || origin.Port() == "" {
+		return "", errors.New("acceptance fixture device origin must be https://localhost:PORT")
+	}
+	// The guest dials the signed origins: the console origin's port equals the
+	// admin listener's; the device origin may name a different loopback port.
+	for _, forward := range []struct{ guestPort, address string }{
+		{"", fixture.AdminAddress}, {origin.Port(), fixture.DeviceAddress},
+	} {
+		host, port, err := net.SplitHostPort(forward.address)
 		if err != nil || host != "127.0.0.1" {
 			return "", errors.New("acceptance fixture endpoints must be isolated IPv4 loopback")
 		}
-		if _, err := g.Forward(ctx, net.JoinHostPort("127.0.0.1", port), address); err != nil {
+		if forward.guestPort != "" {
+			port = forward.guestPort
+		}
+		if _, err := g.Forward(ctx, net.JoinHostPort("127.0.0.1", port), forward.address); err != nil {
 			return "", err
 		}
 	}

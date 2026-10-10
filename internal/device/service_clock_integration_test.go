@@ -38,22 +38,22 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 			}
 			deviceNow := time.Now().UTC().Add(skew)
 			if skew < trust.MaxDeviceClockSkew {
-				if _, err := verifier.VerifyServiceIntent(t.Context(), snapshot.Root, snapshot.Delegation, work.GetIntentEnvelope(), deviceNow); err != nil {
+				if _, err := verifier.VerifyResourceIntent(t.Context(), snapshot.Root, snapshot.Delegation, work.GetIntentEnvelope(), deviceNow); err != nil {
 					t.Fatalf("intent rejected within device-clock tolerance: %v", err)
 				}
 			}
 			challenge := f.challenge(t, work)
 			challenge.IssuedAt = timestamppb.New(deviceNow)
 			challenge.ExpiresAt = timestamppb.New(deviceNow.Add(30 * time.Second))
-			request := &devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, challenge, f.key)}
-			response, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(request))
+			request := &devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, challenge, f.key)}
+			response, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
 			if skew > trust.MaxDeviceClockSkew {
 				dispatchError(t, err, connect.CodeFailedPrecondition, "device_clock_skew")
 			} else {
 				if err != nil {
 					t.Fatalf("challenge rejected within device-clock tolerance: %v", err)
 				}
-				grant, err := verifier.VerifyServiceStart(t.Context(), snapshot.Root, snapshot.Delegation, response.Msg.GetStartGrantEnvelope(), intent, challenge, deviceNow)
+				grant, err := verifier.VerifyResourceStart(t.Context(), snapshot.Root, snapshot.Delegation, response.Msg.GetStartGrantEnvelope(), intent, challenge, deviceNow)
 				if err != nil {
 					t.Fatalf("device rejected grant in its own clock domain: %v", err)
 				}
@@ -61,15 +61,15 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 					t.Fatal("grant extended device challenge or residual authorization window")
 				}
 			}
-			result := f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED, false)
-			attestation := new(agentv1.ServiceExecutionAttestation)
+			result := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED, false)
+			attestation := new(agentv1.ResourceExecutionAttestation)
 			if err := f.service.authority.Verify(t.Context(), result.GetAttestationEnvelope(), attestation, 1, f.principal.PublicKey); err != nil {
 				t.Fatal(err)
 			}
 			attestation.IssuedAt = timestamppb.New(deviceNow)
 			attestation.ExpiresAt = timestamppb.New(deviceNow.Add(30 * time.Second))
 			result.AttestationEnvelope = f.sign(t, attestation, f.key)
-			_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(result))
+			_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(result))
 			if skew > trust.MaxDeviceClockSkew {
 				dispatchError(t, err, connect.CodeFailedPrecondition, "device_clock_skew")
 				return
@@ -86,7 +86,7 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 			if _, err := f.pool.Exec(t.Context(), "UPDATE resource_actions SET nonce_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", work.GetActionId()); err != nil {
 				t.Fatal(err)
 			}
-			_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(result))
+			_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(result))
 			dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
 		})
 	}

@@ -21,11 +21,12 @@ import (
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/gen/lindm/device/v1/devicev1connect"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 func TestServiceDispatchNoDrift(t *testing.T) {
 	f := newDispatchFixture(t)
-	f.state = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -37,13 +38,140 @@ func TestServiceDispatchNoDrift(t *testing.T) {
 	}
 }
 
+func TestResourceReadOnlyOutcomesNeverRequestEffectAuthority(t *testing.T) {
+	for _, disposition := range []resourcev1.VerificationDisposition{
+		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED,
+		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNKNOWN,
+		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE,
+	} {
+		t.Run(disposition.String(), func(t *testing.T) {
+			f := newDispatchFixture(t)
+			f.readOnlyDisposition = disposition
+			f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED
+			if disposition == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE {
+				f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
+			}
+			if err := f.loop.dispatchServices(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if f.starts != 0 || f.authorizations != 0 || f.polls != 0 || f.reports != 1 || !f.closed || f.attestedState != f.state {
+				t.Fatalf("read-only native outcome entered an effect path or lost history: %v", f.events)
+			}
+		})
+	}
+}
+
+func TestServicePreparationSpansManagementCyclesWithoutGrant(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := newDispatchFixture(t)
+		f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING
+		// Independent native staging becomes READY between management cycles.
+		// Only the later fourth Prepare can return a fresh exact challenge.
+		f.readyAtPrepare = 4
+		f.readyPollStates = []agentv1.ResourceExecutionState{agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED}
+		begin := time.Now()
+		stop := f.loop.start(t.Context())
+		time.Sleep(3 * managementInterval)
+		synctest.Wait()
+		// Stopping joins the relay goroutine before its fixture state is read.
+		stop()
+		if len(f.prepareSnapshots) != 4 {
+			t.Fatalf("staging blocked ordinary management cycles: %d prepares", len(f.prepareSnapshots))
+		}
+		for i, seen := range f.prepareSnapshots {
+			cycle := i + 1
+			// Each Prepare begins a cycle after every earlier cycle reported.
+			if seen.reports != cycle-1 || seen.devicePolls < cycle-1 {
+				t.Fatalf("staging blocked ordinary management cycles: cycle=%d %+v", cycle, seen)
+			}
+			if seen.polls != 0 || seen.authorizations != 0 || seen.starts != 0 || seen.closed || seen.evidence {
+				t.Fatalf("pending staging acquired authority, evidence or busy polling: cycle=%d %+v", cycle, seen)
+			}
+			if elapsed := seen.at.Sub(begin); elapsed != time.Duration(i)*managementInterval {
+				t.Fatalf("staging stretched the management cadence: %v", elapsed)
+			}
+		}
+		if f.authorizations != 1 || f.starts != 1 || !f.closed || f.reports != 4 || !f.startAt.Equal(f.challengeAt) {
+			t.Fatalf("ready plan did not immediately relay its exact fresh authority: %v", f.events)
+		}
+	})
+}
+
+func TestServicePreparationCancellationReportsOwnedTerminalHistory(t *testing.T) {
+	for _, state := range []agentv1.ResourceExecutionState{
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED,
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED,
+	} {
+		for _, duringPrepare := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/during-prepare=%t", state, duringPrepare), func(t *testing.T) {
+				f := newDispatchFixture(t)
+				f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING
+				f.cancelState = state
+				if duringPrepare {
+					f.changeWorkOnRefresh = "cancel-preparation"
+				} else {
+					f.work.CancelPreparation = true
+				}
+				if err := f.loop.dispatchServices(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				if f.cancels != 1 || f.starts != 0 || f.authorizations != 0 || !f.closed || f.attestedState != state || f.reports != 1 {
+					t.Fatalf("pending cancellation lost terminal owned cleanup: %v", f.events)
+				}
+				if !duringPrepare && f.prepares != 0 {
+					t.Fatal("cancelled work restarted preparation")
+				}
+			})
+		}
+	}
+}
+
+func TestServicePreparationRPCDeadlineUnchanged(t *testing.T) {
+	for _, phase := range []string{"prepare", "cancel"} {
+		t.Run(phase, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				f := newDispatchFixture(t)
+				f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING
+				f.blockPhase = phase
+				f.work.CancelPreparation = phase == "cancel"
+				begin := time.Now()
+				digest := sha256.Sum256(f.intent)
+				var err error
+				if phase == "cancel" {
+					_, err = f.loop.cancelResourcePreparation(t.Context(), f.work, digest)
+				} else {
+					_, err = f.loop.prepareAndStartService(t.Context(), f.work, digest)
+				}
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("blocked preparation call: %v", err)
+				}
+				if time.Since(begin) != 15*time.Second {
+					t.Fatal("preparation stretched the ordinary RPC deadline")
+				}
+			})
+		})
+	}
+}
+
+func TestServicePreparationNeverAcceptedAcknowledgesNoNativeProof(t *testing.T) {
+	f := newDispatchFixture(t)
+	f.work.CancelPreparation = true
+	f.neverPrepared = true
+	if err := f.loop.dispatchServices(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !f.closed || f.cancels != 1 || f.reports != 1 || f.attestations != 0 || f.prepares != 0 || f.starts != 0 {
+		t.Fatalf("never-prepared cancellation fabricated native evidence or restarted staging: %v", f.events)
+	}
+}
+
 func TestServiceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
 		f.loseAuthorization = true
-		f.pollStates = []agentv1.ServiceExecutionState{
-			agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING,
-			agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED,
+		f.pollStates = []agentv1.ResourceExecutionState{
+			agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING,
+			agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED,
 		}
 		if err := f.loop.dispatchServices(t.Context()); err != nil {
 			t.Fatal(err)
@@ -60,7 +188,7 @@ func TestServiceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
 		if f.authorizations != 1 || f.starts != 1 || !f.closed || f.reports != 2 {
 			t.Fatalf("stored grant was not recovered exactly once: %v", f.events)
 		}
-		if f.attestedState != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+		if f.attestedState != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 			t.Fatal("queue acceptance was reported as terminal completion")
 		}
 	})
@@ -69,15 +197,15 @@ func TestServiceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
 func TestServiceDispatchPollsToTerminalWithFreshSessionAndNonce(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
-		f.pollStates = []agentv1.ServiceExecutionState{
-			agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING,
-			agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED,
+		f.pollStates = []agentv1.ResourceExecutionState{
+			agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING,
+			agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED,
 		}
 		f.changeSessionOnTerminal = true
 		if err := f.loop.dispatchServices(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if f.starts != 1 || f.polls != 2 || f.attestedState != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || f.attestedEpoch != 2 {
+		if f.starts != 1 || f.polls != 2 || f.attestedState != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || f.attestedEpoch != 2 {
 			t.Fatalf("terminal result/session was not refreshed: %v", f.events)
 		}
 		if bytes.Equal(f.attestedNonce, f.initialNonce) || !bytes.Equal(f.attestedNonce, f.lastNonce) {
@@ -92,17 +220,17 @@ func TestServiceDispatchPollsToTerminalWithFreshSessionAndNonce(t *testing.T) {
 func TestServiceDispatchReportsExistingAndExpiredHistory(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		state agentv1.ServiceExecutionState
+		state agentv1.ResourceExecutionState
 		code  connect.Code
 	}{
-		{"already-running", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING, 0},
-		{"already-succeeded", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, 0},
-		{"already-failed", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED, 0},
-		{"already-unknown", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN, 0},
-		{"already-expired", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, 0},
-		{"already-superseded", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUPERSEDED, 0},
-		{"prepare-conflict", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, connect.CodeAlreadyExists},
-		{"prepare-expired", agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, connect.CodeFailedPrecondition},
+		{"already-running", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, 0},
+		{"already-succeeded", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, 0},
+		{"already-failed", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, 0},
+		{"already-unknown", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN, 0},
+		{"already-expired", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, 0},
+		{"already-superseded", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED, 0},
+		{"prepare-conflict", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, connect.CodeAlreadyExists},
+		{"prepare-expired", agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, connect.CodeFailedPrecondition},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newDispatchFixture(t)
@@ -110,8 +238,8 @@ func TestServiceDispatchReportsExistingAndExpiredHistory(t *testing.T) {
 			if tc.code != 0 {
 				f.prepareErr = connect.NewError(tc.code, errors.New(tc.name))
 			}
-			if tc.state == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING {
-				f.pollStates = []agentv1.ServiceExecutionState{agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED}
+			if tc.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
+				f.pollStates = []agentv1.ResourceExecutionState{agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED}
 			}
 			if err := f.loop.dispatchServices(t.Context()); err != nil {
 				t.Fatal(err)
@@ -130,7 +258,7 @@ func TestServiceDispatchExpiredStartReportsHistory(t *testing.T) {
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if f.authorizations != 0 || f.starts != 1 || f.reports != 1 || f.attestedState != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED {
+	if f.authorizations != 0 || f.starts != 1 || f.reports != 1 || f.attestedState != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED {
 		t.Fatalf("expired exact grant did not report protected history: %v", f.events)
 	}
 }
@@ -145,7 +273,7 @@ func TestServiceDispatchPollingBoundDoesNotInventCompletion(t *testing.T) {
 		if elapsed := time.Since(begin); elapsed != servicePollTimeout {
 			t.Fatalf("poll duration = %v, want %v", elapsed, servicePollTimeout)
 		}
-		if f.closed || f.reports != 1 || f.attestedState != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED {
+		if f.closed || f.reports != 1 || f.attestedState != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
 			t.Fatalf("bounded polling invented terminal success: %v", f.events)
 		}
 		if f.polls > 1+int(servicePollTimeout/servicePollInterval) {
@@ -158,7 +286,7 @@ func TestServiceDispatchStopsWhenFreshWorkChanges(t *testing.T) {
 	for _, change := range []string{"cleared", "different-action", "different-intent"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDispatchFixture(t)
-			f.state = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+			f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 			f.changeWorkOnRefresh = change
 			err := f.loop.dispatchServices(t.Context())
 			if (err != nil) != (change == "different-intent") {
@@ -173,7 +301,7 @@ func TestServiceDispatchStopsWhenFreshWorkChanges(t *testing.T) {
 
 func TestServiceDispatchBoundsActionsPerCycle(t *testing.T) {
 	f := newDispatchFixture(t)
-	f.state = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	f.moreActions = true
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
 		t.Fatal(err)
@@ -204,7 +332,7 @@ func TestManagementCancellationJoinsEveryPhase(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				f := newDispatchFixture(t)
 				f.blockPhase = phase
-				f.pollStates = []agentv1.ServiceExecutionState{agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED}
+				f.pollStates = []agentv1.ResourceExecutionState{agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED}
 				ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 				defer cancel()
 				stop := f.loop.start(ctx)
@@ -265,21 +393,37 @@ func TestServiceDispatchRPCDeadline(t *testing.T) {
 // These stateful boundaries model the server-owned open action and executor
 // consumption/history. They do not claim cryptographic or native-effect proof.
 // Opaque envelopes deliberately contain whitespace so byte rewriting is caught.
+// prepareSnapshot is recorded by the relay goroutine itself at each Prepare.
+type prepareSnapshot struct {
+	at                                                  time.Time
+	reports, devicePolls, polls, authorizations, starts int
+	closed, evidence                                    bool
+}
+
 type dispatchFixture struct {
-	t                        *testing.T
-	loop                     *managementLoop
-	work                     *devicev1.ServiceWork
-	state                    agentv1.ServiceExecutionState
-	pollStates               []agentv1.ServiceExecutionState
+	t          *testing.T
+	loop       *managementLoop
+	work       *devicev1.ResourceWork
+	state      agentv1.ResourceExecutionState
+	pollStates []agentv1.ResourceExecutionState
+	// readyAtPrepare makes independent staging READY on that Prepare call, in
+	// the relay goroutine, so the test never writes state the loop reads.
+	readyAtPrepare           int
+	readyPollStates          []agentv1.ResourceExecutionState
+	prepareSnapshots         []prepareSnapshot
 	intent, challenge, grant []byte
 	attestation, certificate []byte
 	initialNonce, lastNonce  []byte
 	attestedNonce            []byte
-	attestedState            agentv1.ServiceExecutionState
+	attestedState            agentv1.ResourceExecutionState
 	epoch, attestedEpoch     uint64
 	connection               *agentv1.GetConnectionResponse
 	events                   []string
 	prepares, starts, polls  int
+	cancels, devicePolls     int
+	cancelState              agentv1.ResourceExecutionState
+	neverPrepared            bool
+	readOnlyDisposition      resourcev1.VerificationDisposition
 	authorizations, reports  int
 	attestations, workCalls  int
 	establishments           int
@@ -299,12 +443,12 @@ type dispatchFixture struct {
 func newDispatchFixture(t *testing.T) *dispatchFixture {
 	t.Helper()
 	f := &dispatchFixture{
-		t: t, epoch: 1, state: agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED,
+		t: t, epoch: 1, state: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED,
 		intent: []byte(" exact intent\n"), challenge: []byte(" exact challenge\n"), grant: []byte(" exact grant\n"),
 		attestation: []byte(" exact attestation\n"), certificate: []byte(" exact certificate\n"),
 		entered: make(chan struct{}), exited: make(chan struct{}),
 	}
-	f.work = &devicev1.ServiceWork{ActionId: "11111111-1111-4111-8111-111111111111", IntentEnvelope: f.intent}
+	f.work = &devicev1.ResourceWork{ActionId: "11111111-1111-4111-8111-111111111111", IntentEnvelope: f.intent}
 	f.connection = &agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewAfter: timestamppb.New(time.Now().Add(time.Hour))}
 	f.loop = &managementLoop{
 		executor: &dispatchExecutor{f: f}, gate: make(authorityGate, 1),
@@ -333,25 +477,66 @@ func (f *dispatchFixture) remote(epoch uint64) {
 	f.lastRemoteEstablishment = f.establishments
 }
 
-func (f *dispatchFixture) status() *agentv1.ServiceExecutionStatus {
+func (f *dispatchFixture) status() *agentv1.ResourceExecutionStatus {
 	digest := sha256.Sum256(f.intent)
-	observation := &agentv1.ServiceObservation{
+	native := &resourcev1.SystemdServiceObservation{
 		Unit: "fixture.service", BootId: "22222222-2222-4222-8222-222222222222", ObservedAt: timestamppb.Now(),
 		LoadState: "loaded", DefinitionSha256: digest[:], FingerprintSha256: digest[:],
 	}
-	status := &agentv1.ServiceExecutionStatus{
-		ActionId: f.work.GetActionId(), IntentSha256: digest[:], State: f.state,
-		Failure: agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE, AcceptedAt: timestamppb.Now(), Before: observation,
+	observation := &resourcev1.ResourceObservation{
+		Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: native.GetUnit()},
+		Metadata: &resourcev1.ObservationMetadata{
+			BootId: native.GetBootId(), ExecutorIncarnation: "a2bca405-36e9-4a43-b5b5-d0b82a05e551", ObservedAt: proto.CloneOf(native.GetObservedAt()),
+			Backend:        &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "255", ProviderVersion: "1", Product: &resourcev1.PlatformProduct{OsId: "ubuntu", Product: "Ubuntu", Version: "24.04", Architecture: "x86_64"}},
+			NativeRevision: digest[:], ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK,
+		},
+		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: native},
 	}
-	if f.state == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING {
+	status := &agentv1.ResourceExecutionStatus{
+		ActionId: f.work.GetActionId(), IntentSha256: digest[:], State: f.state,
+		Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE, AcceptedAt: timestamppb.Now(), Before: observation,
+	}
+	if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+		if f.starts == 0 {
+			status.ReadOnly = true
+		} else {
+			status.StartedAt = timestamppb.Now()
+		}
+	}
+	if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+		status.Before = nil
+	}
+	if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
 		status.StartedAt = timestamppb.Now()
 	}
 	if serviceExecutionTerminal(f.state) {
 		status.CompletedAt = timestamppb.Now()
-		if f.state == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
-			status.Verification = &agentv1.ServiceVerification{Observation: observation, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true}
+		if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+			status.Verification = &resourcev1.ResourceVerification{
+				Ref: proto.CloneOf(observation.GetRef()), DesiredSha256: digest[:], PlanSha256: digest[:],
+				After: observation, Disposition: resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED,
+				Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: native, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true, JobCompleted: true}},
+			}
 		} else {
-			status.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_EXPIRED
+			status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED
+		}
+	}
+	if f.readOnlyDisposition != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNSPECIFIED {
+		status.ReadOnly = true
+		status.Verification = &resourcev1.ResourceVerification{
+			Ref: proto.CloneOf(observation.GetRef()), DesiredSha256: digest[:], PlanSha256: digest[:],
+			After: observation, Disposition: f.readOnlyDisposition,
+			Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: native}},
+		}
+		if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED {
+			status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_POSTCONDITION
+		}
+	}
+	if f.cancels != 0 {
+		status.Before = nil
+		status.PreparationOutcome = &agentv1.ResourcePreparationOutcome{
+			Preparation: &agentv1.ResourceExecutionPreparation{Deadline: timestamppb.New(time.Now().Add(time.Minute)), MaxCacheBytes: 512 << 20},
+			Failure:     status.GetFailure(),
 		}
 	}
 	switch f.badStatus {
@@ -385,9 +570,13 @@ func (*dispatchExecutor) GetExecutionTrust(context.Context, *connect.Request[age
 	}), nil
 }
 
-func (e *dispatchExecutor) PrepareServiceExecution(ctx context.Context, req *connect.Request[agentv1.PrepareServiceExecutionRequest]) (*connect.Response[agentv1.PrepareServiceExecutionResponse], error) {
+func (e *dispatchExecutor) PrepareResourceExecution(ctx context.Context, req *connect.Request[agentv1.PrepareResourceExecutionRequest]) (*connect.Response[agentv1.PrepareResourceExecutionResponse], error) {
 	f := e.f
 	f.prepares++
+	f.prepareSnapshots = append(f.prepareSnapshots, prepareSnapshot{at: time.Now(), reports: f.reports, devicePolls: f.devicePolls, polls: f.polls, authorizations: f.authorizations, starts: f.starts, closed: f.closed, evidence: f.status().GetBefore() != nil})
+	if f.readyAtPrepare != 0 && f.prepares == f.readyAtPrepare {
+		f.state, f.pollStates = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED, f.readyPollStates
+	}
 	if !bytes.Equal(req.Msg.GetIntentEnvelope(), f.intent) {
 		f.t.Fatal("executor did not receive the exact server intent")
 	}
@@ -397,11 +586,15 @@ func (e *dispatchExecutor) PrepareServiceExecution(ctx context.Context, req *con
 	if f.prepareErr != nil {
 		return nil, f.prepareErr
 	}
-	f.challengeAt = time.Now()
-	return connect.NewResponse(&agentv1.PrepareServiceExecutionResponse{Status: f.status(), ChallengeProof: f.challenge}), nil
+	var challenge []byte
+	if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
+		f.challengeAt = time.Now()
+		challenge = f.challenge
+	}
+	return connect.NewResponse(&agentv1.PrepareResourceExecutionResponse{Status: f.status(), ChallengeProof: challenge}), nil
 }
 
-func (e *dispatchExecutor) StartServiceExecution(ctx context.Context, req *connect.Request[agentv1.StartServiceExecutionRequest]) (*connect.Response[agentv1.StartServiceExecutionResponse], error) {
+func (e *dispatchExecutor) StartResourceExecution(ctx context.Context, req *connect.Request[agentv1.StartResourceExecutionRequest]) (*connect.Response[agentv1.StartResourceExecutionResponse], error) {
 	f := e.f
 	f.starts++
 	f.startAt = time.Now()
@@ -411,18 +604,18 @@ func (e *dispatchExecutor) StartServiceExecution(ctx context.Context, req *conne
 	if err := f.phase(ctx, "start"); err != nil {
 		return nil, err
 	}
-	if f.state != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED {
+	if f.state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
 		f.t.Fatal("relay attempted to replay an already consumed effect")
 	}
 	if f.startErr != nil {
-		f.state = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED
+		f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
 		return nil, f.startErr
 	}
-	f.state = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED
-	return connect.NewResponse(&agentv1.StartServiceExecutionResponse{Status: f.status()}), nil
+	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED
+	return connect.NewResponse(&agentv1.StartResourceExecutionResponse{Status: f.status()}), nil
 }
 
-func (e *dispatchExecutor) GetServiceExecution(ctx context.Context, req *connect.Request[agentv1.GetServiceExecutionRequest]) (*connect.Response[agentv1.GetServiceExecutionResponse], error) {
+func (e *dispatchExecutor) GetResourceExecution(ctx context.Context, req *connect.Request[agentv1.GetResourceExecutionRequest]) (*connect.Response[agentv1.GetResourceExecutionResponse], error) {
 	f := e.f
 	f.polls++
 	if req.Msg.GetActionId() != f.work.GetActionId() {
@@ -431,16 +624,33 @@ func (e *dispatchExecutor) GetServiceExecution(ctx context.Context, req *connect
 	if err := f.phase(ctx, "poll"); err != nil {
 		return nil, err
 	}
-	if f.state != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED && len(f.pollStates) != 0 {
+	if f.state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED && len(f.pollStates) != 0 {
 		f.state, f.pollStates = f.pollStates[0], f.pollStates[1:]
 		if serviceExecutionTerminal(f.state) && f.changeSessionOnTerminal {
 			f.epoch++
 		}
 	}
-	return connect.NewResponse(&agentv1.GetServiceExecutionResponse{Status: f.status()}), nil
+	return connect.NewResponse(&agentv1.GetResourceExecutionResponse{Status: f.status()}), nil
 }
 
-func (e *dispatchExecutor) AttestServiceExecution(ctx context.Context, req *connect.Request[agentv1.AttestServiceExecutionRequest]) (*connect.Response[agentv1.AttestServiceExecutionResponse], error) {
+func (e *dispatchExecutor) CancelResourcePreparation(ctx context.Context, req *connect.Request[agentv1.CancelResourcePreparationRequest]) (*connect.Response[agentv1.CancelResourcePreparationResponse], error) {
+	f := e.f
+	digest := sha256.Sum256(f.intent)
+	if req.Msg.GetActionId() != f.work.GetActionId() || !bytes.Equal(req.Msg.GetIntentSha256(), digest[:]) {
+		f.t.Fatal("cancellation did not bind the exact owned intent")
+	}
+	if err := f.phase(ctx, "cancel"); err != nil {
+		return nil, err
+	}
+	f.cancels++
+	if f.neverPrepared {
+		return connect.NewResponse(&agentv1.CancelResourcePreparationResponse{NeverPrepared: true}), nil
+	}
+	f.state = f.cancelState
+	return connect.NewResponse(&agentv1.CancelResourcePreparationResponse{Status: f.status()}), nil
+}
+
+func (e *dispatchExecutor) AttestResourceExecution(ctx context.Context, req *connect.Request[agentv1.AttestResourceExecutionRequest]) (*connect.Response[agentv1.AttestResourceExecutionResponse], error) {
 	f := e.f
 	f.attestations++
 	if req.Msg.GetActionId() != f.work.GetActionId() || !bytes.Equal(req.Msg.GetNonce(), f.lastNonce) || bytes.Equal(req.Msg.GetNonce(), f.initialNonce) {
@@ -451,7 +661,7 @@ func (e *dispatchExecutor) AttestServiceExecution(ctx context.Context, req *conn
 	}
 	f.attestedNonce = bytes.Clone(req.Msg.GetNonce())
 	f.attestedEpoch, f.attestedState = f.epoch, f.state
-	return connect.NewResponse(&agentv1.AttestServiceExecutionResponse{AttestationEnvelope: f.attestation, CertificatePem: f.certificate}), nil
+	return connect.NewResponse(&agentv1.AttestResourceExecutionResponse{AttestationEnvelope: f.attestation, CertificatePem: f.certificate}), nil
 }
 
 type dispatchServer struct {
@@ -468,11 +678,12 @@ func (s *dispatchServer) GetExecutionTrust(ctx context.Context, req *connect.Req
 }
 
 // Service-loop fixtures have no imperative device actions.
-func (*dispatchServer) GetDeviceActionWork(context.Context, *connect.Request[devicev1.GetDeviceActionWorkRequest]) (*connect.Response[devicev1.GetDeviceActionWorkResponse], error) {
+func (s *dispatchServer) GetDeviceActionWork(context.Context, *connect.Request[devicev1.GetDeviceActionWorkRequest]) (*connect.Response[devicev1.GetDeviceActionWorkResponse], error) {
+	s.f.devicePolls++
 	return connect.NewResponse(&devicev1.GetDeviceActionWorkResponse{}), nil
 }
 
-func (s *dispatchServer) GetServiceWork(ctx context.Context, req *connect.Request[devicev1.GetServiceWorkRequest]) (*connect.Response[devicev1.GetServiceWorkResponse], error) {
+func (s *dispatchServer) GetResourceWork(ctx context.Context, req *connect.Request[devicev1.GetResourceWorkRequest]) (*connect.Response[devicev1.GetResourceWorkResponse], error) {
 	f := s.f
 	f.remote(req.Msg.GetSessionEpoch())
 	f.workCalls++
@@ -480,17 +691,19 @@ func (s *dispatchServer) GetServiceWork(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 	if f.work == nil || f.closed {
-		return connect.NewResponse(&devicev1.GetServiceWorkResponse{}), nil
+		return connect.NewResponse(&devicev1.GetResourceWorkResponse{}), nil
 	}
 	work := proto.CloneOf(f.work)
 	if f.workCalls == 2 {
 		switch f.changeWorkOnRefresh {
 		case "cleared":
-			return connect.NewResponse(&devicev1.GetServiceWorkResponse{}), nil
+			return connect.NewResponse(&devicev1.GetResourceWorkResponse{}), nil
 		case "different-action":
 			work.ActionId = "33333333-3333-4333-8333-333333333333"
 		case "different-intent":
 			work.IntentEnvelope = []byte("changed intent")
+		case "cancel-preparation":
+			work.CancelPreparation = true
 		}
 	}
 	work.ResultNonce = make([]byte, 32)
@@ -500,10 +713,10 @@ func (s *dispatchServer) GetServiceWork(ctx context.Context, req *connect.Reques
 	if f.initialNonce == nil {
 		f.initialNonce = bytes.Clone(work.ResultNonce)
 	}
-	return connect.NewResponse(&devicev1.GetServiceWorkResponse{Work: work}), nil
+	return connect.NewResponse(&devicev1.GetResourceWorkResponse{Work: work}), nil
 }
 
-func (s *dispatchServer) AuthorizeServiceStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeServiceStartRequest]) (*connect.Response[devicev1.AuthorizeServiceStartResponse], error) {
+func (s *dispatchServer) AuthorizeResourceStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeResourceStartRequest]) (*connect.Response[devicev1.AuthorizeResourceStartResponse], error) {
 	f := s.f
 	f.remote(req.Msg.GetSessionEpoch())
 	f.authorizations++
@@ -518,26 +731,31 @@ func (s *dispatchServer) AuthorizeServiceStart(ctx context.Context, req *connect
 		f.loseAuthorization = false
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("response lost after grant committed"))
 	}
-	return connect.NewResponse(&devicev1.AuthorizeServiceStartResponse{StartGrantEnvelope: f.grant}), nil
+	return connect.NewResponse(&devicev1.AuthorizeResourceStartResponse{StartGrantEnvelope: f.grant}), nil
 }
 
-func (s *dispatchServer) ReportServiceResult(ctx context.Context, req *connect.Request[devicev1.ReportServiceResultRequest]) (*connect.Response[devicev1.ReportServiceResultResponse], error) {
+func (s *dispatchServer) ReportResourceResult(ctx context.Context, req *connect.Request[devicev1.ReportResourceResultRequest]) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
 	f := s.f
 	f.remote(req.Msg.GetSessionEpoch())
-	if req.Msg.GetActionId() != f.work.GetActionId() || req.Msg.GetSessionEpoch() != f.attestedEpoch || !bytes.Equal(req.Msg.GetAttestationEnvelope(), f.attestation) || !bytes.Equal(req.Msg.GetCertificatePem(), f.certificate) {
+	if cancellation := req.Msg.GetNeverPrepared(); cancellation != nil {
+		digest := sha256.Sum256(f.intent)
+		if !f.neverPrepared || req.Msg.GetActionId() != f.work.GetActionId() || !bytes.Equal(cancellation.GetIntentSha256(), digest[:]) || !bytes.Equal(cancellation.GetResultNonce(), f.lastNonce) || len(req.Msg.GetAttestationEnvelope()) != 0 || len(req.Msg.GetCertificatePem()) != 0 {
+			f.t.Fatal("never-prepared cancellation lost exact binding or fabricated native proof")
+		}
+	} else if req.Msg.GetActionId() != f.work.GetActionId() || req.Msg.GetSessionEpoch() != f.attestedEpoch || !bytes.Equal(req.Msg.GetAttestationEnvelope(), f.attestation) || !bytes.Equal(req.Msg.GetCertificatePem(), f.certificate) {
 		f.t.Fatal("server did not receive the exact attestation/certificate/session")
 	}
 	if err := f.phase(ctx, "report"); err != nil {
 		return nil, err
 	}
 	f.reports++
-	f.closed = serviceExecutionTerminal(f.attestedState)
+	f.closed = f.neverPrepared || serviceExecutionTerminal(f.attestedState)
 	closed := f.closed
 	if f.moreActions && closed {
 		f.closed = false
 		f.work.ActionId = fmt.Sprintf("11111111-1111-4111-8111-%012d", f.reports+1)
 	}
-	return connect.NewResponse(&devicev1.ReportServiceResultResponse{Closed: closed}), nil
+	return connect.NewResponse(&devicev1.ReportResourceResultResponse{Closed: closed}), nil
 }
 
 var (

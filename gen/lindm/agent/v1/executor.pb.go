@@ -2154,7 +2154,7 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x17HOLD_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10HOLD_REASON_NONE\x10\x01\x12%\n" +
 	"!HOLD_REASON_INCOMPLETE_OR_CORRUPT\x10\x02\x12 \n" +
-	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xc7\x18\n" +
+	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xd6\x19\n" +
 	"\x0fExecutorService\x12e\n" +
 	"\x10PrepareBootstrap\x12'.lindm.agent.v1.PrepareBootstrapRequest\x1a(.lindm.agent.v1.PrepareBootstrapResponse\x12h\n" +
 	"\x11InstallEnrollment\x12(.lindm.agent.v1.InstallEnrollmentRequest\x1a).lindm.agent.v1.InstallEnrollmentResponse\x12z\n" +
@@ -2167,11 +2167,12 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\rCommitRenewal\x12$.lindm.agent.v1.CommitRenewalRequest\x1a%.lindm.agent.v1.CommitRenewalResponse\x12q\n" +
 	"\x14UpdateExecutionTrust\x12+.lindm.agent.v1.UpdateExecutionTrustRequest\x1a,.lindm.agent.v1.UpdateExecutionTrustResponse\x12h\n" +
 	"\x11GetExecutionTrust\x12(.lindm.agent.v1.GetExecutionTrustRequest\x1a).lindm.agent.v1.GetExecutionTrustResponse\x12q\n" +
-	"\x14GetRecoveryReadiness\x12+.lindm.agent.v1.GetRecoveryReadinessRequest\x1a,.lindm.agent.v1.GetRecoveryReadinessResponse\x12z\n" +
-	"\x17PrepareServiceExecution\x12..lindm.agent.v1.PrepareServiceExecutionRequest\x1a/.lindm.agent.v1.PrepareServiceExecutionResponse\x12t\n" +
-	"\x15StartServiceExecution\x12,.lindm.agent.v1.StartServiceExecutionRequest\x1a-.lindm.agent.v1.StartServiceExecutionResponse\x12n\n" +
-	"\x13GetServiceExecution\x12*.lindm.agent.v1.GetServiceExecutionRequest\x1a+.lindm.agent.v1.GetServiceExecutionResponse\x12w\n" +
-	"\x16AttestServiceExecution\x12-.lindm.agent.v1.AttestServiceExecutionRequest\x1a..lindm.agent.v1.AttestServiceExecutionResponse\x12n\n" +
+	"\x14GetRecoveryReadiness\x12+.lindm.agent.v1.GetRecoveryReadinessRequest\x1a,.lindm.agent.v1.GetRecoveryReadinessResponse\x12}\n" +
+	"\x18PrepareResourceExecution\x12/.lindm.agent.v1.PrepareResourceExecutionRequest\x1a0.lindm.agent.v1.PrepareResourceExecutionResponse\x12w\n" +
+	"\x16StartResourceExecution\x12-.lindm.agent.v1.StartResourceExecutionRequest\x1a..lindm.agent.v1.StartResourceExecutionResponse\x12q\n" +
+	"\x14GetResourceExecution\x12+.lindm.agent.v1.GetResourceExecutionRequest\x1a,.lindm.agent.v1.GetResourceExecutionResponse\x12\x80\x01\n" +
+	"\x19CancelResourcePreparation\x120.lindm.agent.v1.CancelResourcePreparationRequest\x1a1.lindm.agent.v1.CancelResourcePreparationResponse\x12z\n" +
+	"\x17AttestResourceExecution\x12..lindm.agent.v1.AttestResourceExecutionRequest\x1a/.lindm.agent.v1.AttestResourceExecutionResponse\x12n\n" +
 	"\x13PrepareDeviceAction\x12*.lindm.agent.v1.PrepareDeviceActionRequest\x1a+.lindm.agent.v1.PrepareDeviceActionResponse\x12h\n" +
 	"\x11StartDeviceAction\x12(.lindm.agent.v1.StartDeviceActionRequest\x1a).lindm.agent.v1.StartDeviceActionResponse\x12b\n" +
 	"\x0fGetDeviceAction\x12&.lindm.agent.v1.GetDeviceActionRequest\x1a'.lindm.agent.v1.GetDeviceActionResponse\x12k\n" +
@@ -2234,39 +2235,41 @@ var file_lindm_agent_v1_executor_proto_goTypes = []any{
 	(*UpdateExecutionTrustRequest)(nil),          // 31: lindm.agent.v1.UpdateExecutionTrustRequest
 	(*GetExecutionTrustRequest)(nil),             // 32: lindm.agent.v1.GetExecutionTrustRequest
 	(*GetRecoveryReadinessRequest)(nil),          // 33: lindm.agent.v1.GetRecoveryReadinessRequest
-	(*PrepareServiceExecutionRequest)(nil),       // 34: lindm.agent.v1.PrepareServiceExecutionRequest
-	(*StartServiceExecutionRequest)(nil),         // 35: lindm.agent.v1.StartServiceExecutionRequest
-	(*GetServiceExecutionRequest)(nil),           // 36: lindm.agent.v1.GetServiceExecutionRequest
-	(*AttestServiceExecutionRequest)(nil),        // 37: lindm.agent.v1.AttestServiceExecutionRequest
-	(*PrepareDeviceActionRequest)(nil),           // 38: lindm.agent.v1.PrepareDeviceActionRequest
-	(*StartDeviceActionRequest)(nil),             // 39: lindm.agent.v1.StartDeviceActionRequest
-	(*GetDeviceActionRequest)(nil),               // 40: lindm.agent.v1.GetDeviceActionRequest
-	(*AttestDeviceActionRequest)(nil),            // 41: lindm.agent.v1.AttestDeviceActionRequest
-	(*ConfirmDeviceActionEscrowRequest)(nil),     // 42: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
-	(*ConfirmDeviceActionInventoryRequest)(nil),  // 43: lindm.agent.v1.ConfirmDeviceActionInventoryRequest
-	(*PrepareDeviceActionRecoveryRequest)(nil),   // 44: lindm.agent.v1.PrepareDeviceActionRecoveryRequest
-	(*CommitDeviceActionRecoveryRequest)(nil),    // 45: lindm.agent.v1.CommitDeviceActionRecoveryRequest
-	(*SupplyDeviceActionCredentialRequest)(nil),  // 46: lindm.agent.v1.SupplyDeviceActionCredentialRequest
-	(*ExchangeAgentUpdateRequest)(nil),           // 47: lindm.agent.v1.ExchangeAgentUpdateRequest
-	(*GetAgentUpdateRequest)(nil),                // 48: lindm.agent.v1.GetAgentUpdateRequest
-	(*UpdateExecutionTrustResponse)(nil),         // 49: lindm.agent.v1.UpdateExecutionTrustResponse
-	(*GetExecutionTrustResponse)(nil),            // 50: lindm.agent.v1.GetExecutionTrustResponse
-	(*GetRecoveryReadinessResponse)(nil),         // 51: lindm.agent.v1.GetRecoveryReadinessResponse
-	(*PrepareServiceExecutionResponse)(nil),      // 52: lindm.agent.v1.PrepareServiceExecutionResponse
-	(*StartServiceExecutionResponse)(nil),        // 53: lindm.agent.v1.StartServiceExecutionResponse
-	(*GetServiceExecutionResponse)(nil),          // 54: lindm.agent.v1.GetServiceExecutionResponse
-	(*AttestServiceExecutionResponse)(nil),       // 55: lindm.agent.v1.AttestServiceExecutionResponse
-	(*PrepareDeviceActionResponse)(nil),          // 56: lindm.agent.v1.PrepareDeviceActionResponse
-	(*StartDeviceActionResponse)(nil),            // 57: lindm.agent.v1.StartDeviceActionResponse
-	(*GetDeviceActionResponse)(nil),              // 58: lindm.agent.v1.GetDeviceActionResponse
-	(*AttestDeviceActionResponse)(nil),           // 59: lindm.agent.v1.AttestDeviceActionResponse
-	(*ConfirmDeviceActionEscrowResponse)(nil),    // 60: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
-	(*ConfirmDeviceActionInventoryResponse)(nil), // 61: lindm.agent.v1.ConfirmDeviceActionInventoryResponse
-	(*PrepareDeviceActionRecoveryResponse)(nil),  // 62: lindm.agent.v1.PrepareDeviceActionRecoveryResponse
-	(*CommitDeviceActionRecoveryResponse)(nil),   // 63: lindm.agent.v1.CommitDeviceActionRecoveryResponse
-	(*SupplyDeviceActionCredentialResponse)(nil), // 64: lindm.agent.v1.SupplyDeviceActionCredentialResponse
-	(*ExchangeAgentUpdateResponse)(nil),          // 65: lindm.agent.v1.ExchangeAgentUpdateResponse
-	(*GetAgentUpdateResponse)(nil),               // 66: lindm.agent.v1.GetAgentUpdateResponse
+	(*PrepareResourceExecutionRequest)(nil),      // 34: lindm.agent.v1.PrepareResourceExecutionRequest
+	(*StartResourceExecutionRequest)(nil),        // 35: lindm.agent.v1.StartResourceExecutionRequest
+	(*GetResourceExecutionRequest)(nil),          // 36: lindm.agent.v1.GetResourceExecutionRequest
+	(*CancelResourcePreparationRequest)(nil),     // 37: lindm.agent.v1.CancelResourcePreparationRequest
+	(*AttestResourceExecutionRequest)(nil),       // 38: lindm.agent.v1.AttestResourceExecutionRequest
+	(*PrepareDeviceActionRequest)(nil),           // 39: lindm.agent.v1.PrepareDeviceActionRequest
+	(*StartDeviceActionRequest)(nil),             // 40: lindm.agent.v1.StartDeviceActionRequest
+	(*GetDeviceActionRequest)(nil),               // 41: lindm.agent.v1.GetDeviceActionRequest
+	(*AttestDeviceActionRequest)(nil),            // 42: lindm.agent.v1.AttestDeviceActionRequest
+	(*ConfirmDeviceActionEscrowRequest)(nil),     // 43: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	(*ConfirmDeviceActionInventoryRequest)(nil),  // 44: lindm.agent.v1.ConfirmDeviceActionInventoryRequest
+	(*PrepareDeviceActionRecoveryRequest)(nil),   // 45: lindm.agent.v1.PrepareDeviceActionRecoveryRequest
+	(*CommitDeviceActionRecoveryRequest)(nil),    // 46: lindm.agent.v1.CommitDeviceActionRecoveryRequest
+	(*SupplyDeviceActionCredentialRequest)(nil),  // 47: lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	(*ExchangeAgentUpdateRequest)(nil),           // 48: lindm.agent.v1.ExchangeAgentUpdateRequest
+	(*GetAgentUpdateRequest)(nil),                // 49: lindm.agent.v1.GetAgentUpdateRequest
+	(*UpdateExecutionTrustResponse)(nil),         // 50: lindm.agent.v1.UpdateExecutionTrustResponse
+	(*GetExecutionTrustResponse)(nil),            // 51: lindm.agent.v1.GetExecutionTrustResponse
+	(*GetRecoveryReadinessResponse)(nil),         // 52: lindm.agent.v1.GetRecoveryReadinessResponse
+	(*PrepareResourceExecutionResponse)(nil),     // 53: lindm.agent.v1.PrepareResourceExecutionResponse
+	(*StartResourceExecutionResponse)(nil),       // 54: lindm.agent.v1.StartResourceExecutionResponse
+	(*GetResourceExecutionResponse)(nil),         // 55: lindm.agent.v1.GetResourceExecutionResponse
+	(*CancelResourcePreparationResponse)(nil),    // 56: lindm.agent.v1.CancelResourcePreparationResponse
+	(*AttestResourceExecutionResponse)(nil),      // 57: lindm.agent.v1.AttestResourceExecutionResponse
+	(*PrepareDeviceActionResponse)(nil),          // 58: lindm.agent.v1.PrepareDeviceActionResponse
+	(*StartDeviceActionResponse)(nil),            // 59: lindm.agent.v1.StartDeviceActionResponse
+	(*GetDeviceActionResponse)(nil),              // 60: lindm.agent.v1.GetDeviceActionResponse
+	(*AttestDeviceActionResponse)(nil),           // 61: lindm.agent.v1.AttestDeviceActionResponse
+	(*ConfirmDeviceActionEscrowResponse)(nil),    // 62: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	(*ConfirmDeviceActionInventoryResponse)(nil), // 63: lindm.agent.v1.ConfirmDeviceActionInventoryResponse
+	(*PrepareDeviceActionRecoveryResponse)(nil),  // 64: lindm.agent.v1.PrepareDeviceActionRecoveryResponse
+	(*CommitDeviceActionRecoveryResponse)(nil),   // 65: lindm.agent.v1.CommitDeviceActionRecoveryResponse
+	(*SupplyDeviceActionCredentialResponse)(nil), // 66: lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	(*ExchangeAgentUpdateResponse)(nil),          // 67: lindm.agent.v1.ExchangeAgentUpdateResponse
+	(*GetAgentUpdateResponse)(nil),               // 68: lindm.agent.v1.GetAgentUpdateResponse
 }
 var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	27, // 0: lindm.agent.v1.PrepareBootstrapRequest.offline_authorization:type_name -> lindm.agent.v1.OfflineEnrollmentAuthorizationFile
@@ -2303,52 +2306,54 @@ var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
 	31, // 31: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:input_type -> lindm.agent.v1.UpdateExecutionTrustRequest
 	32, // 32: lindm.agent.v1.ExecutorService.GetExecutionTrust:input_type -> lindm.agent.v1.GetExecutionTrustRequest
 	33, // 33: lindm.agent.v1.ExecutorService.GetRecoveryReadiness:input_type -> lindm.agent.v1.GetRecoveryReadinessRequest
-	34, // 34: lindm.agent.v1.ExecutorService.PrepareServiceExecution:input_type -> lindm.agent.v1.PrepareServiceExecutionRequest
-	35, // 35: lindm.agent.v1.ExecutorService.StartServiceExecution:input_type -> lindm.agent.v1.StartServiceExecutionRequest
-	36, // 36: lindm.agent.v1.ExecutorService.GetServiceExecution:input_type -> lindm.agent.v1.GetServiceExecutionRequest
-	37, // 37: lindm.agent.v1.ExecutorService.AttestServiceExecution:input_type -> lindm.agent.v1.AttestServiceExecutionRequest
-	38, // 38: lindm.agent.v1.ExecutorService.PrepareDeviceAction:input_type -> lindm.agent.v1.PrepareDeviceActionRequest
-	39, // 39: lindm.agent.v1.ExecutorService.StartDeviceAction:input_type -> lindm.agent.v1.StartDeviceActionRequest
-	40, // 40: lindm.agent.v1.ExecutorService.GetDeviceAction:input_type -> lindm.agent.v1.GetDeviceActionRequest
-	41, // 41: lindm.agent.v1.ExecutorService.AttestDeviceAction:input_type -> lindm.agent.v1.AttestDeviceActionRequest
-	42, // 42: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:input_type -> lindm.agent.v1.ConfirmDeviceActionEscrowRequest
-	43, // 43: lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory:input_type -> lindm.agent.v1.ConfirmDeviceActionInventoryRequest
-	44, // 44: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:input_type -> lindm.agent.v1.PrepareDeviceActionRecoveryRequest
-	45, // 45: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:input_type -> lindm.agent.v1.CommitDeviceActionRecoveryRequest
-	46, // 46: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:input_type -> lindm.agent.v1.SupplyDeviceActionCredentialRequest
-	47, // 47: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:input_type -> lindm.agent.v1.ExchangeAgentUpdateRequest
-	48, // 48: lindm.agent.v1.ExecutorService.GetAgentUpdate:input_type -> lindm.agent.v1.GetAgentUpdateRequest
-	24, // 49: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
-	4,  // 50: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
-	6,  // 51: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
-	7,  // 52: lindm.agent.v1.ExecutorService.ImportOfflineEnrollment:output_type -> lindm.agent.v1.ImportOfflineEnrollmentResponse
-	9,  // 53: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
-	13, // 54: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
-	15, // 55: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
-	19, // 56: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
-	21, // 57: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
-	23, // 58: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
-	49, // 59: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
-	50, // 60: lindm.agent.v1.ExecutorService.GetExecutionTrust:output_type -> lindm.agent.v1.GetExecutionTrustResponse
-	51, // 61: lindm.agent.v1.ExecutorService.GetRecoveryReadiness:output_type -> lindm.agent.v1.GetRecoveryReadinessResponse
-	52, // 62: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
-	53, // 63: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
-	54, // 64: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
-	55, // 65: lindm.agent.v1.ExecutorService.AttestServiceExecution:output_type -> lindm.agent.v1.AttestServiceExecutionResponse
-	56, // 66: lindm.agent.v1.ExecutorService.PrepareDeviceAction:output_type -> lindm.agent.v1.PrepareDeviceActionResponse
-	57, // 67: lindm.agent.v1.ExecutorService.StartDeviceAction:output_type -> lindm.agent.v1.StartDeviceActionResponse
-	58, // 68: lindm.agent.v1.ExecutorService.GetDeviceAction:output_type -> lindm.agent.v1.GetDeviceActionResponse
-	59, // 69: lindm.agent.v1.ExecutorService.AttestDeviceAction:output_type -> lindm.agent.v1.AttestDeviceActionResponse
-	60, // 70: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:output_type -> lindm.agent.v1.ConfirmDeviceActionEscrowResponse
-	61, // 71: lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory:output_type -> lindm.agent.v1.ConfirmDeviceActionInventoryResponse
-	62, // 72: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:output_type -> lindm.agent.v1.PrepareDeviceActionRecoveryResponse
-	63, // 73: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:output_type -> lindm.agent.v1.CommitDeviceActionRecoveryResponse
-	64, // 74: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:output_type -> lindm.agent.v1.SupplyDeviceActionCredentialResponse
-	65, // 75: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:output_type -> lindm.agent.v1.ExchangeAgentUpdateResponse
-	66, // 76: lindm.agent.v1.ExecutorService.GetAgentUpdate:output_type -> lindm.agent.v1.GetAgentUpdateResponse
-	25, // 77: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
-	50, // [50:78] is the sub-list for method output_type
-	22, // [22:50] is the sub-list for method input_type
+	34, // 34: lindm.agent.v1.ExecutorService.PrepareResourceExecution:input_type -> lindm.agent.v1.PrepareResourceExecutionRequest
+	35, // 35: lindm.agent.v1.ExecutorService.StartResourceExecution:input_type -> lindm.agent.v1.StartResourceExecutionRequest
+	36, // 36: lindm.agent.v1.ExecutorService.GetResourceExecution:input_type -> lindm.agent.v1.GetResourceExecutionRequest
+	37, // 37: lindm.agent.v1.ExecutorService.CancelResourcePreparation:input_type -> lindm.agent.v1.CancelResourcePreparationRequest
+	38, // 38: lindm.agent.v1.ExecutorService.AttestResourceExecution:input_type -> lindm.agent.v1.AttestResourceExecutionRequest
+	39, // 39: lindm.agent.v1.ExecutorService.PrepareDeviceAction:input_type -> lindm.agent.v1.PrepareDeviceActionRequest
+	40, // 40: lindm.agent.v1.ExecutorService.StartDeviceAction:input_type -> lindm.agent.v1.StartDeviceActionRequest
+	41, // 41: lindm.agent.v1.ExecutorService.GetDeviceAction:input_type -> lindm.agent.v1.GetDeviceActionRequest
+	42, // 42: lindm.agent.v1.ExecutorService.AttestDeviceAction:input_type -> lindm.agent.v1.AttestDeviceActionRequest
+	43, // 43: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:input_type -> lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	44, // 44: lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory:input_type -> lindm.agent.v1.ConfirmDeviceActionInventoryRequest
+	45, // 45: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:input_type -> lindm.agent.v1.PrepareDeviceActionRecoveryRequest
+	46, // 46: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:input_type -> lindm.agent.v1.CommitDeviceActionRecoveryRequest
+	47, // 47: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:input_type -> lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	48, // 48: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:input_type -> lindm.agent.v1.ExchangeAgentUpdateRequest
+	49, // 49: lindm.agent.v1.ExecutorService.GetAgentUpdate:input_type -> lindm.agent.v1.GetAgentUpdateRequest
+	24, // 50: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
+	4,  // 51: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
+	6,  // 52: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
+	7,  // 53: lindm.agent.v1.ExecutorService.ImportOfflineEnrollment:output_type -> lindm.agent.v1.ImportOfflineEnrollmentResponse
+	9,  // 54: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
+	13, // 55: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
+	15, // 56: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
+	19, // 57: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
+	21, // 58: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
+	23, // 59: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
+	50, // 60: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
+	51, // 61: lindm.agent.v1.ExecutorService.GetExecutionTrust:output_type -> lindm.agent.v1.GetExecutionTrustResponse
+	52, // 62: lindm.agent.v1.ExecutorService.GetRecoveryReadiness:output_type -> lindm.agent.v1.GetRecoveryReadinessResponse
+	53, // 63: lindm.agent.v1.ExecutorService.PrepareResourceExecution:output_type -> lindm.agent.v1.PrepareResourceExecutionResponse
+	54, // 64: lindm.agent.v1.ExecutorService.StartResourceExecution:output_type -> lindm.agent.v1.StartResourceExecutionResponse
+	55, // 65: lindm.agent.v1.ExecutorService.GetResourceExecution:output_type -> lindm.agent.v1.GetResourceExecutionResponse
+	56, // 66: lindm.agent.v1.ExecutorService.CancelResourcePreparation:output_type -> lindm.agent.v1.CancelResourcePreparationResponse
+	57, // 67: lindm.agent.v1.ExecutorService.AttestResourceExecution:output_type -> lindm.agent.v1.AttestResourceExecutionResponse
+	58, // 68: lindm.agent.v1.ExecutorService.PrepareDeviceAction:output_type -> lindm.agent.v1.PrepareDeviceActionResponse
+	59, // 69: lindm.agent.v1.ExecutorService.StartDeviceAction:output_type -> lindm.agent.v1.StartDeviceActionResponse
+	60, // 70: lindm.agent.v1.ExecutorService.GetDeviceAction:output_type -> lindm.agent.v1.GetDeviceActionResponse
+	61, // 71: lindm.agent.v1.ExecutorService.AttestDeviceAction:output_type -> lindm.agent.v1.AttestDeviceActionResponse
+	62, // 72: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:output_type -> lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	63, // 73: lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory:output_type -> lindm.agent.v1.ConfirmDeviceActionInventoryResponse
+	64, // 74: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:output_type -> lindm.agent.v1.PrepareDeviceActionRecoveryResponse
+	65, // 75: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:output_type -> lindm.agent.v1.CommitDeviceActionRecoveryResponse
+	66, // 76: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:output_type -> lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	67, // 77: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:output_type -> lindm.agent.v1.ExchangeAgentUpdateResponse
+	68, // 78: lindm.agent.v1.ExecutorService.GetAgentUpdate:output_type -> lindm.agent.v1.GetAgentUpdateResponse
+	25, // 79: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
+	51, // [51:80] is the sub-list for method output_type
+	22, // [22:51] is the sub-list for method input_type
 	22, // [22:22] is the sub-list for extension type_name
 	22, // [22:22] is the sub-list for extension extendee
 	0,  // [0:22] is the sub-list for field type_name

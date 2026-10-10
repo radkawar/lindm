@@ -150,7 +150,7 @@ func (s *Service) PreviewTargetAssignments(ctx context.Context, r *connect.Reque
 func (s *Service) ActivateTargetPreview(ctx context.Context, r *connect.Request[adminv1.ActivateTargetPreviewRequest]) (*connect.Response[adminv1.ActivateTargetPreviewResponse], error) {
 	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.ActivateTargetPreviewRequest) (*adminv1.ActivateTargetPreviewResponse, error) {
 		p, err := s.targeting.Activate(ctx, tx, a.Principal(), identity.PermissionAssignResources, r, func(ctx context.Context, tx pgx.Tx, p *policyv1.TargetPreview) error {
-			return s.activateTargetPreview(ctx, tx, p, a.ActorID(), a.Version())
+			return s.activateTargetPreview(ctx, tx, p, a.ActorID(), a.Version(), r.GetApprovalId())
 		})
 		if err != nil {
 			return nil, err

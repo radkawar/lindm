@@ -636,17 +636,27 @@ func compareVMObservation(expected *vmTruth, actual *inventoryv1.NativeObservati
 		return fmt.Errorf("complete native package comparison failed: %d missing, %d unexpected records", missing, extra)
 	}
 	host := actual.Host
-	fields := []*inventoryv1.ObservedString{host.OsId, host.OsVersion, host.Architecture, host.KernelRelease, host.Hostname, host.BootId}
 	names := []string{"OS ID", "OS version", "architecture", "kernel release", "hostname", "boot ID"}
-	for i, field := range fields {
-		if i == 1 && expected.host[0] == "arch" && expected.host[i] == "" && field != nil && field.Status == inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE && field.Value == "" {
-			continue
-		}
-		if field == nil || field.Status != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS || field.Value == "" || field.Value != expected.host[i] {
+	for i, field := range vmHostFields(host) {
+		if !vmHostFieldMatches(expected, i, field) {
 			return fmt.Errorf("native host comparison failed for %s (values withheld)", names[i])
 		}
 	}
 	return nil
+}
+
+func vmHostFields(host *inventoryv1.HostObservation) [6]*inventoryv1.ObservedString {
+	return [6]*inventoryv1.ObservedString{host.GetOsId(), host.GetOsVersion(), host.GetArchitecture(), host.GetKernelRelease(), host.GetHostname(), host.GetBootId()}
+}
+
+// vmHostFieldMatches is the single native host rule for inspection and for
+// control-plane publications. Arch's rolling os-release defines no VERSION_ID,
+// so its OS version must be an honest UNAVAILABLE, never a fabricated value.
+func vmHostFieldMatches(expected *vmTruth, i int, field *inventoryv1.ObservedString) bool {
+	if i == 1 && expected.host[0] == "arch" && expected.host[i] == "" {
+		return field != nil && field.Status == inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE && field.Value == ""
+	}
+	return field != nil && field.Status == inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS && field.Value != "" && field.Value == expected.host[i]
 }
 
 func saveGuestDiagnostics(directory string, data []byte) (string, error) {

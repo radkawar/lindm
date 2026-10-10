@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -297,6 +298,10 @@ func TestNativeFailuresDiscardPartialDetails(t *testing.T) {
 		switch selected.name {
 		case "lsblk":
 			data = `{"blockdevices":[]}`
+			if slices.Equal(selected.args, []string{"--version"}) {
+				// A full-column-capable lsblk failure stands after its probe.
+				data = "lsblk from util-linux 2.39.3\n"
+			}
 		case "ip":
 			data = `[]`
 		case "flatpak":

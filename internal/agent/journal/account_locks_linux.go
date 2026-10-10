@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal/journaldb"
+	"lindm/internal/agent/privatecustody"
 	"lindm/internal/protodata"
 )
 
@@ -36,7 +38,7 @@ func (s *Store) CreateAccountLock(ctx context.Context, ledger *agentv1.AccountLo
 	if s.db == nil {
 		return 0, ErrClosed
 	}
-	encoded, err := s.encodeAccountLock(ledger)
+	encoded, err := s.encodeAccountLock(ledger, 1)
 	if err != nil {
 		return 0, err
 	}
@@ -133,7 +135,7 @@ func (s *Store) UpdateAccountLock(ctx context.Context, revision int64, next *age
 	if revision < 1 || revision == math.MaxInt64 {
 		return 0, ErrConflict
 	}
-	encoded, err := s.encodeAccountLock(next)
+	encoded, err := s.encodeAccountLock(next, revision+1)
 	if err != nil {
 		return 0, err
 	}
@@ -201,25 +203,25 @@ func accountPhaseTransition(old, next agentv1.AccountLockPhase) bool {
 	}
 }
 
-func (s *Store) encodeAccountLock(ledger *agentv1.AccountLockLedger) ([]byte, error) {
-	if ledger == nil || !canonicalServiceID(ledger.GetLockActionId()) || proto.Size(ledger) > maximumAccountLockBytes || protodata.ValidateClosed(ledger.ProtoReflect()) != nil || s.validator.Validate(ledger) != nil {
-		return nil, ErrAccountLockRejected
+func (s *Store) validateAccountLock(ledger *agentv1.AccountLockLedger) error {
+	if ledger == nil || !canonicalResourceID(ledger.GetLockActionId()) || proto.Size(ledger) > maximumAccountLockBytes || protodata.ValidateClosed(ledger.ProtoReflect()) != nil || s.validator.Validate(ledger) != nil {
+		return ErrAccountLockRejected
 	}
 	for _, entry := range ledger.GetAccounts() {
-		if (entry.GetPhase() == agentv1.AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASE_PENDING || entry.GetPhase() == agentv1.AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASED) && !canonicalServiceID(entry.GetReleaseActionId()) {
-			return nil, ErrAccountLockRejected
+		if (entry.GetPhase() == agentv1.AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASE_PENDING || entry.GetPhase() == agentv1.AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASED) && !canonicalResourceID(entry.GetReleaseActionId()) {
+			return ErrAccountLockRejected
 		}
 		prior, expected := entry.GetPrior(), entry.GetExpected()
 		if prior.GetPasswdEntry() != expected.GetPasswdEntry() || strings.ContainsAny(prior.GetPasswdEntry()+prior.GetShadowEntry()+expected.GetShadowEntry(), "\n\r\x00") {
-			return nil, ErrAccountLockRejected
+			return ErrAccountLockRejected
 		}
 		before, after := strings.Split(prior.GetShadowEntry(), ":"), strings.Split(expected.GetShadowEntry(), ":")
 		if len(before) != 9 || len(after) != 9 || before[0] != prior.GetUsername() || after[0] != prior.GetUsername() {
-			return nil, ErrAccountLockRejected
+			return ErrAccountLockRejected
 		}
 		if proto.Equal(prior, expected) {
 			if entry.GetPhase() != agentv1.AccountLockPhase_ACCOUNT_LOCK_PHASE_PRESERVED {
-				return nil, ErrAccountLockRejected
+				return ErrAccountLockRejected
 			}
 			continue
 		}
@@ -228,26 +230,57 @@ func (s *Store) encodeAccountLock(ledger *agentv1.AccountLockLedger) ([]byte, er
 			password = "!" + password
 		}
 		if after[1] != password || after[7] != "1" {
-			return nil, ErrAccountLockRejected
+			return ErrAccountLockRejected
 		}
 		before[1], before[7] = after[1], after[7]
 		if strings.Join(before, ":") != expected.GetShadowEntry() {
-			return nil, ErrAccountLockRejected
+			return ErrAccountLockRejected
 		}
 	}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(ledger)
+	return nil
+}
+
+func (s *Store) encodeAccountLock(ledger *agentv1.AccountLockLedger, revision int64) ([]byte, error) {
+	if err := s.validateAccountLock(ledger); err != nil {
+		return nil, err
+	}
+	if s.privateCustody == nil {
+		return nil, ErrRecoveryHold
+	}
+	plaintext, err := proto.MarshalOptions{Deterministic: true}.Marshal(ledger)
 	if err != nil {
+		return nil, ErrAccountLockRejected
+	}
+	defer clear(plaintext)
+	envelope, err := s.privateCustody.Seal(plaintext, privatecustody.Binding("lindm.account-lock-ledger.v1", ledger.GetLockActionId(), strconv.FormatInt(revision, 10)))
+	if err != nil {
+		return nil, ErrRecoveryHold
+	}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(envelope)
+	if err != nil || len(encoded) > maximumAccountLockBytes {
 		return nil, ErrAccountLockRejected
 	}
 	return encoded, nil
 }
 
 func (s *Store) decodeAccountLock(row journaldb.AccountLock) (*agentv1.AccountLockLedger, error) {
-	ledger := new(agentv1.AccountLockLedger)
-	if row.Revision < 1 || len(row.Record) > maximumAccountLockBytes || proto.Unmarshal(row.Record, ledger) != nil || ledger.GetLockActionId() != row.LockActionID {
+	if s.privateCustody == nil {
 		return nil, ErrRecoveryHold
 	}
-	if _, err := s.encodeAccountLock(ledger); err != nil {
+	envelope := new(agentv1.PrivateCustodyEnvelope)
+	if row.Revision < 1 || len(row.Record) > maximumAccountLockBytes || proto.Unmarshal(row.Record, envelope) != nil {
+		return nil, ErrRecoveryHold
+	}
+	plaintext, err := s.privateCustody.Open(envelope, privatecustody.Binding("lindm.account-lock-ledger.v1", row.LockActionID, strconv.FormatInt(row.Revision, 10)))
+	if err != nil {
+		return nil, ErrRecoveryHold
+	}
+	defer clear(plaintext)
+	ledger := new(agentv1.AccountLockLedger)
+	if proto.Unmarshal(plaintext, ledger) != nil || ledger.GetLockActionId() != row.LockActionID {
+		return nil, ErrRecoveryHold
+	}
+	if err := s.validateAccountLock(ledger); err != nil {
 		return nil, ErrRecoveryHold
 	}
 	return ledger, nil

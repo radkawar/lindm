@@ -14,14 +14,17 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	configv1 "lindm/gen/lindm/config/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/config"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
 
 // ConfigureDeviceActions installs private online signing and independent escrow
 // transport/wrapping keys in the owned server, with two-person reveal required.
-// The exact action delegation still needs normal Admin API admission. No
-// service execution or wildcard capability is granted. Call once before actions;
+// The exact action delegation still needs normal Admin API admission. Only
+// read-only encryption compliance is added; no service execution or wildcard
+// capability is granted. Call once before actions;
 // restarting preserves all accounts, sessions and the isolated database.
 func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1.UpdateExecutionTrustRequest, error) {
 	if f.closed || f.local == nil {
@@ -38,7 +41,12 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 	if err != nil {
 		return nil, err
 	}
-	keys, err := createExecutionTrustExercise(ctx, f.repository, capabilities)
+	// Read-only encryption compliance is qualified on the same encrypted guest.
+	compliance, err := resource.Capability(resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := createExecutionTrustExercise(ctx, f.repository, append(capabilities, compliance))
 	if err != nil {
 		return nil, err
 	}

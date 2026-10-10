@@ -138,8 +138,8 @@ func TestJournalRejectsPartialCorruptOrReplacedState(t *testing.T) {
 			case "corrupt protobuf":
 				_, err = store.db.ExecContext(ctx, `UPDATE executor_state SET state=? WHERE id=1`, []byte{0xff})
 			case "wrong schema":
-				// An unexpected schema version holds without attempting repair.
-				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 2`)
+				// A pre-cutover version-1 journal holds; it is never migrated or repaired.
+				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 1`)
 			case "unknown fields", "invalid state":
 				state, _, loadErr := store.Load(ctx)
 				if loadErr != nil {

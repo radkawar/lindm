@@ -1,0 +1,38 @@
+[Unit]
+Description=Lindm owned firewall typed state restoration
+DefaultDependencies=no
+After=local-fs.target systemd-tmpfiles-setup.service lindm-connectivity-guard.service
+Requires=lindm-connectivity-guard.service
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lindm/lindm-agent firewall-restore
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_READ_SEARCH CAP_FOWNER CAP_LEASE
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lindm/firewall
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=no
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+LimitCORE=0
+MemoryMax=128M
+TasksMax=64
+TimeoutStartSec=60
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network-pre.target

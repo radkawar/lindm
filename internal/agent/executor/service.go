@@ -59,8 +59,8 @@ var (
 	errInvalid                = errors.New("invalid_request")
 	errInternal               = errors.New("internal")
 	errClosed                 = errors.New("executor_closed")
-	errServiceRejected        = errors.New("service_execution_rejected")
-	errServiceExpired         = errors.New("service_execution_expired")
+	errResourceRejected       = errors.New("resource_execution_rejected")
+	errResourceExpired        = errors.New("resource_execution_expired")
 )
 
 // Option configures process-local test seams. RPC callers cannot set them.
@@ -117,7 +117,9 @@ type Service struct {
 	workerWake            chan struct{}
 	incarnation           string
 	boottime              func() (uint64, error)
-	openService           func(context.Context) (nativeService, error)
+	openResource          func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error)
+	cancelPreparation     func(context.Context, *agentv1.ResourceExecutionIntent) error
+	resourcePreparations  map[string]struct{}
 	actionProvider        DeviceActionProvider
 	actionProviderFactory func(*journal.Store) (DeviceActionProvider, error)
 	actionMu              sync.Mutex
@@ -130,6 +132,8 @@ type Service struct {
 	recoveryPending       *recoveryPendingAction
 	recoveryTPM           func() (recoveryTPMPending, error)
 	updateConfig          *agentv1.AgentUpdateConfig
+	packageProvider       *agentv1.NativePackageProviderConfig
+	nativeResources       NativeResourceProviders
 	updates               *update.Engine
 	updateHold            bool
 }
@@ -148,6 +152,8 @@ type Config struct {
 	ActionProviderFactory func(*journal.Store) (DeviceActionProvider, error)
 	RecoveryBoot          *RecoveryBootConfig
 	Updates               *agentv1.AgentUpdateConfig
+	PackageProvider       *agentv1.NativePackageProviderConfig
+	NativeResources       NativeResourceProviders
 }
 
 // Run serves the executor until ctx is canceled. Cancellation exits without
@@ -156,7 +162,7 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.RequireRoot && os.Geteuid() != 0 {
 		return errors.New("executor requires root")
 	}
-	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates))
+	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates), WithPackageProvider(cfg.PackageProvider), WithNativeResourceProviders(cfg.NativeResources))
 	if err != nil {
 		return err
 	}
@@ -184,10 +190,11 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
 		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.RootObservation{},
-		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
-		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
-		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
-		&agentv1.AttestServiceExecutionRequest{},
+		&agentv1.PrepareResourceExecutionRequest{}, &agentv1.StartResourceExecutionRequest{},
+		&agentv1.GetResourceExecutionRequest{}, &agentv1.ResourceExecutionRecord{},
+		&agentv1.ResourceExecutionIntent{}, &agentv1.ResourceExecutionChallenge{},
+		&agentv1.AttestResourceExecutionRequest{},
+		&agentv1.CancelResourcePreparationRequest{}, &agentv1.CancelResourcePreparationResponse{},
 		&agentv1.PrepareDeviceActionRequest{}, &agentv1.StartDeviceActionRequest{},
 		&agentv1.GetDeviceActionRequest{}, &agentv1.AttestDeviceActionRequest{},
 		&agentv1.ConfirmDeviceActionEscrowRequest{}, &agentv1.SupplyDeviceActionCredentialRequest{},
@@ -215,18 +222,19 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		return nil, err
 	}
 	svc := &Service{
-		directory:   directory,
-		stateLock:   os.NewFile(uintptr(fd), "executor-state-lock"),
-		authority:   authority,
-		validator:   validator,
-		clock:       time.Now,
-		bootID:      readBootID,
-		entropy:     rand.Reader,
-		closeDone:   make(chan struct{}),
-		workerWake:  make(chan struct{}, 1),
-		boottime:    readBoottime,
-		openService: openNativeService,
+		directory:  directory,
+		stateLock:  os.NewFile(uintptr(fd), "executor-state-lock"),
+		authority:  authority,
+		validator:  validator,
+		clock:      time.Now,
+		bootID:     readBootID,
+		entropy:    rand.Reader,
+		closeDone:  make(chan struct{}),
+		workerWake: make(chan struct{}, 1),
+		boottime:   readBoottime,
 	}
+	svc.openResource = svc.openNativeResource
+	svc.cancelPreparation = svc.cancelPackagePreparation
 	for _, opt := range opts {
 		opt(svc)
 	}
@@ -259,7 +267,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		_ = svc.Close()
 		return nil, err
 	}
-	if err := svc.recoverServiceActions(ctx); err != nil && !errors.Is(err, errRecoveryHold) {
+	if err := svc.recoverResourceActions(ctx); err != nil && !errors.Is(err, errRecoveryHold) {
 		_ = svc.Close()
 		return nil, err
 	}
@@ -272,7 +280,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		return nil, err
 	}
 	svc.worker.Add(1)
-	go svc.serviceWorker()
+	go svc.resourceWorker()
 	return svc, nil
 }
 
@@ -359,7 +367,7 @@ func (s *Service) load(ctx context.Context) (*bound, error) {
 // otherwise mutating the journal. Read-only public trust views use this path.
 func (s *Service) loadBound(ctx context.Context) (*bound, error) {
 	if s.liveRoot != nil {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if s.hold {
 		return nil, errRecoveryHold
@@ -510,10 +518,10 @@ func mapError(err error) error {
 		code, reason = connect.CodeDeadlineExceeded, "deadline_exceeded"
 	case errors.Is(err, errClosed):
 		code, reason = connect.CodeUnavailable, "executor_closed"
-	case errors.Is(err, errServiceRejected):
-		code, reason = connect.CodePermissionDenied, "service_execution_rejected"
-	case errors.Is(err, errServiceExpired):
-		code, reason = connect.CodeFailedPrecondition, "service_execution_expired"
+	case errors.Is(err, errResourceRejected):
+		code, reason = connect.CodePermissionDenied, "resource_execution_rejected"
+	case errors.Is(err, errResourceExpired):
+		code, reason = connect.CodeFailedPrecondition, "resource_execution_expired"
 	case errors.Is(err, journal.ErrDeviceActionNotFound):
 		code, reason = connect.CodeNotFound, "device_action_not_found"
 	case errors.Is(err, journal.ErrDeviceActionCapacity):
@@ -526,12 +534,12 @@ func mapError(err error) error {
 		code, reason = connect.CodeFailedPrecondition, "device_action_unsupported"
 	case errors.Is(err, actionprovider.ErrConflict), errors.Is(err, actionprovider.ErrNotVerified):
 		code, reason = connect.CodeFailedPrecondition, "device_action_precondition"
-	case errors.Is(err, journal.ErrServiceActionNotFound):
-		code, reason = connect.CodeNotFound, "service_execution_not_found"
-	case errors.Is(err, journal.ErrServiceActionCapacity):
-		code, reason = connect.CodeResourceExhausted, "service_execution_capacity"
-	case errors.Is(err, journal.ErrServiceActionBusy), errors.Is(err, journal.ErrServiceActionRejected), errors.Is(err, journal.ErrConflict):
-		code, reason = connect.CodeFailedPrecondition, "service_execution_conflict"
+	case errors.Is(err, journal.ErrResourceActionNotFound):
+		code, reason = connect.CodeNotFound, "resource_execution_not_found"
+	case errors.Is(err, journal.ErrResourceActionCapacity):
+		code, reason = connect.CodeResourceExhausted, "resource_execution_capacity"
+	case errors.Is(err, journal.ErrResourceActionBusy), errors.Is(err, journal.ErrResourceActionRejected), errors.Is(err, journal.ErrConflict):
+		code, reason = connect.CodeFailedPrecondition, "resource_execution_conflict"
 	case errors.Is(err, serviceprovider.ErrUnsupported):
 		code, reason = connect.CodeFailedPrecondition, "service_provider_unsupported"
 	case errors.Is(err, serviceprovider.ErrConflict), errors.Is(err, serviceprovider.ErrNotConverged):

@@ -49,7 +49,7 @@ func (s *Service) closeLiveRootJournal(ctx context.Context, loaded *bound, next 
 
 func (s *Service) liveRootStatus(actionID string) (*agentv1.DeviceActionStatus, error) {
 	if s.liveRoot == nil || s.liveRoot.record.GetIntent().GetActionId() != actionID {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	return proto.CloneOf(s.liveRoot.status), nil
 }

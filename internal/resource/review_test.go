@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"testing"
@@ -143,7 +144,7 @@ func TestEveryObservationArmBindsIdentity(t *testing.T) {
 		{5, "system", `"sshServer":{"includeGraphSha256":` + digest + `,"effectiveConfigurationSha256":` + digest + `,"effective":{"port":22},"serviceUnit":"sshd.service"}`, "other"},
 		{6, "system", `"timeSync":{"daemonUnit":"chronyd.service","configurationSha256":` + digest + `}`, "other"},
 		{7, "system/" + strings.Repeat("0", 64), `"trustCa":{"certificateSha256":` + digest + `,"scope":1,"exportedStoreSha256":` + digest + `}`, "system/" + strings.Repeat("1", 64)},
-		{8, fixtureID, `"firewallZone":{"zoneId":"` + fixtureID + `","nativeOwner":"firewalld","nativeVersion":"2","persistentSha256":` + digest + `,"kernelRulesSha256":` + digest + `,"defaultIngress":1,"defaultEgress":1}`, fixtureGeneration},
+		{8, fixtureID, `"firewallZone":{"zoneId":"` + fixtureID + `","nativeOwner":"firewalld","nativeVersion":"2","persistentSha256":` + digest + `,"kernelRulesSha256":` + digest + `,"defaultIngress":1,"defaultEgress":1,"nativeIdentitySha256":` + digest + `,"table":"lindm_z_11111111111141118111111111111111","networkNamespaceSha256":` + digest + `}`, fixtureGeneration},
 		{9, fixtureID, `"networkConnection":{"connectionUuid":"` + fixtureID + `","medium":1,"settingsSha256":` + digest + `}`, fixtureGeneration},
 		{10, "system", `"dns":{"effective":{"system":{},"servers":{}},"nativeOwner":"resolved","persistentSha256":` + digest + `,"runtimeSha256":` + digest + `}`, "connection/" + fixtureID},
 		{11, "packages", `"proxy":{"consumer":{"packages":{}},"nativeOwner":"apt","persistentSha256":` + digest + `,"effectiveSha256":` + digest + `}`, "system-environment"},
@@ -156,6 +157,10 @@ func TestEveryObservationArmBindsIdentity(t *testing.T) {
 		{18, "system/example/", `"snapApp":{"name":"example","confinement":1,"stateRevisionSha256":` + digest + `}`, "system/other/"},
 		{19, fixtureID + "/device/" + fixtureID + "/" + fixtureGeneration, `"certificateEnrollment":{"credentialId":"` + fixtureID + `","subject":{"device":` + fixtureDevice + `}}`, fixtureGeneration + "/device/" + fixtureID + "/" + fixtureGeneration},
 		{20, "system", `"directoryClient":{"backend":1,"domain":"example.com","nativeOwner":"sssd","configurationSha256":` + digest + `,"joinIdentitySha256":` + digest + `,"effectiveLogin":{"offline":1}}`, "other"},
+		{21, "/etc/example/banner", `"managedFile":{"path":"/etc/example/banner","ancestrySha256":` + digest + `}`, "/etc/example/other"},
+		{22, "net.ipv4.ip_forward", `"sysctl":{"key":"net.ipv4.ip_forward","value":"0","persistenceGraphSha256":` + digest + `,"nativeIdentitySha256":` + digest + `,"persistenceFileState":{"path":"/etc/sysctl.d/example.conf","ancestrySha256":` + digest + `}}`, "net.ipv4.conf.all.forwarding"},
+		{23, "timer/example.timer", `"systemdDefinition":{"canonicalKey":"timer/example.timer","definitionSha256":` + digest + `,"targetDefinitionSha256":` + digest + `,"timerScheduleSha256":` + digest + `,"fileState":{"path":"/etc/systemd/system/example.timer","ancestrySha256":` + digest + `},"timerEnabled":false,"timerActive":false,"timerInstallProjectionComplete":true}`, "timer/other.timer"},
+		{24, "system/root", `"encryptionCompliance":{"evidenceSha256":` + digest + `}`, "system/other"},
 	}
 	if err := ValidateObservation(serviceObservation); err != nil {
 		t.Fatal(err)
@@ -189,11 +194,43 @@ func TestPackageRecordCannotSubstituteIdentity(t *testing.T) {
 	recordIdentity := proto.CloneOf(identity)
 	recordIdentity.NativeName = "other"
 	observation.Ref = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: "deb/example/amd64"}
+	nativeIdentity := sha256.Sum256([]byte("fixture installed other/amd64 1.0 instance 1"))
 	observation.Observed = &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{
 		Package: identity, Installed: true, DatabaseRevisionSha256: make([]byte, 32),
-		Record: &resourcev1.NativePackageRecord{Package: recordIdentity, Version: &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Deb{Deb: "1.0"}}, Source: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: "apt/" + fixtureID}, SignerSha256: make([]byte, 32), MetadataRevisionSha256: make([]byte, 32)},
+		Record: &resourcev1.NativePackageRecord{Package: recordIdentity, Version: &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Deb{Deb: "1.0"}}, NativeIdentitySha256: nativeIdentity[:]},
 	}}
 	if err := ValidateObservation(observation); err == nil {
 		t.Fatal("native package record for a different identity accepted")
+	}
+}
+
+func TestPackageObservationPreservesUnknownProvenance(t *testing.T) {
+	_, observation, _ := serviceEvidence(t)
+	identity := &resourcev1.PackageIdentity{Ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB, NativeName: "example", Architecture: "amd64"}
+	nativeIdentity := sha256.Sum256([]byte("fixture installed example/amd64 1.0 instance 1"))
+	record := &resourcev1.NativePackageRecord{
+		Package:              identity,
+		Version:              &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Deb{Deb: "1.0"}},
+		NativeIdentitySha256: nativeIdentity[:],
+	}
+	observation.Ref = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: "deb/example/amd64"}
+	observation.Observed = &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{
+		Package: identity, Installed: true, Record: record, DatabaseRevisionSha256: make([]byte, 32),
+	}}
+	if err := ValidateObservation(observation); err != nil {
+		t.Fatalf("native installed package with unknown provenance rejected: %v", err)
+	}
+	record.Source = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: "apt/" + fixtureID}
+	if err := ValidateObservation(observation); err == nil {
+		t.Fatal("unknown provenance accepted an invented source")
+	}
+	record.ProvenanceKnown = true
+	record.SignerSha256, record.MetadataRevisionSha256 = make([]byte, 32), make([]byte, 32)
+	if err := ValidateObservation(observation); err != nil {
+		t.Fatal(err)
+	}
+	record.Source.CanonicalKey = "rpm/" + fixtureID
+	if err := ValidateObservation(observation); err == nil {
+		t.Fatal("known provenance accepted a different package ecosystem")
 	}
 }

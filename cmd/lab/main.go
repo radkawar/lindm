@@ -101,6 +101,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "dispatch" {
 		return runVMDispatch(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "resources" {
+		return runVMResources(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "encrypted" {
 		return runVMEncrypted(ctx, args[2:], stdout, stderr)
 	}

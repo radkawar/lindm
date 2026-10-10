@@ -321,13 +321,68 @@ func parseStorage(reader io.Reader) *inventoryv1.StorageDetails {
 	return graph.observation()
 }
 
+// lsblk columns were added in util-linux v2.33 (PTTYPE, PTUUID), v2.35 (FSVER)
+// and v2.37 (MOUNTPOINTS); see misc-utils/lsblk.c and the release notes. EL8
+// ships util-linux 2.32.1, whose lsblk rejects the full column set. The legacy
+// set holds only columns that 2.32.1 provides.
+const (
+	storageColumns       = "NAME,KNAME,TYPE,SIZE,FSTYPE,FSVER,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME"
+	legacyStorageColumns = "NAME,KNAME,TYPE,SIZE,FSTYPE,UUID,PARTUUID,PARTTYPE,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINT,PKNAME"
+	storageColumnsMajor  = 2
+	storageColumnsMinor  = 37
+)
+
+func lsblk(args ...string) backend {
+	return backend{name: "lsblk", path: "/usr/bin/lsblk", args: args}
+}
+
+// lsblkRelease reads util-linux's fixed "lsblk from util-linux 2.32.1" line
+// (include/c.h UTIL_LINUX_VERSION). A patch or "-rc" suffix is not compared.
+func lsblkRelease(ctx context.Context, run nativeRunner) (major, minor uint64, status inventoryv1.CollectionStatus) {
+	status = run(ctx, lsblk("--version"), func(reader io.Reader) inventoryv1.CollectionStatus {
+		data, err := io.ReadAll(io.LimitReader(reader, 4097))
+		if err != nil {
+			return invalid
+		}
+		if len(data) > 4096 {
+			return capacity
+		}
+		line, terminated := strings.CutSuffix(string(data), "\n")
+		release, prefixed := strings.CutPrefix(line, "lsblk from util-linux ")
+		majorText, rest, dotted := strings.Cut(release, ".")
+		minorText := rest[:len(rest)-len(strings.TrimLeft(rest, "0123456789"))]
+		suffix := rest[len(minorText):]
+		var majorErr, minorErr error
+		major, majorErr = decimal(majorText)
+		minor, minorErr = decimal(minorText)
+		if !terminated || !prefixed || !dotted || majorErr != nil || minorErr != nil ||
+			strings.ContainsAny(suffix, " \t\r\n\x00") || (suffix != "" && suffix[0] != '.' && suffix[0] != '-') {
+			return invalid
+		}
+		return success
+	})
+	return major, minor, status
+}
+
 func collectStorage(ctx context.Context, s detailSources) *inventoryv1.StorageDetails {
 	var graph *storageGraph
-	status := s.run(ctx, backend{name: "lsblk", path: "/usr/bin/lsblk", args: []string{"--json", "--bytes", "--tree", "--output", "NAME,KNAME,TYPE,SIZE,FSTYPE,FSVER,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME"}}, func(reader io.Reader) inventoryv1.CollectionStatus {
+	parse := func(reader io.Reader) inventoryv1.CollectionStatus {
 		var parsedStatus inventoryv1.CollectionStatus
 		graph, parsedStatus = readStorageGraph(reader)
 		return parsedStatus
-	})
+	}
+	// The full column set is used unless lsblk itself failed and natively
+	// reports a release that predates one of its columns. Other failures
+	// stand. Legacy output has no FSVER, PTTYPE, PTUUID or MOUNTPOINTS: the GPT
+	// disk GUID stays UNAVAILABLE, the LUKS version comes only from cryptsetup
+	// and the mountpoint is lsblk's single MOUNTPOINT.
+	status := s.run(ctx, lsblk("--json", "--bytes", "--tree", "--output", storageColumns), parse)
+	if status == commandFailure {
+		major, minor, versionStatus := lsblkRelease(ctx, s.run)
+		if versionStatus == success && (major < storageColumnsMajor || (major == storageColumnsMajor && minor < storageColumnsMinor)) {
+			status = s.run(ctx, lsblk("--json", "--bytes", "--tree", "--output", legacyStorageColumns), parse)
+		}
+	}
 	if status != success {
 		return &inventoryv1.StorageDetails{Status: status}
 	}

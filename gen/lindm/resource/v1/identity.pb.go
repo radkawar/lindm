@@ -48,6 +48,10 @@ const (
 	ResourceKind_RESOURCE_KIND_SNAP_APP               ResourceKind = 18
 	ResourceKind_RESOURCE_KIND_CERTIFICATE_ENROLLMENT ResourceKind = 19
 	ResourceKind_RESOURCE_KIND_DIRECTORY_CLIENT       ResourceKind = 20
+	ResourceKind_RESOURCE_KIND_MANAGED_FILE           ResourceKind = 21
+	ResourceKind_RESOURCE_KIND_SYSCTL                 ResourceKind = 22
+	ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION     ResourceKind = 23
+	ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE  ResourceKind = 24
 )
 
 // Enum value maps for ResourceKind.
@@ -74,6 +78,10 @@ var (
 		18: "RESOURCE_KIND_SNAP_APP",
 		19: "RESOURCE_KIND_CERTIFICATE_ENROLLMENT",
 		20: "RESOURCE_KIND_DIRECTORY_CLIENT",
+		21: "RESOURCE_KIND_MANAGED_FILE",
+		22: "RESOURCE_KIND_SYSCTL",
+		23: "RESOURCE_KIND_SYSTEMD_DEFINITION",
+		24: "RESOURCE_KIND_ENCRYPTION_COMPLIANCE",
 	}
 	ResourceKind_value = map[string]int32{
 		"RESOURCE_KIND_UNSPECIFIED":            0,
@@ -97,6 +105,10 @@ var (
 		"RESOURCE_KIND_SNAP_APP":               18,
 		"RESOURCE_KIND_CERTIFICATE_ENROLLMENT": 19,
 		"RESOURCE_KIND_DIRECTORY_CLIENT":       20,
+		"RESOURCE_KIND_MANAGED_FILE":           21,
+		"RESOURCE_KIND_SYSCTL":                 22,
+		"RESOURCE_KIND_SYSTEMD_DEFINITION":     23,
+		"RESOURCE_KIND_ENCRYPTION_COMPLIANCE":  24,
 	}
 )
 
@@ -289,24 +301,28 @@ func (ClaimMode) EnumDescriptor() ([]byte, []int) {
 type ClaimDomain int32
 
 const (
-	ClaimDomain_CLAIM_DOMAIN_UNSPECIFIED        ClaimDomain = 0
-	ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME    ClaimDomain = 1
-	ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP   ClaimDomain = 2
-	ClaimDomain_CLAIM_DOMAIN_ACCOUNT            ClaimDomain = 3
-	ClaimDomain_CLAIM_DOMAIN_GROUP              ClaimDomain = 4
-	ClaimDomain_CLAIM_DOMAIN_ADMINISTRATION     ClaimDomain = 5
-	ClaimDomain_CLAIM_DOMAIN_FIREWALL_INTERFACE ClaimDomain = 6
-	ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE      ClaimDomain = 7
-	ClaimDomain_CLAIM_DOMAIN_PACKAGE            ClaimDomain = 8
-	ClaimDomain_CLAIM_DOMAIN_REPOSITORY         ClaimDomain = 9
-	ClaimDomain_CLAIM_DOMAIN_CREDENTIAL         ClaimDomain = 10
-	ClaimDomain_CLAIM_DOMAIN_CONNECTION         ClaimDomain = 11
-	ClaimDomain_CLAIM_DOMAIN_DNS_OWNER          ClaimDomain = 12
-	ClaimDomain_CLAIM_DOMAIN_PAM_OWNER          ClaimDomain = 13
-	ClaimDomain_CLAIM_DOMAIN_REPOSITORY_ALIAS   ClaimDomain = 14
-	ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE      ClaimDomain = 15
-	ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT      ClaimDomain = 16
-	ClaimDomain_CLAIM_DOMAIN_NATIVE_DEPLOYMENT  ClaimDomain = 17
+	ClaimDomain_CLAIM_DOMAIN_UNSPECIFIED           ClaimDomain = 0
+	ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME       ClaimDomain = 1
+	ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP      ClaimDomain = 2
+	ClaimDomain_CLAIM_DOMAIN_ACCOUNT               ClaimDomain = 3
+	ClaimDomain_CLAIM_DOMAIN_GROUP                 ClaimDomain = 4
+	ClaimDomain_CLAIM_DOMAIN_ADMINISTRATION        ClaimDomain = 5
+	ClaimDomain_CLAIM_DOMAIN_FIREWALL_INTERFACE    ClaimDomain = 6
+	ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE         ClaimDomain = 7
+	ClaimDomain_CLAIM_DOMAIN_PACKAGE               ClaimDomain = 8
+	ClaimDomain_CLAIM_DOMAIN_REPOSITORY            ClaimDomain = 9
+	ClaimDomain_CLAIM_DOMAIN_CREDENTIAL            ClaimDomain = 10
+	ClaimDomain_CLAIM_DOMAIN_CONNECTION            ClaimDomain = 11
+	ClaimDomain_CLAIM_DOMAIN_DNS_OWNER             ClaimDomain = 12
+	ClaimDomain_CLAIM_DOMAIN_PAM_OWNER             ClaimDomain = 13
+	ClaimDomain_CLAIM_DOMAIN_REPOSITORY_ALIAS      ClaimDomain = 14
+	ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE         ClaimDomain = 15
+	ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT         ClaimDomain = 16
+	ClaimDomain_CLAIM_DOMAIN_NATIVE_DEPLOYMENT     ClaimDomain = 17
+	ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE           ClaimDomain = 18
+	ClaimDomain_CLAIM_DOMAIN_SYSCTL                ClaimDomain = 19
+	ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION    ClaimDomain = 20
+	ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE ClaimDomain = 21
 )
 
 // Enum value maps for ClaimDomain.
@@ -330,26 +346,34 @@ var (
 		15: "CLAIM_DOMAIN_UPDATE_SOURCE",
 		16: "CLAIM_DOMAIN_FIREWALL_PORT",
 		17: "CLAIM_DOMAIN_NATIVE_DEPLOYMENT",
+		18: "CLAIM_DOMAIN_NATIVE_FILE",
+		19: "CLAIM_DOMAIN_SYSCTL",
+		20: "CLAIM_DOMAIN_SYSTEMD_DEFINITION",
+		21: "CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE",
 	}
 	ClaimDomain_value = map[string]int32{
-		"CLAIM_DOMAIN_UNSPECIFIED":        0,
-		"CLAIM_DOMAIN_SERVICE_RUNTIME":    1,
-		"CLAIM_DOMAIN_GROUP_MEMBERSHIP":   2,
-		"CLAIM_DOMAIN_ACCOUNT":            3,
-		"CLAIM_DOMAIN_GROUP":              4,
-		"CLAIM_DOMAIN_ADMINISTRATION":     5,
-		"CLAIM_DOMAIN_FIREWALL_INTERFACE": 6,
-		"CLAIM_DOMAIN_NETWORK_ROUTE":      7,
-		"CLAIM_DOMAIN_PACKAGE":            8,
-		"CLAIM_DOMAIN_REPOSITORY":         9,
-		"CLAIM_DOMAIN_CREDENTIAL":         10,
-		"CLAIM_DOMAIN_CONNECTION":         11,
-		"CLAIM_DOMAIN_DNS_OWNER":          12,
-		"CLAIM_DOMAIN_PAM_OWNER":          13,
-		"CLAIM_DOMAIN_REPOSITORY_ALIAS":   14,
-		"CLAIM_DOMAIN_UPDATE_SOURCE":      15,
-		"CLAIM_DOMAIN_FIREWALL_PORT":      16,
-		"CLAIM_DOMAIN_NATIVE_DEPLOYMENT":  17,
+		"CLAIM_DOMAIN_UNSPECIFIED":           0,
+		"CLAIM_DOMAIN_SERVICE_RUNTIME":       1,
+		"CLAIM_DOMAIN_GROUP_MEMBERSHIP":      2,
+		"CLAIM_DOMAIN_ACCOUNT":               3,
+		"CLAIM_DOMAIN_GROUP":                 4,
+		"CLAIM_DOMAIN_ADMINISTRATION":        5,
+		"CLAIM_DOMAIN_FIREWALL_INTERFACE":    6,
+		"CLAIM_DOMAIN_NETWORK_ROUTE":         7,
+		"CLAIM_DOMAIN_PACKAGE":               8,
+		"CLAIM_DOMAIN_REPOSITORY":            9,
+		"CLAIM_DOMAIN_CREDENTIAL":            10,
+		"CLAIM_DOMAIN_CONNECTION":            11,
+		"CLAIM_DOMAIN_DNS_OWNER":             12,
+		"CLAIM_DOMAIN_PAM_OWNER":             13,
+		"CLAIM_DOMAIN_REPOSITORY_ALIAS":      14,
+		"CLAIM_DOMAIN_UPDATE_SOURCE":         15,
+		"CLAIM_DOMAIN_FIREWALL_PORT":         16,
+		"CLAIM_DOMAIN_NATIVE_DEPLOYMENT":     17,
+		"CLAIM_DOMAIN_NATIVE_FILE":           18,
+		"CLAIM_DOMAIN_SYSCTL":                19,
+		"CLAIM_DOMAIN_SYSTEMD_DEFINITION":    20,
+		"CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE": 21,
 	}
 )
 
@@ -529,7 +553,7 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04mode\x12\x1e\n" +
 	"\x05value\x18\x04 \x01(\tB\b\xbaH\x05r\x03(\x80\bR\x05value\x12.\n" +
 	"\amembers\x18\x05 \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x80\b\x18\x01\"\ar\x05\x10\x01(\x80\bR\amembers:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +
-	"\x14resource_claim.shape\x12.claim values and members must match their mode\x1aj(this.mode in [1,5] ? this.value != '' : this.value == '') && (this.mode == 4 || this.members.size() == 0)*\xb2\x05\n" +
+	"\x14resource_claim.shape\x12.claim values and members must match their mode\x1aj(this.mode in [1,5] ? this.value != '' : this.value == '') && (this.mode == 4 || this.members.size() == 0)*\xbb\x06\n" +
 	"\fResourceKind\x12\x1d\n" +
 	"\x19RESOURCE_KIND_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dRESOURCE_KIND_SYSTEMD_SERVICE\x10\x01\x12\x1d\n" +
@@ -552,7 +576,11 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\x1dRESOURCE_KIND_PASSWORD_POLICY\x10\x11\x12\x1a\n" +
 	"\x16RESOURCE_KIND_SNAP_APP\x10\x12\x12(\n" +
 	"$RESOURCE_KIND_CERTIFICATE_ENROLLMENT\x10\x13\x12\"\n" +
-	"\x1eRESOURCE_KIND_DIRECTORY_CLIENT\x10\x14*O\n" +
+	"\x1eRESOURCE_KIND_DIRECTORY_CLIENT\x10\x14\x12\x1e\n" +
+	"\x1aRESOURCE_KIND_MANAGED_FILE\x10\x15\x12\x18\n" +
+	"\x14RESOURCE_KIND_SYSCTL\x10\x16\x12$\n" +
+	" RESOURCE_KIND_SYSTEMD_DEFINITION\x10\x17\x12'\n" +
+	"#RESOURCE_KIND_ENCRYPTION_COMPLIANCE\x10\x18*O\n" +
 	"\bPresence\x12\x18\n" +
 	"\x14PRESENCE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10PRESENCE_PRESENT\x10\x01\x12\x13\n" +
@@ -567,7 +595,7 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\x13CLAIM_MODE_REQUIRED\x10\x02\x12\x18\n" +
 	"\x14CLAIM_MODE_FORBIDDEN\x10\x03\x12\x18\n" +
 	"\x14CLAIM_MODE_EXACT_SET\x10\x04\x12\x15\n" +
-	"\x11CLAIM_MODE_MEMBER\x10\x05*\xb8\x04\n" +
+	"\x11CLAIM_MODE_MEMBER\x10\x05*\xbc\x05\n" +
 	"\vClaimDomain\x12\x1c\n" +
 	"\x18CLAIM_DOMAIN_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cCLAIM_DOMAIN_SERVICE_RUNTIME\x10\x01\x12!\n" +
@@ -587,7 +615,11 @@ const file_lindm_resource_v1_identity_proto_rawDesc = "" +
 	"\x1dCLAIM_DOMAIN_REPOSITORY_ALIAS\x10\x0e\x12\x1e\n" +
 	"\x1aCLAIM_DOMAIN_UPDATE_SOURCE\x10\x0f\x12\x1e\n" +
 	"\x1aCLAIM_DOMAIN_FIREWALL_PORT\x10\x10\x12\"\n" +
-	"\x1eCLAIM_DOMAIN_NATIVE_DEPLOYMENT\x10\x11B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
+	"\x1eCLAIM_DOMAIN_NATIVE_DEPLOYMENT\x10\x11\x12\x1c\n" +
+	"\x18CLAIM_DOMAIN_NATIVE_FILE\x10\x12\x12\x17\n" +
+	"\x13CLAIM_DOMAIN_SYSCTL\x10\x13\x12#\n" +
+	"\x1fCLAIM_DOMAIN_SYSTEMD_DEFINITION\x10\x14\x12&\n" +
+	"\"CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE\x10\x15B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
 
 var (
 	file_lindm_resource_v1_identity_proto_rawDescOnce sync.Once

@@ -9,11 +9,11 @@ Image state and subsequent repository state are separate pins
 ([`arch-20261001-x86_64.json`](../../lab/images/arch-20261001-x86_64.json):2-19).
 
 [Verification](../verification.md#1-launch-platform-qualification) is authoritative:
-184 native package identities and host-detail comparisons passed on that cloud
-snapshot, but no complete packaged lifecycle or dispatch pass is recorded
-(`docs/verification.md:730-754`). No complete release cell is certified. Desktop,
-encrypted install, physical hardware and air-gap results do not follow from this
-cloud inventory pass.
+on that cloud snapshot, x86_64 native inspection (184 packages), the full signed
+pacman 0.7.0→0.7.1 automatic-trust lifecycle and connected dispatch passed on
+local KVM (2026-10-10). No complete release cell is certified. Desktop,
+encrypted install, physical hardware, whole-system upgrade/rollback and air-gap
+results do not follow from these cloud records.
 
 **Arch Linux ARM is a separate derivative**, not an aarch64 build of this
 qualification row. The pinned official arch-boxes input has architecture x86_64;
@@ -64,11 +64,10 @@ The executor's address family is AF_UNIX only
 ([`lindm-agent.service`](../../internal/packaging/assets/lindm-agent.service):18-50;
 [`lindm-executor.service`](../../internal/packaging/assets/lindm-executor.service):17-61).
 
-The unsuccessful lifecycle reached signed pacman installation and active executor
-and network units. Active units are not successful enrollment, inventory
-publication or continuous compliance (`docs/verification.md:751-754`). Storage
-access requires the explicit per-target action drop-in, not removal of
-`PrivateDevices` or broad block-device access.
+The 2026-10-10 lifecycle and dispatch passes ran these units from signed pacman
+packages, through enrollment, publication, reboot, reinstall, revocation and
+missing-journal hold. Storage access requires the explicit per-target action
+drop-in, not removal of `PrivateDevices` or broad block-device access.
 
 ## Inventory and per-field quirks
 
@@ -190,21 +189,39 @@ Runtime was QEMU 8.2.2/KVM, SeaBIOS, virtio-blk, no TPM, no desktop and explicit
 user-mode egress (`docs/verification.md:751-754`). This is not air-gap or physical
 validation, nor a new test run performed for this page.
 
-The packaged lifecycle's control-plane inventory wait expired. Private diagnostic
-`~/.cache/lindm-arch-20261010/lindm-cloud-init-1560727248.json` records active units
-and a terminal guest-loopback authority connection refusal, but that terminal
-message does **not** establish the earlier timeout's cause. No successful lifecycle
-or dispatch record was emitted (`docs/verification.md:754`). Later signed
-0.6.0/0.6.1 artifacts are preparation, not a native pass
-(`docs/verification.md:216-220`). Keep raw account/network/journal diagnostics
-private.
+Two earlier packaged lifecycles (the original handoff and the first 2026-10-10
+run) ended with `bounded control-plane inventory wait ended … deadline_exceeded:
+get device failed` after 18 minutes, with active units and no agent errors. Root
+cause (lab, not product): the agent correctly publishes Arch's absent `VERSION_ID`
+as `UNAVAILABLE`, and inspection accepted that, but the control-plane publication
+comparison required `SUCCESS` for every host field, so no publication could ever
+match. The wait also overwrote that mismatch with the query its own deadline cut
+off. Both comparisons now share one host rule, and an expiring wait reports the
+last observed mismatch (`TestPublishedHostComparisonMatchesInspection`,
+`TestInventoryWaitKeepsMismatchAtDeadline`).
+
+Passing records under `~/.cache/lindm-mutabledistros3-20261010/`, local KVM,
+SeaBIOS 1.16.3, virtio-blk, no TPM/desktop, explicit user egress, isolated local
+password/WebAuthn authority. Source `d303cec` plus the `8c30afa7…` lab delta and
+the 2026-10-10 inventory/lab fixes (private diff
+`254f4c223519c8739fa2a6ae82c30e735d739b30093022cb7ad6ee9171e6f82e`); lab
+`04709855c7e5872f35778ec903f58b01018ef50f961617995e64c752e20e2650`, server
+`7b38f7a5c46047ae130f5e9f7048074c511889a3bc4e01badc2f0fbd8b88b762`, signed
+packages `2f03beaa…` (0.7.0) / `4aa2d295…` (0.7.1) in signed repositories:
+
+| Lane      | Observed result                                                                                                                                                                  | Record / SHA-256                                                                                             |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Inspect   | 184 native pacman identities and independent detail comparison                                                                                                                   | `arch-x86_64-local-inspect-md4b.json` / `ee1f077485d4312db0c6784df20e88263261bb169f3d17aef5df8ce753be4c54`   |
+| Lifecycle | Five 185-package publications (the agent package included), denied attempt 6 kept snapshot 5, epoch 1→3, lost issuance, purge identity, spool recovery, revocation, journal hold | `arch-x86_64-local-lifecycle-md4b.json` / `6b2d89456a907f971abb6921e8562f60484a4b3c9f8d32145a4fed739e0fa8fe` |
+| Dispatch  | Nine native scenarios incl. real periodic recheck/remediation, ±90 s clocks and revoked denial; unstarted supersession integration-only                                          | `arch-x86_64-local-dispatch-md4b.json` / `e6ae926e7293f5d58ce9e3a6731096bc931e9fe48dafc066d6cb0f8f6ddb2029`  |
+
+Keep raw account/network/journal diagnostics private.
 
 ## Known gaps
 
-Resolve the prior inventory-publication timeout before claiming a complete
-lifecycle. Native dispatch, continuous drift remediation, whole-system upgrade,
-interruption/rollback, encryption, desktop consent and air-gap/physical gates remain
-open for this exact image/Archive pair. Each future rolling candidate needs its own
-evidence. Arch Linux ARM cannot close any official Arch x86_64 cell. Use the
+Whole-system upgrade, interruption/rollback, encryption, desktop consent and
+air-gap/physical gates remain open for this exact image/Archive pair. Each future
+rolling candidate needs its own evidence. Arch Linux ARM cannot close any official
+Arch x86_64 cell. Use the
 [verification ledger](../verification.md#1-launch-platform-qualification), not
 package-builder availability or shared provider code, as the support authority.

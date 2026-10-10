@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 func (p *Provider) manager(ctx context.Context, method string, args ...any) *dbus.Call {
@@ -36,7 +36,7 @@ func nativeReadError(operation string, err error) error {
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
-func (p *Provider) observe(ctx context.Context, unit string) (*agentv1.ServiceObservation, error) {
+func (p *Provider) observe(ctx context.Context, unit string) (*resourcev1.SystemdServiceObservation, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (p *Provider) observe(ctx context.Context, unit string) (*agentv1.ServiceOb
 	if id != unit {
 		return nil, fmt.Errorf("%w: %q resolves to canonical unit %q", ErrUnsupported, unit, id)
 	}
-	o := &agentv1.ServiceObservation{Unit: id}
+	o := &resourcev1.SystemdServiceObservation{Unit: id}
 	if err := property(unitProperties, "LoadState", &o.LoadState); err != nil {
 		return nil, err
 	}
@@ -156,11 +156,11 @@ func bootID() (string, error) {
 // must durably authorize and consume the start; a plan alone is not authority.
 // Once a mutation is submitted, cancellation/transport failure is uncertain; it
 // never means systemd canceled the job, and no automatic retry is attempted.
-func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authorizeStart func(context.Context) error) (*agentv1.ServiceVerification, error) {
+func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, authorizeStart func(context.Context) error) (*resourcev1.ResourceVerification, error) {
 	if err := ValidatePlan(plan); err != nil {
 		return nil, err
 	}
-	if (plan.GetChangeEnablement() || plan.GetChangeRuntime()) && authorizeStart == nil {
+	if (plan.GetSystemdService().GetChangeEnablement() || plan.GetSystemdService().GetChangeRuntime()) && authorizeStart == nil {
 		return nil, fmt.Errorf("%w: missing start authorization", ErrUnsupported)
 	}
 	ctx, finish, err := p.begin(ctx)
@@ -168,7 +168,10 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authori
 		return nil, err
 	}
 	defer finish()
-	current, err := p.observe(ctx, plan.GetDesired().GetUnit())
+	if err := p.checkBinding(plan, true); err != nil {
+		return nil, err
+	}
+	current, err := p.observe(ctx, plan.GetSystemdService().GetDesired().GetUnit())
 	if err != nil {
 		return nil, err
 	}
@@ -179,28 +182,32 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authori
 		return nil, err
 	}
 	effected := false
-	if plan.GetChangeEnablement() {
-		if err := p.changeEnablement(ctx, plan.GetDesired(), authorizeStart); err != nil {
+	if plan.GetSystemdService().GetChangeEnablement() {
+		if err := p.changeEnablement(ctx, plan.GetSystemdService().GetDesired(), authorizeStart); err != nil {
 			return nil, err
 		}
 		effected = true
 		// Before a second effect, check the actual first result and every other
 		// precondition again. Do not start/stop after unexpected intervening drift.
-		current, err = p.observe(ctx, plan.GetDesired().GetUnit())
+		current, err = p.observe(ctx, plan.GetSystemdService().GetDesired().GetUnit())
 		if err != nil {
 			return nil, fmt.Errorf("%w: observe after enablement: %w", ErrOutcomeUnknown, err)
 		}
-		expected := proto.CloneOf(plan.GetBefore())
-		if plan.GetDesired().GetEnablement() == agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
+		expected := proto.CloneOf(plan.GetSystemdService().GetBefore())
+		if plan.GetSystemdService().GetDesired().GetEnablement() == resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
 			expected.UnitFileState = "enabled"
 		} else {
 			expected.UnitFileState = "disabled"
 		}
 		if !bytes.Equal(fingerprint(expected), current.GetFingerprintSha256()) {
-			return verification(plan, current), fmt.Errorf("%w: unexpected state after enablement", ErrConflict)
+			result, err := verification(plan, current, p.incarnation)
+			if err != nil {
+				return nil, fmt.Errorf("%w: verify after enablement: %w", ErrOutcomeUnknown, err)
+			}
+			return result, fmt.Errorf("%w: unexpected state after enablement", ErrConflict)
 		}
 	}
-	if plan.GetChangeRuntime() {
+	if plan.GetSystemdService().GetChangeRuntime() {
 		if err := ctx.Err(); err != nil {
 			if effected {
 				return nil, fmt.Errorf("%w: %w", ErrOutcomeUnknown, err)
@@ -211,7 +218,7 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authori
 		if effected {
 			start = nil // The enablement effect already consumed this start.
 		}
-		err = p.changeRuntime(ctx, plan.GetDesired(), start)
+		err = p.changeRuntime(ctx, plan.GetSystemdService().GetDesired(), start)
 		if err != nil {
 			if errors.Is(err, ErrNotConverged) {
 				result, observeErr := p.verify(ctx, plan)
@@ -234,7 +241,7 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.ServicePlan, authori
 	return result, err
 }
 
-func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.ServiceDesiredState, authorizeStart func(context.Context) error) error {
+func (p *Provider) changeEnablement(ctx context.Context, desired *resourcev1.SystemdServiceDesired, authorizeStart func(context.Context) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -245,7 +252,7 @@ func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.Servic
 		return err
 	}
 	var call *dbus.Call
-	if desired.GetEnablement() == agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
+	if desired.GetEnablement() == resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
 		call = p.manager(ctx, "EnableUnitFiles", []string{desired.GetUnit()}, false, false)
 	} else {
 		call = p.manager(ctx, "DisableUnitFiles", []string{desired.GetUnit()}, false)
@@ -268,7 +275,7 @@ func (p *Provider) changeEnablement(ctx context.Context, desired *agentv1.Servic
 	return nil
 }
 
-func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDesiredState, authorizeStart func(context.Context) error) (resultErr error) {
+func (p *Provider) changeRuntime(ctx context.Context, desired *resourcev1.SystemdServiceDesired, authorizeStart func(context.Context) error) (resultErr error) {
 	signals := make(chan *dbus.Signal, 32)
 	p.conn.Signal(signals)
 	defer p.conn.RemoveSignal(signals)
@@ -304,7 +311,7 @@ func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDe
 		return err
 	}
 	method := "StartUnit"
-	if desired.GetRuntime() == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE {
+	if desired.GetRuntime() == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE {
 		method = "StopUnit"
 	}
 	if authorizeStart != nil {

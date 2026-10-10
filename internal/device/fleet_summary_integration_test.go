@@ -448,7 +448,7 @@ func TestFleetSummaryRecentActionsAreNewestBoundedAndScoped(t *testing.T) {
 		t.Fatal(err)
 	}
 	assignment := assigned.Msg.GetAssignment().GetAssignmentId()
-	work, err := f.svc.GetServiceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	work, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	if err != nil || work.Msg.GetWork() == nil {
 		t.Fatalf("create real service action fixture: %v", err)
 	}

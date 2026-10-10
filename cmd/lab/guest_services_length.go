@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/vmlab"
 )
@@ -93,8 +93,8 @@ func serviceProofUnreportedDefinition(ctx context.Context, provider *serviceprov
 	if before.LoadState != "loaded" || before.ActiveState != "inactive" || before.UnitFileState != "indirect" {
 		return nil, fmt.Errorf("unreported length refusal requires a loaded inactive indirect service: %+v", before)
 	}
-	desired := &agentv1.ServiceDesiredState{Unit: serviceProofUnit, Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}
-	if _, err := provider.Plan(ctx, desired); !errors.Is(err, serviceprovider.ErrConflict) {
+	desired := serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED)
+	if _, err := provider.Plan(ctx, desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, serviceprovider.ErrConflict) {
 		return nil, fmt.Errorf("unreported definition bytes must fail with conflict: %v", err)
 	}
 	after, err := serviceProofNative(ctx, serviceProofUnit)

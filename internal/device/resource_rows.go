@@ -3,12 +3,12 @@ package device
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
@@ -64,49 +64,74 @@ func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment uui
 	return nil
 }
 
-// Phase 1 preserves the signed service protocol. Only this adapter may translate
-// a generic desired arm into its existing execution payload. Unknown kinds never
-// fall through to systemd, and Phase 2 removes this boundary at atomic cutover.
-func serviceExecutionDesired(desired *resourcev1.ResourceDesiredState) (*agentv1.ServiceDesiredState, error) {
-	if err := resource.ValidateDesired(desired); err != nil {
-		return nil, err
-	}
-	if desired.GetRef().GetKind() != resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE || desired.GetSystemdService() == nil {
-		return nil, errors.New("resource_executor_not_available")
-	}
-	service := desired.GetSystemdService()
-	return &agentv1.ServiceDesiredState{Unit: service.GetUnit(), Runtime: agentv1.ServiceRuntimeState(service.GetRuntime()), Enablement: agentv1.ServiceEnablement(service.GetEnablement())}, nil
-}
-
 func resourceRefKeyFromRow(row devicedb.ResourceAssignmentResource) string {
 	return strconv.FormatInt(int64(row.ResourceKind), 10) + ":" + row.CanonicalKey
 }
 
 func resourceDependencySatisfied(item *policyv1.ProfileResource, condition policyv1.DependencyCondition) bool {
-	if item == nil || item.GetDesired().GetSystemdService() == nil {
+	desired := item.GetDesired()
+	if desired == nil {
 		return false
 	}
 	switch condition {
-	case policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_PRESENT, policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_CONFIGURED:
+	case policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_CONFIGURED:
 		return true
+	case policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_PRESENT:
+		return resourceDesiresPresence(desired)
 	case policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_ACTIVE:
-		return agentv1.ServiceRuntimeState(item.GetDesired().GetSystemdService().GetRuntime()) == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE
+		return desired.GetSystemdService().GetRuntime() == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE
 	default:
 		return false
 	}
 }
 
-// Metadata cannot silently promise checks or ownership operations that the
-// retained Phase 1 service wire cannot express to the privileged executor.
+// resourceDesiresPresence reports whether verified convergence means the native
+// object exists. Kinds without a presence dimension are configured, not present.
+func resourceDesiresPresence(desired *resourcev1.ResourceDesiredState) bool {
+	switch {
+	case desired.GetSystemdService() != nil:
+		return true
+	case desired.GetNativePackage() != nil:
+		return desired.GetNativePackage().GetPresence() == resourcev1.Presence_PRESENCE_PRESENT
+	case desired.GetManagedFile() != nil:
+		return desired.GetManagedFile().GetPresence() == resourcev1.Presence_PRESENCE_PRESENT
+	case desired.GetLocalUser() != nil:
+		return desired.GetLocalUser().GetPresence() == resourcev1.Presence_PRESENCE_PRESENT
+	case desired.GetLocalGroup() != nil:
+		return desired.GetLocalGroup().GetPresence() == resourcev1.Presence_PRESENCE_PRESENT
+	case desired.GetSystemdDefinition() != nil:
+		return desired.GetSystemdDefinition().GetPresence() == resourcev1.Presence_PRESENCE_PRESENT
+	default:
+		return false
+	}
+}
+
+// resourceQualification is the native evidence recorded for one kind: native
+// Ubuntu 24.04 and Fedora 44 lanes exercised exactly these ownership operations.
+// docs/verification.md lists the records. Absent kinds are never dispatched.
+type resourceQualification struct {
+	adoption bool
+	releases []resourcev1.ReleaseBehavior
+}
+
+var qualifiedResourceKinds = map[resourcev1.ResourceKind]resourceQualification{
+	// Services have no ownership baseline: release is retained, or refused by
+	// the agent as baseline_unknown without any native effect.
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE: {releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}},
+}
+
+// The generic wire is not native qualification. Keep unqualified kinds and
+// unsupported ownership, applicability and verification operations blocked.
 func resourceDispatchUnsupported(item *policyv1.ProfileResource) string {
-	if item.GetDesired().GetRef().GetKind() != resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE {
+	qualification, ok := qualifiedResourceKinds[item.GetDesired().GetRef().GetKind()]
+	if !ok {
 		return "resource_executor_not_available"
 	}
 	if len(item.GetApplicability().GetProducts()) != 0 || len(item.GetApplicability().GetFeatures()) != 0 {
 		return "resource_capability_evidence_unavailable"
 	}
-	if item.GetOwnership().GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION || item.GetOwnership().GetRelease() != resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN {
-		return "resource_ownership_operation_unavailable"
+	if reason := resourceOwnershipUnsupported(qualification, item.GetOwnership()); reason != "" {
+		return reason
 	}
 	for _, check := range item.GetVerification().GetChecks() {
 		if check != resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE {
@@ -114,4 +139,25 @@ func resourceDispatchUnsupported(item *policyv1.ProfileResource) string {
 		}
 	}
 	return ""
+}
+
+const resourceOwnershipUnavailable = "resource_ownership_operation_unavailable"
+
+func resourceOwnershipUnsupported(qualification resourceQualification, ownership *resourcev1.OwnershipPolicy) string {
+	if ownership.GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION && !qualification.adoption {
+		return resourceOwnershipUnavailable
+	}
+	if !slices.Contains(qualification.releases, ownership.GetRelease()) {
+		return resourceOwnershipUnavailable
+	}
+	return ""
+}
+
+func resourceAdoptionRequired(resources []*policyv1.ProfileResource) bool {
+	for _, item := range resources {
+		if item.GetOwnership().GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
+			return true
+		}
+	}
+	return false
 }

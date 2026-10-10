@@ -1,0 +1,177 @@
+//go:build linux
+
+package packageprovider
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"google.golang.org/protobuf/proto"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+)
+
+func desiredFixture(ecosystem resourcev1.PackageEcosystem) *resourcev1.ResourceDesiredState {
+	name, arch, key := "proof", "amd64", "deb/proof/amd64"
+	version := debVersion("1:2.0-1")
+	repository := "apt/11111111-1111-4111-8111-111111111111"
+	if ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+		arch = "x86_64"
+		key = "rpm/proof/x86_64"
+		repository = "rpm/11111111-1111-4111-8111-111111111111"
+		version = &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Rpm{Rpm: &resourcev1.RPMVersion{Epoch: 1, Version: "2.0", Release: "1.fc44"}}}
+	}
+	return &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: key}, State: &resourcev1.ResourceDesiredState_NativePackage{NativePackage: &resourcev1.NativePackageDesired{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: name, Architecture: arch}, Presence: resourcev1.Presence_PRESENCE_PRESENT, Version: &resourcev1.NativePackageDesired_Exact{Exact: version}, Repository: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: repository}, Removal: resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_PRESERVE_DATA}}}
+}
+func TestExactAPTNativePinIsPersistentAndNeverDowngradingPriority(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	pin := aptPin(d.GetNativePackage())
+	if !bytes.Contains(pin, []byte("Package: proof:amd64\n")) || !bytes.Contains(pin, []byte("Pin: version 1:2.0-1\n")) || !bytes.Contains(pin, []byte("Pin-Priority: 1000\n")) {
+		t.Fatalf("native pin = %s", pin)
+	}
+	if !pinMatches(d.GetRef(), d.GetNativePackage(), pin) {
+		t.Fatal("rendered exact pin does not converge")
+	}
+	if pinMatches(d.GetRef(), d.GetNativePackage(), bytes.Replace(pin, []byte("2.0"), []byte("3.0"), 1)) {
+		t.Fatal("pin drift hidden")
+	}
+	d.GetNativePackage().Version = &resourcev1.NativePackageDesired_Any{Any: &resourcev1.AnyApprovedVersion{}}
+	if len(aptPin(d.GetNativePackage())) != 0 {
+		t.Fatal("any version installed an unintended pin")
+	}
+}
+func TestDNFNativePinPreservesUnrelatedOwnershipAndIsIdempotent(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM)
+	baseline := []byte("version = '1.0'\n[[packages]]\nname = 'bash'\n[[packages.conditions]]\nkey = 'evr'\ncomparator = '='\nvalue = '0:5.3-1.fc44'\n")
+	pin, err := renderDNFPin(d.GetRef(), d.GetNativePackage(), baseline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseVersionlock(pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.Packages) != 2 || parsed.Packages[0].Name != "bash" || parsed.Packages[0].Conditions[0].Value != "0:5.3-1.fc44" {
+		t.Fatal("unrelated native versionlock lost")
+	}
+	if !pinMatches(d.GetRef(), d.GetNativePackage(), pin) {
+		t.Fatal("exact native versionlock not effective")
+	}
+	again, err := renderDNFPin(d.GetRef(), d.GetNativePackage(), pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(pin, again) {
+		t.Fatal("idempotent pin rewrite")
+	}
+	drift := bytes.Replace(pin, []byte("1:2.0-1.fc44"), []byte("1:2.1-1.fc44"), 1)
+	if pinMatches(d.GetRef(), d.GetNativePackage(), drift) {
+		t.Fatal("external versionlock drift hidden")
+	}
+	for _, name := range []string{"proof", "*", "pro*"} {
+		overlap := bytes.Replace(baseline, []byte("'bash'"), []byte("'"+name+"'"), 1)
+		if _, err := renderDNFPin(d.GetRef(), d.GetNativePackage(), overlap); err == nil {
+			t.Fatalf("acquired overlapping native pin %s", name)
+		}
+	}
+}
+func TestPinObservationRefusesSymlinksAndAtomicReplacementPreservesBaseline(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("root native pin custody")
+	}
+	directory := t.TempDir()
+	path := filepath.Join(directory, "pin")
+	if err := atomicFile(path, []byte("baseline\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	before, contents, err := readPin(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := atomicFile(path, []byte("managed\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, _, err := readPin(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.GetInode() == after.GetInode() || bytes.Equal(before.GetSha256(), after.GetSha256()) {
+		t.Fatal("pin replacement did not produce a distinct native identity")
+	}
+	if err := atomicFile(path, contents, os.FileMode(before.GetMode())); err != nil {
+		t.Fatal(err)
+	}
+	_, restored, err := readPin(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(contents, restored) {
+		t.Fatal("pin baseline not restored")
+	}
+	link := filepath.Join(directory, "link")
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := readPin(link); err == nil {
+		t.Fatal("symlink pin acquired")
+	}
+}
+func TestReleaseOnlyRestoresRecordedDimensions(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	digest := sha256.Sum256([]byte("authenticated fixture installation"))
+	record := &resourcev1.NativePackageRecord{Package: proto.CloneOf(d.GetNativePackage().GetPackage()), Version: proto.CloneOf(d.GetNativePackage().GetExact()), Source: proto.CloneOf(d.GetNativePackage().GetRepository()), SignerSha256: digest[:], MetadataRevisionSha256: digest[:], NativeIdentitySha256: digest[:], ProvenanceKnown: true}
+	current := &resourcev1.NativePackageObservation{Package: record.Package, Installed: true, Record: record, DatabaseRevisionSha256: digest[:], PinContents: aptPin(d.GetNativePackage())}
+	observation := &resourcev1.ResourceObservation{Ref: d.GetRef(), Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: current}}
+	baseline := &resourcev1.ResourceObservation{Ref: d.GetRef(), Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: record.Package, DatabaseRevisionSha256: digest[:]}}}
+	ledger := &agentv1.ResourceOwnershipLedger{Revision: 2, State: agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED, Owner: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}}, Baseline: &agentv1.ResourceOwnershipSnapshot{Observation: baseline}, LastApplied: &agentv1.ResourceOwnershipSnapshot{Observation: proto.CloneOf(observation)}, OwnedDimensions: []agentv1.ResourceOwnedDimension{agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN}}
+	effective, pin, inverse, err := releaseTarget(d, observation, ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if effective.GetPresence() != resourcev1.Presence_PRESENCE_ABSENT || len(pin) != 0 || len(inverse.GetInverseSha256()) != 32 {
+		t.Fatal("release did not bind original absence and pin removal")
+	}
+	d.GetNativePackage().Removal = resourcev1.PackageRemovalPolicy_PACKAGE_REMOVAL_POLICY_RETAIN_INSTALLATION
+	effective, pin, _, err = releaseTarget(d, observation, ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if effective.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT || len(pin) != 0 {
+		t.Fatal("retain-installation release uninstalled package or retained owned pin")
+	}
+	changed := proto.CloneOf(observation)
+	changed.GetNativePackage().Record.Version = debVersion("9.0-1")
+	if _, _, _, err := releaseTarget(d, changed, ledger); !errors.Is(err, ErrConflict) {
+		t.Fatalf("external native version overwrite: %v", err)
+	}
+	changed = proto.CloneOf(observation)
+	changed.GetNativePackage().PinContents = []byte("external pin")
+	if _, _, _, err := releaseTarget(d, changed, ledger); !errors.Is(err, ErrConflict) {
+		t.Fatalf("external pin overwrite: %v", err)
+	}
+	ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN
+	if _, _, _, err := releaseTarget(d, observation, ledger); !errors.Is(err, ErrOutcomeUnknown) {
+		t.Fatalf("uncertain install replayed by release: %v", err)
+	}
+}
+func TestAcquisitionDoesNotGuessInstalledProvenance(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	p := &Provider{config: Config{Ownership: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}}}}
+	before := &resourcev1.ResourceObservation{Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: d.GetNativePackage().GetPackage(), Installed: true, Record: &resourcev1.NativePackageRecord{Package: d.GetNativePackage().GetPackage(), Version: d.GetNativePackage().GetExact()}}}}
+	if err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); err == nil {
+		t.Fatal("unknown source acquired from desired repository")
+	}
+	before.GetNativePackage().Installed = false
+	before.GetNativePackage().Record = nil
+	if err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE); err == nil {
+		t.Fatal("release invented baseline")
+	}
+}

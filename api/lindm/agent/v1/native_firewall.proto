@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/service_execution.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/network.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Protected local policy. Addresses are pinned by root provisioning, not profile
+// supplied exceptions. These exemptions apply only to lindm's own filter chains.
+message NativeFirewallEndpoint {
+  string address = 1 [(buf.validate.field).string.ip = true];
+  uint32 port = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+}
+message NativeFirewallProviderConfig {
+  repeated lindm.resource.v1.InterfaceSelector allowed_interfaces = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  repeated NativeFirewallEndpoint management_endpoints = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  repeated string dns_servers = 3 [(buf.validate.field).repeated = {
+    max_items: 16
+    unique: true
+    items: {
+      string: {ip: true}
+    }
+  }];
+}
+
+// Fixed-format root-owned reboot state, never a netlink program or profile text.
+// PENDING is durable before a native batch and is NEVER replayed after a crash.
+enum FirewallPersistencePhase {
+  FIREWALL_PERSISTENCE_PHASE_UNSPECIFIED = 0;
+  FIREWALL_PERSISTENCE_PHASE_PENDING = 1;
+  FIREWALL_PERSISTENCE_PHASE_COMMITTED = 2;
+}
+message FirewallPersistentState {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  lindm.resource.v1.FirewallZoneDesired desired = 2 [(buf.validate.field).required = true];
+  ResourceOwnershipBinding owner = 3 [(buf.validate.field).required = true];
+  string generation = 4 [(buf.validate.field).string.uuid = true];
+  string applied_boot_id = 5 [(buf.validate.field).string.uuid = true];
+  bytes configuration_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  FirewallPersistencePhase phase = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string deployment_id = 8 [(buf.validate.field).string.uuid = true];
+  string device_id = 9 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 10 [(buf.validate.field).string.uuid = true];
+}
+
+// Native expressions are retained only as digests: every effect must recompile
+// the typed desired state and prove byte identity. No arbitrary expression replay.
+message FirewallNativeRule {
+  string chain = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  uint64 handle = 2;
+  bytes userdata = 3 [(buf.validate.field).bytes.max_len = 256];
+  bytes expressions_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  // Actual kernel bytes, before attribute-order normalization. Never replayed.
+  optional bytes raw_expressions_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+}
+message FirewallNativeChain {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  bytes userdata = 2 [(buf.validate.field).bytes.max_len = 256];
+  optional uint32 hook = 3 [(buf.validate.field).uint32.lte = 4];
+  optional int32 priority = 4;
+  optional uint32 policy = 5 [(buf.validate.field).uint32.lte = 1];
+  string type = 6 [(buf.validate.field).string = {
+    in: [
+      "",
+      "filter"
+    ]
+  }];
+}

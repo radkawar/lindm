@@ -332,8 +332,8 @@ func (RootLoginPolicy) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_accounts_proto_rawDescGZIP(), []int{5}
 }
 
-// Semantic copy of the existing service contract; the old signed wire remains
-// authoritative until the separately reviewed executor cutover.
+// Existing canonical service state only. Definition resources have a separate
+// exact capability and never grant arbitrary executable or unit text authority.
 type SystemdServiceDesired struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Unit          string                 `protobuf:"bytes,1,opt,name=unit,proto3" json:"unit,omitempty"`
@@ -1912,18 +1912,21 @@ func (x *SessionPolicyDesired) GetConcurrentSessionLimit() uint32 {
 }
 
 type PasswordPolicyDesired struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	MinLength          *uint32                `protobuf:"varint,1,opt,name=min_length,json=minLength,proto3,oneof" json:"min_length,omitempty"`
-	MinClasses         *uint32                `protobuf:"varint,2,opt,name=min_classes,json=minClasses,proto3,oneof" json:"min_classes,omitempty"`
-	HistoryCount       *uint32                `protobuf:"varint,3,opt,name=history_count,json=historyCount,proto3,oneof" json:"history_count,omitempty"`
-	MaxAgeDays         *uint32                `protobuf:"varint,4,opt,name=max_age_days,json=maxAgeDays,proto3,oneof" json:"max_age_days,omitempty"`
-	MinAgeDays         *uint32                `protobuf:"varint,5,opt,name=min_age_days,json=minAgeDays,proto3,oneof" json:"min_age_days,omitempty"`
-	WarnDays           *uint32                `protobuf:"varint,6,opt,name=warn_days,json=warnDays,proto3,oneof" json:"warn_days,omitempty"`
-	FailureLimit       *uint32                `protobuf:"varint,7,opt,name=failure_limit,json=failureLimit,proto3,oneof" json:"failure_limit,omitempty"`
-	UnlockAfterSeconds *uint32                `protobuf:"varint,8,opt,name=unlock_after_seconds,json=unlockAfterSeconds,proto3,oneof" json:"unlock_after_seconds,omitempty"`
-	EnforceForRoot     *bool                  `protobuf:"varint,9,opt,name=enforce_for_root,json=enforceForRoot,proto3,oneof" json:"enforce_for_root,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Actual characters, not a native quality score augmented by class credits.
+	MinLength    *uint32 `protobuf:"varint,1,opt,name=min_length,json=minLength,proto3,oneof" json:"min_length,omitempty"`
+	MinClasses   *uint32 `protobuf:"varint,2,opt,name=min_classes,json=minClasses,proto3,oneof" json:"min_classes,omitempty"`
+	HistoryCount *uint32 `protobuf:"varint,3,opt,name=history_count,json=historyCount,proto3,oneof" json:"history_count,omitempty"`
+	// Future local-account defaults; existing account aging is managed separately.
+	MaxAgeDays         *uint32 `protobuf:"varint,4,opt,name=max_age_days,json=maxAgeDays,proto3,oneof" json:"max_age_days,omitempty"`
+	MinAgeDays         *uint32 `protobuf:"varint,5,opt,name=min_age_days,json=minAgeDays,proto3,oneof" json:"min_age_days,omitempty"`
+	WarnDays           *uint32 `protobuf:"varint,6,opt,name=warn_days,json=warnDays,proto3,oneof" json:"warn_days,omitempty"`
+	FailureLimit       *uint32 `protobuf:"varint,7,opt,name=failure_limit,json=failureLimit,proto3,oneof" json:"failure_limit,omitempty"`
+	UnlockAfterSeconds *uint32 `protobuf:"varint,8,opt,name=unlock_after_seconds,json=unlockAfterSeconds,proto3,oneof" json:"unlock_after_seconds,omitempty"`
+	// Root password-change quality/history enforcement, never root login lockout.
+	EnforceForRoot *bool `protobuf:"varint,9,opt,name=enforce_for_root,json=enforceForRoot,proto3,oneof" json:"enforce_for_root,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PasswordPolicyDesired) Reset() {

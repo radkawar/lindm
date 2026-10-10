@@ -17,7 +17,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 func TestRuntimeCompletionWithoutBusArgumentMatching(t *testing.T) {
@@ -51,7 +51,7 @@ func TestRuntimeCompletionWithoutBusArgumentMatching(t *testing.T) {
 				t.Fatal(err)
 			}
 			provider := &Provider{conn: conn, socket: socket, owner: ":1.0"}
-			desired := &agentv1.ServiceDesiredState{Unit: "example.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE}
+			desired := &resourcev1.SystemdServiceDesired{Unit: "example.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE}
 			err = provider.changeRuntime(ctx, desired, func(context.Context) error {
 				if authorized.Swap(true) {
 					t.Error("start authorized more than once")

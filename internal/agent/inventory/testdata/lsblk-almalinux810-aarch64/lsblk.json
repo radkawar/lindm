@@ -1,0 +1,61 @@
+{
+  "version": {
+    "command": [
+      "/usr/bin/lsblk",
+      "--version"
+    ],
+    "stdout": "lsblk from util-linux 2.32.1\n",
+    "stderr": "",
+    "exit_code": 0
+  },
+  "modern_json": {
+    "command": [
+      "/usr/bin/lsblk",
+      "--json",
+      "--bytes",
+      "--tree",
+      "--output",
+      "NAME,KNAME,TYPE,SIZE,FSTYPE,FSVER,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME"
+    ],
+    "stdout": "",
+    "stderr": "lsblk: unknown column: FSVER,UUID,PARTUUID,PARTTYPE,PTTYPE,PTUUID,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINTS,PKNAME\n",
+    "exit_code": 1
+  },
+  "legacy_json": {
+    "command": [
+      "/usr/bin/lsblk",
+      "--json",
+      "--bytes",
+      "--tree",
+      "--output",
+      "NAME,KNAME,TYPE,SIZE,FSTYPE,UUID,PARTUUID,PARTTYPE,TRAN,MODEL,SERIAL,WWN,REV,MOUNTPOINT,PKNAME"
+    ],
+    "stdout": "{\n   \"blockdevices\": [\n      {\"name\": \"sda\", \"kname\": \"sda\", \"type\": \"disk\", \"size\": \"10737418240\", \"fstype\": null, \"uuid\": null, \"partuuid\": null, \"parttype\": null, \"tran\": null, \"model\": \"QEMU HARDDISK   \", \"serial\": \"hd0\", \"wwn\": null, \"rev\": \"2.5+\", \"mountpoint\": null, \"pkname\": null,\n         \"children\": [\n            {\"name\": \"sda1\", \"kname\": \"sda1\", \"type\": \"part\", \"size\": \"209715200\", \"fstype\": \"vfat\", \"uuid\": \"49CA-3D4B\", \"partuuid\": \"06d130c8-da08-419e-970c-9a712a936392\", \"parttype\": \"c12a7328-f81f-11d2-ba4b-00a0c93ec93b\", \"tran\": null, \"model\": null, \"serial\": null, \"wwn\": null, \"rev\": null, \"mountpoint\": \"/boot/efi\", \"pkname\": \"sda\"},\n            {\"name\": \"sda2\", \"kname\": \"sda2\", \"type\": \"part\", \"size\": \"1073741824\", \"fstype\": \"xfs\", \"uuid\": \"c4ea3eca-9290-42d6-9123-357f5b382343\", \"partuuid\": \"bdbca29a-9ebf-4c68-8f38-7f7c8cdda63c\", \"parttype\": \"0fc63daf-8483-4772-8e79-3d69d8477de4\", \"tran\": null, \"model\": null, \"serial\": null, \"wwn\": null, \"rev\": null, \"mountpoint\": \"/boot\", \"pkname\": \"sda\"},\n            {\"name\": \"sda3\", \"kname\": \"sda3\", \"type\": \"part\", \"size\": \"9451864064\", \"fstype\": \"xfs\", \"uuid\": \"95e58dd6-7888-4110-8de2-40a665c36bb2\", \"partuuid\": \"da60e1cf-a0bc-4573-93f8-ab75ac95b33a\", \"parttype\": \"0fc63daf-8483-4772-8e79-3d69d8477de4\", \"tran\": null, \"model\": null, \"serial\": null, \"wwn\": null, \"rev\": null, \"mountpoint\": \"/\", \"pkname\": \"sda\"}\n         ]\n      },\n      {\"name\": \"sdb\", \"kname\": \"sdb\", \"type\": \"disk\", \"size\": \"4294967296\", \"fstype\": \"ext2\", \"uuid\": \"2c61da85-6309-4ade-b6b9-60aa11de74f3\", \"partuuid\": null, \"parttype\": null, \"tran\": null, \"model\": \"QEMU HARDDISK   \", \"serial\": \"appliance\", \"wwn\": null, \"rev\": \"2.5+\", \"mountpoint\": null, \"pkname\": null}\n   ]\n}\n",
+    "stderr": "",
+    "exit_code": 0
+  },
+  "modern_pairs": {
+    "command": [
+      "/usr/bin/lsblk",
+      "--bytes",
+      "--pairs",
+      "--output",
+      "NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,MOUNTPOINTS,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE,PTTYPE,PTUUID"
+    ],
+    "stdout": "",
+    "stderr": "lsblk: unknown column: MOUNTPOINTS,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE,PTTYPE,PTUUID\n",
+    "exit_code": 1
+  },
+  "legacy_pairs": {
+    "command": [
+      "/usr/bin/lsblk",
+      "--bytes",
+      "--pairs",
+      "--output",
+      "NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,PARTUUID,PARTTYPE"
+    ],
+    "stdout": "NAME=\"sda\" TYPE=\"disk\" SIZE=\"10737418240\" FSTYPE=\"\" MOUNTPOINT=\"\" PKNAME=\"\" KNAME=\"sda\" TRAN=\"\" MODEL=\"QEMU HARDDISK   \" SERIAL=\"hd0\" WWN=\"\" REV=\"2.5+\" UUID=\"\" PARTUUID=\"\" PARTTYPE=\"\"\nNAME=\"sda1\" TYPE=\"part\" SIZE=\"209715200\" FSTYPE=\"vfat\" MOUNTPOINT=\"/boot/efi\" PKNAME=\"sda\" KNAME=\"sda1\" TRAN=\"\" MODEL=\"\" SERIAL=\"\" WWN=\"\" REV=\"\" UUID=\"49CA-3D4B\" PARTUUID=\"06d130c8-da08-419e-970c-9a712a936392\" PARTTYPE=\"c12a7328-f81f-11d2-ba4b-00a0c93ec93b\"\nNAME=\"sda2\" TYPE=\"part\" SIZE=\"1073741824\" FSTYPE=\"xfs\" MOUNTPOINT=\"/boot\" PKNAME=\"sda\" KNAME=\"sda2\" TRAN=\"\" MODEL=\"\" SERIAL=\"\" WWN=\"\" REV=\"\" UUID=\"c4ea3eca-9290-42d6-9123-357f5b382343\" PARTUUID=\"bdbca29a-9ebf-4c68-8f38-7f7c8cdda63c\" PARTTYPE=\"0fc63daf-8483-4772-8e79-3d69d8477de4\"\nNAME=\"sda3\" TYPE=\"part\" SIZE=\"9451864064\" FSTYPE=\"xfs\" MOUNTPOINT=\"/\" PKNAME=\"sda\" KNAME=\"sda3\" TRAN=\"\" MODEL=\"\" SERIAL=\"\" WWN=\"\" REV=\"\" UUID=\"95e58dd6-7888-4110-8de2-40a665c36bb2\" PARTUUID=\"da60e1cf-a0bc-4573-93f8-ab75ac95b33a\" PARTTYPE=\"0fc63daf-8483-4772-8e79-3d69d8477de4\"\nNAME=\"sdb\" TYPE=\"disk\" SIZE=\"4294967296\" FSTYPE=\"ext2\" MOUNTPOINT=\"\" PKNAME=\"\" KNAME=\"sdb\" TRAN=\"\" MODEL=\"QEMU HARDDISK   \" SERIAL=\"appliance\" WWN=\"\" REV=\"2.5+\" UUID=\"2c61da85-6309-4ade-b6b9-60aa11de74f3\" PARTUUID=\"\" PARTTYPE=\"\"\n",
+    "stderr": "",
+    "exit_code": 0
+  }
+}

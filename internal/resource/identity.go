@@ -92,6 +92,14 @@ func Capability(kind resourcev1.ResourceKind) (string, error) {
 		return "certificate.enrollment.v1", nil
 	case resourcev1.ResourceKind_RESOURCE_KIND_DIRECTORY_CLIENT:
 		return "directory.client.v1", nil
+	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
+		return "managed.file.v1", nil
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
+		return "sysctl.v1", nil
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
+		return "systemd.definition.v1", nil
+	case resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE:
+		return "encryption.compliance.v1", nil
 	default:
 		return "", errors.New("resource: unknown_kind")
 	}
@@ -200,6 +208,14 @@ func CanonicalRef(desired *resourcev1.ResourceDesiredState) (*resourcev1.Resourc
 			binding, err = subjectKey(state.CertificateEnrollment.GetSubject())
 			key += "/" + binding
 		}
+	case *resourcev1.ResourceDesiredState_ManagedFile:
+		key = state.ManagedFile.GetPath()
+	case *resourcev1.ResourceDesiredState_Sysctl:
+		key = state.Sysctl.GetKey()
+	case *resourcev1.ResourceDesiredState_SystemdDefinition:
+		key = systemdDefinitionKey(state.SystemdDefinition)
+	case *resourcev1.ResourceDesiredState_EncryptionCompliance:
+		key = "system/root"
 	default:
 		return nil, errors.New("resource: unknown_desired_arm")
 	}
@@ -362,6 +378,43 @@ func DesiredDigest(desired *resourcev1.ResourceDesiredState) ([sha256.Size]byte,
 	writeHashField(h, encoded)
 	copy(result[:], h.Sum(nil))
 	return result, nil
+}
+
+// ObservationDigest binds the complete native observation, including freshness
+// and backend metadata; it is not the stable native precondition fingerprint.
+func ObservationDigest(observation *resourcev1.ResourceObservation) ([sha256.Size]byte, error) {
+	if err := ValidateObservation(observation); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return envelopeDigest("lindm.resource-observation.v1", observation)
+}
+
+// PlanDigest binds every planned effect and its complete before-observation.
+func PlanDigest(plan *resourcev1.ResourcePlan) ([sha256.Size]byte, error) {
+	if err := ValidatePlan(plan); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return envelopeDigest("lindm.resource-plan.v1", plan)
+}
+
+func envelopeDigest(domain string, message proto.Message) ([sha256.Size]byte, error) {
+	var result [sha256.Size]byte
+	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(message)
+	if err != nil {
+		return result, err
+	}
+	h := sha256.New()
+	writeHashField(h, []byte(domain))
+	writeHashField(h, encoded)
+	copy(result[:], h.Sum(nil))
+	return result, nil
+}
+
+func systemdDefinitionKey(definition *resourcev1.SystemdDefinitionDesired) string {
+	if timer := definition.GetTimer(); timer != nil {
+		return "timer/" + timer.GetUnit()
+	}
+	return "drop-in/" + definition.GetDropIn().GetUnit()
 }
 
 // RefEqual compares separate fields; nil never identifies a resource.

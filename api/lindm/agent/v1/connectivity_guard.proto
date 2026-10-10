@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Root provisioning, never profile input. Controller origin and transport CA
+// come separately from authenticated enrollment. Probe origins are fixed trusted
+// fixture peers; packets cannot name a destination absent from this policy.
+message ConnectivityGuardConfig {
+  // Omitted means 120 seconds; explicit values are closed to 30–300.
+  optional uint32 timeout_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 30
+    lte: 300
+  }];
+  repeated ConnectivityProbeTarget probes = 2 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 32
+  }];
+  bytes confirmation_public_key = 3 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "connectivity_guard.allow_deny"
+    message: "independent allow and deny targets with unique identities are required"
+    expression: "this.probes.all(p, this.probes.filter(q, p.id == q.id).size() == 1) && [false, true].all(v6, [1, 2].all(verdict, this.probes.exists(p, p.address.contains(':') == v6 && p.expected == verdict)))"
+  };
+}
+enum ConnectivityProbeVerdict {
+  CONNECTIVITY_PROBE_VERDICT_UNSPECIFIED = 0;
+  CONNECTIVITY_PROBE_VERDICT_ALLOW = 1;
+  CONNECTIVITY_PROBE_VERDICT_DENY = 2;
+}
+enum ConnectivityProbeDirection {
+  CONNECTIVITY_PROBE_DIRECTION_UNSPECIFIED = 0;
+  CONNECTIVITY_PROBE_DIRECTION_INPUT = 1;
+  CONNECTIVITY_PROBE_DIRECTION_OUTPUT = 2;
+  CONNECTIVITY_PROBE_DIRECTION_FORWARD = 3;
+}
+enum ConnectivityProbeProtocol {
+  CONNECTIVITY_PROBE_PROTOCOL_UNSPECIFIED = 0;
+  CONNECTIVITY_PROBE_PROTOCOL_TCP = 1;
+  CONNECTIVITY_PROBE_PROTOCOL_UDP = 2;
+}
+message ConnectivityProbePeer {
+  string origin = 1 [(buf.validate.field).string = {
+    uri: true
+    max_bytes: 2048
+    pattern: "^https://[^/?#@]+/?$"
+  }];
+  bytes public_key = 2 [(buf.validate.field).bytes.len = 32];
+}
+message ConnectivityProbeTarget {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string address = 2 [(buf.validate.field).string.ip = true];
+  uint32 port = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  ConnectivityProbeVerdict expected = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string source_address = 5 [(buf.validate.field).string.ip = true];
+  uint32 source_port = 6 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  ConnectivityProbeDirection direction = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ConnectivityProbeProtocol protocol = 8 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ConnectivityProbePeer sender = 9;
+  ConnectivityProbePeer receiver = 10;
+  option (buf.validate.message).cel = {
+    id: "connectivity_probe.peer_roles"
+    message: "input needs an external sender, output an external receiver, forward both"
+    expression: "(this.direction == 1 && has(this.sender) && !has(this.receiver)) || (this.direction == 2 && !has(this.sender) && has(this.receiver)) || (this.direction == 3 && has(this.sender) && has(this.receiver))"
+  };
+}
+message ConnectivityProbePacket {
+  string target_id = 1 [(buf.validate.field).string.uuid = true];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 3 [(buf.validate.field).bytes.len = 32];
+}
+enum ConnectivityProbeOperation {
+  CONNECTIVITY_PROBE_OPERATION_UNSPECIFIED = 0;
+  CONNECTIVITY_PROBE_OPERATION_PREPARE = 1;
+  CONNECTIVITY_PROBE_OPERATION_TRANSMIT = 2;
+  CONNECTIVITY_PROBE_OPERATION_OBSERVE = 3;
+  CONNECTIVITY_PROBE_OPERATION_RELEASE = 4;
+}
+message ConnectivityProbeCommand {
+  ConnectivityProbeTarget target = 1 [(buf.validate.field).required = true];
+  ConnectivityProbePacket packet = 2 [(buf.validate.field).required = true];
+  ConnectivityProbeOperation operation = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+message ConnectivityProbeReceipt {
+  ConnectivityProbePacket packet = 1 [(buf.validate.field).required = true];
+  ConnectivityProbeTarget target = 2 [(buf.validate.field).required = true];
+  bool transmitted = 3;
+  bool received = 4;
+  bytes transport_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // The receiver actually opened its exact native post-filter socket. This is
+  // a readiness witness, NEVER a substitute for a sent/received packet verdict.
+  bool receiver_ready = 6;
+  option (buf.validate.message).cel = {
+    id: "connectivity_probe.witness"
+    message: "a receipt witnesses exactly one native send, receive, or armed receiver"
+    expression: "(this.transmitted ? 1 : 0) + (this.received ? 1 : 0) + (this.receiver_ready ? 1 : 0) == 1"
+  };
+}
+message ConnectivityProbeResponse {
+  bool ready = 1;
+  bytes receipt_envelope = 2 [(buf.validate.field).bytes.max_len = 16384];
+}
+message ConnectivityProbeEvidence {
+  ConnectivityProbeTarget target = 1 [(buf.validate.field).required = true];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+  bytes sender_receipt = 3 [(buf.validate.field).bytes.max_len = 16384];
+  bytes receiver_receipt = 4 [(buf.validate.field).bytes.max_len = 16384];
+  uint32 address_family = 5 [(buf.validate.field).uint32 = {
+    in: [
+      4,
+      6
+    ]
+  }];
+  string table = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  string chain = 7 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  uint64 rule_handle = 8;
+  uint32 trace_id = 9 [(buf.validate.field).uint32.gt = 0];
+  uint32 native_verdict = 10 [(buf.validate.field).uint32 = {
+    in: [
+      0,
+      1
+    ]
+  }];
+  bytes trace_sha256 = 11 [(buf.validate.field).bytes.len = 32];
+  bytes receiver_ready_receipt = 12 [(buf.validate.field).bytes.max_len = 16384];
+  option (buf.validate.message).cel = {
+    id: "connectivity_probe.actual_verdict"
+    message: "packet proof must match advertised direction and kernel verdict"
+    expression: "(this.target.expected == 1 ? this.native_verdict == 1u : this.native_verdict == 0u) && (this.target.direction != 2 ? this.sender_receipt.size() > 0 : this.sender_receipt.size() == 0) && (this.target.expected == 1 && this.target.direction != 1 ? this.receiver_receipt.size() > 0 : this.receiver_receipt.size() == 0) && (has(this.target.receiver) ? this.receiver_ready_receipt.size() > 0 : this.receiver_ready_receipt.size() == 0)"
+  };
+}
+message ConnectivityConfirmation {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string action_id = 4 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.ResourceRef ref = 5 [(buf.validate.field).required = true];
+  string applied_generation = 6 [(buf.validate.field).string.uuid = true];
+  bytes applied_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 8 [(buf.validate.field).bytes.len = 32];
+  uint64 session_epoch = 9 [(buf.validate.field).uint64.gt = 0];
+  bytes tls_exporter = 10 [(buf.validate.field).bytes.len = 32];
+  repeated ConnectivityProbeEvidence probes = 11 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 32
+  }];
+  option (buf.validate.message).cel = {
+    id: "connectivity_confirmation.firewall"
+    message: "confirmation binds a firewall action and both packet verdicts"
+    expression: "this.ref.kind == 8 && this.probes.exists(p, p.target.expected == 1) && this.probes.exists(p, p.target.expected == 2)"
+  };
+}
+message ConnectivityConfirmationResponse {
+  bytes receipt_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 524288
+  }];
+}
+// Fresh verification is separate from an applied transaction confirmation and
+// cannot reuse or retimestamp a guard receipt. Its digest binds exact native
+// state, observation, and independently signed per-packet evidence.
+message ConnectivityVerificationEvidence {
+  string probe_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.ResourceRef ref = 2 [(buf.validate.field).required = true];
+  bytes observation_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes native_state_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated ConnectivityProbeEvidence probes = 5 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 32
+  }];
+  google.protobuf.Timestamp observed_at = 6 [(buf.validate.field).required = true];
+}

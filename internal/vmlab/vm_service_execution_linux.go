@@ -24,6 +24,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 	"lindm/internal/protodata"
@@ -31,16 +32,16 @@ import (
 )
 
 type vmServiceExecutionEvidence struct {
-	Completed                 []*agentv1.ServiceExecutionStatus `json:"completed"`
-	ForgedIntentRejected      bool                              `json:"forged_intent_rejected"`
-	PlanCannotStart           bool                              `json:"plan_cannot_start"`
-	ExactStartReplay          bool                              `json:"exact_start_replay"`
-	ConflictingIntentRejected bool                              `json:"conflicting_intent_rejected"`
-	ExpiredGrantRejected      bool                              `json:"expired_grant_rejected"`
-	RestartGrantRejected      bool                              `json:"restart_grant_rejected"`
-	StalePlanRejected         bool                              `json:"stale_plan_rejected"`
-	RevokedGrantRejected      bool                              `json:"revoked_grant_rejected"`
-	RunningCrashReconciled    bool                              `json:"running_crash_reconciled"`
+	Completed                 []*agentv1.ResourceExecutionStatus `json:"completed"`
+	ForgedIntentRejected      bool                               `json:"forged_intent_rejected"`
+	PlanCannotStart           bool                               `json:"plan_cannot_start"`
+	ExactStartReplay          bool                               `json:"exact_start_replay"`
+	ConflictingIntentRejected bool                               `json:"conflicting_intent_rejected"`
+	ExpiredGrantRejected      bool                               `json:"expired_grant_rejected"`
+	RestartGrantRejected      bool                               `json:"restart_grant_rejected"`
+	StalePlanRejected         bool                               `json:"stale_plan_rejected"`
+	RevokedGrantRejected      bool                               `json:"revoked_grant_rejected"`
+	RunningCrashReconciled    bool                               `json:"running_crash_reconciled"`
 	// These signatures authenticate terminal history, not a fresh observation
 	// or a current authorization/compliance decision.
 	Attestations []vmServiceAttestationPhase   `json:"authenticated_history_attestations"`
@@ -49,7 +50,7 @@ type vmServiceExecutionEvidence struct {
 	packages *nativeGuestPackages
 	verifier *devlab.ExecutionTrustExercise
 	identity *labv1.ConnectionIdentityEvidence
-	bindings map[string]trust.ServiceAttestationBinding
+	bindings map[string]trust.ResourceAttestationBinding
 }
 
 type vmServiceAttestationPhase struct {
@@ -60,19 +61,19 @@ type vmServiceAttestationPhase struct {
 }
 
 type vmServiceAttestationEvidence struct {
-	Attestation              *agentv1.ServiceExecutionAttestation `json:"attestation"`
-	Envelope                 []byte                               `json:"attestation_envelope"`
-	CertificatePEM           []byte                               `json:"certificate_pem"`
-	VerifiedAt               time.Time                            `json:"verified_at"`
-	TamperedPayloadRejected  bool                                 `json:"tampered_payload_rejected"`
-	WrongNonceReplayRejected bool                                 `json:"wrong_nonce_replay_rejected"`
+	Attestation              *agentv1.ResourceExecutionAttestation `json:"attestation"`
+	Envelope                 []byte                                `json:"attestation_envelope"`
+	CertificatePEM           []byte                                `json:"certificate_pem"`
+	VerifiedAt               time.Time                             `json:"verified_at"`
+	TamperedPayloadRejected  bool                                  `json:"tampered_payload_rejected"`
+	WrongNonceReplayRejected bool                                  `json:"wrong_nonce_replay_rejected"`
 }
 
 type vmPreparedService struct {
-	intent   *agentv1.ServiceExecutionIntent
+	intent   *agentv1.ResourceExecutionIntent
 	envelope []byte
-	prepared *agentv1.PrepareServiceExecutionResponse
-	start    *agentv1.StartServiceExecutionRequest
+	prepared *agentv1.PrepareResourceExecutionResponse
+	start    *agentv1.StartResourceExecutionRequest
 	clock    *labv1.ServiceClockEvidence
 }
 
@@ -91,7 +92,7 @@ WantedBy=multi-user.target
 func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages, signer *devlab.ExecutionTrustExercise, identity *labv1.ConnectionIdentityEvidence) (_ *vmServiceExecutionEvidence, err error) {
 	vm := packages.vm
 	defer func() { err = serviceFailureWithJournal(ctx, vm, err) }()
-	unit := devlab.ServiceExecutionProbeUnit
+	unit := devlab.ResourceExecutionProbeUnit
 	path := "/etc/systemd/system/" + unit
 	if err := lifecycleCommand(ctx, vm, "reserve signed service fixture", "test ! -e "+nativeQuote(path)+" && test ! -L "+nativeQuote(path)); err != nil {
 		return nil, err
@@ -127,10 +128,10 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	}
 	result := &vmServiceExecutionEvidence{
 		packages: packages, verifier: signer, identity: proto.CloneOf(identity),
-		bindings: make(map[string]trust.ServiceAttestationBinding),
+		bindings: make(map[string]trust.ResourceAttestationBinding),
 	}
 	var sequence uint64
-	prepare := func(runtime agentv1.ServiceRuntimeState, enablement agentv1.ServiceEnablement) (*vmPreparedService, error) {
+	prepare := func(runtime resourcev1.ServiceRuntimeState, enablement resourcev1.ServiceEnablement) (*vmPreparedService, error) {
 		sequence++
 		action, err := vmPrepareService(ctx, packages, signer, identity, sequence, runtime, enablement)
 		if err != nil {
@@ -140,7 +141,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		if err != nil {
 			return nil, err
 		}
-		result.bindings[action.intent.GetActionId()] = trust.ServiceAttestationBinding{
+		result.bindings[action.intent.GetActionId()] = trust.ResourceAttestationBinding{
 			DeploymentID: deployment, DeviceID: device, EnrollmentGeneration: generation,
 			ActionID: id, IntentSHA256: sha256.Sum256(action.envelope),
 		}
@@ -149,11 +150,11 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		}
 		return action, nil
 	}
-	active, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
+	active, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
 		return nil, err
 	}
-	if active.prepared.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED || !active.prepared.GetNativePlan().GetChangeRuntime() || !active.prepared.GetNativePlan().GetChangeEnablement() {
+	if active.prepared.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || !active.prepared.GetNativePlan().GetSystemdService().GetChangeRuntime() || !active.prepared.GetNativePlan().GetSystemdService().GetChangeEnablement() {
 		return nil, errors.New("signed preflight did not record both required changes")
 	}
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
@@ -162,7 +163,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	forgedIntent := proto.CloneOf(active.intent)
 	forgedIntent.ActionId = uuid.NewString()
 	forgedIntent.ResourceSequence++
-	signed, err := signer.SignServiceIntent(ctx, forgedIntent)
+	signed, err := signer.SignResourceIntent(ctx, forgedIntent)
 	if err != nil {
 		return nil, err
 	}
@@ -178,14 +179,14 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err != nil {
 		return nil, err
 	}
-	if err := vmRejectServiceRPC(ctx, packages, "service-prepare", "forged", &agentv1.PrepareServiceExecutionRequest{IntentEnvelope: encodedForged}, connect.CodePermissionDenied); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-prepare", "forged", &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: encodedForged}, connect.CodePermissionDenied); err != nil {
 		return nil, err
 	}
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
 		return nil, err
 	}
 	result.ForgedIntentRejected = true
-	if err := vmRejectServiceRPC(ctx, packages, "service-start", "plan-domain", &agentv1.StartServiceExecutionRequest{ActionId: active.intent.GetActionId(), StartGrantEnvelope: active.envelope}, connect.CodePermissionDenied); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-start", "plan-domain", &agentv1.StartResourceExecutionRequest{ActionId: active.intent.GetActionId(), StartGrantEnvelope: active.envelope}, connect.CodePermissionDenied); err != nil {
 		return nil, err
 	}
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
@@ -203,8 +204,8 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		return nil, err
 	}
 	result.Completed = append(result.Completed, completed)
-	replay := new(agentv1.StartServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-start", active.intent.GetActionId(), active.start, replay); err != nil {
+	replay := new(agentv1.StartResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-start", active.intent.GetActionId(), active.start, replay); err != nil {
 		return nil, err
 	}
 	if !proto.Equal(replay.GetStatus(), completed) {
@@ -213,21 +214,22 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	result.ExactStartReplay = true
 	conflict := proto.CloneOf(active.intent)
 	conflict.DesiredRevision = uuid.NewString()
-	conflictingEnvelope, err := signer.SignServiceIntent(ctx, conflict)
+	conflict.Ownership.AssignmentId = conflict.GetDesiredRevision()
+	conflictingEnvelope, err := signer.SignResourceIntent(ctx, conflict)
 	if err != nil {
 		return nil, err
 	}
-	if err := vmRejectServiceRPC(ctx, packages, "service-prepare", "conflict", &agentv1.PrepareServiceExecutionRequest{IntentEnvelope: conflictingEnvelope}, connect.CodeAlreadyExists); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-prepare", "conflict", &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: conflictingEnvelope}, connect.CodeAlreadyExists); err != nil {
 		return nil, err
 	}
 	result.ConflictingIntentRejected = true
 	// Runtime-only stop and start qualify the later callback after job-match setup.
-	for _, runtime := range []agentv1.ServiceRuntimeState{agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE} {
-		action, err := prepare(runtime, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED)
+	for _, runtime := range []resourcev1.ServiceRuntimeState{resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE} {
+		action, err := prepare(runtime, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED)
 		if err != nil {
 			return nil, err
 		}
-		if !action.prepared.GetNativePlan().GetChangeRuntime() || action.prepared.GetNativePlan().GetChangeEnablement() {
+		if !action.prepared.GetNativePlan().GetSystemdService().GetChangeRuntime() || action.prepared.GetNativePlan().GetSystemdService().GetChangeEnablement() {
 			return nil, errors.New("runtime-only fixture did not isolate runtime effect")
 		}
 		status, err := vmStartService(ctx, packages, action)
@@ -238,7 +240,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 			return nil, err
 		}
 		want := "active"
-		if runtime == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE {
+		if runtime == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE {
 			want = "inactive"
 		}
 		if err := vmServiceNative(ctx, vm, want, "enabled"); err != nil {
@@ -246,14 +248,14 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		}
 		result.Completed = append(result.Completed, status)
 	}
-	noop, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
+	noop, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
 		return nil, err
 	}
 	if err := vmServiceSucceeded(noop.prepared.GetStatus(), false); err != nil {
 		return nil, err
 	}
-	if noop.prepared.GetNativePlan().GetChangeRuntime() || noop.prepared.GetNativePlan().GetChangeEnablement() || len(noop.prepared.GetChallengeProof()) != 0 {
+	if noop.prepared.GetNativePlan().GetSystemdService().GetChangeRuntime() || noop.prepared.GetNativePlan().GetSystemdService().GetChangeEnablement() || len(noop.prepared.GetChallengeProof()) != 0 {
 		return nil, errors.New("no-drift intent acquired a start challenge")
 	}
 	noopStatus, err := vmGetService(ctx, packages, noop.intent.GetActionId())
@@ -261,7 +263,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		return nil, err
 	}
 	result.Completed = append(result.Completed, noopStatus)
-	expired, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
+	expired, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +274,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		return nil, ctx.Err()
 	case <-timer.C:
 	}
-	if err := vmRejectServiceRPC(ctx, packages, "service-start", expired.intent.GetActionId(), expired.start, connect.CodePermissionDenied); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-start", expired.intent.GetActionId(), expired.start, connect.CodePermissionDenied); err != nil {
 		return nil, err
 	}
 	if err := vmServiceNative(ctx, vm, "active", "enabled"); err != nil {
@@ -282,12 +284,12 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err != nil {
 		return nil, err
 	}
-	if expiredStatus.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED || expiredStatus.GetStartedAt() != nil {
+	if expiredStatus.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || expiredStatus.GetStartedAt() != nil {
 		return nil, errors.New("expired challenge did not retain a no-start terminal result")
 	}
 	result.Completed = append(result.Completed, expiredStatus)
 	result.ExpiredGrantRejected = true
-	restarted, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
+	restarted, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +299,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
 	}
-	if err := vmRejectServiceRPC(ctx, packages, "service-start", restarted.intent.GetActionId(), restarted.start, connect.CodePermissionDenied); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-start", restarted.intent.GetActionId(), restarted.start, connect.CodePermissionDenied); err != nil {
 		return nil, err
 	}
 	if err := vmServiceNative(ctx, vm, "active", "enabled"); err != nil {
@@ -307,12 +309,12 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err != nil {
 		return nil, err
 	}
-	if restartStatus.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED || restartStatus.GetStartedAt() != nil {
+	if restartStatus.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || restartStatus.GetStartedAt() != nil {
 		return nil, errors.New("same-boot restart retained usable challenge authority")
 	}
 	result.Completed = append(result.Completed, restartStatus)
 	result.RestartGrantRejected = true
-	stale, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
+	stale, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +325,7 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err != nil {
 		return nil, err
 	}
-	if staleStatus.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED || staleStatus.GetFailure() != agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_PRECONDITION || staleStatus.GetStartedAt() != nil {
+	if staleStatus.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED || staleStatus.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION || staleStatus.GetStartedAt() != nil {
 		return nil, errors.New("stale service precondition did not fail before start consumption")
 	}
 	if err := vmServiceNative(ctx, vm, "inactive", "enabled"); err != nil {
@@ -331,11 +333,11 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	}
 	result.Completed = append(result.Completed, staleStatus)
 	result.StalePlanRejected = true
-	inactive, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
+	inactive, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	if err != nil {
 		return nil, err
 	}
-	if inactive.prepared.GetNativePlan().GetChangeRuntime() || !inactive.prepared.GetNativePlan().GetChangeEnablement() {
+	if inactive.prepared.GetNativePlan().GetSystemdService().GetChangeRuntime() || !inactive.prepared.GetNativePlan().GetSystemdService().GetChangeEnablement() {
 		return nil, errors.New("disable fixture did not isolate enablement")
 	}
 	inactiveStatus, err := vmStartService(ctx, packages, inactive)
@@ -360,14 +362,14 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	if err := vmAttestServiceActions(ctx, result, "terminal", false); err != nil {
 		return nil, err
 	}
-	revoked, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
+	revoked, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := vmApplyExecutionTrust(ctx, vm, "revoked"); err != nil {
 		return nil, err
 	}
-	if err := vmRejectServiceRPC(ctx, packages, "service-start", revoked.intent.GetActionId(), revoked.start, connect.CodePermissionDenied); err != nil {
+	if err := vmRejectServiceRPC(ctx, packages, "resource-start", revoked.intent.GetActionId(), revoked.start, connect.CodePermissionDenied); err != nil {
 		return nil, err
 	}
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
@@ -380,24 +382,35 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 	return result, nil
 }
 
-func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer *devlab.ExecutionTrustExercise, identity *labv1.ConnectionIdentityEvidence, sequence uint64, runtime agentv1.ServiceRuntimeState, enablement agentv1.ServiceEnablement) (*vmPreparedService, error) {
+func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer *devlab.ExecutionTrustExercise, identity *labv1.ConnectionIdentityEvidence, sequence uint64, runtime resourcev1.ServiceRuntimeState, enablement resourcev1.ServiceEnablement) (*vmPreparedService, error) {
 	now := time.Now().UTC()
-	intent := &agentv1.ServiceExecutionIntent{
+	intent := &agentv1.ResourceExecutionIntent{
 		DeploymentId: identity.GetDeploymentId(), DeviceId: identity.GetDeviceId(), EnrollmentGeneration: identity.GetEnrollmentGeneration(), ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(),
 		ResourceSequence: sequence, RecoveryEpoch: 1, RootVersion: 2, DelegationVersion: 2, AuthorizationVersion: 1,
 		NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)),
-		Desired: &agentv1.ServiceDesiredState{Unit: devlab.ServiceExecutionProbeUnit, Runtime: runtime, Enablement: enablement},
+		Desired: &resourcev1.ResourceDesiredState{
+			Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: devlab.ResourceExecutionProbeUnit},
+			State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: devlab.ResourceExecutionProbeUnit, Runtime: runtime, Enablement: enablement}},
+		},
+		Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE,
 	}
-	envelope, err := signer.SignServiceIntent(ctx, intent)
+	// Keep the profile/resource owner stable across desired revisions and all
+	// native scenario transitions; the assignment remains an exact action fence.
+	intent.Ownership = &agentv1.ResourceOwnershipBinding{
+		AssignmentId: intent.GetDesiredRevision(), ResourceId: "1d8f463f-2f92-41ea-b6af-676c9a30e71f",
+		Policy:  &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},
+		Sources: []*agentv1.ResourceOwnershipSource{{ProfileId: "40e9179c-48a9-444c-a0e6-3fcbdb2126b0", ProfileRevision: intent.GetDesiredRevision(), ResourceId: "1d8f463f-2f92-41ea-b6af-676c9a30e71f"}},
+	}
+	envelope, err := signer.SignResourceIntent(ctx, intent)
 	if err != nil {
 		return nil, err
 	}
-	prepared := new(agentv1.PrepareServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-prepare", intent.GetActionId(), &agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope}, prepared); err != nil {
+	prepared := new(agentv1.PrepareResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-prepare", intent.GetActionId(), &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}, prepared); err != nil {
 		return nil, err
 	}
 	result := &vmPreparedService{intent: intent, envelope: envelope, prepared: prepared}
-	if prepared.GetStatus().GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+	if prepared.GetStatus().GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 		return result, nil
 	}
 	certificate, err := packages.vm.run(ctx, "sudo -n -u lindm -- "+nativeQuote(nativeGuestDir+"/lab-probe")+" guest connection-certificate", nil, 16384, 15*time.Second)
@@ -405,13 +418,13 @@ func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer
 		return nil, err
 	}
 	hostBefore := time.Now().UTC()
-	start, grant, err := signer.SignServiceStart(ctx, intent, envelope, certificate, prepared)
+	start, grant, err := signer.SignResourceStart(ctx, intent, envelope, certificate, prepared)
 	hostAfter := time.Now().UTC()
 	if err != nil {
 		return nil, err
 	}
 	result.clock = &labv1.ServiceClockEvidence{HostBefore: timestamppb.New(hostBefore), HostAfter: timestamppb.New(hostAfter), Challenge: proto.CloneOf(start.GetChallenge())}
-	result.start = &agentv1.StartServiceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}
+	result.start = &agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}
 	return result, nil
 }
 
@@ -461,29 +474,29 @@ func vmRejectServiceRPC(ctx context.Context, packages *nativeGuestPackages, comm
 	}
 	return nil
 }
-func vmGetService(ctx context.Context, packages *nativeGuestPackages, action string) (*agentv1.ServiceExecutionStatus, error) {
-	response := new(agentv1.GetServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-status", action, &agentv1.GetServiceExecutionRequest{ActionId: action}, response); err != nil {
+func vmGetService(ctx context.Context, packages *nativeGuestPackages, action string) (*agentv1.ResourceExecutionStatus, error) {
+	response := new(agentv1.GetResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-status", action, &agentv1.GetResourceExecutionRequest{ActionId: action}, response); err != nil {
 		return nil, err
 	}
 	return response.GetStatus(), nil
 }
-func vmStartService(ctx context.Context, packages *nativeGuestPackages, prepared *vmPreparedService) (*agentv1.ServiceExecutionStatus, error) {
-	response := new(agentv1.StartServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-start", prepared.intent.GetActionId(), prepared.start, response); err != nil {
+func vmStartService(ctx context.Context, packages *nativeGuestPackages, prepared *vmPreparedService) (*agentv1.ResourceExecutionStatus, error) {
+	response := new(agentv1.StartResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-start", prepared.intent.GetActionId(), prepared.start, response); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	if err := vmUploadServiceRequest(ctx, packages, "service-status", prepared.intent.GetActionId(), &agentv1.GetServiceExecutionRequest{ActionId: prepared.intent.GetActionId()}); err != nil {
+	if err := vmUploadServiceRequest(ctx, packages, "resource-status", prepared.intent.GetActionId(), &agentv1.GetResourceExecutionRequest{ActionId: prepared.intent.GetActionId()}); err != nil {
 		return nil, err
 	}
 	for {
-		status := new(agentv1.GetServiceExecutionResponse)
-		if err := vmReadServiceRPC(ctx, packages.vm, "service-status", prepared.intent.GetActionId(), status); err != nil {
+		status := new(agentv1.GetResourceExecutionResponse)
+		if err := vmReadServiceRPC(ctx, packages.vm, "resource-status", prepared.intent.GetActionId(), status); err != nil {
 			return nil, err
 		}
-		if status.GetStatus().GetState() >= agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+		if status.GetStatus().GetState() >= agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 			return status.GetStatus(), nil
 		}
 		timer := time.NewTimer(100 * time.Millisecond)
@@ -495,14 +508,14 @@ func vmStartService(ctx context.Context, packages *nativeGuestPackages, prepared
 		}
 	}
 }
-func vmServiceSucceeded(status *agentv1.ServiceExecutionStatus, started bool) error {
-	if status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || status.GetFailure() != agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE || !status.GetVerification().GetConverged() || (status.GetStartedAt() != nil) != started || status.GetCompletedAt() == nil {
+func vmServiceSucceeded(status *agentv1.ResourceExecutionStatus, started bool) error {
+	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE || status.GetVerification().GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED || (status.GetStartedAt() != nil) != started || status.GetCompletedAt() == nil {
 		return newServiceStatusFailure(status, started)
 	}
 	return nil
 }
 func vmServiceNative(ctx context.Context, vm *guestVM, active, enablement string) error {
-	return vmServiceNativeUnit(ctx, vm, devlab.ServiceExecutionProbeUnit, active, enablement)
+	return vmServiceNativeUnit(ctx, vm, devlab.ResourceExecutionProbeUnit, active, enablement)
 }
 
 func vmServiceNativeUnit(ctx context.Context, vm *guestVM, unit, active, enablement string) error {
@@ -542,8 +555,8 @@ func verifyRetainedVMServiceActions(ctx context.Context, vm *guestVM, evidence *
 		return nil
 	}
 	for _, previous := range evidence.Completed {
-		response := new(agentv1.GetServiceExecutionResponse)
-		if err := vmReadServiceRPC(ctx, vm, "service-status", previous.GetActionId(), response); err != nil {
+		response := new(agentv1.GetResourceExecutionResponse)
+		if err := vmReadServiceRPC(ctx, vm, "resource-status", previous.GetActionId(), response); err != nil {
 			return err
 		}
 		if !proto.Equal(previous, response.GetStatus()) {
@@ -577,13 +590,13 @@ func vmAttestServiceActions(ctx context.Context, evidence *vmServiceExecutionEvi
 		if _, err := rand.Read(binding.Nonce[:]); err != nil {
 			return err
 		}
-		response := new(agentv1.AttestServiceExecutionResponse)
-		request := &agentv1.AttestServiceExecutionRequest{ActionId: binding.ActionID.String(), Nonce: binding.Nonce[:]}
-		if err := vmServiceRPC(ctx, evidence.packages, "service-attest", previous.GetActionId(), request, response); err != nil {
+		response := new(agentv1.AttestResourceExecutionResponse)
+		request := &agentv1.AttestResourceExecutionRequest{ActionId: binding.ActionID.String(), Nonce: binding.Nonce[:]}
+		if err := vmServiceRPC(ctx, evidence.packages, "resource-attest", previous.GetActionId(), request, response); err != nil {
 			return err
 		}
 		now := time.Now().UTC()
-		verified, err := evidence.verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &binding, now)
+		verified, err := evidence.verifier.VerifyResourceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &binding, now)
 		if err != nil {
 			return fmt.Errorf("%s terminal service attestation: %w", phase, err)
 		}
@@ -642,7 +655,7 @@ func vmServiceAttestationSession(ctx context.Context, vm *guestVM, identity *lab
 	}
 }
 
-func vmRejectForgedServiceAttestation(ctx context.Context, verifier *devlab.ExecutionTrustExercise, response *agentv1.AttestServiceExecutionResponse, verified *agentv1.ServiceExecutionAttestation, expected *trust.ServiceAttestationBinding, now time.Time) error {
+func vmRejectForgedServiceAttestation(ctx context.Context, verifier *devlab.ExecutionTrustExercise, response *agentv1.AttestResourceExecutionResponse, verified *agentv1.ResourceExecutionAttestation, expected *trust.ResourceAttestationBinding, now time.Time) error {
 	// Preserve the valid envelope's domain, certificate and signature while
 	// altering a schema-valid revision. This is result forgery, not malformed JSON.
 	forged := proto.CloneOf(verified)
@@ -666,16 +679,16 @@ func vmRejectForgedServiceAttestation(ctx context.Context, verifier *devlab.Exec
 	if err != nil {
 		return err
 	}
-	if _, err := verifier.VerifyServiceAttestation(ctx, tampered, response.GetCertificatePem(), expected, now); err == nil {
+	if _, err := verifier.VerifyResourceAttestation(ctx, tampered, response.GetCertificatePem(), expected, now); err == nil {
 		return errors.New("relay-tampered service attestation was accepted")
 	}
 	wrongNonce := *expected
 	wrongNonce.Nonce[0] ^= 1
-	if _, err := verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &wrongNonce, now); err == nil {
+	if _, err := verifier.VerifyResourceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), &wrongNonce, now); err == nil {
 		return errors.New("service attestation replay was accepted for a different nonce")
 	}
 	// Recheck the positive control with exactly the same inputs and time. A
 	// cancelled context or broken verifier cannot masquerade as either rejection.
-	_, err = verifier.VerifyServiceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), expected, now)
+	_, err = verifier.VerifyResourceAttestation(ctx, response.GetAttestationEnvelope(), response.GetCertificatePem(), expected, now)
 	return err
 }

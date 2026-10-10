@@ -28,9 +28,12 @@ import (
 // keep pinned logical origins; browser and action lanes sign their allocated ports.
 // The development offline keys are never part of this server's configuration.
 type AuthorityFixture struct {
-	AdminAddress     string
-	DeviceAddress    string
-	ConsoleOrigin    string
+	AdminAddress  string
+	DeviceAddress string
+	ConsoleOrigin string
+	// DeviceOrigin is the signed bootstrap bundle's device origin; guests reach
+	// DeviceAddress through this origin's loopback port.
+	DeviceOrigin     string
 	DatabaseName     string
 	repository       string
 	binary           string
@@ -195,6 +198,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
+	f.DeviceOrigin = deviceOrigin
 	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
 	cfg.Tls.CertificateFile = filepath.Join(shared, "server.crt")
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")

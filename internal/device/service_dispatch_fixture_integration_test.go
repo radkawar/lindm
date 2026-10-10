@@ -30,6 +30,7 @@ import (
 	"lindm/internal/config"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/resource"
 	"lindm/internal/testdb"
 	"lindm/internal/trust"
 )
@@ -52,8 +53,11 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 	return newDispatchFixtureWithDelegationAge(t, time.Hour)
 }
 
-func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration) *dispatchFixture {
+func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration, capabilities ...string) *dispatchFixture {
 	t.Helper()
+	if len(capabilities) == 0 {
+		capabilities = []string{"systemd.service.v1"}
+	}
 	pool, _ := testdb.Open(t)
 	identityService, actor, directory := dispatchIdentity(t, pool)
 	f := &dispatchFixture{pool: pool, actor: actor, directory: directory, adminCtx: identity.WithPrincipal(t.Context(), actor), key: ed25519Key(t)}
@@ -98,7 +102,7 @@ func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration) *dispa
 		t.Fatal(err)
 	}
 	plan, start := ed25519Key(t), ed25519Key(t)
-	delegation := &agentv1.ExecutionDelegation{DeploymentId: deployment, RootVersion: 1, Version: 1, MinimumRecoveryEpoch: 0, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: []string{"systemd.service.v1"}}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: []string{"systemd.service.v1"}}}}
+	delegation := &agentv1.ExecutionDelegation{DeploymentId: deployment, RootVersion: 1, Version: 1, MinimumRecoveryEpoch: 0, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: capabilities}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: capabilities}}}
 	delegation.NotBefore = timestamppb.New(now.Add(-age))
 	f.delegation = delegation
 	tx, err := pool.Begin(t.Context())
@@ -171,20 +175,20 @@ func (f *dispatchFixture) assign(t *testing.T, expected *string) *adminv1.Resour
 	}
 	return result.Msg.GetAssignment()
 }
-func (f *dispatchFixture) work(t *testing.T) *devicev1.ServiceWork {
+func (f *dispatchFixture) work(t *testing.T) *devicev1.ResourceWork {
 	t.Helper()
-	response, err := f.service.GetServiceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	response, err := f.service.GetResourceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return response.Msg.GetWork()
 }
-func (f *dispatchFixture) intent(t *testing.T, work *devicev1.ServiceWork) *agentv1.ServiceExecutionIntent {
+func (f *dispatchFixture) intent(t *testing.T, work *devicev1.ResourceWork) *agentv1.ResourceExecutionIntent {
 	t.Helper()
 	if work == nil {
 		t.Fatal("missing service work")
 	}
-	message := new(agentv1.ServiceExecutionIntent)
+	message := new(agentv1.ResourceExecutionIntent)
 	public, ok := f.service.signing.PlanKey.Public().(ed25519.PublicKey)
 	if !ok {
 		t.Fatal("dispatch fixture requires an Ed25519 plan key")
@@ -194,12 +198,12 @@ func (f *dispatchFixture) intent(t *testing.T, work *devicev1.ServiceWork) *agen
 	}
 	return message
 }
-func (f *dispatchFixture) challenge(t *testing.T, work *devicev1.ServiceWork) *agentv1.ServiceExecutionChallenge {
+func (f *dispatchFixture) challenge(t *testing.T, work *devicev1.ResourceWork) *agentv1.ResourceExecutionChallenge {
 	t.Helper()
 	intent := f.intent(t, work)
 	digest := sha256.Sum256(work.GetIntentEnvelope())
 	now := time.Now().UTC().Add(-time.Second)
-	return &agentv1.ServiceExecutionChallenge{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), ActionId: intent.GetActionId(), DesiredRevision: intent.GetDesiredRevision(), ResourceSequence: intent.GetResourceSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(), IntentSha256: digest[:], NativePlanSha256: make([]byte, 32), Nonce: make([]byte, 32), BootId: uuid.NewString(), ExecutorIncarnation: uuid.NewString(), IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second))}
+	return &agentv1.ResourceExecutionChallenge{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), ActionId: intent.GetActionId(), DesiredRevision: intent.GetDesiredRevision(), Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(), ResourceSequence: intent.GetResourceSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(), IntentSha256: digest[:], NativePlanSha256: make([]byte, 32), Nonce: make([]byte, 32), BootId: uuid.NewString(), ExecutorIncarnation: uuid.NewString(), IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second))}
 }
 func (f *dispatchFixture) sign(t *testing.T, message proto.Message, key ed25519.PrivateKey) []byte {
 	t.Helper()
@@ -209,35 +213,58 @@ func (f *dispatchFixture) sign(t *testing.T, message proto.Message, key ed25519.
 	}
 	return encoded
 }
-func (f *dispatchFixture) start(t *testing.T, work *devicev1.ServiceWork) (*devicev1.AuthorizeServiceStartRequest, []byte) {
+func (f *dispatchFixture) start(t *testing.T, work *devicev1.ResourceWork) (*devicev1.AuthorizeResourceStartRequest, []byte) {
 	t.Helper()
-	request := &devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}
-	response, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(request))
+	request := &devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}
+	response, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return request, response.Msg.GetStartGrantEnvelope()
 }
-func (f *dispatchFixture) result(t *testing.T, work *devicev1.ServiceWork, revision uint64, state agentv1.ServiceExecutionState, started bool) *devicev1.ReportServiceResultRequest {
+func (f *dispatchFixture) result(t *testing.T, work *devicev1.ResourceWork, revision uint64, state agentv1.ResourceExecutionState, started bool) *devicev1.ReportResourceResultRequest {
 	t.Helper()
 	intent := f.intent(t, work)
 	now := time.Now().UTC().Add(-time.Second)
 	stamp := timestamppb.New(now)
 	digest := sha256.Sum256(work.GetIntentEnvelope())
-	observation := &agentv1.ServiceObservation{Unit: intent.GetDesired().GetUnit(), BootId: uuid.NewString(), ObservedAt: stamp, LoadState: "loaded", ActiveState: "active", DefinitionSha256: make([]byte, 32), FingerprintSha256: make([]byte, 32)}
-	status := &agentv1.ServiceExecutionStatus{ActionId: intent.GetActionId(), IntentSha256: digest[:], State: state, Failure: agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE, AcceptedAt: stamp, Before: observation}
+	native := &resourcev1.SystemdServiceObservation{Unit: intent.GetDesired().GetRef().GetCanonicalKey(), BootId: uuid.NewString(), ObservedAt: stamp, LoadState: "loaded", ActiveState: "active", DefinitionSha256: make([]byte, 32), FingerprintSha256: make([]byte, 32)}
+	observation := &resourcev1.ResourceObservation{
+		Ref: proto.CloneOf(intent.GetDesired().GetRef()),
+		Metadata: &resourcev1.ObservationMetadata{
+			BootId: native.GetBootId(), ExecutorIncarnation: uuid.NewString(), ObservedAt: stamp,
+			Backend:        &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "fixture", ProviderVersion: "fixture", Product: &resourcev1.PlatformProduct{OsId: "ubuntu", Product: "dispatch fixture", Version: "24.04", Architecture: "amd64"}},
+			NativeRevision: native.GetFingerprintSha256(), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK,
+		},
+		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: native},
+	}
+	status := &agentv1.ResourceExecutionStatus{ActionId: intent.GetActionId(), IntentSha256: digest[:], State: state, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE, AcceptedAt: stamp, Before: observation}
+	if state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED && !started {
+		status.ReadOnly = true
+	}
+	if state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+		status.Before = nil
+	}
 	if started {
 		status.StartedAt = stamp
 	}
-	if state >= agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+	if resourceExecutionTerminal(state) {
 		status.CompletedAt = stamp
 	}
-	if state == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
-		status.Verification = &agentv1.ServiceVerification{Observation: observation, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true}
+	if state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+		desiredDigest, err := resource.DesiredDigest(intent.GetDesired())
+		if err != nil {
+			t.Fatal(err)
+		}
+		status.Verification = &resourcev1.ResourceVerification{
+			Ref: proto.CloneOf(intent.GetDesired().GetRef()), DesiredSha256: desiredDigest[:], PlanSha256: make([]byte, 32),
+			After: observation, Disposition: resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED,
+			Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: native, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, JobCompleted: true, Converged: true}},
+		}
 	}
-	if state > agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
-		status.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NATIVE
+	if resourceExecutionTerminal(state) && state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+		status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE
 	}
-	attestation := &agentv1.ServiceExecutionAttestation{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), SessionEpoch: 1, ActionRevision: revision, Nonce: work.GetResultNonce(), IssuedAt: stamp, ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: status}
-	return &devicev1.ReportServiceResultRequest{SessionEpoch: 1, ActionId: work.GetActionId(), AttestationEnvelope: f.sign(t, attestation, f.key), CertificatePem: f.certificate}
+	attestation := &agentv1.ResourceExecutionAttestation{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), SessionEpoch: 1, ActionRevision: revision, Nonce: work.GetResultNonce(), IssuedAt: stamp, ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: status}
+	return &devicev1.ReportResourceResultRequest{SessionEpoch: 1, ActionId: work.GetActionId(), AttestationEnvelope: f.sign(t, attestation, f.key), CertificatePem: f.certificate}
 }

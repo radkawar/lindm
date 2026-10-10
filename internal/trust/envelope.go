@@ -31,10 +31,12 @@ const (
 	SessionType                        = "application/vnd.lindm.session-acquisition.v1+protobuf"
 	ExecutionRootType                  = "application/vnd.lindm.execution-root.v1+protobuf"
 	DelegationType                     = "application/vnd.lindm.execution-delegation.v1+protobuf"
-	ServiceIntentType                  = "application/vnd.lindm.service-intent.v1+protobuf"
-	ServiceChallengeType               = "application/vnd.lindm.service-challenge.v1+protobuf"
-	ServiceStartType                   = "application/vnd.lindm.service-start.v1+protobuf"
-	ServiceAttestationType             = "application/vnd.lindm.service-attestation.v1+protobuf"
+	ResourceIntentType                 = "application/vnd.lindm.execution-intent.v1+protobuf"
+	ResourceChallengeType              = "application/vnd.lindm.execution-challenge.v1+protobuf"
+	ResourceStartType                  = "application/vnd.lindm.execution-start.v1+protobuf"
+	ResourceAttestationType            = "application/vnd.lindm.execution-attestation.v1+protobuf"
+	ConnectivityConfirmationType       = "application/vnd.lindm.connectivity-confirmation.v1+protobuf"
+	ConnectivityProbeReceiptType       = "application/vnd.lindm.connectivity-probe-receipt.v1+protobuf"
 	DeviceActionIntentType             = "application/vnd.lindm.device-action-intent.v1+protobuf"
 	DeviceActionChallengeType          = "application/vnd.lindm.device-action-challenge.v1+protobuf"
 	DeviceActionStartType              = "application/vnd.lindm.device-action-start.v1+protobuf"
@@ -64,8 +66,9 @@ func New() (*Authority, error) {
 		&agentv1.ExecutionRoot{}, &agentv1.BootstrapBundle{},
 		&agentv1.RenewalIntent{}, &agentv1.IssuanceRetrieval{}, &agentv1.SessionAcquisition{},
 		&agentv1.ExecutionRootTransition{}, &agentv1.ExecutionDelegation{},
-		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{}, &agentv1.ServiceExecutionStartGrant{},
-		&agentv1.ServiceExecutionAttestation{},
+		&agentv1.ResourceExecutionIntent{}, &agentv1.ResourceExecutionChallenge{}, &agentv1.ResourceExecutionStartGrant{},
+		&agentv1.ResourceExecutionAttestation{},
+		&agentv1.ConnectivityConfirmation{}, &agentv1.ConnectivityProbeReceipt{},
 		&agentv1.DeviceActionIntent{}, &agentv1.DeviceActionChallenge{}, &agentv1.DeviceActionStartGrant{},
 		&agentv1.DeviceActionAttestation{}, &agentv1.DeviceActionEscrowReceipt{},
 		&agentv1.DeviceActionInventoryReceipt{},
@@ -111,14 +114,18 @@ func payloadType(message proto.Message) (string, error) {
 		return RetrievalType, nil
 	case *agentv1.SessionAcquisition:
 		return SessionType, nil
-	case *agentv1.ServiceExecutionIntent:
-		return ServiceIntentType, nil
-	case *agentv1.ServiceExecutionChallenge:
-		return ServiceChallengeType, nil
-	case *agentv1.ServiceExecutionStartGrant:
-		return ServiceStartType, nil
-	case *agentv1.ServiceExecutionAttestation:
-		return ServiceAttestationType, nil
+	case *agentv1.ResourceExecutionIntent:
+		return ResourceIntentType, nil
+	case *agentv1.ResourceExecutionChallenge:
+		return ResourceChallengeType, nil
+	case *agentv1.ResourceExecutionStartGrant:
+		return ResourceStartType, nil
+	case *agentv1.ResourceExecutionAttestation:
+		return ResourceAttestationType, nil
+	case *agentv1.ConnectivityConfirmation:
+		return ConnectivityConfirmationType, nil
+	case *agentv1.ConnectivityProbeReceipt:
+		return ConnectivityProbeReceiptType, nil
 	case *agentv1.DeviceActionIntent:
 		return DeviceActionIntentType, nil
 	case *agentv1.DeviceActionChallenge:

@@ -17,8 +17,10 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/serviceprovider"
+	"lindm/internal/resource"
 )
 
 // boundaryNative is a deterministic effect-boundary harness, not systemd. These
@@ -26,7 +28,8 @@ import (
 // D-Bus execution is separately qualified by the packaged VM smoke.
 type boundaryNative struct {
 	mu            sync.Mutex
-	observation   *agentv1.ServiceObservation
+	observation   *resourcev1.SystemdServiceObservation
+	incarnation   string
 	plans         atomic.Int32
 	applies       atomic.Int32
 	verifies      atomic.Int32
@@ -43,7 +46,7 @@ type boundaryNative struct {
 }
 
 func (n *boundaryNative) Close() error { return nil }
-func (n *boundaryNative) Plan(ctx context.Context, desired *agentv1.ServiceDesiredState) (*agentv1.ServicePlan, error) {
+func (n *boundaryNative) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -58,31 +61,63 @@ func (n *boundaryNative) Plan(ctx context.Context, desired *agentv1.ServiceDesir
 	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	plan := &agentv1.ServicePlan{Desired: proto.CloneOf(desired), Before: proto.CloneOf(n.observation)}
-	plan.ChangeRuntime = desired.GetRuntime() == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE && n.observation.GetActiveState() != "active"
+	before := n.envelope(proto.CloneOf(n.observation), boundaryBackend())
+	desiredDigest, err := resource.DesiredDigest(desired)
+	if err != nil {
+		return nil, err
+	}
+	observationDigest, err := resource.ObservationDigest(before)
+	if err != nil {
+		return nil, err
+	}
+	claims, err := resource.Claims(desired)
+	if err != nil {
+		return nil, err
+	}
+	plan := &resourcev1.ResourcePlan{
+		Ref: proto.CloneOf(desired.GetRef()), Operation: operation,
+		Before: before, Backend: before.GetMetadata().GetBackend(),
+		DesiredSha256: desiredDigest[:], ObservationSha256: observationDigest[:],
+		OwnershipRevisionSha256: digestBytes([]byte("fixture ownership")), Claims: claims,
+		Safety: &resourcev1.PlanSafety{LockDomains: []resourcev1.ClaimDomain{resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME}, Reversibility: resourcev1.Reversibility_REVERSIBILITY_IRREVERSIBLE, RollbackScope: resourcev1.RollbackScope_ROLLBACK_SCOPE_NONE, Confirmation: resourcev1.ConfirmationPolicy_CONFIRMATION_POLICY_NOT_REQUIRED},
+		Plan: &resourcev1.ResourcePlan_SystemdService{SystemdService: &resourcev1.SystemdServicePlan{
+			Desired: proto.CloneOf(desired.GetSystemdService()), Before: before.GetSystemdService(),
+			ChangeRuntime: desired.GetSystemdService().GetRuntime() == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE && n.observation.GetActiveState() != "active",
+		}},
+	}
 	if err := serviceprovider.ValidatePlan(plan); err != nil {
 		return nil, err
 	}
 	return plan, nil
 }
-func (n *boundaryNative) Verify(ctx context.Context, plan *agentv1.ServicePlan) (*agentv1.ServiceVerification, error) {
+func (n *boundaryNative) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	n.verifies.Add(1)
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	result := &agentv1.ServiceVerification{Observation: proto.CloneOf(n.observation), RuntimeMatches: n.observation.GetActiveState() == "active", EnablementMatches: true, DefinitionMatches: bytes.Equal(n.observation.GetDefinitionSha256(), plan.GetBefore().GetDefinitionSha256())}
-	result.Converged = result.GetRuntimeMatches() && result.GetEnablementMatches() && result.GetDefinitionMatches() && n.observation.GetBootId() == plan.GetBefore().GetBootId()
+	after := proto.CloneOf(n.observation)
+	checks := &resourcev1.SystemdServiceChecks{Observation: after, RuntimeMatches: after.GetActiveState() == "active", EnablementMatches: true, DefinitionMatches: bytes.Equal(after.GetDefinitionSha256(), plan.GetSystemdService().GetBefore().GetDefinitionSha256()), JobCompleted: !after.GetJobPending()}
+	checks.Converged = checks.GetJobCompleted() && checks.GetRuntimeMatches() && checks.GetEnablementMatches() && checks.GetDefinitionMatches() && after.GetBootId() == plan.GetSystemdService().GetBefore().GetBootId()
+	disposition := resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED
+	if checks.GetConverged() {
+		disposition = resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED
+	}
+	digest, err := resource.PlanDigest(plan)
+	if err != nil {
+		return nil, err
+	}
+	result := &resourcev1.ResourceVerification{Ref: proto.CloneOf(plan.GetRef()), DesiredSha256: bytes.Clone(plan.GetDesiredSha256()), PlanSha256: digest[:], After: n.envelope(after, plan.GetBackend()), Disposition: disposition, Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: checks}}
 	if err := serviceprovider.ValidateVerification(plan, result); err != nil {
 		return nil, err
 	}
-	if !result.GetConverged() {
+	if !checks.GetConverged() {
 		return result, serviceprovider.ErrNotConverged
 	}
 	return result, nil
 }
-func (n *boundaryNative) Apply(ctx context.Context, plan *agentv1.ServicePlan, authorize func(context.Context) error) (*agentv1.ServiceVerification, error) {
+func (n *boundaryNative) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, authorize func(context.Context) error) (*resourcev1.ResourceVerification, error) {
 	n.applies.Add(1)
 	defer n.once.Do(func() { close(n.finished) })
 	if n.beforeGate != nil {
@@ -120,7 +155,7 @@ func (n *boundaryNative) Apply(ctx context.Context, plan *agentv1.ServicePlan, a
 	return n.Verify(ctx, plan)
 }
 
-func setBoundaryFingerprint(observation *agentv1.ServiceObservation) {
+func setBoundaryFingerprint(observation *resourcev1.SystemdServiceObservation) {
 	copy := proto.CloneOf(observation)
 	copy.ObservedAt, copy.FingerprintSha256 = nil, nil
 	observation.FingerprintSha256, _ = digestMessage(copy)
@@ -143,7 +178,7 @@ func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *se
 	f.wall.Store(f.now.UnixNano())
 	f.bootClock.Store(uint64(time.Hour))
 	f.fix = newFixture(t, f.now)
-	observation := &agentv1.ServiceObservation{Unit: "example.service", BootId: f.boot, ObservedAt: protoTimestamp(f.now), LoadState: "loaded", ActiveState: "inactive", SubState: "dead", UnitFileState: "disabled", ServiceType: "simple", DefinitionSha256: digestBytes([]byte("root-owned fixture definition"))}
+	observation := &resourcev1.SystemdServiceObservation{Unit: "example.service", BootId: f.boot, ObservedAt: protoTimestamp(f.now), LoadState: "loaded", ActiveState: "inactive", SubState: "dead", UnitFileState: "disabled", ServiceType: "simple", DefinitionSha256: digestBytes([]byte("root-owned fixture definition"))}
 	if active {
 		observation.ActiveState, observation.SubState = "active", "running"
 	}
@@ -169,7 +204,12 @@ func newServiceFixture(t *testing.T, active bool, withoutDelegation ...bool) *se
 func (f *serviceFixture) options() []Option {
 	return []Option{WithClock(func() time.Time { return time.Unix(0, f.wall.Load()).UTC() }), WithBootID(func() (string, error) { return f.boot, nil }), func(s *Service) {
 		s.boottime = func() (uint64, error) { return f.bootClock.Load(), nil }
-		s.openService = func(context.Context) (nativeService, error) { return f.native, nil }
+		s.openResource = func(context.Context, *agentv1.ResourceExecutionIntent) (nativeResource, error) {
+			f.native.mu.Lock()
+			f.native.incarnation = s.incarnation
+			f.native.mu.Unlock()
+			return f.native, nil
+		}
 	}}
 }
 func (f *serviceFixture) installDelegation(t *testing.T, version, floor uint64) {
@@ -179,38 +219,43 @@ func (f *serviceFixture) installDelegation(t *testing.T, version, floor uint64) 
 	doc := delegationDocument(f.fix.deploy.String(), 1, version, floor, f.now, delegate(t, f.planKey), start)
 	callTrust(t, f.svc, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: mustSign(t, f.svc.authority, doc, f.fix.rootKey)})
 }
-func (f *serviceFixture) intent(t *testing.T, sequence uint64) *agentv1.ServiceExecutionIntent {
+func (f *serviceFixture) intent(t *testing.T, sequence uint64) *agentv1.ResourceExecutionIntent {
 	t.Helper()
 	state := durable(t, f.svc)
-	return &agentv1.ServiceExecutionIntent{DeploymentId: f.fix.deploy.String(), DeviceId: state.GetDeviceId(), EnrollmentGeneration: state.GetEnrollmentGeneration(), ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(), ResourceSequence: sequence, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1, NotBefore: protoTimestamp(f.now.Add(-time.Second)), ExpiresAt: protoTimestamp(f.now.Add(5 * time.Minute)), Desired: &agentv1.ServiceDesiredState{Unit: "example.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}
+	return &agentv1.ResourceExecutionIntent{
+		DeploymentId: f.fix.deploy.String(), DeviceId: state.GetDeviceId(), EnrollmentGeneration: state.GetEnrollmentGeneration(), ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(), ResourceSequence: sequence, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1, NotBefore: protoTimestamp(f.now.Add(-time.Second)), ExpiresAt: protoTimestamp(f.now.Add(5 * time.Minute)),
+		Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE,
+		Ownership: &agentv1.ResourceOwnershipBinding{AssignmentId: uuid.NewString(), ResourceId: uuid.NewString(), Sources: []*agentv1.ResourceOwnershipSource{{ProfileId: uuid.NewString(), ProfileRevision: uuid.NewString(), ResourceId: uuid.NewString()}}, Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+		Desired:   &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "example.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "example.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}},
+	}
 }
-func (f *serviceFixture) prepare(t *testing.T, intent *agentv1.ServiceExecutionIntent) (*agentv1.PrepareServiceExecutionResponse, []byte) {
+func (f *serviceFixture) prepare(t *testing.T, intent *agentv1.ResourceExecutionIntent) (*agentv1.PrepareResourceExecutionResponse, []byte) {
 	t.Helper()
 	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
-	response, err := f.svc.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope}))
+	response, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return response.Msg, envelope
 }
-func serviceRow(t *testing.T, svc *Service, action string) (*agentv1.ServiceExecutionRecord, int64) {
+func serviceRow(t *testing.T, svc *Service, action string) (*agentv1.ResourceExecutionRecord, int64) {
 	t.Helper()
 	svc.mu.Lock()
 	defer svc.mu.Unlock()
-	record, revision, err := svc.store.LoadServiceAction(t.Context(), action)
+	record, revision, err := svc.store.LoadResourceAction(t.Context(), action)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return record, revision
 }
-func (f *serviceFixture) grant(t *testing.T, intent *agentv1.ServiceExecutionIntent) []byte {
+func (f *serviceFixture) grant(t *testing.T, intent *agentv1.ResourceExecutionIntent) []byte {
 	t.Helper()
 	record, _ := serviceRow(t, f.svc, intent.GetActionId())
-	return mustSign(t, f.svc.authority, &agentv1.ServiceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}, f.startKey)
+	return mustSign(t, f.svc.authority, &agentv1.ResourceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}, f.startKey)
 }
-func startService(t *testing.T, svc *Service, action string, grant []byte) *agentv1.StartServiceExecutionResponse {
+func startService(t *testing.T, svc *Service, action string, grant []byte) *agentv1.StartResourceExecutionResponse {
 	t.Helper()
-	response, err := svc.StartServiceExecution(t.Context(), connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: action, StartGrantEnvelope: grant}))
+	response, err := svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: action, StartGrantEnvelope: grant}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,14 +269,14 @@ func waitBoundary(t *testing.T, event <-chan struct{}) {
 		t.Fatal("worker boundary was not reached")
 	}
 }
-func awaitServiceTerminal(t *testing.T, svc *Service, action string) *agentv1.ServiceExecutionStatus {
+func awaitServiceTerminal(t *testing.T, svc *Service, action string) *agentv1.ResourceExecutionStatus {
 	t.Helper()
 	deadline := time.NewTimer(5 * time.Second)
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
-		response, err := svc.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: action}))
+		response, err := svc.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: action}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,19 +298,19 @@ func TestServiceSignedPrepareReplayConflictAndNoDrift(t *testing.T) {
 			intent := f.intent(t, 1)
 			prepared, envelope := f.prepare(t, intent)
 			if active {
-				if prepared.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || len(prepared.GetChallengeProof()) != 0 || !prepared.GetStatus().GetVerification().GetConverged() {
+				if prepared.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || len(prepared.GetChallengeProof()) != 0 || prepared.GetStatus().GetVerification().GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED {
 					t.Fatal("no-drift work lacked durable read-only completion")
 				}
 			} else {
 				record, _ := serviceRow(t, f.svc, intent.GetActionId())
-				challenge := new(agentv1.ServiceExecutionChallenge)
+				challenge := new(agentv1.ResourceExecutionChallenge)
 				if err := f.svc.authority.Verify(t.Context(), prepared.GetChallengeProof(), challenge, 1, publicOf(durable(t, f.svc).GetIdentityPrivateKey())); err != nil || !proto.Equal(challenge, record.GetChallenge()) {
 					t.Fatalf("protected challenge proof mismatch: %v", err)
 				}
 			}
 			_, revision := serviceRow(t, f.svc, intent.GetActionId())
 			f.wall.Store(f.now.Add(6 * time.Minute).UnixNano())
-			retry, err := f.svc.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope}))
+			retry, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 			if err != nil || !proto.Equal(prepared, retry.Msg) {
 				t.Fatalf("expired prepare retry changed historical evidence: %v", err)
 			}
@@ -275,14 +320,14 @@ func TestServiceSignedPrepareReplayConflictAndNoDrift(t *testing.T) {
 			}
 			intent.DesiredRevision = uuid.NewString()
 			conflict := mustSign(t, f.svc.authority, intent, f.planKey)
-			if _, err := f.svc.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: conflict})); connect.CodeOf(err) != connect.CodeAlreadyExists {
+			if _, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: conflict})); connect.CodeOf(err) != connect.CodeAlreadyExists {
 				t.Fatalf("conflicting action UUID accepted: %v", err)
 			}
 		})
 	}
 }
 
-func TestServiceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
+func TestResourceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
 	f := newServiceFixture(t, false)
 	f.native.beforeGate, f.native.releaseGate = make(chan struct{}), make(chan struct{})
 	intent := f.intent(t, 1)
@@ -291,25 +336,25 @@ func TestServiceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
 	f.native.beforeEffect = func() error {
 		f.svc.mu.Lock()
 		defer f.svc.mu.Unlock()
-		record, _, err := f.svc.store.LoadServiceAction(context.Background(), intent.GetActionId())
+		record, _, err := f.svc.store.LoadResourceAction(context.Background(), intent.GetActionId())
 		if err != nil {
 			return err
 		}
-		if record.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING || record.GetStartedAt() == nil {
+		if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING || record.GetStartedAt() == nil {
 			return errors.New("effect preceded durable RUNNING")
 		}
 		return nil
 	}
 	ctx, cancel := context.WithCancel(t.Context())
-	response, err := f.svc.StartServiceExecution(ctx, connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}))
-	if err != nil || response.Msg.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED {
+	response, err := f.svc.StartResourceExecution(ctx, connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}))
+	if err != nil || response.Msg.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
 		t.Fatalf("start did not acknowledge durable queue: %v", err)
 	}
 	cancel()
 	waitBoundary(t, f.native.beforeGate)
 	close(f.native.releaseGate)
 	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
-	if terminal.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || f.native.effects.Load() != 1 {
+	if terminal.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || f.native.effects.Load() != 1 {
 		t.Fatal("RPC cancellation killed owned work or missing durable completion")
 	}
 	_, revision := serviceRow(t, f.svc, intent.GetActionId())
@@ -323,7 +368,7 @@ func TestServiceStartOwnedWorkerCommitAndHistoricalRetry(t *testing.T) {
 	}
 	changed := bytes.Clone(grant)
 	changed = append(changed, ' ')
-	if _, err := f.svc.StartServiceExecution(t.Context(), connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: changed})); connect.CodeOf(err) != connect.CodeAlreadyExists {
+	if _, err := f.svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: changed})); connect.CodeOf(err) != connect.CodeAlreadyExists {
 		t.Fatalf("different grant bytes accepted: %v", err)
 	}
 }
@@ -366,7 +411,7 @@ func TestServiceEffectGateRevalidatesExpiryTrustAndFloor(t *testing.T) {
 			close(f.native.releaseGate)
 			waitBoundary(t, f.native.finished)
 			terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
-			if terminal.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || terminal.GetStartedAt() != nil || f.native.effects.Load() != 0 {
+			if terminal.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || terminal.GetStartedAt() != nil || f.native.effects.Load() != 0 {
 				t.Fatal("stale queued authority reached effect")
 			}
 		})
@@ -400,16 +445,16 @@ func TestServiceRejectsWrongAuthorityBeforeNativePreflight(t *testing.T) {
 				f.svc.mu.Unlock()
 			}
 			envelope := mustSign(t, f.svc.authority, intent, key)
-			if _, err := f.svc.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope})); err == nil {
+			if _, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope})); err == nil {
 				t.Fatal("untrusted intent accepted")
 			}
 			if f.native.plans.Load() != 0 || f.native.effects.Load() != 0 {
 				t.Fatal("untrusted intent reached native provider")
 			}
 			f.svc.mu.Lock()
-			_, _, err := f.svc.store.LoadServiceAction(t.Context(), intent.GetActionId())
+			_, _, err := f.svc.store.LoadResourceAction(t.Context(), intent.GetActionId())
 			f.svc.mu.Unlock()
-			if !errors.Is(err, journal.ErrServiceActionNotFound) {
+			if !errors.Is(err, journal.ErrResourceActionNotFound) {
 				t.Fatalf("rejected intent changed durable journal: %v", err)
 			}
 		})
@@ -446,7 +491,7 @@ func TestServiceCloseJoinsWorkerAndBlocksAdmission(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = next.Close() })
 	result := startService(t, next, intent.GetActionId(), grant).GetStatus()
-	if result.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN || result.GetFailure() != agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_INTERRUPTED {
+	if result.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN || result.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_INTERRUPTED {
 		t.Fatal("Close did not persist uncertainty after RUNNING")
 	}
 }
@@ -475,7 +520,7 @@ func TestServiceRestartInvalidatesUnconsumedAndNeverReplaysRunning(t *testing.T)
 			}
 			if state != "prepared" && state != "queued" {
 				record, _ := serviceRow(t, f.svc, intent.GetActionId())
-				if err := f.svc.consumeServiceStart(t.Context(), record); err != nil {
+				if err := f.svc.consumeResourceStart(t.Context(), record); err != nil {
 					t.Fatal(err)
 				}
 				f.native.mu.Lock()
@@ -501,12 +546,12 @@ func TestServiceRestartInvalidatesUnconsumedAndNeverReplaysRunning(t *testing.T)
 				t.Fatal("same-boot restart retained incarnation")
 			}
 			result := awaitServiceTerminal(t, next, intent.GetActionId())
-			want := agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN
+			want := agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN
 			if state == "prepared" || state == "queued" {
-				want = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED
+				want = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
 			}
 			if state == "running-converged" {
-				want = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+				want = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 			}
 			if result.GetState() != want || f.native.applies.Load() != 0 || f.native.effects.Load() != 0 {
 				t.Fatalf("restart replayed or misclassified work: got %v want %v", result.GetState(), want)
@@ -528,26 +573,26 @@ func TestServiceHistoricalEvidenceChecksCryptographyAndRetainedCertificate(t *te
 	}
 	// Historical verification cannot depend on today's certificate public key.
 	loaded.identityPublic = publicOf(testKey(t))
-	if err := f.svc.verifyServiceRecord(t.Context(), loaded, record); err != nil {
+	if err := f.svc.verifyResourceRecord(t.Context(), loaded, record); err != nil {
 		t.Fatalf("retained certificate not used: %v", err)
 	}
-	for _, mutate := range []func(*agentv1.ServiceExecutionRecord){
-		func(r *agentv1.ServiceExecutionRecord) { r.ChallengeProof[len(r.ChallengeProof)/2] ^= 1 },
-		func(r *agentv1.ServiceExecutionRecord) {
+	for _, mutate := range []func(*agentv1.ResourceExecutionRecord){
+		func(r *agentv1.ResourceExecutionRecord) { r.ChallengeProof[len(r.ChallengeProof)/2] ^= 1 },
+		func(r *agentv1.ResourceExecutionRecord) {
 			r.AcceptedDelegationEnvelope[len(r.AcceptedDelegationEnvelope)/2] ^= 1
 		},
-		func(r *agentv1.ServiceExecutionRecord) {
+		func(r *agentv1.ResourceExecutionRecord) {
 			r.IntentEnvelope[len(r.IntentEnvelope)/2] ^= 1
 			r.IntentSha256 = digestBytes(r.IntentEnvelope)
 		},
-		func(r *agentv1.ServiceExecutionRecord) { r.NativePlan.ChangeRuntime = false },
-		func(r *agentv1.ServiceExecutionRecord) {
+		func(r *agentv1.ResourceExecutionRecord) { r.NativePlan.GetSystemdService().ChangeRuntime = false },
+		func(r *agentv1.ResourceExecutionRecord) {
 			r.ChallengeCertificatePem = f.fix.leaf(t, publicOf(testKey(t)), uuid.MustParse(intent.GetDeviceId()), uuid.MustParse(intent.GetEnrollmentGeneration()), f.now.Add(-time.Minute), f.now.Add(time.Hour))
 		},
 	} {
 		bad := proto.CloneOf(record)
 		mutate(bad)
-		if err := f.svc.verifyServiceRecord(t.Context(), loaded, bad); !errors.Is(err, errRecoveryHold) {
+		if err := f.svc.verifyResourceRecord(t.Context(), loaded, bad); !errors.Is(err, errRecoveryHold) {
 			t.Fatalf("corrupt protected evidence did not require hold: %v", err)
 		}
 	}
@@ -571,13 +616,13 @@ func TestServiceDamagedStoredSignatureEntersRecoveryHold(t *testing.T) {
 	f.svc.mu.Lock()
 	loaded, err := f.svc.load(t.Context())
 	if err == nil {
-		_, err = f.svc.store.AcceptServiceAction(t.Context(), loaded.revision, loaded.execution.revision, record)
+		_, err = f.svc.store.AcceptResourceAction(t.Context(), loaded.revision, loaded.execution.revision, record)
 	}
 	f.svc.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.svc.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: record.Intent.ActionId})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := f.svc.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: record.Intent.ActionId})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("corrupt signature was exposed: %v", err)
 	}
 	status, err := f.svc.Status(t.Context(), connect.NewRequest(&agentv1.StatusRequest{}))
@@ -598,12 +643,12 @@ func TestServiceDamagedStoredSignatureEntersRecoveryHold(t *testing.T) {
 	}
 }
 
-func TestServiceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
+func TestResourceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
 	f := newServiceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
 	record, revision := serviceRow(t, f.svc, intent.GetActionId())
-	valid := &agentv1.ServiceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}
+	valid := &agentv1.ResourceExecutionStartGrant{Challenge: record.GetChallenge(), ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: record.GetChallenge().GetIssuedAt(), ExpiresAt: record.GetChallenge().GetExpiresAt()}
 	for _, cause := range []string{"plan-role", "actor", "authorization-version", "nonce", "action", "root", "delegation"} {
 		grant := proto.CloneOf(valid)
 		key := f.startKey
@@ -624,7 +669,7 @@ func TestServiceStartRequiresSeparateExactlyBoundGrant(t *testing.T) {
 			grant.DelegationVersion++
 		}
 		envelope := mustSign(t, f.svc.authority, grant, key)
-		if _, err := f.svc.StartServiceExecution(t.Context(), connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: envelope})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		if _, err := f.svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: envelope})); connect.CodeOf(err) != connect.CodePermissionDenied {
 			t.Fatalf("%s grant was accepted: %v", cause, err)
 		}
 		current, after := serviceRow(t, f.svc, intent.GetActionId())
@@ -641,7 +686,7 @@ func TestServiceCloseCancelsPreflightBeforeReleasingStorage(t *testing.T) {
 	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
 	result := make(chan error, 1)
 	go func() {
-		_, err := f.svc.PrepareServiceExecution(context.Background(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope}))
+		_, err := f.svc.PrepareResourceExecution(context.Background(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 		result <- err
 	}()
 	waitBoundary(t, f.native.planEntered)
@@ -663,7 +708,7 @@ func TestServiceCloseCancelsPreflightBeforeReleasingStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = next.Close() })
-	if _, err := next.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: intent.GetActionId()})); connect.CodeOf(err) != connect.CodeNotFound {
+	if _, err := next.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: intent.GetActionId()})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("canceled preflight was durably accepted: %v", err)
 	}
 }
@@ -688,7 +733,7 @@ func TestServiceHistoricalCompletionSurvivesRotationAndRestart(t *testing.T) {
 	if got := startService(t, next, intent.GetActionId(), grant); !proto.Equal(got.GetStatus(), terminal) {
 		t.Fatal("revocation/restart invalidated historical grant evidence")
 	}
-	prepared, err := next.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{IntentEnvelope: envelope}))
+	prepared, err := next.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
 	if err != nil || !proto.Equal(prepared.Msg.GetStatus(), terminal) || f.native.applies.Load() != 1 {
 		t.Fatalf("historical preparation replayed after revocation: %v", err)
 	}
@@ -700,16 +745,16 @@ func TestServiceExpiryRetainsActualRollbackWallTime(t *testing.T) {
 	f.prepare(t, intent)
 	rolledBack := f.now.Add(-time.Second)
 	f.wall.Store(rolledBack.UnixNano())
-	response, err := f.svc.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: intent.GetActionId()}))
+	response, err := f.svc.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: intent.GetActionId()}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	status := response.Msg.GetStatus()
-	if status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED || !status.GetCompletedAt().AsTime().Equal(rolledBack) || !status.GetCompletedAt().AsTime().Before(status.GetAcceptedAt().AsTime()) {
+	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || !status.GetCompletedAt().AsTime().Equal(rolledBack) || !status.GetCompletedAt().AsTime().Before(status.GetAcceptedAt().AsTime()) {
 		t.Fatal("rollback expiry fabricated monotonic wall time")
 	}
 	// The actual earlier wall completion remains valid historical evidence.
-	if _, err := f.svc.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: intent.GetActionId()})); err != nil {
+	if _, err := f.svc.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: intent.GetActionId()})); err != nil {
 		t.Fatalf("actual rollback wall time became recovery hold: %v", err)
 	}
 }
@@ -735,10 +780,62 @@ func TestServiceEffectGateChecksDeadlineAgainAfterDurableCommit(t *testing.T) {
 	close(f.native.releaseGate)
 	waitBoundary(t, f.native.finished)
 	terminal := awaitServiceTerminal(t, f.svc, intent.GetActionId())
-	if terminal.GetStartedAt() == nil || terminal.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN || f.native.effects.Load() != 0 {
+	if terminal.GetStartedAt() == nil || terminal.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN || f.native.effects.Load() != 0 {
 		t.Fatal("durable commit extended the native start deadline")
 	}
 	if retry := startService(t, f.svc, intent.GetActionId(), grant); !proto.Equal(retry.GetStatus(), terminal) || f.native.applies.Load() != 1 {
 		t.Fatal("consumed postcommit rejection was reexecuted")
+	}
+}
+
+func boundaryBackend() *resourcev1.BackendSelection {
+	return &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "fixture", ProviderVersion: "fixture", Product: &resourcev1.PlatformProduct{OsId: "fixture", Product: "Fixture Linux", Version: "1", Architecture: "x86_64"}}
+}
+
+func (n *boundaryNative) envelope(observation *resourcev1.SystemdServiceObservation, backend *resourcev1.BackendSelection) *resourcev1.ResourceObservation {
+	return &resourcev1.ResourceObservation{
+		Ref:      &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: observation.GetUnit()},
+		Metadata: &resourcev1.ObservationMetadata{BootId: observation.GetBootId(), ExecutorIncarnation: n.incarnation, ObservedAt: observation.GetObservedAt(), Backend: proto.CloneOf(backend), NativeRevision: bytes.Clone(observation.GetFingerprintSha256()), ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK},
+		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: observation},
+	}
+}
+
+func TestResourceIntentCannotBorrowSystemdCapability(t *testing.T) {
+	f := newServiceFixture(t, false)
+	intent := f.intent(t, 1)
+	intent.Desired = &resourcev1.ResourceDesiredState{
+		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "operators"},
+		State: &resourcev1.ResourceDesiredState_LocalGroup{LocalGroup: &resourcev1.LocalGroupDesired{Name: "operators", Presence: resourcev1.Presence_PRESENCE_PRESENT}},
+	}
+	envelope := mustSign(t, f.svc.authority, intent, f.planKey)
+	if _, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("systemd-only signer authorized local group: %v", err)
+	}
+	if f.native.plans.Load() != 0 || f.native.effects.Load() != 0 {
+		t.Fatal("cross-kind intent reached native provider")
+	}
+}
+
+func TestResourceGrantBindsKindAndOperation(t *testing.T) {
+	for _, change := range []string{"kind", "operation"} {
+		t.Run(change, func(t *testing.T) {
+			f := newServiceFixture(t, false)
+			intent := f.intent(t, 1)
+			f.prepare(t, intent)
+			record, _ := serviceRow(t, f.svc, intent.GetActionId())
+			challenge := proto.CloneOf(record.GetChallenge())
+			if change == "kind" {
+				challenge.Ref = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "operators"}
+			} else {
+				challenge.Operation = resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE
+			}
+			grant := mustSign(t, f.svc.authority, &agentv1.ResourceExecutionStartGrant{Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt()}, f.startKey)
+			if _, err := f.svc.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant})); connect.CodeOf(err) != connect.CodePermissionDenied {
+				t.Fatalf("mismatched %s start grant accepted: %v", change, err)
+			}
+			if f.native.effects.Load() != 0 {
+				t.Fatal("mismatched grant performed an effect")
+			}
+		})
 	}
 }

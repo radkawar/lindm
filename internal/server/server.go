@@ -217,6 +217,13 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	deviceMux := http.NewServeMux()
 	path, handler = devices.DeviceHandler()
 	deviceMux.Handle(path, handler)
+	if len(resources.Proto.GetConnectivityProbes()) != 0 {
+		confirmation, err := devices.ConnectivityConfirmationHandler(resources.Proto.GetConnectivityProbes())
+		if err != nil {
+			return fmt.Errorf("configure native connectivity confirmation: %w", err)
+		}
+		deviceMux.Handle(device.ConnectivityConfirmationPath, confirmation)
+	}
 
 	requestContext, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelRequests()

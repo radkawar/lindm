@@ -202,8 +202,8 @@ message OwnershipPolicy {
   bool complete_membership_dimension = 4;
   option (buf.validate.message).cel = {
     id: "ownership_policy.approval"
-    message: "adoption requires an approval binding"
-    expression: "(this.mode == 2) == has(this.adoption_approval_id)"
+    message: "an approval binding is only valid for approved adoption"
+    expression: "!has(this.adoption_approval_id) || this.mode == 2"
   };
 }
 enum HealthCheck {
@@ -242,10 +242,9 @@ message PlatformProduct {
     min_len: 1
     max_len: 128
   }];
-  string version = 3 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 128
-  }];
+  // Empty only when native VERSION_ID is unavailable; not a wildcard or
+  // evidence of a successful version match.
+  string version = 3 [(buf.validate.field).string = {max_len: 128}];
   string architecture = 4 [(buf.validate.field).string = {
     min_len: 1
     max_len: 64
@@ -323,6 +322,9 @@ enum Backend {
   BACKEND_SSSD = 33;
   BACKEND_NSS_TRUST = 34;
   BACKEND_JAVA_TRUST = 35;
+  BACKEND_POSIX_FILE = 36;
+  BACKEND_PROC_SYSCTL = 37;
+  BACKEND_LUKS_COMPLIANCE = 38;
 }
 message BackendSelection {
   Backend backend = 1 [(buf.validate.field).enum = {

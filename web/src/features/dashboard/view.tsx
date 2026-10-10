@@ -609,21 +609,17 @@ function ActionRecord({ action }: { action: FleetRecentAction }) {
         aria-label="Server action record details"
       >
         <StatusBadge
-          status={
-            action.outcomeUnknown
-              ? "warning"
-              : action.closedAt || action.closedReason
-                ? "neutral"
-                : "info"
-          }
+          status={action.outcomeUnknown ? "warning" : action.closedAt ? "neutral" : "info"}
         >
           {action.outcomeUnknown
             ? "Outcome unknown"
-            : action.closedAt || action.closedReason
+            : action.closedAt
               ? "Closed"
-              : action.startAuthorizedAt
-                ? "Start authorized"
-                : "Issued"}
+              : action.kind === "resource" && action.closedReason
+                ? "Cancellation requested"
+                : action.startAuthorizedAt
+                  ? "Start authorized"
+                  : "Issued"}
         </StatusBadge>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">

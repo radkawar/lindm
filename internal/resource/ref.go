@@ -78,6 +78,25 @@ func ValidateRef(ref *resourcev1.ResourceRef) error {
 		}
 	case resourcev1.ResourceKind_RESOURCE_KIND_CERTIFICATE_ENROLLMENT:
 		valid = len(parts) == 4 && isCanonicalUUID(parts[0]) && (parts[1] == "device" || parts[1] == "person") && isCanonicalUUID(parts[2]) && isCanonicalUUID(parts[3])
+	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
+		identity = &resourcev1.ManagedFileDesired{Path: key, Presence: resourcev1.Presence_PRESENCE_ABSENT}
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:
+		identity = &resourcev1.SysctlDesired{Key: key, Value: "0"}
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
+		if len(parts) == 2 {
+			switch parts[0] {
+			case "timer":
+				identity = &resourcev1.TimerDefinition{
+					Unit:     parts[1],
+					Service:  &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "example.service"},
+					Schedule: &resourcev1.TimerSchedule{Schedule: &resourcev1.TimerSchedule_IntervalSeconds{IntervalSeconds: 1}},
+				}
+			case "drop-in":
+				identity = &resourcev1.ServiceDropIn{Unit: parts[1], CpuWeight: proto.Uint32(100)}
+			}
+		}
+	case resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE:
+		valid = key == "system/root"
 	}
 	if identity != nil {
 		valid = rules.Validate(identity) == nil

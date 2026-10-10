@@ -62,10 +62,11 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.UpdateExecutionTrustRequest{},
 		&agentv1.GetExecutionTrustRequest{},
 		&agentv1.GetRecoveryReadinessRequest{},
-		&agentv1.PrepareServiceExecutionRequest{},
-		&agentv1.StartServiceExecutionRequest{},
-		&agentv1.GetServiceExecutionRequest{},
-		&agentv1.AttestServiceExecutionRequest{},
+		&agentv1.PrepareResourceExecutionRequest{},
+		&agentv1.CancelResourcePreparationRequest{},
+		&agentv1.StartResourceExecutionRequest{},
+		&agentv1.GetResourceExecutionRequest{},
+		&agentv1.AttestResourceExecutionRequest{},
 		&agentv1.PrepareDeviceActionRequest{},
 		&agentv1.StartDeviceActionRequest{},
 		&agentv1.GetDeviceActionRequest{},
@@ -157,10 +158,11 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure ||
-		procedure == agentv1connect.ExecutorServicePrepareServiceExecutionProcedure ||
-		procedure == agentv1connect.ExecutorServiceStartServiceExecutionProcedure ||
-		procedure == agentv1connect.ExecutorServiceGetServiceExecutionProcedure ||
-		procedure == agentv1connect.ExecutorServiceAttestServiceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServicePrepareResourceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServiceCancelResourcePreparationProcedure ||
+		procedure == agentv1connect.ExecutorServiceStartResourceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetResourceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServiceAttestResourceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareDeviceActionProcedure ||
 		procedure == agentv1connect.ExecutorServiceStartDeviceActionProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetDeviceActionProcedure ||

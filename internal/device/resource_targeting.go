@@ -84,7 +84,7 @@ func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candid
 	return out, nil
 }
 
-func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, authorizationVersion uint64) error {
+func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, authorizationVersion uint64, adoptionApprovalID string) error {
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(preview.GetResolution())
 	if err != nil {
 		return err
@@ -101,6 +101,9 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 			return rpcError(connect.CodeFailedPrecondition, "resource_resolution_conflict")
 		}
 		resources = append(resources, proto.CloneOf(item.GetResource()))
+	}
+	if resourceAdoptionRequired(resources) && adoptionApprovalID == "" {
+		return rpcError(connect.CodePermissionDenied, "approval_required")
 	}
 	ordered, err := orderedServiceResources(resources)
 	if err != nil {
@@ -141,6 +144,15 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if err := insertResourceRows(ctx, q, id, ordered); err != nil {
 		return err
 	}
+	if resourceAdoptionRequired(resources) {
+		approvalID, err := uuid.Parse(adoptionApprovalID)
+		if err != nil {
+			return rpcError(connect.CodePermissionDenied, "approval_invalid")
+		}
+		if err := q.SetResourceAssignmentAdoptionApproval(ctx, devicedb.SetResourceAssignmentAdoptionApprovalParams{ID: id, AdoptionApprovalID: &approvalID}); err != nil {
+			return err
+		}
+	}
 	if headErr == nil {
 		if err := q.RecordResourceReleases(ctx, devicedb.RecordResourceReleasesParams{NewAssignmentID: id, OldAssignmentID: head.ID, RequestedAt: timestamptz(now)}); err != nil {
 			return err
@@ -151,7 +163,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	}
 	action, err := q.GetOpenServiceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
-		if err := closeUnstartedServiceAction(ctx, q, action, "assignment_changed", now); err != nil {
+		if err := closeUnstartedServiceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return err
 		}
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {

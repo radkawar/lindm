@@ -28,10 +28,10 @@ const (
 // timestamps and retains the authenticated guest challenge timestamps. It is lab
 // provenance, not an additional device signature or an authorization extension.
 type ServiceClockEvidence struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	HostBefore    *timestamppb.Timestamp        `protobuf:"bytes,1,opt,name=host_before,json=hostBefore,proto3" json:"host_before,omitempty"`
-	HostAfter     *timestamppb.Timestamp        `protobuf:"bytes,2,opt,name=host_after,json=hostAfter,proto3" json:"host_after,omitempty"`
-	Challenge     *v1.ServiceExecutionChallenge `protobuf:"bytes,3,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	HostBefore    *timestamppb.Timestamp         `protobuf:"bytes,1,opt,name=host_before,json=hostBefore,proto3" json:"host_before,omitempty"`
+	HostAfter     *timestamppb.Timestamp         `protobuf:"bytes,2,opt,name=host_after,json=hostAfter,proto3" json:"host_after,omitempty"`
+	Challenge     *v1.ResourceExecutionChallenge `protobuf:"bytes,3,opt,name=challenge,proto3" json:"challenge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,7 +80,7 @@ func (x *ServiceClockEvidence) GetHostAfter() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *ServiceClockEvidence) GetChallenge() *v1.ServiceExecutionChallenge {
+func (x *ServiceClockEvidence) GetChallenge() *v1.ResourceExecutionChallenge {
 	if x != nil {
 		return x.Challenge
 	}
@@ -91,13 +91,13 @@ var File_lindm_lab_v1_service_execution_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/lab/v1/service_execution.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/agent/v1/service_execution.proto\"\xef\x01\n" +
+	"$lindm/lab/v1/service_execution.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/agent/v1/service_execution.proto\"\xf0\x01\n" +
 	"\x14ServiceClockEvidence\x12C\n" +
 	"\vhost_before\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"hostBefore\x12A\n" +
 	"\n" +
-	"host_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\thostAfter\x12O\n" +
-	"\tchallenge\x18\x03 \x01(\v2).lindm.agent.v1.ServiceExecutionChallengeB\x06\xbaH\x03\xc8\x01\x01R\tchallengeB\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
+	"host_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\thostAfter\x12P\n" +
+	"\tchallenge\x18\x03 \x01(\v2*.lindm.agent.v1.ResourceExecutionChallengeB\x06\xbaH\x03\xc8\x01\x01R\tchallengeB\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
 
 var (
 	file_lindm_lab_v1_service_execution_proto_rawDescOnce sync.Once
@@ -113,14 +113,14 @@ func file_lindm_lab_v1_service_execution_proto_rawDescGZIP() []byte {
 
 var file_lindm_lab_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_lindm_lab_v1_service_execution_proto_goTypes = []any{
-	(*ServiceClockEvidence)(nil),         // 0: lindm.lab.v1.ServiceClockEvidence
-	(*timestamppb.Timestamp)(nil),        // 1: google.protobuf.Timestamp
-	(*v1.ServiceExecutionChallenge)(nil), // 2: lindm.agent.v1.ServiceExecutionChallenge
+	(*ServiceClockEvidence)(nil),          // 0: lindm.lab.v1.ServiceClockEvidence
+	(*timestamppb.Timestamp)(nil),         // 1: google.protobuf.Timestamp
+	(*v1.ResourceExecutionChallenge)(nil), // 2: lindm.agent.v1.ResourceExecutionChallenge
 }
 var file_lindm_lab_v1_service_execution_proto_depIdxs = []int32{
 	1, // 0: lindm.lab.v1.ServiceClockEvidence.host_before:type_name -> google.protobuf.Timestamp
 	1, // 1: lindm.lab.v1.ServiceClockEvidence.host_after:type_name -> google.protobuf.Timestamp
-	2, // 2: lindm.lab.v1.ServiceClockEvidence.challenge:type_name -> lindm.agent.v1.ServiceExecutionChallenge
+	2, // 2: lindm.lab.v1.ServiceClockEvidence.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name

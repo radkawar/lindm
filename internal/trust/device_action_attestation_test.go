@@ -14,7 +14,7 @@ import (
 )
 
 func TestDeviceActionAttestationRejectsReplayAndForeignCertificates(t *testing.T) {
-	f := newServiceAttestationFixture(t)
+	f := newResourceAttestationFixture(t)
 	binding := DeviceActionAttestationBinding{
 		DeploymentID: f.binding.DeploymentID, DeviceID: f.binding.DeviceID, EnrollmentGeneration: f.binding.EnrollmentGeneration,
 		SessionEpoch: f.binding.SessionEpoch, ActionID: f.binding.ActionID, IntentSHA256: f.binding.IntentSHA256, Nonce: f.binding.Nonce,
@@ -82,7 +82,7 @@ func TestDeviceActionAttestationRejectsReplayAndForeignCertificates(t *testing.T
 			t.Fatal("foreign or unsuitable certificate accepted")
 		}
 	}
-	wrongDomain := signDeviceActionUnchecked(t, attestation, ServiceAttestationType, f.key)
+	wrongDomain := signDeviceActionUnchecked(t, attestation, ResourceAttestationType, f.key)
 	if _, err := f.authority.VerifyDeviceActionAttestation(t.Context(), wrongDomain, f.certificatePEM, f.ca, &binding, f.now, 0); err == nil {
 		t.Fatal("service domain accepted as device action")
 	}

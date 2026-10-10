@@ -14,20 +14,22 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
 )
 
 // One action is in flight per device, just as on the server. Retain the prepared
 // challenge and terminal history until a report is acknowledged, not just until
 // the RPC returns: admission failures and lost replies do not undo execution.
 type pendingService struct {
-	work      *devicev1.ServiceWork
-	intent    *agentv1.ServiceExecutionIntent
-	challenge *agentv1.ServiceExecutionChallenge
+	work      *devicev1.ResourceWork
+	intent    *agentv1.ResourceExecutionIntent
+	challenge *agentv1.ResourceExecutionChallenge
 	proof     []byte
 	grant     []byte
 	deadline  time.Time
-	status    *agentv1.ServiceExecutionStatus
-	report    *devicev1.ReportServiceResultRequest
+	status    *agentv1.ResourceExecutionStatus
+	report    *devicev1.ReportResourceResultRequest
 	reportEnd time.Time
 }
 
@@ -40,7 +42,7 @@ func (r *runner) dispatch(ctx context.Context, d *simulatedDevice) error {
 	if p != nil && p.report != nil && time.Now().Before(p.reportEnd) && time.Now().Before(p.work.GetResultNonceExpiresAt().AsTime()) {
 		return r.reportService(ctx, d)
 	}
-	response, err := d.client.GetServiceWork(ctx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: d.epoch}))
+	response, err := d.client.GetResourceWork(ctx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: d.epoch}))
 	if err != nil {
 		return err
 	}
@@ -74,24 +76,24 @@ func (r *runner) dispatch(ctx context.Context, d *simulatedDevice) error {
 		}
 		d.pending = p
 	}
-	if p.status.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED {
+	if p.status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
 		if err := r.startService(ctx, d, p); err != nil {
 			return err
 		}
 	}
 	now := time.Now().UTC()
-	attestation := &agentv1.ServiceExecutionAttestation{DeploymentId: p.intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, ActionRevision: 1, Nonce: p.work.GetResultNonce(), IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: p.status}
+	attestation := &agentv1.ResourceExecutionAttestation{DeploymentId: p.intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, ActionRevision: 1, Nonce: p.work.GetResultNonce(), IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: p.status}
 	envelope, err := r.authority.Sign(ctx, attestation, d.key)
 	if err != nil {
 		return err
 	}
-	p.report = &devicev1.ReportServiceResultRequest{SessionEpoch: d.epoch, ActionId: p.intent.GetActionId(), AttestationEnvelope: envelope, CertificatePem: d.certificate}
+	p.report = &devicev1.ReportResourceResultRequest{SessionEpoch: d.epoch, ActionId: p.intent.GetActionId(), AttestationEnvelope: envelope, CertificatePem: d.certificate}
 	p.reportEnd = attestation.GetExpiresAt().AsTime()
 	return r.reportService(ctx, d)
 }
 
-func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *devicev1.ServiceWork) (*pendingService, error) {
-	intent, err := r.verifier.VerifyServiceIntent(ctx, d.root, d.delegation, work.GetIntentEnvelope(), time.Now())
+func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *devicev1.ResourceWork) (*pendingService, error) {
+	intent, err := r.verifier.VerifyResourceIntent(ctx, d.root, d.delegation, work.GetIntentEnvelope(), time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -106,37 +108,58 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 	now := time.Now()
 	accepted := timestamppb.New(now)
 	digest := sha256.Sum256(work.GetIntentEnvelope())
-	before := &agentv1.ServiceObservation{Unit: intent.GetDesired().GetUnit(), BootId: d.boot, ObservedAt: accepted, LoadState: "loaded", ActiveState: "inactive", DefinitionSha256: digest[:], FingerprintSha256: digest[:]}
-	plan := &agentv1.ServicePlan{Desired: intent.GetDesired(), Before: before, ChangeRuntime: true}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(plan)
+	native := &resourcev1.SystemdServiceObservation{Unit: intent.GetDesired().GetRef().GetCanonicalKey(), BootId: d.boot, ObservedAt: accepted, LoadState: "loaded", ActiveState: "inactive", DefinitionSha256: digest[:], FingerprintSha256: digest[:]}
+	before := &resourcev1.ResourceObservation{
+		Ref: intent.GetDesired().GetRef(),
+		Metadata: &resourcev1.ObservationMetadata{
+			BootId: d.boot, ExecutorIncarnation: d.incarnation, ObservedAt: accepted, NativeRevision: digest[:],
+			ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK,
+			Backend:           &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "synthetic", ProviderVersion: "loadlab-synthetic", Product: &resourcev1.PlatformProduct{OsId: "synthetic", Product: "protocol load fixture", Version: "1", Architecture: "synthetic"}},
+		},
+		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: native},
+	}
+	desiredDigest, err := resource.DesiredDigest(intent.GetDesired())
 	if err != nil {
 		return nil, err
 	}
-	planDigest := sha256.Sum256(encoded)
+	observedDigest, err := resource.ObservationDigest(before)
+	if err != nil {
+		return nil, err
+	}
+	plan := &resourcev1.ResourcePlan{
+		Ref: intent.GetDesired().GetRef(), Operation: intent.GetOperation(), DesiredSha256: desiredDigest[:],
+		ObservationSha256: observedDigest[:], Backend: before.GetMetadata().GetBackend(), Before: before, OwnershipRevisionSha256: digest[:],
+		Safety: &resourcev1.PlanSafety{LockDomains: []resourcev1.ClaimDomain{resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME}, Reversibility: resourcev1.Reversibility_REVERSIBILITY_PARTIAL, RollbackScope: resourcev1.RollbackScope_ROLLBACK_SCOPE_NONE, Confirmation: resourcev1.ConfirmationPolicy_CONFIRMATION_POLICY_NOT_REQUIRED},
+		Plan:   &resourcev1.ResourcePlan_SystemdService{SystemdService: &resourcev1.SystemdServicePlan{Desired: intent.GetDesired().GetSystemdService(), Before: native, ChangeRuntime: true}},
+	}
+	planDigest, err := resource.PlanDigest(plan)
+	if err != nil {
+		return nil, err
+	}
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, err
 	}
 	deadline := now.Add(min(30*time.Second, intent.GetExpiresAt().AsTime().Sub(now)))
-	challenge := &agentv1.ServiceExecutionChallenge{DeploymentId: intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, ActionId: intent.GetActionId(), DesiredRevision: intent.GetDesiredRevision(), ResourceSequence: intent.GetResourceSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(), IntentSha256: digest[:], NativePlanSha256: planDigest[:], Nonce: nonce, BootId: d.boot, ExecutorIncarnation: d.incarnation, IssuedAt: accepted, ExpiresAt: timestamppb.New(deadline)}
+	challenge := &agentv1.ResourceExecutionChallenge{DeploymentId: intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, ActionId: intent.GetActionId(), DesiredRevision: intent.GetDesiredRevision(), Ref: intent.GetDesired().GetRef(), Operation: intent.GetOperation(), ResourceSequence: intent.GetResourceSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(), IntentSha256: digest[:], NativePlanSha256: planDigest[:], Nonce: nonce, BootId: d.boot, ExecutorIncarnation: d.incarnation, IssuedAt: accepted, ExpiresAt: timestamppb.New(deadline)}
 	proof, err := r.authority.Sign(ctx, challenge, d.key)
 	if err != nil {
 		return nil, err
 	}
-	status := &agentv1.ServiceExecutionStatus{ActionId: intent.GetActionId(), IntentSha256: digest[:], State: agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED, Failure: agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE, AcceptedAt: accepted, Before: before}
+	status := &agentv1.ResourceExecutionStatus{ActionId: intent.GetActionId(), IntentSha256: digest[:], State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE, AcceptedAt: accepted, Before: before}
 	return &pendingService{work: work, intent: intent, challenge: challenge, proof: proof, deadline: deadline, status: status}, nil
 }
 
 func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendingService) error {
 	if !time.Now().Before(p.deadline) {
-		p.status.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED
-		p.status.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_EXPIRED
+		p.status.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
+		p.status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED
 		p.status.CompletedAt = stamp()
 		return nil
 	}
 	p.grant = p.work.GetStartGrantEnvelope()
 	if len(p.grant) == 0 {
-		started, err := d.client.AuthorizeServiceStart(ctx, connect.NewRequest(&devicev1.AuthorizeServiceStartRequest{SessionEpoch: d.epoch, ActionId: p.intent.GetActionId(), ChallengeProof: p.proof}))
+		started, err := d.client.AuthorizeResourceStart(ctx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: d.epoch, ActionId: p.intent.GetActionId(), ChallengeProof: p.proof}))
 		if err != nil {
 			return err
 		}
@@ -145,28 +168,37 @@ func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendin
 	now := time.Now()
 	// A delayed authorization does not extend the executor's challenge window.
 	if !now.Before(p.deadline) {
-		p.status.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED
-		p.status.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_EXPIRED
+		p.status.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED
+		p.status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED
 		p.status.CompletedAt = timestamppb.New(now)
 		return nil
 	}
-	_, err := r.verifier.VerifyServiceStart(ctx, d.root, d.delegation, p.grant, p.intent, p.challenge, now)
+	_, err := r.verifier.VerifyResourceStart(ctx, d.root, d.delegation, p.grant, p.intent, p.challenge, now)
 	if err != nil {
 		return err
 	}
 	after := proto.CloneOf(p.status.GetBefore())
-	after.ActiveState = "active"
-	after.ObservedAt = stamp()
-	p.status.State = agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+	after.GetSystemdService().ActiveState = "active"
+	after.Metadata.ObservedAt = stamp()
+	after.GetSystemdService().ObservedAt = after.Metadata.ObservedAt
+	p.status.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	p.status.StartedAt = timestamppb.New(now)
-	p.status.CompletedAt = after.ObservedAt
-	p.status.Verification = &agentv1.ServiceVerification{Observation: after, RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, Converged: true}
+	p.status.CompletedAt = after.GetMetadata().GetObservedAt()
+	desiredDigest, err := resource.DesiredDigest(p.intent.GetDesired())
+	if err != nil {
+		return err
+	}
+	p.status.Verification = &resourcev1.ResourceVerification{
+		Ref: p.intent.GetDesired().GetRef(), DesiredSha256: desiredDigest[:], PlanSha256: p.challenge.GetNativePlanSha256(),
+		After: after, Disposition: resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED,
+		Checks: &resourcev1.ResourceVerification_SystemdService{SystemdService: &resourcev1.SystemdServiceChecks{Observation: after.GetSystemdService(), RuntimeMatches: true, EnablementMatches: true, DefinitionMatches: true, JobCompleted: true, Converged: true}},
+	}
 	return nil
 }
 
 func (r *runner) reportService(ctx context.Context, d *simulatedDevice) error {
 	p := d.pending
-	reported, err := d.client.ReportServiceResult(ctx, connect.NewRequest(p.report))
+	reported, err := d.client.ReportResourceResult(ctx, connect.NewRequest(p.report))
 	if err != nil {
 		return err
 	}
@@ -174,7 +206,7 @@ func (r *runner) reportService(ctx context.Context, d *simulatedDevice) error {
 		return errors.New("terminal simulated action was not closed")
 	}
 	d.serviceSequence = p.intent.GetResourceSequence()
-	if p.status.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+	if p.status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 		if len(d.completed) == 0 {
 			r.completedDevices.Add(1)
 		}

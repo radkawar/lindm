@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/config.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/observations.proto";
+import "lindm/resource/v1/plans.proto";
+import "lindm/resource/v1/resource.proto";
+import "lindm/resource/v1/software.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Private root-owned transaction data. This is not an RPC or execution grant.
+enum NativePackageHelperOperation {
+  NATIVE_PACKAGE_HELPER_OPERATION_UNSPECIFIED = 0;
+  NATIVE_PACKAGE_HELPER_OPERATION_PREPARE = 1;
+  NATIVE_PACKAGE_HELPER_OPERATION_APPLY = 2;
+}
+
+message NativePackageTransactionRequest {
+  NativePackageHelperOperation operation = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.ResourceDesiredState desired = 2 [(buf.validate.field).required = true];
+  lindm.resource.v1.NativePackageDesired effective_desired = 3 [(buf.validate.field).required = true];
+  NativePackageSource source = 4 [(buf.validate.field).required = true];
+  string transaction_id = 5 [(buf.validate.field).string.uuid = true];
+  bytes expected_database_revision = 6 [(buf.validate.field).bytes.len = 32];
+  lindm.resource.v1.PackageTransactionManifest manifest = 7;
+  lindm.resource.v1.ResourcePlan plan = 8;
+  lindm.resource.v1.PlatformProduct platform = 9 [(buf.validate.field).required = true];
+  string action_id = 10 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 11 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp staging_expires_at = 12 [(buf.validate.field).required = true];
+  // Authenticated declared bytes plus bounded metadata, not a filesystem quota.
+  uint64 staging_max_bytes = 13 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 4294967296
+  }];
+  bytes intent_sha256 = 14 [(buf.validate.field).bytes.len = 32];
+  // PREPARE-only read-only projection at the fixed native DNF5 versionlock path.
+  optional bytes candidate_pin_contents = 15 [(buf.validate.field).bytes.max_len = 32768];
+  optional bytes candidate_pin_sha256 = 16 [(buf.validate.field).bytes.len = 32];
+  lindm.resource.v1.FileIdentity original_pin = 17;
+  option (buf.validate.message).cel = {
+    id: "native_package_helper.pin_projection"
+    message: "pin projection binds existing native RPM versionlock evidence and exact candidate bytes"
+    expression: "has(this.candidate_pin_contents) == has(this.candidate_pin_sha256) && has(this.candidate_pin_contents) == has(this.original_pin) && (!has(this.original_pin) || (this.desired.native_package.package.ecosystem == 2 && this.original_pin.path == '/etc/dnf/versionlock.toml'))"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_package_helper.request_kind"
+    message: "native package helper accepts only package resources and exact package identity"
+    expression: "this.desired.ref.kind == 12 && has(this.desired.native_package) && this.desired.native_package.package == this.effective_desired.package"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_package_helper.apply_binding"
+    message: "application requires the complete admitted plan and transaction manifest"
+    expression: "this.operation != 2 || (has(this.manifest) && has(this.plan) && this.plan.ref == this.desired.ref && has(this.plan.native_package) && this.plan.native_package.desired == this.desired.native_package)"
+  };
+}
+
+message NativePackageStagingCancellation {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+}

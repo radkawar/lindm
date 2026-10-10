@@ -9,13 +9,13 @@ and 16, and SLED 15 SP7, are separate enterprise product rows, not results inher
 from openSUSE. [Verification](../verification.md#1-launch-platform-qualification)
 is authoritative; no complete release cell is certified (`docs/verification.md:155-175,770-815`).
 
-| Input                                         | Recorded boundary                                                                                                          |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Leap 16.0 Minimal-VM Cloud Build18.75, x86_64 | Authenticated acquisition; native inspection failed, no lifecycle or dispatch pass.                                        |
-| Tumbleweed Cloud Snapshot20261007, x86_64     | Authenticated acquisition and offline cache verification only; no native inspection/lifecycle pass.                        |
-| Leap 16.0 Build18.75, aarch64                 | Authenticated acquisition and offline verification only; not an expansion of the x86_64 launch allocation.                 |
-| Tumbleweed aarch64                            | No maintained cloud-image/installer-to-golden input; signed DVD/NET availability is not an installed guest.                |
-| SLES/SLED                                     | Required independent vendor installation, entitlement and native lifecycle evidence; openSUSE results do not qualify them. |
+| Input                                         | Recorded boundary                                                                                                                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Leap 16.0 Minimal-VM Cloud Build18.75, x86_64 | Authenticated acquisition; inspection exited 1 for the ndb rpmdb cause diagnosed below. Fixed, but no x86_64 rerun, lifecycle or dispatch pass yet.                                  |
+| Tumbleweed Cloud Snapshot20261007, x86_64     | Authenticated acquisition and offline cache verification only; no native inspection/lifecycle pass.                                                                                  |
+| Leap 16.0 Build18.75, aarch64                 | Native inspection (376 RPMs), full signed lifecycle and connected dispatch passed on dgx21 KVM after the ndb and disk fixes below; not an expansion of the x86_64 launch allocation. |
+| Tumbleweed aarch64                            | No maintained cloud-image/installer-to-golden input; signed DVD/NET availability is not an installed guest.                                                                          |
+| SLES/SLED                                     | Required independent vendor installation, entitlement and native lifecycle evidence; openSUSE results do not qualify them.                                                           |
 
 These boundaries are recorded in `docs/verification.md:177-220,267-304`.
 
@@ -68,9 +68,15 @@ provisioned per-target exception; never disable the persistent device sandbox.
 
 - RPM inventory uses native name, epoch, version, release, architecture and module
   fields. Supported database locations include `/usr/lib/sysimage/rpm` and
-  `/var/lib/rpm`; zypper presence is a separate capability, not the package manager
-  name stored on each package
-  ([`packages_linux.go`](../../internal/agent/inventory/packages_linux.go):46-101;
+  `/var/lib/rpm`, in sqlite, BerkeleyDB and **ndb** form. Leap 16.0 defaults to
+  rpm's ndb backend: the Build18.75 image ships only
+  `Index.db`/`Packages.db`. Before that marker was recognised the agent reported
+  package collection `UNAVAILABLE` and `lindm-agent inspect` exited 1 with exactly
+  the earlier 63 stderr bytes (`lindm-agent: package collection: COLLECTION_STATUS_UNAVAILABLE`).
+  zypper presence is a separate capability, not the package manager name stored on
+  each package
+  ([`packages_linux.go`](../../internal/agent/inventory/packages_linux.go):51-104;
+  [`mutable_packages_linux_test.go`](../../internal/agent/inventory/mutable_packages_linux_test.go):15-41;
   [`vm_distribution_linux_test.go`](../../internal/vmlab/vm_distribution_linux_test.go):55-78).
 - Native package warnings/failures invalidate a complete observation rather than
   publishing a successful partial list
@@ -168,17 +174,51 @@ Recorded acquisition evidence, not new checks performed for this page:
 | `~/.cache/lindm-mutabledistros3-20261010/arm64-acquisition.json`                              | `1c7b1bfe9711e92d513c768a72cfddc430bdc3dc3dac601e52c2885651d0d5fb` | Eight ARM inputs including Leap; acquisition only. |
 
 The first two hashes are recorded in the retained `evidence-index.json`; the ARM
-record is also cited in `docs/verification.md:267-272`. Leap x86_64 BIOS exited;
-UEFI reached inspection after lab boot-time/SSH fixes but the agent exited 1 with
-63 stderr bytes. The root cause remains unresolved, not inferred from that byte
-count (`docs/verification.md:196,216-217`). Raw diagnostics remain private.
+record is also cited in `docs/verification.md`. Leap x86_64 BIOS exited; UEFI
+reached inspection after lab boot-time/SSH fixes, then the agent exited 1 with 63
+stderr bytes. The ARM diagnostic below captured those bytes: package collection
+was `UNAVAILABLE` because the ndb `Packages.db` marker was not recognised. Raw
+diagnostics remain private.
+
+### Leap 16.0 aarch64 native records (2026-10-10)
+
+Two Leap-specific defects were fixed with regressions before the passes:
+
+- **ndb rpmdb** (agent): `Packages.db` added to the RPM database markers;
+  `TestMutableDistributionPackageManagerIdentity/opensuse-leap-16.0`.
+- **1.5 GiB vendor disk** (lab): the Minimal-VM image's root had ~8 MB free and the
+  first signed RPM install failed (`needs 27MB more space on the / filesystem`,
+  zypper exit 8). Disposable lab overlays now get at least 10 GiB; kiwi-repart
+  grows Leap's root on first boot as on any resized cloud disk
+  ([`vm_linux.go`](../../internal/vmlab/vm_linux.go):33-60;
+  `TestGuestOverlayDiskFloor`).
+
+Records are under `~/.cache/lindm-mutabledistros3-20261010/`, host `dgx21`,
+native aarch64 KVM/QEMU 8.2.2, AAVMF `2024.02-2ubuntu0.10` (Secure Boot disabled,
+SetupMode), virtio-blk, no TPM/desktop, explicit user egress. Source is `d303cec`
+plus the `8c30afa7…` lab delta, the ndb fix and the disk floor; the lane-recorded
+source diff SHA-256 is `5e45a68b40197dea0ee85e0fd6a932e67572b608cff94dad1d04b7ff4ee8fdf7`.
+Signed 0.7.0/0.7.1 RPMs (`491aca49…`/`f679b398…`) carry only the ndb product fix.
+
+| Lane      | Observed result                                                                                                                                                                                   | Record / SHA-256                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Inspect   | 376 native RPM identities and independent detail comparison                                                                                                                                       | `leap16-arm64-dgx21-inspect-diskfix.json` / `69b00b31f66d1255af30af2f2ffa3f584de1747ecc72d9c1366d64b2197fee9b`   |
+| Lifecycle | Signed zypper 0.7.0→0.7.1 automatic-trust lifecycle: five 378-package publications, denied attempt 6 kept snapshot 5, epoch 1→3, purge identity, spool recovery, revocation, missing-journal hold | `leap16-arm64-dgx21-lifecycle-diskfix.json` / `8f5056bf5a095b46eead2a4cb89d6988008de18437cd5aa8f62a71c52e0ba87d` |
+| Dispatch  | Nine native scenarios incl. real periodic recheck/remediation, ±90 s clocks and revoked denial; unstarted supersession integration-only. The lane records SELinux as `not applicable`             | `leap16-arm64-dgx21-dispatch-diskfix.json` / `29d037b83bcb7ca9c51c647a5175c4072542a7633e830c67e5d52274192a4b57`  |
+
+The first post-fix inspection, before the disk floor, also passed
+(`leap16-arm64-dgx21-inspect-ndbfix.json`,
+`720a662f58912499b01d499cd7022874a13ebc8f9b0b183c7364348d83690c89`).
 
 ## Known gaps
 
-Complete native Leap diagnosis and independent inspection before claiming its
-lifecycle. Tumbleweed needs inspection, lifecycle, distribution-upgrade snapshot
-and rollback evidence. Leap ARM acquisition does not establish native execution;
-Tumbleweed ARM additionally lacks a maintained installer-to-golden path.
+Leap x86_64 needs its own rerun of inspection, lifecycle and dispatch; the ARM
+records above do not qualify it. Leap LSM enforcement is not established by these
+records. Tumbleweed needs inspection, lifecycle, distribution-upgrade snapshot and
+rollback evidence. Tumbleweed aarch64 has no official ARM Cloud/KVM image (the
+advertised checksum links return 404), so its prerequisite is a maintained,
+snapshot-pinned SUSE installer-to-golden workflow (signed Snapshot DVD/NET media
+exist); an ISO cannot be relabeled as a provisioned cloud disk.
 Desktop sessions, enterprise vendor installations, air-gap operation, encryption,
 actions and physical hardware remain distinct gates. None is waived by signed
 image availability or shared RPM code. See the authoritative

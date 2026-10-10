@@ -14,12 +14,14 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/pki"
+	"lindm/internal/resource"
 	"lindm/internal/trust"
 )
 
-// ServiceExecutionProbeUnit belongs exclusively to a disposable lab guest.
-const ServiceExecutionProbeUnit = "lab-signed-service-proof.service"
+// ResourceExecutionProbeUnit belongs exclusively to a disposable lab guest.
+const ResourceExecutionProbeUnit = "lab-signed-service-proof.service"
 
 func (f *ExecutionTrustExercise) Close() {
 	if f == nil {
@@ -30,21 +32,21 @@ func (f *ExecutionTrustExercise) Close() {
 	f.planKey, f.startKey = nil, nil
 }
 
-// SignServiceIntent is deliberately limited to the sacrificial fixture resource
+// SignResourceIntent is deliberately limited to the sacrificial fixture resource
 // and the exercise's second root/delegation. It is not a control-plane signer.
-func (f *ExecutionTrustExercise) SignServiceIntent(ctx context.Context, intent *agentv1.ServiceExecutionIntent) ([]byte, error) {
-	if f == nil || len(f.planKey) != ed25519.PrivateKeySize || intent.GetDeploymentId() != f.deploymentID || intent.GetRootVersion() != 2 || intent.GetDelegationVersion() != 2 || intent.GetRecoveryEpoch() != 1 || intent.GetDesired().GetUnit() != ServiceExecutionProbeUnit {
-		return nil, errors.New("service intent is outside the disposable signing fixture")
+func (f *ExecutionTrustExercise) SignResourceIntent(ctx context.Context, intent *agentv1.ResourceExecutionIntent) ([]byte, error) {
+	if f == nil || len(f.planKey) != ed25519.PrivateKeySize || intent.GetDeploymentId() != f.deploymentID || intent.GetRootVersion() != 2 || intent.GetDelegationVersion() != 2 || intent.GetRecoveryEpoch() != 1 || !fixtureResourceIntent(intent) {
+		return nil, errors.New("resource intent is outside the disposable signing fixture")
 	}
 	return f.authority.Sign(ctx, intent, f.planKey)
 }
 
-// SignServiceStart authenticates the root-generated proof and exact native plan
+// SignResourceStart authenticates the root-generated proof and exact native plan
 // against the separately pinned development device CA before signing. The lab
 // owner is the actor; this must never substitute for production reauthorization.
-func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *agentv1.ServiceExecutionIntent, intentEnvelope, certificatePEM []byte, prepared *agentv1.PrepareServiceExecutionResponse) (*agentv1.ServiceExecutionStartGrant, []byte, error) {
-	if f == nil || len(f.startKey) != ed25519.PrivateKeySize || intent.GetDeploymentId() != f.deploymentID || intent.GetRootVersion() != 2 || intent.GetDelegationVersion() != 2 || intent.GetDesired().GetUnit() != ServiceExecutionProbeUnit {
-		return nil, nil, errors.New("service start is outside the disposable signing fixture")
+func (f *ExecutionTrustExercise) SignResourceStart(ctx context.Context, intent *agentv1.ResourceExecutionIntent, intentEnvelope, certificatePEM []byte, prepared *agentv1.PrepareResourceExecutionResponse) (*agentv1.ResourceExecutionStartGrant, []byte, error) {
+	if f == nil || len(f.startKey) != ed25519.PrivateKeySize || intent.GetDeploymentId() != f.deploymentID || intent.GetRootVersion() != 2 || intent.GetDelegationVersion() != 2 || intent.GetRecoveryEpoch() != 1 || !fixtureResourceIntent(intent) {
+		return nil, nil, errors.New("resource start is outside the disposable signing fixture")
 	}
 	certificate, err := serviceExerciseCertificate(certificatePEM)
 	if err != nil {
@@ -70,22 +72,22 @@ func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *a
 	if _, err := pki.VerifyDeviceCertificatePEM(certificatePEM, public, f.deviceCA, deployment, device, generation, now); err != nil {
 		return nil, nil, err
 	}
-	challenge := new(agentv1.ServiceExecutionChallenge)
+	challenge := new(agentv1.ResourceExecutionChallenge)
 	if err := f.authority.Verify(ctx, prepared.GetChallengeProof(), challenge, 1, public); err != nil {
 		return nil, nil, err
 	}
-	encodedPlan, err := proto.MarshalOptions{Deterministic: true}.Marshal(prepared.GetNativePlan())
+	planHash, err := resource.PlanDigest(prepared.GetNativePlan())
 	if err != nil {
 		return nil, nil, err
 	}
-	planHash, intentHash := sha256.Sum256(encodedPlan), sha256.Sum256(intentEnvelope)
-	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() || !bytes.Equal(challenge.GetIntentSha256(), intentHash[:]) || !bytes.Equal(challenge.GetNativePlanSha256(), planHash[:]) || !proto.Equal(prepared.GetNativePlan().GetDesired(), intent.GetDesired()) {
+	intentHash := sha256.Sum256(intentEnvelope)
+	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() || !bytes.Equal(challenge.GetIntentSha256(), intentHash[:]) || !bytes.Equal(challenge.GetNativePlanSha256(), planHash[:]) || !proto.Equal(resource.PlanDesired(prepared.GetNativePlan()), intent.GetDesired()) || !resource.RefEqual(challenge.GetRef(), intent.GetDesired().GetRef()) || challenge.GetOperation() != intent.GetOperation() || prepared.GetNativePlan().GetOperation() != intent.GetOperation() {
 		return nil, nil, errors.New("device challenge does not bind the requested intent and native plan")
 	}
 	if !serviceChallengeWindow(now, intent, challenge) {
 		return nil, nil, errors.New("device challenge is outside the signing window")
 	}
-	grant := &agentv1.ServiceExecutionStartGrant{
+	grant := &agentv1.ResourceExecutionStartGrant{
 		Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 2, DelegationVersion: 2,
 		NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt(),
 	}
@@ -93,7 +95,39 @@ func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *a
 	return grant, envelope, err
 }
 
-func serviceChallengeWindow(now time.Time, intent *agentv1.ServiceExecutionIntent, challenge *agentv1.ServiceExecutionChallenge) bool {
+func fixtureResourceIntent(intent *agentv1.ResourceExecutionIntent) bool {
+	if resource.ValidateDesired(intent.GetDesired()) != nil {
+		return false
+	}
+	if intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE && intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+		return false
+	}
+	desired := intent.GetDesired()
+	switch desired.GetRef().GetKind() {
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE:
+		return desired.GetSystemdService().GetUnit() == ResourceExecutionProbeUnit
+	case resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE:
+		pkg := desired.GetNativePackage().GetPackage()
+		if pkg.GetNativeName() != "lindm-resource-proof" && pkg.GetNativeName() != "lindm-resource-crash" {
+			return false
+		}
+		repository := desired.GetNativePackage().GetRepository().GetCanonicalKey()
+		switch pkg.GetEcosystem() {
+		case resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB:
+			return pkg.GetArchitecture() == "amd64" && repository == "apt/d06a3d03-3118-4779-a00f-a5544ff095ad"
+		case resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM:
+			return pkg.GetArchitecture() == "x86_64" && repository == "rpm/d06a3d03-3118-4779-a00f-a5544ff095ad"
+		}
+	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
+		switch desired.GetManagedFile().GetPath() {
+		case "/etc/lindm-resource-lab/direct", "/etc/lindm-resource-lab/created", "/etc/lindm-resource-lab/adopted", "/etc/lindm-resource-lab/external":
+			return true
+		}
+	}
+	return false
+}
+
+func serviceChallengeWindow(now time.Time, intent *agentv1.ResourceExecutionIntent, challenge *agentv1.ResourceExecutionChallenge) bool {
 	issued, expires := challenge.GetIssuedAt().AsTime(), challenge.GetExpiresAt().AsTime()
 	notBefore, intentExpires := intent.GetNotBefore().AsTime(), intent.GetExpiresAt().AsTime()
 	// Guest timestamps use the production tolerance. The host-issued intent
@@ -104,15 +138,15 @@ func serviceChallengeWindow(now time.Time, intent *agentv1.ServiceExecutionInten
 		!issued.Before(notBefore) && !expires.After(intentExpires)
 }
 
-// VerifyServiceAttestation uses the fixture's independently pinned device CA,
+// VerifyResourceAttestation uses the fixture's independently pinned device CA,
 // never trust supplied by the relay. Close removes signing keys but deliberately
 // retains this public verifier for the reboot/reinstall history checks.
 // A verified receipt authenticates retained history, not current compliance.
-func (f *ExecutionTrustExercise) VerifyServiceAttestation(ctx context.Context, envelope, certificatePEM []byte, expected *trust.ServiceAttestationBinding, now time.Time) (*agentv1.ServiceExecutionAttestation, error) {
+func (f *ExecutionTrustExercise) VerifyResourceAttestation(ctx context.Context, envelope, certificatePEM []byte, expected *trust.ResourceAttestationBinding, now time.Time) (*agentv1.ResourceExecutionAttestation, error) {
 	if f == nil || f.authority == nil || expected == nil || expected.DeploymentID.String() != f.deploymentID {
 		return nil, errors.New("service attestation is outside the disposable verification fixture")
 	}
-	return f.authority.VerifyServiceAttestation(ctx, envelope, certificatePEM, f.deviceCA, expected, now, trust.MaxDeviceClockSkew)
+	return f.authority.VerifyResourceAttestation(ctx, envelope, certificatePEM, f.deviceCA, expected, now, trust.MaxDeviceClockSkew)
 }
 
 func serviceExerciseCertificate(encoded []byte) (*x509.Certificate, error) {

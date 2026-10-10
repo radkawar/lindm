@@ -120,7 +120,7 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 			if _, err := guest.PrepareServiceProbe(ctx); err != nil {
 				return errors.Join(resultErr, err)
 			}
-			revision, err := acceptanceProfile(ctx, owner)
+			revision, err := acceptanceProfile(ctx, owner, manifest.GetId())
 			if err != nil {
 				return errors.Join(resultErr, err)
 			}
@@ -170,10 +170,12 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 	return records, failures
 }
 
-func acceptanceProfile(ctx context.Context, owner *devlab.OwnerSession) (string, error) {
+// Each guest publishes its own profile head; the image-qualified name keeps the
+// console's catalog labels unambiguous for the visible-option selection.
+func acceptanceProfile(ctx context.Context, owner *devlab.OwnerSession, image string) (string, error) {
 	response, err := owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{
 		RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "release acceptance native service effect",
-		Spec: &policyv1.ResourceProfile{Name: "Acceptance service effect", Resources: []*policyv1.ProfileResource{{
+		Spec: &policyv1.ResourceProfile{Name: "Acceptance service effect " + image, Resources: []*policyv1.ProfileResource{{
 			ResourceId:   uuid.NewString(),
 			Desired:      &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: vmlab.AcceptanceServiceProbeUnit}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: vmlab.AcceptanceServiceProbeUnit, Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}},
 			Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},

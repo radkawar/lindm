@@ -71,6 +71,12 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 -- name: CloseServiceAction :exec
 UPDATE resource_actions SET closed_at = $2, closed_reason = $3 WHERE id = $1 AND closed_at IS NULL;
 
+-- Cancellation retains the one-open-action fence until the executor reports
+-- terminal owned staging cleanup. The first cancellation reason is immutable.
+-- name: RequestResourcePreparationCancellation :exec
+UPDATE resource_actions SET closed_reason = $2
+WHERE id = $1 AND closed_at IS NULL AND closed_reason = '' AND octet_length(start_grant_envelope) = 0;
+
 -- name: SetServiceNonce :exec
 UPDATE resource_actions SET result_nonce = $2, nonce_expires_at = $3 WHERE id = $1;
 
@@ -100,3 +106,28 @@ ON CONFLICT (source_assignment_id, resource_id, superseding_assignment_id) DO NO
 
 -- name: ListResourceReleases :many
 SELECT * FROM resource_releases WHERE generation_id = $1 ORDER BY requested_at DESC, id LIMIT 256;
+
+-- name: SetResourceAssignmentAdoptionApproval :exec
+UPDATE resource_assignments SET adoption_approval_id = $2 WHERE id = $1;
+
+-- name: GetResourceAssignmentByID :one
+SELECT * FROM resource_assignments WHERE id = $1;
+
+-- name: PendingResourceReleases :many
+SELECT r.* FROM resource_releases r
+JOIN resource_assignment_resources original ON original.assignment_id = r.source_assignment_id AND original.resource_id = r.resource_id
+WHERE r.generation_id = $1 AND r.state = 'pending'
+ORDER BY original.position DESC, r.requested_at, r.id
+LIMIT 256;
+
+-- name: GetResourceRelease :one
+SELECT * FROM resource_releases WHERE id = $1 FOR UPDATE;
+
+-- name: BindResourceReleaseAction :exec
+UPDATE resource_actions SET release_id = $2 WHERE id = $1 AND release_id IS NULL;
+
+-- name: SetResourceReleaseState :exec
+UPDATE resource_releases SET state = $2, reason = $3, completed_at = $4 WHERE id = $1;
+
+-- name: LatestResourceReleaseAction :one
+SELECT * FROM resource_actions WHERE release_id = $1 ORDER BY resource_sequence DESC LIMIT 1;

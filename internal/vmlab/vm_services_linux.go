@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 // VMServicesOptions only accepts the laboratory executable, never service
@@ -42,16 +42,16 @@ type VMServiceNativeState struct {
 // Provider messages retain complete native observations, including definition
 // hashes and fingerprints. Native states come from independent systemctl calls.
 type VMServiceStep struct {
-	Name                 string                       `json:"name"`
-	Target               string                       `json:"target"`
-	Plan                 *agentv1.ServicePlan         `json:"plan,omitempty"`
-	Before               *agentv1.ServiceObservation  `json:"before,omitempty"`
-	After                *agentv1.ServiceObservation  `json:"after"`
-	Verification         *agentv1.ServiceVerification `json:"verification,omitempty"`
-	NativeBefore         *VMServiceNativeState        `json:"native_before"`
-	NativeAfter          *VMServiceNativeState        `json:"native_after"`
-	Rejection            string                       `json:"rejection,omitempty"`
-	UnreportedDefinition *VMServiceDefinitionLength   `json:"unreported_definition,omitempty"`
+	Name                 string                           `json:"name"`
+	Target               string                           `json:"target"`
+	Plan                 *resourcev1.ResourcePlan         `json:"plan,omitempty"`
+	Before               *resourcev1.ResourceObservation  `json:"before,omitempty"`
+	After                *resourcev1.ResourceObservation  `json:"after"`
+	Verification         *resourcev1.ResourceVerification `json:"verification,omitempty"`
+	NativeBefore         *VMServiceNativeState            `json:"native_before"`
+	NativeAfter          *VMServiceNativeState            `json:"native_after"`
+	Rejection            string                           `json:"rejection,omitempty"`
+	UnreportedDefinition *VMServiceDefinitionLength       `json:"unreported_definition,omitempty"`
 }
 
 type VMServiceDefinitionLength struct {
@@ -188,7 +188,7 @@ func validateServiceEvidence(evidence *VMServicesEvidence) error {
 		step := &evidence.Steps[index]
 		if step.Name != want.name || step.Target != want.target || step.Rejection != want.rejection ||
 			step.NativeBefore == nil || step.NativeAfter == nil || step.After == nil ||
-			step.NativeBefore.Unit != want.target || step.NativeAfter.Unit != want.target || step.After.Unit != primary {
+			step.NativeBefore.Unit != want.target || step.NativeAfter.Unit != want.target || step.After.GetSystemdService().GetUnit() != primary {
 			return fmt.Errorf("incomplete native service scenario %s", want.name)
 		}
 		id := want.target
@@ -210,9 +210,9 @@ func validateServiceEvidence(evidence *VMServicesEvidence) error {
 			if length == nil || length.ReportedSize != 0 || length.ObservedSize <= 0 || length.ObservedSize >= 4096 ||
 				length.NativeDescription != "Disposable native unreported definition bytes proof\n" ||
 				step.NativeBefore.LoadState != "loaded" || step.NativeBefore.ActiveState != "inactive" || step.NativeBefore.UnitFileState != "indirect" ||
-				step.Before == nil || step.Before.Unit != primary ||
-				len(step.Before.FingerprintSha256) != sha256.Size || len(step.After.FingerprintSha256) != sha256.Size ||
-				!bytes.Equal(step.Before.FingerprintSha256, step.After.FingerprintSha256) {
+				step.Before == nil || step.Before.GetSystemdService().GetUnit() != primary ||
+				len(step.Before.GetSystemdService().GetFingerprintSha256()) != sha256.Size || len(step.After.GetSystemdService().GetFingerprintSha256()) != sha256.Size ||
+				!bytes.Equal(step.Before.GetSystemdService().GetFingerprintSha256(), step.After.GetSystemdService().GetFingerprintSha256()) {
 				return errors.New("unreported definition refusal lacks loaded native bytes or restored definition evidence")
 			}
 		} else if step.UnreportedDefinition != nil {

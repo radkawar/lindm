@@ -246,6 +246,55 @@ func Claims(desired *resourcev1.ResourceDesiredState) ([]*resourcev1.ResourceCla
 		for _, ca := range state.DirectoryClient.GetTrust().GetCertificates() {
 			requireRef(ca)
 		}
+	case *resourcev1.ResourceDesiredState_ManagedFile:
+		file := state.ManagedFile
+		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), file.GetPresence())
+		if file.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
+			digest, err := messageDigest(file)
+			if err != nil {
+				return nil, err
+			}
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+		}
+	case *resourcev1.ResourceDesiredState_Sysctl:
+		sysctl := state.Sysctl
+		// Hash bounded public values because claim values are smaller than
+		// the typed sysctl value bound. Persistence remains a separate claim.
+		digest := sha256.Sum256([]byte(sysctl.GetValue()))
+		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSCTL, sysctl.GetKey(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, hex.EncodeToString(digest[:]))
+		if sysctl.GetPersistent() {
+			keyDigest := sha256.Sum256([]byte(sysctl.GetKey()))
+			path := "/etc/sysctl.d/60-lindm-" + hex.EncodeToString(keyDigest[:]) + ".conf"
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "sysctl:"+sysctl.GetKey())
+		}
+	case *resourcev1.ResourceDesiredState_SystemdDefinition:
+		definition := state.SystemdDefinition
+		key := desired.GetRef().GetCanonicalKey()
+		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, definition.GetPresence())
+		path := "/etc/systemd/system/" + definition.GetDropIn().GetUnit() + ".d/60-lindm.conf"
+		if timer := definition.GetTimer(); timer != nil {
+			path = "/etc/systemd/system/" + timer.GetUnit()
+			if definition.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
+				add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "service/"+timer.GetService().GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+			}
+		}
+		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, definition.GetPresence())
+		if definition.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
+			digest, err := messageDigest(definition)
+			if err != nil {
+				return nil, err
+			}
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "systemd-definition:"+digest)
+		}
+	case *resourcev1.ResourceDesiredState_EncryptionCompliance:
+		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/luks", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		if state.EncryptionCompliance.GetRequireEscrow() {
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/escrow", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		}
+		if state.EncryptionCompliance.GetRequireTpm() {
+			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/tpm", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		}
 	}
 	return claims, nil
 }
@@ -272,6 +321,10 @@ func existenceDomain(kind resourcev1.ResourceKind) (resourcev1.ClaimDomain, bool
 		return resourcev1.ClaimDomain_CLAIM_DOMAIN_REPOSITORY, true
 	case resourcev1.ResourceKind_RESOURCE_KIND_CERTIFICATE_ENROLLMENT, resourcev1.ResourceKind_RESOURCE_KIND_TRUST_CA:
 		return resourcev1.ClaimDomain_CLAIM_DOMAIN_CREDENTIAL, true
+	case resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:
+		return resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, true
+	case resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:
+		return resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, true
 	default:
 		return 0, false
 	}

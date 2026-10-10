@@ -58,6 +58,9 @@ type AcceptanceGuest struct {
 	enrolled   bool
 	probeReady bool
 	closed     bool
+	// diagnostics is the caller's private work directory for withheld guest
+	// unit state when the control plane never observes the enrolled agent.
+	diagnostics string
 }
 
 // RunAcceptanceGuest retains the guest through package installation, the browser
@@ -90,7 +93,7 @@ func RunAcceptanceGuest(ctx context.Context, options AcceptanceGuestOptions, vis
 	evidence.Encrypted = options.Encrypted != nil
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
 	defer cancel()
-	g := &AcceptanceGuest{manifest: m, evidence: evidence}
+	g := &AcceptanceGuest{manifest: m, evidence: evidence, diagnostics: options.WorkDir}
 	hardware := VMHardwareOptions{StorageBus: "virtio-blk", AllowNetwork: true, stockAcceptance: true}
 	if options.Encrypted != nil {
 		opts := *options.Encrypted

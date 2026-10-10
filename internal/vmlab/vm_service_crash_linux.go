@@ -12,12 +12,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 )
 
-func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, prepare func(agentv1.ServiceRuntimeState, agentv1.ServiceEnablement) (*vmPreparedService, error)) ([]*agentv1.ServiceExecutionStatus, error) {
+func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, prepare func(resourcev1.ServiceRuntimeState, resourcev1.ServiceEnablement) (*vmPreparedService, error)) ([]*agentv1.ResourceExecutionStatus, error) {
 	vm := packages.vm
-	unit := devlab.ServiceExecutionProbeUnit
+	unit := devlab.ResourceExecutionProbeUnit
 	path := "/etc/systemd/system/" + unit
 	// The slow native pre-start creates an observable RUNNING transaction. The
 	// native job must survive executor SIGKILL; the executor never owns its PID.
@@ -28,12 +29,12 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 	if err := lifecycleCommand(ctx, vm, "install slow signed fixture", "install -o root -g root -m 0644 "+nativeQuote(nativeGuestDir+"/signed-service-unit")+" "+nativeQuote(path)+"; if command -v restorecon >/dev/null 2>&1; then restorecon -F "+nativeQuote(path)+"; fi; systemctl daemon-reload"); err != nil {
 		return nil, err
 	}
-	action, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
+	action, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
 	if err != nil {
 		return nil, err
 	}
-	accepted := new(agentv1.StartServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-start", action.intent.GetActionId(), action.start, accepted); err != nil {
+	accepted := new(agentv1.StartResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-start", action.intent.GetActionId(), action.start, accepted); err != nil {
 		return nil, err
 	}
 	window, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -48,11 +49,11 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 		if err != nil {
 			return nil, err
 		}
-		if status.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING && status.GetStartedAt() != nil && state == "activating" {
+		if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING && status.GetStartedAt() != nil && state == "activating" {
 			invocation = id
 			break
 		}
-		if status.GetState() >= agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+		if status.GetState() >= agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 			return nil, errors.New("crash fixture completed before a running native job was observed")
 		}
 		if err := vmServicePause(window); err != nil {
@@ -65,7 +66,7 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
 	}
-	var reconciled *agentv1.ServiceExecutionStatus
+	var reconciled *agentv1.ResourceExecutionStatus
 	recovery, stop := context.WithTimeout(ctx, time.Minute)
 	defer stop()
 	for {
@@ -73,14 +74,14 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 		if err != nil {
 			return nil, err
 		}
-		if status.GetState() >= agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
-			if status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN && status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED {
+		if status.GetState() >= agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
+			if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN && status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 				return nil, errors.New("running crash was neither read-only convergence nor persistent unknown")
 			}
 			if status.GetStartedAt() == nil || status.GetCompletedAt() == nil {
 				return nil, errors.New("running crash lost consumed-start evidence")
 			}
-			if status.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED && !status.GetVerification().GetConverged() {
+			if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED && status.GetVerification().GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED {
 				return nil, errors.New("running crash falsely claimed verified success")
 			}
 			reconciled = status
@@ -111,8 +112,8 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 	if err := vmServiceNative(ctx, vm, "active", "enabled"); err != nil {
 		return nil, err
 	}
-	replay := new(agentv1.StartServiceExecutionResponse)
-	if err := vmServiceRPC(ctx, packages, "service-start", action.intent.GetActionId(), action.start, replay); err != nil {
+	replay := new(agentv1.StartResourceExecutionResponse)
+	if err := vmServiceRPC(ctx, packages, "resource-start", action.intent.GetActionId(), action.start, replay); err != nil {
 		return nil, err
 	}
 	if !proto.Equal(reconciled, replay.GetStatus()) {
@@ -125,7 +126,7 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 	if afterReplay != invocation {
 		return nil, errors.New("crashed action retry restarted native service")
 	}
-	inactive, err := prepare(agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
+	inactive, err := prepare(resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +140,11 @@ func vmCrashRunningService(ctx context.Context, packages *nativeGuestPackages, p
 	if err := vmServiceNative(ctx, vm, "inactive", "disabled"); err != nil {
 		return nil, err
 	}
-	return []*agentv1.ServiceExecutionStatus{reconciled, stopped}, nil
+	return []*agentv1.ResourceExecutionStatus{reconciled, stopped}, nil
 }
 
 func vmServiceInvocation(ctx context.Context, vm *guestVM) (string, string, error) {
-	unit := nativeQuote(devlab.ServiceExecutionProbeUnit)
+	unit := nativeQuote(devlab.ResourceExecutionProbeUnit)
 	data, err := vm.run(ctx, "sudo -n systemctl show --value --property=ActiveState "+unit+" && sudo -n systemctl show --value --property=InvocationID "+unit, nil, 256, 15*time.Second)
 	if err != nil {
 		return "", "", err

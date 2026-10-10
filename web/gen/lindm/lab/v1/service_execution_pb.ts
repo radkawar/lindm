@@ -7,7 +7,7 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { ServiceExecutionChallenge } from "../../agent/v1/service_execution_pb.js";
+import type { ResourceExecutionChallenge } from "../../agent/v1/service_execution_pb.js";
 import { file_lindm_agent_v1_service_execution } from "../../agent/v1/service_execution_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/lab/v1/service_execution.proto.
  */
 export const file_lindm_lab_v1_service_execution: GenFile = /*@__PURE__*/
-  fileDesc("CiRsaW5kbS9sYWIvdjEvc2VydmljZV9leGVjdXRpb24ucHJvdG8SDGxpbmRtLmxhYi52MSLNAQoUU2VydmljZUNsb2NrRXZpZGVuY2USNwoLaG9zdF9iZWZvcmUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESNgoKaG9zdF9hZnRlchgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJECgljaGFsbGVuZ2UYAyABKAsyKS5saW5kbS5hZ2VudC52MS5TZXJ2aWNlRXhlY3V0aW9uQ2hhbGxlbmdlQga6SAPIAQFCHlocbGluZG0vZ2VuL2xpbmRtL2xhYi92MTtsYWJ2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_service_execution]);
+  fileDesc("CiRsaW5kbS9sYWIvdjEvc2VydmljZV9leGVjdXRpb24ucHJvdG8SDGxpbmRtLmxhYi52MSLOAQoUU2VydmljZUNsb2NrRXZpZGVuY2USNwoLaG9zdF9iZWZvcmUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESNgoKaG9zdF9hZnRlchgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJFCgljaGFsbGVuZ2UYAyABKAsyKi5saW5kbS5hZ2VudC52MS5SZXNvdXJjZUV4ZWN1dGlvbkNoYWxsZW5nZUIGukgDyAEBQh5aHGxpbmRtL2dlbi9saW5kbS9sYWIvdjE7bGFidjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_service_execution]);
 
 /**
  * ServiceClockEvidence brackets host-side challenge verification with host wall
@@ -36,9 +36,9 @@ export type ServiceClockEvidence = Message<"lindm.lab.v1.ServiceClockEvidence"> 
   hostAfter?: Timestamp | undefined;
 
   /**
-   * @generated from field: lindm.agent.v1.ServiceExecutionChallenge challenge = 3;
+   * @generated from field: lindm.agent.v1.ResourceExecutionChallenge challenge = 3;
    */
-  challenge?: ServiceExecutionChallenge | undefined;
+  challenge?: ResourceExecutionChallenge | undefined;
 };
 
 /**

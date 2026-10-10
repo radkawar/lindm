@@ -3,14 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
-import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ProtobufFields } from "@/components/ui/protobuf-fields";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
@@ -39,11 +37,12 @@ import {
   formatRevisionNumber,
   newResource,
   removeResource,
-  type DraftResource,
+  updateResource,
   type DraftSpec,
   type PublishPayload,
 } from "./model";
 import { profileRevisionQueryOptions } from "./queries";
+import { ResourceFields } from "./resource-form";
 
 export function ProfileEditor({
   mode,
@@ -252,15 +251,9 @@ export function ProfileEditor({
                 key={resource.resourceId}
                 index={index}
                 resource={resource}
+                resources={shown.resources}
                 locked={locked}
-                onChange={(next) =>
-                  setDraft({
-                    ...draft,
-                    resources: draft.resources.map((item) =>
-                      item.resourceId === resource.resourceId ? next : item,
-                    ),
-                  })
-                }
+                onChange={(next) => setDraft(updateResource(draft, next))}
                 onRemove={() => setDraft(removeResource(draft, resource.resourceId))}
               />
             ))}
@@ -531,50 +524,5 @@ function RefreshedHead({
         </p>
       </AlertDescription>
     </Alert>
-  );
-}
-
-function ResourceFields({
-  index,
-  resource,
-  locked,
-  onChange,
-  onRemove,
-}: {
-  index: number;
-  resource: DraftResource;
-  locked: boolean;
-  onChange: (next: DraftResource) => void;
-  onRemove: () => void;
-}) {
-  const documentId = `resource-document-${resource.resourceId}`;
-  return (
-    <fieldset className="grid min-w-0 gap-3 border bg-muted/20 p-4">
-      <legend className="px-1 text-sm font-medium">Resource {index + 1}</legend>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <Label htmlFor={documentId}>Typed resource document (protobuf JSON)</Label>
-        <Button type="button" variant="outline" size="sm" disabled={locked} onClick={onRemove}>
-          Remove resource {index + 1}
-        </Button>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Set resourceId, desired.ref and exactly one typed desired state, ownership, verification and
-        any typed dependencies or applicability. All declared resource kinds are accepted by their
-        generated schema; unknown fields and invalid enum values are rejected. Use immutable secret
-        references only, never passwords or private keys. Native capability support is evaluated
-        separately for each target and is not implied by publication.
-      </p>
-      <Textarea
-        id={documentId}
-        required
-        rows={14}
-        spellCheck={false}
-        className="font-mono text-xs"
-        value={resource.document}
-        readOnly={locked}
-        onChange={(event) => onChange({ ...resource, document: event.target.value })}
-      />
-      <ProtobufFields schema={ProfileResourceSchema} />
-    </fieldset>
   );
 }

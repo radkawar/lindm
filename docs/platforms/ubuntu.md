@@ -180,6 +180,23 @@ cannot downgrade. Paths are not authority, and the fallback does not qualify NVM
 sanitize ([target construction](../../internal/device/storage_targets.go#L111),
 [native revalidation](../../internal/agent/actionprovider/target_linux.go#L157)).
 
+## Resource providers
+
+The agent executes only generic signed resource intents. Systemd service is
+dispatched; the post-cutover 24.04 aarch64 connected dispatch lane passed (see
+[verification](../verification.md#generic-resource-executor-cutover-phase-2)).
+Every other kind has an agent provider but is dispatched only after the server's
+per-kind qualification table lists it with native Ubuntu 24.04 and Fedora 44
+records; until then its assignments show `resource_executor_not_available`.
+
+Native mechanisms on Ubuntu: packages use apt/dpkg in asynchronously staged
+transient units with an owned `/etc/apt/preferences.d/lindm-*` exact-version
+pin; password policy uses owned `pam-auth-update` profiles and requires the
+`libpam-pwquality` module package for quality controls; sysctl persistence is an
+owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
+tools against the exact host `/etc` bound into a private account root.
+Firewall restoration and its rollback supervisor units ship disabled.
+
 ## Device actions
 
 Logind is the session/power boundary, not a shell wrapper. Lock requests require

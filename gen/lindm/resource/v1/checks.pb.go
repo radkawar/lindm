@@ -909,15 +909,16 @@ func (x *ProxyChecks) GetConverged() bool {
 }
 
 type NativePackageChecks struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	NativeDatabaseMatches    bool                   `protobuf:"varint,1,opt,name=native_database_matches,json=nativeDatabaseMatches,proto3" json:"native_database_matches,omitempty"`
-	ExactVersionMatches      bool                   `protobuf:"varint,2,opt,name=exact_version_matches,json=exactVersionMatches,proto3" json:"exact_version_matches,omitempty"`
-	ApprovedSourceMatches    bool                   `protobuf:"varint,3,opt,name=approved_source_matches,json=approvedSourceMatches,proto3" json:"approved_source_matches,omitempty"`
-	ApplicationReadiness     *ProbeReceipt          `protobuf:"bytes,4,opt,name=application_readiness,json=applicationReadiness,proto3" json:"application_readiness,omitempty"`
-	SideEffectsMatchManifest bool                   `protobuf:"varint,5,opt,name=side_effects_match_manifest,json=sideEffectsMatchManifest,proto3" json:"side_effects_match_manifest,omitempty"`
-	Converged                bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	NativeDatabaseMatches bool                   `protobuf:"varint,1,opt,name=native_database_matches,json=nativeDatabaseMatches,proto3" json:"native_database_matches,omitempty"`
+	ExactVersionMatches   bool                   `protobuf:"varint,2,opt,name=exact_version_matches,json=exactVersionMatches,proto3" json:"exact_version_matches,omitempty"`
+	ApprovedSourceMatches bool                   `protobuf:"varint,3,opt,name=approved_source_matches,json=approvedSourceMatches,proto3" json:"approved_source_matches,omitempty"`
+	// Native installed/configured state, not application launch or health.
+	NativeConfigurationReadiness *ProbeReceipt `protobuf:"bytes,4,opt,name=native_configuration_readiness,json=nativeConfigurationReadiness,proto3" json:"native_configuration_readiness,omitempty"`
+	SideEffectsMatchManifest     bool          `protobuf:"varint,5,opt,name=side_effects_match_manifest,json=sideEffectsMatchManifest,proto3" json:"side_effects_match_manifest,omitempty"`
+	Converged                    bool          `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *NativePackageChecks) Reset() {
@@ -971,9 +972,9 @@ func (x *NativePackageChecks) GetApprovedSourceMatches() bool {
 	return false
 }
 
-func (x *NativePackageChecks) GetApplicationReadiness() *ProbeReceipt {
+func (x *NativePackageChecks) GetNativeConfigurationReadiness() *ProbeReceipt {
 	if x != nil {
-		return x.ApplicationReadiness
+		return x.NativeConfigurationReadiness
 	}
 	return nil
 }
@@ -1307,12 +1308,13 @@ func (x *SessionPolicyChecks) GetConverged() bool {
 type PasswordPolicyChecks struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	EffectiveSettingsMatch bool                   `protobuf:"varint,1,opt,name=effective_settings_match,json=effectiveSettingsMatch,proto3" json:"effective_settings_match,omitempty"`
-	WeakPasswordRejection  *ProbeReceipt          `protobuf:"bytes,2,opt,name=weak_password_rejection,json=weakPasswordRejection,proto3" json:"weak_password_rejection,omitempty"`
-	LockoutBehavior        *ProbeReceipt          `protobuf:"bytes,3,opt,name=lockout_behavior,json=lockoutBehavior,proto3" json:"lockout_behavior,omitempty"`
-	NativePamOwnerMatches  bool                   `protobuf:"varint,4,opt,name=native_pam_owner_matches,json=nativePamOwnerMatches,proto3" json:"native_pam_owner_matches,omitempty"`
-	Converged              bool                   `protobuf:"varint,5,opt,name=converged,proto3" json:"converged,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Native authentication attempts belong to disposable qualification fixtures.
+	InstalledModulesReady    bool `protobuf:"varint,6,opt,name=installed_modules_ready,json=installedModulesReady,proto3" json:"installed_modules_ready,omitempty"`
+	NativePrecedenceVerified bool `protobuf:"varint,7,opt,name=native_precedence_verified,json=nativePrecedenceVerified,proto3" json:"native_precedence_verified,omitempty"`
+	NativePamOwnerMatches    bool `protobuf:"varint,4,opt,name=native_pam_owner_matches,json=nativePamOwnerMatches,proto3" json:"native_pam_owner_matches,omitempty"`
+	Converged                bool `protobuf:"varint,5,opt,name=converged,proto3" json:"converged,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *PasswordPolicyChecks) Reset() {
@@ -1352,18 +1354,18 @@ func (x *PasswordPolicyChecks) GetEffectiveSettingsMatch() bool {
 	return false
 }
 
-func (x *PasswordPolicyChecks) GetWeakPasswordRejection() *ProbeReceipt {
+func (x *PasswordPolicyChecks) GetInstalledModulesReady() bool {
 	if x != nil {
-		return x.WeakPasswordRejection
+		return x.InstalledModulesReady
 	}
-	return nil
+	return false
 }
 
-func (x *PasswordPolicyChecks) GetLockoutBehavior() *ProbeReceipt {
+func (x *PasswordPolicyChecks) GetNativePrecedenceVerified() bool {
 	if x != nil {
-		return x.LockoutBehavior
+		return x.NativePrecedenceVerified
 	}
-	return nil
+	return false
 }
 
 func (x *PasswordPolicyChecks) GetNativePamOwnerMatches() bool {
@@ -1640,6 +1642,327 @@ func (x *DirectoryClientChecks) GetConverged() bool {
 	return false
 }
 
+type ManagedFileChecks struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PresenceMatches bool                   `protobuf:"varint,1,opt,name=presence_matches,json=presenceMatches,proto3" json:"presence_matches,omitempty"`
+	ContentMatches  bool                   `protobuf:"varint,2,opt,name=content_matches,json=contentMatches,proto3" json:"content_matches,omitempty"`
+	ModeMatches     bool                   `protobuf:"varint,3,opt,name=mode_matches,json=modeMatches,proto3" json:"mode_matches,omitempty"`
+	OwnerMatches    bool                   `protobuf:"varint,4,opt,name=owner_matches,json=ownerMatches,proto3" json:"owner_matches,omitempty"`
+	AncestrySafe    bool                   `protobuf:"varint,5,opt,name=ancestry_safe,json=ancestrySafe,proto3" json:"ancestry_safe,omitempty"`
+	Converged       bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ManagedFileChecks) Reset() {
+	*x = ManagedFileChecks{}
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ManagedFileChecks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ManagedFileChecks) ProtoMessage() {}
+
+func (x *ManagedFileChecks) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ManagedFileChecks.ProtoReflect.Descriptor instead.
+func (*ManagedFileChecks) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_checks_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ManagedFileChecks) GetPresenceMatches() bool {
+	if x != nil {
+		return x.PresenceMatches
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetContentMatches() bool {
+	if x != nil {
+		return x.ContentMatches
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetModeMatches() bool {
+	if x != nil {
+		return x.ModeMatches
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetOwnerMatches() bool {
+	if x != nil {
+		return x.OwnerMatches
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetAncestrySafe() bool {
+	if x != nil {
+		return x.AncestrySafe
+	}
+	return false
+}
+
+func (x *ManagedFileChecks) GetConverged() bool {
+	if x != nil {
+		return x.Converged
+	}
+	return false
+}
+
+type SysctlChecks struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	LiveValueMatches        bool                   `protobuf:"varint,1,opt,name=live_value_matches,json=liveValueMatches,proto3" json:"live_value_matches,omitempty"`
+	PersistenceMatches      bool                   `protobuf:"varint,2,opt,name=persistence_matches,json=persistenceMatches,proto3" json:"persistence_matches,omitempty"`
+	PersistenceOwnerMatches bool                   `protobuf:"varint,3,opt,name=persistence_owner_matches,json=persistenceOwnerMatches,proto3" json:"persistence_owner_matches,omitempty"`
+	Converged               bool                   `protobuf:"varint,4,opt,name=converged,proto3" json:"converged,omitempty"`
+	// Independent cross-boot observation, not a prerequisite for initial apply.
+	RebootPersistenceVerified bool `protobuf:"varint,5,opt,name=reboot_persistence_verified,json=rebootPersistenceVerified,proto3" json:"reboot_persistence_verified,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *SysctlChecks) Reset() {
+	*x = SysctlChecks{}
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SysctlChecks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SysctlChecks) ProtoMessage() {}
+
+func (x *SysctlChecks) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SysctlChecks.ProtoReflect.Descriptor instead.
+func (*SysctlChecks) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_checks_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SysctlChecks) GetLiveValueMatches() bool {
+	if x != nil {
+		return x.LiveValueMatches
+	}
+	return false
+}
+
+func (x *SysctlChecks) GetPersistenceMatches() bool {
+	if x != nil {
+		return x.PersistenceMatches
+	}
+	return false
+}
+
+func (x *SysctlChecks) GetPersistenceOwnerMatches() bool {
+	if x != nil {
+		return x.PersistenceOwnerMatches
+	}
+	return false
+}
+
+func (x *SysctlChecks) GetConverged() bool {
+	if x != nil {
+		return x.Converged
+	}
+	return false
+}
+
+func (x *SysctlChecks) GetRebootPersistenceVerified() bool {
+	if x != nil {
+		return x.RebootPersistenceVerified
+	}
+	return false
+}
+
+type SystemdDefinitionChecks struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	DefinitionMatches     bool                   `protobuf:"varint,1,opt,name=definition_matches,json=definitionMatches,proto3" json:"definition_matches,omitempty"`
+	EffectiveOptionsMatch bool                   `protobuf:"varint,2,opt,name=effective_options_match,json=effectiveOptionsMatch,proto3" json:"effective_options_match,omitempty"`
+	TargetServiceExists   bool                   `protobuf:"varint,3,opt,name=target_service_exists,json=targetServiceExists,proto3" json:"target_service_exists,omitempty"`
+	TimerStateMatches     bool                   `protobuf:"varint,4,opt,name=timer_state_matches,json=timerStateMatches,proto3" json:"timer_state_matches,omitempty"`
+	DaemonReloadCompleted bool                   `protobuf:"varint,5,opt,name=daemon_reload_completed,json=daemonReloadCompleted,proto3" json:"daemon_reload_completed,omitempty"`
+	Converged             bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *SystemdDefinitionChecks) Reset() {
+	*x = SystemdDefinitionChecks{}
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SystemdDefinitionChecks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SystemdDefinitionChecks) ProtoMessage() {}
+
+func (x *SystemdDefinitionChecks) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SystemdDefinitionChecks.ProtoReflect.Descriptor instead.
+func (*SystemdDefinitionChecks) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_checks_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SystemdDefinitionChecks) GetDefinitionMatches() bool {
+	if x != nil {
+		return x.DefinitionMatches
+	}
+	return false
+}
+
+func (x *SystemdDefinitionChecks) GetEffectiveOptionsMatch() bool {
+	if x != nil {
+		return x.EffectiveOptionsMatch
+	}
+	return false
+}
+
+func (x *SystemdDefinitionChecks) GetTargetServiceExists() bool {
+	if x != nil {
+		return x.TargetServiceExists
+	}
+	return false
+}
+
+func (x *SystemdDefinitionChecks) GetTimerStateMatches() bool {
+	if x != nil {
+		return x.TimerStateMatches
+	}
+	return false
+}
+
+func (x *SystemdDefinitionChecks) GetDaemonReloadCompleted() bool {
+	if x != nil {
+		return x.DaemonReloadCompleted
+	}
+	return false
+}
+
+func (x *SystemdDefinitionChecks) GetConverged() bool {
+	if x != nil {
+		return x.Converged
+	}
+	return false
+}
+
+type EncryptionComplianceChecks struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	LuksRootRequirementMet bool                   `protobuf:"varint,1,opt,name=luks_root_requirement_met,json=luksRootRequirementMet,proto3" json:"luks_root_requirement_met,omitempty"`
+	EscrowRequirementMet   bool                   `protobuf:"varint,2,opt,name=escrow_requirement_met,json=escrowRequirementMet,proto3" json:"escrow_requirement_met,omitempty"`
+	TpmRequirementMet      bool                   `protobuf:"varint,3,opt,name=tpm_requirement_met,json=tpmRequirementMet,proto3" json:"tpm_requirement_met,omitempty"`
+	EvidenceComplete       bool                   `protobuf:"varint,4,opt,name=evidence_complete,json=evidenceComplete,proto3" json:"evidence_complete,omitempty"`
+	Converged              bool                   `protobuf:"varint,5,opt,name=converged,proto3" json:"converged,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *EncryptionComplianceChecks) Reset() {
+	*x = EncryptionComplianceChecks{}
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EncryptionComplianceChecks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EncryptionComplianceChecks) ProtoMessage() {}
+
+func (x *EncryptionComplianceChecks) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_checks_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EncryptionComplianceChecks.ProtoReflect.Descriptor instead.
+func (*EncryptionComplianceChecks) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_checks_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *EncryptionComplianceChecks) GetLuksRootRequirementMet() bool {
+	if x != nil {
+		return x.LuksRootRequirementMet
+	}
+	return false
+}
+
+func (x *EncryptionComplianceChecks) GetEscrowRequirementMet() bool {
+	if x != nil {
+		return x.EscrowRequirementMet
+	}
+	return false
+}
+
+func (x *EncryptionComplianceChecks) GetTpmRequirementMet() bool {
+	if x != nil {
+		return x.TpmRequirementMet
+	}
+	return false
+}
+
+func (x *EncryptionComplianceChecks) GetEvidenceComplete() bool {
+	if x != nil {
+		return x.EvidenceComplete
+	}
+	return false
+}
+
+func (x *EncryptionComplianceChecks) GetConverged() bool {
+	if x != nil {
+		return x.Converged
+	}
+	return false
+}
+
 var File_lindm_resource_v1_checks_proto protoreflect.FileDescriptor
 
 const file_lindm_resource_v1_checks_proto_rawDesc = "" +
@@ -1732,15 +2055,15 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x0eauthentication\x18\x03 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x0eauthentication\x12?\n" +
 	"\x06bypass\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x06bypass\x12\x1c\n" +
 	"\tconverged\x18\x05 \x01(\bR\tconverged:\xfa\x01\xbaH\xf6\x01\x1a\xf3\x01\n" +
-	"\x18proxy_checks.convergence\x12Qproxy convergence requires consumer-specific request/authentication/bypass probes\x1a\x83\x01!this.converged || (this.consumer_configuration_matches && this.request.passed && this.authentication.passed && this.bypass.passed)\"\xa9\x05\n" +
+	"\x18proxy_checks.convergence\x12Qproxy convergence requires consumer-specific request/authentication/bypass probes\x1a\x83\x01!this.converged || (this.consumer_configuration_matches && this.request.passed && this.authentication.passed && this.bypass.passed)\"\xca\x05\n" +
 	"\x13NativePackageChecks\x126\n" +
 	"\x17native_database_matches\x18\x01 \x01(\bR\x15nativeDatabaseMatches\x122\n" +
 	"\x15exact_version_matches\x18\x02 \x01(\bR\x13exactVersionMatches\x126\n" +
-	"\x17approved_source_matches\x18\x03 \x01(\bR\x15approvedSourceMatches\x12\\\n" +
-	"\x15application_readiness\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x14applicationReadiness\x12=\n" +
+	"\x17approved_source_matches\x18\x03 \x01(\bR\x15approvedSourceMatches\x12m\n" +
+	"\x1enative_configuration_readiness\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x1cnativeConfigurationReadiness\x12=\n" +
 	"\x1bside_effects_match_manifest\x18\x05 \x01(\bR\x18sideEffectsMatchManifest\x12\x1c\n" +
-	"\tconverged\x18\x06 \x01(\bR\tconverged:\xb2\x02\xbaH\xae\x02\x1a\xab\x02\n" +
-	"\x1apackage_checks.convergence\x12Rpackage convergence requires native DB, source, complete transaction and readiness\x1a\xb8\x01!this.converged || (this.native_database_matches && this.exact_version_matches && this.approved_source_matches && this.application_readiness.passed && this.side_effects_match_manifest)\"\xc0\x04\n" +
+	"\tconverged\x18\x06 \x01(\bR\tconverged:\xc2\x02\xbaH\xbe\x02\x1a\xbb\x02\n" +
+	"\x1apackage_checks.convergence\x12Ypackage convergence requires native DB, source, complete transaction and configured state\x1a\xc1\x01!this.converged || (this.native_database_matches && this.exact_version_matches && this.approved_source_matches && this.native_configuration_readiness.passed && this.side_effects_match_manifest)\"\xc0\x04\n" +
 	"\x10RepositoryChecks\x12.\n" +
 	"\x13owned_stanzas_match\x18\x01 \x01(\bR\x11ownedStanzasMatch\x125\n" +
 	"\x17owned_key_objects_match\x18\x02 \x01(\bR\x14ownedKeyObjectsMatch\x12V\n" +
@@ -1769,14 +2092,14 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x18visible_session_behavior\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x16visibleSessionBehavior\x120\n" +
 	"\x14native_owner_matches\x18\x03 \x01(\bR\x12nativeOwnerMatches\x12\x1c\n" +
 	"\tconverged\x18\x04 \x01(\bR\tconverged:\xdb\x01\xbaH\xd7\x01\x1a\xd4\x01\n" +
-	"\x1asession_checks.convergence\x12=session convergence requires visible behavior, not text alone\x1aw!this.converged || (this.effective_settings_match && this.visible_session_behavior.passed && this.native_owner_matches)\"\xe3\x04\n" +
+	"\x1asession_checks.convergence\x12=session convergence requires visible behavior, not text alone\x1aw!this.converged || (this.effective_settings_match && this.visible_session_behavior.passed && this.native_owner_matches)\"\xf8\x04\n" +
 	"\x14PasswordPolicyChecks\x128\n" +
-	"\x18effective_settings_match\x18\x01 \x01(\bR\x16effectiveSettingsMatch\x12_\n" +
-	"\x17weak_password_rejection\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x15weakPasswordRejection\x12R\n" +
-	"\x10lockout_behavior\x18\x03 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x0flockoutBehavior\x127\n" +
+	"\x18effective_settings_match\x18\x01 \x01(\bR\x16effectiveSettingsMatch\x126\n" +
+	"\x17installed_modules_ready\x18\x06 \x01(\bR\x15installedModulesReady\x12<\n" +
+	"\x1anative_precedence_verified\x18\a \x01(\bR\x18nativePrecedenceVerified\x127\n" +
 	"\x18native_pam_owner_matches\x18\x04 \x01(\bR\x15nativePamOwnerMatches\x12\x1c\n" +
-	"\tconverged\x18\x05 \x01(\bR\tconverged:\x84\x02\xbaH\x80\x02\x1a\xfd\x01\n" +
-	"\x1bpassword_checks.convergence\x12Apassword convergence requires real rejection and lockout behavior\x1a\x9a\x01!this.converged || (this.effective_settings_match && this.weak_password_rejection.passed && this.lockout_behavior.passed && this.native_pam_owner_matches)\"\xae\x05\n" +
+	"\tconverged\x18\x05 \x01(\bR\tconverged:\xa1\x02\xbaH\x9d\x02\x1a\x9a\x02\n" +
+	"\x1bpassword_checks.convergence\x12bpassword configuration convergence requires native owner, module and effective precedence evidence\x1a\x96\x01!this.converged || (this.effective_settings_match && this.installed_modules_ready && this.native_precedence_verified && this.native_pam_owner_matches)J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x17weak_password_rejectionR\x10lockout_behavior\"\xae\x05\n" +
 	"\rSnapAppChecks\x124\n" +
 	"\x16revision_channel_match\x18\x01 \x01(\bR\x14revisionChannelMatch\x12/\n" +
 	"\x13confinement_matches\x18\x02 \x01(\bR\x12confinementMatches\x124\n" +
@@ -1801,7 +2124,37 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x15offline_outage_policy\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x13offlineOutagePolicy\x12K\n" +
 	"\"unrelated_join_artifacts_preserved\x18\x05 \x01(\bR\x1funrelatedJoinArtifactsPreserved\x12\x1c\n" +
 	"\tconverged\x18\x06 \x01(\bR\tconverged:\xb5\x02\xbaH\xb1\x02\x1a\xae\x02\n" +
-	"\x1cdirectory_checks.convergence\x12Idirectory convergence requires a real account fixture and outage behavior\x1a\xc2\x01!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
+	"\x1cdirectory_checks.convergence\x12Idirectory convergence requires a real account fixture and outage behavior\x1a\xc2\x01!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)\"\xf5\x03\n" +
+	"\x11ManagedFileChecks\x12)\n" +
+	"\x10presence_matches\x18\x01 \x01(\bR\x0fpresenceMatches\x12'\n" +
+	"\x0fcontent_matches\x18\x02 \x01(\bR\x0econtentMatches\x12!\n" +
+	"\fmode_matches\x18\x03 \x01(\bR\vmodeMatches\x12#\n" +
+	"\rowner_matches\x18\x04 \x01(\bR\fownerMatches\x12#\n" +
+	"\rancestry_safe\x18\x05 \x01(\bR\fancestrySafe\x12\x1c\n" +
+	"\tconverged\x18\x06 \x01(\bR\tconverged:\x80\x02\xbaH\xfc\x01\x1a\xf9\x01\n" +
+	"\x1fmanaged_file_checks.convergence\x12Pfile convergence requires independently read content, metadata and safe ancestry\x1a\x83\x01!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe)\"\xeb\x03\n" +
+	"\fSysctlChecks\x12,\n" +
+	"\x12live_value_matches\x18\x01 \x01(\bR\x10liveValueMatches\x12/\n" +
+	"\x13persistence_matches\x18\x02 \x01(\bR\x12persistenceMatches\x12:\n" +
+	"\x19persistence_owner_matches\x18\x03 \x01(\bR\x17persistenceOwnerMatches\x12\x1c\n" +
+	"\tconverged\x18\x04 \x01(\bR\tconverged\x12>\n" +
+	"\x1breboot_persistence_verified\x18\x05 \x01(\bR\x19rebootPersistenceVerified:\xe1\x01\xbaH\xdd\x01\x1a\xda\x01\n" +
+	"\x19sysctl_checks.convergence\x12Qsysctl convergence requires both live and requested persistent ownership evidence\x1aj!this.converged || (this.live_value_matches && this.persistence_matches && this.persistence_owner_matches)\"\xe4\x04\n" +
+	"\x17SystemdDefinitionChecks\x12-\n" +
+	"\x12definition_matches\x18\x01 \x01(\bR\x11definitionMatches\x126\n" +
+	"\x17effective_options_match\x18\x02 \x01(\bR\x15effectiveOptionsMatch\x122\n" +
+	"\x15target_service_exists\x18\x03 \x01(\bR\x13targetServiceExists\x12.\n" +
+	"\x13timer_state_matches\x18\x04 \x01(\bR\x11timerStateMatches\x126\n" +
+	"\x17daemon_reload_completed\x18\x05 \x01(\bR\x15daemonReloadCompleted\x12\x1c\n" +
+	"\tconverged\x18\x06 \x01(\bR\tconverged:\xa7\x02\xbaH\xa3\x02\x1a\xa0\x02\n" +
+	"%systemd_definition_checks.convergence\x12Ndefinition convergence requires effective native settings and completed reload\x1a\xa6\x01!this.converged || (this.definition_matches && this.effective_options_match && this.target_service_exists && this.timer_state_matches && this.daemon_reload_completed)\"\x99\x04\n" +
+	"\x1aEncryptionComplianceChecks\x129\n" +
+	"\x19luks_root_requirement_met\x18\x01 \x01(\bR\x16luksRootRequirementMet\x124\n" +
+	"\x16escrow_requirement_met\x18\x02 \x01(\bR\x14escrowRequirementMet\x12.\n" +
+	"\x13tpm_requirement_met\x18\x03 \x01(\bR\x11tpmRequirementMet\x12+\n" +
+	"\x11evidence_complete\x18\x04 \x01(\bR\x10evidenceComplete\x12\x1c\n" +
+	"\tconverged\x18\x05 \x01(\bR\tconverged:\x8e\x02\xbaH\x8a\x02\x1a\x87\x02\n" +
+	"(encryption_compliance_checks.convergence\x12Pencryption compliance requires positive evidence for every requested requirement\x1a\x88\x01!this.converged || (this.luks_root_requirement_met && this.escrow_requirement_met && this.tpm_requirement_met && this.evidence_complete)B(Z&lindm/gen/lindm/resource/v1;resourcev1b\x06proto3"
 
 var (
 	file_lindm_resource_v1_checks_proto_rawDescOnce sync.Once
@@ -1815,7 +2168,7 @@ func file_lindm_resource_v1_checks_proto_rawDescGZIP() []byte {
 	return file_lindm_resource_v1_checks_proto_rawDescData
 }
 
-var file_lindm_resource_v1_checks_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_lindm_resource_v1_checks_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_lindm_resource_v1_checks_proto_goTypes = []any{
 	(*SystemdServiceChecks)(nil),        // 0: lindm.resource.v1.SystemdServiceChecks
 	(*LocalGroupChecks)(nil),            // 1: lindm.resource.v1.LocalGroupChecks
@@ -1837,44 +2190,46 @@ var file_lindm_resource_v1_checks_proto_goTypes = []any{
 	(*SnapAppChecks)(nil),               // 17: lindm.resource.v1.SnapAppChecks
 	(*CertificateEnrollmentChecks)(nil), // 18: lindm.resource.v1.CertificateEnrollmentChecks
 	(*DirectoryClientChecks)(nil),       // 19: lindm.resource.v1.DirectoryClientChecks
-	(*SystemdServiceObservation)(nil),   // 20: lindm.resource.v1.SystemdServiceObservation
-	(*ProbeReceipt)(nil),                // 21: lindm.resource.v1.ProbeReceipt
+	(*ManagedFileChecks)(nil),           // 20: lindm.resource.v1.ManagedFileChecks
+	(*SysctlChecks)(nil),                // 21: lindm.resource.v1.SysctlChecks
+	(*SystemdDefinitionChecks)(nil),     // 22: lindm.resource.v1.SystemdDefinitionChecks
+	(*EncryptionComplianceChecks)(nil),  // 23: lindm.resource.v1.EncryptionComplianceChecks
+	(*SystemdServiceObservation)(nil),   // 24: lindm.resource.v1.SystemdServiceObservation
+	(*ProbeReceipt)(nil),                // 25: lindm.resource.v1.ProbeReceipt
 }
 var file_lindm_resource_v1_checks_proto_depIdxs = []int32{
-	20, // 0: lindm.resource.v1.SystemdServiceChecks.observation:type_name -> lindm.resource.v1.SystemdServiceObservation
-	21, // 1: lindm.resource.v1.LocalGroupChecks.nss_reread:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 2: lindm.resource.v1.LocalUserChecks.nss_reread:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 3: lindm.resource.v1.SudoRuleChecks.aggregate_syntax:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 4: lindm.resource.v1.SudoRuleChecks.effective_privileges:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 5: lindm.resource.v1.SSHServerChecks.syntax:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 6: lindm.resource.v1.SSHServerChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 7: lindm.resource.v1.SSHServerChecks.connectivity:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 8: lindm.resource.v1.TimeSyncChecks.source_reachability:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 9: lindm.resource.v1.TrustCAChecks.tls_chain:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 10: lindm.resource.v1.FirewallZoneChecks.allow_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 11: lindm.resource.v1.FirewallZoneChecks.deny_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 12: lindm.resource.v1.NetworkConnectionChecks.end_to_end_reachability:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 13: lindm.resource.v1.DNSChecks.split_dns_lookup:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 14: lindm.resource.v1.ProxyChecks.request:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 15: lindm.resource.v1.ProxyChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 16: lindm.resource.v1.ProxyChecks.bypass:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 17: lindm.resource.v1.NativePackageChecks.application_readiness:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 18: lindm.resource.v1.RepositoryChecks.metadata_signature:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 19: lindm.resource.v1.FlatpakAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 20: lindm.resource.v1.OSUpdateChecks.new_boot_health:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 21: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 22: lindm.resource.v1.PasswordPolicyChecks.weak_password_rejection:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 23: lindm.resource.v1.PasswordPolicyChecks.lockout_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 24: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 25: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 26: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 27: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	21, // 28: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	24, // 0: lindm.resource.v1.SystemdServiceChecks.observation:type_name -> lindm.resource.v1.SystemdServiceObservation
+	25, // 1: lindm.resource.v1.LocalGroupChecks.nss_reread:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 2: lindm.resource.v1.LocalUserChecks.nss_reread:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 3: lindm.resource.v1.SudoRuleChecks.aggregate_syntax:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 4: lindm.resource.v1.SudoRuleChecks.effective_privileges:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 5: lindm.resource.v1.SSHServerChecks.syntax:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 6: lindm.resource.v1.SSHServerChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 7: lindm.resource.v1.SSHServerChecks.connectivity:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 8: lindm.resource.v1.TimeSyncChecks.source_reachability:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 9: lindm.resource.v1.TrustCAChecks.tls_chain:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 10: lindm.resource.v1.FirewallZoneChecks.allow_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 11: lindm.resource.v1.FirewallZoneChecks.deny_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 12: lindm.resource.v1.NetworkConnectionChecks.end_to_end_reachability:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 13: lindm.resource.v1.DNSChecks.split_dns_lookup:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 14: lindm.resource.v1.ProxyChecks.request:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 15: lindm.resource.v1.ProxyChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 16: lindm.resource.v1.ProxyChecks.bypass:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 17: lindm.resource.v1.NativePackageChecks.native_configuration_readiness:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 18: lindm.resource.v1.RepositoryChecks.metadata_signature:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 19: lindm.resource.v1.FlatpakAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 20: lindm.resource.v1.OSUpdateChecks.new_boot_health:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 21: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 22: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 23: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 24: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 25: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 26: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_checks_proto_init() }
@@ -1890,7 +2245,7 @@ func file_lindm_resource_v1_checks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_checks_proto_rawDesc), len(file_lindm_resource_v1_checks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

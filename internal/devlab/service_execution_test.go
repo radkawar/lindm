@@ -10,7 +10,7 @@ import (
 	"lindm/internal/trust"
 )
 
-func TestServiceChallengeWindowDeviceClockTolerance(t *testing.T) {
+func TestResourceChallengeWindowDeviceClockTolerance(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		name string
@@ -24,8 +24,8 @@ func TestServiceChallengeWindowDeviceClockTolerance(t *testing.T) {
 		{"expired exclusive boundary", -trust.MaxDeviceClockSkew - 30*time.Second, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			intent := &agentv1.ServiceExecutionIntent{NotBefore: timestamppb.New(now.Add(-5 * time.Minute)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute))}
-			challenge := &agentv1.ServiceExecutionChallenge{IssuedAt: timestamppb.New(now.Add(tc.skew)), ExpiresAt: timestamppb.New(now.Add(tc.skew + 30*time.Second))}
+			intent := &agentv1.ResourceExecutionIntent{NotBefore: timestamppb.New(now.Add(-5 * time.Minute)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute))}
+			challenge := &agentv1.ResourceExecutionChallenge{IssuedAt: timestamppb.New(now.Add(tc.skew)), ExpiresAt: timestamppb.New(now.Add(tc.skew + 30*time.Second))}
 			if got := serviceChallengeWindow(now, intent, challenge); got != tc.want {
 				t.Fatalf("signing window accepted=%v, want %v", got, tc.want)
 			}
@@ -33,7 +33,7 @@ func TestServiceChallengeWindowDeviceClockTolerance(t *testing.T) {
 	}
 }
 
-func TestServiceChallengeWindowDoesNotExtendIntent(t *testing.T) {
+func TestResourceChallengeWindowDoesNotExtendIntent(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		name                        string
@@ -45,8 +45,8 @@ func TestServiceChallengeWindowDoesNotExtendIntent(t *testing.T) {
 		{"challenge outlives intent", -time.Minute, time.Second, 0, 30 * time.Second},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			intent := &agentv1.ServiceExecutionIntent{NotBefore: timestamppb.New(now.Add(tc.start)), ExpiresAt: timestamppb.New(now.Add(tc.end))}
-			challenge := &agentv1.ServiceExecutionChallenge{IssuedAt: timestamppb.New(now.Add(tc.issued)), ExpiresAt: timestamppb.New(now.Add(tc.expires))}
+			intent := &agentv1.ResourceExecutionIntent{NotBefore: timestamppb.New(now.Add(tc.start)), ExpiresAt: timestamppb.New(now.Add(tc.end))}
+			challenge := &agentv1.ResourceExecutionChallenge{IssuedAt: timestamppb.New(now.Add(tc.issued)), ExpiresAt: timestamppb.New(now.Add(tc.expires))}
 			if serviceChallengeWindow(now, intent, challenge) {
 				t.Fatal("device-clock tolerance extended host intent authority")
 			}

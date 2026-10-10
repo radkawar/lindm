@@ -533,10 +533,10 @@ type ServiceActionSummary struct {
 	ClosedReason string                 `protobuf:"bytes,6,opt,name=closed_reason,json=closedReason,proto3" json:"closed_reason,omitempty"`
 	ClosedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=closed_at,json=closedAt,proto3" json:"closed_at,omitempty"`
 	// Latest verified device-signed history. Absent until a report is accepted.
-	Status         *v1.ServiceExecutionStatus `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
-	ActionRevision uint64                     `protobuf:"varint,9,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
-	AttestedAt     *timestamppb.Timestamp     `protobuf:"bytes,10,opt,name=attested_at,json=attestedAt,proto3" json:"attested_at,omitempty"`
-	ReceivedAt     *timestamppb.Timestamp     `protobuf:"bytes,11,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
+	Status         *v1.ResourceExecutionStatus `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	ActionRevision uint64                      `protobuf:"varint,9,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
+	AttestedAt     *timestamppb.Timestamp      `protobuf:"bytes,10,opt,name=attested_at,json=attestedAt,proto3" json:"attested_at,omitempty"`
+	ReceivedAt     *timestamppb.Timestamp      `protobuf:"bytes,11,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -620,7 +620,7 @@ func (x *ServiceActionSummary) GetClosedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *ServiceActionSummary) GetStatus() *v1.ServiceExecutionStatus {
+func (x *ServiceActionSummary) GetStatus() *v1.ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
@@ -1045,7 +1045,7 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"assignment\x18\x01 \x01(\v2\".lindm.admin.v1.ResourceAssignmentB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"assignment\"l\n" +
 	"\x1dGetDeviceResourceStateRequest\x12K\n" +
-	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\"\xe1\x04\n" +
+	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\"\xe2\x04\n" +
 	"\x14ServiceActionSummary\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12+\n" +
 	"\x11resource_sequence\x18\x02 \x01(\x04R\x10resourceSequence\x127\n" +
@@ -1054,8 +1054,8 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12J\n" +
 	"\x13start_authorized_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x11startAuthorizedAt\x12#\n" +
 	"\rclosed_reason\x18\x06 \x01(\tR\fclosedReason\x127\n" +
-	"\tclosed_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bclosedAt\x12>\n" +
-	"\x06status\x18\b \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusR\x06status\x12'\n" +
+	"\tclosed_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bclosedAt\x12?\n" +
+	"\x06status\x18\b \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusR\x06status\x12'\n" +
 	"\x0faction_revision\x18\t \x01(\x04R\x0eactionRevision\x12;\n" +
 	"\vattested_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
@@ -1145,7 +1145,7 @@ var file_lindm_admin_v1_assignments_proto_goTypes = []any{
 	(*GetDeviceResourceStateResponse)(nil), // 10: lindm.admin.v1.GetDeviceResourceStateResponse
 	(*ResourceRelease)(nil),                // 11: lindm.admin.v1.ResourceRelease
 	(*timestamppb.Timestamp)(nil),          // 12: google.protobuf.Timestamp
-	(*v1.ServiceExecutionStatus)(nil),      // 13: lindm.agent.v1.ServiceExecutionStatus
+	(*v1.ResourceExecutionStatus)(nil),     // 13: lindm.agent.v1.ResourceExecutionStatus
 	(*v11.ResourceDesiredState)(nil),       // 14: lindm.resource.v1.ResourceDesiredState
 	(*v12.ResourceDependency)(nil),         // 15: lindm.policy.v1.ResourceDependency
 	(*v11.ResourceRef)(nil),                // 16: lindm.resource.v1.ResourceRef
@@ -1158,7 +1158,7 @@ var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	12, // 4: lindm.admin.v1.ServiceActionSummary.expires_at:type_name -> google.protobuf.Timestamp
 	12, // 5: lindm.admin.v1.ServiceActionSummary.start_authorized_at:type_name -> google.protobuf.Timestamp
 	12, // 6: lindm.admin.v1.ServiceActionSummary.closed_at:type_name -> google.protobuf.Timestamp
-	13, // 7: lindm.admin.v1.ServiceActionSummary.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
+	13, // 7: lindm.admin.v1.ServiceActionSummary.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
 	12, // 8: lindm.admin.v1.ServiceActionSummary.attested_at:type_name -> google.protobuf.Timestamp
 	12, // 9: lindm.admin.v1.ServiceActionSummary.received_at:type_name -> google.protobuf.Timestamp
 	14, // 10: lindm.admin.v1.ResourceState.desired:type_name -> lindm.resource.v1.ResourceDesiredState

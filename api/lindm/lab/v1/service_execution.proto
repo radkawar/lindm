@@ -14,5 +14,5 @@ option go_package = "lindm/gen/lindm/lab/v1;labv1";
 message ServiceClockEvidence {
   google.protobuf.Timestamp host_before = 1 [(buf.validate.field).required = true];
   google.protobuf.Timestamp host_after = 2 [(buf.validate.field).required = true];
-  lindm.agent.v1.ServiceExecutionChallenge challenge = 3 [(buf.validate.field).required = true];
+  lindm.agent.v1.ResourceExecutionChallenge challenge = 3 [(buf.validate.field).required = true];
 }

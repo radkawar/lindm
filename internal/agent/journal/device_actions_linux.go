@@ -216,7 +216,7 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	}
 	i, c := record.GetIntent(), record.GetChallenge()
 	for _, id := range []string{record.GetInstallationId(), i.GetDeploymentId(), i.GetDeviceId(), i.GetEnrollmentGeneration(), i.GetActionId(), i.GetActorId(), c.GetBootId(), c.GetExecutorIncarnation()} {
-		if !canonicalServiceID(id) {
+		if !canonicalResourceID(id) {
 			return ErrDeviceActionRejected
 		}
 	}
@@ -229,10 +229,10 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 		return ErrDeviceActionRejected
 	}
 	intentHash, specHash, planHash := sha256.Sum256(record.GetIntentEnvelope()), sha256.Sum256(spec), sha256.Sum256(plan)
-	if !bytes.Equal(intentHash[:], record.GetIntentSha256()) || !bytes.Equal(specHash[:], i.GetSpecSha256()) || !proto.Equal(i.GetSpec(), record.GetNativePlan().GetSpec()) || !record.GetNativePlan().GetBefore().GetSupported() || record.GetAcceptedRoot().GetDeploymentId() != i.GetDeploymentId() || record.GetAcceptedRoot().GetVersion() != i.GetRootVersion() || serviceTimestampBefore(record.GetAcceptedAt(), i.GetNotBefore()) || !serviceTimestampBefore(record.GetAcceptedAt(), i.GetExpiresAt()) {
+	if !bytes.Equal(intentHash[:], record.GetIntentSha256()) || !bytes.Equal(specHash[:], i.GetSpecSha256()) || !proto.Equal(i.GetSpec(), record.GetNativePlan().GetSpec()) || !record.GetNativePlan().GetBefore().GetSupported() || record.GetAcceptedRoot().GetDeploymentId() != i.GetDeploymentId() || record.GetAcceptedRoot().GetVersion() != i.GetRootVersion() || resourceTimestampBefore(record.GetAcceptedAt(), i.GetNotBefore()) || !resourceTimestampBefore(record.GetAcceptedAt(), i.GetExpiresAt()) {
 		return ErrDeviceActionRejected
 	}
-	if c == nil || c.GetDeploymentId() != i.GetDeploymentId() || c.GetDeviceId() != i.GetDeviceId() || c.GetEnrollmentGeneration() != i.GetEnrollmentGeneration() || c.GetActionId() != i.GetActionId() || c.GetActionSequence() != i.GetActionSequence() || c.GetRecoveryEpoch() != i.GetRecoveryEpoch() || !bytes.Equal(c.GetIntentSha256(), intentHash[:]) || !bytes.Equal(c.GetSpecSha256(), specHash[:]) || !bytes.Equal(c.GetNativePlanSha256(), planHash[:]) || !proto.Equal(c.GetIssuedAt(), record.GetAcceptedAt()) || serviceTimestampBefore(i.GetExpiresAt(), c.GetExpiresAt()) || record.GetChallengeBoottimeNs() < uint64(c.GetExpiresAt().AsTime().Sub(c.GetIssuedAt().AsTime())) {
+	if c == nil || c.GetDeploymentId() != i.GetDeploymentId() || c.GetDeviceId() != i.GetDeviceId() || c.GetEnrollmentGeneration() != i.GetEnrollmentGeneration() || c.GetActionId() != i.GetActionId() || c.GetActionSequence() != i.GetActionSequence() || c.GetRecoveryEpoch() != i.GetRecoveryEpoch() || !bytes.Equal(c.GetIntentSha256(), intentHash[:]) || !bytes.Equal(c.GetSpecSha256(), specHash[:]) || !bytes.Equal(c.GetNativePlanSha256(), planHash[:]) || !proto.Equal(c.GetIssuedAt(), record.GetAcceptedAt()) || resourceTimestampBefore(i.GetExpiresAt(), c.GetExpiresAt()) || record.GetChallengeBoottimeNs() < uint64(c.GetExpiresAt().AsTime().Sub(c.GetIssuedAt().AsTime())) {
 		return ErrDeviceActionRejected
 	}
 	if !proto.Equal(c.GetNativePlan(), record.GetNativePlan()) || record.GetNativePlan().GetActionId() != i.GetActionId() {
@@ -240,7 +240,7 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	}
 	if len(record.GetStartGrantEnvelope()) != 0 {
 		hash := sha256.Sum256(record.GetStartGrantEnvelope())
-		if !bytes.Equal(hash[:], record.GetStartGrantSha256()) || !proto.Equal(record.GetGrantAcceptedAt(), record.GetStartedAt()) || !serviceTimestampBefore(record.GetStartedAt(), c.GetExpiresAt()) {
+		if !bytes.Equal(hash[:], record.GetStartGrantSha256()) || !proto.Equal(record.GetGrantAcceptedAt(), record.GetStartedAt()) || !resourceTimestampBefore(record.GetStartedAt(), c.GetExpiresAt()) {
 			return ErrDeviceActionRejected
 		}
 	}
@@ -255,7 +255,7 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	}
 	if len(bootGrant) != 0 {
 		digest := sha256.Sum256(bootGrant)
-		if !recoveryAction || !bytes.Equal(digest[:], record.GetRecoveryBootGrantSha256()) || len(record.GetRecoveryCredentialEnvelope()) == 0 || !proto.Equal(record.GetGrantAcceptedAt(), record.GetStartedAt()) || !serviceTimestampBefore(record.GetStartedAt(), c.GetExpiresAt()) {
+		if !recoveryAction || !bytes.Equal(digest[:], record.GetRecoveryBootGrantSha256()) || len(record.GetRecoveryCredentialEnvelope()) == 0 || !proto.Equal(record.GetGrantAcceptedAt(), record.GetStartedAt()) || !resourceTimestampBefore(record.GetStartedAt(), c.GetExpiresAt()) {
 			return ErrDeviceActionRejected
 		}
 	} else if len(record.GetRecoveryCredentialEnvelope()) != 0 || len(record.GetRecoveryBootGrantSha256()) != 0 {

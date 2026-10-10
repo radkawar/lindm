@@ -250,6 +250,7 @@ type ResourceAction struct {
 	AttestedAt             pgtype.Timestamptz
 	ReceivedAt             pgtype.Timestamptz
 	ReadOnlySuccess        bool
+	ReleaseID              *uuid.UUID
 }
 
 type ResourceAssignment struct {
@@ -265,6 +266,7 @@ type ResourceAssignment struct {
 	AssignedAt               pgtype.Timestamptz
 	ReconcileIntervalSeconds int32
 	BlockedReason            string
+	AdoptionApprovalID       *uuid.UUID
 }
 
 type ResourceAssignmentResource struct {

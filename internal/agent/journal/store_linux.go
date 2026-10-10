@@ -1,6 +1,11 @@
-// Package journal owns the executor's protected authority, execution trust and
-// durable service actions. Opening a damaged or incomplete installation never
-// recreates it.
+// Package journal owns the executor's protected authority, execution trust,
+// kind/key execution floors and typed native ownership ledger. Admission
+// reserves complete action and ownership lifecycles; revisions survive release.
+// Before-effect evidence is durable before native authority is consumed, and
+// interrupted effects remain unknown rather than replayable. Signature and
+// native-state verification belong to the executor and providers, not SQLite.
+// Opening a damaged, historical service-only or incomplete installation never
+// recreates state or invents a restoration baseline.
 package journal
 
 import (
@@ -24,6 +29,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal/journaldb"
+	"lindm/internal/agent/privatecustody"
 	"lindm/internal/agent/statefs"
 	"lindm/internal/protodata"
 )
@@ -34,7 +40,7 @@ const (
 	maximumStateBytes = 1 << 20
 	maximumTrustBytes = 128 << 10
 	applicationID     = 1279872580
-	schemaVersion     = 1
+	schemaVersion     = 2
 )
 
 var (
@@ -64,6 +70,7 @@ type Store struct {
 	queries        *journaldb.Queries
 	validator      protovalidate.Validator
 	installationID string
+	privateCustody *privatecustody.Custody
 }
 
 // Open opens an existing protected installation. The directory must already
@@ -118,7 +125,7 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ServiceExecutionRecord{}, &agentv1.DeviceActionRecord{}, &agentv1.AccountLockLedger{}), protovalidate.WithDisableLazy())
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ResourceExecutionRecord{}, &agentv1.DeviceActionRecord{}, &agentv1.AccountLockLedger{}, &agentv1.ResourceOwnershipLedger{}), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile executor journal schema: %w", err)
 	}
@@ -168,6 +175,10 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err := s.createFile(markerName, []byte(s.installationID+"\n")); err != nil {
 			return nil, err
 		}
+		s.privateCustody, err = privatecustody.Initialize(directory, s.installationID)
+		if err != nil {
+			return nil, ErrRecoveryHold
+		}
 		// The marker is durable before any SQLite file exists. A crash at any
 		// later point leaves an explicit recovery condition, never a new device.
 		if err := s.dir.Sync(); err != nil {
@@ -193,14 +204,17 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, trustEncoded); err != nil {
 			return nil, errors.New("initialize execution trust failed")
 		}
-		if err := s.queries.WithTx(tx).InitializeServiceActionUsage(ctx); err != nil {
-			return nil, errors.New("initialize service action accounting failed")
+		if err := s.queries.WithTx(tx).InitializeResourceActionUsage(ctx); err != nil {
+			return nil, errors.New("initialize resource action accounting failed")
 		}
 		if err := s.queries.WithTx(tx).InitializeDeviceActionUsage(ctx); err != nil {
 			return nil, errors.New("initialize device action accounting failed")
 		}
 		if err := s.queries.WithTx(tx).InitializeAccountLockUsage(ctx); err != nil {
 			return nil, errors.New("initialize account lock accounting failed")
+		}
+		if err := s.queries.WithTx(tx).InitializeResourceOwnershipUsage(ctx); err != nil {
+			return nil, errors.New("initialize resource ownership accounting failed")
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, errors.New("commit executor initialization failed")
@@ -223,6 +237,11 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := s.verifyDatabase(ctx); err != nil {
 		return nil, err
 	}
+	// An older or foreign journal is never migrated: it holds for re-provisioning.
+	s.privateCustody, err = privatecustody.Open(directory, s.installationID)
+	if err != nil {
+		return nil, ErrRecoveryHold
+	}
 	if err := validateJournalSchema(ctx, s.db); err != nil {
 		return nil, err
 	}
@@ -232,13 +251,16 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if _, _, err := s.LoadExecutionTrust(ctx); err != nil {
 		return nil, err
 	}
-	if err := s.validateServiceActions(ctx); err != nil {
+	if err := s.validateResourceActions(ctx); err != nil {
 		return nil, err
 	}
 	if err := s.validateDeviceActions(ctx); err != nil {
 		return nil, err
 	}
 	if err := s.validateAccountLocks(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.validateResourceOwnership(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -465,6 +487,10 @@ func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var result error
+	if s.privateCustody != nil {
+		s.privateCustody.Close()
+		s.privateCustody = nil
+	}
 	if s.db != nil {
 		result = s.db.Close()
 		s.db = nil

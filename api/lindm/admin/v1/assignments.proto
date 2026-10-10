@@ -118,7 +118,7 @@ message ServiceActionSummary {
   string closed_reason = 6;
   google.protobuf.Timestamp closed_at = 7;
   // Latest verified device-signed history. Absent until a report is accepted.
-  lindm.agent.v1.ServiceExecutionStatus status = 8;
+  lindm.agent.v1.ResourceExecutionStatus status = 8;
   uint64 action_revision = 9;
   google.protobuf.Timestamp attested_at = 10;
   google.protobuf.Timestamp received_at = 11;

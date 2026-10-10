@@ -72,7 +72,7 @@ func TestReleasePolicyPersistsAndFencesUnknownSession(t *testing.T) {
 	}
 	denied := func(epoch uint64) {
 		t.Helper()
-		if _, err := f.svc.GetServiceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: epoch})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		if _, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: epoch})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 			t.Fatalf("unsupported session got executable work: %v", err)
 		}
 	}
@@ -92,7 +92,7 @@ func TestReleasePolicyPersistsAndFencesUnknownSession(t *testing.T) {
 	if err := f.svc.requireReleaseCompatibility(f.ctx, devicedb.New(f.svc.pool), f.principal.GenerationID, 2); err != nil {
 		t.Fatalf("signed supported claim denied: %v", err)
 	}
-	if _, err := f.svc.GetServiceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 2})); err != nil {
+	if _, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 2})); err != nil {
 		t.Fatalf("supported session dispatch denied: %v", err)
 	}
 	report, err := devicedb.New(f.svc.pool).GetDeviceReleaseReport(f.ctx, f.principal.GenerationID)
@@ -236,7 +236,7 @@ func TestUnsupportedReleasePreservesIssuedServiceRecovery(t *testing.T) {
 	if recovered.GetActionId() != work.GetActionId() || len(recovered.GetResultNonce()) == 0 {
 		t.Fatal("release gate suppressed issued action recovery")
 	}
-	response, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(request))
+	response, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
 	if err != nil || !bytes.Equal(response.Msg.GetStartGrantEnvelope(), envelope) {
 		t.Fatalf("release gate suppressed exact start receipt: %v", err)
 	}

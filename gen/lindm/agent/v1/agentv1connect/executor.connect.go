@@ -69,18 +69,21 @@ const (
 	// ExecutorServiceGetRecoveryReadinessProcedure is the fully-qualified name of the ExecutorService's
 	// GetRecoveryReadiness RPC.
 	ExecutorServiceGetRecoveryReadinessProcedure = "/lindm.agent.v1.ExecutorService/GetRecoveryReadiness"
-	// ExecutorServicePrepareServiceExecutionProcedure is the fully-qualified name of the
-	// ExecutorService's PrepareServiceExecution RPC.
-	ExecutorServicePrepareServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareServiceExecution"
-	// ExecutorServiceStartServiceExecutionProcedure is the fully-qualified name of the
-	// ExecutorService's StartServiceExecution RPC.
-	ExecutorServiceStartServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/StartServiceExecution"
-	// ExecutorServiceGetServiceExecutionProcedure is the fully-qualified name of the ExecutorService's
-	// GetServiceExecution RPC.
-	ExecutorServiceGetServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/GetServiceExecution"
-	// ExecutorServiceAttestServiceExecutionProcedure is the fully-qualified name of the
-	// ExecutorService's AttestServiceExecution RPC.
-	ExecutorServiceAttestServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/AttestServiceExecution"
+	// ExecutorServicePrepareResourceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's PrepareResourceExecution RPC.
+	ExecutorServicePrepareResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareResourceExecution"
+	// ExecutorServiceStartResourceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's StartResourceExecution RPC.
+	ExecutorServiceStartResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/StartResourceExecution"
+	// ExecutorServiceGetResourceExecutionProcedure is the fully-qualified name of the ExecutorService's
+	// GetResourceExecution RPC.
+	ExecutorServiceGetResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/GetResourceExecution"
+	// ExecutorServiceCancelResourcePreparationProcedure is the fully-qualified name of the
+	// ExecutorService's CancelResourcePreparation RPC.
+	ExecutorServiceCancelResourcePreparationProcedure = "/lindm.agent.v1.ExecutorService/CancelResourcePreparation"
+	// ExecutorServiceAttestResourceExecutionProcedure is the fully-qualified name of the
+	// ExecutorService's AttestResourceExecution RPC.
+	ExecutorServiceAttestResourceExecutionProcedure = "/lindm.agent.v1.ExecutorService/AttestResourceExecution"
 	// ExecutorServicePrepareDeviceActionProcedure is the fully-qualified name of the ExecutorService's
 	// PrepareDeviceAction RPC.
 	ExecutorServicePrepareDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/PrepareDeviceAction"
@@ -161,17 +164,19 @@ type ExecutorServiceClient interface {
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Reads native recovery capability and ESP capacity without changing boot state.
 	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
-	// Verifies signed desired intent and records native preflight/challenge before
-	// replying. No native effect; callers cannot supply a plan or challenge.
-	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
+	// Verifies and journals intent before native preparation. Package staging is
+	// asynchronous; exact retries poll without extending its signed deadline.
+	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
 	// Accepts a separately signed start grant. Native work runs durably outside
 	// the RPC; acceptance is not completion. Exact retries never repeat effects.
-	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
+	StartResourceExecution(context.Context, *connect.Request[v1.StartResourceExecutionRequest]) (*connect.Response[v1.StartResourceExecutionResponse], error)
 	// Returns durable action state/evidence, not fresh compliance or authority.
-	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
+	GetResourceExecution(context.Context, *connect.Request[v1.GetResourceExecutionRequest]) (*connect.Response[v1.GetResourceExecutionResponse], error)
+	// Cancels only exact ungranted preparation, never queued or consumed effects.
+	CancelResourcePreparation(context.Context, *connect.Request[v1.CancelResourcePreparationRequest]) (*connect.Response[v1.CancelResourcePreparationResponse], error)
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
-	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
+	AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error)
 	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
 	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
@@ -273,28 +278,34 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
 			connect.WithClientOptions(opts...),
 		),
-		prepareServiceExecution: connect.NewClient[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse](
+		prepareResourceExecution: connect.NewClient[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse](
 			httpClient,
-			baseURL+ExecutorServicePrepareServiceExecutionProcedure,
-			connect.WithSchema(executorServiceMethods.ByName("PrepareServiceExecution")),
+			baseURL+ExecutorServicePrepareResourceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("PrepareResourceExecution")),
 			connect.WithClientOptions(opts...),
 		),
-		startServiceExecution: connect.NewClient[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse](
+		startResourceExecution: connect.NewClient[v1.StartResourceExecutionRequest, v1.StartResourceExecutionResponse](
 			httpClient,
-			baseURL+ExecutorServiceStartServiceExecutionProcedure,
-			connect.WithSchema(executorServiceMethods.ByName("StartServiceExecution")),
+			baseURL+ExecutorServiceStartResourceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("StartResourceExecution")),
 			connect.WithClientOptions(opts...),
 		),
-		getServiceExecution: connect.NewClient[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse](
+		getResourceExecution: connect.NewClient[v1.GetResourceExecutionRequest, v1.GetResourceExecutionResponse](
 			httpClient,
-			baseURL+ExecutorServiceGetServiceExecutionProcedure,
-			connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
+			baseURL+ExecutorServiceGetResourceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetResourceExecution")),
 			connect.WithClientOptions(opts...),
 		),
-		attestServiceExecution: connect.NewClient[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse](
+		cancelResourcePreparation: connect.NewClient[v1.CancelResourcePreparationRequest, v1.CancelResourcePreparationResponse](
 			httpClient,
-			baseURL+ExecutorServiceAttestServiceExecutionProcedure,
-			connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
+			baseURL+ExecutorServiceCancelResourcePreparationProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("CancelResourcePreparation")),
+			connect.WithClientOptions(opts...),
+		),
+		attestResourceExecution: connect.NewClient[v1.AttestResourceExecutionRequest, v1.AttestResourceExecutionResponse](
+			httpClient,
+			baseURL+ExecutorServiceAttestResourceExecutionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("AttestResourceExecution")),
 			connect.WithClientOptions(opts...),
 		),
 		prepareDeviceAction: connect.NewClient[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse](
@@ -386,10 +397,11 @@ type executorServiceClient struct {
 	updateExecutionTrust         *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
 	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
 	getRecoveryReadiness         *connect.Client[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse]
-	prepareServiceExecution      *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
-	startServiceExecution        *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
-	getServiceExecution          *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
-	attestServiceExecution       *connect.Client[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse]
+	prepareResourceExecution     *connect.Client[v1.PrepareResourceExecutionRequest, v1.PrepareResourceExecutionResponse]
+	startResourceExecution       *connect.Client[v1.StartResourceExecutionRequest, v1.StartResourceExecutionResponse]
+	getResourceExecution         *connect.Client[v1.GetResourceExecutionRequest, v1.GetResourceExecutionResponse]
+	cancelResourcePreparation    *connect.Client[v1.CancelResourcePreparationRequest, v1.CancelResourcePreparationResponse]
+	attestResourceExecution      *connect.Client[v1.AttestResourceExecutionRequest, v1.AttestResourceExecutionResponse]
 	prepareDeviceAction          *connect.Client[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse]
 	startDeviceAction            *connect.Client[v1.StartDeviceActionRequest, v1.StartDeviceActionResponse]
 	getDeviceAction              *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
@@ -464,24 +476,29 @@ func (c *executorServiceClient) GetRecoveryReadiness(ctx context.Context, req *c
 	return c.getRecoveryReadiness.CallUnary(ctx, req)
 }
 
-// PrepareServiceExecution calls lindm.agent.v1.ExecutorService.PrepareServiceExecution.
-func (c *executorServiceClient) PrepareServiceExecution(ctx context.Context, req *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
-	return c.prepareServiceExecution.CallUnary(ctx, req)
+// PrepareResourceExecution calls lindm.agent.v1.ExecutorService.PrepareResourceExecution.
+func (c *executorServiceClient) PrepareResourceExecution(ctx context.Context, req *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error) {
+	return c.prepareResourceExecution.CallUnary(ctx, req)
 }
 
-// StartServiceExecution calls lindm.agent.v1.ExecutorService.StartServiceExecution.
-func (c *executorServiceClient) StartServiceExecution(ctx context.Context, req *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error) {
-	return c.startServiceExecution.CallUnary(ctx, req)
+// StartResourceExecution calls lindm.agent.v1.ExecutorService.StartResourceExecution.
+func (c *executorServiceClient) StartResourceExecution(ctx context.Context, req *connect.Request[v1.StartResourceExecutionRequest]) (*connect.Response[v1.StartResourceExecutionResponse], error) {
+	return c.startResourceExecution.CallUnary(ctx, req)
 }
 
-// GetServiceExecution calls lindm.agent.v1.ExecutorService.GetServiceExecution.
-func (c *executorServiceClient) GetServiceExecution(ctx context.Context, req *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error) {
-	return c.getServiceExecution.CallUnary(ctx, req)
+// GetResourceExecution calls lindm.agent.v1.ExecutorService.GetResourceExecution.
+func (c *executorServiceClient) GetResourceExecution(ctx context.Context, req *connect.Request[v1.GetResourceExecutionRequest]) (*connect.Response[v1.GetResourceExecutionResponse], error) {
+	return c.getResourceExecution.CallUnary(ctx, req)
 }
 
-// AttestServiceExecution calls lindm.agent.v1.ExecutorService.AttestServiceExecution.
-func (c *executorServiceClient) AttestServiceExecution(ctx context.Context, req *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error) {
-	return c.attestServiceExecution.CallUnary(ctx, req)
+// CancelResourcePreparation calls lindm.agent.v1.ExecutorService.CancelResourcePreparation.
+func (c *executorServiceClient) CancelResourcePreparation(ctx context.Context, req *connect.Request[v1.CancelResourcePreparationRequest]) (*connect.Response[v1.CancelResourcePreparationResponse], error) {
+	return c.cancelResourcePreparation.CallUnary(ctx, req)
+}
+
+// AttestResourceExecution calls lindm.agent.v1.ExecutorService.AttestResourceExecution.
+func (c *executorServiceClient) AttestResourceExecution(ctx context.Context, req *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error) {
+	return c.attestResourceExecution.CallUnary(ctx, req)
 }
 
 // PrepareDeviceAction calls lindm.agent.v1.ExecutorService.PrepareDeviceAction.
@@ -587,17 +604,19 @@ type ExecutorServiceHandler interface {
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
 	// Reads native recovery capability and ESP capacity without changing boot state.
 	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
-	// Verifies signed desired intent and records native preflight/challenge before
-	// replying. No native effect; callers cannot supply a plan or challenge.
-	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
+	// Verifies and journals intent before native preparation. Package staging is
+	// asynchronous; exact retries poll without extending its signed deadline.
+	PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error)
 	// Accepts a separately signed start grant. Native work runs durably outside
 	// the RPC; acceptance is not completion. Exact retries never repeat effects.
-	StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error)
+	StartResourceExecution(context.Context, *connect.Request[v1.StartResourceExecutionRequest]) (*connect.Response[v1.StartResourceExecutionResponse], error)
 	// Returns durable action state/evidence, not fresh compliance or authority.
-	GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error)
+	GetResourceExecution(context.Context, *connect.Request[v1.GetResourceExecutionRequest]) (*connect.Response[v1.GetResourceExecutionResponse], error)
+	// Cancels only exact ungranted preparation, never queued or consumed effects.
+	CancelResourcePreparation(context.Context, *connect.Request[v1.CancelResourcePreparationRequest]) (*connect.Response[v1.CancelResourcePreparationResponse], error)
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
-	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
+	AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error)
 	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
 	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
@@ -695,28 +714,34 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
 		connect.WithHandlerOptions(opts...),
 	)
-	executorServicePrepareServiceExecutionHandler := connect.NewUnaryHandler(
-		ExecutorServicePrepareServiceExecutionProcedure,
-		svc.PrepareServiceExecution,
-		connect.WithSchema(executorServiceMethods.ByName("PrepareServiceExecution")),
+	executorServicePrepareResourceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServicePrepareResourceExecutionProcedure,
+		svc.PrepareResourceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("PrepareResourceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
-	executorServiceStartServiceExecutionHandler := connect.NewUnaryHandler(
-		ExecutorServiceStartServiceExecutionProcedure,
-		svc.StartServiceExecution,
-		connect.WithSchema(executorServiceMethods.ByName("StartServiceExecution")),
+	executorServiceStartResourceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceStartResourceExecutionProcedure,
+		svc.StartResourceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("StartResourceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
-	executorServiceGetServiceExecutionHandler := connect.NewUnaryHandler(
-		ExecutorServiceGetServiceExecutionProcedure,
-		svc.GetServiceExecution,
-		connect.WithSchema(executorServiceMethods.ByName("GetServiceExecution")),
+	executorServiceGetResourceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetResourceExecutionProcedure,
+		svc.GetResourceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("GetResourceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
-	executorServiceAttestServiceExecutionHandler := connect.NewUnaryHandler(
-		ExecutorServiceAttestServiceExecutionProcedure,
-		svc.AttestServiceExecution,
-		connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
+	executorServiceCancelResourcePreparationHandler := connect.NewUnaryHandler(
+		ExecutorServiceCancelResourcePreparationProcedure,
+		svc.CancelResourcePreparation,
+		connect.WithSchema(executorServiceMethods.ByName("CancelResourcePreparation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceAttestResourceExecutionHandler := connect.NewUnaryHandler(
+		ExecutorServiceAttestResourceExecutionProcedure,
+		svc.AttestResourceExecution,
+		connect.WithSchema(executorServiceMethods.ByName("AttestResourceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServicePrepareDeviceActionHandler := connect.NewUnaryHandler(
@@ -817,14 +842,16 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceGetExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetRecoveryReadinessProcedure:
 			executorServiceGetRecoveryReadinessHandler.ServeHTTP(w, r)
-		case ExecutorServicePrepareServiceExecutionProcedure:
-			executorServicePrepareServiceExecutionHandler.ServeHTTP(w, r)
-		case ExecutorServiceStartServiceExecutionProcedure:
-			executorServiceStartServiceExecutionHandler.ServeHTTP(w, r)
-		case ExecutorServiceGetServiceExecutionProcedure:
-			executorServiceGetServiceExecutionHandler.ServeHTTP(w, r)
-		case ExecutorServiceAttestServiceExecutionProcedure:
-			executorServiceAttestServiceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServicePrepareResourceExecutionProcedure:
+			executorServicePrepareResourceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceStartResourceExecutionProcedure:
+			executorServiceStartResourceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetResourceExecutionProcedure:
+			executorServiceGetResourceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServiceCancelResourcePreparationProcedure:
+			executorServiceCancelResourcePreparationHandler.ServeHTTP(w, r)
+		case ExecutorServiceAttestResourceExecutionProcedure:
+			executorServiceAttestResourceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareDeviceActionProcedure:
 			executorServicePrepareDeviceActionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartDeviceActionProcedure:
@@ -906,20 +933,24 @@ func (UnimplementedExecutorServiceHandler) GetRecoveryReadiness(context.Context,
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetRecoveryReadiness is not implemented"))
 }
 
-func (UnimplementedExecutorServiceHandler) PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareServiceExecution is not implemented"))
+func (UnimplementedExecutorServiceHandler) PrepareResourceExecution(context.Context, *connect.Request[v1.PrepareResourceExecutionRequest]) (*connect.Response[v1.PrepareResourceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareResourceExecution is not implemented"))
 }
 
-func (UnimplementedExecutorServiceHandler) StartServiceExecution(context.Context, *connect.Request[v1.StartServiceExecutionRequest]) (*connect.Response[v1.StartServiceExecutionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.StartServiceExecution is not implemented"))
+func (UnimplementedExecutorServiceHandler) StartResourceExecution(context.Context, *connect.Request[v1.StartResourceExecutionRequest]) (*connect.Response[v1.StartResourceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.StartResourceExecution is not implemented"))
 }
 
-func (UnimplementedExecutorServiceHandler) GetServiceExecution(context.Context, *connect.Request[v1.GetServiceExecutionRequest]) (*connect.Response[v1.GetServiceExecutionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetServiceExecution is not implemented"))
+func (UnimplementedExecutorServiceHandler) GetResourceExecution(context.Context, *connect.Request[v1.GetResourceExecutionRequest]) (*connect.Response[v1.GetResourceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetResourceExecution is not implemented"))
 }
 
-func (UnimplementedExecutorServiceHandler) AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestServiceExecution is not implemented"))
+func (UnimplementedExecutorServiceHandler) CancelResourcePreparation(context.Context, *connect.Request[v1.CancelResourcePreparationRequest]) (*connect.Response[v1.CancelResourcePreparationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.CancelResourcePreparation is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) AttestResourceExecution(context.Context, *connect.Request[v1.AttestResourceExecutionRequest]) (*connect.Response[v1.AttestResourceExecutionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestResourceExecution is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error) {

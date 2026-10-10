@@ -81,7 +81,7 @@ func (g *AcceptanceGuest) Observe(ctx context.Context, owner *devlab.OwnerSessio
 	control := &vmControlPlane{session: owner}
 	publication, err := control.WaitSnapshot(ctx, g.evidence.DeviceID, after, nil, 10*time.Minute)
 	if err != nil {
-		return result, errors.Join(comparisonErr, err)
+		return result, errors.Join(comparisonErr, err, saveLifecycleFailure(ctx, g.vm, g.diagnostics))
 	}
 	result.Publication = publication
 	detail, err := owner.Admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: g.evidence.DeviceID}))

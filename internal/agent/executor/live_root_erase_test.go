@@ -78,7 +78,7 @@ func TestLiveRootClosesJournalBeforeEffectAndAttestsOnlyMemory(t *testing.T) {
 				if f.svc.liveRoot == nil || !f.svc.liveRoot.status.GetReportOnly() || f.svc.liveRoot.record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || !bytes.Equal(f.svc.liveRoot.record.GetStartGrantEnvelope(), grant) {
 					return errors.New("effect preceded consumed memory fence")
 				}
-				if _, err := f.svc.loadBound(t.Context()); !errors.Is(err, errServiceRejected) {
+				if _, err := f.svc.loadBound(t.Context()); !errors.Is(err, errResourceRejected) {
 					return errors.New("journal remained accessible after memory fence")
 				}
 				return nil

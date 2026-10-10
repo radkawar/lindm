@@ -182,7 +182,7 @@ func TestExecutionTrustDamageStaysHold(t *testing.T) {
 					t.Fatal(err)
 				}
 				preserved = append([]byte(nil), preserved...)
-				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 2`)
+				_, err = store.db.ExecContext(ctx, `PRAGMA user_version = 1`)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -210,7 +210,7 @@ func TestExecutionTrustDamageStaysHold(t *testing.T) {
 					t.Fatal("missing trust row was reinserted")
 				}
 			case "unexpected version":
-				if after.version != 2 || !after.hasTrustRow || after.trustRevision != 2 || !bytes.Equal(after.trust, preserved) {
+				if after.version != 1 || !after.hasTrustRow || after.trustRevision != 2 || !bytes.Equal(after.trust, preserved) {
 					t.Fatal("unexpected schema version changed committed trust")
 				}
 			case "oversized row":

@@ -94,7 +94,7 @@ func exerciseDispatchRecheck(ctx context.Context, vm *guestVM, control *vmContro
 			if err := vmServiceSucceeded(action.GetStatus(), drift); err != nil {
 				return nil, fmt.Errorf("%s: %w", scenario.Name, err)
 			}
-			before := action.GetStatus().GetBefore()
+			before := action.GetStatus().GetBefore().GetSystemdService()
 			if before.GetActiveState() != scenario.NativeBeforeActive || before.GetUnitFileState() != scenario.NativeBeforeEnablement {
 				return nil, fmt.Errorf("%s: signed observation did not detect the independent native baseline", scenario.Name)
 			}

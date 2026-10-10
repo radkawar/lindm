@@ -19,7 +19,7 @@ var errInventoryPublicationPending = errors.New("inventory_publication_pending")
 // collect. Only a verified server publication receipt completes this operation.
 func (s *Service) beginInventoryRefresh(ctx context.Context, record *agentv1.DeviceActionRecord, gate func(context.Context) error) (*agentv1.DeviceActionVerification, error) {
 	if record.GetIntent().GetSpec().GetRefreshInventory() == nil {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if err := gate(ctx); err != nil {
 		return nil, err
@@ -52,14 +52,14 @@ func (s *Service) ConfirmDeviceActionInventory(ctx context.Context, req *connect
 		return noStore(&agentv1.ConfirmDeviceActionInventoryResponse{Status: deviceActionStatus(record)}), nil
 	}
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING && record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
-		return nil, mapError(errServiceRejected)
+		return nil, mapError(errResourceRejected)
 	}
 	if loaded.execution.delegation == nil {
-		return nil, mapError(errServiceRejected)
+		return nil, mapError(errResourceRejected)
 	}
 	receipt, err := loaded.execution.verifier.VerifyDeviceActionInventoryReceipt(ctx, loaded.execution.root, loaded.execution.delegation, req.Msg.GetReceiptEnvelope(), record, s.now())
 	if err != nil {
-		return nil, mapError(serviceAuthorityError(ctx, err))
+		return nil, mapError(resourceAuthorityError(ctx, err))
 	}
 	next := proto.CloneOf(record)
 	next.InventoryReceiptEnvelope = bytes.Clone(req.Msg.GetReceiptEnvelope())
@@ -88,11 +88,11 @@ func (s *Service) verifyInventoryRefreshHistory(ctx context.Context, loaded *bou
 	at := record.GetCompletedAt().AsTime()
 	delegation, err := loaded.execution.verifier.VerifyDelegation(ctx, record.GetInventoryReceiptRoot(), record.GetInventoryReceiptDelegationEnvelope(), 0, 0, at)
 	if err != nil {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	receipt, err := loaded.execution.verifier.VerifyDeviceActionInventoryReceipt(ctx, record.GetInventoryReceiptRoot(), delegation, record.GetInventoryReceiptEnvelope(), record, at)
 	if err != nil || receipt.GetPackageSequence() != record.GetVerification().GetInventorySequence() {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	return nil
 }

@@ -24,9 +24,9 @@ const MaxDeviceClockSkew = 2 * time.Minute
 // consumer's explicit clock tolerance.
 var ErrDeviceClockSkew = errors.New("device_clock_skew")
 
-// ServiceAttestationBinding is the consumer's independently trusted request
+// ResourceAttestationBinding is the consumer's independently trusted request
 // context. Nonce must be chosen unpredictably by that consumer, not by the relay.
-type ServiceAttestationBinding struct {
+type ResourceAttestationBinding struct {
 	DeploymentID, DeviceID, EnrollmentGeneration uuid.UUID
 	SessionEpoch                                 uint64
 	ActionID                                     uuid.UUID
@@ -34,7 +34,7 @@ type ServiceAttestationBinding struct {
 	Nonce                                        [32]byte
 }
 
-// VerifyServiceAttestation authenticates a short-lived snapshot of retained
+// VerifyResourceAttestation authenticates a short-lived snapshot of retained
 // service execution evidence using the independently pinned device CA. A current
 // same-identity certificate may attest history recorded under an older key.
 //
@@ -43,14 +43,14 @@ type ServiceAttestationBinding struct {
 // desired-head and authorization policy. Retained observation timestamps are not
 // bounded by issuance: the device wall clock may have moved backwards.
 // clockSkew must be explicitly selected by the consumer; zero remains strict.
-func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, certificatePEM []byte, deviceCA *x509.Certificate, expected *ServiceAttestationBinding, now time.Time, clockSkew time.Duration) (*agentv1.ServiceExecutionAttestation, error) {
+func (a *Authority) VerifyResourceAttestation(ctx context.Context, envelope, certificatePEM []byte, deviceCA *x509.Certificate, expected *ResourceAttestationBinding, now time.Time, clockSkew time.Duration) (*agentv1.ResourceExecutionAttestation, error) {
 	if clockSkew < 0 {
 		return nil, errors.New("invalid device clock tolerance")
 	}
 	if expected == nil || expected.DeploymentID == uuid.Nil || expected.DeviceID == uuid.Nil || expected.EnrollmentGeneration == uuid.Nil || expected.ActionID == uuid.Nil || expected.SessionEpoch == 0 {
 		return nil, errors.New("invalid service attestation binding")
 	}
-	if len(envelope) == 0 || len(envelope) > 65536 {
+	if len(envelope) == 0 || len(envelope) > 262144 {
 		return nil, errors.New("invalid service attestation size")
 	}
 	if len(certificatePEM) == 0 || len(certificatePEM) > 16384 || deviceCA == nil {
@@ -60,7 +60,7 @@ func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, cert
 	if err != nil {
 		return nil, err
 	}
-	attestation := new(agentv1.ServiceExecutionAttestation)
+	attestation := new(agentv1.ResourceExecutionAttestation)
 	if err := a.Verify(ctx, envelope, attestation, 1, public); err != nil {
 		return nil, err
 	}

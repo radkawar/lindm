@@ -30,6 +30,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	devicev1connect "lindm/gen/lindm/device/v1/devicev1connect"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/pki"
 	"lindm/internal/trust"
 )
@@ -80,7 +81,7 @@ func TestDispatchRetainsStartedActionAfterReportFailure(t *testing.T) {
 				if err := f.r.dispatch(t.Context(), f.d); err != nil || f.r.completed.Load() != 1 || f.reports != 2 {
 					t.Fatalf("closed work was replayed as a new effect: %v", err)
 				}
-				metrics := f.r.metrics.snapshot(false)["ReportServiceResult"]
+				metrics := f.r.metrics.snapshot(false)["ReportResourceResult"]
 				if metrics.Calls != 2 || metrics.Errors != 1 || metrics.Reasons["admission_rejected"] != 1 {
 					t.Fatalf("transient failure vanished from capacity evidence: %+v", metrics)
 				}
@@ -108,7 +109,7 @@ func TestDispatchRetriesPreparedChallengeAndStoredGrant(t *testing.T) {
 				}
 				wantCalls := 2
 				if lost {
-					wantCalls = 1 // GetServiceWork carries the already-authorized grant.
+					wantCalls = 1 // GetResourceWork carries the already-authorized grant.
 				}
 				if f.authorizations != wantCalls || f.grants != 1 || !f.closed || !bytes.Equal(proof, f.challengeProof) || !proto.Equal(accepted, f.lastAttestation.GetStatus().GetAcceptedAt()) {
 					t.Fatal("retry replaced the prepared challenge or admitted a second start")
@@ -133,7 +134,7 @@ func TestDispatchExpiresPreparedChallengeWithoutExecution(t *testing.T) {
 					t.Fatal(err)
 				}
 				status := f.lastAttestation.GetStatus()
-				if f.authorizations != 1 || !f.closed || status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED || status.GetStartedAt() != nil || f.r.completed.Load() != 0 || len(f.d.completed) != 0 {
+				if f.authorizations != 1 || !f.closed || status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || status.GetStartedAt() != nil || f.r.completed.Load() != 0 || len(f.d.completed) != 0 {
 					t.Fatal("lapsed challenge generated a new start or counted as success")
 				}
 			})
@@ -158,7 +159,7 @@ func TestDispatchPreservesNonretryableReportError(t *testing.T) {
 	if err := f.r.dispatch(t.Context(), f.d); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("real rejection was reinterpreted: %v", err)
 	}
-	metrics := f.r.metrics.snapshot(false)["ReportServiceResult"]
+	metrics := f.r.metrics.snapshot(false)["ReportResourceResult"]
 	if metrics.NonRetryableErrors != 1 || metrics.Reasons["service_result_rejected"] != 1 || f.r.completed.Load() != 0 || f.d.pending == nil {
 		t.Fatal("real rejection or pending history was lost")
 	}
@@ -183,6 +184,7 @@ func TestDispatchRejectsChangedIntentOnReportRefresh(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.intent.DesiredRevision = uuid.NewString()
+		f.intent.Ownership.AssignmentId = f.intent.GetDesiredRevision()
 		f.work.IntentEnvelope = f.sign(f.intent, f.planKey)
 		time.Sleep(30 * time.Second)
 		if err := f.r.dispatch(t.Context(), f.d); err == nil {
@@ -200,7 +202,7 @@ func TestDispatchBoundsCompletedHistoryAcrossPeriodicActions(t *testing.T) {
 	for sequence := uint64(1); sequence <= 8; sequence++ {
 		f.intent.ActionId = uuid.NewString()
 		f.intent.ResourceSequence = sequence
-		f.work = &devicev1.ServiceWork{ActionId: f.intent.GetActionId(), IntentEnvelope: f.sign(f.intent, f.planKey)}
+		f.work = &devicev1.ResourceWork{ActionId: f.intent.GetActionId(), IntentEnvelope: f.sign(f.intent, f.planKey)}
 		f.closed, f.receipt = false, nil
 		f.challengeProof = nil
 		if err := f.r.dispatch(t.Context(), f.d); err != nil {
@@ -224,14 +226,14 @@ type replayFixture struct {
 	t               *testing.T
 	r               *runner
 	d               *simulatedDevice
-	intent          *agentv1.ServiceExecutionIntent
-	work            *devicev1.ServiceWork
+	intent          *agentv1.ResourceExecutionIntent
+	work            *devicev1.ResourceWork
 	planKey         ed25519.PrivateKey
 	startKey        ed25519.PrivateKey
 	deviceCA        *x509.Certificate
 	challengeProof  []byte
-	receipt         *devicev1.ReportServiceResultRequest
-	lastAttestation *agentv1.ServiceExecutionAttestation
+	receipt         *devicev1.ReportResourceResultRequest
+	lastAttestation *agentv1.ResourceExecutionAttestation
 	startFailure    error
 	reportFailure   error
 	loseStart       bool
@@ -297,28 +299,33 @@ func newReplayFixture(t *testing.T) *replayFixture {
 		t.Fatal(err)
 	}
 	f.d.certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	f.intent = &agentv1.ServiceExecutionIntent{DeploymentId: root.GetDeploymentId(), DeviceId: f.d.id, EnrollmentGeneration: f.d.generation, ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(), ResourceSequence: 1, RecoveryEpoch: 1, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1, NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)), Desired: &agentv1.ServiceDesiredState{Unit: "capacity-synthetic.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}
-	f.work = &devicev1.ServiceWork{ActionId: f.intent.GetActionId(), IntentEnvelope: f.sign(f.intent, f.planKey)}
+	f.intent = &agentv1.ResourceExecutionIntent{DeploymentId: root.GetDeploymentId(), DeviceId: f.d.id, EnrollmentGeneration: f.d.generation, ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(), ResourceSequence: 1, RecoveryEpoch: 1, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1, NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)),
+		Desired:   &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "capacity-synthetic.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "capacity-synthetic.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}},
+		Operation: resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE,
+	}
+	resourceID := uuid.NewString()
+	f.intent.Ownership = &agentv1.ResourceOwnershipBinding{AssignmentId: f.intent.GetDesiredRevision(), ResourceId: resourceID, Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Sources: []*agentv1.ResourceOwnershipSource{{ProfileId: uuid.NewString(), ProfileRevision: uuid.NewString(), ResourceId: resourceID}}}
+	f.work = &devicev1.ResourceWork{ActionId: f.intent.GetActionId(), IntentEnvelope: f.sign(f.intent, f.planKey)}
 	_, handler := devicev1connect.NewDeviceServiceHandler(f)
 	f.d.client = devicev1connect.NewDeviceServiceClient(replayHTTPClient{handler}, "https://device.example", connect.WithInterceptors(f.r.metrics))
 	return f
 }
 
-func (f *replayFixture) GetServiceWork(_ context.Context, _ *connect.Request[devicev1.GetServiceWorkRequest]) (*connect.Response[devicev1.GetServiceWorkResponse], error) {
+func (f *replayFixture) GetResourceWork(_ context.Context, _ *connect.Request[devicev1.GetResourceWorkRequest]) (*connect.Response[devicev1.GetResourceWorkResponse], error) {
 	if f.closed {
-		return connect.NewResponse(&devicev1.GetServiceWorkResponse{}), nil
+		return connect.NewResponse(&devicev1.GetResourceWorkResponse{}), nil
 	}
 	f.work.ResultNonce = make([]byte, 32)
 	if _, err := rand.Read(f.work.ResultNonce); err != nil {
 		return nil, err
 	}
 	f.work.ResultNonceExpiresAt = timestamppb.New(time.Now().Add(time.Minute))
-	return connect.NewResponse(&devicev1.GetServiceWorkResponse{Work: f.work}), nil
+	return connect.NewResponse(&devicev1.GetResourceWorkResponse{Work: f.work}), nil
 }
 
-func (f *replayFixture) AuthorizeServiceStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeServiceStartRequest]) (*connect.Response[devicev1.AuthorizeServiceStartResponse], error) {
+func (f *replayFixture) AuthorizeResourceStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeResourceStartRequest]) (*connect.Response[devicev1.AuthorizeResourceStartResponse], error) {
 	f.authorizations++
-	challenge := new(agentv1.ServiceExecutionChallenge)
+	challenge := new(agentv1.ResourceExecutionChallenge)
 	if err := f.r.authority.Verify(ctx, req.Msg.GetChallengeProof(), challenge, 1, ed25519.PublicKey(f.d.key[ed25519.SeedSize:])); err != nil {
 		return nil, err
 	}
@@ -333,20 +340,20 @@ func (f *replayFixture) AuthorizeServiceStart(ctx context.Context, req *connect.
 		if f.changeGrant {
 			challenge.Nonce[0] ^= 1
 		}
-		grant := &agentv1.ServiceExecutionStartGrant{Challenge: challenge, ActorId: f.intent.GetActorId(), AuthorizationVersion: 1, RootVersion: 1, DelegationVersion: 1, NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt()}
+		grant := &agentv1.ResourceExecutionStartGrant{Challenge: challenge, ActorId: f.intent.GetActorId(), AuthorizationVersion: 1, RootVersion: 1, DelegationVersion: 1, NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt()}
 		f.work.StartGrantEnvelope = f.sign(grant, f.startKey)
 		f.grants++
 	}
 	if f.authorizations == 1 && f.startFailure != nil {
 		return nil, f.startFailure
 	}
-	return connect.NewResponse(&devicev1.AuthorizeServiceStartResponse{StartGrantEnvelope: f.work.GetStartGrantEnvelope()}), nil
+	return connect.NewResponse(&devicev1.AuthorizeResourceStartResponse{StartGrantEnvelope: f.work.GetStartGrantEnvelope()}), nil
 }
 
-func (f *replayFixture) ReportServiceResult(ctx context.Context, req *connect.Request[devicev1.ReportServiceResultRequest]) (*connect.Response[devicev1.ReportServiceResultResponse], error) {
+func (f *replayFixture) ReportResourceResult(ctx context.Context, req *connect.Request[devicev1.ReportResourceResultRequest]) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
 	f.reports++
 	if f.receipt != nil && proto.Equal(f.receipt, req.Msg) {
-		return connect.NewResponse(&devicev1.ReportServiceResultResponse{Closed: f.closed}), nil
+		return connect.NewResponse(&devicev1.ReportResourceResultResponse{Closed: f.closed}), nil
 	}
 	if f.reports == 1 && f.reportFailure != nil && !f.loseReport {
 		return nil, f.reportFailure
@@ -354,19 +361,19 @@ func (f *replayFixture) ReportServiceResult(ctx context.Context, req *connect.Re
 	if !time.Now().Before(f.work.GetResultNonceExpiresAt().AsTime()) {
 		return nil, replayRPCError(connect.CodePermissionDenied, "service_result_nonce_rejected")
 	}
-	binding := &trust.ServiceAttestationBinding{DeploymentID: uuid.MustParse(f.intent.GetDeploymentId()), DeviceID: uuid.MustParse(f.d.id), EnrollmentGeneration: uuid.MustParse(f.d.generation), SessionEpoch: f.d.epoch, ActionID: uuid.MustParse(f.work.GetActionId()), IntentSHA256: sha256.Sum256(f.work.GetIntentEnvelope())}
+	binding := &trust.ResourceAttestationBinding{DeploymentID: uuid.MustParse(f.intent.GetDeploymentId()), DeviceID: uuid.MustParse(f.d.id), EnrollmentGeneration: uuid.MustParse(f.d.generation), SessionEpoch: f.d.epoch, ActionID: uuid.MustParse(f.work.GetActionId()), IntentSHA256: sha256.Sum256(f.work.GetIntentEnvelope())}
 	copy(binding.Nonce[:], f.work.GetResultNonce())
-	attestation, err := f.r.authority.VerifyServiceAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), f.deviceCA, binding, time.Now(), trust.MaxDeviceClockSkew)
+	attestation, err := f.r.authority.VerifyResourceAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), f.deviceCA, binding, time.Now(), trust.MaxDeviceClockSkew)
 	if err != nil {
 		return nil, err
 	}
 	f.lastAttestation = attestation
 	f.receipt = proto.CloneOf(req.Msg)
-	f.closed = !f.leaveOpen && attestation.GetStatus().GetState() >= agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED
+	f.closed = !f.leaveOpen && attestation.GetStatus().GetState() >= agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	if f.reports == 1 && f.reportFailure != nil {
 		return nil, f.reportFailure
 	}
-	return connect.NewResponse(&devicev1.ReportServiceResultResponse{Closed: f.closed}), nil
+	return connect.NewResponse(&devicev1.ReportResourceResultResponse{Closed: f.closed}), nil
 }
 
 func (f *replayFixture) sign(message proto.Message, key ed25519.PrivateKey) []byte {

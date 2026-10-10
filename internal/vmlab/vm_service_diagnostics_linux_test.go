@@ -11,25 +11,26 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 func TestServiceFailureRetainsPublicTerminalEvidence(t *testing.T) {
-	status := &agentv1.ServiceExecutionStatus{
+	status := &agentv1.ResourceExecutionStatus{
 		ActionId:     "e7fb3f03-56b3-453b-89cb-07b709ea865d",
-		State:        agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED,
-		Failure:      agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NATIVE,
+		State:        agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED,
+		Failure:      agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE,
 		AcceptedAt:   timestamppb.New(time.Unix(100, 0)),
 		StartedAt:    timestamppb.New(time.Unix(101, 0)),
 		CompletedAt:  timestamppb.New(time.Unix(102, 0)),
-		Before:       &agentv1.ServiceObservation{},
-		Verification: &agentv1.ServiceVerification{Converged: false},
+		Before:       &resourcev1.ResourceObservation{},
+		Verification: &resourcev1.ResourceVerification{Disposition: resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED},
 	}
 	err := vmServiceSucceeded(status, true)
 	if err == nil {
 		t.Fatal("failed native action reported success")
 	}
-	status.Failure = agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE
-	for _, want := range []string{"SERVICE_EXECUTION_STATE_FAILED", "SERVICE_EXECUTION_FAILURE_NATIVE", "before", "verification", "acceptedAt", "startedAt", "completedAt", "expected_started=true"} {
+	status.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE
+	for _, want := range []string{"RESOURCE_EXECUTION_STATE_FAILED", "RESOURCE_EXECUTION_FAILURE_NATIVE", "before", "verification", "acceptedAt", "startedAt", "completedAt", "expected_started=true"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("diagnostic lost %q: %v", want, err)
 		}

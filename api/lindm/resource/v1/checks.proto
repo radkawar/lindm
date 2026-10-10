@@ -152,13 +152,14 @@ message NativePackageChecks {
   bool native_database_matches = 1;
   bool exact_version_matches = 2;
   bool approved_source_matches = 3;
-  ProbeReceipt application_readiness = 4 [(buf.validate.field).required = true];
+  // Native installed/configured state, not application launch or health.
+  ProbeReceipt native_configuration_readiness = 4 [(buf.validate.field).required = true];
   bool side_effects_match_manifest = 5;
   bool converged = 6;
   option (buf.validate.message).cel = {
     id: "package_checks.convergence"
-    message: "package convergence requires native DB, source, complete transaction and readiness"
-    expression: "!this.converged || (this.native_database_matches && this.exact_version_matches && this.approved_source_matches && this.application_readiness.passed && this.side_effects_match_manifest)"
+    message: "package convergence requires native DB, source, complete transaction and configured state"
+    expression: "!this.converged || (this.native_database_matches && this.exact_version_matches && this.approved_source_matches && this.native_configuration_readiness.passed && this.side_effects_match_manifest)"
   };
 }
 message RepositoryChecks {
@@ -212,14 +213,17 @@ message SessionPolicyChecks {
 }
 message PasswordPolicyChecks {
   bool effective_settings_match = 1;
-  ProbeReceipt weak_password_rejection = 2 [(buf.validate.field).required = true];
-  ProbeReceipt lockout_behavior = 3 [(buf.validate.field).required = true];
+  reserved 2, 3;
+  reserved "weak_password_rejection", "lockout_behavior";
+  // Native authentication attempts belong to disposable qualification fixtures.
+  bool installed_modules_ready = 6;
+  bool native_precedence_verified = 7;
   bool native_pam_owner_matches = 4;
   bool converged = 5;
   option (buf.validate.message).cel = {
     id: "password_checks.convergence"
-    message: "password convergence requires real rejection and lockout behavior"
-    expression: "!this.converged || (this.effective_settings_match && this.weak_password_rejection.passed && this.lockout_behavior.passed && this.native_pam_owner_matches)"
+    message: "password configuration convergence requires native owner, module and effective precedence evidence"
+    expression: "!this.converged || (this.effective_settings_match && this.installed_modules_ready && this.native_precedence_verified && this.native_pam_owner_matches)"
   };
 }
 message SnapAppChecks {
@@ -260,5 +264,57 @@ message DirectoryClientChecks {
     id: "directory_checks.convergence"
     message: "directory convergence requires a real account fixture and outage behavior"
     expression: "!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)"
+  };
+}
+
+message ManagedFileChecks {
+  bool presence_matches = 1;
+  bool content_matches = 2;
+  bool mode_matches = 3;
+  bool owner_matches = 4;
+  bool ancestry_safe = 5;
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "managed_file_checks.convergence"
+    message: "file convergence requires independently read content, metadata and safe ancestry"
+    expression: "!this.converged || (this.presence_matches && this.content_matches && this.mode_matches && this.owner_matches && this.ancestry_safe)"
+  };
+}
+message SysctlChecks {
+  bool live_value_matches = 1;
+  bool persistence_matches = 2;
+  bool persistence_owner_matches = 3;
+  bool converged = 4;
+  // Independent cross-boot observation, not a prerequisite for initial apply.
+  bool reboot_persistence_verified = 5;
+  option (buf.validate.message).cel = {
+    id: "sysctl_checks.convergence"
+    message: "sysctl convergence requires both live and requested persistent ownership evidence"
+    expression: "!this.converged || (this.live_value_matches && this.persistence_matches && this.persistence_owner_matches)"
+  };
+}
+message SystemdDefinitionChecks {
+  bool definition_matches = 1;
+  bool effective_options_match = 2;
+  bool target_service_exists = 3;
+  bool timer_state_matches = 4;
+  bool daemon_reload_completed = 5;
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "systemd_definition_checks.convergence"
+    message: "definition convergence requires effective native settings and completed reload"
+    expression: "!this.converged || (this.definition_matches && this.effective_options_match && this.target_service_exists && this.timer_state_matches && this.daemon_reload_completed)"
+  };
+}
+message EncryptionComplianceChecks {
+  bool luks_root_requirement_met = 1;
+  bool escrow_requirement_met = 2;
+  bool tpm_requirement_met = 3;
+  bool evidence_complete = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "encryption_compliance_checks.convergence"
+    message: "encryption compliance requires positive evidence for every requested requirement"
+    expression: "!this.converged || (this.luks_root_requirement_met && this.escrow_requirement_met && this.tpm_requirement_met && this.evidence_complete)"
   };
 }

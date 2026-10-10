@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-10-10T15:44:34Z",
+  "host": "dgx20",
+  "host_architecture": "aarch64",
+  "image_id": "almalinux-8.10-20260928-aarch64",
+  "image_manifest_repository_path": "lab/images/almalinux-8.10-aarch64.json",
+  "image_sha256": "b5deb2b8c9d19a92b5d8f12cdbdc20d255ed48e397fb5321a7ccf23f854b5a54",
+  "image_cache_path": "~/lindm-lab/images/sha256-b5deb2b8c9d19a92b5d8f12cdbdc20d255ed48e397fb5321a7ccf23f854b5a54/image",
+  "native_util_linux": "util-linux-2.32.1-48.el8_10.aarch64 (rpm -q util-linux inside the image root)",
+  "native_lsblk_version": "lsblk from util-linux 2.32.1",
+  "libguestfs": "guestfish 1.52.0, LIBGUESTFS_BACKEND=direct, aarch64 appliance",
+  "method": "The cached image was copied to a private mktemp directory and its sha256 re-verified. guestfish --rw -a COPY -i mounted the copy's filesystems; guestfish sh ran the image's own /usr/bin/lsblk chrooted in the image root under env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C TZ=UTC (the agent's native runner environment). stdout, stderr and the exit status of each command were written to /tmp inside the copy, copied out unmodified with copy-out and the copy was deleted. The cached image and running guests were not touched.",
+  "udev": "The appliance's /run/udev was bind-mounted at the image root's /run/udev (guestfish debug sh) so lsblk could read udev properties. Without it, util-linux 2.32.1 printed null FSTYPE/UUID/PARTUUID/PARTTYPE/SERIAL values.",
+  "devices": "Block devices are the libguestfs appliance's QEMU SCSI disks, not a booted EL8 guest: sda is the image copy (GPT: EFI vfat at /boot/efi, xfs /boot, xfs /), sdb is the appliance root. Mountpoints are libguestfs inspection mounts as seen from the image root. udev properties come from the appliance's udev database.",
+  "commands": "Exact argument arrays with unmodified stdout, stderr and exit_code are recorded in lsblk.json. modern_json/modern_pairs are the agent and oracle full column sets; legacy_json/legacy_pairs are their util-linux 2.32.1 column sets.",
+  "observed_format": "util-linux 2.32.1 lsblk rejects FSVER, PTTYPE, PTUUID and MOUNTPOINTS with exit status 1, empty stdout and an 'unknown column' diagnostic. Its JSON prints SIZE as a decimal string, empty values as null and one MOUNTPOINT per device; MODEL keeps trailing padding.",
+  "column_history": "util-linux misc-utils/lsblk.c: PTTYPE/PTUUID added by 1b06b33dd (first in v2.33), FSVER by 9cca1ef2d (v2.35), MOUNTPOINTS by c6648d2db (v2.37).",
+  "purpose": "native interface format evidence, not agent qualification or physical validation"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "rocky-8.10-20240528.0-aarch64",
+  "distribution": "rocky",
+  "version": "8.10",
+  "architecture": "aarch64",
+  "edition": "genericcloud-base",
+  "release": "8.10-20240528.0",
+  "imageFilename": "Rocky-8-GenericCloud-Base-8.10-20240528.0.aarch64.qcow2",
+  "imageUrl": "https://download.rockylinux.org/pub/rocky/8/images/aarch64/Rocky-8-GenericCloud-Base-8.10-20240528.0.aarch64.qcow2",
+  "checksumUrl": "https://download.rockylinux.org/pub/rocky/8/images/aarch64/CHECKSUM",
+  "signatureUrl": "https://download.rockylinux.org/pub/rocky/8/images/aarch64/CHECKSUM.sig",
+  "keyUrl": "https://dl.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-8",
+  "sha256": "946b5b9845aa5e3ed98f1bc6ee9873201712a2aef01b87731aed16857e0ca13f",
+  "signerFingerprint": "7051C470A929F454CEBE37B715AF5DAC6D745A60",
+  "imageSizeBytes": "1925644288",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://rockylinux.org/resources/gpg-key-info",
+  "releaseProvenanceUrl": "https://download.rockylinux.org/pub/rocky/8/images/aarch64/"
+}

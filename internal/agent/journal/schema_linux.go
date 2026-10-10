@@ -8,10 +8,11 @@ import (
 )
 
 // Only reviewed table definitions may be present. Checking SQL also rejects
-// removed constraints, foreign indexes and triggers. Opening never repairs DDL.
+// removed constraints, foreign indexes and triggers. Opening never repairs DDL,
+// and an older service-only journal holds for re-provisioning.
 func validateJournalSchema(ctx context.Context, db journaldb.DBTX) error {
-	expected := map[string]string{"executor_state": "table", "execution_trust": "table", "service_actions_read_only": "index", "device_actions": "table", "device_action_usage": "table", "account_locks": "table", "account_lock_owners": "table", "account_lock_usage": "table"}
-	for _, name := range serviceTableNames {
+	expected := map[string]string{"executor_state": "table", "execution_trust": "table", "resource_actions_read_only": "index", "device_actions": "table", "device_action_usage": "table", "account_locks": "table", "account_lock_owners": "table", "account_lock_usage": "table"}
+	for _, name := range resourceTableNames {
 		expected[name] = "table"
 	}
 	rows, err := db.QueryContext(ctx, `SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL`)
@@ -38,7 +39,7 @@ func validateJournalSchema(ctx context.Context, db journaldb.DBTX) error {
 	return nil
 }
 
-var serviceTableNames = [...]string{"service_actions", "service_resource_floors", "service_action_usage"}
+var resourceTableNames = [...]string{"resource_actions", "resource_floors", "resource_action_usage", "resource_ownership", "resource_ownership_usage", "resource_ownership_reservations", "resource_preparation_cancellations"}
 
 func normalizeDDL(ddl string) string {
 	return strings.Join(strings.Fields(strings.TrimSuffix(strings.TrimSpace(ddl), ";")), " ")

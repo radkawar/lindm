@@ -52,8 +52,12 @@ type VMDispatchOptions struct {
 	Hold                                                                   time.Duration
 	Progress                                                               io.Writer
 	// LocalAuthority uses the real password/WebAuthn authority without an IdP.
-	LocalAuthority bool
-	PowerActions   bool
+	LocalAuthority        bool
+	PowerActions          bool
+	Resources             bool
+	ResourceExecutionOnly bool
+	// ResourceKinds selects connected lane kind groups; see resourceKindSelection.
+	ResourceKinds map[string]bool
 }
 
 type VMDispatchScenario struct {
@@ -98,6 +102,8 @@ type VMDispatchResult struct {
 	ClockSkew              []*VMDispatchClockEvidence      `json:"clock_skew,omitempty"`
 	Hold                   *VMDispatchHoldEvidence         `json:"hold,omitempty"`
 	Power                  *VMPowerEvidence                `json:"power,omitempty"`
+	Resources              *VMResourceEvidence             `json:"resources,omitempty"`
+	Architecture           string                          `json:"architecture,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -106,6 +112,13 @@ type VMDispatchResult struct {
 func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDispatchOptions) (result *VMDispatchResult, err error) {
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
+	}
+	if options.ResourceExecutionOnly && !options.Resources {
+		return nil, errors.New("direct resource execution requires the resource lane")
+	}
+	if options.Resources && (options.PowerActions || options.Hold != 0 ||
+		((manifest.GetDistribution() != "ubuntu" || manifest.GetVersion() != "24.04") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44"))) {
+		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04 or Fedora 44, without power actions or console hold")
 	}
 	format, err := NativePackageFormat(manifest.GetDistribution())
 	if err != nil {
@@ -157,6 +170,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	default:
 		return result, errors.New("dispatch packages require a supported guest architecture")
 	}
+	result.Architecture = architecture
 	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: VMBuildRepository(options.Repository, options.BuildRepository), Revision: "connected-dispatch-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
 	if err != nil {
 		return result, err
@@ -255,6 +269,16 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err := packages.InstallFirst(ctx); err != nil {
 		return result, err
 	}
+	if options.Resources {
+		result.Resources = newVMResourceEvidence()
+		if err := setupVMResourceFixtures(ctx, packages, architecture, options.ResourceKinds); err != nil {
+			return result, err
+		}
+		result.Resources.Fixture, err = resourceFixtureEvidence(ctx, packages)
+		if err != nil {
+			return result, err
+		}
+	}
 	if err := packages.uploadBytes(ctx, nativeGuestDir+"/dispatch.service", []byte(dispatchUnitDefinition)); err != nil {
 		return result, err
 	}
@@ -281,9 +305,20 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	defer func() { err = errors.Join(err, fixture.Close()) }()
 	result.Database = fixture.DatabaseName
-	delegation, err := fixture.ConfigureServiceDispatch(ctx)
-	if err != nil {
-		return result, err
+	var delegation *agentv1.UpdateExecutionTrustRequest
+	var resourceSigner *devlab.ExecutionTrustExercise
+	if options.ResourceExecutionOnly {
+		resourceSigner, err = devlab.CreateExecutionTrustExercise(ctx, options.Repository)
+		if err != nil {
+			return result, err
+		}
+		defer resourceSigner.Close()
+		delegation = resourceSigner.Initial
+	} else {
+		delegation, err = fixture.ConfigureServiceDispatch(ctx)
+		if err != nil {
+			return result, err
+		}
 	}
 	forwards, err := openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
 	if err != nil {
@@ -326,6 +361,24 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if _, err := waitVMExecutionTrust(ctx, vm, authority, delegation); err != nil {
+		return result, err
+	}
+	if options.ResourceExecutionOnly {
+		if err := control.applyExecutionAuthority(ctx, resourceSigner.Rotated, 2, 2, 1); err != nil {
+			return result, err
+		}
+		rotated, err := control.executionAuthority(ctx)
+		if err != nil {
+			return result, err
+		}
+		if _, err := waitVMExecutionTrust(ctx, vm, rotated, resourceSigner.Rotated); err != nil {
+			return result, err
+		}
+		err = exerciseSignedNativeResources(ctx, packages, resourceSigner, result)
+		return result, err
+	}
+	if options.Resources {
+		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds)
 		return result, err
 	}
 	if options.PowerActions {
@@ -399,7 +452,7 @@ func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, 
 			return action, nil
 		}
 		if !open && resource.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_SUCCEEDED {
-			if action == nil || action.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || action.GetAttestedAt() == nil || action.GetReceivedAt() == nil || action.GetActionRevision() == 0 || action.GetClosedReason() != "result" {
+			if action == nil || action.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED || action.GetAttestedAt() == nil || action.GetReceivedAt() == nil || action.GetActionRevision() == 0 || action.GetClosedReason() != "result" {
 				return nil, errors.New("SUCCEEDED lacks verified device history and server closure")
 			}
 			return action, nil

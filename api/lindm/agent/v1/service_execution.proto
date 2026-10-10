@@ -3,16 +3,21 @@ syntax = "proto3";
 package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "lindm/agent/v1/service.proto";
+import "lindm/agent/v1/connectivity_guard.proto";
+import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/trust.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/resource.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
-// Plan-role DSSE payload application/vnd.lindm.service-intent.v1+protobuf.
+// Plan-role DSSE payload application/vnd.lindm.execution-intent.v1+protobuf.
 // This authorizes preflight, not a native effect. Sequence is monotonic for this
 // device generation and canonical service resource, including after removal.
-message ServiceExecutionIntent {
+message ResourceExecutionIntent {
   string deployment_id = 1 [(buf.validate.field).string.uuid = true];
   string device_id = 2 [(buf.validate.field).string.uuid = true];
   string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
@@ -32,24 +37,58 @@ message ServiceExecutionIntent {
   }];
   google.protobuf.Timestamp not_before = 12 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expires_at = 13 [(buf.validate.field).required = true];
-  ServiceDesiredState desired = 14 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourceDesiredState desired = 14 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourceOperation operation = 15 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ResourceOwnershipBinding ownership = 16 [(buf.validate.field).required = true];
+  ResourceExecutionPreparation preparation = 17;
   option (buf.validate.message).cel = {
-    id: "service_intent.validity"
+    id: "resource_intent.preparation"
+    message: "only native packages require immutable bounded staging"
+    expression: "has(this.preparation) == has(this.desired.native_package) && (!has(this.preparation) || (this.preparation.deadline > this.not_before && this.preparation.deadline <= this.expires_at))"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_intent.validity"
     message: "execution intent validity must be positive and at most fifteen minutes"
     expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('900s')"
   };
   option (buf.validate.message).cel = {
-    id: "service_intent.nonzero_identity"
+    id: "resource_intent.nonzero_identity"
     message: "execution identities must be nonzero UUIDs"
     expression: "[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.actor_id].all(id, id != '00000000-0000-0000-0000-000000000000')"
   };
 }
 
-// Device-key DSSE payload application/vnd.lindm.service-challenge.v1+protobuf.
+// Signed limits for an independent, effect-free native staging unit. Retries
+// retain the same deadline, quota and action UUID, including across restarts.
+message ResourceExecutionPreparation {
+  google.protobuf.Timestamp deadline = 1 [(buf.validate.field).required = true];
+  uint64 max_cache_bytes = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 4294967296
+  }];
+}
+
+// Explicit evidence that staging ended without ever producing a native plan.
+// This is not a native observation, mutation result or convergence claim.
+message ResourcePreparationOutcome {
+  ResourceExecutionPreparation preparation = 1 [(buf.validate.field).required = true];
+  ResourceExecutionFailure failure = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [
+      0,
+      1
+    ]
+  }];
+}
+
+// Device-key DSSE payload application/vnd.lindm.execution-challenge.v1+protobuf.
 // Device authentication evidence only: its signature never grants execution.
 // The executor owns every field and retains the exact signed proof. Its local
 // CLOCK_BOOTTIME deadline is authoritative and includes time spent suspended.
-message ServiceExecutionChallenge {
+message ResourceExecutionChallenge {
   string deployment_id = 1 [(buf.validate.field).string.uuid = true];
   string device_id = 2 [(buf.validate.field).string.uuid = true];
   string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
@@ -68,23 +107,28 @@ message ServiceExecutionChallenge {
   string executor_incarnation = 12 [(buf.validate.field).string.uuid = true];
   google.protobuf.Timestamp issued_at = 13 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expires_at = 14 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourceRef ref = 15 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourceOperation operation = 16 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
   option (buf.validate.message).cel = {
-    id: "service_challenge.validity"
+    id: "resource_challenge.validity"
     message: "challenge validity must be positive and at most thirty seconds"
     expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
   };
   option (buf.validate.message).cel = {
-    id: "service_challenge.nonzero_identity"
+    id: "resource_challenge.nonzero_identity"
     message: "challenge identities must be nonzero UUIDs"
     expression: "[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.boot_id, this.executor_incarnation].all(id, id != '00000000-0000-0000-0000-000000000000')"
   };
 }
 
-// Start-role DSSE payload application/vnd.lindm.service-start.v1+protobuf.
+// Start-role DSSE payload application/vnd.lindm.execution-start.v1+protobuf.
 // The issuer must reauthorize the actor, desired head, generation and work fence
 // before signing. A transport peer or device challenge cannot replace this role.
-message ServiceExecutionStartGrant {
-  ServiceExecutionChallenge challenge = 1 [(buf.validate.field).required = true];
+message ResourceExecutionStartGrant {
+  ResourceExecutionChallenge challenge = 1 [(buf.validate.field).required = true];
   string actor_id = 2 [(buf.validate.field).string.uuid = true];
   uint64 authorization_version = 3 [(buf.validate.field).uint64 = {
     gt: 0
@@ -95,120 +139,152 @@ message ServiceExecutionStartGrant {
   google.protobuf.Timestamp not_before = 6 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expires_at = 7 [(buf.validate.field).required = true];
   option (buf.validate.message).cel = {
-    id: "service_start.validity"
+    id: "resource_start.validity"
     message: "start validity must fit the challenge and at most thirty seconds"
     expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at"
   };
   option (buf.validate.message).cel = {
-    id: "service_start.actor"
+    id: "resource_start.actor"
     message: "start actor must be a nonzero UUID"
     expression: "this.actor_id != '00000000-0000-0000-0000-000000000000'"
   };
 }
 
-enum ServiceExecutionState {
-  SERVICE_EXECUTION_STATE_UNSPECIFIED = 0;
-  SERVICE_EXECUTION_STATE_PREPARED = 1;
-  SERVICE_EXECUTION_STATE_QUEUED = 2;
-  SERVICE_EXECUTION_STATE_RUNNING = 3;
-  SERVICE_EXECUTION_STATE_SUCCEEDED = 4;
-  SERVICE_EXECUTION_STATE_FAILED = 5;
-  SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN = 6;
-  SERVICE_EXECUTION_STATE_EXPIRED = 7;
-  SERVICE_EXECUTION_STATE_SUPERSEDED = 8;
+enum ResourceExecutionState {
+  RESOURCE_EXECUTION_STATE_UNSPECIFIED = 0;
+  RESOURCE_EXECUTION_STATE_PREPARED = 1;
+  RESOURCE_EXECUTION_STATE_QUEUED = 2;
+  RESOURCE_EXECUTION_STATE_RUNNING = 3;
+  RESOURCE_EXECUTION_STATE_SUCCEEDED = 4;
+  RESOURCE_EXECUTION_STATE_FAILED = 5;
+  RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN = 6;
+  RESOURCE_EXECUTION_STATE_EXPIRED = 7;
+  RESOURCE_EXECUTION_STATE_SUPERSEDED = 8;
+  RESOURCE_EXECUTION_STATE_PREPARING = 9;
 }
 
-enum ServiceExecutionFailure {
-  SERVICE_EXECUTION_FAILURE_UNSPECIFIED = 0;
-  SERVICE_EXECUTION_FAILURE_NONE = 1;
-  SERVICE_EXECUTION_FAILURE_PRECONDITION = 2;
-  SERVICE_EXECUTION_FAILURE_UNSUPPORTED = 3;
-  SERVICE_EXECUTION_FAILURE_NATIVE = 4;
-  SERVICE_EXECUTION_FAILURE_OBSERVATION = 5;
-  SERVICE_EXECUTION_FAILURE_AUTHORITY = 6;
-  SERVICE_EXECUTION_FAILURE_EXPIRED = 7;
-  SERVICE_EXECUTION_FAILURE_INTERRUPTED = 8;
-  SERVICE_EXECUTION_FAILURE_SUPERSEDED = 9;
+enum ResourceExecutionFailure {
+  RESOURCE_EXECUTION_FAILURE_UNSPECIFIED = 0;
+  RESOURCE_EXECUTION_FAILURE_NONE = 1;
+  RESOURCE_EXECUTION_FAILURE_PRECONDITION = 2;
+  RESOURCE_EXECUTION_FAILURE_UNSUPPORTED = 3;
+  RESOURCE_EXECUTION_FAILURE_NATIVE = 4;
+  RESOURCE_EXECUTION_FAILURE_OBSERVATION = 5;
+  RESOURCE_EXECUTION_FAILURE_AUTHORITY = 6;
+  RESOURCE_EXECUTION_FAILURE_EXPIRED = 7;
+  RESOURCE_EXECUTION_FAILURE_INTERRUPTED = 8;
+  RESOURCE_EXECUTION_FAILURE_SUPERSEDED = 9;
+  RESOURCE_EXECUTION_FAILURE_POSTCONDITION = 10;
 }
 
 // Protected journal data, not an RPC response. Historical trust verifies accepted
 // bytes at accepted_at; only CURRENT trust can authorize a new native effect.
-message ServiceExecutionRecord {
+message ResourceExecutionRecord {
   uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
   string installation_id = 2 [(buf.validate.field).string.uuid = true];
   bytes intent_envelope = 3 [(buf.validate.field).bytes = {
     min_len: 1
-    max_len: 16384
+    max_len: 131072
   }];
   bytes intent_sha256 = 4 [(buf.validate.field).bytes.len = 32];
-  ServiceExecutionIntent intent = 5 [(buf.validate.field).required = true];
-  ServicePlan native_plan = 6 [(buf.validate.field).required = true];
+  ResourceExecutionIntent intent = 5 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourcePlan native_plan = 6;
   ExecutionRoot accepted_root = 7 [(buf.validate.field).required = true];
   bytes accepted_delegation_envelope = 8 [(buf.validate.field).bytes = {
     min_len: 1
     max_len: 16384
   }];
   google.protobuf.Timestamp accepted_at = 9 [(buf.validate.field).required = true];
-  ServiceExecutionState state = 10 [(buf.validate.field).enum = {
+  ResourceExecutionState state = 10 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
-  ServiceExecutionFailure failure = 11 [(buf.validate.field).enum = {
+  ResourceExecutionFailure failure = 11 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
-  ServiceExecutionChallenge challenge = 12;
+  ResourceExecutionChallenge challenge = 12;
   bytes challenge_proof = 13 [(buf.validate.field).bytes.max_len = 16384];
   uint64 challenge_boottime_ns = 14 [(buf.validate.field).uint64.lte = 9223372036854775807];
   bytes start_grant_envelope = 15 [(buf.validate.field).bytes.max_len = 16384];
   bytes start_grant_sha256 = 16 [(buf.validate.field).bytes.max_len = 32];
   google.protobuf.Timestamp started_at = 17;
   google.protobuf.Timestamp completed_at = 18;
-  ServiceVerification verification = 19;
+  lindm.resource.v1.ResourceVerification verification = 19;
   // Public signing certificate retained for historical proof after TLS renewal.
   bytes challenge_certificate_pem = 20 [(buf.validate.field).bytes.max_len = 16384];
   google.protobuf.Timestamp grant_accepted_at = 21;
+  ResourcePreparationOutcome preparation_outcome = 22;
+  ResourceAdmissionRefusal admission_refusal = 23;
+  // Full signed packet/native verdict proof stays in root custody. Attestations
+  // expose its digest through the verification receipts, not private endpoints.
+  ConnectivityVerificationEvidence firewall_evidence = 24;
   option (buf.validate.message).cel = {
-    id: "service_record.desired_binding"
-    message: "native plan must describe exactly the signed desired resource"
-    expression: "this.native_plan.desired == this.intent.desired"
+    id: "resource_record.firewall_evidence"
+    message: "retained packet proof requires the exact terminal firewall verification"
+    expression: "!has(this.firewall_evidence) || (has(this.verification) && this.verification.ref.kind == 8 && this.firewall_evidence.ref == this.verification.ref)"
   };
   option (buf.validate.message).cel = {
-    id: "service_record.challenge_shape"
+    id: "resource_record.preparation_evidence"
+    message: "missing native evidence is restricted to effect-free preparation or authenticated admission refusal"
+    expression: "(has(this.native_plan) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal))) && (this.state != 9 || has(this.intent.preparation)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.preparation == this.intent.preparation && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at) && !has(this.verification)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_record.desired_binding"
+    message: "native plan must describe exactly the signed desired resource"
+    expression: "!has(this.native_plan) || (this.native_plan.ref == this.intent.desired.ref && this.native_plan.operation == this.intent.operation)"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_record.challenge_shape"
     message: "challenge proof and local deadline must be complete"
     expression: "has(this.challenge) == (this.challenge_proof.size() > 0) && has(this.challenge) == (this.challenge_boottime_ns > 0u) && (has(this.challenge) ? this.challenge_certificate_pem.size() >= 64 : this.challenge_certificate_pem.size() == 0)"
   };
   option (buf.validate.message).cel = {
-    id: "service_record.grant_shape"
+    id: "resource_record.grant_shape"
     message: "a retained grant requires a digest and its challenge"
     expression: "(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && has(this.challenge) && has(this.grant_accepted_at))"
   };
   option (buf.validate.message).cel = {
-    id: "service_record.lifecycle"
+    id: "resource_record.lifecycle"
     message: "execution state must retain its required evidence"
-    expression: "((this.state == 1 || this.state == 2 || this.state == 3) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && this.verification.converged))"
+    expression: "((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && (this.verification.disposition == 1 || (this.verification.disposition == 5 && this.intent.operation == 2 && !has(this.challenge) && !has(this.started_at)))))"
   };
   option (buf.validate.message).cel = {
-    id: "service_record.failure_shape"
+    id: "resource_record.failure_shape"
     message: "successful or pending work cannot carry a failure"
-    expression: "(this.state <= 4) == (this.failure == 1)"
+    expression: "(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_record.read_only_evidence"
+    message: "effect-free native evidence must retain a terminal verified finding"
+    expression: "(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_record.admission_refusal"
+    message: "admission refusal is an effect-free terminal rejection of exactly the signed resource"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.intent.preparation) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))"
   };
 }
 
-message PrepareServiceExecutionRequest {
+message PrepareResourceExecutionRequest {
   bytes intent_envelope = 1 [(buf.validate.field).bytes = {
     min_len: 1
-    max_len: 16384
+    max_len: 131072
   }];
 }
 
-message PrepareServiceExecutionResponse {
-  ServiceExecutionStatus status = 1 [(buf.validate.field).required = true];
-  ServicePlan native_plan = 2 [(buf.validate.field).required = true];
+message PrepareResourceExecutionResponse {
+  ResourceExecutionStatus status = 1 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourcePlan native_plan = 2;
   bytes challenge_proof = 3 [(buf.validate.field).bytes.max_len = 16384];
+  option (buf.validate.message).cel = {
+    id: "resource_preparation.native_evidence"
+    message: "only pending preparation, terminated preparation, or admission refusal may omit a native plan"
+    expression: "has(this.native_plan) == (this.status.state != 9 && !has(this.status.preparation_outcome) && !has(this.status.admission_refusal)) && ((this.status.state != 9 && !has(this.status.preparation_outcome) && !has(this.status.admission_refusal)) || this.challenge_proof.size() == 0)"
+  };
 }
 
-message StartServiceExecutionRequest {
+message StartResourceExecutionRequest {
   string action_id = 1 [(buf.validate.field).string.uuid = true];
   bytes start_grant_envelope = 2 [(buf.validate.field).bytes = {
     min_len: 1
@@ -216,50 +292,103 @@ message StartServiceExecutionRequest {
   }];
 }
 
-message StartServiceExecutionResponse {
-  ServiceExecutionStatus status = 1 [(buf.validate.field).required = true];
+message StartResourceExecutionResponse {
+  ResourceExecutionStatus status = 1 [(buf.validate.field).required = true];
 }
 
-message GetServiceExecutionRequest {
+message GetResourceExecutionRequest {
   string action_id = 1 [(buf.validate.field).string.uuid = true];
 }
 
-message GetServiceExecutionResponse {
-  ServiceExecutionStatus status = 1 [(buf.validate.field).required = true];
+message GetResourceExecutionResponse {
+  ResourceExecutionStatus status = 1 [(buf.validate.field).required = true];
+}
+
+message CancelResourcePreparationRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes intent_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+message CancelResourcePreparationResponse {
+  ResourceExecutionStatus status = 1;
+  // A protected cancellation tombstone was persisted before any preparation.
+  // This denies future work; it is not native or historical execution evidence.
+  bool never_prepared = 2;
+  option (buf.validate.message).cel = {
+    id: "resource_cancel.result"
+    message: "cancellation returns either protected history or a never-prepared fence"
+    expression: "has(this.status) != this.never_prepared"
+  };
 }
 
 // Public evidence; never contains private keys or retained signed authority.
-message ServiceExecutionStatus {
+message ResourceExecutionStatus {
   string action_id = 1 [(buf.validate.field).string.uuid = true];
   bytes intent_sha256 = 2 [(buf.validate.field).bytes.len = 32];
-  ServiceExecutionState state = 3 [(buf.validate.field).enum = {
+  ResourceExecutionState state = 3 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
-  ServiceExecutionFailure failure = 4 [(buf.validate.field).enum = {
+  ResourceExecutionFailure failure = 4 [(buf.validate.field).enum = {
     defined_only: true
     not_in: 0
   }];
   google.protobuf.Timestamp accepted_at = 5 [(buf.validate.field).required = true];
   google.protobuf.Timestamp started_at = 6;
   google.protobuf.Timestamp completed_at = 7;
-  ServiceObservation before = 8 [(buf.validate.field).required = true];
-  ServiceVerification verification = 9;
+  lindm.resource.v1.ResourceObservation before = 8;
+  lindm.resource.v1.ResourceVerification verification = 9;
+  ResourcePreparationOutcome preparation_outcome = 10;
+  repeated ResourceActionRemediation remediations = 11 [(buf.validate.field).repeated.max_items = 2];
+  // Authenticated no-effect finding, not a native mutation or start authority.
+  bool read_only = 12;
+  ResourceAdmissionRefusal admission_refusal = 13;
   option (buf.validate.message).cel = {
-    id: "service_status.lifecycle"
+    id: "resource_status.preparation_evidence"
+    message: "only effect-free preparation or admission refusal may omit native observation"
+    expression: "has(this.before) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.started_at) && !has(this.verification)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_status.lifecycle"
     message: "pending work, effect start, completion and convergence must agree"
-    expression: "((this.state <= 3) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.converged))"
+    expression: "((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (!(this.state in [1, 2, 9]) || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && (has(this.started_at) || this.read_only) && (this.verification.disposition == 1 || (this.read_only && this.verification.disposition == 5))))"
   };
   option (buf.validate.message).cel = {
-    id: "service_status.failure_shape"
+    id: "resource_status.failure_shape"
     message: "successful or pending work cannot carry a failure"
-    expression: "(this.state <= 4) == (this.failure == 1)"
+    expression: "(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)"
   };
+  option (buf.validate.message).cel = {
+    id: "resource_status.read_only_evidence"
+    message: "read-only terminal status distinguishes compliance from execution"
+    expression: "(!this.read_only || (has(this.before) && has(this.verification) && !has(this.started_at) && ((this.state == 4 && this.verification.disposition in [1, 5]) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || this.read_only)"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_status.remediation_evidence"
+    message: "action recommendations require encryption compliance findings"
+    expression: "this.remediations.size() == 0 || (has(this.verification) && this.verification.ref.kind == 24 && this.verification.disposition != 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_status.admission_refusal"
+    message: "admission refusal cannot claim native observation, compliance, or execution"
+    expression: "!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))"
+  };
+}
+
+// A typed recommendation to open an existing device action workflow. This is
+// not a DeviceActionSpec, a grant, or permission to perform any remediation.
+message ResourceActionRemediation {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  oneof action {
+    option (buf.validate.oneof).required = true;
+    google.protobuf.Empty escrow_rotate = 2;
+    google.protobuf.Empty tpm2_bind = 3;
+  }
 }
 
 // A fresh device-authenticated snapshot of protected history, not a fresh native
 // observation, current compliance, or permission to perform an effect.
-message ServiceExecutionAttestation {
+message ResourceExecutionAttestation {
   string deployment_id = 1 [(buf.validate.field).string.uuid = true];
   string device_id = 2 [(buf.validate.field).string.uuid = true];
   string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
@@ -268,26 +397,88 @@ message ServiceExecutionAttestation {
   bytes nonce = 6 [(buf.validate.field).bytes.len = 32];
   google.protobuf.Timestamp issued_at = 7 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expires_at = 8 [(buf.validate.field).required = true];
-  ServiceExecutionStatus status = 9 [(buf.validate.field).required = true];
+  ResourceExecutionStatus status = 9 [(buf.validate.field).required = true];
   option (buf.validate.message).cel = {
-    id: "service_attestation.lifetime"
+    id: "resource_attestation.lifetime"
     message: "attestation lifetime must be positive and at most thirty seconds"
     expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
   };
 }
 
-message AttestServiceExecutionRequest {
+message AttestResourceExecutionRequest {
   string action_id = 1 [(buf.validate.field).string.uuid = true];
   bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
 }
 
-message AttestServiceExecutionResponse {
+message AttestResourceExecutionResponse {
   bytes attestation_envelope = 1 [(buf.validate.field).bytes = {
     min_len: 1
-    max_len: 65536
+    max_len: 262144
   }];
   bytes certificate_pem = 2 [(buf.validate.field).bytes = {
     min_len: 1
     max_len: 16384
   }];
+}
+
+// Signed profile ownership is separate from native desired state. Providers may
+// only acquire or release effects under this immutable profile-resource binding.
+message ResourceOwnershipBinding {
+  string assignment_id = 1 [(buf.validate.field).string.uuid = true];
+  repeated ResourceOwnershipSource sources = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  string resource_id = 3 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.OwnershipPolicy policy = 4 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "resource_ownership.nonzero_identity"
+    message: "ownership identities must be nonzero UUIDs"
+    expression: "[this.assignment_id, this.resource_id].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+  option (buf.validate.message).cel = {
+    id: "resource_ownership.approved_adoption"
+    message: "signed adoption requires the independently consumed approval binding"
+    expression: "(this.policy.mode == 2) == has(this.policy.adoption_approval_id) && (!has(this.policy.adoption_approval_id) || this.policy.adoption_approval_id != '00000000-0000-0000-0000-000000000000')"
+  };
+}
+
+message ResourceOwnershipSource {
+  string profile_id = 1 [(buf.validate.field).string.uuid = true];
+  string profile_revision = 2 [(buf.validate.field).string.uuid = true];
+  string resource_id = 3 [(buf.validate.field).string.uuid = true];
+  option (buf.validate.message).cel = {
+    id: "resource_ownership_source.nonzero_identity"
+    message: "source identities must be nonzero UUIDs"
+    expression: "[this.profile_id, this.profile_revision, this.resource_id].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+}
+
+enum ResourceAdmissionRefusalReason {
+  RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED = 0;
+  RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN = 1;
+  RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE = 2;
+  RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION = 3;
+}
+
+// Authenticated executor admission evidence, not native-state evidence. No
+// native plan, inverse, observation, start grant or effect exists for this action.
+message ResourceAdmissionRefusal {
+  lindm.resource.v1.ResourceRef ref = 1 [(buf.validate.field).required = true];
+  lindm.resource.v1.ResourceOperation operation = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ResourceAdmissionRefusalReason reason = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string boot_id = 4 [(buf.validate.field).string.uuid = true];
+  string executor_incarnation = 5 [(buf.validate.field).string.uuid = true];
+  bool native_evidence_unavailable = 6 [(buf.validate.field).bool.const = true];
+  option (buf.validate.message).cel = {
+    id: "resource_admission_refusal.identity"
+    message: "admission evidence binds nonzero executor identity and release-only unknown baseline"
+    expression: "this.boot_id != '00000000-0000-0000-0000-000000000000' && this.executor_incarnation != '00000000-0000-0000-0000-000000000000' && (this.reason != 1 || this.operation == 2)"
+  };
 }

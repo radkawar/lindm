@@ -1,6 +1,8 @@
 // This module drives visible controls only. No RPC client, request interception,
 // cookie import, synthetic WebAuthn API or alternate application implementation.
 
+import { setTimeout as delay } from "node:timers/promises";
+
 export async function enroll(ui, config) {
   await ui.click({ role: "link", text: "Enroll a local administrator account" });
   await ui.fill({ label: "One-time enrollment secret" }, config.enrollmentSecret);
@@ -118,6 +120,9 @@ export async function assignProfile(ui, config) {
   // reflects the exact selected server revision; read it before submitting.
   for (let page = 0; page < 20 && !label; page++) {
     await ui.click({ label: "Profile revision" });
+    // The placeholder option is always rendered; wait for the popup to mount
+    // before reading the page's options once.
+    await ui.wait({ role: "option", text: "Select a profile head" });
     const labels = await ui.driver.observe(() =>
       [...document.querySelectorAll('[role="option"]')]
         .filter(
@@ -130,13 +135,18 @@ export async function assignProfile(ui, config) {
     for (let index = 0; index < labels.length; index++) {
       if (index) await ui.click({ label: "Profile revision" });
       await ui.click({ role: "option", text: labels[index] });
-      const selected = await ui.driver.observe(
-        (id) =>
-          [...document.querySelectorAll('form input[aria-hidden="true"]')].some(
-            (input) => input.value === id,
-          ),
-        config.profileRevisionId,
-      );
+      // Base UI commits the hidden input value asynchronously after input.
+      let selected = false;
+      for (let attempt = 0; attempt < 20 && !selected; attempt++) {
+        if (attempt) await delay(100);
+        selected = await ui.driver.observe(
+          (id) =>
+            [...document.querySelectorAll('form input[aria-hidden="true"]')].some(
+              (input) => input.value === id,
+            ),
+          config.profileRevisionId,
+        );
+      }
       if (selected) {
         label = labels[index];
         break;

@@ -401,7 +401,7 @@ func (r *runner) stage(ctx context.Context, devices []*simulatedDevice, stage St
 					expected++
 				}
 			}
-			stage.SLOBreached = stage.SLOBreached || r.completedDevices.Load() != expected || stage.RPC["GetSyncState"].Calls < uint64(len(devices)) || stage.RPC["GetServiceWork"].Calls < uint64(len(devices))
+			stage.SLOBreached = stage.SLOBreached || r.completedDevices.Load() != expected || stage.RPC["GetSyncState"].Calls < uint64(len(devices)) || stage.RPC["GetResourceWork"].Calls < uint64(len(devices))
 			if r.options.StageDuration >= 11*time.Minute && !snapshotsComplete(stage.CompletedPeriodicSnapshots, stage.ExpectedPeriodicSnapshots, 0) {
 				stage.SLOBreached = true
 			}

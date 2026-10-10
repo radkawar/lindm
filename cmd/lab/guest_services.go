@@ -14,9 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/vmlab"
 )
@@ -135,14 +138,24 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if _, err := serviceProofCommand(ctx, "/usr/bin/systemctl", "--no-ask-password", "daemon-reload"); err != nil {
 		return nil, err
 	}
-	provider, err := serviceprovider.Open(ctx)
+	platform, err := inventory.HostPlatform(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resourceID := uuid.NewString()
+	ownership := &agentv1.ResourceOwnershipBinding{
+		AssignmentId: uuid.NewString(), ResourceId: resourceID,
+		Policy:  &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},
+		Sources: []*agentv1.ResourceOwnershipSource{{ProfileId: uuid.NewString(), ProfileRevision: uuid.NewString(), ResourceId: resourceID}},
+	}
+	provider, err := serviceprovider.Open(ctx, serviceprovider.Config{ExecutorIncarnation: uuid.NewString(), Ownership: ownership, Platform: platform})
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, provider.Close()) }()
 	evidence := &vmlab.VMServicesEvidence{Capability: serviceprovider.Capability}
-	active := &agentv1.ServiceDesiredState{Unit: serviceProofUnit, Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}
-	inactive := &agentv1.ServiceDesiredState{Unit: serviceProofUnit, Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED}
+	active := serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED)
+	inactive := serviceProofDesired(serviceProofUnit, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED)
 	for _, phase := range []struct {
 		name                string
 		runtime, enablement bool
@@ -156,11 +169,11 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		}
 		evidence.Steps = append(evidence.Steps, *step)
 	}
-	stale, err := provider.Plan(ctx, inactive)
+	stale, err := provider.Plan(ctx, inactive, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
 	if err != nil {
 		return nil, err
 	}
-	if !stale.ChangeRuntime || !stale.ChangeEnablement {
+	if !stale.GetSystemdService().GetChangeRuntime() || !stale.GetSystemdService().GetChangeEnablement() {
 		return nil, errors.New("stale-plan fixture did not initially require both effects")
 	}
 	// Change runtime independently after planning. Applying the stale plan must
@@ -186,7 +199,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if err != nil {
 		return nil, err
 	}
-	if *before != *native || after.ActiveState != "inactive" || after.UnitFileState != "enabled" || bytes.Equal(stale.Before.FingerprintSha256, after.FingerprintSha256) {
+	if *before != *native || after.GetSystemdService().GetActiveState() != "inactive" || after.GetSystemdService().GetUnitFileState() != "enabled" || bytes.Equal(stale.GetBefore().GetSystemdService().GetFingerprintSha256(), after.GetSystemdService().GetFingerprintSha256()) {
 		return nil, errors.New("stale plan mutated state or failed to expose native drift")
 	}
 	evidence.Steps = append(evidence.Steps, vmlab.VMServiceStep{Name: "stale-plan", Target: serviceProofUnit, Plan: stale, After: after, NativeBefore: before, NativeAfter: native, Rejection: "conflict"})
@@ -200,11 +213,11 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		return nil, err
 	}
 	evidence.Steps = append(evidence.Steps, *step)
-	plan, err := provider.Plan(ctx, active)
+	plan, err := provider.Plan(ctx, active, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
 	if err != nil {
 		return nil, err
 	}
-	if !plan.ChangeRuntime || !plan.ChangeEnablement {
+	if !plan.GetSystemdService().GetChangeRuntime() || !plan.GetSystemdService().GetChangeEnablement() {
 		return nil, errors.New("cancellation fixture must require start and enable")
 	}
 	nativeBefore, err := serviceProofNative(ctx, serviceProofUnit)
@@ -224,7 +237,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(plan.Before.FingerprintSha256, after.FingerprintSha256) || *nativeBefore != *nativeAfter || nativeAfter.ActiveState != "inactive" || nativeAfter.UnitFileState != "disabled" {
+	if !bytes.Equal(plan.GetBefore().GetSystemdService().GetFingerprintSha256(), after.GetSystemdService().GetFingerprintSha256()) || *nativeBefore != *nativeAfter || nativeAfter.ActiveState != "inactive" || nativeAfter.UnitFileState != "disabled" {
 		return nil, errors.New("pre-start cancellation changed native service state")
 	}
 	evidence.Steps = append(evidence.Steps, vmlab.VMServiceStep{Name: "canceled-before-start", Target: serviceProofUnit, Plan: plan, After: after, NativeBefore: nativeBefore, NativeAfter: nativeAfter, Rejection: "canceled"})
@@ -265,8 +278,9 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 			return nil, errors.New("legacy include rejection requires an otherwise loaded, inactive and disabled service")
 		}
 		desired := proto.CloneOf(active)
-		desired.Unit = target.unit
-		if _, err := provider.Plan(ctx, desired); !errors.Is(err, serviceprovider.ErrUnsupported) {
+		desired.GetSystemdService().Unit = target.unit
+		desired.Ref.CanonicalKey = target.unit
+		if _, err := provider.Plan(ctx, desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, serviceprovider.ErrUnsupported) {
 			return nil, fmt.Errorf("%s must fail as unsupported: %w", target.name, err)
 		}
 		after, err := provider.Observe(ctx, serviceProofUnit)
@@ -277,7 +291,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 		if err != nil {
 			return nil, err
 		}
-		if !bytes.Equal(before.FingerprintSha256, after.FingerprintSha256) || *nativeBefore != *nativeAfter {
+		if !bytes.Equal(before.GetSystemdService().GetFingerprintSha256(), after.GetSystemdService().GetFingerprintSha256()) || *nativeBefore != *nativeAfter {
 			return nil, errors.New("unsupported service input changed native state")
 		}
 		evidence.Steps = append(evidence.Steps, vmlab.VMServiceStep{Name: target.name, Target: target.unit, Before: before, After: after, NativeBefore: nativeBefore, NativeAfter: nativeAfter, Rejection: "unsupported"})
@@ -297,7 +311,7 @@ func probeGuestServices(ctx context.Context) (_ *vmlab.VMServicesEvidence, err e
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(beforeLength.FingerprintSha256, lengthStep.After.FingerprintSha256) {
+	if !bytes.Equal(beforeLength.GetSystemdService().GetFingerprintSha256(), lengthStep.After.GetSystemdService().GetFingerprintSha256()) {
 		return nil, errors.New("unreported definition fixture did not restore the original service definition")
 	}
 	evidence.Steps = append(evidence.Steps, *lengthStep)
@@ -313,51 +327,58 @@ func serviceProofAuthorize(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func serviceProofConverge(ctx context.Context, provider *serviceprovider.Provider, name string, desired *agentv1.ServiceDesiredState, changeRuntime, changeEnablement bool) (*vmlab.VMServiceStep, error) {
-	plan, err := provider.Plan(ctx, desired)
+func serviceProofConverge(ctx context.Context, provider *serviceprovider.Provider, name string, desired *resourcev1.ResourceDesiredState, changeRuntime, changeEnablement bool) (*vmlab.VMServiceStep, error) {
+	plan, err := provider.Plan(ctx, desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
 	if err != nil {
 		return nil, err
 	}
-	nativeBefore, err := serviceProofNative(ctx, desired.Unit)
+	nativeBefore, err := serviceProofNative(ctx, desired.GetSystemdService().Unit)
 	if err != nil {
 		return nil, err
 	}
-	if plan.ChangeRuntime != changeRuntime || plan.ChangeEnablement != changeEnablement || plan.Before.ActiveState != nativeBefore.ActiveState || plan.Before.UnitFileState != nativeBefore.UnitFileState {
+	if plan.GetSystemdService().GetChangeRuntime() != changeRuntime || plan.GetSystemdService().GetChangeEnablement() != changeEnablement || plan.GetBefore().GetSystemdService().GetActiveState() != nativeBefore.ActiveState || plan.GetBefore().GetSystemdService().GetUnitFileState() != nativeBefore.UnitFileState {
 		return nil, fmt.Errorf("%s: provider plan disagrees with expected drift or native state", name)
 	}
 	applied, err := provider.Apply(ctx, plan, serviceProofAuthorize)
 	if err != nil {
 		return nil, fmt.Errorf("%s apply: %w", name, err)
 	}
-	if applied == nil || !applied.Converged || !applied.RuntimeMatches || !applied.EnablementMatches || !applied.DefinitionMatches {
+	if applied == nil || applied.GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED || !applied.GetSystemdService().GetRuntimeMatches() || !applied.GetSystemdService().GetEnablementMatches() || !applied.GetSystemdService().GetDefinitionMatches() {
 		return nil, fmt.Errorf("%s: apply did not verify convergence", name)
 	}
 	verified, err := provider.Verify(ctx, plan)
 	if err != nil {
 		return nil, fmt.Errorf("%s verify: %w", name, err)
 	}
-	if verified == nil || !verified.Converged || !verified.RuntimeMatches || !verified.EnablementMatches || !verified.DefinitionMatches || verified.Observation == nil {
+	if verified == nil || verified.GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED || !verified.GetSystemdService().GetRuntimeMatches() || !verified.GetSystemdService().GetEnablementMatches() || !verified.GetSystemdService().GetDefinitionMatches() || verified.GetAfter().GetSystemdService() == nil {
 		return nil, fmt.Errorf("%s: independent provider verify did not converge", name)
 	}
-	nativeAfter, err := serviceProofNative(ctx, desired.Unit)
+	nativeAfter, err := serviceProofNative(ctx, desired.GetSystemdService().Unit)
 	if err != nil {
 		return nil, err
 	}
 	wantRuntime, wantEnablement := "inactive", "disabled"
-	if desired.Runtime == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE {
+	if desired.GetSystemdService().Runtime == resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE {
 		wantRuntime = "active"
 	}
-	if desired.Enablement == agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
+	if desired.GetSystemdService().Enablement == resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED {
 		wantEnablement = "enabled"
 	}
-	observation := verified.Observation
-	if nativeAfter.ID != desired.Unit || nativeAfter.LoadState != "loaded" || nativeAfter.ActiveState != wantRuntime || nativeAfter.UnitFileState != wantEnablement || observation.ActiveState != nativeAfter.ActiveState || observation.SubState != nativeAfter.SubState || observation.UnitFileState != nativeAfter.UnitFileState || !bytes.Equal(plan.Before.DefinitionSha256, observation.DefinitionSha256) {
+	observation := verified.GetAfter().GetSystemdService()
+	if nativeAfter.ID != desired.GetSystemdService().Unit || nativeAfter.LoadState != "loaded" || nativeAfter.ActiveState != wantRuntime || nativeAfter.UnitFileState != wantEnablement || observation.ActiveState != nativeAfter.ActiveState || observation.SubState != nativeAfter.SubState || observation.UnitFileState != nativeAfter.UnitFileState || !bytes.Equal(plan.GetBefore().GetSystemdService().GetDefinitionSha256(), observation.DefinitionSha256) {
 		return nil, fmt.Errorf("%s: independent systemctl oracle did not confirm desired state", name)
 	}
 	if name == "converge-active" && (nativeBefore.ActiveState != "inactive" || nativeBefore.UnitFileState != "disabled") {
 		return nil, errors.New("initial service fixture was not disabled and inactive")
 	}
-	return &vmlab.VMServiceStep{Name: name, Target: desired.Unit, Plan: plan, After: observation, Verification: verified, NativeBefore: nativeBefore, NativeAfter: nativeAfter}, nil
+	return &vmlab.VMServiceStep{Name: name, Target: desired.GetSystemdService().Unit, Plan: plan, After: verified.GetAfter(), Verification: verified, NativeBefore: nativeBefore, NativeAfter: nativeAfter}, nil
+}
+
+func serviceProofDesired(unit string, runtime resourcev1.ServiceRuntimeState, enablement resourcev1.ServiceEnablement) *resourcev1.ResourceDesiredState {
+	return &resourcev1.ResourceDesiredState{
+		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: unit},
+		State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: unit, Runtime: runtime, Enablement: enablement}},
+	}
 }
 
 func serviceProofNative(ctx context.Context, unit string) (*vmlab.VMServiceNativeState, error) {

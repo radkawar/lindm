@@ -1,0 +1,214 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/connectivity_guard.proto";
+import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/resource_ownership.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/resource.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Root-local provisioning, never part of a remotely supplied profile. Generic
+// files cannot write native authority domains even under an approved root.
+message NativeFileProviderConfig {
+  repeated string allowed_roots = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        max_bytes: 1024
+        pattern: "^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$"
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "native_file_provider.canonical_roots"
+    message: "approved file roots must not contain dot or parent components"
+    expression: "this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))"
+  };
+}
+
+// Protected root-helper operation. The target is recomputed from plan and ledger,
+// not treated as an independently authoritative old value or path override.
+message NativeResourceTransactionRequest {
+  lindm.resource.v1.ResourcePlan plan = 1 [(buf.validate.field).required = true];
+  ResourceOwnershipSnapshot before = 2 [(buf.validate.field).required = true];
+  ResourceOwnershipSnapshot target = 3 [(buf.validate.field).required = true];
+  ResourceOwnershipLedger ownership = 4 [(buf.validate.field).required = true];
+  string action_id = 5 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 6 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "native_resource_transaction.kind"
+    message: "native resource helper only accepts closed local configuration plans"
+    expression: "this.plan.ref.kind in [2, 3, 8, 17, 21, 22, 23]"
+  };
+}
+
+// Exact root-approved keys. No allow-all default or client-supplied path.
+message NativeSysctlProviderConfig {
+  repeated string allowed_keys = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+    unique: true
+    items: {
+      string: {
+        max_bytes: 256
+        pattern: "^[a-z0-9_]+([.][a-zA-Z0-9_-]+)+$"
+      }
+    }
+  }];
+}
+
+message NativeApprovedHomeRoot {
+  string root_id = 1 [(buf.validate.field).string.uuid = true];
+  string path = 2 [(buf.validate.field).string = {
+    max_bytes: 1024
+    pattern: "^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "native_account_provider.canonical_home_root"
+    message: "approved home roots must not contain dot or parent components"
+    expression: "!this.path.matches('/[.]{1,2}(/|$)')"
+  };
+}
+
+message NativeAccountProviderConfig {
+  repeated NativeApprovedHomeRoot approved_home_roots = 1 [(buf.validate.field).repeated.max_items = 32];
+  repeated string protected_names = 2 [(buf.validate.field).repeated = {
+    max_items: 128
+    unique: true
+    items: {
+      string: {
+        max_bytes: 32
+        pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+      }
+    }
+  }];
+  uint32 min_uid = 3 [(buf.validate.field).uint32.gte = 1000];
+  uint32 max_uid = 4 [(buf.validate.field).uint32.lt = 4294967295];
+  uint32 min_gid = 5 [(buf.validate.field).uint32.gte = 1000];
+  uint32 max_gid = 6 [(buf.validate.field).uint32.lt = 4294967295];
+  option (buf.validate.message).cel = {
+    id: "native_account_provider.ordered_ranges"
+    message: "approved native account ranges must be ordered and exclude system IDs"
+    expression: "this.min_uid <= this.max_uid && this.min_gid <= this.max_gid"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_account_provider.unique_home_roots"
+    message: "approved home root identities and paths must be unique"
+    expression: "this.approved_home_roots.all(r, this.approved_home_roots.filter(p, p.root_id == r.root_id).size() == 1 && this.approved_home_roots.filter(p, p.path == r.path).size() == 1)"
+  };
+}
+
+// Sent only over the private executor/helper Unix channel after native preflight.
+// The executor consumes the signed start grant before sending this one-use permit.
+message NativeEffectPermit {
+  bytes request_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+  string boot_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 start_deadline_boottime_ns = 4 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+
+enum NativeHelperOutcome {
+  NATIVE_HELPER_OUTCOME_UNSPECIFIED = 0;
+  NATIVE_HELPER_OUTCOME_PREPARED = 1;
+  NATIVE_HELPER_OUTCOME_SUCCEEDED = 2;
+  NATIVE_HELPER_OUTCOME_FAILED = 3;
+  NATIVE_HELPER_OUTCOME_UNKNOWN = 4;
+  NATIVE_HELPER_OUTCOME_OBSERVED = 5;
+}
+
+message NativeHelperResult {
+  bytes request_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+  NativeHelperOutcome outcome = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string reason = 4 [(buf.validate.field).string = {
+    max_len: 128
+    pattern: "^[a-z0-9_]*$"
+  }];
+  uint64 declared_bytes = 5;
+  uint64 observed_bytes = 6;
+  ResourceOwnershipSnapshot after = 7;
+  NativeRootEncryptionEvidence encryption = 8;
+  lindm.resource.v1.ProbeReceipt firewall_allow = 9;
+  lindm.resource.v1.ProbeReceipt firewall_deny = 10;
+  ConnectivityVerificationEvidence firewall_evidence = 11;
+  option (buf.validate.message).cel = {
+    id: "native_helper_result.firewall_proofs"
+    message: "firewall verification retains both receipts and their fresh native packet proof"
+    expression: "has(this.firewall_allow) == has(this.firewall_deny) && has(this.firewall_allow) == has(this.firewall_evidence)"
+  };
+}
+
+message NativeHelperReady {
+  bytes request_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+}
+
+message NativeHelperMessage {
+  oneof message {
+    option (buf.validate.oneof).required = true;
+    NativeHelperReady ready = 1;
+    NativeEffectPermit permit = 2;
+    NativeHelperResult result = 3;
+  }
+}
+
+message NativeResourceObservationRequest {
+  lindm.resource.v1.ResourceDesiredState desired = 1 [(buf.validate.field).required = true];
+  lindm.resource.v1.PlatformProduct platform = 2 [(buf.validate.field).required = true];
+  string executor_incarnation = 3 [(buf.validate.field).string.uuid = true];
+  string observation_id = 4 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 5 [(buf.validate.field).bytes.len = 32];
+  lindm.resource.v1.BackendSelection backend = 6;
+  lindm.resource.v1.ResourceObservation firewall_verification = 7;
+  option (buf.validate.message).cel = {
+    id: "native_resource_observation.kind"
+    message: "native observation helper accepts only sandbox-inaccessible native facts"
+    expression: "this.desired.ref.kind in [2, 3, 8, 24]"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_resource_observation.backend"
+    message: "native firewall observation must bind the provider and current platform"
+    expression: "(!has(this.backend) || this.backend.product == this.platform) && (this.desired.ref.kind != 8 || has(this.backend))"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_resource_observation.firewall_verification"
+    message: "fresh firewall probes bind the exact requested resource observation"
+    expression: "!has(this.firewall_verification) || (this.desired.ref.kind == 8 && this.firewall_verification.ref == this.desired.ref && this.firewall_verification.metadata.backend == this.backend)"
+  };
+}
+
+message NativeRootRecoveryEvidence {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 keyslot = 2 [(buf.validate.field).uint32.lte = 31];
+  bytes key_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+}
+
+message NativeRootEncryptionEvidence {
+  bool luks_root = 1;
+  StorageTarget target = 2;
+  bytes native_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  optional bytes metadata_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated NativeRootRecoveryEvidence recovery = 5 [(buf.validate.field).repeated.max_items = 32];
+  bool tpm_bound = 6;
+  string reason = 7 [(buf.validate.field).string = {
+    max_bytes: 128
+    pattern: "^[a-z0-9_]*$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "native_root_encryption.evidence"
+    message: "root encryption evidence must bind its exact native target and metadata"
+    expression: "this.luks_root == has(this.target) && this.luks_root == has(this.metadata_sha256) && (this.luks_root || (!this.tpm_bound && this.recovery.size() == 0))"
+  };
+}

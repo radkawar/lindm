@@ -27,11 +27,11 @@ func (s *Service) verifyDeviceActionRecord(ctx context.Context, loaded *bound, r
 	accepted := r.GetAcceptedAt().AsTime()
 	delegation, err := loaded.execution.verifier.VerifyDelegation(ctx, r.GetAcceptedRoot(), r.GetAcceptedDelegationEnvelope(), 0, 0, accepted)
 	if err != nil {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	intent, err := loaded.execution.verifier.VerifyDeviceActionIntent(ctx, r.GetAcceptedRoot(), delegation, r.GetIntentEnvelope(), accepted)
 	if err != nil || !proto.Equal(intent, r.GetIntent()) {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	if err := s.verifyDeviceActionChallenge(ctx, loaded, r); err != nil {
 		return err
@@ -41,7 +41,7 @@ func (s *Service) verifyDeviceActionRecord(ctx context.Context, loaded *bound, r
 			return errRecoveryHold
 		}
 		if _, err := loaded.execution.verifier.VerifyDeviceActionStart(ctx, r.GetAcceptedRoot(), delegation, r.GetStartGrantEnvelope(), intent, r.GetChallenge(), r.GetStartedAt().AsTime()); err != nil {
-			return historicalServiceError(ctx)
+			return historicalResourceError(ctx)
 		}
 	}
 	if err := s.verifyRecoveryBootHistory(ctx, loaded, r, delegation); err != nil {
@@ -54,10 +54,10 @@ func (s *Service) verifyDeviceActionRecord(ctx context.Context, loaded *bound, r
 		receiptAt := r.GetEscrowConfirmedAt().AsTime()
 		receiptDelegation, err := loaded.execution.verifier.VerifyDelegation(ctx, r.GetReceiptRoot(), r.GetReceiptDelegationEnvelope(), 0, 0, receiptAt)
 		if err != nil {
-			return historicalServiceError(ctx)
+			return historicalResourceError(ctx)
 		}
 		if _, err := loaded.execution.verifier.VerifyDeviceActionEscrowReceipt(ctx, r.GetReceiptRoot(), receiptDelegation, r.GetEscrowReceiptEnvelope(), r, receiptAt); err != nil {
-			return historicalServiceError(ctx)
+			return historicalResourceError(ctx)
 		}
 	}
 	return s.verifyInventoryRefreshHistory(ctx, loaded, r)
@@ -99,7 +99,7 @@ func (s *Service) verifyDeviceActionChallenge(ctx context.Context, loaded *bound
 	}
 	verified := new(agentv1.DeviceActionChallenge)
 	if err := s.authority.Verify(ctx, r.GetChallengeProof(), verified, 1, public); err != nil || !proto.Equal(verified, c) {
-		return historicalServiceError(ctx)
+		return historicalResourceError(ctx)
 	}
 	if len(r.GetHandoffProof()) != 0 {
 		_, err := s.verifyRecoveryHandoff(ctx, r, public)
@@ -111,7 +111,7 @@ func (s *Service) verifyDeviceActionChallenge(ctx context.Context, loaded *bound
 func (s *Service) loadDeviceAction(ctx context.Context, loaded *bound, actionID string) (*agentv1.DeviceActionRecord, int64, error) {
 	record, revision, err := s.store.LoadDeviceAction(ctx, actionID)
 	if err != nil {
-		return nil, 0, s.serviceStoreError(err)
+		return nil, 0, s.resourceStoreError(err)
 	}
 	if record.GetIntent().GetActionId() != actionID {
 		s.noteTrustDamage()
@@ -134,7 +134,7 @@ func (s *Service) updateDeviceAction(ctx context.Context, loaded *bound, revisio
 		return errInternal
 	}
 	_, err := s.store.UpdateDeviceAction(ctx, revision, loaded.revision, loaded.execution.revision, next)
-	return s.serviceStoreError(err)
+	return s.resourceStoreError(err)
 }
 
 // AttestDeviceAction signs only protected historical facts with current device
@@ -156,7 +156,7 @@ func (s *Service) AttestDeviceAction(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if err := s.serviceIdentitySession(loaded); err != nil {
+	if err := s.resourceIdentitySession(loaded); err != nil {
 		return nil, mapError(err)
 	}
 	record, revision, err := s.loadDeviceAction(ctx, loaded, req.Msg.GetActionId())

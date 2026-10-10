@@ -102,3 +102,55 @@ transaction semantics, independent native oracles, network rollback, secret cust
 and physical safety evidence. The existing Ubuntu 24.04 signed-service dispatch
 lane remains the Phase 1 end-to-end regression; Phase 2 requires separate generic
 protocol/journal migration and ownership-release qualification.
+
+## Asynchronous native package preparation
+
+Package intent acceptance is durable before native staging starts. The executor
+reserves the action lifecycle, binds the signed ownership and sequence floor, and
+records `PREPARING` without a native plan, observation, challenge or start grant.
+The independent native staging unit owns its signed immutable deadline, disk
+quota, exact request digest and per-action protected cache. Executor restart does
+not extend those limits or restart consumed native effects.
+
+An exact later `PrepareResourceExecution` call performs one bounded readiness
+poll. Only a validated ready plan is journaled with a fresh challenge of at most
+thirty seconds; original acceptance, ownership and intent expiry remain unchanged.
+Ordinary RPC deadlines and the executor sandbox remain unchanged. Systemd
+preparation retains its immediate lifecycle.
+
+Cancellation, expiry and invalid authority stop only owned staging. A terminal
+`ResourcePreparationOutcome` explicitly distinguishes a preparation failure with
+no native observation from native execution evidence. Cancellation before delivery
+persists a generation-bound action/digest denial tombstone, returning
+`never_prepared` rather than fabricating historical acceptance or a native result.
+Late preparation cannot bypass that tombstone. Queued or running effects cannot be
+canceled through this preparation-only API, and `RUNNING` recovery is read-only.
+
+The wire contract is in `api/lindm/agent/v1/service_execution.proto`; executor
+admission/polling is in `internal/agent/executor/service_preparation.go`; durable
+fences and reservations are in `internal/agent/journal/resource_actions_linux.go`
+and `resource_preparation_linux.go`. Their deterministic regression tests cover
+restart, cancellation, expiry, evidence shape and digest corruption. These tests
+are authored contract coverage, not evidence that a native distro lane passed.
+
+## Read-only resource findings
+
+A validated no-effect plan completes without a challenge, start grant, worker
+mutation or `started_at`. Its authenticated status explicitly sets `read_only`.
+`CONVERGED` is successful verification. `DRIFTED` and `UNKNOWN` remain durable
+`FAILED` findings with `POSTCONDITION`; a provider's typed nonconvergence error
+does not discard valid evidence or turn it into success. Unrelated native errors,
+missing observations and mismatched plan digests cannot produce accepted findings.
+
+Read-only release may finish successfully as `NOT_APPLICABLE`, which is not a
+claim that the removed requirement converged. Encryption compliance release does
+not construct an ownership inverse or change storage. Server interpretation still
+binds the original signed release operation and distinguishes this evidence from
+compliance success.
+
+The journal's `read_only_terminal` marker covers both successful and unsuccessful
+no-effect findings. Their bounded historical retention preserves current sequence
+floors and does not turn them into ownership mutation history. Native effect
+failures retain their existing protected-history rules. Validation is shared in
+`internal/resource/readonly.go`; executor and journal regression tests cover signed
+read-only outcomes, restart, bad evidence, retention and clock rollback.

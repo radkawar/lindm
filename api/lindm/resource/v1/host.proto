@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+// Public non-secret regular-file content only. Providers reject native authority
+// domains, symlinks and unsafe ancestry. Release restores a protected journal
+// baseline only while the last-applied identity and managed dimensions match.
+message ManagedFileDesired {
+  string path = 1 [(buf.validate.field).string = {
+    max_bytes: 1024
+    pattern: "^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$"
+  }];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional bytes content = 3 [(buf.validate.field).bytes.max_len = 32768];
+  optional uint32 mode = 4 [(buf.validate.field).uint32.lte = 511];
+  optional uint32 uid = 5 [(buf.validate.field).uint32.lt = 4294967295];
+  optional uint32 gid = 6 [(buf.validate.field).uint32.lt = 4294967295];
+  option (buf.validate.message).cel = {
+    id: "managed_file.canonical_path"
+    message: "file paths must not contain dot or parent components"
+    expression: "!this.path.matches('/[.]{1,2}(/|$)')"
+  };
+  option (buf.validate.message).cel = {
+    id: "managed_file.dimensions"
+    message: "present files require a managed dimension; absent files carry no replacement"
+    expression: "this.presence == 1 ? (has(this.content) || has(this.mode) || has(this.uid) || has(this.gid)) : (!has(this.content) && !has(this.mode) && !has(this.uid) && !has(this.gid))"
+  };
+}
+
+// A single kernel key/value, never sysctl configuration text or an include.
+// Persistent changes own a derived stanza; release compares both live and
+// persistent last-applied state before restoring the journal baseline.
+message SysctlDesired {
+  string key = 1 [(buf.validate.field).string = {
+    max_bytes: 255
+    pattern: "^[a-z][a-z0-9_]*([.][a-zA-Z0-9_-]+)+$"
+  }];
+  string value = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 4096
+    pattern: "^[a-zA-Z0-9_.,:/+ -]+$"
+  }];
+  bool persistent = 3;
+  option (buf.validate.message).cel = {
+    id: "sysctl.canonical_value"
+    message: "sysctl values must not have leading or trailing spaces"
+    expression: "!this.value.startsWith(' ') && !this.value.endsWith(' ')"
+  };
+}
+
+// Daily schedules are explicitly UTC; intervals are monotonic OnUnitActiveSec.
+// No raw OnCalendar, executable, environment, unit text or native option map.
+message DailyTimerSchedule {
+  uint32 hour = 1 [(buf.validate.field).uint32.lte = 23];
+  uint32 minute = 2 [(buf.validate.field).uint32.lte = 59];
+}
+message TimerSchedule {
+  oneof schedule {
+    option (buf.validate.oneof).required = true;
+    DailyTimerSchedule daily = 1;
+    uint32 interval_seconds = 2 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 31536000
+    }];
+  }
+}
+message TimerDefinition {
+  string unit = 1 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*\\.timer$"
+  }];
+  ResourceRef service = 2 [(buf.validate.field).required = true];
+  TimerSchedule schedule = 3 [(buf.validate.field).required = true];
+  bool enabled = 4;
+  option (buf.validate.message).cel = {
+    id: "timer_definition.target"
+    message: "timers target existing canonical services and cannot manage agent authority"
+    expression: "this.service.kind == 1 && !this.unit.startsWith('lindm-') && this.unit != 'lindm.timer' && !this.service.canonical_key.startsWith('lindm-') && this.service.canonical_key != 'lindm.service'"
+  };
+}
+message ServiceDropIn {
+  string unit = 1 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*(@[a-zA-Z0-9][a-zA-Z0-9_.-]*)?\\.service$"
+  }];
+  optional uint32 cpu_weight = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 10000
+  }];
+  optional uint64 memory_max_bytes = 3 [(buf.validate.field).uint64 = {
+    gte: 4096
+    lte: 1125899906842624
+  }];
+  optional uint32 tasks_max = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 4194304
+  }];
+  optional bool no_new_privileges = 5;
+  option (buf.validate.message).cel = {
+    id: "service_drop_in.dimensions"
+    message: "drop-ins require an approved managed option"
+    expression: "has(this.cpu_weight) || has(this.memory_max_bytes) || has(this.tasks_max) || has(this.no_new_privileges)"
+  };
+  option (buf.validate.message).cel = {
+    id: "service_drop_in.protected_agent"
+    message: "agent authority services cannot manage themselves"
+    expression: "!this.unit.startsWith('lindm-') && this.unit != 'lindm.service'"
+  };
+}
+message SystemdDefinitionDesired {
+  Presence presence = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  oneof definition {
+    option (buf.validate.oneof).required = true;
+    TimerDefinition timer = 2;
+    ServiceDropIn drop_in = 3;
+  }
+}
+
+// Compliance only. This grants no encryption, key enrollment, recovery-key
+// disclosure, disk mutation, TPM action or escrow upload authority.
+message EncryptionComplianceDesired {
+  bool require_luks_root = 1 [(buf.validate.field).bool.const = true];
+  optional bool require_escrow = 2 [(buf.validate.field).bool.const = true];
+  optional bool require_tpm = 3 [(buf.validate.field).bool.const = true];
+}

@@ -2000,14 +2000,21 @@ func (x *FirewallObjectDelta) GetRule() *FirewallRule {
 }
 
 type FirewallZonePlan struct {
-	state                    protoimpl.MessageState   `protogen:"open.v1"`
-	Desired                  *FirewallZoneDesired     `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
-	CompiledRulesetSha256    []byte                   `protobuf:"bytes,2,opt,name=compiled_ruleset_sha256,json=compiledRulesetSha256,proto3" json:"compiled_ruleset_sha256,omitempty"`
-	Objects                  []*FirewallObjectDelta   `protobuf:"bytes,3,rep,name=objects,proto3" json:"objects,omitempty"`
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Desired               *FirewallZoneDesired   `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
+	CompiledRulesetSha256 []byte                 `protobuf:"bytes,2,opt,name=compiled_ruleset_sha256,json=compiledRulesetSha256,proto3" json:"compiled_ruleset_sha256,omitempty"`
+	Objects               []*FirewallObjectDelta `protobuf:"bytes,3,rep,name=objects,proto3" json:"objects,omitempty"`
+	// The native backend's protected supervisor owns the durable checkpoint and
+	// deadline; this optional public reference is not rollback authority.
 	Checkpoint               *CheckpointRef           `protobuf:"bytes,4,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
 	ExpectedPersistentSha256 []byte                   `protobuf:"bytes,5,opt,name=expected_persistent_sha256,json=expectedPersistentSha256,proto3" json:"expected_persistent_sha256,omitempty"`
 	ExpectedKernelSha256     []byte                   `protobuf:"bytes,6,opt,name=expected_kernel_sha256,json=expectedKernelSha256,proto3" json:"expected_kernel_sha256,omitempty"`
 	Inverse                  *OwnershipInverseBinding `protobuf:"bytes,7,opt,name=inverse,proto3" json:"inverse,omitempty"`
+	Before                   *FirewallZoneObservation `protobuf:"bytes,8,opt,name=before,proto3" json:"before,omitempty"`
+	Change                   NativeObjectChange       `protobuf:"varint,9,opt,name=change,proto3,enum=lindm.resource.v1.NativeObjectChange" json:"change,omitempty"`
+	Generation               string                   `protobuf:"bytes,10,opt,name=generation,proto3" json:"generation,omitempty"`
+	TargetPersistentSha256   []byte                   `protobuf:"bytes,11,opt,name=target_persistent_sha256,json=targetPersistentSha256,proto3" json:"target_persistent_sha256,omitempty"`
+	ConfigurationSha256      []byte                   `protobuf:"bytes,12,opt,name=configuration_sha256,json=configurationSha256,proto3" json:"configuration_sha256,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -2087,6 +2094,41 @@ func (x *FirewallZonePlan) GetExpectedKernelSha256() []byte {
 func (x *FirewallZonePlan) GetInverse() *OwnershipInverseBinding {
 	if x != nil {
 		return x.Inverse
+	}
+	return nil
+}
+
+func (x *FirewallZonePlan) GetBefore() *FirewallZoneObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *FirewallZonePlan) GetChange() NativeObjectChange {
+	if x != nil {
+		return x.Change
+	}
+	return NativeObjectChange_NATIVE_OBJECT_CHANGE_UNSPECIFIED
+}
+
+func (x *FirewallZonePlan) GetGeneration() string {
+	if x != nil {
+		return x.Generation
+	}
+	return ""
+}
+
+func (x *FirewallZonePlan) GetTargetPersistentSha256() []byte {
+	if x != nil {
+		return x.TargetPersistentSha256
+	}
+	return nil
+}
+
+func (x *FirewallZonePlan) GetConfigurationSha256() []byte {
+	if x != nil {
+		return x.ConfigurationSha256
 	}
 	return nil
 }
@@ -2360,17 +2402,19 @@ func (x *ProxyPlan) GetInverse() *OwnershipInverseBinding {
 }
 
 type PackageTransactionEntry struct {
-	state             protoimpl.MessageState      `protogen:"open.v1"`
-	Package           *PackageIdentity            `protobuf:"bytes,1,opt,name=package,proto3" json:"package,omitempty"`
-	Operation         PackageTransactionOperation `protobuf:"varint,2,opt,name=operation,proto3,enum=lindm.resource.v1.PackageTransactionOperation" json:"operation,omitempty"`
-	Before            *NativeVersion              `protobuf:"bytes,3,opt,name=before,proto3" json:"before,omitempty"`
-	After             *NativeVersion              `protobuf:"bytes,4,opt,name=after,proto3" json:"after,omitempty"`
-	Artifact          *ArtifactRef                `protobuf:"bytes,5,opt,name=artifact,proto3" json:"artifact,omitempty"`
-	Source            *ResourceRef                `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
-	DirectRequest     bool                        `protobuf:"varint,7,opt,name=direct_request,json=directRequest,proto3" json:"direct_request,omitempty"`
-	OwnedInstallation bool                        `protobuf:"varint,8,opt,name=owned_installation,json=ownedInstallation,proto3" json:"owned_installation,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                  protoimpl.MessageState      `protogen:"open.v1"`
+	Package                *PackageIdentity            `protobuf:"bytes,1,opt,name=package,proto3" json:"package,omitempty"`
+	Operation              PackageTransactionOperation `protobuf:"varint,2,opt,name=operation,proto3,enum=lindm.resource.v1.PackageTransactionOperation" json:"operation,omitempty"`
+	Before                 *NativeVersion              `protobuf:"bytes,3,opt,name=before,proto3" json:"before,omitempty"`
+	After                  *NativeVersion              `protobuf:"bytes,4,opt,name=after,proto3" json:"after,omitempty"`
+	Artifact               *ArtifactRef                `protobuf:"bytes,5,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	Source                 *ResourceRef                `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
+	DirectRequest          bool                        `protobuf:"varint,7,opt,name=direct_request,json=directRequest,proto3" json:"direct_request,omitempty"`
+	OwnedInstallation      bool                        `protobuf:"varint,8,opt,name=owned_installation,json=ownedInstallation,proto3" json:"owned_installation,omitempty"`
+	SignerSha256           []byte                      `protobuf:"bytes,9,opt,name=signer_sha256,json=signerSha256,proto3,oneof" json:"signer_sha256,omitempty"`
+	MetadataRevisionSha256 []byte                      `protobuf:"bytes,10,opt,name=metadata_revision_sha256,json=metadataRevisionSha256,proto3,oneof" json:"metadata_revision_sha256,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *PackageTransactionEntry) Reset() {
@@ -2459,6 +2503,20 @@ func (x *PackageTransactionEntry) GetOwnedInstallation() bool {
 	return false
 }
 
+func (x *PackageTransactionEntry) GetSignerSha256() []byte {
+	if x != nil {
+		return x.SignerSha256
+	}
+	return nil
+}
+
+func (x *PackageTransactionEntry) GetMetadataRevisionSha256() []byte {
+	if x != nil {
+		return x.MetadataRevisionSha256
+	}
+	return nil
+}
+
 type PackageTransactionManifest struct {
 	state                  protoimpl.MessageState     `protogen:"open.v1"`
 	Entries                []*PackageTransactionEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
@@ -2467,8 +2525,12 @@ type PackageTransactionManifest struct {
 	NativeLockIdentity     string                     `protobuf:"bytes,4,opt,name=native_lock_identity,json=nativeLockIdentity,proto3" json:"native_lock_identity,omitempty"`
 	AffectedResources      []*ResourceRef             `protobuf:"bytes,5,rep,name=affected_resources,json=affectedResources,proto3" json:"affected_resources,omitempty"`
 	AffectedDesiredSha256  [][]byte                   `protobuf:"bytes,6,rep,name=affected_desired_sha256,json=affectedDesiredSha256,proto3" json:"affected_desired_sha256,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Native solver/replay bytes are immutable alongside the normalized entries.
+	NativeTransaction  *ArtifactRef  `protobuf:"bytes,7,opt,name=native_transaction,json=nativeTransaction,proto3" json:"native_transaction,omitempty"`
+	CandidatePinSha256 []byte        `protobuf:"bytes,8,opt,name=candidate_pin_sha256,json=candidatePinSha256,proto3,oneof" json:"candidate_pin_sha256,omitempty"`
+	OriginalPin        *FileIdentity `protobuf:"bytes,9,opt,name=original_pin,json=originalPin,proto3" json:"original_pin,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *PackageTransactionManifest) Reset() {
@@ -2543,6 +2605,27 @@ func (x *PackageTransactionManifest) GetAffectedDesiredSha256() [][]byte {
 	return nil
 }
 
+func (x *PackageTransactionManifest) GetNativeTransaction() *ArtifactRef {
+	if x != nil {
+		return x.NativeTransaction
+	}
+	return nil
+}
+
+func (x *PackageTransactionManifest) GetCandidatePinSha256() []byte {
+	if x != nil {
+		return x.CandidatePinSha256
+	}
+	return nil
+}
+
+func (x *PackageTransactionManifest) GetOriginalPin() *FileIdentity {
+	if x != nil {
+		return x.OriginalPin
+	}
+	return nil
+}
+
 type NativePackagePlan struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Desired *NativePackageDesired  `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
@@ -2551,8 +2634,15 @@ type NativePackagePlan struct {
 	NativeDatabaseRevision []byte                   `protobuf:"bytes,3,opt,name=native_database_revision,json=nativeDatabaseRevision,proto3" json:"native_database_revision,omitempty"`
 	NativeLockIdentity     string                   `protobuf:"bytes,4,opt,name=native_lock_identity,json=nativeLockIdentity,proto3" json:"native_lock_identity,omitempty"`
 	Inverse                *OwnershipInverseBinding `protobuf:"bytes,5,opt,name=inverse,proto3" json:"inverse,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Exact provider-rendered pin, or empty to remove its owned pin. Bind the
+	// candidate separately from the baseline retained by the ownership journal.
+	PinContents []byte `protobuf:"bytes,6,opt,name=pin_contents,json=pinContents,proto3" json:"pin_contents,omitempty"`
+	ChangePin   bool   `protobuf:"varint,7,opt,name=change_pin,json=changePin,proto3" json:"change_pin,omitempty"`
+	PinMode     uint32 `protobuf:"varint,8,opt,name=pin_mode,json=pinMode,proto3" json:"pin_mode,omitempty"`
+	// Derived from the complete digest-bound manifest, never from desired state alone.
+	ChangePackages bool `protobuf:"varint,9,opt,name=change_packages,json=changePackages,proto3" json:"change_packages,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NativePackagePlan) Reset() {
@@ -2618,6 +2708,34 @@ func (x *NativePackagePlan) GetInverse() *OwnershipInverseBinding {
 		return x.Inverse
 	}
 	return nil
+}
+
+func (x *NativePackagePlan) GetPinContents() []byte {
+	if x != nil {
+		return x.PinContents
+	}
+	return nil
+}
+
+func (x *NativePackagePlan) GetChangePin() bool {
+	if x != nil {
+		return x.ChangePin
+	}
+	return false
+}
+
+func (x *NativePackagePlan) GetPinMode() uint32 {
+	if x != nil {
+		return x.PinMode
+	}
+	return 0
+}
+
+func (x *NativePackagePlan) GetChangePackages() bool {
+	if x != nil {
+		return x.ChangePackages
+	}
+	return false
 }
 
 type RepositoryPlan struct {
@@ -3852,11 +3970,292 @@ func (x *DeploymentTransactionManifest) GetRollsBackUserData() bool {
 	return false
 }
 
+type ManagedFilePlan struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Desired       *ManagedFileDesired      `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
+	Before        *ManagedFileObservation  `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
+	Change        NativeObjectChange       `protobuf:"varint,3,opt,name=change,proto3,enum=lindm.resource.v1.NativeObjectChange" json:"change,omitempty"`
+	Inverse       *OwnershipInverseBinding `protobuf:"bytes,4,opt,name=inverse,proto3" json:"inverse,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ManagedFilePlan) Reset() {
+	*x = ManagedFilePlan{}
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ManagedFilePlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ManagedFilePlan) ProtoMessage() {}
+
+func (x *ManagedFilePlan) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ManagedFilePlan.ProtoReflect.Descriptor instead.
+func (*ManagedFilePlan) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ManagedFilePlan) GetDesired() *ManagedFileDesired {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *ManagedFilePlan) GetBefore() *ManagedFileObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *ManagedFilePlan) GetChange() NativeObjectChange {
+	if x != nil {
+		return x.Change
+	}
+	return NativeObjectChange_NATIVE_OBJECT_CHANGE_UNSPECIFIED
+}
+
+func (x *ManagedFilePlan) GetInverse() *OwnershipInverseBinding {
+	if x != nil {
+		return x.Inverse
+	}
+	return nil
+}
+
+type SysctlPlan struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Desired       *SysctlDesired           `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
+	Before        *SysctlObservation       `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
+	Change        NativeObjectChange       `protobuf:"varint,3,opt,name=change,proto3,enum=lindm.resource.v1.NativeObjectChange" json:"change,omitempty"`
+	Inverse       *OwnershipInverseBinding `protobuf:"bytes,4,opt,name=inverse,proto3" json:"inverse,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SysctlPlan) Reset() {
+	*x = SysctlPlan{}
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SysctlPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SysctlPlan) ProtoMessage() {}
+
+func (x *SysctlPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SysctlPlan.ProtoReflect.Descriptor instead.
+func (*SysctlPlan) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SysctlPlan) GetDesired() *SysctlDesired {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *SysctlPlan) GetBefore() *SysctlObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *SysctlPlan) GetChange() NativeObjectChange {
+	if x != nil {
+		return x.Change
+	}
+	return NativeObjectChange_NATIVE_OBJECT_CHANGE_UNSPECIFIED
+}
+
+func (x *SysctlPlan) GetInverse() *OwnershipInverseBinding {
+	if x != nil {
+		return x.Inverse
+	}
+	return nil
+}
+
+type SystemdDefinitionPlan struct {
+	state                   protoimpl.MessageState        `protogen:"open.v1"`
+	Desired                 *SystemdDefinitionDesired     `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
+	Before                  *SystemdDefinitionObservation `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
+	Change                  NativeObjectChange            `protobuf:"varint,3,opt,name=change,proto3,enum=lindm.resource.v1.NativeObjectChange" json:"change,omitempty"`
+	Inverse                 *OwnershipInverseBinding      `protobuf:"bytes,4,opt,name=inverse,proto3" json:"inverse,omitempty"`
+	RenderedCandidateSha256 []byte                        `protobuf:"bytes,5,opt,name=rendered_candidate_sha256,json=renderedCandidateSha256,proto3" json:"rendered_candidate_sha256,omitempty"`
+	DaemonReload            bool                          `protobuf:"varint,6,opt,name=daemon_reload,json=daemonReload,proto3" json:"daemon_reload,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *SystemdDefinitionPlan) Reset() {
+	*x = SystemdDefinitionPlan{}
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SystemdDefinitionPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SystemdDefinitionPlan) ProtoMessage() {}
+
+func (x *SystemdDefinitionPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SystemdDefinitionPlan.ProtoReflect.Descriptor instead.
+func (*SystemdDefinitionPlan) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *SystemdDefinitionPlan) GetDesired() *SystemdDefinitionDesired {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *SystemdDefinitionPlan) GetBefore() *SystemdDefinitionObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *SystemdDefinitionPlan) GetChange() NativeObjectChange {
+	if x != nil {
+		return x.Change
+	}
+	return NativeObjectChange_NATIVE_OBJECT_CHANGE_UNSPECIFIED
+}
+
+func (x *SystemdDefinitionPlan) GetInverse() *OwnershipInverseBinding {
+	if x != nil {
+		return x.Inverse
+	}
+	return nil
+}
+
+func (x *SystemdDefinitionPlan) GetRenderedCandidateSha256() []byte {
+	if x != nil {
+		return x.RenderedCandidateSha256
+	}
+	return nil
+}
+
+func (x *SystemdDefinitionPlan) GetDaemonReload() bool {
+	if x != nil {
+		return x.DaemonReload
+	}
+	return false
+}
+
+type EncryptionCompliancePlan struct {
+	state   protoimpl.MessageState           `protogen:"open.v1"`
+	Desired *EncryptionComplianceDesired     `protobuf:"bytes,1,opt,name=desired,proto3" json:"desired,omitempty"`
+	Before  *EncryptionComplianceObservation `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
+	// Compliance never authorizes a native effect, including during release.
+	Change        NativeObjectChange `protobuf:"varint,3,opt,name=change,proto3,enum=lindm.resource.v1.NativeObjectChange" json:"change,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EncryptionCompliancePlan) Reset() {
+	*x = EncryptionCompliancePlan{}
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EncryptionCompliancePlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EncryptionCompliancePlan) ProtoMessage() {}
+
+func (x *EncryptionCompliancePlan) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_resource_v1_plans_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EncryptionCompliancePlan.ProtoReflect.Descriptor instead.
+func (*EncryptionCompliancePlan) Descriptor() ([]byte, []int) {
+	return file_lindm_resource_v1_plans_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *EncryptionCompliancePlan) GetDesired() *EncryptionComplianceDesired {
+	if x != nil {
+		return x.Desired
+	}
+	return nil
+}
+
+func (x *EncryptionCompliancePlan) GetBefore() *EncryptionComplianceObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *EncryptionCompliancePlan) GetChange() NativeObjectChange {
+	if x != nil {
+		return x.Change
+	}
+	return NativeObjectChange_NATIVE_OBJECT_CHANGE_UNSPECIFIED
+}
+
 var File_lindm_resource_v1_plans_proto protoreflect.FileDescriptor
 
 const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\n" +
-	"\x1dlindm/resource/v1/plans.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a lindm/resource/v1/accounts.proto\x1a\x1elindm/resource/v1/common.proto\x1a#lindm/resource/v1/credentials.proto\x1a lindm/resource/v1/identity.proto\x1a\x1flindm/resource/v1/network.proto\x1a$lindm/resource/v1/observations.proto\x1a lindm/resource/v1/software.proto\"\xf1\x03\n" +
+	"\x1dlindm/resource/v1/plans.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a lindm/resource/v1/accounts.proto\x1a\x1elindm/resource/v1/common.proto\x1a#lindm/resource/v1/credentials.proto\x1a\x1clindm/resource/v1/host.proto\x1a lindm/resource/v1/identity.proto\x1a\x1flindm/resource/v1/network.proto\x1a$lindm/resource/v1/observations.proto\x1a lindm/resource/v1/software.proto\"\xf1\x03\n" +
 	"\n" +
 	"PlanSafety\x12X\n" +
 	"\flock_domains\x18\x01 \x03(\x0e2\x1e.lindm.resource.v1.ClaimDomainB\x15\xbaH\x12\x92\x01\x0f\b\x01\x10 \x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\vlockDomains\x12R\n" +
@@ -3957,17 +4356,26 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x06change\x18\x02 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06change\x123\n" +
 	"\x04rule\x18\x03 \x01(\v2\x1f.lindm.resource.v1.FirewallRuleR\x04rule:\xb1\x01\xbaH\xad\x01\x1a\xaa\x01\n" +
-	"\x13firewall_delta.rule\x12'new rules require a matching typed rule\x1aj((this.change in [1,2]) ? has(this.rule) : true) && (!has(this.rule) || this.rule.rule_id == this.rule_id)\"\x80\x04\n" +
+	"\x13firewall_delta.rule\x12'new rules require a matching typed rule\x1aj((this.change in [1,2]) ? has(this.rule) : true) && (!has(this.rule) || this.rule.rule_id == this.rule_id)\"\xb8\x06\n" +
 	"\x10FirewallZonePlan\x12H\n" +
 	"\adesired\x18\x01 \x01(\v2&.lindm.resource.v1.FirewallZoneDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12?\n" +
 	"\x17compiled_ruleset_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x15compiledRulesetSha256\x12K\n" +
-	"\aobjects\x18\x03 \x03(\v2&.lindm.resource.v1.FirewallObjectDeltaB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\aobjects\x12H\n" +
+	"\aobjects\x18\x03 \x03(\v2&.lindm.resource.v1.FirewallObjectDeltaB\t\xbaH\x06\x92\x01\x03\x10\x80\x02R\aobjects\x12@\n" +
 	"\n" +
-	"checkpoint\x18\x04 \x01(\v2 .lindm.resource.v1.CheckpointRefB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"checkpoint\x18\x04 \x01(\v2 .lindm.resource.v1.CheckpointRefR\n" +
 	"checkpoint\x12E\n" +
 	"\x1aexpected_persistent_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x18expectedPersistentSha256\x12=\n" +
 	"\x16expected_kernel_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x14expectedKernelSha256\x12D\n" +
-	"\ainverse\x18\a \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\xda\x04\n" +
+	"\ainverse\x18\a \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\x12J\n" +
+	"\x06before\x18\b \x01(\v2*.lindm.resource.v1.FirewallZoneObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12I\n" +
+	"\x06change\x18\t \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06change\x12(\n" +
+	"\n" +
+	"generation\x18\n" +
+	" \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"generation\x12A\n" +
+	"\x18target_persistent_sha256\x18\v \x01(\fB\a\xbaH\x04z\x02h R\x16targetPersistentSha256\x12:\n" +
+	"\x14configuration_sha256\x18\f \x01(\fB\a\xbaH\x04z\x02h R\x13configurationSha256\"\xda\x04\n" +
 	"\x15NetworkConnectionPlan\x12M\n" +
 	"\adesired\x18\x01 \x01(\v2+.lindm.resource.v1.NetworkConnectionDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12J\n" +
 	"\x05steps\x18\x02 \x03(\x0e2!.lindm.resource.v1.ConnectionStepB\x11\xbaH\x0e\x92\x01\v\x10\b\"\a\x82\x01\x04\x10\x01 \x00R\x05steps\x12G\n" +
@@ -3999,7 +4407,7 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\n" +
 	"checkpoint\x18\x05 \x01(\v2 .lindm.resource.v1.CheckpointRefR\n" +
 	"checkpoint\x12D\n" +
-	"\ainverse\x18\x06 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\x9c\x06\n" +
+	"\ainverse\x18\x06 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\x87\b\n" +
 	"\x17PackageTransactionEntry\x12D\n" +
 	"\apackage\x18\x01 \x01(\v2\".lindm.resource.v1.PackageIdentityB\x06\xbaH\x03\xc8\x01\x01R\apackage\x12X\n" +
 	"\toperation\x18\x02 \x01(\x0e2..lindm.resource.v1.PackageTransactionOperationB\n" +
@@ -4009,24 +4417,38 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\bartifact\x18\x05 \x01(\v2\x1e.lindm.resource.v1.ArtifactRefR\bartifact\x12>\n" +
 	"\x06source\x18\x06 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x06source\x12%\n" +
 	"\x0edirect_request\x18\a \x01(\bR\rdirectRequest\x12-\n" +
-	"\x12owned_installation\x18\b \x01(\bR\x11ownedInstallation:\x9c\x02\xbaH\x98\x02\x1a\x95\x02\n" +
-	"\x1fpackage_transaction_entry.shape\x12Vinstall/upgrade entries bind exact bytes and versions; removal binds owned prior state\x1a\x99\x01this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact))\"\xf8\x04\n" +
-	"\x1aPackageTransactionManifest\x12Q\n" +
-	"\aentries\x18\x01 \x03(\v2*.lindm.resource.v1.PackageTransactionEntryB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80 R\aentries\x12A\n" +
+	"\x12owned_installation\x18\b \x01(\bR\x11ownedInstallation\x121\n" +
+	"\rsigner_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02h H\x00R\fsignerSha256\x88\x01\x01\x12F\n" +
+	"\x18metadata_revision_sha256\x18\n" +
+	" \x01(\fB\a\xbaH\x04z\x02h H\x01R\x16metadataRevisionSha256\x88\x01\x01:\xdd\x02\xbaH\xd9\x02\x1a\xd6\x02\n" +
+	"\x1fpackage_transaction_entry.shape\x12Vinstall/upgrade entries bind exact bytes and versions; removal binds owned prior state\x1a\xda\x01this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact) && has(this.signer_sha256) && has(this.metadata_revision_sha256))B\x10\n" +
+	"\x0e_signer_sha256B\x1b\n" +
+	"\x19_metadata_revision_sha256\"\xea\x06\n" +
+	"\x1aPackageTransactionManifest\x12O\n" +
+	"\aentries\x18\x01 \x03(\v2*.lindm.resource.v1.PackageTransactionEntryB\t\xbaH\x06\x92\x01\x03\x10\x80 R\aentries\x12A\n" +
 	"\x18native_database_revision\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x16nativeDatabaseRevision\x12C\n" +
 	"\asources\x18\x03 \x01(\v2!.lindm.resource.v1.SourceSnapshotB\x06\xbaH\x03\xc8\x01\x01R\asources\x12<\n" +
 	"\x14native_lock_identity\x18\x04 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x12nativeLockIdentity\x12Z\n" +
 	"\x12affected_resources\x18\x05 \x03(\v2\x1e.lindm.resource.v1.ResourceRefB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x02R\x11affectedResources\x12I\n" +
-	"\x17affected_desired_sha256\x18\x06 \x03(\fB\x11\xbaH\x0e\x92\x01\v\b\x01\x10\x80\x02\"\x04z\x02h R\x15affectedDesiredSha256:\x99\x01\xbaH\x95\x01\x1a\x92\x01\n" +
-	"\x19package_manifest.bindings\x12.every affected resource binds a desired digest\x1aEthis.affected_resources.size() == this.affected_desired_sha256.size()\"\x80\x03\n" +
+	"\x17affected_desired_sha256\x18\x06 \x03(\fB\x11\xbaH\x0e\x92\x01\v\b\x01\x10\x80\x02\"\x04z\x02h R\x15affectedDesiredSha256\x12U\n" +
+	"\x12native_transaction\x18\a \x01(\v2\x1e.lindm.resource.v1.ArtifactRefB\x06\xbaH\x03\xc8\x01\x01R\x11nativeTransaction\x12>\n" +
+	"\x14candidate_pin_sha256\x18\b \x01(\fB\a\xbaH\x04z\x02h H\x00R\x12candidatePinSha256\x88\x01\x01\x12B\n" +
+	"\foriginal_pin\x18\t \x01(\v2\x1f.lindm.resource.v1.FileIdentityR\voriginalPin:\x99\x01\xbaH\x95\x01\x1a\x92\x01\n" +
+	"\x19package_manifest.bindings\x12.every affected resource binds a desired digest\x1aEthis.affected_resources.size() == this.affected_desired_sha256.size()B\x17\n" +
+	"\x15_candidate_pin_sha256\"\x9b\x04\n" +
 	"\x11NativePackagePlan\x12I\n" +
 	"\adesired\x18\x01 \x01(\v2'.lindm.resource.v1.NativePackageDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12Y\n" +
 	"\x14transaction_manifest\x18\x02 \x01(\v2\x1e.lindm.resource.v1.ArtifactRefB\x06\xbaH\x03\xc8\x01\x01R\x13transactionManifest\x12A\n" +
 	"\x18native_database_revision\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x16nativeDatabaseRevision\x12<\n" +
 	"\x14native_lock_identity\x18\x04 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x12nativeLockIdentity\x12D\n" +
-	"\ainverse\x18\x05 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\xb2\x04\n" +
+	"\ainverse\x18\x05 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\x12,\n" +
+	"\fpin_contents\x18\x06 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02R\vpinContents\x12\x1d\n" +
+	"\n" +
+	"change_pin\x18\a \x01(\bR\tchangePin\x12#\n" +
+	"\bpin_mode\x18\b \x01(\rB\b\xbaH\x05*\x03\x18\xff\x1fR\apinMode\x12'\n" +
+	"\x0fchange_packages\x18\t \x01(\bR\x0echangePackages\"\xb2\x04\n" +
 	"\x0eRepositoryPlan\x12F\n" +
 	"\adesired\x18\x01 \x01(\v2$.lindm.resource.v1.RepositoryDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12V\n" +
 	"\rstanza_change\x18\x02 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\n" +
@@ -4148,7 +4570,34 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x1bapproved_composition_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x19approvedCompositionSha256\x12\\\n" +
 	"\vcheckpoints\x18\a \x03(\x0e2#.lindm.resource.v1.UpdateCheckpointB\x15\xbaH\x12\x92\x01\x0f\b\x01\x10\x06\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\vcheckpoints\x12>\n" +
 	"\x1bretains_previous_deployment\x18\b \x01(\bR\x19retainsPreviousDeployment\x128\n" +
-	"\x14rolls_back_user_data\x18\t \x01(\bB\a\xbaH\x04j\x02\b\x00R\x11rollsBackUserData*\x87\x01\n" +
+	"\x14rolls_back_user_data\x18\t \x01(\bB\a\xbaH\x04j\x02\b\x00R\x11rollsBackUserData\"\xaf\x03\n" +
+	"\x0fManagedFilePlan\x12G\n" +
+	"\adesired\x18\x01 \x01(\v2%.lindm.resource.v1.ManagedFileDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12I\n" +
+	"\x06before\x18\x02 \x01(\v2).lindm.resource.v1.ManagedFileObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12I\n" +
+	"\x06change\x18\x03 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06change\x12D\n" +
+	"\ainverse\x18\x04 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse:w\xbaHt\x1ar\n" +
+	"\x1amanaged_file_plan.identity\x12-file plans bind the same path before mutation\x1a%this.desired.path == this.before.path\"\xa8\x03\n" +
+	"\n" +
+	"SysctlPlan\x12B\n" +
+	"\adesired\x18\x01 \x01(\v2 .lindm.resource.v1.SysctlDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12D\n" +
+	"\x06before\x18\x02 \x01(\v2$.lindm.resource.v1.SysctlObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12M\n" +
+	"\x06change\x18\x03 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\x0e\xbaH\v\x82\x01\b\x10\x01\x18\x02\x18\x04\x18\x05R\x06change\x12D\n" +
+	"\ainverse\x18\x04 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse:{\xbaHx\x1av\n" +
+	"\x14sysctl_plan.identity\x129sysctl plans bind the same live and persistent kernel key\x1a#this.desired.key == this.before.key\"\xa8\x05\n" +
+	"\x15SystemdDefinitionPlan\x12M\n" +
+	"\adesired\x18\x01 \x01(\v2+.lindm.resource.v1.SystemdDefinitionDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12O\n" +
+	"\x06before\x18\x02 \x01(\v2/.lindm.resource.v1.SystemdDefinitionObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12I\n" +
+	"\x06change\x18\x03 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06change\x12D\n" +
+	"\ainverse\x18\x04 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\x12C\n" +
+	"\x19rendered_candidate_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x17renderedCandidateSha256\x12#\n" +
+	"\rdaemon_reload\x18\x06 \x01(\bR\fdaemonReload:\xf3\x01\xbaH\xef\x01\x1a\xec\x01\n" +
+	" systemd_definition_plan.identity\x12Adefinition plans bind the same canonical unit and definition type\x1a\x84\x01this.before.canonical_key == (has(this.desired.timer) ? 'timer/' + this.desired.timer.unit : 'drop-in/' + this.desired.drop_in.unit)\"\x98\x02\n" +
+	"\x18EncryptionCompliancePlan\x12P\n" +
+	"\adesired\x18\x01 \x01(\v2..lindm.resource.v1.EncryptionComplianceDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12R\n" +
+	"\x06before\x18\x02 \x01(\v22.lindm.resource.v1.EncryptionComplianceObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12G\n" +
+	"\x06change\x18\x03 \x01(\x0e2%.lindm.resource.v1.NativeObjectChangeB\b\xbaH\x05\x82\x01\x02\b\x05R\x06changeJ\x04\b\x04\x10\x05R\ainverse*\x87\x01\n" +
 	"\rReversibility\x12\x1d\n" +
 	"\x19REVERSIBILITY_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18REVERSIBILITY_REVERSIBLE\x10\x01\x12\x19\n" +
@@ -4291,228 +4740,260 @@ func file_lindm_resource_v1_plans_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_resource_v1_plans_proto_enumTypes = make([]protoimpl.EnumInfo, 17)
-var file_lindm_resource_v1_plans_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_lindm_resource_v1_plans_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_lindm_resource_v1_plans_proto_goTypes = []any{
-	(Reversibility)(0),                    // 0: lindm.resource.v1.Reversibility
-	(RollbackScope)(0),                    // 1: lindm.resource.v1.RollbackScope
-	(ConfirmationPolicy)(0),               // 2: lindm.resource.v1.ConfirmationPolicy
-	(NativeObjectChange)(0),               // 3: lindm.resource.v1.NativeObjectChange
-	(UserField)(0),                        // 4: lindm.resource.v1.UserField
-	(SSHDirective)(0),                     // 5: lindm.resource.v1.SSHDirective
-	(ReloadMechanism)(0),                  // 6: lindm.resource.v1.ReloadMechanism
-	(ConnectionStep)(0),                   // 7: lindm.resource.v1.ConnectionStep
-	(DNSField)(0),                         // 8: lindm.resource.v1.DNSField
-	(ProxyField)(0),                       // 9: lindm.resource.v1.ProxyField
-	(PackageTransactionOperation)(0),      // 10: lindm.resource.v1.PackageTransactionOperation
-	(AppTransactionOperation)(0),          // 11: lindm.resource.v1.AppTransactionOperation
-	(UpdateCheckpoint)(0),                 // 12: lindm.resource.v1.UpdateCheckpoint
-	(SessionField)(0),                     // 13: lindm.resource.v1.SessionField
-	(PasswordField)(0),                    // 14: lindm.resource.v1.PasswordField
-	(CredentialStep)(0),                   // 15: lindm.resource.v1.CredentialStep
-	(DirectoryStep)(0),                    // 16: lindm.resource.v1.DirectoryStep
-	(*PlanSafety)(nil),                    // 17: lindm.resource.v1.PlanSafety
-	(*CheckpointRef)(nil),                 // 18: lindm.resource.v1.CheckpointRef
-	(*OwnershipInverseBinding)(nil),       // 19: lindm.resource.v1.OwnershipInverseBinding
-	(*SystemdServicePlan)(nil),            // 20: lindm.resource.v1.SystemdServicePlan
-	(*MemberEdgeChange)(nil),              // 21: lindm.resource.v1.MemberEdgeChange
-	(*LocalGroupPlan)(nil),                // 22: lindm.resource.v1.LocalGroupPlan
-	(*LocalUserPlan)(nil),                 // 23: lindm.resource.v1.LocalUserPlan
-	(*SudoRulePlan)(nil),                  // 24: lindm.resource.v1.SudoRulePlan
-	(*SSHServerPlan)(nil),                 // 25: lindm.resource.v1.SSHServerPlan
-	(*TimeSyncPlan)(nil),                  // 26: lindm.resource.v1.TimeSyncPlan
-	(*TrustCAPlan)(nil),                   // 27: lindm.resource.v1.TrustCAPlan
-	(*FirewallObjectDelta)(nil),           // 28: lindm.resource.v1.FirewallObjectDelta
-	(*FirewallZonePlan)(nil),              // 29: lindm.resource.v1.FirewallZonePlan
-	(*NetworkConnectionPlan)(nil),         // 30: lindm.resource.v1.NetworkConnectionPlan
-	(*DNSPlan)(nil),                       // 31: lindm.resource.v1.DNSPlan
-	(*ProxyPlan)(nil),                     // 32: lindm.resource.v1.ProxyPlan
-	(*PackageTransactionEntry)(nil),       // 33: lindm.resource.v1.PackageTransactionEntry
-	(*PackageTransactionManifest)(nil),    // 34: lindm.resource.v1.PackageTransactionManifest
-	(*NativePackagePlan)(nil),             // 35: lindm.resource.v1.NativePackagePlan
-	(*RepositoryPlan)(nil),                // 36: lindm.resource.v1.RepositoryPlan
-	(*FlatpakAppPlan)(nil),                // 37: lindm.resource.v1.FlatpakAppPlan
-	(*OSUpdatePlan)(nil),                  // 38: lindm.resource.v1.OSUpdatePlan
-	(*SessionPolicyPlan)(nil),             // 39: lindm.resource.v1.SessionPolicyPlan
-	(*PasswordPolicyPlan)(nil),            // 40: lindm.resource.v1.PasswordPolicyPlan
-	(*SnapAppPlan)(nil),                   // 41: lindm.resource.v1.SnapAppPlan
-	(*CertificateEnrollmentPlan)(nil),     // 42: lindm.resource.v1.CertificateEnrollmentPlan
-	(*DirectoryClientPlan)(nil),           // 43: lindm.resource.v1.DirectoryClientPlan
-	(*FlatpakTransactionEntry)(nil),       // 44: lindm.resource.v1.FlatpakTransactionEntry
-	(*SnapTransactionEntry)(nil),          // 45: lindm.resource.v1.SnapTransactionEntry
-	(*AppTransactionEntry)(nil),           // 46: lindm.resource.v1.AppTransactionEntry
-	(*ResourceDigestBinding)(nil),         // 47: lindm.resource.v1.ResourceDigestBinding
-	(*AppTransactionManifest)(nil),        // 48: lindm.resource.v1.AppTransactionManifest
-	(*DeploymentTransactionManifest)(nil), // 49: lindm.resource.v1.DeploymentTransactionManifest
-	(ClaimDomain)(0),                      // 50: lindm.resource.v1.ClaimDomain
-	(*ArtifactRef)(nil),                   // 51: lindm.resource.v1.ArtifactRef
-	(*timestamppb.Timestamp)(nil),         // 52: google.protobuf.Timestamp
-	(*SystemdServiceDesired)(nil),         // 53: lindm.resource.v1.SystemdServiceDesired
-	(*SystemdServiceObservation)(nil),     // 54: lindm.resource.v1.SystemdServiceObservation
-	(*InstallLink)(nil),                   // 55: lindm.resource.v1.InstallLink
-	(*ResourceRef)(nil),                   // 56: lindm.resource.v1.ResourceRef
-	(*LocalGroupDesired)(nil),             // 57: lindm.resource.v1.LocalGroupDesired
-	(*LocalUserDesired)(nil),              // 58: lindm.resource.v1.LocalUserDesired
-	(*SudoRuleDesired)(nil),               // 59: lindm.resource.v1.SudoRuleDesired
-	(*ProbeReceipt)(nil),                  // 60: lindm.resource.v1.ProbeReceipt
-	(*SSHServerDesired)(nil),              // 61: lindm.resource.v1.SSHServerDesired
-	(*TimeSyncDesired)(nil),               // 62: lindm.resource.v1.TimeSyncDesired
-	(*TrustCADesired)(nil),                // 63: lindm.resource.v1.TrustCADesired
-	(*FirewallRule)(nil),                  // 64: lindm.resource.v1.FirewallRule
-	(*FirewallZoneDesired)(nil),           // 65: lindm.resource.v1.FirewallZoneDesired
-	(*NetworkConnectionDesired)(nil),      // 66: lindm.resource.v1.NetworkConnectionDesired
-	(ConnectionMedium)(0),                 // 67: lindm.resource.v1.ConnectionMedium
-	(*DNSDesired)(nil),                    // 68: lindm.resource.v1.DNSDesired
-	(*ProxyDesired)(nil),                  // 69: lindm.resource.v1.ProxyDesired
-	(*PackageIdentity)(nil),               // 70: lindm.resource.v1.PackageIdentity
-	(*NativeVersion)(nil),                 // 71: lindm.resource.v1.NativeVersion
-	(*SourceSnapshot)(nil),                // 72: lindm.resource.v1.SourceSnapshot
-	(*NativePackageDesired)(nil),          // 73: lindm.resource.v1.NativePackageDesired
-	(*RepositoryDesired)(nil),             // 74: lindm.resource.v1.RepositoryDesired
-	(*FileIdentity)(nil),                  // 75: lindm.resource.v1.FileIdentity
-	(*FlatpakAppDesired)(nil),             // 76: lindm.resource.v1.FlatpakAppDesired
-	(*FlatpakPermissionPolicy)(nil),       // 77: lindm.resource.v1.FlatpakPermissionPolicy
-	(*OSUpdateDesired)(nil),               // 78: lindm.resource.v1.OSUpdateDesired
-	(*DeploymentIdentity)(nil),            // 79: lindm.resource.v1.DeploymentIdentity
-	(*SessionPolicyDesired)(nil),          // 80: lindm.resource.v1.SessionPolicyDesired
-	(*PasswordPolicyDesired)(nil),         // 81: lindm.resource.v1.PasswordPolicyDesired
-	(*SnapAppDesired)(nil),                // 82: lindm.resource.v1.SnapAppDesired
-	(*SnapInterfaceGrant)(nil),            // 83: lindm.resource.v1.SnapInterfaceGrant
-	(*CertificateEnrollmentDesired)(nil),  // 84: lindm.resource.v1.CertificateEnrollmentDesired
-	(*DirectoryClientDesired)(nil),        // 85: lindm.resource.v1.DirectoryClientDesired
-	(*InstallationBinding)(nil),           // 86: lindm.resource.v1.InstallationBinding
-	(SnapConfinement)(0),                  // 87: lindm.resource.v1.SnapConfinement
+	(Reversibility)(0),                      // 0: lindm.resource.v1.Reversibility
+	(RollbackScope)(0),                      // 1: lindm.resource.v1.RollbackScope
+	(ConfirmationPolicy)(0),                 // 2: lindm.resource.v1.ConfirmationPolicy
+	(NativeObjectChange)(0),                 // 3: lindm.resource.v1.NativeObjectChange
+	(UserField)(0),                          // 4: lindm.resource.v1.UserField
+	(SSHDirective)(0),                       // 5: lindm.resource.v1.SSHDirective
+	(ReloadMechanism)(0),                    // 6: lindm.resource.v1.ReloadMechanism
+	(ConnectionStep)(0),                     // 7: lindm.resource.v1.ConnectionStep
+	(DNSField)(0),                           // 8: lindm.resource.v1.DNSField
+	(ProxyField)(0),                         // 9: lindm.resource.v1.ProxyField
+	(PackageTransactionOperation)(0),        // 10: lindm.resource.v1.PackageTransactionOperation
+	(AppTransactionOperation)(0),            // 11: lindm.resource.v1.AppTransactionOperation
+	(UpdateCheckpoint)(0),                   // 12: lindm.resource.v1.UpdateCheckpoint
+	(SessionField)(0),                       // 13: lindm.resource.v1.SessionField
+	(PasswordField)(0),                      // 14: lindm.resource.v1.PasswordField
+	(CredentialStep)(0),                     // 15: lindm.resource.v1.CredentialStep
+	(DirectoryStep)(0),                      // 16: lindm.resource.v1.DirectoryStep
+	(*PlanSafety)(nil),                      // 17: lindm.resource.v1.PlanSafety
+	(*CheckpointRef)(nil),                   // 18: lindm.resource.v1.CheckpointRef
+	(*OwnershipInverseBinding)(nil),         // 19: lindm.resource.v1.OwnershipInverseBinding
+	(*SystemdServicePlan)(nil),              // 20: lindm.resource.v1.SystemdServicePlan
+	(*MemberEdgeChange)(nil),                // 21: lindm.resource.v1.MemberEdgeChange
+	(*LocalGroupPlan)(nil),                  // 22: lindm.resource.v1.LocalGroupPlan
+	(*LocalUserPlan)(nil),                   // 23: lindm.resource.v1.LocalUserPlan
+	(*SudoRulePlan)(nil),                    // 24: lindm.resource.v1.SudoRulePlan
+	(*SSHServerPlan)(nil),                   // 25: lindm.resource.v1.SSHServerPlan
+	(*TimeSyncPlan)(nil),                    // 26: lindm.resource.v1.TimeSyncPlan
+	(*TrustCAPlan)(nil),                     // 27: lindm.resource.v1.TrustCAPlan
+	(*FirewallObjectDelta)(nil),             // 28: lindm.resource.v1.FirewallObjectDelta
+	(*FirewallZonePlan)(nil),                // 29: lindm.resource.v1.FirewallZonePlan
+	(*NetworkConnectionPlan)(nil),           // 30: lindm.resource.v1.NetworkConnectionPlan
+	(*DNSPlan)(nil),                         // 31: lindm.resource.v1.DNSPlan
+	(*ProxyPlan)(nil),                       // 32: lindm.resource.v1.ProxyPlan
+	(*PackageTransactionEntry)(nil),         // 33: lindm.resource.v1.PackageTransactionEntry
+	(*PackageTransactionManifest)(nil),      // 34: lindm.resource.v1.PackageTransactionManifest
+	(*NativePackagePlan)(nil),               // 35: lindm.resource.v1.NativePackagePlan
+	(*RepositoryPlan)(nil),                  // 36: lindm.resource.v1.RepositoryPlan
+	(*FlatpakAppPlan)(nil),                  // 37: lindm.resource.v1.FlatpakAppPlan
+	(*OSUpdatePlan)(nil),                    // 38: lindm.resource.v1.OSUpdatePlan
+	(*SessionPolicyPlan)(nil),               // 39: lindm.resource.v1.SessionPolicyPlan
+	(*PasswordPolicyPlan)(nil),              // 40: lindm.resource.v1.PasswordPolicyPlan
+	(*SnapAppPlan)(nil),                     // 41: lindm.resource.v1.SnapAppPlan
+	(*CertificateEnrollmentPlan)(nil),       // 42: lindm.resource.v1.CertificateEnrollmentPlan
+	(*DirectoryClientPlan)(nil),             // 43: lindm.resource.v1.DirectoryClientPlan
+	(*FlatpakTransactionEntry)(nil),         // 44: lindm.resource.v1.FlatpakTransactionEntry
+	(*SnapTransactionEntry)(nil),            // 45: lindm.resource.v1.SnapTransactionEntry
+	(*AppTransactionEntry)(nil),             // 46: lindm.resource.v1.AppTransactionEntry
+	(*ResourceDigestBinding)(nil),           // 47: lindm.resource.v1.ResourceDigestBinding
+	(*AppTransactionManifest)(nil),          // 48: lindm.resource.v1.AppTransactionManifest
+	(*DeploymentTransactionManifest)(nil),   // 49: lindm.resource.v1.DeploymentTransactionManifest
+	(*ManagedFilePlan)(nil),                 // 50: lindm.resource.v1.ManagedFilePlan
+	(*SysctlPlan)(nil),                      // 51: lindm.resource.v1.SysctlPlan
+	(*SystemdDefinitionPlan)(nil),           // 52: lindm.resource.v1.SystemdDefinitionPlan
+	(*EncryptionCompliancePlan)(nil),        // 53: lindm.resource.v1.EncryptionCompliancePlan
+	(ClaimDomain)(0),                        // 54: lindm.resource.v1.ClaimDomain
+	(*ArtifactRef)(nil),                     // 55: lindm.resource.v1.ArtifactRef
+	(*timestamppb.Timestamp)(nil),           // 56: google.protobuf.Timestamp
+	(*SystemdServiceDesired)(nil),           // 57: lindm.resource.v1.SystemdServiceDesired
+	(*SystemdServiceObservation)(nil),       // 58: lindm.resource.v1.SystemdServiceObservation
+	(*InstallLink)(nil),                     // 59: lindm.resource.v1.InstallLink
+	(*ResourceRef)(nil),                     // 60: lindm.resource.v1.ResourceRef
+	(*LocalGroupDesired)(nil),               // 61: lindm.resource.v1.LocalGroupDesired
+	(*LocalUserDesired)(nil),                // 62: lindm.resource.v1.LocalUserDesired
+	(*SudoRuleDesired)(nil),                 // 63: lindm.resource.v1.SudoRuleDesired
+	(*ProbeReceipt)(nil),                    // 64: lindm.resource.v1.ProbeReceipt
+	(*SSHServerDesired)(nil),                // 65: lindm.resource.v1.SSHServerDesired
+	(*TimeSyncDesired)(nil),                 // 66: lindm.resource.v1.TimeSyncDesired
+	(*TrustCADesired)(nil),                  // 67: lindm.resource.v1.TrustCADesired
+	(*FirewallRule)(nil),                    // 68: lindm.resource.v1.FirewallRule
+	(*FirewallZoneDesired)(nil),             // 69: lindm.resource.v1.FirewallZoneDesired
+	(*FirewallZoneObservation)(nil),         // 70: lindm.resource.v1.FirewallZoneObservation
+	(*NetworkConnectionDesired)(nil),        // 71: lindm.resource.v1.NetworkConnectionDesired
+	(ConnectionMedium)(0),                   // 72: lindm.resource.v1.ConnectionMedium
+	(*DNSDesired)(nil),                      // 73: lindm.resource.v1.DNSDesired
+	(*ProxyDesired)(nil),                    // 74: lindm.resource.v1.ProxyDesired
+	(*PackageIdentity)(nil),                 // 75: lindm.resource.v1.PackageIdentity
+	(*NativeVersion)(nil),                   // 76: lindm.resource.v1.NativeVersion
+	(*SourceSnapshot)(nil),                  // 77: lindm.resource.v1.SourceSnapshot
+	(*FileIdentity)(nil),                    // 78: lindm.resource.v1.FileIdentity
+	(*NativePackageDesired)(nil),            // 79: lindm.resource.v1.NativePackageDesired
+	(*RepositoryDesired)(nil),               // 80: lindm.resource.v1.RepositoryDesired
+	(*FlatpakAppDesired)(nil),               // 81: lindm.resource.v1.FlatpakAppDesired
+	(*FlatpakPermissionPolicy)(nil),         // 82: lindm.resource.v1.FlatpakPermissionPolicy
+	(*OSUpdateDesired)(nil),                 // 83: lindm.resource.v1.OSUpdateDesired
+	(*DeploymentIdentity)(nil),              // 84: lindm.resource.v1.DeploymentIdentity
+	(*SessionPolicyDesired)(nil),            // 85: lindm.resource.v1.SessionPolicyDesired
+	(*PasswordPolicyDesired)(nil),           // 86: lindm.resource.v1.PasswordPolicyDesired
+	(*SnapAppDesired)(nil),                  // 87: lindm.resource.v1.SnapAppDesired
+	(*SnapInterfaceGrant)(nil),              // 88: lindm.resource.v1.SnapInterfaceGrant
+	(*CertificateEnrollmentDesired)(nil),    // 89: lindm.resource.v1.CertificateEnrollmentDesired
+	(*DirectoryClientDesired)(nil),          // 90: lindm.resource.v1.DirectoryClientDesired
+	(*InstallationBinding)(nil),             // 91: lindm.resource.v1.InstallationBinding
+	(SnapConfinement)(0),                    // 92: lindm.resource.v1.SnapConfinement
+	(*ManagedFileDesired)(nil),              // 93: lindm.resource.v1.ManagedFileDesired
+	(*ManagedFileObservation)(nil),          // 94: lindm.resource.v1.ManagedFileObservation
+	(*SysctlDesired)(nil),                   // 95: lindm.resource.v1.SysctlDesired
+	(*SysctlObservation)(nil),               // 96: lindm.resource.v1.SysctlObservation
+	(*SystemdDefinitionDesired)(nil),        // 97: lindm.resource.v1.SystemdDefinitionDesired
+	(*SystemdDefinitionObservation)(nil),    // 98: lindm.resource.v1.SystemdDefinitionObservation
+	(*EncryptionComplianceDesired)(nil),     // 99: lindm.resource.v1.EncryptionComplianceDesired
+	(*EncryptionComplianceObservation)(nil), // 100: lindm.resource.v1.EncryptionComplianceObservation
 }
 var file_lindm_resource_v1_plans_proto_depIdxs = []int32{
-	50,  // 0: lindm.resource.v1.PlanSafety.lock_domains:type_name -> lindm.resource.v1.ClaimDomain
+	54,  // 0: lindm.resource.v1.PlanSafety.lock_domains:type_name -> lindm.resource.v1.ClaimDomain
 	0,   // 1: lindm.resource.v1.PlanSafety.reversibility:type_name -> lindm.resource.v1.Reversibility
 	1,   // 2: lindm.resource.v1.PlanSafety.rollback_scope:type_name -> lindm.resource.v1.RollbackScope
 	2,   // 3: lindm.resource.v1.PlanSafety.confirmation:type_name -> lindm.resource.v1.ConfirmationPolicy
-	51,  // 4: lindm.resource.v1.PlanSafety.prerequisite_manifests:type_name -> lindm.resource.v1.ArtifactRef
-	52,  // 5: lindm.resource.v1.CheckpointRef.rollback_deadline:type_name -> google.protobuf.Timestamp
-	53,  // 6: lindm.resource.v1.SystemdServicePlan.desired:type_name -> lindm.resource.v1.SystemdServiceDesired
-	54,  // 7: lindm.resource.v1.SystemdServicePlan.before:type_name -> lindm.resource.v1.SystemdServiceObservation
-	55,  // 8: lindm.resource.v1.SystemdServicePlan.install_projection:type_name -> lindm.resource.v1.InstallLink
-	56,  // 9: lindm.resource.v1.SystemdServicePlan.related_units:type_name -> lindm.resource.v1.ResourceRef
+	55,  // 4: lindm.resource.v1.PlanSafety.prerequisite_manifests:type_name -> lindm.resource.v1.ArtifactRef
+	56,  // 5: lindm.resource.v1.CheckpointRef.rollback_deadline:type_name -> google.protobuf.Timestamp
+	57,  // 6: lindm.resource.v1.SystemdServicePlan.desired:type_name -> lindm.resource.v1.SystemdServiceDesired
+	58,  // 7: lindm.resource.v1.SystemdServicePlan.before:type_name -> lindm.resource.v1.SystemdServiceObservation
+	59,  // 8: lindm.resource.v1.SystemdServicePlan.install_projection:type_name -> lindm.resource.v1.InstallLink
+	60,  // 9: lindm.resource.v1.SystemdServicePlan.related_units:type_name -> lindm.resource.v1.ResourceRef
 	19,  // 10: lindm.resource.v1.SystemdServicePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	57,  // 11: lindm.resource.v1.LocalGroupPlan.desired:type_name -> lindm.resource.v1.LocalGroupDesired
+	61,  // 11: lindm.resource.v1.LocalGroupPlan.desired:type_name -> lindm.resource.v1.LocalGroupDesired
 	3,   // 12: lindm.resource.v1.LocalGroupPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
 	21,  // 13: lindm.resource.v1.LocalGroupPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
 	19,  // 14: lindm.resource.v1.LocalGroupPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	58,  // 15: lindm.resource.v1.LocalUserPlan.desired:type_name -> lindm.resource.v1.LocalUserDesired
+	62,  // 15: lindm.resource.v1.LocalUserPlan.desired:type_name -> lindm.resource.v1.LocalUserDesired
 	3,   // 16: lindm.resource.v1.LocalUserPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
 	4,   // 17: lindm.resource.v1.LocalUserPlan.fields:type_name -> lindm.resource.v1.UserField
 	21,  // 18: lindm.resource.v1.LocalUserPlan.member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
 	19,  // 19: lindm.resource.v1.LocalUserPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	59,  // 20: lindm.resource.v1.SudoRulePlan.desired:type_name -> lindm.resource.v1.SudoRuleDesired
+	63,  // 20: lindm.resource.v1.SudoRulePlan.desired:type_name -> lindm.resource.v1.SudoRuleDesired
 	3,   // 21: lindm.resource.v1.SudoRulePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
-	60,  // 22: lindm.resource.v1.SudoRulePlan.aggregate_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	64,  // 22: lindm.resource.v1.SudoRulePlan.aggregate_validation:type_name -> lindm.resource.v1.ProbeReceipt
 	19,  // 23: lindm.resource.v1.SudoRulePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	61,  // 24: lindm.resource.v1.SSHServerPlan.desired:type_name -> lindm.resource.v1.SSHServerDesired
+	65,  // 24: lindm.resource.v1.SSHServerPlan.desired:type_name -> lindm.resource.v1.SSHServerDesired
 	5,   // 25: lindm.resource.v1.SSHServerPlan.changed_directives:type_name -> lindm.resource.v1.SSHDirective
 	6,   // 26: lindm.resource.v1.SSHServerPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	60,  // 27: lindm.resource.v1.SSHServerPlan.syntax_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	64,  // 27: lindm.resource.v1.SSHServerPlan.syntax_validation:type_name -> lindm.resource.v1.ProbeReceipt
 	18,  // 28: lindm.resource.v1.SSHServerPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
 	19,  // 29: lindm.resource.v1.SSHServerPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	62,  // 30: lindm.resource.v1.TimeSyncPlan.desired:type_name -> lindm.resource.v1.TimeSyncDesired
-	56,  // 31: lindm.resource.v1.TimeSyncPlan.daemon:type_name -> lindm.resource.v1.ResourceRef
+	66,  // 30: lindm.resource.v1.TimeSyncPlan.desired:type_name -> lindm.resource.v1.TimeSyncDesired
+	60,  // 31: lindm.resource.v1.TimeSyncPlan.daemon:type_name -> lindm.resource.v1.ResourceRef
 	19,  // 32: lindm.resource.v1.TimeSyncPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	63,  // 33: lindm.resource.v1.TrustCAPlan.desired:type_name -> lindm.resource.v1.TrustCADesired
+	67,  // 33: lindm.resource.v1.TrustCAPlan.desired:type_name -> lindm.resource.v1.TrustCADesired
 	3,   // 34: lindm.resource.v1.TrustCAPlan.anchor_change:type_name -> lindm.resource.v1.NativeObjectChange
 	19,  // 35: lindm.resource.v1.TrustCAPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
 	3,   // 36: lindm.resource.v1.FirewallObjectDelta.change:type_name -> lindm.resource.v1.NativeObjectChange
-	64,  // 37: lindm.resource.v1.FirewallObjectDelta.rule:type_name -> lindm.resource.v1.FirewallRule
-	65,  // 38: lindm.resource.v1.FirewallZonePlan.desired:type_name -> lindm.resource.v1.FirewallZoneDesired
+	68,  // 37: lindm.resource.v1.FirewallObjectDelta.rule:type_name -> lindm.resource.v1.FirewallRule
+	69,  // 38: lindm.resource.v1.FirewallZonePlan.desired:type_name -> lindm.resource.v1.FirewallZoneDesired
 	28,  // 39: lindm.resource.v1.FirewallZonePlan.objects:type_name -> lindm.resource.v1.FirewallObjectDelta
 	18,  // 40: lindm.resource.v1.FirewallZonePlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
 	19,  // 41: lindm.resource.v1.FirewallZonePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	66,  // 42: lindm.resource.v1.NetworkConnectionPlan.desired:type_name -> lindm.resource.v1.NetworkConnectionDesired
-	7,   // 43: lindm.resource.v1.NetworkConnectionPlan.steps:type_name -> lindm.resource.v1.ConnectionStep
-	67,  // 44: lindm.resource.v1.NetworkConnectionPlan.plugin:type_name -> lindm.resource.v1.ConnectionMedium
-	18,  // 45: lindm.resource.v1.NetworkConnectionPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	60,  // 46: lindm.resource.v1.NetworkConnectionPlan.rollback_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 47: lindm.resource.v1.NetworkConnectionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	68,  // 48: lindm.resource.v1.DNSPlan.desired:type_name -> lindm.resource.v1.DNSDesired
-	8,   // 49: lindm.resource.v1.DNSPlan.fields:type_name -> lindm.resource.v1.DNSField
-	6,   // 50: lindm.resource.v1.DNSPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	18,  // 51: lindm.resource.v1.DNSPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 52: lindm.resource.v1.DNSPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	69,  // 53: lindm.resource.v1.ProxyPlan.desired:type_name -> lindm.resource.v1.ProxyDesired
-	9,   // 54: lindm.resource.v1.ProxyPlan.fields:type_name -> lindm.resource.v1.ProxyField
-	6,   // 55: lindm.resource.v1.ProxyPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
-	18,  // 56: lindm.resource.v1.ProxyPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
-	19,  // 57: lindm.resource.v1.ProxyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	70,  // 58: lindm.resource.v1.PackageTransactionEntry.package:type_name -> lindm.resource.v1.PackageIdentity
-	10,  // 59: lindm.resource.v1.PackageTransactionEntry.operation:type_name -> lindm.resource.v1.PackageTransactionOperation
-	71,  // 60: lindm.resource.v1.PackageTransactionEntry.before:type_name -> lindm.resource.v1.NativeVersion
-	71,  // 61: lindm.resource.v1.PackageTransactionEntry.after:type_name -> lindm.resource.v1.NativeVersion
-	51,  // 62: lindm.resource.v1.PackageTransactionEntry.artifact:type_name -> lindm.resource.v1.ArtifactRef
-	56,  // 63: lindm.resource.v1.PackageTransactionEntry.source:type_name -> lindm.resource.v1.ResourceRef
-	33,  // 64: lindm.resource.v1.PackageTransactionManifest.entries:type_name -> lindm.resource.v1.PackageTransactionEntry
-	72,  // 65: lindm.resource.v1.PackageTransactionManifest.sources:type_name -> lindm.resource.v1.SourceSnapshot
-	56,  // 66: lindm.resource.v1.PackageTransactionManifest.affected_resources:type_name -> lindm.resource.v1.ResourceRef
-	73,  // 67: lindm.resource.v1.NativePackagePlan.desired:type_name -> lindm.resource.v1.NativePackageDesired
-	51,  // 68: lindm.resource.v1.NativePackagePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	19,  // 69: lindm.resource.v1.NativePackagePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	74,  // 70: lindm.resource.v1.RepositoryPlan.desired:type_name -> lindm.resource.v1.RepositoryDesired
-	3,   // 71: lindm.resource.v1.RepositoryPlan.stanza_change:type_name -> lindm.resource.v1.NativeObjectChange
-	51,  // 72: lindm.resource.v1.RepositoryPlan.key_artifacts:type_name -> lindm.resource.v1.ArtifactRef
-	75,  // 73: lindm.resource.v1.RepositoryPlan.owned_objects:type_name -> lindm.resource.v1.FileIdentity
-	60,  // 74: lindm.resource.v1.RepositoryPlan.signature_validation:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 75: lindm.resource.v1.RepositoryPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	76,  // 76: lindm.resource.v1.FlatpakAppPlan.desired:type_name -> lindm.resource.v1.FlatpakAppDesired
-	11,  // 77: lindm.resource.v1.FlatpakAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
-	51,  // 78: lindm.resource.v1.FlatpakAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	77,  // 79: lindm.resource.v1.FlatpakAppPlan.permission_delta:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
-	19,  // 80: lindm.resource.v1.FlatpakAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	78,  // 81: lindm.resource.v1.OSUpdatePlan.desired:type_name -> lindm.resource.v1.OSUpdateDesired
-	51,  // 82: lindm.resource.v1.OSUpdatePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	12,  // 83: lindm.resource.v1.OSUpdatePlan.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
-	79,  // 84: lindm.resource.v1.OSUpdatePlan.target_deployment:type_name -> lindm.resource.v1.DeploymentIdentity
-	19,  // 85: lindm.resource.v1.OSUpdatePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	80,  // 86: lindm.resource.v1.SessionPolicyPlan.desired:type_name -> lindm.resource.v1.SessionPolicyDesired
-	13,  // 87: lindm.resource.v1.SessionPolicyPlan.fields:type_name -> lindm.resource.v1.SessionField
-	75,  // 88: lindm.resource.v1.SessionPolicyPlan.owned_settings:type_name -> lindm.resource.v1.FileIdentity
-	19,  // 89: lindm.resource.v1.SessionPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	81,  // 90: lindm.resource.v1.PasswordPolicyPlan.desired:type_name -> lindm.resource.v1.PasswordPolicyDesired
-	14,  // 91: lindm.resource.v1.PasswordPolicyPlan.fields:type_name -> lindm.resource.v1.PasswordField
-	75,  // 92: lindm.resource.v1.PasswordPolicyPlan.owned_profile_objects:type_name -> lindm.resource.v1.FileIdentity
-	19,  // 93: lindm.resource.v1.PasswordPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	82,  // 94: lindm.resource.v1.SnapAppPlan.desired:type_name -> lindm.resource.v1.SnapAppDesired
-	11,  // 95: lindm.resource.v1.SnapAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
-	51,  // 96: lindm.resource.v1.SnapAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
-	83,  // 97: lindm.resource.v1.SnapAppPlan.interface_delta:type_name -> lindm.resource.v1.SnapInterfaceGrant
-	19,  // 98: lindm.resource.v1.SnapAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	84,  // 99: lindm.resource.v1.CertificateEnrollmentPlan.desired:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
-	15,  // 100: lindm.resource.v1.CertificateEnrollmentPlan.steps:type_name -> lindm.resource.v1.CredentialStep
-	19,  // 101: lindm.resource.v1.CertificateEnrollmentPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	85,  // 102: lindm.resource.v1.DirectoryClientPlan.desired:type_name -> lindm.resource.v1.DirectoryClientDesired
-	16,  // 103: lindm.resource.v1.DirectoryClientPlan.steps:type_name -> lindm.resource.v1.DirectoryStep
-	60,  // 104: lindm.resource.v1.DirectoryClientPlan.remote_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	19,  // 105: lindm.resource.v1.DirectoryClientPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
-	86,  // 106: lindm.resource.v1.FlatpakTransactionEntry.installation:type_name -> lindm.resource.v1.InstallationBinding
-	11,  // 107: lindm.resource.v1.FlatpakTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
-	56,  // 108: lindm.resource.v1.FlatpakTransactionEntry.remote:type_name -> lindm.resource.v1.ResourceRef
-	51,  // 109: lindm.resource.v1.FlatpakTransactionEntry.objects:type_name -> lindm.resource.v1.ArtifactRef
-	11,  // 110: lindm.resource.v1.SnapTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
-	87,  // 111: lindm.resource.v1.SnapTransactionEntry.confinement:type_name -> lindm.resource.v1.SnapConfinement
-	51,  // 112: lindm.resource.v1.SnapTransactionEntry.snap:type_name -> lindm.resource.v1.ArtifactRef
-	51,  // 113: lindm.resource.v1.SnapTransactionEntry.assertion_chain:type_name -> lindm.resource.v1.ArtifactRef
-	44,  // 114: lindm.resource.v1.AppTransactionEntry.flatpak:type_name -> lindm.resource.v1.FlatpakTransactionEntry
-	45,  // 115: lindm.resource.v1.AppTransactionEntry.snap:type_name -> lindm.resource.v1.SnapTransactionEntry
-	56,  // 116: lindm.resource.v1.ResourceDigestBinding.ref:type_name -> lindm.resource.v1.ResourceRef
-	46,  // 117: lindm.resource.v1.AppTransactionManifest.entries:type_name -> lindm.resource.v1.AppTransactionEntry
-	47,  // 118: lindm.resource.v1.AppTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
-	72,  // 119: lindm.resource.v1.DeploymentTransactionManifest.source:type_name -> lindm.resource.v1.SourceSnapshot
-	79,  // 120: lindm.resource.v1.DeploymentTransactionManifest.before:type_name -> lindm.resource.v1.DeploymentIdentity
-	79,  // 121: lindm.resource.v1.DeploymentTransactionManifest.target:type_name -> lindm.resource.v1.DeploymentIdentity
-	51,  // 122: lindm.resource.v1.DeploymentTransactionManifest.content_objects:type_name -> lindm.resource.v1.ArtifactRef
-	47,  // 123: lindm.resource.v1.DeploymentTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
-	12,  // 124: lindm.resource.v1.DeploymentTransactionManifest.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
-	125, // [125:125] is the sub-list for method output_type
-	125, // [125:125] is the sub-list for method input_type
-	125, // [125:125] is the sub-list for extension type_name
-	125, // [125:125] is the sub-list for extension extendee
-	0,   // [0:125] is the sub-list for field type_name
+	70,  // 42: lindm.resource.v1.FirewallZonePlan.before:type_name -> lindm.resource.v1.FirewallZoneObservation
+	3,   // 43: lindm.resource.v1.FirewallZonePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	71,  // 44: lindm.resource.v1.NetworkConnectionPlan.desired:type_name -> lindm.resource.v1.NetworkConnectionDesired
+	7,   // 45: lindm.resource.v1.NetworkConnectionPlan.steps:type_name -> lindm.resource.v1.ConnectionStep
+	72,  // 46: lindm.resource.v1.NetworkConnectionPlan.plugin:type_name -> lindm.resource.v1.ConnectionMedium
+	18,  // 47: lindm.resource.v1.NetworkConnectionPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	64,  // 48: lindm.resource.v1.NetworkConnectionPlan.rollback_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	19,  // 49: lindm.resource.v1.NetworkConnectionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	73,  // 50: lindm.resource.v1.DNSPlan.desired:type_name -> lindm.resource.v1.DNSDesired
+	8,   // 51: lindm.resource.v1.DNSPlan.fields:type_name -> lindm.resource.v1.DNSField
+	6,   // 52: lindm.resource.v1.DNSPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
+	18,  // 53: lindm.resource.v1.DNSPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	19,  // 54: lindm.resource.v1.DNSPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	74,  // 55: lindm.resource.v1.ProxyPlan.desired:type_name -> lindm.resource.v1.ProxyDesired
+	9,   // 56: lindm.resource.v1.ProxyPlan.fields:type_name -> lindm.resource.v1.ProxyField
+	6,   // 57: lindm.resource.v1.ProxyPlan.reload:type_name -> lindm.resource.v1.ReloadMechanism
+	18,  // 58: lindm.resource.v1.ProxyPlan.checkpoint:type_name -> lindm.resource.v1.CheckpointRef
+	19,  // 59: lindm.resource.v1.ProxyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	75,  // 60: lindm.resource.v1.PackageTransactionEntry.package:type_name -> lindm.resource.v1.PackageIdentity
+	10,  // 61: lindm.resource.v1.PackageTransactionEntry.operation:type_name -> lindm.resource.v1.PackageTransactionOperation
+	76,  // 62: lindm.resource.v1.PackageTransactionEntry.before:type_name -> lindm.resource.v1.NativeVersion
+	76,  // 63: lindm.resource.v1.PackageTransactionEntry.after:type_name -> lindm.resource.v1.NativeVersion
+	55,  // 64: lindm.resource.v1.PackageTransactionEntry.artifact:type_name -> lindm.resource.v1.ArtifactRef
+	60,  // 65: lindm.resource.v1.PackageTransactionEntry.source:type_name -> lindm.resource.v1.ResourceRef
+	33,  // 66: lindm.resource.v1.PackageTransactionManifest.entries:type_name -> lindm.resource.v1.PackageTransactionEntry
+	77,  // 67: lindm.resource.v1.PackageTransactionManifest.sources:type_name -> lindm.resource.v1.SourceSnapshot
+	60,  // 68: lindm.resource.v1.PackageTransactionManifest.affected_resources:type_name -> lindm.resource.v1.ResourceRef
+	55,  // 69: lindm.resource.v1.PackageTransactionManifest.native_transaction:type_name -> lindm.resource.v1.ArtifactRef
+	78,  // 70: lindm.resource.v1.PackageTransactionManifest.original_pin:type_name -> lindm.resource.v1.FileIdentity
+	79,  // 71: lindm.resource.v1.NativePackagePlan.desired:type_name -> lindm.resource.v1.NativePackageDesired
+	55,  // 72: lindm.resource.v1.NativePackagePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	19,  // 73: lindm.resource.v1.NativePackagePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	80,  // 74: lindm.resource.v1.RepositoryPlan.desired:type_name -> lindm.resource.v1.RepositoryDesired
+	3,   // 75: lindm.resource.v1.RepositoryPlan.stanza_change:type_name -> lindm.resource.v1.NativeObjectChange
+	55,  // 76: lindm.resource.v1.RepositoryPlan.key_artifacts:type_name -> lindm.resource.v1.ArtifactRef
+	78,  // 77: lindm.resource.v1.RepositoryPlan.owned_objects:type_name -> lindm.resource.v1.FileIdentity
+	64,  // 78: lindm.resource.v1.RepositoryPlan.signature_validation:type_name -> lindm.resource.v1.ProbeReceipt
+	19,  // 79: lindm.resource.v1.RepositoryPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	81,  // 80: lindm.resource.v1.FlatpakAppPlan.desired:type_name -> lindm.resource.v1.FlatpakAppDesired
+	11,  // 81: lindm.resource.v1.FlatpakAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
+	55,  // 82: lindm.resource.v1.FlatpakAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	82,  // 83: lindm.resource.v1.FlatpakAppPlan.permission_delta:type_name -> lindm.resource.v1.FlatpakPermissionPolicy
+	19,  // 84: lindm.resource.v1.FlatpakAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	83,  // 85: lindm.resource.v1.OSUpdatePlan.desired:type_name -> lindm.resource.v1.OSUpdateDesired
+	55,  // 86: lindm.resource.v1.OSUpdatePlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	12,  // 87: lindm.resource.v1.OSUpdatePlan.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
+	84,  // 88: lindm.resource.v1.OSUpdatePlan.target_deployment:type_name -> lindm.resource.v1.DeploymentIdentity
+	19,  // 89: lindm.resource.v1.OSUpdatePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	85,  // 90: lindm.resource.v1.SessionPolicyPlan.desired:type_name -> lindm.resource.v1.SessionPolicyDesired
+	13,  // 91: lindm.resource.v1.SessionPolicyPlan.fields:type_name -> lindm.resource.v1.SessionField
+	78,  // 92: lindm.resource.v1.SessionPolicyPlan.owned_settings:type_name -> lindm.resource.v1.FileIdentity
+	19,  // 93: lindm.resource.v1.SessionPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	86,  // 94: lindm.resource.v1.PasswordPolicyPlan.desired:type_name -> lindm.resource.v1.PasswordPolicyDesired
+	14,  // 95: lindm.resource.v1.PasswordPolicyPlan.fields:type_name -> lindm.resource.v1.PasswordField
+	78,  // 96: lindm.resource.v1.PasswordPolicyPlan.owned_profile_objects:type_name -> lindm.resource.v1.FileIdentity
+	19,  // 97: lindm.resource.v1.PasswordPolicyPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	87,  // 98: lindm.resource.v1.SnapAppPlan.desired:type_name -> lindm.resource.v1.SnapAppDesired
+	11,  // 99: lindm.resource.v1.SnapAppPlan.operations:type_name -> lindm.resource.v1.AppTransactionOperation
+	55,  // 100: lindm.resource.v1.SnapAppPlan.transaction_manifest:type_name -> lindm.resource.v1.ArtifactRef
+	88,  // 101: lindm.resource.v1.SnapAppPlan.interface_delta:type_name -> lindm.resource.v1.SnapInterfaceGrant
+	19,  // 102: lindm.resource.v1.SnapAppPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	89,  // 103: lindm.resource.v1.CertificateEnrollmentPlan.desired:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
+	15,  // 104: lindm.resource.v1.CertificateEnrollmentPlan.steps:type_name -> lindm.resource.v1.CredentialStep
+	19,  // 105: lindm.resource.v1.CertificateEnrollmentPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	90,  // 106: lindm.resource.v1.DirectoryClientPlan.desired:type_name -> lindm.resource.v1.DirectoryClientDesired
+	16,  // 107: lindm.resource.v1.DirectoryClientPlan.steps:type_name -> lindm.resource.v1.DirectoryStep
+	64,  // 108: lindm.resource.v1.DirectoryClientPlan.remote_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	19,  // 109: lindm.resource.v1.DirectoryClientPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	91,  // 110: lindm.resource.v1.FlatpakTransactionEntry.installation:type_name -> lindm.resource.v1.InstallationBinding
+	11,  // 111: lindm.resource.v1.FlatpakTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
+	60,  // 112: lindm.resource.v1.FlatpakTransactionEntry.remote:type_name -> lindm.resource.v1.ResourceRef
+	55,  // 113: lindm.resource.v1.FlatpakTransactionEntry.objects:type_name -> lindm.resource.v1.ArtifactRef
+	11,  // 114: lindm.resource.v1.SnapTransactionEntry.operation:type_name -> lindm.resource.v1.AppTransactionOperation
+	92,  // 115: lindm.resource.v1.SnapTransactionEntry.confinement:type_name -> lindm.resource.v1.SnapConfinement
+	55,  // 116: lindm.resource.v1.SnapTransactionEntry.snap:type_name -> lindm.resource.v1.ArtifactRef
+	55,  // 117: lindm.resource.v1.SnapTransactionEntry.assertion_chain:type_name -> lindm.resource.v1.ArtifactRef
+	44,  // 118: lindm.resource.v1.AppTransactionEntry.flatpak:type_name -> lindm.resource.v1.FlatpakTransactionEntry
+	45,  // 119: lindm.resource.v1.AppTransactionEntry.snap:type_name -> lindm.resource.v1.SnapTransactionEntry
+	60,  // 120: lindm.resource.v1.ResourceDigestBinding.ref:type_name -> lindm.resource.v1.ResourceRef
+	46,  // 121: lindm.resource.v1.AppTransactionManifest.entries:type_name -> lindm.resource.v1.AppTransactionEntry
+	47,  // 122: lindm.resource.v1.AppTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
+	77,  // 123: lindm.resource.v1.DeploymentTransactionManifest.source:type_name -> lindm.resource.v1.SourceSnapshot
+	84,  // 124: lindm.resource.v1.DeploymentTransactionManifest.before:type_name -> lindm.resource.v1.DeploymentIdentity
+	84,  // 125: lindm.resource.v1.DeploymentTransactionManifest.target:type_name -> lindm.resource.v1.DeploymentIdentity
+	55,  // 126: lindm.resource.v1.DeploymentTransactionManifest.content_objects:type_name -> lindm.resource.v1.ArtifactRef
+	47,  // 127: lindm.resource.v1.DeploymentTransactionManifest.affected:type_name -> lindm.resource.v1.ResourceDigestBinding
+	12,  // 128: lindm.resource.v1.DeploymentTransactionManifest.checkpoints:type_name -> lindm.resource.v1.UpdateCheckpoint
+	93,  // 129: lindm.resource.v1.ManagedFilePlan.desired:type_name -> lindm.resource.v1.ManagedFileDesired
+	94,  // 130: lindm.resource.v1.ManagedFilePlan.before:type_name -> lindm.resource.v1.ManagedFileObservation
+	3,   // 131: lindm.resource.v1.ManagedFilePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	19,  // 132: lindm.resource.v1.ManagedFilePlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	95,  // 133: lindm.resource.v1.SysctlPlan.desired:type_name -> lindm.resource.v1.SysctlDesired
+	96,  // 134: lindm.resource.v1.SysctlPlan.before:type_name -> lindm.resource.v1.SysctlObservation
+	3,   // 135: lindm.resource.v1.SysctlPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	19,  // 136: lindm.resource.v1.SysctlPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	97,  // 137: lindm.resource.v1.SystemdDefinitionPlan.desired:type_name -> lindm.resource.v1.SystemdDefinitionDesired
+	98,  // 138: lindm.resource.v1.SystemdDefinitionPlan.before:type_name -> lindm.resource.v1.SystemdDefinitionObservation
+	3,   // 139: lindm.resource.v1.SystemdDefinitionPlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	19,  // 140: lindm.resource.v1.SystemdDefinitionPlan.inverse:type_name -> lindm.resource.v1.OwnershipInverseBinding
+	99,  // 141: lindm.resource.v1.EncryptionCompliancePlan.desired:type_name -> lindm.resource.v1.EncryptionComplianceDesired
+	100, // 142: lindm.resource.v1.EncryptionCompliancePlan.before:type_name -> lindm.resource.v1.EncryptionComplianceObservation
+	3,   // 143: lindm.resource.v1.EncryptionCompliancePlan.change:type_name -> lindm.resource.v1.NativeObjectChange
+	144, // [144:144] is the sub-list for method output_type
+	144, // [144:144] is the sub-list for method input_type
+	144, // [144:144] is the sub-list for extension type_name
+	144, // [144:144] is the sub-list for extension extendee
+	0,   // [0:144] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_plans_proto_init() }
@@ -4523,11 +5004,14 @@ func file_lindm_resource_v1_plans_proto_init() {
 	file_lindm_resource_v1_accounts_proto_init()
 	file_lindm_resource_v1_common_proto_init()
 	file_lindm_resource_v1_credentials_proto_init()
+	file_lindm_resource_v1_host_proto_init()
 	file_lindm_resource_v1_identity_proto_init()
 	file_lindm_resource_v1_network_proto_init()
 	file_lindm_resource_v1_observations_proto_init()
 	file_lindm_resource_v1_software_proto_init()
 	file_lindm_resource_v1_plans_proto_msgTypes[6].OneofWrappers = []any{}
+	file_lindm_resource_v1_plans_proto_msgTypes[16].OneofWrappers = []any{}
+	file_lindm_resource_v1_plans_proto_msgTypes[17].OneofWrappers = []any{}
 	file_lindm_resource_v1_plans_proto_msgTypes[27].OneofWrappers = []any{}
 	file_lindm_resource_v1_plans_proto_msgTypes[28].OneofWrappers = []any{}
 	file_lindm_resource_v1_plans_proto_msgTypes[29].OneofWrappers = []any{
@@ -4540,7 +5024,7 @@ func file_lindm_resource_v1_plans_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_resource_v1_plans_proto_rawDesc), len(file_lindm_resource_v1_plans_proto_rawDesc)),
 			NumEnums:      17,
-			NumMessages:   33,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

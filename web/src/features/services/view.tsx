@@ -1,5 +1,10 @@
 import { toJsonString } from "@bufbuild/protobuf";
-import { ResourceDesiredStateSchema } from "../../../gen/lindm/resource/v1/resource_pb";
+import {
+  ResourceDesiredStateSchema,
+  ResourceObservationSchema,
+  VerificationDisposition,
+  type ResourceObservation,
+} from "../../../gen/lindm/resource/v1/resource_pb";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import {
@@ -8,10 +13,10 @@ import {
   type ServiceActionSummary,
 } from "../../../gen/lindm/admin/v1/assignments_pb";
 import {
-  ServiceExecutionFailure,
-  ServiceExecutionState,
+  ResourceExecutionFailure,
+  ResourceExecutionState,
 } from "../../../gen/lindm/agent/v1/service_execution_pb";
-import { type ServiceObservation } from "../../../gen/lindm/agent/v1/service_pb";
+import type { SystemdServiceObservation } from "../../../gen/lindm/resource/v1/observations_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -337,14 +342,23 @@ export function DeviceResources({
                         <TableCell>
                           {formatTimestamp(recent.action?.startAuthorizedAt).local}
                         </TableCell>
-                        <TableCell>{recent.action?.closedReason || "Not closed"}</TableCell>
+                        <TableCell>
+                          {recent.action?.closedReason
+                            ? recent.action.closedAt
+                              ? recent.action.closedReason
+                              : `Cancellation requested: ${recent.action.closedReason}`
+                            : "Not closed"}
+                        </TableCell>
                         <TableCell>
                           {recent.action?.status ? (
                             <>
-                              <ServiceExecutionStatus state={recent.action.status.state} />
+                              <ResourceExecutionStatus
+                                state={recent.action.status.state}
+                                verification={recent.action.status.verification?.disposition}
+                              />
                               <p>
                                 Failure:{" "}
-                                {enumLabel(ServiceExecutionFailure[recent.action.status.failure])}
+                                {enumLabel(ResourceExecutionFailure[recent.action.status.failure])}
                               </p>
                             </>
                           ) : (
@@ -375,22 +389,34 @@ export function DeviceResources({
   );
 }
 
-function ServiceExecutionStatus({ state }: { state: ServiceExecutionState | undefined }) {
+function ResourceExecutionStatus({
+  state,
+  verification,
+}: {
+  state: ResourceExecutionState | undefined;
+  verification?: VerificationDisposition;
+}) {
+  if (
+    state === ResourceExecutionState.SUCCEEDED &&
+    verification === VerificationDisposition.NOT_APPLICABLE
+  ) {
+    return <StatusBadge status="neutral">Released, not applicable</StatusBadge>;
+  }
   return (
     <StatusBadge
       status={
-        state === ServiceExecutionState.FAILED || state === ServiceExecutionState.OUTCOME_UNKNOWN
+        state === ResourceExecutionState.FAILED || state === ResourceExecutionState.OUTCOME_UNKNOWN
           ? "destructive"
-          : state === ServiceExecutionState.SUCCEEDED
+          : state === ResourceExecutionState.SUCCEEDED
             ? "success"
-            : state === ServiceExecutionState.RUNNING
+            : state === ResourceExecutionState.RUNNING || state === ResourceExecutionState.PREPARING
               ? "info"
               : "neutral"
       }
     >
       {state === undefined
         ? "Awaiting signed device history"
-        : enumLabel(ServiceExecutionState[state])}
+        : enumLabel(ResourceExecutionState[state])}
     </StatusBadge>
   );
 }
@@ -398,14 +424,39 @@ function ServiceExecutionStatus({ state }: { state: ServiceExecutionState | unde
 function ActionHistory({ action }: { action: ServiceActionSummary | undefined }) {
   if (!action) return <p>No action issued.</p>;
   const status = action.status;
+  const checks =
+    status?.verification?.checks.case === "systemdService"
+      ? status.verification.checks.value
+      : undefined;
   return (
     <div className="grid gap-1 whitespace-normal text-xs">
       <p>
         Sequence {action.resourceSequence.toString()} ·{" "}
-        <ServiceExecutionStatus state={status?.state} />
+        <ResourceExecutionStatus
+          state={status?.state}
+          verification={status?.verification?.disposition}
+        />
       </p>
       <p className="break-all font-mono">{action.actionId}</p>
-      <p>Failure: {status ? enumLabel(ServiceExecutionFailure[status.failure]) : "Not reported"}</p>
+      <p>
+        Failure: {status ? enumLabel(ResourceExecutionFailure[status.failure]) : "Not reported"}
+      </p>
+      {status?.state === ResourceExecutionState.PREPARING ? (
+        <p>Preparing native transaction. No start authority or native verification yet.</p>
+      ) : status?.preparationOutcome ? (
+        <p>Preparation ended without a native effect. No native verification was produced.</p>
+      ) : null}
+      {status?.readOnly ? (
+        <p>
+          Read-only verification:{" "}
+          {enumLabel(
+            VerificationDisposition[
+              status.verification?.disposition ?? VerificationDisposition.UNSPECIFIED
+            ],
+          )}
+          . No native effect was authorized.
+        </p>
+      ) : null}
       <p>Issued (server): {formatTimestamp(action.issuedAt).local}</p>
       <p>Expires (server): {formatTimestamp(action.expiresAt).local}</p>
       <p>Start authorized (server): {formatTimestamp(action.startAuthorizedAt).local}</p>
@@ -413,7 +464,8 @@ function ActionHistory({ action }: { action: ServiceActionSummary | undefined })
       <p>Completed (device clock): {formatTimestamp(status?.completedAt).local}</p>
       {action.closedReason ? (
         <p>
-          Closed (server): {action.closedReason} · {formatTimestamp(action.closedAt).local}
+          {action.closedAt ? "Closed (server)" : "Cancellation requested"}: {action.closedReason}
+          {action.closedAt ? ` · ${formatTimestamp(action.closedAt).local}` : ""}
         </p>
       ) : null}
       {status ? (
@@ -429,15 +481,22 @@ function ActionHistory({ action }: { action: ServiceActionSummary | undefined })
               <Observation label="Before execution" observation={status.before} />
               <Observation
                 label="Verification after execution"
-                observation={status.verification?.observation}
+                observation={status.verification?.after}
               />
               {status.verification ? (
-                <p>
-                  Converged: {String(status.verification.converged)}; runtime matches:{" "}
-                  {String(status.verification.runtimeMatches)}; enablement matches:{" "}
-                  {String(status.verification.enablementMatches)}; definition matches:{" "}
-                  {String(status.verification.definitionMatches)}.
-                </p>
+                <div>
+                  <p>
+                    Verification:{" "}
+                    {enumLabel(VerificationDisposition[status.verification.disposition])}
+                  </p>
+                  {checks ? (
+                    <p>
+                      Runtime matches: {String(checks.runtimeMatches)}; enablement matches:{" "}
+                      {String(checks.enablementMatches)}; definition matches:{" "}
+                      {String(checks.definitionMatches)}.
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <p>No verification reported.</p>
               )}
@@ -454,7 +513,38 @@ function Observation({
   observation,
 }: {
   label: string;
-  observation: ServiceObservation | undefined;
+  observation: ResourceObservation | undefined;
+}) {
+  if (observation?.observed.case === "systemdService") {
+    return <SystemdObservation label={label} observation={observation.observed.value} />;
+  }
+  return (
+    <div>
+      <h4 className="font-semibold">{label}</h4>
+      {observation ? (
+        <>
+          <p>Observed: {formatTimestamp(observation.metadata?.observedAt).local}</p>
+          <p className="break-all">Resource: {observation.ref?.canonicalKey || "Not reported"}</p>
+          <details>
+            <summary className="cursor-pointer">Advanced: view observation JSON</summary>
+            <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">
+              {toJsonString(ResourceObservationSchema, observation, { prettySpaces: 2 })}
+            </pre>
+          </details>
+        </>
+      ) : (
+        <p>Not reported.</p>
+      )}
+    </div>
+  );
+}
+
+function SystemdObservation({
+  label,
+  observation,
+}: {
+  label: string;
+  observation: SystemdServiceObservation | undefined;
 }) {
   return (
     <div>

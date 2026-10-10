@@ -3,6 +3,7 @@ package trust
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -10,21 +11,41 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/resource"
 )
 
-// VerifyServiceIntent authenticates preflight authority, never permission to
+// VerifyResourceIntent authenticates preflight authority, never permission to
 // mutate native state. Root and delegation must be previously authenticated
 // outputs of this verifier; they cannot be selected by an untrusted caller.
 // The executor separately checks device/generation/resource rollback fences.
-func (v *ExecutionVerifier) VerifyServiceIntent(ctx context.Context, root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, envelope []byte, now time.Time) (*agentv1.ServiceExecutionIntent, error) {
-	keys, err := v.serviceKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, now)
+func (v *ExecutionVerifier) VerifyResourceIntent(ctx context.Context, root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, envelope []byte, now time.Time) (*agentv1.ResourceExecutionIntent, error) {
+	if len(envelope) == 0 || len(envelope) > 131072 {
+		return nil, errors.New("invalid resource intent size")
+	}
+	// This untrusted parse selects an exact key scope only. Authority.Verify
+	// independently authenticates and validates the original envelope below.
+	var selection struct {
+		Payload []byte `json:"payload"`
+	}
+	if err := json.Unmarshal(envelope, &selection); err != nil {
+		return nil, errors.New("invalid resource intent envelope")
+	}
+	candidate := new(agentv1.ResourceExecutionIntent)
+	if err := proto.Unmarshal(selection.Payload, candidate); err != nil {
+		return nil, errors.New("invalid resource intent payload")
+	}
+	if err := resource.ValidateDesired(candidate.GetDesired()); err != nil {
+		return nil, err
+	}
+	capability, err := resource.Capability(candidate.GetDesired().GetRef().GetKind())
 	if err != nil {
 		return nil, err
 	}
-	intent := new(agentv1.ServiceExecutionIntent)
-	if len(envelope) > 16384 {
-		return nil, errors.New("service intent exceeds size limit")
+	keys, err := v.capabilityKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, capability, now)
+	if err != nil {
+		return nil, err
 	}
+	intent := new(agentv1.ResourceExecutionIntent)
 	if err := v.authority.Verify(ctx, envelope, intent, 1, keys...); err != nil {
 		return nil, err
 	}
@@ -34,12 +55,16 @@ func (v *ExecutionVerifier) VerifyServiceIntent(ctx context.Context, root *agent
 	return intent, nil
 }
 
-// VerifyServiceStart verifies a separately delegated start signature and exact
+// VerifyResourceStart verifies a separately delegated start signature and exact
 // root-generated challenge. It does not consume the challenge or check its local
 // CLOCK_BOOTTIME deadline: the executor must do both durably at the effect gate.
 // Intent and challenge must come from the protected, authenticated action record.
-func (v *ExecutionVerifier) VerifyServiceStart(ctx context.Context, root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, envelope []byte, intent *agentv1.ServiceExecutionIntent, challenge *agentv1.ServiceExecutionChallenge, now time.Time) (*agentv1.ServiceExecutionStartGrant, error) {
-	keys, err := v.serviceKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, now)
+func (v *ExecutionVerifier) VerifyResourceStart(ctx context.Context, root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, envelope []byte, intent *agentv1.ResourceExecutionIntent, challenge *agentv1.ResourceExecutionChallenge, now time.Time) (*agentv1.ResourceExecutionStartGrant, error) {
+	capability, err := resource.Capability(intent.GetDesired().GetRef().GetKind())
+	if err != nil {
+		return nil, err
+	}
+	keys, err := v.capabilityKeys(root, delegation, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, capability, now)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +77,7 @@ func (v *ExecutionVerifier) VerifyServiceStart(ctx context.Context, root *agentv
 	if err := v.authority.validateExecutionMessage(challenge); err != nil {
 		return nil, err
 	}
-	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() {
+	if !proto.Equal(challenge.GetRef(), intent.GetDesired().GetRef()) || challenge.GetOperation() != intent.GetOperation() || challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() {
 		return nil, errors.New("service challenge target binding rejected")
 	}
 	if !validServiceInterval(now, challenge.GetIssuedAt().AsTime(), challenge.GetExpiresAt().AsTime(), intent.GetNotBefore().AsTime(), intent.GetExpiresAt().AsTime()) {
@@ -61,7 +86,7 @@ func (v *ExecutionVerifier) VerifyServiceStart(ctx context.Context, root *agentv
 	if len(envelope) > 16384 {
 		return nil, errors.New("service start grant exceeds size limit")
 	}
-	grant := new(agentv1.ServiceExecutionStartGrant)
+	grant := new(agentv1.ResourceExecutionStartGrant)
 	if err := v.authority.Verify(ctx, envelope, grant, 1, keys...); err != nil {
 		return nil, err
 	}
@@ -74,7 +99,10 @@ func (v *ExecutionVerifier) VerifyServiceStart(ctx context.Context, root *agentv
 	return grant, nil
 }
 
-func (v *ExecutionVerifier) serviceIntentBinding(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, intent *agentv1.ServiceExecutionIntent, now time.Time) error {
+func (v *ExecutionVerifier) serviceIntentBinding(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, intent *agentv1.ResourceExecutionIntent, now time.Time) error {
+	if err := resource.ValidateDesired(intent.GetDesired()); err != nil {
+		return err
+	}
 	if intent.GetDeploymentId() != v.deploymentID || intent.GetRootVersion() != root.GetVersion() || intent.GetDelegationVersion() != delegation.GetVersion() || intent.GetRecoveryEpoch() < delegation.GetMinimumRecoveryEpoch() {
 		return errors.New("service intent authority binding rejected")
 	}
@@ -82,10 +110,6 @@ func (v *ExecutionVerifier) serviceIntentBinding(root *agentv1.ExecutionRoot, de
 		return errors.New("service intent validity rejected")
 	}
 	return nil
-}
-
-func (v *ExecutionVerifier) serviceKeys(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, role agentv1.ExecutionSignerRole, now time.Time) ([]ed25519.PublicKey, error) {
-	return v.capabilityKeys(root, delegation, role, "systemd.service.v1", now)
 }
 
 func (v *ExecutionVerifier) capabilityKeys(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, role agentv1.ExecutionSignerRole, capability string, now time.Time) ([]ed25519.PublicKey, error) {

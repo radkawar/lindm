@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
 )
 
@@ -75,6 +76,20 @@ func (s *Service) activateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	}
 	if err := insertResourceRows(ctx, q, id, resources); err != nil {
 		return err
+	}
+	// Enrollment approval is not approval of this exact native adoption. Keep
+	// enrollment usable, but require an independently approved admin assignment.
+	for _, item := range resources {
+		if item.GetOwnership().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
+			continue
+		}
+		resourceID, err := uuid.Parse(item.GetResourceId())
+		if err != nil {
+			return errInternalState
+		}
+		if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: id, ResourceID: resourceID, Disposition: int16(adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED), Reason: "adoption_approval_required"}); err != nil {
+			return err
+		}
 	}
 	if err := q.SetServiceAssignmentHead(ctx, devicedb.SetServiceAssignmentHeadParams{GenerationID: receipt.GenerationID, AssignmentID: id}); err != nil {
 		return err

@@ -45,6 +45,8 @@ type Document struct {
 	NetworkUser      string
 	NetworkUID       uint32
 	NetworkGID       uint32
+	// Resolved local authority namespaces excluded from generic file profiles.
+	ProtectedPaths []string
 }
 
 // Load decodes configuration, requires a root-owned file with non-replaceable
@@ -84,6 +86,12 @@ func load(path string, rootOwner bool) (*Document, error) {
 	if err := resolveRecoveryBoot(base, cfg.GetRecoveryBoot()); err != nil {
 		return nil, err
 	}
+	if err := resolvePackageProvider(base, cfg.GetPackageProvider(), rootOwner); err != nil {
+		return nil, err
+	}
+	if err := resolveConnectivityProbe(base, cfg.GetConnectivityProbe()); err != nil {
+		return nil, err
+	}
 	stateDir, err := canonicalDirectory(resolve(base, cfg.GetStateDirectory()))
 	if err != nil {
 		return nil, fmt.Errorf("state directory: %w", err)
@@ -99,6 +107,10 @@ func load(path string, rootOwner bool) (*Document, error) {
 	if err := distinctDirectories(stateDir, runtimeDir, spoolDir); err != nil {
 		return nil, err
 	}
+	protectedPaths, err := resourceProtectedPaths(base, cfg, stateDir, runtimeDir, spoolDir)
+	if err != nil {
+		return nil, err
+	}
 	socket, err := socketPath(runtimeDir, cfg.GetSocketName())
 	if err != nil {
 		return nil, err
@@ -110,6 +122,7 @@ func load(path string, rootOwner bool) (*Document, error) {
 	return &Document{
 		Proto:            cfg,
 		StateDirectory:   stateDir,
+		ProtectedPaths:   protectedPaths,
 		RuntimeDirectory: runtimeDir,
 		SpoolDirectory:   spoolDir,
 		SocketName:       cfg.GetSocketName(),

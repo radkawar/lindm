@@ -1,0 +1,293 @@
+//go:build linux
+
+package connectivityguard
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
+	"net/http"
+	"sync"
+	"time"
+
+	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/proto"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/pki"
+	"lindm/internal/protodata"
+	"lindm/internal/trust"
+)
+
+const ProbePath = "/lindm.device.v1.ConnectivityProbe/Exchange"
+
+type probeJob struct {
+	command               *agentv1.ConnectivityProbeCommand
+	receiver              *packetReceiver
+	receipt, readyReceipt []byte
+	expires               time.Time
+}
+
+// ProbeServer is a separately installed external packet witness. Every destination
+// and source is preapproved at startup; mTLS device identity authorizes access.
+// At most 32 native sockets exist, all expire after ten seconds even if the
+// controller/client disappears. Polling never waits for packet arrival.
+type ProbeServer struct {
+	mu                 sync.Mutex
+	origin, deployment string
+	targets            map[string]*agentv1.ConnectivityProbeTarget
+	key                ed25519.PrivateKey
+	authority          *trust.Authority
+	rules              protovalidate.Validator
+	jobs               map[string]*probeJob
+	cancel             context.CancelFunc
+	done               chan struct{}
+	closeErr           error
+	closed             bool
+	slots              chan struct{}
+}
+
+func NewProbeServer(ctx context.Context, origin, deployment string, targets []*agentv1.ConnectivityProbeTarget, key ed25519.PrivateKey) (*ProbeServer, error) {
+	if _, err := controllerAddress(origin); err != nil {
+		return nil, err
+	}
+	if len(key) != ed25519.PrivateKeySize || deployment == "" || len(targets) == 0 || len(targets) > 32 {
+		return nil, ErrConflict
+	}
+	authority, err := trust.New()
+	if err != nil {
+		return nil, err
+	}
+	rules, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ConnectivityProbeCommand{}, &agentv1.ConnectivityProbeTarget{}))
+	if err != nil {
+		return nil, err
+	}
+	server := &ProbeServer{origin: origin, deployment: deployment, targets: make(map[string]*agentv1.ConnectivityProbeTarget, len(targets)), key: bytes.Clone(key), authority: authority, rules: rules, jobs: make(map[string]*probeJob), done: make(chan struct{}), slots: make(chan struct{}, 32)}
+	for _, target := range targets {
+		if err := rules.Validate(target); err != nil {
+			return nil, err
+		}
+		if err := protodata.ValidateClosed(target.ProtoReflect()); err != nil {
+			return nil, err
+		}
+		if _, _, err := packetAddresses(target); err != nil {
+			return nil, err
+		}
+		if _, exists := server.targets[target.GetId()]; exists {
+			return nil, ErrConflict
+		}
+		peer := target.GetSender()
+		if target.GetReceiver().GetOrigin() == origin {
+			peer = target.GetReceiver()
+		}
+		if public, ok := key.Public().(ed25519.PublicKey); !ok || peer.GetOrigin() != origin || !bytes.Equal(peer.GetPublicKey(), public) {
+			return nil, ErrConflict
+		}
+		server.targets[target.GetId()] = proto.CloneOf(target)
+	}
+	ctx, server.cancel = context.WithCancel(ctx)
+	go server.cleanup(ctx)
+	return server, nil
+}
+func (s *ProbeServer) cleanup(ctx context.Context) {
+	defer close(s.done)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			s.mu.Lock()
+			s.closed = true
+			for id, job := range s.jobs {
+				if job.receiver != nil {
+					s.closeErr = errors.Join(s.closeErr, job.receiver.close())
+				}
+				delete(s.jobs, id)
+			}
+			clear(s.key)
+			s.mu.Unlock()
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			for id, job := range s.jobs {
+				if !time.Now().Before(job.expires) {
+					if job.receiver != nil {
+						s.closeErr = errors.Join(s.closeErr, job.receiver.close())
+					}
+					delete(s.jobs, id)
+				}
+			}
+			s.mu.Unlock()
+		}
+	}
+}
+func (s *ProbeServer) Close() error { s.cancel(); <-s.done; return s.closeErr }
+func (s *ProbeServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	reject := func(code int) { http.Error(w, "packet_witness_rejected", code) }
+	select {
+	case s.slots <- struct{}{}:
+		defer func() { <-s.slots }()
+	default:
+		reject(http.StatusTooManyRequests)
+		return
+	}
+	if r.Method != http.MethodPost || r.URL.Path != ProbePath || r.URL.RawQuery != "" || r.Header.Get("Content-Type") != "application/protobuf" {
+		reject(http.StatusBadRequest)
+		return
+	}
+	if r.TLS == nil || !r.TLS.HandshakeComplete || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.VerifiedChains[0]) == 0 {
+		reject(http.StatusUnauthorized)
+		return
+	}
+	leaf := r.TLS.VerifiedChains[0][0]
+	if len(leaf.URIs) != 1 {
+		reject(http.StatusUnauthorized)
+		return
+	}
+	deployment, device, generation, err := pki.ParseDeviceIdentity(leaf.URIs[0].String())
+	if err != nil || deployment.String() != s.deployment || pki.CheckDeviceCertificate(leaf, deployment, device, generation) != nil {
+		reject(http.StatusUnauthorized)
+		return
+	}
+	controller := http.NewResponseController(w)
+	if controller.SetReadDeadline(time.Now().Add(3*time.Second)) != nil || controller.SetWriteDeadline(time.Now().Add(5*time.Second)) != nil {
+		reject(http.StatusServiceUnavailable)
+		return
+	}
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16384))
+	if err != nil {
+		reject(http.StatusBadRequest)
+		return
+	}
+	command := new(agentv1.ConnectivityProbeCommand)
+	if proto.Unmarshal(data, command) != nil || protodata.ValidateClosed(command.ProtoReflect()) != nil || s.rules.Validate(command) != nil || !proto.Equal(command.GetTarget(), s.targets[command.GetTarget().GetId()]) || command.GetPacket().GetTargetId() != command.GetTarget().GetId() {
+		reject(http.StatusForbidden)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		reject(http.StatusServiceUnavailable)
+		return
+	}
+	// Device identity is part of slot identity: another enrolled device cannot
+	// observe, retransmit or release someone else's nonce/capture reservation.
+	id := device.String() + "/" + generation.String() + "/" + command.GetPacket().GetActionId() + "/" + hex.EncodeToString(command.GetPacket().GetNonce())
+	job := s.jobs[id]
+	if job != nil && (!proto.Equal(job.command.GetPacket(), command.GetPacket()) || !proto.Equal(job.command.GetTarget(), command.GetTarget())) {
+		reject(http.StatusConflict)
+		return
+	}
+	response := &agentv1.ConnectivityProbeResponse{}
+	switch command.GetOperation() {
+	case agentv1.ConnectivityProbeOperation_CONNECTIVITY_PROBE_OPERATION_PREPARE:
+		if command.GetTarget().GetReceiver().GetOrigin() != s.origin {
+			reject(http.StatusForbidden)
+			return
+		}
+		if job == nil {
+			if len(s.jobs) >= 32 {
+				reject(http.StatusTooManyRequests)
+				return
+			}
+			receiver, err := receivePackets(command.GetTarget(), command.GetPacket().GetNonce())
+			if err != nil {
+				reject(http.StatusUnprocessableEntity)
+				return
+			}
+			job = &probeJob{command: proto.CloneOf(command), receiver: receiver, expires: time.Now().Add(10 * time.Second)}
+			s.jobs[id] = job
+			digest := sha256.Sum256(receiver.expected)
+			job.readyReceipt, err = s.authority.Sign(ctx, &agentv1.ConnectivityProbeReceipt{Packet: command.GetPacket(), Target: command.GetTarget(), ReceiverReady: true, TransportSha256: digest[:]}, s.key)
+			if err != nil {
+				reject(http.StatusInternalServerError)
+				return
+			}
+		}
+		if len(job.readyReceipt) == 0 {
+			reject(http.StatusConflict)
+			return
+		}
+		response.Ready = true
+		response.ReceiptEnvelope = job.readyReceipt
+	case agentv1.ConnectivityProbeOperation_CONNECTIVITY_PROBE_OPERATION_TRANSMIT:
+		if command.GetTarget().GetSender().GetOrigin() != s.origin {
+			reject(http.StatusForbidden)
+			return
+		}
+		if job == nil {
+			if len(s.jobs) >= 32 {
+				reject(http.StatusTooManyRequests)
+				return
+			}
+			job = &probeJob{command: proto.CloneOf(command), expires: time.Now().Add(10 * time.Second)}
+			s.jobs[id] = job
+			digest, err := transmitPacket(ctx, command.GetTarget(), command.GetPacket().GetNonce())
+			if err != nil {
+				reject(http.StatusUnprocessableEntity)
+				return
+			}
+			receipt := &agentv1.ConnectivityProbeReceipt{Packet: command.GetPacket(), Target: command.GetTarget(), Transmitted: true, TransportSha256: digest}
+			job.receipt, err = s.authority.Sign(ctx, receipt, s.key)
+			if err != nil {
+				reject(http.StatusInternalServerError)
+				return
+			}
+		}
+		if len(job.receipt) == 0 {
+			reject(http.StatusConflict)
+			return
+		}
+		response.Ready = true
+		response.ReceiptEnvelope = job.receipt
+	case agentv1.ConnectivityProbeOperation_CONNECTIVITY_PROBE_OPERATION_OBSERVE:
+		if command.GetTarget().GetReceiver().GetOrigin() != s.origin || job == nil || job.receiver == nil {
+			reject(http.StatusConflict)
+			return
+		}
+		if len(job.receipt) == 0 {
+			digest, err := job.receiver.observe()
+			if err != nil {
+				reject(http.StatusUnprocessableEntity)
+				return
+			}
+			if len(digest) != 0 {
+				job.receipt, err = s.authority.Sign(ctx, &agentv1.ConnectivityProbeReceipt{Packet: command.GetPacket(), Target: command.GetTarget(), Received: true, TransportSha256: digest}, s.key)
+				if err != nil {
+					reject(http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+		response.Ready = true
+		response.ReceiptEnvelope = job.receipt
+	case agentv1.ConnectivityProbeOperation_CONNECTIVITY_PROBE_OPERATION_RELEASE:
+		if job != nil {
+			delete(s.jobs, id)
+			if job.receiver != nil {
+				if err := job.receiver.close(); err != nil {
+					reject(http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+		response.Ready = true
+	default:
+		reject(http.StatusBadRequest)
+		return
+	}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(response)
+	if err != nil {
+		reject(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/protobuf")
+	_, _ = w.Write(encoded)
+}

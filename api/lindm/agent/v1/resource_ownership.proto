@@ -1,0 +1,334 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/native_firewall.proto";
+import "lindm/agent/v1/private_custody.proto";
+import "lindm/agent/v1/service_execution.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/observations.proto";
+import "lindm/resource/v1/plans.proto";
+import "lindm/resource/v1/resource.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Private root-owned evidence. This message is never transport inventory.
+// Native identities (inodes, invocation IDs, package provenance) remain typed
+// inside the observation arm. Artifacts must be durable before referencing them.
+message ResourceOwnershipSnapshot {
+  lindm.resource.v1.ResourceObservation observation = 1 [(buf.validate.field).required = true];
+  optional bytes managed_file_content = 2 [(buf.validate.field).bytes.max_len = 32768];
+  repeated lindm.resource.v1.ArtifactRef artifacts = 3 [(buf.validate.field).repeated.max_items = 128];
+  repeated NativeFileXattr managed_file_xattrs = 4 [(buf.validate.field).repeated.max_items = 64];
+  ResourceAccountPrivate account_private = 5;
+  // Exact planned membership edge changes, captured before the effect.
+  repeated lindm.resource.v1.MemberEdgeChange account_member_edges = 6 [(buf.validate.field).repeated.max_items = 1024];
+  SysctlPersistenceSnapshot sysctl_persistence = 7;
+  DefinitionFileSnapshot definition_file = 8;
+  PasswordPolicyOwnership password_policy = 9;
+  FirewallNativeSnapshot firewall = 10;
+  lindm.resource.v1.ProbeReceipt account_nss_receipt = 11;
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.content"
+    message: "private content is only valid for a managed file observation"
+    expression: "!has(this.managed_file_content) || has(this.observation.managed_file)"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.private_kind"
+    message: "private state must match its native resource kind"
+    expression: "(this.managed_file_xattrs.size() == 0 || has(this.observation.managed_file)) && (!has(this.account_private) || has(this.observation.local_user) || has(this.observation.local_group)) && (this.account_member_edges.size() == 0 || has(this.observation.local_user) || has(this.observation.local_group))"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.account_planning"
+    message: "native account planning evidence must match its account kind"
+    expression: "(!has(this.account_nss_receipt) || has(this.observation.local_user) || has(this.observation.local_group)) && (!has(this.account_private) || !has(this.account_private.desired_home) || has(this.observation.local_user))"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.sysctl"
+    message: "sysctl private file evidence belongs only to a sysctl observation"
+    expression: "!has(this.sysctl_persistence) || has(this.observation.sysctl)"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.definition"
+    message: "definition private evidence belongs only to a systemd definition"
+    expression: "has(this.definition_file) == has(this.observation.systemd_definition)"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.password"
+    message: "password private evidence belongs only to password policy"
+    expression: "has(this.password_policy) == has(this.observation.password_policy)"
+  };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.firewall"
+    message: "firewall private evidence belongs only to firewall zones"
+    expression: "has(this.firewall) == has(this.observation.firewall_zone)"
+  };
+}
+message FirewallNativeSnapshot {
+  string table = 1 [(buf.validate.field).string = {pattern: "^lindm_z_[a-f0-9]{32}$"}];
+  bytes userdata = 2 [(buf.validate.field).bytes.max_len = 256];
+  repeated FirewallNativeChain chains = 3 [(buf.validate.field).repeated.max_items = 2048];
+  repeated FirewallNativeRule rules = 4 [(buf.validate.field).repeated.max_items = 4096];
+  uint32 ruleset_generation = 5;
+  FirewallPersistentState persistent = 6;
+  lindm.resource.v1.ManagedFileObservation persistence_file = 7 [(buf.validate.field).required = true];
+  optional bytes persistence_content = 8 [(buf.validate.field).bytes.max_len = 32768];
+  bytes network_namespace_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  bool conflict = 10;
+  repeated NativeFileXattr persistence_xattrs = 11 [(buf.validate.field).repeated.max_items = 64];
+  // Read-only final-path SELinux creation prediction by the fixed native helper.
+  repeated NativeFileXattr creation_xattrs = 12 [(buf.validate.field).repeated.max_items = 64];
+  option (buf.validate.message).cel = {
+    id: "firewall_snapshot.persistence"
+    message: "persistence file presence requires exact private bytes"
+    expression: "this.persistence_file.exists == has(this.persistence_content)"
+  };
+}
+
+// File custody remains typed and nonrecursive; the runtime baseline is the
+// kernel-normalized value in the enclosing sysctl observation.
+message SysctlPersistenceSnapshot {
+  lindm.resource.v1.ManagedFileObservation state = 1 [(buf.validate.field).required = true];
+  optional bytes content = 2 [(buf.validate.field).bytes.max_len = 32768];
+  repeated NativeFileXattr xattrs = 3 [(buf.validate.field).repeated.max_items = 64];
+  option (buf.validate.message).cel = {
+    id: "sysctl_persistence.content"
+    message: "existing stanza files require complete private baseline content"
+    expression: "this.state.exists == has(this.content)"
+  };
+}
+
+message DefinitionFileSnapshot {
+  lindm.resource.v1.ManagedFileObservation state = 1 [(buf.validate.field).required = true];
+  optional bytes content = 2 [(buf.validate.field).bytes.max_len = 32768];
+  repeated NativeFileXattr xattrs = 3 [(buf.validate.field).repeated.max_items = 64];
+  // True only when the exact service .d parent was absent at observation.
+  bool parent_missing = 4;
+  // Descriptor-checked parent inode birth time, ancestry and security metadata.
+  // For an absent .d directory this binds its existing grandparent instead.
+  bytes parent_identity_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bytes native_revision_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "definition_file.content"
+    message: "existing definitions require complete private baseline content"
+    expression: "this.state.exists == has(this.content) && (!this.parent_missing || !this.state.exists)"
+  };
+}
+
+enum PasswordNativeFile {
+  PASSWORD_NATIVE_FILE_UNSPECIFIED = 0;
+  PASSWORD_NATIVE_FILE_QUALITY = 1;
+  PASSWORD_NATIVE_FILE_HISTORY = 2;
+  PASSWORD_NATIVE_FILE_FAILLOCK = 3;
+  PASSWORD_NATIVE_FILE_LOGIN_DEFAULTS = 4;
+  PASSWORD_NATIVE_FILE_QUALITY_PROFILE = 5;
+  PASSWORD_NATIVE_FILE_HISTORY_PROFILE = 6;
+  PASSWORD_NATIVE_FILE_FAILLOCK_PROFILE = 7;
+  PASSWORD_NATIVE_FILE_FAILLOCK_PRE_PROFILE = 8;
+}
+enum PasswordNativeFeature {
+  PASSWORD_NATIVE_FEATURE_UNSPECIFIED = 0;
+  PASSWORD_NATIVE_FEATURE_QUALITY = 1;
+  PASSWORD_NATIVE_FEATURE_HISTORY = 2;
+  PASSWORD_NATIVE_FEATURE_FAILLOCK = 3;
+}
+message PasswordNativeFileSnapshot {
+  PasswordNativeFile kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  lindm.resource.v1.ManagedFileObservation state = 2 [(buf.validate.field).required = true];
+  optional bytes content = 3 [(buf.validate.field).bytes.max_len = 32768];
+  repeated NativeFileXattr xattrs = 4 [(buf.validate.field).repeated.max_items = 64];
+  bytes native_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "password_file.content"
+    message: "existing password configuration requires private native bytes"
+    expression: "this.state.exists == has(this.content)"
+  };
+}
+// Root-only baseline and last-applied evidence, never a profile payload.
+message PasswordPolicyOwnership {
+  repeated PasswordNativeFileSnapshot files = 1 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 8
+  }];
+  string manager_profile = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bytes manager_generation_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  repeated PasswordNativeFeature enabled_features = 4 [(buf.validate.field).repeated = {
+    max_items: 3
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes manager_profile_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // Only features activated by this ledger, never all newly observed features.
+  repeated PasswordNativeFeature acquired_features = 6 [(buf.validate.field).repeated = {
+    max_items: 3
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  // Lower-precedence quality sources are not rewritten, but their generation
+  // fences acquisition of newly owned dimensions after module activation.
+  bytes quality_dropins_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "password_ownership.unique_files"
+    message: "password native files have unique closed identities"
+    expression: "this.files.all(f, this.files.filter(g, g.kind == f.kind).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "password_ownership.acquired_features"
+    message: "acquired manager features must be observed enabled"
+    expression: "this.acquired_features.all(f, f in this.enabled_features)"
+  };
+}
+
+message NativeFileXattr {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+  }];
+  bytes value = 2 [(buf.validate.field).bytes.max_len = 32768];
+}
+
+// Never exposed as account inventory or placed in process arguments.
+message ResourceAccountPrivate {
+  // Process-local only. Durable encoders MUST clear this and seal field 5.
+  optional string password_token = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^[^:\\x00\\r\\n]*$"
+  }];
+  string native_generation = 2 [(buf.validate.field).string.uuid = true];
+  bytes identity_anchor_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  lindm.resource.v1.HomeMetadata desired_home = 4;
+  PrivateCustodyEnvelope encrypted_password_token = 5;
+}
+
+message ResourceOwnedMemberEdge {
+  string user = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  string group = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  bool baseline_present = 3;
+  bool last_applied_present = 4;
+}
+
+enum ResourceOwnedDimension {
+  RESOURCE_OWNED_DIMENSION_UNSPECIFIED = 0;
+  RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME = 1;
+  RESOURCE_OWNED_DIMENSION_SYSTEMD_ENABLEMENT = 2;
+  RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PRESENCE = 3;
+  RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_VERSION = 4;
+  RESOURCE_OWNED_DIMENSION_NATIVE_PACKAGE_PIN = 5;
+  RESOURCE_OWNED_DIMENSION_OBJECT = 6;
+  RESOURCE_OWNED_DIMENSION_MANAGED_FILE_PRESENCE = 7;
+  RESOURCE_OWNED_DIMENSION_MANAGED_FILE_CONTENT = 8;
+  RESOURCE_OWNED_DIMENSION_MANAGED_FILE_MODE = 9;
+  RESOURCE_OWNED_DIMENSION_MANAGED_FILE_UID = 10;
+  RESOURCE_OWNED_DIMENSION_MANAGED_FILE_GID = 11;
+  RESOURCE_OWNED_DIMENSION_GROUP_GID = 12;
+  RESOURCE_OWNED_DIMENSION_GROUP_MEMBERS = 13;
+  RESOURCE_OWNED_DIMENSION_USER_UID = 14;
+  RESOURCE_OWNED_DIMENSION_USER_PRIMARY_GROUP = 15;
+  RESOURCE_OWNED_DIMENSION_USER_GROUPS = 16;
+  RESOURCE_OWNED_DIMENSION_USER_HOME = 17;
+  RESOURCE_OWNED_DIMENSION_USER_SHELL = 18;
+  RESOURCE_OWNED_DIMENSION_USER_PASSWORD_LOCK = 19;
+  RESOURCE_OWNED_DIMENSION_USER_AGING_MIN = 20;
+  RESOURCE_OWNED_DIMENSION_USER_AGING_MAX = 21;
+  RESOURCE_OWNED_DIMENSION_USER_AGING_WARN = 22;
+  RESOURCE_OWNED_DIMENSION_USER_AGING_INACTIVE = 23;
+  RESOURCE_OWNED_DIMENSION_USER_AGING_EXPIRY = 24;
+  RESOURCE_OWNED_DIMENSION_USER_ACCOUNT_LOCK = 25;
+  RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE = 26;
+  RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE = 27;
+  RESOURCE_OWNED_DIMENSION_DEFINITION_FILE = 30;
+  RESOURCE_OWNED_DIMENSION_DEFINITION_ENABLEMENT = 31;
+  RESOURCE_OWNED_DIMENSION_DEFINITION_RUNTIME = 32;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_LENGTH = 40;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_CLASSES = 41;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_HISTORY = 42;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_MAX_AGE = 43;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_MIN_AGE = 44;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_WARN = 45;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_FAILURE_LIMIT = 46;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_UNLOCK_AFTER = 47;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_ENFORCE_ROOT = 48;
+  RESOURCE_OWNED_DIMENSION_PASSWORD_MANAGER = 49;
+  RESOURCE_OWNED_DIMENSION_FIREWALL_RULESET = 50;
+  RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE = 51;
+}
+
+enum ResourceOwnershipState {
+  RESOURCE_OWNERSHIP_STATE_UNSPECIFIED = 0;
+  RESOURCE_OWNERSHIP_STATE_CLAIMED = 1;
+  RESOURCE_OWNERSHIP_STATE_APPLIED = 2;
+  // Written before beforeEffect. A crash or failed completion remains unknown;
+  // neither restart nor a repeated action may replay this native effect.
+  RESOURCE_OWNERSHIP_STATE_UNKNOWN = 3;
+  RESOURCE_OWNERSHIP_STATE_RELEASED = 4;
+}
+
+message ResourceOwnershipLedger {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string installation_id = 2 [(buf.validate.field).string.uuid = true];
+  string deployment_id = 3 [(buf.validate.field).string.uuid = true];
+  string device_id = 4 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 5 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.ResourceRef ref = 6 [(buf.validate.field).required = true];
+  ResourceOwnershipBinding owner = 7 [(buf.validate.field).required = true];
+  uint64 revision = 8 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  ResourceOwnershipState state = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ResourceOwnershipSnapshot baseline = 10 [(buf.validate.field).required = true];
+  ResourceOwnershipSnapshot last_applied = 11;
+  ResourceOwnershipSnapshot before_effect = 12;
+  optional string effect_action_id = 13 [(buf.validate.field).string.uuid = true];
+  repeated ResourceOwnedDimension owned_dimensions = 14 [(buf.validate.field).repeated = {
+    max_items: 30
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  // Exact signed intent bytes establish where the owner binding came from.
+  bytes owner_intent_envelope = 15 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 131072
+  }];
+  string claim_action_id = 16 [(buf.validate.field).string.uuid = true];
+  repeated ResourceOwnedMemberEdge owned_member_edges = 17 [(buf.validate.field).repeated.max_items = 1024];
+  option (buf.validate.message).cel = {
+    id: "ownership_ledger.effect"
+    message: "effect evidence and action binding must be present together"
+    expression: "has(this.before_effect) == has(this.effect_action_id) && (this.state != 3 || has(this.before_effect)) && (this.state != 2 || has(this.last_applied))"
+  };
+}

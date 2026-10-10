@@ -33,6 +33,7 @@ type VMDeviceActionsOptions struct {
 
 type VMDeviceActionsResult struct {
 	Scenario                string                         `json:"scenario"`
+	Compliance              *VMResourceKindEvidence        `json:"encryption_compliance,omitempty"`
 	HostStart               *HostResourceEvidence          `json:"host_start,omitempty"`
 	HostFailure             *HostResourceEvidence          `json:"host_failure,omitempty"`
 	HostObservationError    string                         `json:"host_observation_error,omitempty"`
@@ -220,8 +221,8 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.Scenario == "" {
 		options.Scenario = "all"
 	}
-	if options.Scenario != "all" && options.Scenario != "encryption" && options.Scenario != "wipe" {
-		return nil, errors.New("device action scenario must be all, encryption or wipe")
+	if options.Scenario != "all" && options.Scenario != "encryption" && options.Scenario != "wipe" && options.Scenario != "compliance" {
+		return nil, errors.New("device action scenario must be all, encryption, wipe or compliance")
 	}
 	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata"}, options.WipePhase)) {
 		return nil, errors.New("wipe phase requires scenario wipe and a supported native phase")
@@ -337,6 +338,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		return result, err
 	}
 	result.Runtime.SeedDisk = false
+	if options.Scenario == "compliance" {
+		return result, nativeComplianceScenario(ctx, machine, control, result)
+	}
 	if options.Scenario == "wipe" {
 		return result, nativeWipeScenarios(ctx, manifest, options, packages, fixture, control, approver, delegation, machine, result)
 	}

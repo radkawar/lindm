@@ -5,6 +5,7 @@ package lindm.config.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
 import "lindm/advisory/v1/feed.proto";
+import "lindm/agent/v1/connectivity_guard.proto";
 import "lindm/auth/v1/authorization.proto";
 import "lindm/validation/v1/string_rules.proto";
 
@@ -87,6 +88,14 @@ message ServerConfig {
   ReleaseRepositoryConfig release_repository = 20;
   // Optional native installation repositories advertised by the enrollment console.
   EnrollmentInstructionsConfig enrollment_instructions = 21;
+  // Independent native firewall probe peers, provisioned by the server operator.
+  // The enrolled device endpoint only confirms these exact external targets.
+  repeated lindm.agent.v1.ConnectivityProbeTarget connectivity_probes = 22 [(buf.validate.field).repeated.max_items = 32];
+  option (buf.validate.message).cel = {
+    id: "connectivity_probes.authority"
+    message: "native connectivity confirmation requires configured signing and at least four approved peers"
+    expression: "this.connectivity_probes.size() == 0 || (has(this.execution_signing) && this.connectivity_probes.size() >= 4)"
+  };
 }
 
 // Absent repositories are explicitly not configured, never inferred from a host.

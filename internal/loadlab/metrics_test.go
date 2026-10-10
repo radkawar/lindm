@@ -20,9 +20,9 @@ func TestMeasurementsPreserveErrorsAndBoundLatency(t *testing.T) {
 	if len(m.snapshot(false)) != 0 {
 		t.Fatal("stage reset retained earlier measurements")
 	}
-	m.observe("/device/GetServiceWork", time.Hour, connect.NewError(connect.CodeUnavailable, errors.New("unavailable")))
-	m.observe("/device/GetServiceWork", time.Millisecond, connect.NewError(connect.CodePermissionDenied, errors.New("denied")))
-	result = m.snapshot(false)["GetServiceWork"]
+	m.observe("/device/GetResourceWork", time.Hour, connect.NewError(connect.CodeUnavailable, errors.New("unavailable")))
+	m.observe("/device/GetResourceWork", time.Millisecond, connect.NewError(connect.CodePermissionDenied, errors.New("denied")))
+	result = m.snapshot(false)["GetResourceWork"]
 	if result.Errors != 2 || result.NonRetryableErrors != 1 || result.P99Milliseconds != 30001 || result.MaxMilliseconds != 3600000 {
 		t.Fatalf("unbounded or lost error measurement: %+v", result)
 	}
@@ -62,13 +62,13 @@ func TestFailureReasonsSurviveStageSnapshot(t *testing.T) {
 	m := &measurements{}
 	failure := connect.NewError(connect.CodeFailedPrecondition, errors.New("not persisted"))
 	failure.Meta().Set("Lindm-Reason", "execution_signing_rejected")
-	m.observe("/device/GetServiceWork", time.Millisecond, failure)
+	m.observe("/device/GetResourceWork", time.Millisecond, failure)
 	first := m.snapshot(false)
-	m.observe("/device/GetServiceWork", time.Millisecond, failure)
-	if first["GetServiceWork"].Reasons["execution_signing_rejected"] != 1 {
+	m.observe("/device/GetResourceWork", time.Millisecond, failure)
+	if first["GetResourceWork"].Reasons["execution_signing_rejected"] != 1 {
 		t.Fatal("later traffic mutated retained evidence")
 	}
-	if m.snapshot(true)["GetServiceWork"].Reasons["execution_signing_rejected"] != 2 {
+	if m.snapshot(true)["GetResourceWork"].Reasons["execution_signing_rejected"] != 2 {
 		t.Fatal("diagnostic reason was lost")
 	}
 }

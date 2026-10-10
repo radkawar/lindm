@@ -69,17 +69,19 @@ service ExecutorService {
   rpc GetExecutionTrust(GetExecutionTrustRequest) returns (GetExecutionTrustResponse);
   // Reads native recovery capability and ESP capacity without changing boot state.
   rpc GetRecoveryReadiness(GetRecoveryReadinessRequest) returns (GetRecoveryReadinessResponse);
-  // Verifies signed desired intent and records native preflight/challenge before
-  // replying. No native effect; callers cannot supply a plan or challenge.
-  rpc PrepareServiceExecution(PrepareServiceExecutionRequest) returns (PrepareServiceExecutionResponse);
+  // Verifies and journals intent before native preparation. Package staging is
+  // asynchronous; exact retries poll without extending its signed deadline.
+  rpc PrepareResourceExecution(PrepareResourceExecutionRequest) returns (PrepareResourceExecutionResponse);
   // Accepts a separately signed start grant. Native work runs durably outside
   // the RPC; acceptance is not completion. Exact retries never repeat effects.
-  rpc StartServiceExecution(StartServiceExecutionRequest) returns (StartServiceExecutionResponse);
+  rpc StartResourceExecution(StartResourceExecutionRequest) returns (StartResourceExecutionResponse);
   // Returns durable action state/evidence, not fresh compliance or authority.
-  rpc GetServiceExecution(GetServiceExecutionRequest) returns (GetServiceExecutionResponse);
+  rpc GetResourceExecution(GetResourceExecutionRequest) returns (GetResourceExecutionResponse);
+  // Cancels only exact ungranted preparation, never queued or consumed effects.
+  rpc CancelResourcePreparation(CancelResourcePreparationRequest) returns (CancelResourcePreparationResponse);
   // Signs a nonce-bound snapshot of protected action history using the current
   // device identity/session. Does not observe native state or authorize effects.
-  rpc AttestServiceExecution(AttestServiceExecutionRequest) returns (AttestServiceExecutionResponse);
+  rpc AttestResourceExecution(AttestResourceExecutionRequest) returns (AttestResourceExecutionResponse);
   rpc PrepareDeviceAction(PrepareDeviceActionRequest) returns (PrepareDeviceActionResponse);
   rpc StartDeviceAction(StartDeviceActionRequest) returns (StartDeviceActionResponse);
   rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);

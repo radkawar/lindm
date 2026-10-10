@@ -189,7 +189,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	guestProbe := remote + "/bin/lab"
 	if r.Architecture != nativeArch {
 		switch args[1] {
-		case "lifecycle", "dispatch", "device-actions", "enroll-unattended", "updates":
+		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "updates":
 			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
 			guestProbe = remote + "/bin/lab-guest"
 		}
@@ -197,7 +197,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	switch args[1] {
 	case "inspect", "inspect-storage":
 		executables = append(executables, executable{"lindm-agent", r.Architecture, "./cmd/lindm-agent"})
-	case "dispatch", "device-actions", "enroll-unattended", "lifecycle":
+	case "dispatch", "resources", "device-actions", "enroll-unattended", "lifecycle":
 		executables = append(executables, executable{"lindmd", nativeArch, "./cmd/lindmd"})
 	}
 	for _, item := range executables {
@@ -239,10 +239,10 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if args[1] == "inspect" || args[1] == "inspect-storage" {
 		args = SetFlag(args, "agent", remote+"/bin/lindm-agent")
 	}
-	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" {
+	if FlagValue(args, "lab") != "" || args[1] == "device-actions" || args[1] == "lifecycle" || args[1] == "dispatch" || args[1] == "resources" {
 		args = SetFlag(args, "lab", guestProbe)
 	}
-	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "device-actions" || args[1] == "enroll-unattended" {
+	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" {
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}
 	if args[1] == "enroll-unattended" {
@@ -255,7 +255,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 		args = SetFlag(args, "architecture", architecture)
 	}
-	if args[1] == "dispatch" {
+	if args[1] == "dispatch" || args[1] == "resources" {
 		args = append(args, "-local-authority=true")
 	}
 	if args[1] == "lifecycle" {
@@ -353,7 +353,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 		database := ""
 		switch args[1] {
-		case "dispatch", "device-actions", "updates", "enroll-unattended", "lifecycle":
+		case "dispatch", "resources", "device-actions", "updates", "enroll-unattended", "lifecycle":
 			database = " --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock --group-add \"$(stat -c %g /var/run/docker.sock)\""
 		}
 		script = "exec docker run -i --name " + QuoteShell(container) + " --network host --user \"$(id -u):$(id -g)\"" + devices + database + " --mount " + QuoteShell("type=bind,src="+work+",dst="+work) + " --workdir " + QuoteShell(remote+"/source") + " --env " + QuoteShell("TMPDIR="+remote+"/work") + " " + QuoteShell(r.Host.RunnerImage) + " " + strings.Join(command, " ")

@@ -11,7 +11,8 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
-	v11 "lindm/gen/lindm/advisory/v1"
+	v12 "lindm/gen/lindm/advisory/v1"
+	v11 "lindm/gen/lindm/agent/v1"
 	v1 "lindm/gen/lindm/auth/v1"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
@@ -66,8 +67,11 @@ type ServerConfig struct {
 	ReleaseRepository *ReleaseRepositoryConfig `protobuf:"bytes,20,opt,name=release_repository,json=releaseRepository,proto3" json:"release_repository,omitempty"`
 	// Optional native installation repositories advertised by the enrollment console.
 	EnrollmentInstructions *EnrollmentInstructionsConfig `protobuf:"bytes,21,opt,name=enrollment_instructions,json=enrollmentInstructions,proto3" json:"enrollment_instructions,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Independent native firewall probe peers, provisioned by the server operator.
+	// The enrolled device endpoint only confirms these exact external targets.
+	ConnectivityProbes []*v11.ConnectivityProbeTarget `protobuf:"bytes,22,rep,name=connectivity_probes,json=connectivityProbes,proto3" json:"connectivity_probes,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -243,6 +247,13 @@ func (x *ServerConfig) GetReleaseRepository() *ReleaseRepositoryConfig {
 func (x *ServerConfig) GetEnrollmentInstructions() *EnrollmentInstructionsConfig {
 	if x != nil {
 		return x.EnrollmentInstructions
+	}
+	return nil
+}
+
+func (x *ServerConfig) GetConnectivityProbes() []*v11.ConnectivityProbeTarget {
+	if x != nil {
+		return x.ConnectivityProbes
 	}
 	return nil
 }
@@ -549,7 +560,7 @@ func (x *ReleaseRepositorySigning) GetDirectory() string {
 
 type AdvisoryConfig struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Feeds                  []*v11.FeedSource      `protobuf:"bytes,1,rep,name=feeds,proto3" json:"feeds,omitempty"`
+	Feeds                  []*v12.FeedSource      `protobuf:"bytes,1,rep,name=feeds,proto3" json:"feeds,omitempty"`
 	RefreshEnabled         bool                   `protobuf:"varint,2,opt,name=refresh_enabled,json=refreshEnabled,proto3" json:"refresh_enabled,omitempty"`
 	RefreshIntervalSeconds *uint32                `protobuf:"varint,3,opt,name=refresh_interval_seconds,json=refreshIntervalSeconds,proto3,oneof" json:"refresh_interval_seconds,omitempty"`
 	InventoryMaxAgeSeconds *uint32                `protobuf:"varint,4,opt,name=inventory_max_age_seconds,json=inventoryMaxAgeSeconds,proto3,oneof" json:"inventory_max_age_seconds,omitempty"`
@@ -587,7 +598,7 @@ func (*AdvisoryConfig) Descriptor() ([]byte, []int) {
 	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *AdvisoryConfig) GetFeeds() []*v11.FeedSource {
+func (x *AdvisoryConfig) GetFeeds() []*v12.FeedSource {
 	if x != nil {
 		return x.Feeds
 	}
@@ -1953,7 +1964,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xef\x16\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc3\x19\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -1980,14 +1991,14 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x06escrow\x18\x12 \x01(\v2\x1d.lindm.config.v1.EscrowConfigR\x06escrow\x12>\n" +
 	"\tprofiling\x18\x13 \x01(\v2 .lindm.config.v1.ProfilingConfigR\tprofiling\x12W\n" +
 	"\x12release_repository\x18\x14 \x01(\v2(.lindm.config.v1.ReleaseRepositoryConfigR\x11releaseRepository\x12f\n" +
-	"\x17enrollment_instructions\x18\x15 \x01(\v2-.lindm.config.v1.EnrollmentInstructionsConfigR\x16enrollmentInstructions:\xad\n" +
-	"\xbaH\xa9\n" +
-	"\x1a\xb2\x01\n" +
+	"\x17enrollment_instructions\x18\x15 \x01(\v2-.lindm.config.v1.EnrollmentInstructionsConfigR\x16enrollmentInstructions\x12b\n" +
+	"\x13connectivity_probes\x18\x16 \x03(\v2'.lindm.agent.v1.ConnectivityProbeTargetB\b\xbaH\x05\x92\x01\x02\x10 R\x12connectivityProbes:\x9d\f\xbaH\x99\f\x1a\xb2\x01\n" +
 	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x82\x02\n" +
 	"\x1bprofiling.distinct_listener\x12&profiling must use a separate listener\x1a\xba\x01!has(this.profiling) || ((!has(this.admin_listener) || this.profiling.listener != this.admin_listener) && (!has(this.device_listener) || this.profiling.listener != this.device_listener))\x1a\x8f\x01\n" +
 	"\x1bexecution_signing.bootstrap\x121execution signing requires an execution bootstrap\x1a=!has(this.execution_signing) || has(this.execution_bootstrap)\x1a\xa1\x01\n" +
 	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)\x1a\xb6\x04\n" +
-	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)B\x19\n" +
+	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)\x1a\xed\x01\n" +
+	"\x1dconnectivity_probes.authority\x12]native connectivity confirmation requires configured signing and at least four approved peers\x1amthis.connectivity_probes.size() == 0 || (has(this.execution_signing) && this.connectivity_probes.size() >= 4)B\x19\n" +
 	"\x17_inventory_budget_bytesB\x14\n" +
 	"\x12_device_public_url\"\xcc\x01\n" +
 	"\x1cEnrollmentInstructionsConfig\x12U\n" +
@@ -2183,8 +2194,9 @@ var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*SCIMCorrelation)(nil),               // 25: lindm.config.v1.SCIMCorrelation
 	(*BreakGlassPolicy)(nil),              // 26: lindm.config.v1.BreakGlassPolicy
 	(*v1.AuthorizationPolicy)(nil),        // 27: lindm.auth.v1.AuthorizationPolicy
-	(*v11.FeedSource)(nil),                // 28: lindm.advisory.v1.FeedSource
-	(*durationpb.Duration)(nil),           // 29: google.protobuf.Duration
+	(*v11.ConnectivityProbeTarget)(nil),   // 28: lindm.agent.v1.ConnectivityProbeTarget
+	(*v12.FeedSource)(nil),                // 29: lindm.advisory.v1.FeedSource
+	(*durationpb.Duration)(nil),           // 30: google.protobuf.Duration
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	11, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
@@ -2203,26 +2215,27 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	12, // 13: lindm.config.v1.ServerConfig.profiling:type_name -> lindm.config.v1.ProfilingConfig
 	4,  // 14: lindm.config.v1.ServerConfig.release_repository:type_name -> lindm.config.v1.ReleaseRepositoryConfig
 	1,  // 15: lindm.config.v1.ServerConfig.enrollment_instructions:type_name -> lindm.config.v1.EnrollmentInstructionsConfig
-	2,  // 16: lindm.config.v1.EnrollmentInstructionsConfig.apt_repository:type_name -> lindm.config.v1.EnrollmentAPTRepositoryConfig
-	3,  // 17: lindm.config.v1.EnrollmentInstructionsConfig.dnf_repository:type_name -> lindm.config.v1.EnrollmentDNFRepositoryConfig
-	5,  // 18: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
-	28, // 19: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
-	11, // 20: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	17, // 21: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
-	18, // 22: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
-	19, // 23: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
-	20, // 24: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
-	21, // 25: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
-	23, // 26: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
-	22, // 27: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
-	24, // 28: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
-	25, // 29: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
-	29, // 30: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
-	31, // [31:31] is the sub-list for method output_type
-	31, // [31:31] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	28, // 16: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
+	2,  // 17: lindm.config.v1.EnrollmentInstructionsConfig.apt_repository:type_name -> lindm.config.v1.EnrollmentAPTRepositoryConfig
+	3,  // 18: lindm.config.v1.EnrollmentInstructionsConfig.dnf_repository:type_name -> lindm.config.v1.EnrollmentDNFRepositoryConfig
+	5,  // 19: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
+	29, // 20: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
+	11, // 21: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	17, // 22: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
+	18, // 23: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
+	19, // 24: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
+	20, // 25: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
+	21, // 26: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
+	23, // 27: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
+	22, // 28: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
+	24, // 29: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
+	25, // 30: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
+	30, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }

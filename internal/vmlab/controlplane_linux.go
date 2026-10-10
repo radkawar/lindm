@@ -331,7 +331,11 @@ func (c *vmControlPlane) waitInventory(ctx context.Context, deviceID string, tim
 				return evidence, nil
 			}
 		}
-		last = err
+		// A call cut off by this wait's own deadline says nothing about the
+		// device; keep the last observed mismatch as the failure diagnosis.
+		if last == nil || ctx.Err() == nil {
+			last = err
+		}
 		select {
 		case <-ctx.Done():
 			return nil, errors.Join(errors.New("bounded control-plane inventory wait ended"), ctx.Err(), last)
@@ -395,9 +399,8 @@ func vmCanonicalEvidence(detail *adminv1.GetDeviceResponse) (*vmInventoryEvidenc
 }
 
 func vmCompareHost(truth *vmTruth, host *inventoryv1.HostObservation) error {
-	fields := []*inventoryv1.ObservedString{host.GetOsId(), host.GetOsVersion(), host.GetArchitecture(), host.GetKernelRelease(), host.GetHostname(), host.GetBootId()}
-	for i, field := range fields {
-		if field.GetStatus() != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS || field.GetValue() != truth.host[i] {
+	for i, field := range vmHostFields(host) {
+		if !vmHostFieldMatches(truth, i, field) {
 			return errors.New("published successful host fields or boot ID differ from native truth")
 		}
 	}

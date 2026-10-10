@@ -69,6 +69,11 @@ func TestKindRegistryAndCanonicalIdentity(t *testing.T) {
 		{18, "snap.app.v1", `{"snapApp":{"name":"example-app","instanceKey":"","presence":1,"channel":"stable","confinement":1}}`, "system/example-app/"},
 		{19, "certificate.enrollment.v1", `{"certificateEnrollment":{"credentialId":"` + fixtureID + `","subject":{"device":` + fixtureDevice + `},"issuerProfileId":"` + fixtureID + `","eku":[2],"sans":[{"dns":"device.example.com"}],"key":{"algorithm":1,"software":{}},"renewBeforeSeconds":3600,"consumers":[{"kind":1,"resource":{"kind":9,"canonicalKey":"` + fixtureID + `"}}]}}`, fixtureID + "/device/" + fixtureID + "/" + fixtureGeneration},
 		{20, "directory.client.v1", `{"directoryClient":{"backend":1,"realm":"example.com","approvedServers":["dc.example.com"],"login":{"offline":1},"trust":{"certificates":[{"kind":7,"canonicalKey":"system/` + strings.Repeat("0", 64) + `"}]}}}`, "system"},
+		{21, "managed.file.v1", `{"managedFile":{"path":"/etc/example/banner","presence":1,"content":"","mode":420,"uid":0,"gid":0}}`, "/etc/example/banner"},
+		{22, "sysctl.v1", `{"sysctl":{"key":"net.ipv4.ip_forward","value":"0","persistent":true}}`, "net.ipv4.ip_forward"},
+		{23, "systemd.definition.v1", `{"systemdDefinition":{"presence":1,"timer":{"unit":"example.timer","service":{"kind":1,"canonicalKey":"example.service"},"schedule":{"daily":{"hour":4,"minute":30}},"enabled":true}}}`, "timer/example.timer"},
+		{23, "systemd.definition.v1", `{"systemdDefinition":{"presence":1,"dropIn":{"unit":"example.service","cpuWeight":100}}}`, "drop-in/example.service"},
+		{24, "encryption.compliance.v1", `{"encryptionCompliance":{"requireLuksRoot":true,"requireEscrow":true,"requireTpm":true}}`, "system/root"},
 	}
 	for _, test := range cases {
 		t.Run(test.capability, func(t *testing.T) {
@@ -99,7 +104,7 @@ func TestKindRegistryAndCanonicalIdentity(t *testing.T) {
 			}
 		})
 	}
-	for _, kind := range []resourcev1.ResourceKind{0, -1, 21, 1000} {
+	for _, kind := range []resourcev1.ResourceKind{0, -1, 25, 1000} {
 		if _, err := Capability(kind); err == nil {
 			t.Errorf("accepted unknown kind %d", kind)
 		}

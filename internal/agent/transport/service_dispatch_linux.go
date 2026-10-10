@@ -44,12 +44,12 @@ func (m *managementLoop) dispatchServices(ctx context.Context) error {
 	return nil
 }
 
-func (m *managementLoop) serviceWork(ctx context.Context) (*devicev1.ServiceWork, error) {
+func (m *managementLoop) serviceWork(ctx context.Context) (*devicev1.ResourceWork, error) {
 	authority, err := establish(ctx, m.executor, &m.cache, m.gate)
 	if err != nil {
 		return nil, fmt.Errorf("establish service work session: %w", err)
 	}
-	response, err := rpc(ctx, authority.servers.device.GetServiceWork, &devicev1.GetServiceWorkRequest{SessionEpoch: authority.epoch})
+	response, err := rpc(ctx, authority.servers.device.GetResourceWork, &devicev1.GetResourceWorkRequest{SessionEpoch: authority.epoch})
 	if err != nil {
 		return nil, fmt.Errorf("get service work: %w", err)
 	}
@@ -59,7 +59,10 @@ func (m *managementLoop) serviceWork(ctx context.Context) (*devicev1.ServiceWork
 	return response.GetWork(), nil
 }
 
-func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.ServiceWork) (bool, error) {
+func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.ResourceWork) (bool, error) {
+	if work.GetCancelPreparation() {
+		return m.reportResourceResult(ctx, work)
+	}
 	digest := sha256.Sum256(work.GetIntentEnvelope())
 	status, phaseErr := m.prepareAndStartService(ctx, work, digest)
 	if phaseErr != nil {
@@ -73,18 +76,21 @@ func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.
 		}
 		slog.Warn("service execution phase incomplete; reporting protected history", "action_id", work.GetActionId(), "error", phaseErr)
 	}
-	// A failed start authorization must retry in the next cycle, not spend the
-	// remaining challenge lifetime waiting for a PREPARED action to execute.
-	if phaseErr == nil || status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED {
-		if err := m.pollServiceExecution(ctx, work.GetActionId(), digest, status); err != nil {
+	// Staging is independent native work. Prepare polls it once per management
+	// cycle; never spend a dispatch polling window waiting for downloads.
+	// A failed start authorization also retries in the next cycle, without
+	// spending the remaining challenge lifetime waiting for PREPARED to execute.
+	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING &&
+		(phaseErr == nil || status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED) {
+		if err := m.pollResourceExecution(ctx, work.GetActionId(), digest, status); err != nil {
 			return false, errors.Join(phaseErr, err)
 		}
 	}
-	return m.reportServiceResult(ctx, work)
+	return m.reportResourceResult(ctx, work)
 }
 
-func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devicev1.ServiceWork, digest [sha256.Size]byte) (*agentv1.ServiceExecutionStatus, error) {
-	prepared, err := rpc(ctx, m.executor.PrepareServiceExecution, &agentv1.PrepareServiceExecutionRequest{IntentEnvelope: work.GetIntentEnvelope()})
+func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devicev1.ResourceWork, digest [sha256.Size]byte) (*agentv1.ResourceExecutionStatus, error) {
+	prepared, err := rpc(ctx, m.executor.PrepareResourceExecution, &agentv1.PrepareResourceExecutionRequest{IntentEnvelope: work.GetIntentEnvelope()})
 	if err != nil {
 		return nil, fmt.Errorf("prepare service execution: %w", err)
 	}
@@ -92,7 +98,7 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 	if err := checkServiceStatus(status, work.GetActionId(), digest); err != nil {
 		return nil, err
 	}
-	if status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED {
+	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
 		return status, nil
 	}
 	if len(prepared.GetChallengeProof()) == 0 {
@@ -104,7 +110,7 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 		if err != nil {
 			return nil, fmt.Errorf("establish service start session: %w", err)
 		}
-		response, err := rpc(ctx, authority.servers.device.AuthorizeServiceStart, &devicev1.AuthorizeServiceStartRequest{
+		response, err := rpc(ctx, authority.servers.device.AuthorizeResourceStart, &devicev1.AuthorizeResourceStartRequest{
 			SessionEpoch: authority.epoch, ActionId: work.GetActionId(), ChallengeProof: prepared.GetChallengeProof(),
 		})
 		if err != nil {
@@ -118,7 +124,7 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 	// No cadence delay or new authorization intervenes here. A retained grant
 	// is replayed exactly; the executor alone decides whether it was consumed
 	// already or its short-lived challenge has expired.
-	started, err := rpc(ctx, m.executor.StartServiceExecution, &agentv1.StartServiceExecutionRequest{
+	started, err := rpc(ctx, m.executor.StartResourceExecution, &agentv1.StartResourceExecutionRequest{
 		ActionId: work.GetActionId(), StartGrantEnvelope: grant,
 	})
 	if err != nil {
@@ -130,7 +136,25 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 	return started.GetStatus(), nil
 }
 
-func checkServiceStatus(status *agentv1.ServiceExecutionStatus, actionID string, digest [sha256.Size]byte) error {
+func (m *managementLoop) cancelResourcePreparation(ctx context.Context, work *devicev1.ResourceWork, digest [sha256.Size]byte) (*agentv1.CancelResourcePreparationResponse, error) {
+	response, err := rpc(ctx, m.executor.CancelResourcePreparation, &agentv1.CancelResourcePreparationRequest{
+		ActionId: work.GetActionId(), IntentSha256: digest[:],
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cancel resource preparation: %w", err)
+	}
+	if err := validateManagementMessage(response); err != nil {
+		return nil, fmt.Errorf("invalid preparation cancellation: %w", err)
+	}
+	if response.GetStatus() != nil {
+		if err := checkServiceStatus(response.GetStatus(), work.GetActionId(), digest); err != nil {
+			return nil, err
+		}
+	}
+	return response, nil
+}
+
+func checkServiceStatus(status *agentv1.ResourceExecutionStatus, actionID string, digest [sha256.Size]byte) error {
 	if err := validateManagementMessage(status); err != nil {
 		return fmt.Errorf("invalid protected service status: %w", err)
 	}
@@ -140,8 +164,8 @@ func checkServiceStatus(status *agentv1.ServiceExecutionStatus, actionID string,
 	return nil
 }
 
-func (m *managementLoop) serviceStatus(ctx context.Context, actionID string, digest [sha256.Size]byte) (*agentv1.ServiceExecutionStatus, error) {
-	response, err := rpc(ctx, m.executor.GetServiceExecution, &agentv1.GetServiceExecutionRequest{ActionId: actionID})
+func (m *managementLoop) serviceStatus(ctx context.Context, actionID string, digest [sha256.Size]byte) (*agentv1.ResourceExecutionStatus, error) {
+	response, err := rpc(ctx, m.executor.GetResourceExecution, &agentv1.GetResourceExecutionRequest{ActionId: actionID})
 	if err != nil {
 		return nil, fmt.Errorf("get service execution: %w", err)
 	}
@@ -151,7 +175,7 @@ func (m *managementLoop) serviceStatus(ctx context.Context, actionID string, dig
 	return response.GetStatus(), nil
 }
 
-func (m *managementLoop) pollServiceExecution(parent context.Context, actionID string, digest [sha256.Size]byte, status *agentv1.ServiceExecutionStatus) error {
+func (m *managementLoop) pollResourceExecution(parent context.Context, actionID string, digest [sha256.Size]byte, status *agentv1.ResourceExecutionStatus) error {
 	ctx, cancel := context.WithTimeout(parent, servicePollTimeout)
 	defer cancel()
 	for !serviceExecutionTerminal(status.GetState()) {
@@ -163,7 +187,7 @@ func (m *managementLoop) pollServiceExecution(parent context.Context, actionID s
 			}
 			return err
 		}
-		if serviceExecutionTerminal(status.GetState()) {
+		if serviceExecutionTerminal(status.GetState()) || status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
 			return nil
 		}
 		timer := time.NewTimer(servicePollInterval)
@@ -177,20 +201,20 @@ func (m *managementLoop) pollServiceExecution(parent context.Context, actionID s
 	return nil
 }
 
-func serviceExecutionTerminal(state agentv1.ServiceExecutionState) bool {
+func serviceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
 	switch state {
-	case agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED,
-		agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED,
-		agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN,
-		agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED,
-		agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUPERSEDED:
+	case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED,
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED,
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN,
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED,
+		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED:
 		return true
 	default:
 		return false
 	}
 }
 
-func (m *managementLoop) reportServiceResult(ctx context.Context, work *devicev1.ServiceWork) (bool, error) {
+func (m *managementLoop) reportResourceResult(ctx context.Context, work *devicev1.ResourceWork) (bool, error) {
 	fresh, err := m.serviceWork(ctx)
 	if err != nil {
 		return false, err
@@ -201,25 +225,40 @@ func (m *managementLoop) reportServiceResult(ctx context.Context, work *devicev1
 	if !bytes.Equal(fresh.GetIntentEnvelope(), work.GetIntentEnvelope()) {
 		return false, errors.New("server changed the intent of an existing service action")
 	}
+	neverPrepared := false
+	if fresh.GetCancelPreparation() {
+		// Supersession/expiry may have committed during preparation. Cleanup
+		// consumes no effect authority and must precede its acknowledgment.
+		digest := sha256.Sum256(work.GetIntentEnvelope())
+		cancelled, err := m.cancelResourcePreparation(ctx, fresh, digest)
+		if err != nil {
+			return false, err
+		}
+		neverPrepared = cancelled.GetNeverPrepared()
+	}
 	// Re-establish before attesting so the signed session and report request
 	// use current protected identity, including renewal while native work ran.
 	authority, err := establish(ctx, m.executor, &m.cache, m.gate)
 	if err != nil {
 		return false, fmt.Errorf("establish service result session: %w", err)
 	}
-	attested, err := rpc(ctx, m.executor.AttestServiceExecution, &agentv1.AttestServiceExecutionRequest{
-		ActionId: work.GetActionId(), Nonce: fresh.GetResultNonce(),
-	})
-	if err != nil {
-		return false, fmt.Errorf("attest service execution: %w", err)
+	request := &devicev1.ReportResourceResultRequest{SessionEpoch: authority.epoch, ActionId: work.GetActionId()}
+	if neverPrepared {
+		digest := sha256.Sum256(work.GetIntentEnvelope())
+		request.NeverPrepared = &devicev1.ResourcePreparationCancellation{IntentSha256: digest[:], ResultNonce: fresh.GetResultNonce()}
+	} else {
+		attested, err := rpc(ctx, m.executor.AttestResourceExecution, &agentv1.AttestResourceExecutionRequest{
+			ActionId: work.GetActionId(), Nonce: fresh.GetResultNonce(),
+		})
+		if err != nil {
+			return false, fmt.Errorf("attest service execution: %w", err)
+		}
+		if err := validateManagementMessage(attested); err != nil {
+			return false, fmt.Errorf("invalid protected service attestation: %w", err)
+		}
+		request.AttestationEnvelope, request.CertificatePem = attested.GetAttestationEnvelope(), attested.GetCertificatePem()
 	}
-	if err := validateManagementMessage(attested); err != nil {
-		return false, fmt.Errorf("invalid protected service attestation: %w", err)
-	}
-	reported, err := rpc(ctx, authority.servers.device.ReportServiceResult, &devicev1.ReportServiceResultRequest{
-		SessionEpoch: authority.epoch, ActionId: work.GetActionId(),
-		AttestationEnvelope: attested.GetAttestationEnvelope(), CertificatePem: attested.GetCertificatePem(),
-	})
+	reported, err := rpc(ctx, authority.servers.device.ReportResourceResult, request)
 	if err != nil {
 		return false, fmt.Errorf("report service result: %w", err)
 	}

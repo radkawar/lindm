@@ -1,0 +1,45 @@
+[Unit]
+Description=Lindm bounded firewall rollback supervisor
+DefaultDependencies=no
+After=local-fs.target systemd-tmpfiles-setup.service
+Before=network-pre.target lindm-firewall-restore.service
+Wants=network-pre.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=/usr/libexec/lindm/lindm-agent connectivity-guard
+User=root
+Group=root
+UMask=0077
+StateDirectory=lindm/connectivity-guard
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_KILL CAP_DAC_OVERRIDE CAP_FOWNER
+AmbientCapabilities=CAP_NET_ADMIN CAP_KILL CAP_DAC_OVERRIDE CAP_FOWNER
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lindm/connectivity-guard /var/lib/lindm/firewall
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service @network-io pidfd_open pidfd_send_signal
+LimitCORE=0
+Restart=on-failure
+RestartSec=1s
+TimeoutStartSec=30s
+TimeoutStopSec=35s
+
+[Install]
+WantedBy=network-pre.target

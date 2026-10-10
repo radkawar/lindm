@@ -20,19 +20,20 @@ func TestHeterogeneousResourceAssignmentDispatchAndRelease(t *testing.T) {
 	f := newDispatchFixture(t)
 	service := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	service.DependsOn = nil
+	// SSH server configuration has no qualified native provider.
 	group := dispatchProfileResource(&resourcev1.ResourceDesiredState{
-		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP, CanonicalKey: "operators"},
-		State: &resourcev1.ResourceDesiredState_LocalGroup{LocalGroup: &resourcev1.LocalGroupDesired{Name: "operators", Presence: resourcev1.Presence_PRESENCE_PRESENT}},
+		Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER, CanonicalKey: "system"},
+		State: &resourcev1.ResourceDesiredState_SshServer{SshServer: &resourcev1.SSHServerDesired{PublicKeyAuthentication: proto.Bool(true)}},
 	})
 	publishDispatchResources(t, f, service, group)
 	assignment := f.assign(t, nil)
 	work := f.work(t)
 	intent := f.intent(t, work)
-	if intent.GetDesired().GetUnit() != service.GetDesired().GetSystemdService().GetUnit() {
+	if intent.GetDesired().GetRef().GetCanonicalKey() != service.GetDesired().GetSystemdService().GetUnit() {
 		t.Fatal("heterogeneous assignment dispatched a different native service")
 	}
 	f.start(t, work)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
 		t.Fatal(err)
 	}
 	state := complianceState(t, f)
@@ -67,15 +68,22 @@ func TestHeterogeneousResourceAssignmentDispatchAndRelease(t *testing.T) {
 	refs := map[string]bool{service.GetDesired().GetRef().GetCanonicalKey(): true, group.GetDesired().GetRef().GetCanonicalKey(): true}
 	for _, release := range state.GetReleases() {
 		key := release.GetRef().GetCanonicalKey()
-		if !refs[key] || release.GetState() != "baseline_unknown" || release.GetReason() != "ownership_baseline_unavailable" || release.GetCompletedAt() != nil || release.GetRequestedAt() == nil || release.GetSourceAssignmentId() != assignment.GetAssignmentId() || release.GetSupersedingAssignmentId() != cleared.Msg.GetAssignment().GetAssignmentId() {
+		if !refs[key] || release.GetState() != "pending" || release.GetReason() != "" || release.GetCompletedAt() != nil || release.GetRequestedAt() == nil || release.GetSourceAssignmentId() != assignment.GetAssignmentId() || release.GetSupersedingAssignmentId() != cleared.Msg.GetAssignment().GetAssignmentId() {
 			t.Fatalf("release fabricated native cleanup or lost provenance: %v", release)
 		}
 		delete(refs, key)
 	}
+	releaseWork := f.work(t)
+	if f.intent(t, releaseWork).GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+		t.Fatal("clear did not mint generic release")
+	}
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(resourceRefusalResult(t, f, releaseWork))); err != nil {
+		t.Fatal(err)
+	}
 	assertNoResourceWork(t, f)
 	var count int
-	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM resource_actions WHERE generation_id=$1", f.principal.GenerationID).Scan(&count); err != nil || count != 1 {
-		t.Fatalf("unsupported resource or release minted a native action: count=%d err=%v", count, err)
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM resource_actions WHERE generation_id=$1", f.principal.GenerationID).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("release missing or unsupported resource minted an action: count=%d err=%v", count, err)
 	}
 }
 
@@ -134,8 +142,56 @@ func publishDispatchResources(t *testing.T, f *dispatchFixture, resources ...*po
 
 func assertNoResourceWork(t *testing.T, f *dispatchFixture) {
 	t.Helper()
-	response, err := f.service.GetServiceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1}))
+	response, err := f.service.GetResourceWork(f.deviceCtx, connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1}))
 	if err != nil || response.Msg.GetWork() != nil {
 		t.Fatalf("unexpected resource work: response=%v err=%v", response, err)
 	}
+}
+
+func TestTargetedResourceIntentRetainsEveryOwnershipContributor(t *testing.T) {
+	f := newDispatchFixture(t)
+	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "ownership-preview"))); err != nil {
+		t.Fatal(err)
+	}
+	service := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
+	service.DependsOn = nil
+	sources := make(map[string]*agentv1.ResourceOwnershipSource)
+	for range 2 {
+		item := proto.CloneOf(service)
+		item.ResourceId = uuid.NewString()
+		publishDispatchResources(t, f, item)
+		sources[f.revision.GetRevisionId()] = &agentv1.ResourceOwnershipSource{ProfileId: f.revision.GetProfileId(), ProfileRevision: f.revision.GetRevisionId(), ResourceId: item.GetResourceId()}
+		_, err := f.service.PutTargetAssignment(f.adminCtx, connect.NewRequest(&adminv1.PutTargetAssignmentRequest{
+			RequestId: uuid.NewString(), Reason: "merge exact resource ownership contributors",
+			Assignment: &policyv1.TargetAssignment{AssignmentId: uuid.NewString(), ProfileRevisionId: f.revision.GetRevisionId(), Target: &policyv1.TargetRef{Target: &policyv1.TargetRef_DeviceId{DeviceId: f.principal.DeviceID.String()}}},
+		}))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	preview, err := f.service.PreviewTargetAssignments(f.adminCtx, connect.NewRequest(&adminv1.PreviewTargetAssignmentsRequest{DeviceId: f.principal.DeviceID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.service.ActivateTargetPreview(f.adminCtx, connect.NewRequest(&adminv1.ActivateTargetPreviewRequest{
+		RequestId: uuid.NewString(), DeviceId: f.principal.DeviceID.String(), PreviewId: preview.Msg.GetPreview().GetPreviewId(),
+		PreviewSha256: preview.Msg.GetPreview().GetPreviewSha256(), Reason: "activate merged resource ownership",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := f.work(t)
+	intent := f.intent(t, work)
+	binding := intent.GetOwnership()
+	if binding.GetAssignmentId() != preview.Msg.GetPreview().GetPreviewId() || len(binding.GetSources()) != len(sources) || !proto.Equal(intent.GetDesired(), service.GetDesired()) {
+		t.Fatal("merged dispatch lost exact head, desired resource or contributors")
+	}
+	for _, source := range binding.GetSources() {
+		expected := sources[source.GetProfileRevision()]
+		if expected == nil || !proto.Equal(source, expected) {
+			t.Fatalf("minted fabricated or duplicate ownership source: %v", source)
+		}
+		delete(sources, source.GetProfileRevision())
+	}
+	f.start(t, work)
 }

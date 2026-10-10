@@ -16,7 +16,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04 or Fedora 44 encrypted installer manifest")
 	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud recovery image manifest")
 	var options vmlab.VMDeviceActionsOptions
-	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption or wipe native qualification scenarios")
+	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")
 	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: lock-quarantine, live-erase, live-report-loss, recovery-nvme or recovery-sata; empty runs all")
 	flags.StringVar(&options.EncryptionPhase, "encryption-phase", "", "with -scenario encryption: tpm for separately recorded bind/cold-boot/PCR recovery; empty runs all")
 	hardware := &vmlab.VMHardwareOptions{TPM: true, Desktop: true, AllowNetwork: true}

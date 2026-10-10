@@ -473,7 +473,7 @@ symlink/path races and validate syntax before atomic replacement/reload.
 
 ### Closed resources and targeting: control-plane cutover
 
-`lindm.resource.v1` is the shared closed vocabulary for twenty resource kinds.
+`lindm.resource.v1` is the shared closed vocabulary for twenty-four resource kinds.
 Desired state, observations, plans and checks use explicit oneof arms; capability
 IDs are derived from the kind registry, never supplied as weaker caller authority.
 Profiles use canonical `(kind, key)` identities, typed dependencies and explicit
@@ -508,15 +508,35 @@ transactions also refresh contact. Read-only trust and empty-work polling remain
 write-free. The availability window is the greater of the ring health window and
 180 seconds; contact never extends native verification timestamps or validity.
 
-Phase 1 deliberately retains the signed systemd-service execution protocol while
-the executor/journal generic cutover is pending. Only the systemd arm is translated
-at that boundary; every other declared kind is explicitly unsupported for dispatch.
-Schema availability is not a native-provider qualification. Removing an assignment
-records retained ownership-safe release bookkeeping. Existing service effects have
-no trustworthy pre-management ownership baseline, so release remains
-`baseline_unknown`, not fabricated restoration, deletion, or compliance. Phase 2
-must replace the old signed wire, provider dispatch and protected journal together
-before any generic native operation or ownership-safe release is enabled.
+The execution wire uses generic resource desired state, plans, observations and
+verification through one executor path, including existing systemd services.
+The `execution-intent`, `execution-challenge`, `execution-start` and
+`execution-attestation` DSSE domains replace the service-specific domains.
+Intent binds the operation and signed assignment/resource ownership policy plus
+every contributing immutable profile resource. Challenge binds the exact canonical
+kind/key and operation. Native plans and results use domain-separated digests.
+Protected journal sequence floors are keyed by enrollment generation, kind and key.
+Pre-cutover service authority and incompatible journals are not reinterpreted:
+they require explicit recovery, remain held, and are never silently reset.
+
+Schema availability remains separate from native-provider qualification. Dispatch
+continues to refuse each unqualified kind. Existing service effects have no
+trustworthy pre-management ownership baseline, so service release remains
+`baseline_unknown`, not fabricated restoration, deletion, or compliance.
+Managed files, sysctl, typed timer/drop-in definitions and encryption compliance
+extend the closed vocabulary; their presence does not authorize generic file,
+command or live-encryption effects.
+
+Native package repositories are explicit root-owned configuration, with exact
+signing-key hashes and isolated native source configuration. The executor's own
+sandbox is not widened. Package transactions run in distinct per-transaction
+systemd units started over D-Bus with a fixed installed helper executable,
+protected typed operation records, bounded native-installer permissions and
+timeouts. Approved package scriptlets are privileged code, not a confinement
+boundary. A private root-only handshake consumes signed start authority after
+the helper's final preflight. The helper checks the exact boot-bound deadline,
+durably records its one-use start and retains its result across executor loss.
+Uncertain transactions are observed, never automatically replayed.
 
 ### Work contract
 
@@ -817,9 +837,10 @@ monotonic rollback and expired authority fail closed before destructive effects.
 
 ### Implemented connected service dispatch (G3)
 
-The first dispatch path is pull-based and limited to `systemd.service.v1`. Postgres
-owns the desired head, actions, signed bytes and results; the executor journal owns
-local acceptance and effects. Nothing is queued in the unprivileged spool.
+The pull-based dispatch path now carries generic resources. Native admission is
+still per qualified kind, not implied by the generic wire. Postgres owns the desired
+head, actions, signed bytes and results; the executor journal owns local acceptance
+and effects. Nothing is queued in the unprivileged spool.
 
 ```mermaid
 sequenceDiagram
@@ -827,18 +848,18 @@ sequenceDiagram
     participant S as lindmd
     participant N as Agent network
     participant E as Root executor
-    A->>S: SetServiceAssignment (fresh actor auth, head CAS)
-    N->>S: GetServiceWork (mTLS, session epoch)
+    A->>S: SetResourceAssignment (fresh actor auth, head CAS)
+    N->>S: GetResourceWork (mTLS, session epoch)
     S-->>N: exact intent [+ prior grant] + fresh nonce
-    N->>E: PrepareServiceExecution(intent)
+    N->>E: PrepareResourceExecution(intent)
     E-->>N: plan + device-signed challenge (≤30 s)
-    N->>S: AuthorizeServiceStart(challenge)
+    N->>S: AuthorizeResourceStart(challenge)
     S-->>N: start grant (fresh actor auth, ≤ challenge)
-    N->>E: StartServiceExecution(grant)
-    N->>S: GetServiceWork (fresh nonce)
-    N->>E: AttestServiceExecution(action, nonce)
-    N->>S: ReportServiceResult(attestation, certificate)
-    A->>S: GetDeviceServiceState
+    N->>E: StartResourceExecution(grant)
+    N->>S: GetResourceWork (fresh nonce)
+    N->>E: AttestResourceExecution(action, nonce)
+    N->>S: ReportResourceResult(attestation, certificate)
+    A->>S: GetDeviceResourceState
 ```
 
 Unchanged or updated execution-trust delivery and service polling with no
@@ -862,6 +883,14 @@ timestamps; `GetSyncState` supplies the durable jittered 60-second heartbeat.
   minutes clipped to delegation expiry. Empty/already-expired windows are refused
   as `execution_window_empty`; fresh delegation admission does not create a mint outage.
   `resource_sequence` increases forever per generation and unit.
+- Package preparation is independent, effect-free native staging. `PREPARING`
+  is nonterminal and contains no native observation or verification. The transport
+  calls Prepare once per ordinary management cycle and returns immediately while
+  staging is pending; it does not extend ordinary RPC, dispatch or transport
+  deadlines or occupy the native-execution polling window. Heartbeat/inventory
+  scheduling and imperative action polling remain independent. Only a ready exact
+  plan can create the existing thirty-second challenge and start grant. Immediate
+  systemd no-drift completion retains its read-only path.
 - Device clocks may differ from the server by up to two minutes
   (`trust.MaxDeviceClockSkew`). Server checks of device-signed challenge and
   attestation times allow that tolerance; beyond it the call fails with
@@ -869,22 +898,44 @@ timestamps; `GetSyncState` supplies the durable jittered 60-second heartbeat.
   that expires on server time and the open action. Start grants are expressed in
   device time from the challenge, clipped to the remaining server approval and the
   delegation. Certificate, root and delegation validity stay strict.
-- An open action without a start grant closes as `expired_unstarted` or
-  `assignment_changed` and may be replaced. Once a grant is issued, the action stays
-  open until verified terminal evidence arrives: the effect may already have run.
+- An immediate-provider action without a start grant closes as `expired_unstarted`
+  or `assignment_changed` and may be replaced. Package staging instead retains its
+  open-action fence with a durable cancellation reason and returns
+  `cancel_preparation` on later polls until the executor reports terminal owned
+  cleanup. A cancellation reason with no `closed_at` means cancellation requested,
+  not completed. A never-prepared executor durably tombstones the exact action and
+  intent before acknowledging cancellation; the server accepts only the matching
+  current-session, action, intent digest and fresh result nonce, never as native
+  proof. Once a grant is issued, the action stays open until verified terminal
+  evidence arrives: the effect may already have run.
 - Start grants require a valid device challenge bound to the stored intent, a fresh
   re-authorization at the same version and the unchanged head. Exact retries return
   stored bytes; nothing is re-signed for an existing action.
 - Results are nonce-bound attestations verified against the device CA and the
   registered, unrevoked device certificate, with monotonic `action_revision`.
-  SUCCEEDED converges the resource for the head; FAILED, OUTCOME_UNKNOWN or a started
-  non-success needs operator attention with no automatic retry. Unstarted expiry or
-  supersession returns the resource to pending.
+  Fresh nonces may authenticate the identical `PREPARING` status at the same
+  protected revision; changed history and every other lifecycle state still
+  require an increasing revision.
+  SUCCEEDED with CONVERGED verification proves the resource for the head; FAILED,
+  OUTCOME_UNKNOWN or a started non-success needs operator attention with no
+  automatic retry. Unstarted expiry or supersession returns the resource to pending.
+  Pending preparation cannot refresh verification or release dependencies. A
+  terminal preparation-only outcome binds the original signed preparation limits
+  and explicitly contains no native observation, verification or effect evidence.
+  Explicit read-only native findings retain their full before/verification evidence:
+  DRIFTED or UNKNOWN ends FAILED with POSTCONDITION, never a challenge or grant.
+  Encryption compliance never receives effect authority. Read-only RELEASE with
+  NOT_APPLICABLE verification may end SUCCEEDED as a release acknowledgment, but
+  projects BLOCKED/not_applicable for any still-active resource row. It neither
+  refreshes old convergence evidence nor satisfies dependency success.
+  Rollout health keeps verification UNKNOWN and NOT_APPLICABLE separate from
+  known failed drift, and never promotes either from retained older timestamps.
 - Each assignment has a reconciliation interval (default 15 minutes; API range
   5 minutes–24 hours). At the next device acquisition after verified evidence reaches
   that age, a new action re-observes the resource. Due dependencies are checked first.
-  Compliant Prepare completes read-only without a start grant; drift requires the
-  ordinary fresh-authorized challenge/start path. No offline catch-up backlog is minted.
+  Compliant Prepare completes read-only without a start grant; effect-capable drift
+  requires the ordinary fresh-authorized challenge/start path. Read-only compliance
+  findings do not enter that path. No offline catch-up backlog is minted.
 - Resource compliance is distinct from action disposition: `UNKNOWN` has no successful
   verification; `COMPLIANT` has fresh successful read-only evidence;
   `DRIFT_REMEDIATED` has fresh successful granted evidence. Known drift awaiting

@@ -393,13 +393,22 @@ signed checksum metadata and vendor trust anchors. They are not architecture
 aliases for the x86_64 images. Run acquisition and offline verification before
 native ARM KVM qualification with the execution host's pinned AAVMF firmware.
 Neither manifest presence nor a passing x86_64 lane proves the ARM cell.
+Cloud-image overlays get at least 10 GiB of virtual disk (larger bases keep their
+size), as vendor images expect to be resized before first boot; Leap 16.0's
+1.5 GiB Minimal-VM disk otherwise cannot hold one agent RPM.
 
 Native inspection independently observes per-interface default-route membership
 through iproute2's netlink JSON (IPv4 main table, IPv6 all tables), rather than
 reusing the agent's proc-table parser. Active-session truth uses `loginctl`
-properties independently of the agent's `busctl` JSON decoder. Missing optional
+properties independently of the agent's `busctl` decoder; on systemd before v240
+(EL8) the agent reads busctl's text format after `busctl --version`, and both the
+agent and the oracle use legacy `lsblk` columns before util-linux 2.37, each only
+after the modern native command failed. Missing optional
 properties retain unavailable status; neither oracle chooses a preferred interface
-or infers session activity from session counts.
+or infers session activity from session counts. The control-plane publication
+comparison uses the inspection host rule, including Arch's honest `UNAVAILABLE`
+OS version, and an inventory wait cut off by its own deadline reports the last
+observed mismatch rather than the interrupted query.
 
 Native equality is not health: matching permission, timeout, malformed-output,
 capacity or command failures fail inspection. Only exact `UNAVAILABLE` fields in
@@ -1793,6 +1802,326 @@ This is KVM/QEMU guest-reset and virtual-block-device evidence, not physical pow
 removal or drive-cache qualification. A library test or manual package installation
 does not substitute for this lane. Native arm64, Arch/zypper transactions and other
 hardware/OS tuples require their own recorded runs.
+
+### Native package resource provider
+
+`internal/agent/packageprovider` implements the typed `package.native.v1`
+resource for mutable APT and DNF5 systems. A root-provisioned approved repository
+and its checked signing key are prerequisites, not authority supplied by a
+profile. Immutable OSTree and Nix installations are rejected. Existing native
+records with unprovable repository provenance remain explicitly unknown and
+cannot be acquired by inventing a signer or copying the desired repository.
+
+Preparation runs asynchronously in the bounded native helper, keyed by the exact
+signed action and its preparation deadline. It downloads authenticated metadata
+and package artifacts into protected state, computes the complete dependency
+transaction, and binds its exact bytes, source revision, database revision and
+native transaction receipt. Package download sizes come from authenticated APT
+URI declarations or a fixed, isolated `python3-libdnf5` native resolver. The latter
+only resolves goals and reads native package sizes; it cannot download or execute
+transactions. Declared artifact bytes and observed staging bytes are distinct:
+the observed total also includes metadata and native cache copies. Free-space
+prechecks, per-file limits, bounded output and active aggregate cancellation are
+bounded staging defenses, not a filesystem quota or a reservation guarantee.
+The metadata bootstrap is bounded by the entire signed staging byte ceiling and
+requires that ceiling plus a fixed 64 MiB free-space margin before native refresh;
+metadata sizes are authenticated and observed after refresh, not represented as
+predeclared artifact bytes. Exact package-size totals are checked before payload
+downloads. The staging ceiling is at most 512 MiB; manifests are at most 256 KiB.
+Plans expose `change_packages` derived from the complete digest-bound native
+manifest and `change_pin` separately. The provider rejects disagreement with
+manifest operations before verification or application, so a truly idempotent
+reconcile does not request a final native-effect grant.
+
+The executor sandbox is unchanged. The separately bounded transient helper
+performs final preflight before its private one-use permit handshake consumes the
+signed `beforeEffect` gate. Its APPLY phase is offline. Native distro package
+maintainer scripts remain privileged code; authenticated distribution artifacts
+are not a promise that scriptlets are side-effect-free. The ownership journal
+records an unknown effect before authority consumption; a restart, timeout or
+lost completion receipt never causes an uncertain installation to be replayed.
+
+APT uses an isolated source/configuration and `apt-get` simulation and
+download-only interfaces. The digest-bound `Inst`/`Conf` ordering preserves
+predependency configuration barriers. Fixed `dpkg --unpack`, `--configure` and
+owned `--remove` operations run with the documented frontend lock held and
+`DPKG_FRONTEND_LOCKED=true`; each child still acquires the inner database lock.
+There is no purge, autoremove, implicit downgrade or force-dependency bypass.
+Dependencies are retained rather than acquiring APT automatic-removal ownership.
+Dependencies with independent active ownership are refused, both at planning and
+again at the final authority gate; their ownership is never silently transferred.
+This is not a claim of equivalence with arbitrary APT hooks or automatic-mark
+behavior. See [dpkg's native frontend contract](https://manpages.debian.org/bookworm/dpkg/dpkg.1.en.html).
+
+DNF5 uses authenticated metadata, the native solver's exact transaction sizes,
+`--store` and strict offline `replay`, without ignore/skip flags. Both metadata
+and package signatures are mandatory. A repository that does not publish signed
+metadata, including common default Fedora repository configurations, does not
+meet that contract; qualification uses a genuinely signed repository rather than
+disabling `repo_gpgcheck`. The package key must already have been provisioned into
+system RPM trust. See the [DNF5 replay](https://dnf5.readthedocs.io/en/latest/commands/replay.8.html)
+and [versionlock](https://dnf5.readthedocs.io/en/latest/commands/versionlock.8.html)
+interfaces. DNF4 does not inherit DNF5 transaction support.
+To change an existing DNF5 exact pin, PREPARE can see a read-only projection of the
+candidate versionlock at the fixed existing native path. The original root-owned
+file identity and candidate digest are both bound into the plan; preparation does
+not mutate the host pin. Only APPLY replaces that owned pin after its final gate.
+
+Exact native pins are persistent, owned and atomically replaced. Release binds
+the original baseline and last applied dimensions, refuses external changes,
+restores recorded pin bytes and permissions, and respects retain-installation.
+Dependency installations are not recursively removed. Restoring an older
+baseline never implicitly authorizes a downgrade. Native configured-state
+readiness is not application launch or health evidence; native qualification
+must independently exercise the selected application's behavior and a real
+dependency-bearing transaction. Unit parser/ownership coverage does not certify
+Ubuntu or Fedora VM behavior. Those native qualification checks remain required.
+
+### Read-only root encryption compliance
+
+`internal/agent/encryptionprovider` implements `encryption.compliance.v1` as
+observation and evaluation only. It does not encrypt disks, enroll or disclose
+keys, upload escrow, acquire native ownership, or restore a fabricated baseline
+on release. A signed plan binds fresh observations and the signed ownership
+context; unmet requirements remain noncompliant after Apply. Release reports
+not applicable, not proof that the former requirements were satisfied.
+Before launching its transient reader, the executor derives exact device paths
+from the kernel root graph and bounded sysfs uevents without opening `/dev`.
+Only the root backing node, its exact kernel-proven parent disk for GPT identity
+reads, mapper control and an existing TPM resource-manager node are admitted.
+No block-device class wildcard is needed. An unencrypted root
+admits no devices. The helper independently recomputes topology, checks root-owned
+block-node custody and pins durable identity rather than trusting that allowlist.
+
+The action provider's read-only adapter follows the mounted root's kernel block
+dependency graph, including LVM above dm-crypt. Every backing leaf must be
+protected by the single identified LUKS2 mapping. An encrypted data disk is not
+root encryption. Mixed, ambiguous and unsupported graphs remain unavailable.
+The exact existing action target basis is preserved: WWN plus serial, or the
+existing `SERIAL_GPT_LUKS` tuple when native WWN absence is established. The latter
+requires a unique physical serial, exact GPT disk GUID, whole-disk and selected
+container sizes, and LUKS UUID. Native block-level serial facts are used on virtio;
+no WWN is fabricated. The pinned parent-disk reader checks GPT header CRC/GUID and
+kernel partition ancestry. Duplicate serials, uncertain WWN reads and basis
+downgrades refuse. Public observations explicitly project the basis, GUID and
+disk size; remediation references reconstruct the exact existing action target.
+Pinned native descriptors and bounded LUKS2 metadata are cross-checked;
+human-readable lsblk tables are not parsed.
+The complete root mapper table must have one crypt segment covering its whole
+native size and the exact backing device; a CRYPT UUID label alone is insufficient.
+The fixed [dmsetup table](https://manpages.debian.org/bookworm/dmsetup/dmsetup.8.en.html)
+query selects the kernel major/minor, never requests `--showkeys`, and retains
+only a digest, not table text or native key references.
+
+Escrow requires the executor-authenticated successful rotation history and
+server-signed durable receipt for the exact root target, current active slot and
+recovery-key fingerprint. Local recovery configuration is never escrow proof.
+The current metadata fingerprint must equal the rotation's final verified
+metadata, so later header changes invalidate that proof conservatively. For a
+fixture requiring both TPM and escrow, enroll TPM before the acknowledged
+rotation. An unchanged token label cannot conceal a replaced native keyslot.
+
+TPM compliance requires an active systemd-tpm2 token with a nonempty, unique PCR
+selection and an actual current-TPM unlock test through cryptsetup's token plugin.
+The fixed `open --test-passphrase --token-only --token-id` invocation creates no
+mapping and prints no key. A stale sealed token, wrong TPM, changed PCR state,
+missing plugin or missing native TPM cannot be promoted from token counts.
+Typed findings reference only the existing escrow-rotation and TPM-binding
+action workflows; they grant no action authority. An unencrypted root requires
+separately authorized offline installation/encryption, not an invented action.
+
+Qualification requires the installed Ubuntu/Fedora encrypted-root fixture,
+independent root/data-disk identity and header oracles, real signed escrow
+receipt custody, the systemd cryptsetup token plugin and a real native or VM TPM.
+Exercise LVM-on-LUKS2, unrelated encrypted disks, stale receipt/slot metadata,
+PCR/TPM mismatch, and read-only refusal without changing the executor sandbox.
+Unit fixtures do not certify native TPM, cold boot, recovery or physical safety.
+
+### Dedicated typed firewall zones
+
+`internal/agent/firewallprovider` implements the typed `firewall.zone.v1` native
+boundary for mutable Ubuntu and Fedora. Implementation is not a qualified platform
+claim. Expressions use the maintained Google nftables library; a narrow
+mdlayher/netlink object adapter supplies table/chain userdata, generation-fenced
+atomic batches, and lossless expression readback that the library's object API
+does not expose. There are no nft text scripts or profile-supplied native options.
+
+Only `inet lindm_z_<zone UUID without hyphens>` tables belong to this provider.
+Every chain and rule carries its exact owner binding and generation. Reconciliation
+uses one generation-CAS delete/create batch after inspecting all objects; release
+requires unchanged owned dimensions, including raw read-back expression digests.
+Foreign sets, flowtables, unknown expressions, userdata, generation, file metadata,
+or state changes block destructive work. Approved adoption is limited to a complete
+prior provider-format table with matching root-custody typed persistent state. It
+does not acquire firewalld, UFW, arbitrary nftables tables, or the global firewall.
+An approved, provable baseline can be restored; an absent baseline restores absence.
+
+Input, output and forward base chains have priority `10` and accept policy.
+Profile accept ends only that chain: another owner's drop is still final. In
+particular the existing action-owned `lindm_q_<action>` timed quarantine at priority
+`-10` remains authoritative and is neither removed nor modified. Zone interface and
+remote-network bindings form a union inside the root-approved interface boundary;
+output uses the remote destination address, and forward uses ingress binding and
+the default ingress verdict. Rules sort by priority then UUID. Selector stages
+grow linearly with CIDR/port alternatives rather than their Cartesian product.
+IPv4/IPv6, TCP/UDP ranges and typed ICMP selectors compile to native expressions.
+
+The helper preserves its own management path using root-pinned TCP endpoints and
+DNS servers, established replies, loopback, DHCP on approved links, IPv6 neighbor
+discovery with hop-limit 255, and related ICMP errors for path-MTU discovery. These
+exceptions cannot override another owner's rules or quarantine. Root provisioning
+must keep enrollment endpoint addresses and approved interface identity current;
+the provider does not turn a profile-controlled address into a management exception.
+Independent fresh allow and deny packet receipts are required for convergence.
+Missing probes remain unknown; kernel readback alone is not connectivity proof.
+Every native apply arms the independent root-custody connectivity supervisor before
+the final effect gate. After exact kernel readback it records the applied owned
+snapshot and waits for fresh authenticated controller confirmation and external
+packet proof. Only that confirmation permits COMMITTED state and ownership-ledger
+success. Timeout, helper death, or reboot causes the supervisor to restore only the
+exact recorded owned baseline; changed userdata, generation, or expression bytes
+refuse rollback rather than overwrite another actor.
+
+Persistence is the installed fixed `lindm-firewall-restore.service` and root-owned
+`/var/lib/lindm/firewall/<zone UUID>.pb`, not a claim about kernel state surviving
+reboot. The service, exact enablement link, fixed executable, and state directory
+must pass custody checks. A durable PENDING state precedes the kernel batch; exact
+readback and connectivity-supervisor confirmation both precede COMMITTED state.
+PENDING or journal UNKNOWN never causes a forward replay. The supervisor starts
+before committed-state restoration and resolves interrupted owned transactions
+first. Boot restoration accepts only committed typed state under unchanged root
+configuration, refuses same-boot recreation, and records the new boot only after
+exact replay. No command strings or serialized raw expressions are executed from
+that file. SELinux creation metadata uses shared nativefile custody. Kernel and
+filesystem effects are not one atomic transaction.
+
+The ordinary executor sandbox is unchanged. Its fixed firewall helper has
+CAP_NET_ADMIN/CAP_NET_RAW and AF_UNIX/AF_INET/AF_INET6/AF_NETLINK in the host network
+namespace, checked against `/proc/1/ns/net`. PrivateNetwork is forbidden for host
+firewall effects and target-specific packet verification. The provider retains the
+existing bounded plan, private snapshot, transaction and ownership admission caps;
+an oversized native expansion fails before the final authority gate.
+
+Qualification requires disposable installed Ubuntu/Fedora VMs, not access to an
+owner's live host. Use separate management and data links, dual-stack probe peers,
+real preexisting UFW/firewalld rules, and the actual timed quarantine action.
+Exercise allow/deny and source/interface/port selection, idempotent plans, drift,
+generation-CAS races, unassignment, approved baseline restoration, daemon reload,
+SELinux labels, cold reboot restoration, missing unit custody, and termination
+between guard arm, pending-file write, netlink acknowledgement, authenticated
+confirmation, committed-file write, and guard disarm. Force missed confirmation
+and restart the agent and supervisor independently; require persisted exact owned
+rollback without replaying an uncertain forward batch.
+Retain native JSON rule/handle/userdata evidence and independent packet captures.
+The isolated kernel test exercises netlink atomicity and coexistence only; it does
+not certify installed service, reboot persistence, packet reachability or a
+platform matrix cell.
+
+### Firewall connectivity guard and independent packet witnesses
+
+`internal/agent/connectivityguard` owns one durable root-only rollback slot at
+`/var/lib/lindm/connectivity-guard/firewall-guard.pb`. The separately installed
+`lindm-connectivity-guard.service` runs before firewall restoration and reports
+systemd readiness only after startup recovery. Helper admission requires its
+live readiness lock. The default deadline is 120 seconds, with explicit root
+configuration restricted to 30–300 seconds; CLOCK_BOOTTIME includes suspend.
+Absent firewall configuration permits an installed supervisor to announce
+readiness and monitor only an empty recovery store. Any retained record under
+missing configuration is a recovery hold, not permission to discard custody.
+Same-boot supervisor restart, helper death, deadline expiry, and reboot recover
+uncommitted work. A same-boot worker is stopped through a PID/start-time-checked
+pidfd before inverse application, preventing a rollback/forward-effect race.
+SIGTERM withdraws admission and drains the exact inverse under an independent
+25-second context; the unit allows 35 seconds for stopping. An already-running
+inverse is not interrupted by cancellation of the supervisor's signal context.
+The live readiness lock also contains the exact native root configuration, so
+a helper cannot arm against a disabled or stale supervisor after reprovisioning.
+The native provider recompiles only the protected exact inverse and rejects
+foreign generation, expression, namespace or persistent-file changes. Failed
+or uncertain recovery remains CONFLICT custody, not an automatically replayed
+forward operation. CONFIRMED is not COMMITTED: the native persistent replacement
+and durable guard COMMITTED receipt both precede disarm.
+Before the active guard slot becomes COMMITTED/reusable, the helper must also
+fsync its signed confirmation into protected per-action history. Failed
+retention leaves recovery armed. This local custody write runs without holding
+the guard record lock, so a stalled worker cannot block deadline recovery;
+signature/binding, unchanged record and remaining deadline are checked before
+the terminal transition. A read-only verifier never requires or invokes the
+retention operation.
+
+The root helper reads DeviceOrigin, transport CA, active device certificate and
+session epoch through the root-authenticated executor Unix socket. The existing
+purpose-restricted TLS message signer retains private identity keys in the
+executor. Confirmation opens a new TLS 1.3 TCP connection without session
+resumption, proxying or redirects; it does not borrow the network process's
+connection. The server checks the actual TLS exporter, enrolled device,
+current certificate/session and still-open granted action. Its DSSE receipt binds
+action, resource reference, exact applied native generation/digest, fresh nonce,
+session epoch, connection exporter and packet proofs. Root provisioning pins the
+confirmation key and independent probe peer origins/keys; no profile URL is an
+authority source. The long wait occurs only in the bounded native worker;
+ordinary executor RPCs and heartbeats continue independently.
+
+Packet probes support TCP SYN and UDP, IPv4/IPv6, and INPUT/OUTPUT/FORWARD.
+Every experiment places an unpredictable 32-byte nonce in the actual packet and
+matches exact source/destination addresses, ports, protocol, family and nonce.
+A separate kernel socket-owned nft diagnostic table only sets nftrace; it never
+changes a packet verdict or flushes another table. Its lifetime is tied to the
+worker's netlink socket, including automatic removal on death or reboot. Trace
+IDs are admitted only from that exact marker rule and correlated to actual
+native hook, chain, rule handle and verdict. Owned-table handles must still
+match the applied snapshot. Foreign verdicts remain evidence of effective
+policy, not ownership of the foreign table. A last-priority diagnostic observation
+point permits proof after releasing a table to absence without inventing an
+owned rule. An ACCEPT never overrides a later foreign DROP.
+The trace netlink header identifies the base-chain family, separately from the
+packet family; foreign `ip`, `ip6` and `inet` tables are queried in their actual
+family. This follows the kernel's
+[nf_tables trace notification contract](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux-stable.git/+/refs/tags/v4.14.173/net/netfilter/nf_tables_trace.c).
+
+Dedicated external peers run the no-argument root command
+`lindm-agent connectivity-probe` using `AgentConfig.connectivity_probe` in
+`/etc/lindm/executor.json`. The optional `lindm-connectivity-probe.service` is not
+enabled on ordinary managed devices. Its only capabilities are CAP_NET_RAW and
+CAP_NET_BIND_SERVICE; lindmd and the ordinary executor gain no probe privileges.
+The typed peer configuration fixes deployment, public origin, listen IP/port,
+targets, TLS certificate/key files, device-CA file and Ed25519 PKCS8 proof-key
+file. Credential reads reject replaceable ancestry, symlinks, hardlinks, oversized
+files and group/world-readable private keys. The leaf must authenticate the
+configured HTTPS origin; the proof key must match the configured peer identity.
+Sixty-four listener connections and thirty-two admitted peer requests/jobs bound
+resource use. Shutdown closes receive sockets and clears the owned proof-key
+copy. Provision the peer control HTTPS addresses among the trusted management
+dependencies so packet-deny experiments cannot cut their own control protocol.
+
+The external `ProbeServer` authenticates enrolled clients using mTLS and permits
+only its preconfigured packet endpoints, never an arbitrary scan destination.
+INPUT requires a signed external transmission witness; OUTPUT requires a signed
+external receive witness for allow; FORWARD requires both external peers.
+External receivers also sign exact target/nonce readiness after opening the
+actual native receive socket, including for denied probes. This prevents an
+unavailable OUTPUT-deny peer from being mistaken for a completed independent
+experiment. Readiness alone proves neither delivery nor denial.
+Receivers use native post-filter raw sockets, not pre-filter packet visibility.
+An allow requires actual receive evidence as well as the appropriate native
+trace; deny requires an explicit kernel DROP/REJECT trace of the exact nonce
+packet. Silence, a TCP timeout, an absent application listener, or a failed send
+does not prove denial. Thirty-two bounded peer jobs expire within ten seconds
+even when clients disappear. Root policy requires independent IPv4 and IPv6
+allow/deny targets. Trace loss, unsupported kernel socket ownership, packet
+rewriting, unapproved topology, or unavailable peers fails closed.
+
+Periodic verification runs a new packet experiment under exact native
+before/after custody and returns `ConnectivityVerificationEvidence`. It never
+reuses or retimestamps an earlier guard receipt and does not arm a mutation
+rollback. The two public probe receipts bind the complete evidence digest; the
+protected helper result retains the exact observation/native-state hashes and
+signed packet witnesses. Unit/TLS and isolated network-namespace tests are
+authored separately from installed native qualification. No test, build,
+formatter, code generation or native qualification result is claimed by this
+source change. Qualification must still exercise real external routed peers,
+FORWARD traffic, partitions, reboot, worker/supervisor loss, foreign changes,
+and all persistence/confirmation crash boundaries on each advertised platform.
 
 ## 2. Toolchain and quality gates
 

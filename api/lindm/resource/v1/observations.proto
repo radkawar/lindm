@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 import "lindm/resource/v1/accounts.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/credentials.proto";
+import "lindm/resource/v1/host.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/network.proto";
 import "lindm/resource/v1/software.proto";
@@ -266,6 +267,19 @@ message FirewallZoneObservation {
     not_in: 0
   }];
   string zone_id = 11 [(buf.validate.field).string.uuid = true];
+  bytes native_identity_sha256 = 12 [(buf.validate.field).bytes.len = 32];
+  bool conflict = 13;
+  bool persistent_ready = 14;
+  string table = 15 [(buf.validate.field).string = {pattern: "^lindm_z_[a-f0-9]{32}$"}];
+  bytes ownership_userdata = 16 [(buf.validate.field).bytes.max_len = 256];
+  bytes network_namespace_sha256 = 17 [(buf.validate.field).bytes.len = 32];
+  // Foreign chains remain independently authoritative; this is not global adoption.
+  repeated string foreign_tables = 18 [(buf.validate.field).repeated = {
+    max_items: 256
+    items: {
+      string: {max_len: 256}
+    }
+  }];
 }
 enum ConnectionMedium {
   CONNECTION_MEDIUM_UNSPECIFIED = 0;
@@ -337,13 +351,19 @@ message ProxyObservation {
 message NativePackageRecord {
   PackageIdentity package = 1 [(buf.validate.field).required = true];
   NativeVersion version = 2 [(buf.validate.field).required = true];
-  ResourceRef source = 3 [(buf.validate.field).required = true];
-  bytes signer_sha256 = 4 [(buf.validate.field).bytes.len = 32];
-  bytes metadata_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // dpkg/rpm do not reliably retain repository provenance. Unknown is explicit;
+  // providers may not substitute the desired repository or an all-zero signer.
+  ResourceRef source = 3;
+  optional bytes signer_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  optional bytes metadata_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bool provenance_known = 6;
+  // Native package-row/control-file identity detects reinstallations even when
+  // the displayed version is unchanged. It is not itself source provenance.
+  bytes native_identity_sha256 = 7 [(buf.validate.field).bytes.len = 32];
   option (buf.validate.message).cel = {
     id: "native_package_record.source"
-    message: "package source must identify a repository"
-    expression: "this.source.kind == 13"
+    message: "known provenance binds authenticated source evidence; unknown provenance has no invented source"
+    expression: "this.provenance_known ? has(this.source) && this.source.kind == 13 && has(this.signer_sha256) && has(this.metadata_revision_sha256) : !has(this.source) && !has(this.signer_sha256) && !has(this.metadata_revision_sha256)"
   };
 }
 message NativePackageObservation {
@@ -352,6 +372,9 @@ message NativePackageObservation {
   NativePackageRecord record = 3;
   bytes database_revision_sha256 = 4 [(buf.validate.field).bytes.len = 32];
   bool native_lock_held = 5;
+  // Provider-derived native pin object, not an operator-selected path.
+  FileIdentity pin_file = 6;
+  bytes pin_contents = 7 [(buf.validate.field).bytes.max_len = 32768];
   option (buf.validate.message).cel = {
     id: "native_package_observation.record"
     message: "installed packages require their native record"
@@ -548,4 +571,120 @@ message DirectoryClientObservation {
   bool reachable = 8;
   repeated DirectoryAccountMapping mappings = 9 [(buf.validate.field).repeated.max_items = 64];
   DirectoryLoginPolicy effective_login = 10 [(buf.validate.field).required = true];
+}
+
+message ManagedFileObservation {
+  string path = 1 [(buf.validate.field).string = {
+    max_bytes: 1024
+    pattern: "^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$"
+  }];
+  bool exists = 2;
+  FileIdentity file = 3;
+  bytes ancestry_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  // Native providers require both fingerprints. Optional preserves readable
+  // historical observations; missing evidence never authorizes native effects.
+  optional bytes security_metadata_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  optional bytes native_identity_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "managed_file_observation.identity"
+    message: "existing regular files require exact identity; absent files have none"
+    expression: "!this.path.matches('/[.]{1,2}(/|$)') && (this.exists == has(this.file)) && (!has(this.file) || this.file.path == this.path)"
+  };
+}
+message SysctlObservation {
+  string key = 1 [(buf.validate.field).string = {
+    max_bytes: 255
+    pattern: "^[a-z][a-z0-9_]*([.][a-zA-Z0-9_-]+)+$"
+  }];
+  optional string value = 2 [(buf.validate.field).string.max_bytes = 4096];
+  optional string persistent_value = 3 [(buf.validate.field).string.max_bytes = 4096];
+  FileIdentity owned_persistence_file = 4;
+  bytes persistence_graph_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // Procfs inode and namespace/boot identity; a recreated key is not its owner.
+  bytes native_identity_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  ManagedFileObservation persistence_file_state = 7 [(buf.validate.field).required = true];
+  optional string persistent_source = 8 [(buf.validate.field).string.max_bytes = 4096];
+  bool persistence_conflict = 9;
+}
+message SystemdDefinitionObservation {
+  // Identity is retained even when the definition is absent or unreadable.
+  string canonical_key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 1024
+  }];
+  bool exists = 2;
+  SystemdDefinitionDesired effective = 3;
+  FileIdentity owned_file = 4;
+  bytes definition_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bool daemon_reload_pending = 6;
+  bool target_service_exists = 7;
+  optional bool timer_enabled = 8;
+  optional bool timer_active = 9;
+  bytes target_definition_sha256 = 10 [(buf.validate.field).bytes.len = 32];
+  ManagedFileObservation file_state = 11 [(buf.validate.field).required = true];
+  SystemdEffectiveOptions effective_options = 12;
+  repeated InstallLink timer_install_links = 13 [(buf.validate.field).repeated.max_items = 128];
+  bool timer_install_projection_complete = 14;
+  optional bytes timer_invocation_id = 15 [(buf.validate.field).bytes.len = 16];
+  bool timer_job_pending = 16;
+  string timer_unit_file_state = 17 [(buf.validate.field).string.max_len = 64];
+  // Canonical native schedule properties, excluding volatile next-elapse times.
+  bytes timer_schedule_sha256 = 18 [(buf.validate.field).bytes.len = 32];
+}
+// Native defaults may be UINT64_MAX (infinity/unset), unlike desired bounds.
+message SystemdEffectiveOptions {
+  uint64 cpu_weight = 1;
+  uint64 memory_max = 2;
+  uint64 tasks_max = 3;
+  bool no_new_privileges = 4;
+}
+// Public projection of the existing imperative storage identity basis. This
+// observation grants no storage authority; adapters map each basis explicitly.
+enum RootStorageIdentityBasis {
+  ROOT_STORAGE_IDENTITY_BASIS_UNSPECIFIED = 0;
+  ROOT_STORAGE_IDENTITY_BASIS_WWN_SERIAL = 1;
+  ROOT_STORAGE_IDENTITY_BASIS_SERIAL_GPT_LUKS = 2;
+}
+message EncryptionComplianceObservation {
+  // Presence distinguishes a negative finding from missing native evidence.
+  optional bool luks_root = 1;
+  optional string root_luks_uuid = 2 [(buf.validate.field).string.uuid = true];
+  optional bool escrow_verified = 3;
+  optional bool tpm_bound = 4;
+  bytes evidence_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // Public durable native identity; no device path or token payload.
+  string root_wwn = 6 [(buf.validate.field).string.max_len = 256];
+  string root_serial = 7 [(buf.validate.field).string.max_len = 256];
+  uint64 root_size_bytes = 8;
+  bytes metadata_sha256 = 9 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  optional uint32 escrow_keyslot = 10 [(buf.validate.field).uint32.lte = 31];
+  bytes escrow_receipt_sha256 = 11 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  RootStorageIdentityBasis root_identity_basis = 12 [(buf.validate.field).enum.defined_only = true];
+  string root_gpt_disk_guid = 13 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 root_disk_size_bytes = 14;
+  option (buf.validate.message).cel = {
+    id: "encryption_compliance_observation.root"
+    message: "positive root encryption evidence requires an exact LUKS identity"
+    expression: "(!has(this.luks_root) || !this.luks_root || has(this.root_luks_uuid)) && (!has(this.root_luks_uuid) || (has(this.luks_root) && this.luks_root))"
+  };
+  option (buf.validate.message).cel = {
+    id: "encryption_compliance_observation.escrow"
+    message: "positive escrow proof requires current root, slot, metadata and authenticated receipt identity"
+    expression: "(!has(this.escrow_verified) || !this.escrow_verified) || (has(this.luks_root) && this.luks_root && this.root_serial != '' && this.root_size_bytes > 0 && this.metadata_sha256.size() == 32 && has(this.escrow_keyslot) && this.escrow_receipt_sha256.size() == 32)"
+  };
+  option (buf.validate.message).cel = {
+    id: "encryption_compliance_observation.identity"
+    message: "positive root evidence requires its complete exact native storage identity basis"
+    expression: "(!has(this.luks_root) || !this.luks_root) || (this.root_serial != '' && this.root_size_bytes > 0 && ((this.root_identity_basis == 1 && this.root_wwn != '' && this.root_gpt_disk_guid == '' && this.root_disk_size_bytes == 0u) || (this.root_identity_basis == 2 && this.root_wwn == '' && this.root_gpt_disk_guid != '' && this.root_disk_size_bytes >= this.root_size_bytes && this.root_luks_uuid != '00000000-0000-0000-0000-000000000000')))"
+  };
 }

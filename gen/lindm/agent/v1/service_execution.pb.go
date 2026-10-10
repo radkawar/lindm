@@ -10,7 +10,9 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	v1 "lindm/gen/lindm/resource/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -23,180 +25,241 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ServiceExecutionState int32
+type ResourceExecutionState int32
 
 const (
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_UNSPECIFIED     ServiceExecutionState = 0
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED        ServiceExecutionState = 1
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_QUEUED          ServiceExecutionState = 2
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING         ServiceExecutionState = 3
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED       ServiceExecutionState = 4
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_FAILED          ServiceExecutionState = 5
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN ServiceExecutionState = 6
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED         ServiceExecutionState = 7
-	ServiceExecutionState_SERVICE_EXECUTION_STATE_SUPERSEDED      ServiceExecutionState = 8
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_UNSPECIFIED     ResourceExecutionState = 0
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED        ResourceExecutionState = 1
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED          ResourceExecutionState = 2
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING         ResourceExecutionState = 3
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED       ResourceExecutionState = 4
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED          ResourceExecutionState = 5
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN ResourceExecutionState = 6
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED         ResourceExecutionState = 7
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED      ResourceExecutionState = 8
+	ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING       ResourceExecutionState = 9
 )
 
-// Enum value maps for ServiceExecutionState.
+// Enum value maps for ResourceExecutionState.
 var (
-	ServiceExecutionState_name = map[int32]string{
-		0: "SERVICE_EXECUTION_STATE_UNSPECIFIED",
-		1: "SERVICE_EXECUTION_STATE_PREPARED",
-		2: "SERVICE_EXECUTION_STATE_QUEUED",
-		3: "SERVICE_EXECUTION_STATE_RUNNING",
-		4: "SERVICE_EXECUTION_STATE_SUCCEEDED",
-		5: "SERVICE_EXECUTION_STATE_FAILED",
-		6: "SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN",
-		7: "SERVICE_EXECUTION_STATE_EXPIRED",
-		8: "SERVICE_EXECUTION_STATE_SUPERSEDED",
+	ResourceExecutionState_name = map[int32]string{
+		0: "RESOURCE_EXECUTION_STATE_UNSPECIFIED",
+		1: "RESOURCE_EXECUTION_STATE_PREPARED",
+		2: "RESOURCE_EXECUTION_STATE_QUEUED",
+		3: "RESOURCE_EXECUTION_STATE_RUNNING",
+		4: "RESOURCE_EXECUTION_STATE_SUCCEEDED",
+		5: "RESOURCE_EXECUTION_STATE_FAILED",
+		6: "RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN",
+		7: "RESOURCE_EXECUTION_STATE_EXPIRED",
+		8: "RESOURCE_EXECUTION_STATE_SUPERSEDED",
+		9: "RESOURCE_EXECUTION_STATE_PREPARING",
 	}
-	ServiceExecutionState_value = map[string]int32{
-		"SERVICE_EXECUTION_STATE_UNSPECIFIED":     0,
-		"SERVICE_EXECUTION_STATE_PREPARED":        1,
-		"SERVICE_EXECUTION_STATE_QUEUED":          2,
-		"SERVICE_EXECUTION_STATE_RUNNING":         3,
-		"SERVICE_EXECUTION_STATE_SUCCEEDED":       4,
-		"SERVICE_EXECUTION_STATE_FAILED":          5,
-		"SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN": 6,
-		"SERVICE_EXECUTION_STATE_EXPIRED":         7,
-		"SERVICE_EXECUTION_STATE_SUPERSEDED":      8,
+	ResourceExecutionState_value = map[string]int32{
+		"RESOURCE_EXECUTION_STATE_UNSPECIFIED":     0,
+		"RESOURCE_EXECUTION_STATE_PREPARED":        1,
+		"RESOURCE_EXECUTION_STATE_QUEUED":          2,
+		"RESOURCE_EXECUTION_STATE_RUNNING":         3,
+		"RESOURCE_EXECUTION_STATE_SUCCEEDED":       4,
+		"RESOURCE_EXECUTION_STATE_FAILED":          5,
+		"RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN": 6,
+		"RESOURCE_EXECUTION_STATE_EXPIRED":         7,
+		"RESOURCE_EXECUTION_STATE_SUPERSEDED":      8,
+		"RESOURCE_EXECUTION_STATE_PREPARING":       9,
 	}
 )
 
-func (x ServiceExecutionState) Enum() *ServiceExecutionState {
-	p := new(ServiceExecutionState)
+func (x ResourceExecutionState) Enum() *ResourceExecutionState {
+	p := new(ResourceExecutionState)
 	*p = x
 	return p
 }
 
-func (x ServiceExecutionState) String() string {
+func (x ResourceExecutionState) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (ServiceExecutionState) Descriptor() protoreflect.EnumDescriptor {
+func (ResourceExecutionState) Descriptor() protoreflect.EnumDescriptor {
 	return file_lindm_agent_v1_service_execution_proto_enumTypes[0].Descriptor()
 }
 
-func (ServiceExecutionState) Type() protoreflect.EnumType {
+func (ResourceExecutionState) Type() protoreflect.EnumType {
 	return &file_lindm_agent_v1_service_execution_proto_enumTypes[0]
 }
 
-func (x ServiceExecutionState) Number() protoreflect.EnumNumber {
+func (x ResourceExecutionState) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use ServiceExecutionState.Descriptor instead.
-func (ServiceExecutionState) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ResourceExecutionState.Descriptor instead.
+func (ResourceExecutionState) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{0}
 }
 
-type ServiceExecutionFailure int32
+type ResourceExecutionFailure int32
 
 const (
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_UNSPECIFIED  ServiceExecutionFailure = 0
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE         ServiceExecutionFailure = 1
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_PRECONDITION ServiceExecutionFailure = 2
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_UNSUPPORTED  ServiceExecutionFailure = 3
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NATIVE       ServiceExecutionFailure = 4
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_OBSERVATION  ServiceExecutionFailure = 5
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_AUTHORITY    ServiceExecutionFailure = 6
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_EXPIRED      ServiceExecutionFailure = 7
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_INTERRUPTED  ServiceExecutionFailure = 8
-	ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_SUPERSEDED   ServiceExecutionFailure = 9
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED   ResourceExecutionFailure = 0
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NONE          ResourceExecutionFailure = 1
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION  ResourceExecutionFailure = 2
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED   ResourceExecutionFailure = 3
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE        ResourceExecutionFailure = 4
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_OBSERVATION   ResourceExecutionFailure = 5
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_AUTHORITY     ResourceExecutionFailure = 6
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED       ResourceExecutionFailure = 7
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_INTERRUPTED   ResourceExecutionFailure = 8
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_SUPERSEDED    ResourceExecutionFailure = 9
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_POSTCONDITION ResourceExecutionFailure = 10
 )
 
-// Enum value maps for ServiceExecutionFailure.
+// Enum value maps for ResourceExecutionFailure.
 var (
-	ServiceExecutionFailure_name = map[int32]string{
-		0: "SERVICE_EXECUTION_FAILURE_UNSPECIFIED",
-		1: "SERVICE_EXECUTION_FAILURE_NONE",
-		2: "SERVICE_EXECUTION_FAILURE_PRECONDITION",
-		3: "SERVICE_EXECUTION_FAILURE_UNSUPPORTED",
-		4: "SERVICE_EXECUTION_FAILURE_NATIVE",
-		5: "SERVICE_EXECUTION_FAILURE_OBSERVATION",
-		6: "SERVICE_EXECUTION_FAILURE_AUTHORITY",
-		7: "SERVICE_EXECUTION_FAILURE_EXPIRED",
-		8: "SERVICE_EXECUTION_FAILURE_INTERRUPTED",
-		9: "SERVICE_EXECUTION_FAILURE_SUPERSEDED",
+	ResourceExecutionFailure_name = map[int32]string{
+		0:  "RESOURCE_EXECUTION_FAILURE_UNSPECIFIED",
+		1:  "RESOURCE_EXECUTION_FAILURE_NONE",
+		2:  "RESOURCE_EXECUTION_FAILURE_PRECONDITION",
+		3:  "RESOURCE_EXECUTION_FAILURE_UNSUPPORTED",
+		4:  "RESOURCE_EXECUTION_FAILURE_NATIVE",
+		5:  "RESOURCE_EXECUTION_FAILURE_OBSERVATION",
+		6:  "RESOURCE_EXECUTION_FAILURE_AUTHORITY",
+		7:  "RESOURCE_EXECUTION_FAILURE_EXPIRED",
+		8:  "RESOURCE_EXECUTION_FAILURE_INTERRUPTED",
+		9:  "RESOURCE_EXECUTION_FAILURE_SUPERSEDED",
+		10: "RESOURCE_EXECUTION_FAILURE_POSTCONDITION",
 	}
-	ServiceExecutionFailure_value = map[string]int32{
-		"SERVICE_EXECUTION_FAILURE_UNSPECIFIED":  0,
-		"SERVICE_EXECUTION_FAILURE_NONE":         1,
-		"SERVICE_EXECUTION_FAILURE_PRECONDITION": 2,
-		"SERVICE_EXECUTION_FAILURE_UNSUPPORTED":  3,
-		"SERVICE_EXECUTION_FAILURE_NATIVE":       4,
-		"SERVICE_EXECUTION_FAILURE_OBSERVATION":  5,
-		"SERVICE_EXECUTION_FAILURE_AUTHORITY":    6,
-		"SERVICE_EXECUTION_FAILURE_EXPIRED":      7,
-		"SERVICE_EXECUTION_FAILURE_INTERRUPTED":  8,
-		"SERVICE_EXECUTION_FAILURE_SUPERSEDED":   9,
+	ResourceExecutionFailure_value = map[string]int32{
+		"RESOURCE_EXECUTION_FAILURE_UNSPECIFIED":   0,
+		"RESOURCE_EXECUTION_FAILURE_NONE":          1,
+		"RESOURCE_EXECUTION_FAILURE_PRECONDITION":  2,
+		"RESOURCE_EXECUTION_FAILURE_UNSUPPORTED":   3,
+		"RESOURCE_EXECUTION_FAILURE_NATIVE":        4,
+		"RESOURCE_EXECUTION_FAILURE_OBSERVATION":   5,
+		"RESOURCE_EXECUTION_FAILURE_AUTHORITY":     6,
+		"RESOURCE_EXECUTION_FAILURE_EXPIRED":       7,
+		"RESOURCE_EXECUTION_FAILURE_INTERRUPTED":   8,
+		"RESOURCE_EXECUTION_FAILURE_SUPERSEDED":    9,
+		"RESOURCE_EXECUTION_FAILURE_POSTCONDITION": 10,
 	}
 )
 
-func (x ServiceExecutionFailure) Enum() *ServiceExecutionFailure {
-	p := new(ServiceExecutionFailure)
+func (x ResourceExecutionFailure) Enum() *ResourceExecutionFailure {
+	p := new(ResourceExecutionFailure)
 	*p = x
 	return p
 }
 
-func (x ServiceExecutionFailure) String() string {
+func (x ResourceExecutionFailure) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (ServiceExecutionFailure) Descriptor() protoreflect.EnumDescriptor {
+func (ResourceExecutionFailure) Descriptor() protoreflect.EnumDescriptor {
 	return file_lindm_agent_v1_service_execution_proto_enumTypes[1].Descriptor()
 }
 
-func (ServiceExecutionFailure) Type() protoreflect.EnumType {
+func (ResourceExecutionFailure) Type() protoreflect.EnumType {
 	return &file_lindm_agent_v1_service_execution_proto_enumTypes[1]
 }
 
-func (x ServiceExecutionFailure) Number() protoreflect.EnumNumber {
+func (x ResourceExecutionFailure) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use ServiceExecutionFailure.Descriptor instead.
-func (ServiceExecutionFailure) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ResourceExecutionFailure.Descriptor instead.
+func (ResourceExecutionFailure) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{1}
 }
 
-// Plan-role DSSE payload application/vnd.lindm.service-intent.v1+protobuf.
+type ResourceAdmissionRefusalReason int32
+
+const (
+	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED        ResourceAdmissionRefusalReason = 0
+	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN   ResourceAdmissionRefusalReason = 1
+	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE ResourceAdmissionRefusalReason = 2
+	ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION       ResourceAdmissionRefusalReason = 3
+)
+
+// Enum value maps for ResourceAdmissionRefusalReason.
+var (
+	ResourceAdmissionRefusalReason_name = map[int32]string{
+		0: "RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED",
+		1: "RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN",
+		2: "RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE",
+		3: "RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION",
+	}
+	ResourceAdmissionRefusalReason_value = map[string]int32{
+		"RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED":        0,
+		"RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN":   1,
+		"RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE": 2,
+		"RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION":       3,
+	}
+)
+
+func (x ResourceAdmissionRefusalReason) Enum() *ResourceAdmissionRefusalReason {
+	p := new(ResourceAdmissionRefusalReason)
+	*p = x
+	return p
+}
+
+func (x ResourceAdmissionRefusalReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResourceAdmissionRefusalReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_service_execution_proto_enumTypes[2].Descriptor()
+}
+
+func (ResourceAdmissionRefusalReason) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_service_execution_proto_enumTypes[2]
+}
+
+func (x ResourceAdmissionRefusalReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResourceAdmissionRefusalReason.Descriptor instead.
+func (ResourceAdmissionRefusalReason) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{2}
+}
+
+// Plan-role DSSE payload application/vnd.lindm.execution-intent.v1+protobuf.
 // This authorizes preflight, not a native effect. Sequence is monotonic for this
 // device generation and canonical service resource, including after removal.
-type ServiceExecutionIntent struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	DeploymentId         string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
-	DeviceId             string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	EnrollmentGeneration string                 `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
-	ActionId             string                 `protobuf:"bytes,4,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	DesiredRevision      string                 `protobuf:"bytes,5,opt,name=desired_revision,json=desiredRevision,proto3" json:"desired_revision,omitempty"`
-	ActorId              string                 `protobuf:"bytes,6,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
-	ResourceSequence     uint64                 `protobuf:"varint,7,opt,name=resource_sequence,json=resourceSequence,proto3" json:"resource_sequence,omitempty"`
-	RecoveryEpoch        uint64                 `protobuf:"varint,8,opt,name=recovery_epoch,json=recoveryEpoch,proto3" json:"recovery_epoch,omitempty"`
-	RootVersion          uint64                 `protobuf:"varint,9,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
-	DelegationVersion    uint64                 `protobuf:"varint,10,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
-	AuthorizationVersion uint64                 `protobuf:"varint,11,opt,name=authorization_version,json=authorizationVersion,proto3" json:"authorization_version,omitempty"`
-	NotBefore            *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
-	ExpiresAt            *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	Desired              *ServiceDesiredState   `protobuf:"bytes,14,opt,name=desired,proto3" json:"desired,omitempty"`
+type ResourceExecutionIntent struct {
+	state                protoimpl.MessageState        `protogen:"open.v1"`
+	DeploymentId         string                        `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	DeviceId             string                        `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	EnrollmentGeneration string                        `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
+	ActionId             string                        `protobuf:"bytes,4,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	DesiredRevision      string                        `protobuf:"bytes,5,opt,name=desired_revision,json=desiredRevision,proto3" json:"desired_revision,omitempty"`
+	ActorId              string                        `protobuf:"bytes,6,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	ResourceSequence     uint64                        `protobuf:"varint,7,opt,name=resource_sequence,json=resourceSequence,proto3" json:"resource_sequence,omitempty"`
+	RecoveryEpoch        uint64                        `protobuf:"varint,8,opt,name=recovery_epoch,json=recoveryEpoch,proto3" json:"recovery_epoch,omitempty"`
+	RootVersion          uint64                        `protobuf:"varint,9,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
+	DelegationVersion    uint64                        `protobuf:"varint,10,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
+	AuthorizationVersion uint64                        `protobuf:"varint,11,opt,name=authorization_version,json=authorizationVersion,proto3" json:"authorization_version,omitempty"`
+	NotBefore            *timestamppb.Timestamp        `protobuf:"bytes,12,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
+	ExpiresAt            *timestamppb.Timestamp        `protobuf:"bytes,13,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Desired              *v1.ResourceDesiredState      `protobuf:"bytes,14,opt,name=desired,proto3" json:"desired,omitempty"`
+	Operation            v1.ResourceOperation          `protobuf:"varint,15,opt,name=operation,proto3,enum=lindm.resource.v1.ResourceOperation" json:"operation,omitempty"`
+	Ownership            *ResourceOwnershipBinding     `protobuf:"bytes,16,opt,name=ownership,proto3" json:"ownership,omitempty"`
+	Preparation          *ResourceExecutionPreparation `protobuf:"bytes,17,opt,name=preparation,proto3" json:"preparation,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionIntent) Reset() {
-	*x = ServiceExecutionIntent{}
+func (x *ResourceExecutionIntent) Reset() {
+	*x = ResourceExecutionIntent{}
 	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionIntent) String() string {
+func (x *ResourceExecutionIntent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionIntent) ProtoMessage() {}
+func (*ResourceExecutionIntent) ProtoMessage() {}
 
-func (x *ServiceExecutionIntent) ProtoReflect() protoreflect.Message {
+func (x *ResourceExecutionIntent) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -208,114 +271,243 @@ func (x *ServiceExecutionIntent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionIntent.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionIntent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ResourceExecutionIntent.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionIntent) Descriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ServiceExecutionIntent) GetDeploymentId() string {
+func (x *ResourceExecutionIntent) GetDeploymentId() string {
 	if x != nil {
 		return x.DeploymentId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetDeviceId() string {
+func (x *ResourceExecutionIntent) GetDeviceId() string {
 	if x != nil {
 		return x.DeviceId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetEnrollmentGeneration() string {
+func (x *ResourceExecutionIntent) GetEnrollmentGeneration() string {
 	if x != nil {
 		return x.EnrollmentGeneration
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetActionId() string {
+func (x *ResourceExecutionIntent) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetDesiredRevision() string {
+func (x *ResourceExecutionIntent) GetDesiredRevision() string {
 	if x != nil {
 		return x.DesiredRevision
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetActorId() string {
+func (x *ResourceExecutionIntent) GetActorId() string {
 	if x != nil {
 		return x.ActorId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionIntent) GetResourceSequence() uint64 {
+func (x *ResourceExecutionIntent) GetResourceSequence() uint64 {
 	if x != nil {
 		return x.ResourceSequence
 	}
 	return 0
 }
 
-func (x *ServiceExecutionIntent) GetRecoveryEpoch() uint64 {
+func (x *ResourceExecutionIntent) GetRecoveryEpoch() uint64 {
 	if x != nil {
 		return x.RecoveryEpoch
 	}
 	return 0
 }
 
-func (x *ServiceExecutionIntent) GetRootVersion() uint64 {
+func (x *ResourceExecutionIntent) GetRootVersion() uint64 {
 	if x != nil {
 		return x.RootVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionIntent) GetDelegationVersion() uint64 {
+func (x *ResourceExecutionIntent) GetDelegationVersion() uint64 {
 	if x != nil {
 		return x.DelegationVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionIntent) GetAuthorizationVersion() uint64 {
+func (x *ResourceExecutionIntent) GetAuthorizationVersion() uint64 {
 	if x != nil {
 		return x.AuthorizationVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionIntent) GetNotBefore() *timestamppb.Timestamp {
+func (x *ResourceExecutionIntent) GetNotBefore() *timestamppb.Timestamp {
 	if x != nil {
 		return x.NotBefore
 	}
 	return nil
 }
 
-func (x *ServiceExecutionIntent) GetExpiresAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionIntent) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
 	return nil
 }
 
-func (x *ServiceExecutionIntent) GetDesired() *ServiceDesiredState {
+func (x *ResourceExecutionIntent) GetDesired() *v1.ResourceDesiredState {
 	if x != nil {
 		return x.Desired
 	}
 	return nil
 }
 
-// Device-key DSSE payload application/vnd.lindm.service-challenge.v1+protobuf.
+func (x *ResourceExecutionIntent) GetOperation() v1.ResourceOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return v1.ResourceOperation(0)
+}
+
+func (x *ResourceExecutionIntent) GetOwnership() *ResourceOwnershipBinding {
+	if x != nil {
+		return x.Ownership
+	}
+	return nil
+}
+
+func (x *ResourceExecutionIntent) GetPreparation() *ResourceExecutionPreparation {
+	if x != nil {
+		return x.Preparation
+	}
+	return nil
+}
+
+// Signed limits for an independent, effect-free native staging unit. Retries
+// retain the same deadline, quota and action UUID, including across restarts.
+type ResourceExecutionPreparation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deadline      *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	MaxCacheBytes uint64                 `protobuf:"varint,2,opt,name=max_cache_bytes,json=maxCacheBytes,proto3" json:"max_cache_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceExecutionPreparation) Reset() {
+	*x = ResourceExecutionPreparation{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceExecutionPreparation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceExecutionPreparation) ProtoMessage() {}
+
+func (x *ResourceExecutionPreparation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceExecutionPreparation.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionPreparation) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ResourceExecutionPreparation) GetDeadline() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Deadline
+	}
+	return nil
+}
+
+func (x *ResourceExecutionPreparation) GetMaxCacheBytes() uint64 {
+	if x != nil {
+		return x.MaxCacheBytes
+	}
+	return 0
+}
+
+// Explicit evidence that staging ended without ever producing a native plan.
+// This is not a native observation, mutation result or convergence claim.
+type ResourcePreparationOutcome struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Preparation   *ResourceExecutionPreparation `protobuf:"bytes,1,opt,name=preparation,proto3" json:"preparation,omitempty"`
+	Failure       ResourceExecutionFailure      `protobuf:"varint,2,opt,name=failure,proto3,enum=lindm.agent.v1.ResourceExecutionFailure" json:"failure,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourcePreparationOutcome) Reset() {
+	*x = ResourcePreparationOutcome{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourcePreparationOutcome) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourcePreparationOutcome) ProtoMessage() {}
+
+func (x *ResourcePreparationOutcome) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourcePreparationOutcome.ProtoReflect.Descriptor instead.
+func (*ResourcePreparationOutcome) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ResourcePreparationOutcome) GetPreparation() *ResourceExecutionPreparation {
+	if x != nil {
+		return x.Preparation
+	}
+	return nil
+}
+
+func (x *ResourcePreparationOutcome) GetFailure() ResourceExecutionFailure {
+	if x != nil {
+		return x.Failure
+	}
+	return ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED
+}
+
+// Device-key DSSE payload application/vnd.lindm.execution-challenge.v1+protobuf.
 // Device authentication evidence only: its signature never grants execution.
 // The executor owns every field and retains the exact signed proof. Its local
 // CLOCK_BOOTTIME deadline is authoritative and includes time spent suspended.
-type ServiceExecutionChallenge struct {
+type ResourceExecutionChallenge struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId         string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
 	DeviceId             string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
@@ -332,25 +524,27 @@ type ServiceExecutionChallenge struct {
 	ExecutorIncarnation string                 `protobuf:"bytes,12,opt,name=executor_incarnation,json=executorIncarnation,proto3" json:"executor_incarnation,omitempty"`
 	IssuedAt            *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
 	ExpiresAt           *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Ref                 *v1.ResourceRef        `protobuf:"bytes,15,opt,name=ref,proto3" json:"ref,omitempty"`
+	Operation           v1.ResourceOperation   `protobuf:"varint,16,opt,name=operation,proto3,enum=lindm.resource.v1.ResourceOperation" json:"operation,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionChallenge) Reset() {
-	*x = ServiceExecutionChallenge{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+func (x *ResourceExecutionChallenge) Reset() {
+	*x = ResourceExecutionChallenge{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionChallenge) String() string {
+func (x *ResourceExecutionChallenge) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionChallenge) ProtoMessage() {}
+func (*ResourceExecutionChallenge) ProtoMessage() {}
 
-func (x *ServiceExecutionChallenge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+func (x *ResourceExecutionChallenge) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,140 +555,154 @@ func (x *ServiceExecutionChallenge) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionChallenge.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionChallenge) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use ResourceExecutionChallenge.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionChallenge) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *ServiceExecutionChallenge) GetDeploymentId() string {
+func (x *ResourceExecutionChallenge) GetDeploymentId() string {
 	if x != nil {
 		return x.DeploymentId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetDeviceId() string {
+func (x *ResourceExecutionChallenge) GetDeviceId() string {
 	if x != nil {
 		return x.DeviceId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetEnrollmentGeneration() string {
+func (x *ResourceExecutionChallenge) GetEnrollmentGeneration() string {
 	if x != nil {
 		return x.EnrollmentGeneration
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetActionId() string {
+func (x *ResourceExecutionChallenge) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetDesiredRevision() string {
+func (x *ResourceExecutionChallenge) GetDesiredRevision() string {
 	if x != nil {
 		return x.DesiredRevision
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetResourceSequence() uint64 {
+func (x *ResourceExecutionChallenge) GetResourceSequence() uint64 {
 	if x != nil {
 		return x.ResourceSequence
 	}
 	return 0
 }
 
-func (x *ServiceExecutionChallenge) GetRecoveryEpoch() uint64 {
+func (x *ResourceExecutionChallenge) GetRecoveryEpoch() uint64 {
 	if x != nil {
 		return x.RecoveryEpoch
 	}
 	return 0
 }
 
-func (x *ServiceExecutionChallenge) GetIntentSha256() []byte {
+func (x *ResourceExecutionChallenge) GetIntentSha256() []byte {
 	if x != nil {
 		return x.IntentSha256
 	}
 	return nil
 }
 
-func (x *ServiceExecutionChallenge) GetNativePlanSha256() []byte {
+func (x *ResourceExecutionChallenge) GetNativePlanSha256() []byte {
 	if x != nil {
 		return x.NativePlanSha256
 	}
 	return nil
 }
 
-func (x *ServiceExecutionChallenge) GetNonce() []byte {
+func (x *ResourceExecutionChallenge) GetNonce() []byte {
 	if x != nil {
 		return x.Nonce
 	}
 	return nil
 }
 
-func (x *ServiceExecutionChallenge) GetBootId() string {
+func (x *ResourceExecutionChallenge) GetBootId() string {
 	if x != nil {
 		return x.BootId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetExecutorIncarnation() string {
+func (x *ResourceExecutionChallenge) GetExecutorIncarnation() string {
 	if x != nil {
 		return x.ExecutorIncarnation
 	}
 	return ""
 }
 
-func (x *ServiceExecutionChallenge) GetIssuedAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionChallenge) GetIssuedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.IssuedAt
 	}
 	return nil
 }
 
-func (x *ServiceExecutionChallenge) GetExpiresAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionChallenge) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
 	return nil
 }
 
-// Start-role DSSE payload application/vnd.lindm.service-start.v1+protobuf.
+func (x *ResourceExecutionChallenge) GetRef() *v1.ResourceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *ResourceExecutionChallenge) GetOperation() v1.ResourceOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return v1.ResourceOperation(0)
+}
+
+// Start-role DSSE payload application/vnd.lindm.execution-start.v1+protobuf.
 // The issuer must reauthorize the actor, desired head, generation and work fence
 // before signing. A transport peer or device challenge cannot replace this role.
-type ServiceExecutionStartGrant struct {
-	state                protoimpl.MessageState     `protogen:"open.v1"`
-	Challenge            *ServiceExecutionChallenge `protobuf:"bytes,1,opt,name=challenge,proto3" json:"challenge,omitempty"`
-	ActorId              string                     `protobuf:"bytes,2,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
-	AuthorizationVersion uint64                     `protobuf:"varint,3,opt,name=authorization_version,json=authorizationVersion,proto3" json:"authorization_version,omitempty"`
-	RootVersion          uint64                     `protobuf:"varint,4,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
-	DelegationVersion    uint64                     `protobuf:"varint,5,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
-	NotBefore            *timestamppb.Timestamp     `protobuf:"bytes,6,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
-	ExpiresAt            *timestamppb.Timestamp     `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+type ResourceExecutionStartGrant struct {
+	state                protoimpl.MessageState      `protogen:"open.v1"`
+	Challenge            *ResourceExecutionChallenge `protobuf:"bytes,1,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	ActorId              string                      `protobuf:"bytes,2,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	AuthorizationVersion uint64                      `protobuf:"varint,3,opt,name=authorization_version,json=authorizationVersion,proto3" json:"authorization_version,omitempty"`
+	RootVersion          uint64                      `protobuf:"varint,4,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
+	DelegationVersion    uint64                      `protobuf:"varint,5,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
+	NotBefore            *timestamppb.Timestamp      `protobuf:"bytes,6,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
+	ExpiresAt            *timestamppb.Timestamp      `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionStartGrant) Reset() {
-	*x = ServiceExecutionStartGrant{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+func (x *ResourceExecutionStartGrant) Reset() {
+	*x = ResourceExecutionStartGrant{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionStartGrant) String() string {
+func (x *ResourceExecutionStartGrant) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionStartGrant) ProtoMessage() {}
+func (*ResourceExecutionStartGrant) ProtoMessage() {}
 
-func (x *ServiceExecutionStartGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+func (x *ResourceExecutionStartGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,54 +713,54 @@ func (x *ServiceExecutionStartGrant) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionStartGrant.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionStartGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{2}
+// Deprecated: Use ResourceExecutionStartGrant.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionStartGrant) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ServiceExecutionStartGrant) GetChallenge() *ServiceExecutionChallenge {
+func (x *ResourceExecutionStartGrant) GetChallenge() *ResourceExecutionChallenge {
 	if x != nil {
 		return x.Challenge
 	}
 	return nil
 }
 
-func (x *ServiceExecutionStartGrant) GetActorId() string {
+func (x *ResourceExecutionStartGrant) GetActorId() string {
 	if x != nil {
 		return x.ActorId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionStartGrant) GetAuthorizationVersion() uint64 {
+func (x *ResourceExecutionStartGrant) GetAuthorizationVersion() uint64 {
 	if x != nil {
 		return x.AuthorizationVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionStartGrant) GetRootVersion() uint64 {
+func (x *ResourceExecutionStartGrant) GetRootVersion() uint64 {
 	if x != nil {
 		return x.RootVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionStartGrant) GetDelegationVersion() uint64 {
+func (x *ResourceExecutionStartGrant) GetDelegationVersion() uint64 {
 	if x != nil {
 		return x.DelegationVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionStartGrant) GetNotBefore() *timestamppb.Timestamp {
+func (x *ResourceExecutionStartGrant) GetNotBefore() *timestamppb.Timestamp {
 	if x != nil {
 		return x.NotBefore
 	}
 	return nil
 }
 
-func (x *ServiceExecutionStartGrant) GetExpiresAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionStartGrant) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
@@ -561,49 +769,54 @@ func (x *ServiceExecutionStartGrant) GetExpiresAt() *timestamppb.Timestamp {
 
 // Protected journal data, not an RPC response. Historical trust verifies accepted
 // bytes at accepted_at; only CURRENT trust can authorize a new native effect.
-type ServiceExecutionRecord struct {
-	state                      protoimpl.MessageState     `protogen:"open.v1"`
-	FormatVersion              uint32                     `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
-	InstallationId             string                     `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	IntentEnvelope             []byte                     `protobuf:"bytes,3,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
-	IntentSha256               []byte                     `protobuf:"bytes,4,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
-	Intent                     *ServiceExecutionIntent    `protobuf:"bytes,5,opt,name=intent,proto3" json:"intent,omitempty"`
-	NativePlan                 *ServicePlan               `protobuf:"bytes,6,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
-	AcceptedRoot               *ExecutionRoot             `protobuf:"bytes,7,opt,name=accepted_root,json=acceptedRoot,proto3" json:"accepted_root,omitempty"`
-	AcceptedDelegationEnvelope []byte                     `protobuf:"bytes,8,opt,name=accepted_delegation_envelope,json=acceptedDelegationEnvelope,proto3" json:"accepted_delegation_envelope,omitempty"`
-	AcceptedAt                 *timestamppb.Timestamp     `protobuf:"bytes,9,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
-	State                      ServiceExecutionState      `protobuf:"varint,10,opt,name=state,proto3,enum=lindm.agent.v1.ServiceExecutionState" json:"state,omitempty"`
-	Failure                    ServiceExecutionFailure    `protobuf:"varint,11,opt,name=failure,proto3,enum=lindm.agent.v1.ServiceExecutionFailure" json:"failure,omitempty"`
-	Challenge                  *ServiceExecutionChallenge `protobuf:"bytes,12,opt,name=challenge,proto3" json:"challenge,omitempty"`
-	ChallengeProof             []byte                     `protobuf:"bytes,13,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
-	ChallengeBoottimeNs        uint64                     `protobuf:"varint,14,opt,name=challenge_boottime_ns,json=challengeBoottimeNs,proto3" json:"challenge_boottime_ns,omitempty"`
-	StartGrantEnvelope         []byte                     `protobuf:"bytes,15,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
-	StartGrantSha256           []byte                     `protobuf:"bytes,16,opt,name=start_grant_sha256,json=startGrantSha256,proto3" json:"start_grant_sha256,omitempty"`
-	StartedAt                  *timestamppb.Timestamp     `protobuf:"bytes,17,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	CompletedAt                *timestamppb.Timestamp     `protobuf:"bytes,18,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	Verification               *ServiceVerification       `protobuf:"bytes,19,opt,name=verification,proto3" json:"verification,omitempty"`
+type ResourceExecutionRecord struct {
+	state                      protoimpl.MessageState      `protogen:"open.v1"`
+	FormatVersion              uint32                      `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
+	InstallationId             string                      `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	IntentEnvelope             []byte                      `protobuf:"bytes,3,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
+	IntentSha256               []byte                      `protobuf:"bytes,4,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
+	Intent                     *ResourceExecutionIntent    `protobuf:"bytes,5,opt,name=intent,proto3" json:"intent,omitempty"`
+	NativePlan                 *v1.ResourcePlan            `protobuf:"bytes,6,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
+	AcceptedRoot               *ExecutionRoot              `protobuf:"bytes,7,opt,name=accepted_root,json=acceptedRoot,proto3" json:"accepted_root,omitempty"`
+	AcceptedDelegationEnvelope []byte                      `protobuf:"bytes,8,opt,name=accepted_delegation_envelope,json=acceptedDelegationEnvelope,proto3" json:"accepted_delegation_envelope,omitempty"`
+	AcceptedAt                 *timestamppb.Timestamp      `protobuf:"bytes,9,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	State                      ResourceExecutionState      `protobuf:"varint,10,opt,name=state,proto3,enum=lindm.agent.v1.ResourceExecutionState" json:"state,omitempty"`
+	Failure                    ResourceExecutionFailure    `protobuf:"varint,11,opt,name=failure,proto3,enum=lindm.agent.v1.ResourceExecutionFailure" json:"failure,omitempty"`
+	Challenge                  *ResourceExecutionChallenge `protobuf:"bytes,12,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	ChallengeProof             []byte                      `protobuf:"bytes,13,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
+	ChallengeBoottimeNs        uint64                      `protobuf:"varint,14,opt,name=challenge_boottime_ns,json=challengeBoottimeNs,proto3" json:"challenge_boottime_ns,omitempty"`
+	StartGrantEnvelope         []byte                      `protobuf:"bytes,15,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
+	StartGrantSha256           []byte                      `protobuf:"bytes,16,opt,name=start_grant_sha256,json=startGrantSha256,proto3" json:"start_grant_sha256,omitempty"`
+	StartedAt                  *timestamppb.Timestamp      `protobuf:"bytes,17,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt                *timestamppb.Timestamp      `protobuf:"bytes,18,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	Verification               *v1.ResourceVerification    `protobuf:"bytes,19,opt,name=verification,proto3" json:"verification,omitempty"`
 	// Public signing certificate retained for historical proof after TLS renewal.
-	ChallengeCertificatePem []byte                 `protobuf:"bytes,20,opt,name=challenge_certificate_pem,json=challengeCertificatePem,proto3" json:"challenge_certificate_pem,omitempty"`
-	GrantAcceptedAt         *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=grant_accepted_at,json=grantAcceptedAt,proto3" json:"grant_accepted_at,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	ChallengeCertificatePem []byte                      `protobuf:"bytes,20,opt,name=challenge_certificate_pem,json=challengeCertificatePem,proto3" json:"challenge_certificate_pem,omitempty"`
+	GrantAcceptedAt         *timestamppb.Timestamp      `protobuf:"bytes,21,opt,name=grant_accepted_at,json=grantAcceptedAt,proto3" json:"grant_accepted_at,omitempty"`
+	PreparationOutcome      *ResourcePreparationOutcome `protobuf:"bytes,22,opt,name=preparation_outcome,json=preparationOutcome,proto3" json:"preparation_outcome,omitempty"`
+	AdmissionRefusal        *ResourceAdmissionRefusal   `protobuf:"bytes,23,opt,name=admission_refusal,json=admissionRefusal,proto3" json:"admission_refusal,omitempty"`
+	// Full signed packet/native verdict proof stays in root custody. Attestations
+	// expose its digest through the verification receipts, not private endpoints.
+	FirewallEvidence *ConnectivityVerificationEvidence `protobuf:"bytes,24,opt,name=firewall_evidence,json=firewallEvidence,proto3" json:"firewall_evidence,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionRecord) Reset() {
-	*x = ServiceExecutionRecord{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
+func (x *ResourceExecutionRecord) Reset() {
+	*x = ResourceExecutionRecord{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionRecord) String() string {
+func (x *ResourceExecutionRecord) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionRecord) ProtoMessage() {}
+func (*ResourceExecutionRecord) ProtoMessage() {}
 
-func (x *ServiceExecutionRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
+func (x *ResourceExecutionRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -614,180 +827,201 @@ func (x *ServiceExecutionRecord) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionRecord.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionRecord) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use ResourceExecutionRecord.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionRecord) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ServiceExecutionRecord) GetFormatVersion() uint32 {
+func (x *ResourceExecutionRecord) GetFormatVersion() uint32 {
 	if x != nil {
 		return x.FormatVersion
 	}
 	return 0
 }
 
-func (x *ServiceExecutionRecord) GetInstallationId() string {
+func (x *ResourceExecutionRecord) GetInstallationId() string {
 	if x != nil {
 		return x.InstallationId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionRecord) GetIntentEnvelope() []byte {
+func (x *ResourceExecutionRecord) GetIntentEnvelope() []byte {
 	if x != nil {
 		return x.IntentEnvelope
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetIntentSha256() []byte {
+func (x *ResourceExecutionRecord) GetIntentSha256() []byte {
 	if x != nil {
 		return x.IntentSha256
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetIntent() *ServiceExecutionIntent {
+func (x *ResourceExecutionRecord) GetIntent() *ResourceExecutionIntent {
 	if x != nil {
 		return x.Intent
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetNativePlan() *ServicePlan {
+func (x *ResourceExecutionRecord) GetNativePlan() *v1.ResourcePlan {
 	if x != nil {
 		return x.NativePlan
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetAcceptedRoot() *ExecutionRoot {
+func (x *ResourceExecutionRecord) GetAcceptedRoot() *ExecutionRoot {
 	if x != nil {
 		return x.AcceptedRoot
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetAcceptedDelegationEnvelope() []byte {
+func (x *ResourceExecutionRecord) GetAcceptedDelegationEnvelope() []byte {
 	if x != nil {
 		return x.AcceptedDelegationEnvelope
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetAcceptedAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionRecord) GetAcceptedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AcceptedAt
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetState() ServiceExecutionState {
+func (x *ResourceExecutionRecord) GetState() ResourceExecutionState {
 	if x != nil {
 		return x.State
 	}
-	return ServiceExecutionState_SERVICE_EXECUTION_STATE_UNSPECIFIED
+	return ResourceExecutionState_RESOURCE_EXECUTION_STATE_UNSPECIFIED
 }
 
-func (x *ServiceExecutionRecord) GetFailure() ServiceExecutionFailure {
+func (x *ResourceExecutionRecord) GetFailure() ResourceExecutionFailure {
 	if x != nil {
 		return x.Failure
 	}
-	return ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_UNSPECIFIED
+	return ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED
 }
 
-func (x *ServiceExecutionRecord) GetChallenge() *ServiceExecutionChallenge {
+func (x *ResourceExecutionRecord) GetChallenge() *ResourceExecutionChallenge {
 	if x != nil {
 		return x.Challenge
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetChallengeProof() []byte {
+func (x *ResourceExecutionRecord) GetChallengeProof() []byte {
 	if x != nil {
 		return x.ChallengeProof
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetChallengeBoottimeNs() uint64 {
+func (x *ResourceExecutionRecord) GetChallengeBoottimeNs() uint64 {
 	if x != nil {
 		return x.ChallengeBoottimeNs
 	}
 	return 0
 }
 
-func (x *ServiceExecutionRecord) GetStartGrantEnvelope() []byte {
+func (x *ResourceExecutionRecord) GetStartGrantEnvelope() []byte {
 	if x != nil {
 		return x.StartGrantEnvelope
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetStartGrantSha256() []byte {
+func (x *ResourceExecutionRecord) GetStartGrantSha256() []byte {
 	if x != nil {
 		return x.StartGrantSha256
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetStartedAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionRecord) GetStartedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StartedAt
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetCompletedAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionRecord) GetCompletedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CompletedAt
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetVerification() *ServiceVerification {
+func (x *ResourceExecutionRecord) GetVerification() *v1.ResourceVerification {
 	if x != nil {
 		return x.Verification
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetChallengeCertificatePem() []byte {
+func (x *ResourceExecutionRecord) GetChallengeCertificatePem() []byte {
 	if x != nil {
 		return x.ChallengeCertificatePem
 	}
 	return nil
 }
 
-func (x *ServiceExecutionRecord) GetGrantAcceptedAt() *timestamppb.Timestamp {
+func (x *ResourceExecutionRecord) GetGrantAcceptedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.GrantAcceptedAt
 	}
 	return nil
 }
 
-type PrepareServiceExecutionRequest struct {
+func (x *ResourceExecutionRecord) GetPreparationOutcome() *ResourcePreparationOutcome {
+	if x != nil {
+		return x.PreparationOutcome
+	}
+	return nil
+}
+
+func (x *ResourceExecutionRecord) GetAdmissionRefusal() *ResourceAdmissionRefusal {
+	if x != nil {
+		return x.AdmissionRefusal
+	}
+	return nil
+}
+
+func (x *ResourceExecutionRecord) GetFirewallEvidence() *ConnectivityVerificationEvidence {
+	if x != nil {
+		return x.FirewallEvidence
+	}
+	return nil
+}
+
+type PrepareResourceExecutionRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	IntentEnvelope []byte                 `protobuf:"bytes,1,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *PrepareServiceExecutionRequest) Reset() {
-	*x = PrepareServiceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
+func (x *PrepareResourceExecutionRequest) Reset() {
+	*x = PrepareResourceExecutionRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PrepareServiceExecutionRequest) String() string {
+func (x *PrepareResourceExecutionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PrepareServiceExecutionRequest) ProtoMessage() {}
+func (*PrepareResourceExecutionRequest) ProtoMessage() {}
 
-func (x *PrepareServiceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
+func (x *PrepareResourceExecutionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,42 +1032,42 @@ func (x *PrepareServiceExecutionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PrepareServiceExecutionRequest.ProtoReflect.Descriptor instead.
-func (*PrepareServiceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{4}
+// Deprecated: Use PrepareResourceExecutionRequest.ProtoReflect.Descriptor instead.
+func (*PrepareResourceExecutionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *PrepareServiceExecutionRequest) GetIntentEnvelope() []byte {
+func (x *PrepareResourceExecutionRequest) GetIntentEnvelope() []byte {
 	if x != nil {
 		return x.IntentEnvelope
 	}
 	return nil
 }
 
-type PrepareServiceExecutionResponse struct {
-	state          protoimpl.MessageState  `protogen:"open.v1"`
-	Status         *ServiceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	NativePlan     *ServicePlan            `protobuf:"bytes,2,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
-	ChallengeProof []byte                  `protobuf:"bytes,3,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
+type PrepareResourceExecutionResponse struct {
+	state          protoimpl.MessageState   `protogen:"open.v1"`
+	Status         *ResourceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	NativePlan     *v1.ResourcePlan         `protobuf:"bytes,2,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
+	ChallengeProof []byte                   `protobuf:"bytes,3,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *PrepareServiceExecutionResponse) Reset() {
-	*x = PrepareServiceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
+func (x *PrepareResourceExecutionResponse) Reset() {
+	*x = PrepareResourceExecutionResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PrepareServiceExecutionResponse) String() string {
+func (x *PrepareResourceExecutionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PrepareServiceExecutionResponse) ProtoMessage() {}
+func (*PrepareResourceExecutionResponse) ProtoMessage() {}
 
-func (x *PrepareServiceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
+func (x *PrepareResourceExecutionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,33 +1078,33 @@ func (x *PrepareServiceExecutionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PrepareServiceExecutionResponse.ProtoReflect.Descriptor instead.
-func (*PrepareServiceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{5}
+// Deprecated: Use PrepareResourceExecutionResponse.ProtoReflect.Descriptor instead.
+func (*PrepareResourceExecutionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *PrepareServiceExecutionResponse) GetStatus() *ServiceExecutionStatus {
+func (x *PrepareResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-func (x *PrepareServiceExecutionResponse) GetNativePlan() *ServicePlan {
+func (x *PrepareResourceExecutionResponse) GetNativePlan() *v1.ResourcePlan {
 	if x != nil {
 		return x.NativePlan
 	}
 	return nil
 }
 
-func (x *PrepareServiceExecutionResponse) GetChallengeProof() []byte {
+func (x *PrepareResourceExecutionResponse) GetChallengeProof() []byte {
 	if x != nil {
 		return x.ChallengeProof
 	}
 	return nil
 }
 
-type StartServiceExecutionRequest struct {
+type StartResourceExecutionRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ActionId           string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	StartGrantEnvelope []byte                 `protobuf:"bytes,2,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
@@ -878,21 +1112,21 @@ type StartServiceExecutionRequest struct {
 	sizeCache          protoimpl.SizeCache
 }
 
-func (x *StartServiceExecutionRequest) Reset() {
-	*x = StartServiceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
+func (x *StartResourceExecutionRequest) Reset() {
+	*x = StartResourceExecutionRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StartServiceExecutionRequest) String() string {
+func (x *StartResourceExecutionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StartServiceExecutionRequest) ProtoMessage() {}
+func (*StartResourceExecutionRequest) ProtoMessage() {}
 
-func (x *StartServiceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
+func (x *StartResourceExecutionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -903,47 +1137,47 @@ func (x *StartServiceExecutionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StartServiceExecutionRequest.ProtoReflect.Descriptor instead.
-func (*StartServiceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{6}
+// Deprecated: Use StartResourceExecutionRequest.ProtoReflect.Descriptor instead.
+func (*StartResourceExecutionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *StartServiceExecutionRequest) GetActionId() string {
+func (x *StartResourceExecutionRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *StartServiceExecutionRequest) GetStartGrantEnvelope() []byte {
+func (x *StartResourceExecutionRequest) GetStartGrantEnvelope() []byte {
 	if x != nil {
 		return x.StartGrantEnvelope
 	}
 	return nil
 }
 
-type StartServiceExecutionResponse struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Status        *ServiceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+type StartResourceExecutionResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Status        *ResourceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StartServiceExecutionResponse) Reset() {
-	*x = StartServiceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
+func (x *StartResourceExecutionResponse) Reset() {
+	*x = StartResourceExecutionResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StartServiceExecutionResponse) String() string {
+func (x *StartResourceExecutionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StartServiceExecutionResponse) ProtoMessage() {}
+func (*StartResourceExecutionResponse) ProtoMessage() {}
 
-func (x *StartServiceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
+func (x *StartResourceExecutionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -954,40 +1188,40 @@ func (x *StartServiceExecutionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StartServiceExecutionResponse.ProtoReflect.Descriptor instead.
-func (*StartServiceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{7}
+// Deprecated: Use StartResourceExecutionResponse.ProtoReflect.Descriptor instead.
+func (*StartResourceExecutionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *StartServiceExecutionResponse) GetStatus() *ServiceExecutionStatus {
+func (x *StartResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-type GetServiceExecutionRequest struct {
+type GetResourceExecutionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceExecutionRequest) Reset() {
-	*x = GetServiceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
+func (x *GetResourceExecutionRequest) Reset() {
+	*x = GetResourceExecutionRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceExecutionRequest) String() string {
+func (x *GetResourceExecutionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceExecutionRequest) ProtoMessage() {}
+func (*GetResourceExecutionRequest) ProtoMessage() {}
 
-func (x *GetServiceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
+func (x *GetResourceExecutionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -998,40 +1232,40 @@ func (x *GetServiceExecutionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceExecutionRequest.ProtoReflect.Descriptor instead.
-func (*GetServiceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{8}
+// Deprecated: Use GetResourceExecutionRequest.ProtoReflect.Descriptor instead.
+func (*GetResourceExecutionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *GetServiceExecutionRequest) GetActionId() string {
+func (x *GetResourceExecutionRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-type GetServiceExecutionResponse struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Status        *ServiceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+type GetResourceExecutionResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Status        *ResourceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceExecutionResponse) Reset() {
-	*x = GetServiceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
+func (x *GetResourceExecutionResponse) Reset() {
+	*x = GetResourceExecutionResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceExecutionResponse) String() string {
+func (x *GetResourceExecutionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceExecutionResponse) ProtoMessage() {}
+func (*GetResourceExecutionResponse) ProtoMessage() {}
 
-func (x *GetServiceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
+func (x *GetResourceExecutionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1042,49 +1276,41 @@ func (x *GetServiceExecutionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceExecutionResponse.ProtoReflect.Descriptor instead.
-func (*GetServiceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{9}
+// Deprecated: Use GetResourceExecutionResponse.ProtoReflect.Descriptor instead.
+func (*GetResourceExecutionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *GetServiceExecutionResponse) GetStatus() *ServiceExecutionStatus {
+func (x *GetResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-// Public evidence; never contains private keys or retained signed authority.
-type ServiceExecutionStatus struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	ActionId      string                  `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	IntentSha256  []byte                  `protobuf:"bytes,2,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
-	State         ServiceExecutionState   `protobuf:"varint,3,opt,name=state,proto3,enum=lindm.agent.v1.ServiceExecutionState" json:"state,omitempty"`
-	Failure       ServiceExecutionFailure `protobuf:"varint,4,opt,name=failure,proto3,enum=lindm.agent.v1.ServiceExecutionFailure" json:"failure,omitempty"`
-	AcceptedAt    *timestamppb.Timestamp  `protobuf:"bytes,5,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
-	StartedAt     *timestamppb.Timestamp  `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	CompletedAt   *timestamppb.Timestamp  `protobuf:"bytes,7,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	Before        *ServiceObservation     `protobuf:"bytes,8,opt,name=before,proto3" json:"before,omitempty"`
-	Verification  *ServiceVerification    `protobuf:"bytes,9,opt,name=verification,proto3" json:"verification,omitempty"`
+type CancelResourcePreparationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	IntentSha256  []byte                 `protobuf:"bytes,2,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionStatus) Reset() {
-	*x = ServiceExecutionStatus{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
+func (x *CancelResourcePreparationRequest) Reset() {
+	*x = CancelResourcePreparationRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionStatus) String() string {
+func (x *CancelResourcePreparationRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionStatus) ProtoMessage() {}
+func (*CancelResourcePreparationRequest) ProtoMessage() {}
 
-func (x *ServiceExecutionStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
+func (x *CancelResourcePreparationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1095,106 +1321,50 @@ func (x *ServiceExecutionStatus) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionStatus.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{10}
+// Deprecated: Use CancelResourcePreparationRequest.ProtoReflect.Descriptor instead.
+func (*CancelResourcePreparationRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *ServiceExecutionStatus) GetActionId() string {
+func (x *CancelResourcePreparationRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ServiceExecutionStatus) GetIntentSha256() []byte {
+func (x *CancelResourcePreparationRequest) GetIntentSha256() []byte {
 	if x != nil {
 		return x.IntentSha256
 	}
 	return nil
 }
 
-func (x *ServiceExecutionStatus) GetState() ServiceExecutionState {
-	if x != nil {
-		return x.State
-	}
-	return ServiceExecutionState_SERVICE_EXECUTION_STATE_UNSPECIFIED
+type CancelResourcePreparationResponse struct {
+	state  protoimpl.MessageState   `protogen:"open.v1"`
+	Status *ResourceExecutionStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	// A protected cancellation tombstone was persisted before any preparation.
+	// This denies future work; it is not native or historical execution evidence.
+	NeverPrepared bool `protobuf:"varint,2,opt,name=never_prepared,json=neverPrepared,proto3" json:"never_prepared,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ServiceExecutionStatus) GetFailure() ServiceExecutionFailure {
-	if x != nil {
-		return x.Failure
-	}
-	return ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_UNSPECIFIED
-}
-
-func (x *ServiceExecutionStatus) GetAcceptedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.AcceptedAt
-	}
-	return nil
-}
-
-func (x *ServiceExecutionStatus) GetStartedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.StartedAt
-	}
-	return nil
-}
-
-func (x *ServiceExecutionStatus) GetCompletedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CompletedAt
-	}
-	return nil
-}
-
-func (x *ServiceExecutionStatus) GetBefore() *ServiceObservation {
-	if x != nil {
-		return x.Before
-	}
-	return nil
-}
-
-func (x *ServiceExecutionStatus) GetVerification() *ServiceVerification {
-	if x != nil {
-		return x.Verification
-	}
-	return nil
-}
-
-// A fresh device-authenticated snapshot of protected history, not a fresh native
-// observation, current compliance, or permission to perform an effect.
-type ServiceExecutionAttestation struct {
-	state                protoimpl.MessageState  `protogen:"open.v1"`
-	DeploymentId         string                  `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
-	DeviceId             string                  `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	EnrollmentGeneration string                  `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
-	SessionEpoch         uint64                  `protobuf:"varint,4,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
-	ActionRevision       uint64                  `protobuf:"varint,5,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
-	Nonce                []byte                  `protobuf:"bytes,6,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	IssuedAt             *timestamppb.Timestamp  `protobuf:"bytes,7,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
-	ExpiresAt            *timestamppb.Timestamp  `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	Status               *ServiceExecutionStatus `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *ServiceExecutionAttestation) Reset() {
-	*x = ServiceExecutionAttestation{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+func (x *CancelResourcePreparationResponse) Reset() {
+	*x = CancelResourcePreparationResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceExecutionAttestation) String() string {
+func (x *CancelResourcePreparationResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceExecutionAttestation) ProtoMessage() {}
+func (*CancelResourcePreparationResponse) ProtoMessage() {}
 
-func (x *ServiceExecutionAttestation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+func (x *CancelResourcePreparationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,75 +1375,370 @@ func (x *ServiceExecutionAttestation) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceExecutionAttestation.ProtoReflect.Descriptor instead.
-func (*ServiceExecutionAttestation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{11}
+// Deprecated: Use CancelResourcePreparationResponse.ProtoReflect.Descriptor instead.
+func (*CancelResourcePreparationResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *ServiceExecutionAttestation) GetDeploymentId() string {
-	if x != nil {
-		return x.DeploymentId
-	}
-	return ""
-}
-
-func (x *ServiceExecutionAttestation) GetDeviceId() string {
-	if x != nil {
-		return x.DeviceId
-	}
-	return ""
-}
-
-func (x *ServiceExecutionAttestation) GetEnrollmentGeneration() string {
-	if x != nil {
-		return x.EnrollmentGeneration
-	}
-	return ""
-}
-
-func (x *ServiceExecutionAttestation) GetSessionEpoch() uint64 {
-	if x != nil {
-		return x.SessionEpoch
-	}
-	return 0
-}
-
-func (x *ServiceExecutionAttestation) GetActionRevision() uint64 {
-	if x != nil {
-		return x.ActionRevision
-	}
-	return 0
-}
-
-func (x *ServiceExecutionAttestation) GetNonce() []byte {
-	if x != nil {
-		return x.Nonce
-	}
-	return nil
-}
-
-func (x *ServiceExecutionAttestation) GetIssuedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.IssuedAt
-	}
-	return nil
-}
-
-func (x *ServiceExecutionAttestation) GetExpiresAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ExpiresAt
-	}
-	return nil
-}
-
-func (x *ServiceExecutionAttestation) GetStatus() *ServiceExecutionStatus {
+func (x *CancelResourcePreparationResponse) GetStatus() *ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-type AttestServiceExecutionRequest struct {
+func (x *CancelResourcePreparationResponse) GetNeverPrepared() bool {
+	if x != nil {
+		return x.NeverPrepared
+	}
+	return false
+}
+
+// Public evidence; never contains private keys or retained signed authority.
+type ResourceExecutionStatus struct {
+	state              protoimpl.MessageState       `protogen:"open.v1"`
+	ActionId           string                       `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	IntentSha256       []byte                       `protobuf:"bytes,2,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
+	State              ResourceExecutionState       `protobuf:"varint,3,opt,name=state,proto3,enum=lindm.agent.v1.ResourceExecutionState" json:"state,omitempty"`
+	Failure            ResourceExecutionFailure     `protobuf:"varint,4,opt,name=failure,proto3,enum=lindm.agent.v1.ResourceExecutionFailure" json:"failure,omitempty"`
+	AcceptedAt         *timestamppb.Timestamp       `protobuf:"bytes,5,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	StartedAt          *timestamppb.Timestamp       `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt        *timestamppb.Timestamp       `protobuf:"bytes,7,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	Before             *v1.ResourceObservation      `protobuf:"bytes,8,opt,name=before,proto3" json:"before,omitempty"`
+	Verification       *v1.ResourceVerification     `protobuf:"bytes,9,opt,name=verification,proto3" json:"verification,omitempty"`
+	PreparationOutcome *ResourcePreparationOutcome  `protobuf:"bytes,10,opt,name=preparation_outcome,json=preparationOutcome,proto3" json:"preparation_outcome,omitempty"`
+	Remediations       []*ResourceActionRemediation `protobuf:"bytes,11,rep,name=remediations,proto3" json:"remediations,omitempty"`
+	// Authenticated no-effect finding, not a native mutation or start authority.
+	ReadOnly         bool                      `protobuf:"varint,12,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
+	AdmissionRefusal *ResourceAdmissionRefusal `protobuf:"bytes,13,opt,name=admission_refusal,json=admissionRefusal,proto3" json:"admission_refusal,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ResourceExecutionStatus) Reset() {
+	*x = ResourceExecutionStatus{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceExecutionStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceExecutionStatus) ProtoMessage() {}
+
+func (x *ResourceExecutionStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceExecutionStatus.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionStatus) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ResourceExecutionStatus) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *ResourceExecutionStatus) GetIntentSha256() []byte {
+	if x != nil {
+		return x.IntentSha256
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetState() ResourceExecutionState {
+	if x != nil {
+		return x.State
+	}
+	return ResourceExecutionState_RESOURCE_EXECUTION_STATE_UNSPECIFIED
+}
+
+func (x *ResourceExecutionStatus) GetFailure() ResourceExecutionFailure {
+	if x != nil {
+		return x.Failure
+	}
+	return ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED
+}
+
+func (x *ResourceExecutionStatus) GetAcceptedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AcceptedAt
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetBefore() *v1.ResourceObservation {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetVerification() *v1.ResourceVerification {
+	if x != nil {
+		return x.Verification
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetPreparationOutcome() *ResourcePreparationOutcome {
+	if x != nil {
+		return x.PreparationOutcome
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetRemediations() []*ResourceActionRemediation {
+	if x != nil {
+		return x.Remediations
+	}
+	return nil
+}
+
+func (x *ResourceExecutionStatus) GetReadOnly() bool {
+	if x != nil {
+		return x.ReadOnly
+	}
+	return false
+}
+
+func (x *ResourceExecutionStatus) GetAdmissionRefusal() *ResourceAdmissionRefusal {
+	if x != nil {
+		return x.AdmissionRefusal
+	}
+	return nil
+}
+
+// A typed recommendation to open an existing device action workflow. This is
+// not a DeviceActionSpec, a grant, or permission to perform any remediation.
+type ResourceActionRemediation struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Target *StorageTarget         `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	// Types that are valid to be assigned to Action:
+	//
+	//	*ResourceActionRemediation_EscrowRotate
+	//	*ResourceActionRemediation_Tpm2Bind
+	Action        isResourceActionRemediation_Action `protobuf_oneof:"action"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceActionRemediation) Reset() {
+	*x = ResourceActionRemediation{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceActionRemediation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceActionRemediation) ProtoMessage() {}
+
+func (x *ResourceActionRemediation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceActionRemediation.ProtoReflect.Descriptor instead.
+func (*ResourceActionRemediation) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ResourceActionRemediation) GetTarget() *StorageTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *ResourceActionRemediation) GetAction() isResourceActionRemediation_Action {
+	if x != nil {
+		return x.Action
+	}
+	return nil
+}
+
+func (x *ResourceActionRemediation) GetEscrowRotate() *emptypb.Empty {
+	if x != nil {
+		if x, ok := x.Action.(*ResourceActionRemediation_EscrowRotate); ok {
+			return x.EscrowRotate
+		}
+	}
+	return nil
+}
+
+func (x *ResourceActionRemediation) GetTpm2Bind() *emptypb.Empty {
+	if x != nil {
+		if x, ok := x.Action.(*ResourceActionRemediation_Tpm2Bind); ok {
+			return x.Tpm2Bind
+		}
+	}
+	return nil
+}
+
+type isResourceActionRemediation_Action interface {
+	isResourceActionRemediation_Action()
+}
+
+type ResourceActionRemediation_EscrowRotate struct {
+	EscrowRotate *emptypb.Empty `protobuf:"bytes,2,opt,name=escrow_rotate,json=escrowRotate,proto3,oneof"`
+}
+
+type ResourceActionRemediation_Tpm2Bind struct {
+	Tpm2Bind *emptypb.Empty `protobuf:"bytes,3,opt,name=tpm2_bind,json=tpm2Bind,proto3,oneof"`
+}
+
+func (*ResourceActionRemediation_EscrowRotate) isResourceActionRemediation_Action() {}
+
+func (*ResourceActionRemediation_Tpm2Bind) isResourceActionRemediation_Action() {}
+
+// A fresh device-authenticated snapshot of protected history, not a fresh native
+// observation, current compliance, or permission to perform an effect.
+type ResourceExecutionAttestation struct {
+	state                protoimpl.MessageState   `protogen:"open.v1"`
+	DeploymentId         string                   `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	DeviceId             string                   `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	EnrollmentGeneration string                   `protobuf:"bytes,3,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
+	SessionEpoch         uint64                   `protobuf:"varint,4,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	ActionRevision       uint64                   `protobuf:"varint,5,opt,name=action_revision,json=actionRevision,proto3" json:"action_revision,omitempty"`
+	Nonce                []byte                   `protobuf:"bytes,6,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	IssuedAt             *timestamppb.Timestamp   `protobuf:"bytes,7,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
+	ExpiresAt            *timestamppb.Timestamp   `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Status               *ResourceExecutionStatus `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ResourceExecutionAttestation) Reset() {
+	*x = ResourceExecutionAttestation{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceExecutionAttestation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceExecutionAttestation) ProtoMessage() {}
+
+func (x *ResourceExecutionAttestation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceExecutionAttestation.ProtoReflect.Descriptor instead.
+func (*ResourceExecutionAttestation) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ResourceExecutionAttestation) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *ResourceExecutionAttestation) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ResourceExecutionAttestation) GetEnrollmentGeneration() string {
+	if x != nil {
+		return x.EnrollmentGeneration
+	}
+	return ""
+}
+
+func (x *ResourceExecutionAttestation) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *ResourceExecutionAttestation) GetActionRevision() uint64 {
+	if x != nil {
+		return x.ActionRevision
+	}
+	return 0
+}
+
+func (x *ResourceExecutionAttestation) GetNonce() []byte {
+	if x != nil {
+		return x.Nonce
+	}
+	return nil
+}
+
+func (x *ResourceExecutionAttestation) GetIssuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.IssuedAt
+	}
+	return nil
+}
+
+func (x *ResourceExecutionAttestation) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *ResourceExecutionAttestation) GetStatus() *ResourceExecutionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type AttestResourceExecutionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	Nonce         []byte                 `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
@@ -1281,21 +1746,21 @@ type AttestServiceExecutionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AttestServiceExecutionRequest) Reset() {
-	*x = AttestServiceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+func (x *AttestResourceExecutionRequest) Reset() {
+	*x = AttestResourceExecutionRequest{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AttestServiceExecutionRequest) String() string {
+func (x *AttestResourceExecutionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AttestServiceExecutionRequest) ProtoMessage() {}
+func (*AttestResourceExecutionRequest) ProtoMessage() {}
 
-func (x *AttestServiceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+func (x *AttestResourceExecutionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,26 +1771,26 @@ func (x *AttestServiceExecutionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AttestServiceExecutionRequest.ProtoReflect.Descriptor instead.
-func (*AttestServiceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{12}
+// Deprecated: Use AttestResourceExecutionRequest.ProtoReflect.Descriptor instead.
+func (*AttestResourceExecutionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *AttestServiceExecutionRequest) GetActionId() string {
+func (x *AttestResourceExecutionRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *AttestServiceExecutionRequest) GetNonce() []byte {
+func (x *AttestResourceExecutionRequest) GetNonce() []byte {
 	if x != nil {
 		return x.Nonce
 	}
 	return nil
 }
 
-type AttestServiceExecutionResponse struct {
+type AttestResourceExecutionResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	AttestationEnvelope []byte                 `protobuf:"bytes,1,opt,name=attestation_envelope,json=attestationEnvelope,proto3" json:"attestation_envelope,omitempty"`
 	CertificatePem      []byte                 `protobuf:"bytes,2,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
@@ -1333,21 +1798,21 @@ type AttestServiceExecutionResponse struct {
 	sizeCache           protoimpl.SizeCache
 }
 
-func (x *AttestServiceExecutionResponse) Reset() {
-	*x = AttestServiceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+func (x *AttestResourceExecutionResponse) Reset() {
+	*x = AttestResourceExecutionResponse{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AttestServiceExecutionResponse) String() string {
+func (x *AttestResourceExecutionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AttestServiceExecutionResponse) ProtoMessage() {}
+func (*AttestResourceExecutionResponse) ProtoMessage() {}
 
-func (x *AttestServiceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+func (x *AttestResourceExecutionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1358,31 +1823,247 @@ func (x *AttestServiceExecutionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AttestServiceExecutionResponse.ProtoReflect.Descriptor instead.
-func (*AttestServiceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{13}
+// Deprecated: Use AttestResourceExecutionResponse.ProtoReflect.Descriptor instead.
+func (*AttestResourceExecutionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *AttestServiceExecutionResponse) GetAttestationEnvelope() []byte {
+func (x *AttestResourceExecutionResponse) GetAttestationEnvelope() []byte {
 	if x != nil {
 		return x.AttestationEnvelope
 	}
 	return nil
 }
 
-func (x *AttestServiceExecutionResponse) GetCertificatePem() []byte {
+func (x *AttestResourceExecutionResponse) GetCertificatePem() []byte {
 	if x != nil {
 		return x.CertificatePem
 	}
 	return nil
 }
 
+// Signed profile ownership is separate from native desired state. Providers may
+// only acquire or release effects under this immutable profile-resource binding.
+type ResourceOwnershipBinding struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	AssignmentId  string                     `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	Sources       []*ResourceOwnershipSource `protobuf:"bytes,2,rep,name=sources,proto3" json:"sources,omitempty"`
+	ResourceId    string                     `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Policy        *v1.OwnershipPolicy        `protobuf:"bytes,4,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceOwnershipBinding) Reset() {
+	*x = ResourceOwnershipBinding{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceOwnershipBinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceOwnershipBinding) ProtoMessage() {}
+
+func (x *ResourceOwnershipBinding) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceOwnershipBinding.ProtoReflect.Descriptor instead.
+func (*ResourceOwnershipBinding) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ResourceOwnershipBinding) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+func (x *ResourceOwnershipBinding) GetSources() []*ResourceOwnershipSource {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *ResourceOwnershipBinding) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *ResourceOwnershipBinding) GetPolicy() *v1.OwnershipPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type ResourceOwnershipSource struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId       string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ProfileRevision string                 `protobuf:"bytes,2,opt,name=profile_revision,json=profileRevision,proto3" json:"profile_revision,omitempty"`
+	ResourceId      string                 `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ResourceOwnershipSource) Reset() {
+	*x = ResourceOwnershipSource{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceOwnershipSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceOwnershipSource) ProtoMessage() {}
+
+func (x *ResourceOwnershipSource) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceOwnershipSource.ProtoReflect.Descriptor instead.
+func (*ResourceOwnershipSource) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ResourceOwnershipSource) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *ResourceOwnershipSource) GetProfileRevision() string {
+	if x != nil {
+		return x.ProfileRevision
+	}
+	return ""
+}
+
+func (x *ResourceOwnershipSource) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+// Authenticated executor admission evidence, not native-state evidence. No
+// native plan, inverse, observation, start grant or effect exists for this action.
+type ResourceAdmissionRefusal struct {
+	state                     protoimpl.MessageState         `protogen:"open.v1"`
+	Ref                       *v1.ResourceRef                `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Operation                 v1.ResourceOperation           `protobuf:"varint,2,opt,name=operation,proto3,enum=lindm.resource.v1.ResourceOperation" json:"operation,omitempty"`
+	Reason                    ResourceAdmissionRefusalReason `protobuf:"varint,3,opt,name=reason,proto3,enum=lindm.agent.v1.ResourceAdmissionRefusalReason" json:"reason,omitempty"`
+	BootId                    string                         `protobuf:"bytes,4,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	ExecutorIncarnation       string                         `protobuf:"bytes,5,opt,name=executor_incarnation,json=executorIncarnation,proto3" json:"executor_incarnation,omitempty"`
+	NativeEvidenceUnavailable bool                           `protobuf:"varint,6,opt,name=native_evidence_unavailable,json=nativeEvidenceUnavailable,proto3" json:"native_evidence_unavailable,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *ResourceAdmissionRefusal) Reset() {
+	*x = ResourceAdmissionRefusal{}
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceAdmissionRefusal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceAdmissionRefusal) ProtoMessage() {}
+
+func (x *ResourceAdmissionRefusal) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceAdmissionRefusal.ProtoReflect.Descriptor instead.
+func (*ResourceAdmissionRefusal) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ResourceAdmissionRefusal) GetRef() *v1.ResourceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *ResourceAdmissionRefusal) GetOperation() v1.ResourceOperation {
+	if x != nil {
+		return x.Operation
+	}
+	return v1.ResourceOperation(0)
+}
+
+func (x *ResourceAdmissionRefusal) GetReason() ResourceAdmissionRefusalReason {
+	if x != nil {
+		return x.Reason
+	}
+	return ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED
+}
+
+func (x *ResourceAdmissionRefusal) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
+func (x *ResourceAdmissionRefusal) GetExecutorIncarnation() string {
+	if x != nil {
+		return x.ExecutorIncarnation
+	}
+	return ""
+}
+
+func (x *ResourceAdmissionRefusal) GetNativeEvidenceUnavailable() bool {
+	if x != nil {
+		return x.NativeEvidenceUnavailable
+	}
+	return false
+}
+
 var File_lindm_agent_v1_service_execution_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/agent/v1/service_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1clindm/agent/v1/service.proto\x1a\x1alindm/agent/v1/trust.proto\"\xe5\t\n" +
-	"\x16ServiceExecutionIntent\x12-\n" +
+	"&lindm/agent/v1/service_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\"\xed\r\n" +
+	"\x17ResourceExecutionIntent\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
 	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12%\n" +
@@ -1399,11 +2080,24 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
 	"not_before\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tnotBefore\x12A\n" +
 	"\n" +
-	"expires_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12E\n" +
-	"\adesired\x18\x0e \x01(\v2#.lindm.agent.v1.ServiceDesiredStateB\x06\xbaH\x03\xc8\x01\x01R\adesired:\xc3\x03\xbaH\xbf\x03\x1a\xbd\x01\n" +
-	"\x17service_intent.validity\x12Fexecution intent validity must be positive and at most fifteen minutes\x1aZthis.expires_at > this.not_before && this.expires_at - this.not_before <= duration('900s')\x1a\xfc\x01\n" +
-	"\x1fservice_intent.nonzero_identity\x12*execution identities must be nonzero UUIDs\x1a\xac\x01[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.actor_id].all(id, id != '00000000-0000-0000-0000-000000000000')\"\xc7\t\n" +
-	"\x19ServiceExecutionChallenge\x12-\n" +
+	"expires_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12I\n" +
+	"\adesired\x18\x0e \x01(\v2'.lindm.resource.v1.ResourceDesiredStateB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12N\n" +
+	"\toperation\x18\x0f \x01(\x0e2$.lindm.resource.v1.ResourceOperationB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\toperation\x12N\n" +
+	"\townership\x18\x10 \x01(\v2(.lindm.agent.v1.ResourceOwnershipBindingB\x06\xbaH\x03\xc8\x01\x01R\townership\x12N\n" +
+	"\vpreparation\x18\x11 \x01(\v2,.lindm.agent.v1.ResourceExecutionPreparationR\vpreparation:\xd6\x05\xbaH\xd2\x05\x1a\x8e\x02\n" +
+	"\x1bresource_intent.preparation\x126only native packages require immutable bounded staging\x1a\xb6\x01has(this.preparation) == has(this.desired.native_package) && (!has(this.preparation) || (this.preparation.deadline > this.not_before && this.preparation.deadline <= this.expires_at))\x1a\xbe\x01\n" +
+	"\x18resource_intent.validity\x12Fexecution intent validity must be positive and at most fifteen minutes\x1aZthis.expires_at > this.not_before && this.expires_at - this.not_before <= duration('900s')\x1a\xfd\x01\n" +
+	" resource_intent.nonzero_identity\x12*execution identities must be nonzero UUIDs\x1a\xac\x01[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.actor_id].all(id, id != '00000000-0000-0000-0000-000000000000')\"\x95\x01\n" +
+	"\x1cResourceExecutionPreparation\x12>\n" +
+	"\bdeadline\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bdeadline\x125\n" +
+	"\x0fmax_cache_bytes\x18\x02 \x01(\x04B\r\xbaH\n" +
+	"2\b\x18\x80\x80\x80\x80\x10 \x00R\rmaxCacheBytes\"\xc6\x01\n" +
+	"\x1aResourcePreparationOutcome\x12V\n" +
+	"\vpreparation\x18\x01 \x01(\v2,.lindm.agent.v1.ResourceExecutionPreparationB\x06\xbaH\x03\xc8\x01\x01R\vpreparation\x12P\n" +
+	"\afailure\x18\x02 \x01(\x0e2(.lindm.agent.v1.ResourceExecutionFailureB\f\xbaH\t\x82\x01\x06\x10\x01 \x00 \x01R\afailure\"\xd4\n" +
+	"\n" +
+	"\x1aResourceExecutionChallenge\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
 	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12%\n" +
@@ -1420,11 +2114,14 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x14executor_incarnation\x18\f \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x13executorIncarnation\x12?\n" +
 	"\tissued_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bissuedAt\x12A\n" +
 	"\n" +
-	"expires_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:\xd8\x03\xbaH\xd4\x03\x1a\xb5\x01\n" +
-	"\x1aservice_challenge.validity\x12>challenge validity must be positive and at most thirty seconds\x1aWthis.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')\x1a\x99\x02\n" +
-	"\"service_challenge.nonzero_identity\x12*challenge identities must be nonzero UUIDs\x1a\xc6\x01[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.boot_id, this.executor_incarnation].all(id, id != '00000000-0000-0000-0000-000000000000')\"\xa8\x06\n" +
-	"\x1aServiceExecutionStartGrant\x12O\n" +
-	"\tchallenge\x18\x01 \x01(\v2).lindm.agent.v1.ServiceExecutionChallengeB\x06\xbaH\x03\xc8\x01\x01R\tchallenge\x12#\n" +
+	"expires_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x128\n" +
+	"\x03ref\x18\x0f \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12N\n" +
+	"\toperation\x18\x10 \x01(\x0e2$.lindm.resource.v1.ResourceOperationB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\toperation:\xda\x03\xbaH\xd6\x03\x1a\xb6\x01\n" +
+	"\x1bresource_challenge.validity\x12>challenge validity must be positive and at most thirty seconds\x1aWthis.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')\x1a\x9a\x02\n" +
+	"#resource_challenge.nonzero_identity\x12*challenge identities must be nonzero UUIDs\x1a\xc6\x01[this.deployment_id, this.device_id, this.enrollment_generation, this.action_id, this.desired_revision, this.boot_id, this.executor_incarnation].all(id, id != '00000000-0000-0000-0000-000000000000')\"\xac\x06\n" +
+	"\x1bResourceExecutionStartGrant\x12P\n" +
+	"\tchallenge\x18\x01 \x01(\v2*.lindm.agent.v1.ResourceExecutionChallengeB\x06\xbaH\x03\xc8\x01\x01R\tchallenge\x12#\n" +
 	"\bactor_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\aactorId\x12F\n" +
 	"\x15authorization_version\x18\x03 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\x14authorizationVersion\x12*\n" +
 	"\froot_version\x18\x04 \x01(\x04B\a\xbaH\x042\x02 \x00R\vrootVersion\x126\n" +
@@ -1432,27 +2129,27 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\n" +
 	"not_before\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tnotBefore\x12A\n" +
 	"\n" +
-	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:\xe1\x02\xbaH\xdd\x02\x1a\xe6\x01\n" +
-	"\x16service_start.validity\x12@start validity must fit the challenge and at most thirty seconds\x1a\x89\x01this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at\x1ar\n" +
-	"\x13service_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\xab\x16\n" +
-	"\x16ServiceExecutionRecord\x12.\n" +
+	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:\xe3\x02\xbaH\xdf\x02\x1a\xe7\x01\n" +
+	"\x17resource_start.validity\x12@start validity must fit the challenge and at most thirty seconds\x1a\x89\x01this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at\x1as\n" +
+	"\x14resource_start.actor\x12\"start actor must be a nonzero UUID\x1a7this.actor_id != '00000000-0000-0000-0000-000000000000'\"\xf3)\n" +
+	"\x17ResourceExecutionRecord\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x124\n" +
-	"\x0fintent_envelope\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eintentEnvelope\x12,\n" +
-	"\rintent_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12F\n" +
-	"\x06intent\x18\x05 \x01(\v2&.lindm.agent.v1.ServiceExecutionIntentB\x06\xbaH\x03\xc8\x01\x01R\x06intent\x12D\n" +
-	"\vnative_plan\x18\x06 \x01(\v2\x1b.lindm.agent.v1.ServicePlanB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"\x0fintent_envelope\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x12,\n" +
+	"\rintent_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12G\n" +
+	"\x06intent\x18\x05 \x01(\v2'.lindm.agent.v1.ResourceExecutionIntentB\x06\xbaH\x03\xc8\x01\x01R\x06intent\x12@\n" +
+	"\vnative_plan\x18\x06 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanR\n" +
 	"nativePlan\x12J\n" +
 	"\raccepted_root\x18\a \x01(\v2\x1d.lindm.agent.v1.ExecutionRootB\x06\xbaH\x03\xc8\x01\x01R\facceptedRoot\x12M\n" +
 	"\x1caccepted_delegation_envelope\x18\b \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x1aacceptedDelegationEnvelope\x12C\n" +
 	"\vaccepted_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"acceptedAt\x12G\n" +
+	"acceptedAt\x12H\n" +
 	"\x05state\x18\n" +
-	" \x01(\x0e2%.lindm.agent.v1.ServiceExecutionStateB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05state\x12M\n" +
-	"\afailure\x18\v \x01(\x0e2'.lindm.agent.v1.ServiceExecutionFailureB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\afailure\x12G\n" +
-	"\tchallenge\x18\f \x01(\v2).lindm.agent.v1.ServiceExecutionChallengeR\tchallenge\x122\n" +
+	" \x01(\x0e2&.lindm.agent.v1.ResourceExecutionStateB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05state\x12N\n" +
+	"\afailure\x18\v \x01(\x0e2(.lindm.agent.v1.ResourceExecutionFailureB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\afailure\x12H\n" +
+	"\tchallenge\x18\f \x01(\v2*.lindm.agent.v1.ResourceExecutionChallengeR\tchallenge\x122\n" +
 	"\x0fchallenge_proof\x18\r \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x0echallengeProof\x12C\n" +
 	"\x15challenge_boottime_ns\x18\x0e \x01(\x04B\x0f\xbaH\f2\n" +
 	"\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7fR\x13challengeBoottimeNs\x12;\n" +
@@ -1460,48 +2157,77 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x12start_grant_sha256\x18\x10 \x01(\fB\a\xbaH\x04z\x02\x18 R\x10startGrantSha256\x129\n" +
 	"\n" +
 	"started_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
-	"\fcompleted_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12G\n" +
-	"\fverification\x18\x13 \x01(\v2#.lindm.agent.v1.ServiceVerificationR\fverification\x12E\n" +
+	"\fcompleted_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12K\n" +
+	"\fverification\x18\x13 \x01(\v2'.lindm.resource.v1.ResourceVerificationR\fverification\x12E\n" +
 	"\x19challenge_certificate_pem\x18\x14 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x17challengeCertificatePem\x12F\n" +
-	"\x11grant_accepted_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\x0fgrantAcceptedAt:\xbb\v\xbaH\xb7\v\x1a\x90\x01\n" +
-	"\x1eservice_record.desired_binding\x12=native plan must describe exactly the signed desired resource\x1a/this.native_plan.desired == this.intent.desired\x1a\xc0\x02\n" +
-	"\x1eservice_record.challenge_shape\x123challenge proof and local deadline must be complete\x1a\xe8\x01has(this.challenge) == (this.challenge_proof.size() > 0) && has(this.challenge) == (this.challenge_boottime_ns > 0u) && (has(this.challenge) ? this.challenge_certificate_pem.size() >= 64 : this.challenge_certificate_pem.size() == 0)\x1a\xcb\x02\n" +
-	"\x1aservice_record.grant_shape\x124a retained grant requires a digest and its challenge\x1a\xf6\x01(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && has(this.challenge) && has(this.grant_accepted_at))\x1a\x93\x04\n" +
-	"\x18service_record.lifecycle\x121execution state must retain its required evidence\x1a\xc3\x03((this.state == 1 || this.state == 2 || this.state == 3) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && this.verification.converged))\x1a{\n" +
-	"\x1cservice_record.failure_shape\x121successful or pending work cannot carry a failure\x1a((this.state <= 4) == (this.failure == 1)\"V\n" +
-	"\x1ePrepareServiceExecutionRequest\x124\n" +
-	"\x0fintent_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eintentEnvelope\"\xe3\x01\n" +
-	"\x1fPrepareServiceExecutionResponse\x12F\n" +
-	"\x06status\x18\x01 \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\x12D\n" +
-	"\vnative_plan\x18\x02 \x01(\v2\x1b.lindm.agent.v1.ServicePlanB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"\x11grant_accepted_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\x0fgrantAcceptedAt\x12[\n" +
+	"\x13preparation_outcome\x18\x16 \x01(\v2*.lindm.agent.v1.ResourcePreparationOutcomeR\x12preparationOutcome\x12U\n" +
+	"\x11admission_refusal\x18\x17 \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal\x12]\n" +
+	"\x11firewall_evidence\x18\x18 \x01(\v20.lindm.agent.v1.ConnectivityVerificationEvidenceR\x10firewallEvidence:\xeb\x1c\xbaH\xe7\x1c\x1a\x81\x02\n" +
+	"!resource_record.firewall_evidence\x12Gretained packet proof requires the exact terminal firewall verification\x1a\x92\x01!has(this.firewall_evidence) || (has(this.verification) && this.verification.ref.kind == 8 && this.firewall_evidence.ref == this.verification.ref)\x1a\xb9\x05\n" +
+	"$resource_record.preparation_evidence\x12cmissing native evidence is restricted to effect-free preparation or authenticated admission refusal\x1a\xab\x04(has(this.native_plan) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal))) && (this.state != 9 || has(this.intent.preparation)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.preparation == this.intent.preparation && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at) && !has(this.verification)))\x1a\xe5\x01\n" +
+	"\x1fresource_record.desired_binding\x12=native plan must describe exactly the signed desired resource\x1a\x82\x01!has(this.native_plan) || (this.native_plan.ref == this.intent.desired.ref && this.native_plan.operation == this.intent.operation)\x1a\xc1\x02\n" +
+	"\x1fresource_record.challenge_shape\x123challenge proof and local deadline must be complete\x1a\xe8\x01has(this.challenge) == (this.challenge_proof.size() > 0) && has(this.challenge) == (this.challenge_boottime_ns > 0u) && (has(this.challenge) ? this.challenge_certificate_pem.size() >= 64 : this.challenge_certificate_pem.size() == 0)\x1a\xcc\x02\n" +
+	"\x1bresource_record.grant_shape\x124a retained grant requires a digest and its challenge\x1a\xf6\x01(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && has(this.challenge) && has(this.grant_accepted_at))\x1a\xf9\x04\n" +
+	"\x19resource_record.lifecycle\x121execution state must retain its required evidence\x1a\xa8\x04((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && this.start_grant_envelope.size() == 0 && !has(this.started_at))) && (this.state != 2 || (this.start_grant_envelope.size() > 0 && !has(this.started_at))) && (this.state != 3 || (this.start_grant_envelope.size() > 0 && has(this.started_at))) && (this.state != 4 || (has(this.verification) && (this.verification.disposition == 1 || (this.verification.disposition == 5 && this.intent.operation == 2 && !has(this.challenge) && !has(this.started_at)))))\x1a\x8a\x01\n" +
+	"\x1dresource_record.failure_shape\x121successful or pending work cannot carry a failure\x1a6(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)\x1a\xb5\x04\n" +
+	"\"resource_record.read_only_evidence\x12Ceffect-free native evidence must retain a terminal verified finding\x1a\xc9\x03(!(has(this.native_plan) && !has(this.challenge)) || (has(this.verification) && !has(this.started_at) && this.start_grant_envelope.size() == 0 && ((this.state == 4 && (this.verification.disposition == 1 || (this.intent.operation == 2 && this.verification.disposition == 5))) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || (has(this.native_plan) && !has(this.challenge) && this.state == 5))\x1a\xe8\x03\n" +
+	"!resource_record.admission_refusal\x12Uadmission refusal is an effect-free terminal rejection of exactly the signed resource\x1a\xeb\x02!has(this.admission_refusal) || (this.state == 5 && !has(this.intent.preparation) && !has(this.preparation_outcome) && this.admission_refusal.ref == this.intent.desired.ref && this.admission_refusal.operation == this.intent.operation && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))\"W\n" +
+	"\x1fPrepareResourceExecutionRequest\x124\n" +
+	"\x0fintent_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\"\x86\x05\n" +
+	" PrepareResourceExecutionResponse\x12G\n" +
+	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\x12@\n" +
+	"\vnative_plan\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanR\n" +
 	"nativePlan\x122\n" +
-	"\x0fchallenge_proof\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x0echallengeProof\"\x84\x01\n" +
-	"\x1cStartServiceExecutionRequest\x12%\n" +
+	"\x0fchallenge_proof\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x0echallengeProof:\xa2\x03\xbaH\x9e\x03\x1a\x9b\x03\n" +
+	"$resource_preparation.native_evidence\x12]only pending preparation, terminated preparation, or admission refusal may omit a native plan\x1a\x93\x02has(this.native_plan) == (this.status.state != 9 && !has(this.status.preparation_outcome) && !has(this.status.admission_refusal)) && ((this.status.state != 9 && !has(this.status.preparation_outcome) && !has(this.status.admission_refusal)) || this.challenge_proof.size() == 0)\"\x85\x01\n" +
+	"\x1dStartResourceExecutionRequest\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12=\n" +
-	"\x14start_grant_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x12startGrantEnvelope\"g\n" +
-	"\x1dStartServiceExecutionResponse\x12F\n" +
-	"\x06status\x18\x01 \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"C\n" +
-	"\x1aGetServiceExecutionRequest\x12%\n" +
-	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\"e\n" +
-	"\x1bGetServiceExecutionResponse\x12F\n" +
-	"\x06status\x18\x01 \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"\x90\b\n" +
-	"\x16ServiceExecutionStatus\x12%\n" +
+	"\x14start_grant_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x12startGrantEnvelope\"i\n" +
+	"\x1eStartResourceExecutionResponse\x12G\n" +
+	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"D\n" +
+	"\x1bGetResourceExecutionRequest\x12%\n" +
+	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\"g\n" +
+	"\x1cGetResourceExecutionResponse\x12G\n" +
+	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status\"w\n" +
+	" CancelResourcePreparationRequest\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12,\n" +
-	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12G\n" +
-	"\x05state\x18\x03 \x01(\x0e2%.lindm.agent.v1.ServiceExecutionStateB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05state\x12M\n" +
-	"\afailure\x18\x04 \x01(\x0e2'.lindm.agent.v1.ServiceExecutionFailureB\n" +
+	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\"\x9f\x02\n" +
+	"!CancelResourcePreparationResponse\x12?\n" +
+	"\x06status\x18\x01 \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusR\x06status\x12%\n" +
+	"\x0enever_prepared\x18\x02 \x01(\bR\rneverPrepared:\x91\x01\xbaH\x8d\x01\x1a\x8a\x01\n" +
+	"\x16resource_cancel.result\x12Gcancellation returns either protected history or a never-prepared fence\x1a'has(this.status) != this.never_prepared\"\x8e\x17\n" +
+	"\x17ResourceExecutionStatus\x12%\n" +
+	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12,\n" +
+	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12H\n" +
+	"\x05state\x18\x03 \x01(\x0e2&.lindm.agent.v1.ResourceExecutionStateB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05state\x12N\n" +
+	"\afailure\x18\x04 \x01(\x0e2(.lindm.agent.v1.ResourceExecutionFailureB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\afailure\x12C\n" +
 	"\vaccepted_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"acceptedAt\x129\n" +
 	"\n" +
 	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
-	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12B\n" +
-	"\x06before\x18\b \x01(\v2\".lindm.agent.v1.ServiceObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12G\n" +
-	"\fverification\x18\t \x01(\v2#.lindm.agent.v1.ServiceVerificationR\fverification:\xbc\x03\xbaH\xb8\x03\x1a\xb8\x02\n" +
-	"\x18service_status.lifecycle\x12Apending work, effect start, completion and convergence must agree\x1a\xd8\x01((this.state <= 3) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.converged))\x1a{\n" +
-	"\x1cservice_status.failure_shape\x121successful or pending work cannot carry a failure\x1a((this.state <= 4) == (this.failure == 1)\"\xc0\x05\n" +
-	"\x1bServiceExecutionAttestation\x12-\n" +
+	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12>\n" +
+	"\x06before\x18\b \x01(\v2&.lindm.resource.v1.ResourceObservationR\x06before\x12K\n" +
+	"\fverification\x18\t \x01(\v2'.lindm.resource.v1.ResourceVerificationR\fverification\x12[\n" +
+	"\x13preparation_outcome\x18\n" +
+	" \x01(\v2*.lindm.agent.v1.ResourcePreparationOutcomeR\x12preparationOutcome\x12W\n" +
+	"\fremediations\x18\v \x03(\v2).lindm.agent.v1.ResourceActionRemediationB\b\xbaH\x05\x92\x01\x02\x10\x02R\fremediations\x12\x1b\n" +
+	"\tread_only\x18\f \x01(\bR\breadOnly\x12U\n" +
+	"\x11admission_refusal\x18\r \x01(\v2(.lindm.agent.v1.ResourceAdmissionRefusalR\x10admissionRefusal:\x8d\x10\xbaH\x89\x10\x1a\xe3\x03\n" +
+	"$resource_status.preparation_evidence\x12Monly effect-free preparation or admission refusal may omit native observation\x1a\xeb\x02has(this.before) == (this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) && (!has(this.preparation_outcome) || (this.state in [5, 7, 8] && this.preparation_outcome.failure == this.failure)) && ((this.state != 9 && !has(this.preparation_outcome) && !has(this.admission_refusal)) || (!has(this.started_at) && !has(this.verification)))\x1a\xbf\x03\n" +
+	"\x19resource_status.lifecycle\x12Apending work, effect start, completion and convergence must agree\x1a\xde\x02((this.state in [1, 2, 3, 9]) == !has(this.completed_at)) && (!(this.state in [1, 2, 9]) || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && (has(this.started_at) || this.read_only) && (this.verification.disposition == 1 || (this.read_only && this.verification.disposition == 5))))\x1a\x8a\x01\n" +
+	"\x1dresource_status.failure_shape\x121successful or pending work cannot carry a failure\x1a6(this.state in [1, 2, 3, 4, 9]) == (this.failure == 1)\x1a\x86\x03\n" +
+	"\"resource_status.read_only_evidence\x12Aread-only terminal status distinguishes compliance from execution\x1a\x9c\x02(!this.read_only || (has(this.before) && has(this.verification) && !has(this.started_at) && ((this.state == 4 && this.verification.disposition in [1, 5]) || (this.state == 5 && this.failure == 10 && this.verification.disposition in [2, 4])))) && (this.failure != 10 || this.read_only)\x1a\xeb\x01\n" +
+	"$resource_status.remediation_evidence\x12=action recommendations require encryption compliance findings\x1a\x83\x01this.remediations.size() == 0 || (has(this.verification) && this.verification.ref.kind == 24 && this.verification.disposition != 1)\x1a\xda\x02\n" +
+	"!resource_status.admission_refusal\x12Kadmission refusal cannot claim native observation, compliance, or execution\x1a\xe7\x01!has(this.admission_refusal) || (this.state == 5 && !has(this.preparation_outcome) && !this.read_only && ((this.admission_refusal.reason in [1, 2] && this.failure == 3) || (this.admission_refusal.reason == 3 && this.failure == 2)))\"\xe1\x01\n" +
+	"\x19ResourceActionRemediation\x12=\n" +
+	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
+	"\rescrow_rotate\x18\x02 \x01(\v2\x16.google.protobuf.EmptyH\x00R\fescrowRotate\x125\n" +
+	"\ttpm2_bind\x18\x03 \x01(\v2\x16.google.protobuf.EmptyH\x00R\btpm2BindB\x0f\n" +
+	"\x06action\x12\x05\xbaH\x02\b\x01\"\xc3\x05\n" +
+	"\x1cResourceExecutionAttestation\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
 	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x12,\n" +
@@ -1510,36 +2236,69 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\x12?\n" +
 	"\tissued_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bissuedAt\x12A\n" +
 	"\n" +
-	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12F\n" +
-	"\x06status\x18\t \x01(\v2&.lindm.agent.v1.ServiceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status:\xc0\x01\xbaH\xbc\x01\x1a\xb9\x01\n" +
-	"\x1cservice_attestation.lifetime\x12@attestation lifetime must be positive and at most thirty seconds\x1aWthis.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')\"e\n" +
-	"\x1dAttestServiceExecutionRequest\x12%\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12G\n" +
+	"\x06status\x18\t \x01(\v2'.lindm.agent.v1.ResourceExecutionStatusB\x06\xbaH\x03\xc8\x01\x01R\x06status:\xc1\x01\xbaH\xbd\x01\x1a\xba\x01\n" +
+	"\x1dresource_attestation.lifetime\x12@attestation lifetime must be positive and at most thirty seconds\x1aWthis.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')\"f\n" +
+	"\x1eAttestResourceExecutionRequest\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12\x1d\n" +
-	"\x05nonce\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\"\x96\x01\n" +
-	"\x1eAttestServiceExecutionResponse\x12>\n" +
-	"\x14attestation_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x04R\x13attestationEnvelope\x124\n" +
-	"\x0fcertificate_pem\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0ecertificatePem*\xf4\x02\n" +
-	"\x15ServiceExecutionState\x12'\n" +
-	"#SERVICE_EXECUTION_STATE_UNSPECIFIED\x10\x00\x12$\n" +
-	" SERVICE_EXECUTION_STATE_PREPARED\x10\x01\x12\"\n" +
-	"\x1eSERVICE_EXECUTION_STATE_QUEUED\x10\x02\x12#\n" +
-	"\x1fSERVICE_EXECUTION_STATE_RUNNING\x10\x03\x12%\n" +
-	"!SERVICE_EXECUTION_STATE_SUCCEEDED\x10\x04\x12\"\n" +
-	"\x1eSERVICE_EXECUTION_STATE_FAILED\x10\x05\x12+\n" +
-	"'SERVICE_EXECUTION_STATE_OUTCOME_UNKNOWN\x10\x06\x12#\n" +
-	"\x1fSERVICE_EXECUTION_STATE_EXPIRED\x10\a\x12&\n" +
-	"\"SERVICE_EXECUTION_STATE_SUPERSEDED\x10\b*\xb5\x03\n" +
-	"\x17ServiceExecutionFailure\x12)\n" +
-	"%SERVICE_EXECUTION_FAILURE_UNSPECIFIED\x10\x00\x12\"\n" +
-	"\x1eSERVICE_EXECUTION_FAILURE_NONE\x10\x01\x12*\n" +
-	"&SERVICE_EXECUTION_FAILURE_PRECONDITION\x10\x02\x12)\n" +
-	"%SERVICE_EXECUTION_FAILURE_UNSUPPORTED\x10\x03\x12$\n" +
-	" SERVICE_EXECUTION_FAILURE_NATIVE\x10\x04\x12)\n" +
-	"%SERVICE_EXECUTION_FAILURE_OBSERVATION\x10\x05\x12'\n" +
-	"#SERVICE_EXECUTION_FAILURE_AUTHORITY\x10\x06\x12%\n" +
-	"!SERVICE_EXECUTION_FAILURE_EXPIRED\x10\a\x12)\n" +
-	"%SERVICE_EXECUTION_FAILURE_INTERRUPTED\x10\b\x12(\n" +
-	"$SERVICE_EXECUTION_FAILURE_SUPERSEDED\x10\tB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\x05nonce\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\"\x97\x01\n" +
+	"\x1fAttestResourceExecutionResponse\x12>\n" +
+	"\x14attestation_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x10R\x13attestationEnvelope\x124\n" +
+	"\x0fcertificate_pem\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0ecertificatePem\"\xed\x05\n" +
+	"\x18ResourceOwnershipBinding\x12-\n" +
+	"\rassignment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fassignmentId\x12N\n" +
+	"\asources\x18\x02 \x03(\v2'.lindm.agent.v1.ResourceOwnershipSourceB\v\xbaH\b\x92\x01\x05\b\x01\x10\x80\x01R\asources\x12)\n" +
+	"\vresource_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"resourceId\x12B\n" +
+	"\x06policy\x18\x04 \x01(\v2\".lindm.resource.v1.OwnershipPolicyB\x06\xbaH\x03\xc8\x01\x01R\x06policy:\xe2\x03\xbaH\xde\x03\x1a\xaf\x01\n" +
+	"#resource_ownership.nonzero_identity\x12*ownership identities must be nonzero UUIDs\x1a\\[this.assignment_id, this.resource_id].all(id, id != '00000000-0000-0000-0000-000000000000')\x1a\xa9\x02\n" +
+	"$resource_ownership.approved_adoption\x12Dsigned adoption requires the independently consumed approval binding\x1a\xba\x01(this.policy.mode == 2) == has(this.policy.adoption_approval_id) && (!has(this.policy.adoption_approval_id) || this.policy.adoption_approval_id != '00000000-0000-0000-0000-000000000000')\"\xf3\x02\n" +
+	"\x17ResourceOwnershipSource\x12'\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tprofileId\x123\n" +
+	"\x10profile_revision\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0fprofileRevision\x12)\n" +
+	"\vresource_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"resourceId:\xce\x01\xbaH\xca\x01\x1a\xc7\x01\n" +
+	"*resource_ownership_source.nonzero_identity\x12'source identities must be nonzero UUIDs\x1ap[this.profile_id, this.profile_revision, this.resource_id].all(id, id != '00000000-0000-0000-0000-000000000000')\"\xd3\x05\n" +
+	"\x18ResourceAdmissionRefusal\x128\n" +
+	"\x03ref\x18\x01 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12N\n" +
+	"\toperation\x18\x02 \x01(\x0e2$.lindm.resource.v1.ResourceOperationB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\toperation\x12R\n" +
+	"\x06reason\x18\x03 \x01(\x0e2..lindm.agent.v1.ResourceAdmissionRefusalReasonB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06reason\x12!\n" +
+	"\aboot_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12;\n" +
+	"\x14executor_incarnation\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x13executorIncarnation\x12G\n" +
+	"\x1bnative_evidence_unavailable\x18\x06 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x19nativeEvidenceUnavailable:\xaf\x02\xbaH\xab\x02\x1a\xa8\x02\n" +
+	"#resource_admission_refusal.identity\x12Tadmission evidence binds nonzero executor identity and release-only unknown baseline\x1a\xaa\x01this.boot_id != '00000000-0000-0000-0000-000000000000' && this.executor_incarnation != '00000000-0000-0000-0000-000000000000' && (this.reason != 1 || this.operation == 2)*\xa6\x03\n" +
+	"\x16ResourceExecutionState\x12(\n" +
+	"$RESOURCE_EXECUTION_STATE_UNSPECIFIED\x10\x00\x12%\n" +
+	"!RESOURCE_EXECUTION_STATE_PREPARED\x10\x01\x12#\n" +
+	"\x1fRESOURCE_EXECUTION_STATE_QUEUED\x10\x02\x12$\n" +
+	" RESOURCE_EXECUTION_STATE_RUNNING\x10\x03\x12&\n" +
+	"\"RESOURCE_EXECUTION_STATE_SUCCEEDED\x10\x04\x12#\n" +
+	"\x1fRESOURCE_EXECUTION_STATE_FAILED\x10\x05\x12,\n" +
+	"(RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN\x10\x06\x12$\n" +
+	" RESOURCE_EXECUTION_STATE_EXPIRED\x10\a\x12'\n" +
+	"#RESOURCE_EXECUTION_STATE_SUPERSEDED\x10\b\x12&\n" +
+	"\"RESOURCE_EXECUTION_STATE_PREPARING\x10\t*\xee\x03\n" +
+	"\x18ResourceExecutionFailure\x12*\n" +
+	"&RESOURCE_EXECUTION_FAILURE_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fRESOURCE_EXECUTION_FAILURE_NONE\x10\x01\x12+\n" +
+	"'RESOURCE_EXECUTION_FAILURE_PRECONDITION\x10\x02\x12*\n" +
+	"&RESOURCE_EXECUTION_FAILURE_UNSUPPORTED\x10\x03\x12%\n" +
+	"!RESOURCE_EXECUTION_FAILURE_NATIVE\x10\x04\x12*\n" +
+	"&RESOURCE_EXECUTION_FAILURE_OBSERVATION\x10\x05\x12(\n" +
+	"$RESOURCE_EXECUTION_FAILURE_AUTHORITY\x10\x06\x12&\n" +
+	"\"RESOURCE_EXECUTION_FAILURE_EXPIRED\x10\a\x12*\n" +
+	"&RESOURCE_EXECUTION_FAILURE_INTERRUPTED\x10\b\x12)\n" +
+	"%RESOURCE_EXECUTION_FAILURE_SUPERSEDED\x10\t\x12,\n" +
+	"(RESOURCE_EXECUTION_FAILURE_POSTCONDITION\x10\n" +
+	"*\xf9\x01\n" +
+	"\x1eResourceAdmissionRefusalReason\x121\n" +
+	"-RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED\x10\x00\x126\n" +
+	"2RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN\x10\x01\x128\n" +
+	"4RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE\x10\x02\x122\n" +
+	".RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION\x10\x03B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_service_execution_proto_rawDescOnce sync.Once
@@ -1553,71 +2312,109 @@ func file_lindm_agent_v1_service_execution_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_service_execution_proto_rawDescData
 }
 
-var file_lindm_agent_v1_service_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_agent_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_lindm_agent_v1_service_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_agent_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
-	(ServiceExecutionState)(0),              // 0: lindm.agent.v1.ServiceExecutionState
-	(ServiceExecutionFailure)(0),            // 1: lindm.agent.v1.ServiceExecutionFailure
-	(*ServiceExecutionIntent)(nil),          // 2: lindm.agent.v1.ServiceExecutionIntent
-	(*ServiceExecutionChallenge)(nil),       // 3: lindm.agent.v1.ServiceExecutionChallenge
-	(*ServiceExecutionStartGrant)(nil),      // 4: lindm.agent.v1.ServiceExecutionStartGrant
-	(*ServiceExecutionRecord)(nil),          // 5: lindm.agent.v1.ServiceExecutionRecord
-	(*PrepareServiceExecutionRequest)(nil),  // 6: lindm.agent.v1.PrepareServiceExecutionRequest
-	(*PrepareServiceExecutionResponse)(nil), // 7: lindm.agent.v1.PrepareServiceExecutionResponse
-	(*StartServiceExecutionRequest)(nil),    // 8: lindm.agent.v1.StartServiceExecutionRequest
-	(*StartServiceExecutionResponse)(nil),   // 9: lindm.agent.v1.StartServiceExecutionResponse
-	(*GetServiceExecutionRequest)(nil),      // 10: lindm.agent.v1.GetServiceExecutionRequest
-	(*GetServiceExecutionResponse)(nil),     // 11: lindm.agent.v1.GetServiceExecutionResponse
-	(*ServiceExecutionStatus)(nil),          // 12: lindm.agent.v1.ServiceExecutionStatus
-	(*ServiceExecutionAttestation)(nil),     // 13: lindm.agent.v1.ServiceExecutionAttestation
-	(*AttestServiceExecutionRequest)(nil),   // 14: lindm.agent.v1.AttestServiceExecutionRequest
-	(*AttestServiceExecutionResponse)(nil),  // 15: lindm.agent.v1.AttestServiceExecutionResponse
-	(*timestamppb.Timestamp)(nil),           // 16: google.protobuf.Timestamp
-	(*ServiceDesiredState)(nil),             // 17: lindm.agent.v1.ServiceDesiredState
-	(*ServicePlan)(nil),                     // 18: lindm.agent.v1.ServicePlan
-	(*ExecutionRoot)(nil),                   // 19: lindm.agent.v1.ExecutionRoot
-	(*ServiceVerification)(nil),             // 20: lindm.agent.v1.ServiceVerification
-	(*ServiceObservation)(nil),              // 21: lindm.agent.v1.ServiceObservation
+	(ResourceExecutionState)(0),               // 0: lindm.agent.v1.ResourceExecutionState
+	(ResourceExecutionFailure)(0),             // 1: lindm.agent.v1.ResourceExecutionFailure
+	(ResourceAdmissionRefusalReason)(0),       // 2: lindm.agent.v1.ResourceAdmissionRefusalReason
+	(*ResourceExecutionIntent)(nil),           // 3: lindm.agent.v1.ResourceExecutionIntent
+	(*ResourceExecutionPreparation)(nil),      // 4: lindm.agent.v1.ResourceExecutionPreparation
+	(*ResourcePreparationOutcome)(nil),        // 5: lindm.agent.v1.ResourcePreparationOutcome
+	(*ResourceExecutionChallenge)(nil),        // 6: lindm.agent.v1.ResourceExecutionChallenge
+	(*ResourceExecutionStartGrant)(nil),       // 7: lindm.agent.v1.ResourceExecutionStartGrant
+	(*ResourceExecutionRecord)(nil),           // 8: lindm.agent.v1.ResourceExecutionRecord
+	(*PrepareResourceExecutionRequest)(nil),   // 9: lindm.agent.v1.PrepareResourceExecutionRequest
+	(*PrepareResourceExecutionResponse)(nil),  // 10: lindm.agent.v1.PrepareResourceExecutionResponse
+	(*StartResourceExecutionRequest)(nil),     // 11: lindm.agent.v1.StartResourceExecutionRequest
+	(*StartResourceExecutionResponse)(nil),    // 12: lindm.agent.v1.StartResourceExecutionResponse
+	(*GetResourceExecutionRequest)(nil),       // 13: lindm.agent.v1.GetResourceExecutionRequest
+	(*GetResourceExecutionResponse)(nil),      // 14: lindm.agent.v1.GetResourceExecutionResponse
+	(*CancelResourcePreparationRequest)(nil),  // 15: lindm.agent.v1.CancelResourcePreparationRequest
+	(*CancelResourcePreparationResponse)(nil), // 16: lindm.agent.v1.CancelResourcePreparationResponse
+	(*ResourceExecutionStatus)(nil),           // 17: lindm.agent.v1.ResourceExecutionStatus
+	(*ResourceActionRemediation)(nil),         // 18: lindm.agent.v1.ResourceActionRemediation
+	(*ResourceExecutionAttestation)(nil),      // 19: lindm.agent.v1.ResourceExecutionAttestation
+	(*AttestResourceExecutionRequest)(nil),    // 20: lindm.agent.v1.AttestResourceExecutionRequest
+	(*AttestResourceExecutionResponse)(nil),   // 21: lindm.agent.v1.AttestResourceExecutionResponse
+	(*ResourceOwnershipBinding)(nil),          // 22: lindm.agent.v1.ResourceOwnershipBinding
+	(*ResourceOwnershipSource)(nil),           // 23: lindm.agent.v1.ResourceOwnershipSource
+	(*ResourceAdmissionRefusal)(nil),          // 24: lindm.agent.v1.ResourceAdmissionRefusal
+	(*timestamppb.Timestamp)(nil),             // 25: google.protobuf.Timestamp
+	(*v1.ResourceDesiredState)(nil),           // 26: lindm.resource.v1.ResourceDesiredState
+	(v1.ResourceOperation)(0),                 // 27: lindm.resource.v1.ResourceOperation
+	(*v1.ResourceRef)(nil),                    // 28: lindm.resource.v1.ResourceRef
+	(*v1.ResourcePlan)(nil),                   // 29: lindm.resource.v1.ResourcePlan
+	(*ExecutionRoot)(nil),                     // 30: lindm.agent.v1.ExecutionRoot
+	(*v1.ResourceVerification)(nil),           // 31: lindm.resource.v1.ResourceVerification
+	(*ConnectivityVerificationEvidence)(nil),  // 32: lindm.agent.v1.ConnectivityVerificationEvidence
+	(*v1.ResourceObservation)(nil),            // 33: lindm.resource.v1.ResourceObservation
+	(*StorageTarget)(nil),                     // 34: lindm.agent.v1.StorageTarget
+	(*emptypb.Empty)(nil),                     // 35: google.protobuf.Empty
+	(*v1.OwnershipPolicy)(nil),                // 36: lindm.resource.v1.OwnershipPolicy
 }
 var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
-	16, // 0: lindm.agent.v1.ServiceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
-	16, // 1: lindm.agent.v1.ServiceExecutionIntent.expires_at:type_name -> google.protobuf.Timestamp
-	17, // 2: lindm.agent.v1.ServiceExecutionIntent.desired:type_name -> lindm.agent.v1.ServiceDesiredState
-	16, // 3: lindm.agent.v1.ServiceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
-	16, // 4: lindm.agent.v1.ServiceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
-	3,  // 5: lindm.agent.v1.ServiceExecutionStartGrant.challenge:type_name -> lindm.agent.v1.ServiceExecutionChallenge
-	16, // 6: lindm.agent.v1.ServiceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
-	16, // 7: lindm.agent.v1.ServiceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 8: lindm.agent.v1.ServiceExecutionRecord.intent:type_name -> lindm.agent.v1.ServiceExecutionIntent
-	18, // 9: lindm.agent.v1.ServiceExecutionRecord.native_plan:type_name -> lindm.agent.v1.ServicePlan
-	19, // 10: lindm.agent.v1.ServiceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	16, // 11: lindm.agent.v1.ServiceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
-	0,  // 12: lindm.agent.v1.ServiceExecutionRecord.state:type_name -> lindm.agent.v1.ServiceExecutionState
-	1,  // 13: lindm.agent.v1.ServiceExecutionRecord.failure:type_name -> lindm.agent.v1.ServiceExecutionFailure
-	3,  // 14: lindm.agent.v1.ServiceExecutionRecord.challenge:type_name -> lindm.agent.v1.ServiceExecutionChallenge
-	16, // 15: lindm.agent.v1.ServiceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
-	16, // 16: lindm.agent.v1.ServiceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
-	20, // 17: lindm.agent.v1.ServiceExecutionRecord.verification:type_name -> lindm.agent.v1.ServiceVerification
-	16, // 18: lindm.agent.v1.ServiceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
-	12, // 19: lindm.agent.v1.PrepareServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
-	18, // 20: lindm.agent.v1.PrepareServiceExecutionResponse.native_plan:type_name -> lindm.agent.v1.ServicePlan
-	12, // 21: lindm.agent.v1.StartServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
-	12, // 22: lindm.agent.v1.GetServiceExecutionResponse.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
-	0,  // 23: lindm.agent.v1.ServiceExecutionStatus.state:type_name -> lindm.agent.v1.ServiceExecutionState
-	1,  // 24: lindm.agent.v1.ServiceExecutionStatus.failure:type_name -> lindm.agent.v1.ServiceExecutionFailure
-	16, // 25: lindm.agent.v1.ServiceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
-	16, // 26: lindm.agent.v1.ServiceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
-	16, // 27: lindm.agent.v1.ServiceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
-	21, // 28: lindm.agent.v1.ServiceExecutionStatus.before:type_name -> lindm.agent.v1.ServiceObservation
-	20, // 29: lindm.agent.v1.ServiceExecutionStatus.verification:type_name -> lindm.agent.v1.ServiceVerification
-	16, // 30: lindm.agent.v1.ServiceExecutionAttestation.issued_at:type_name -> google.protobuf.Timestamp
-	16, // 31: lindm.agent.v1.ServiceExecutionAttestation.expires_at:type_name -> google.protobuf.Timestamp
-	12, // 32: lindm.agent.v1.ServiceExecutionAttestation.status:type_name -> lindm.agent.v1.ServiceExecutionStatus
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	25, // 0: lindm.agent.v1.ResourceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
+	25, // 1: lindm.agent.v1.ResourceExecutionIntent.expires_at:type_name -> google.protobuf.Timestamp
+	26, // 2: lindm.agent.v1.ResourceExecutionIntent.desired:type_name -> lindm.resource.v1.ResourceDesiredState
+	27, // 3: lindm.agent.v1.ResourceExecutionIntent.operation:type_name -> lindm.resource.v1.ResourceOperation
+	22, // 4: lindm.agent.v1.ResourceExecutionIntent.ownership:type_name -> lindm.agent.v1.ResourceOwnershipBinding
+	4,  // 5: lindm.agent.v1.ResourceExecutionIntent.preparation:type_name -> lindm.agent.v1.ResourceExecutionPreparation
+	25, // 6: lindm.agent.v1.ResourceExecutionPreparation.deadline:type_name -> google.protobuf.Timestamp
+	4,  // 7: lindm.agent.v1.ResourcePreparationOutcome.preparation:type_name -> lindm.agent.v1.ResourceExecutionPreparation
+	1,  // 8: lindm.agent.v1.ResourcePreparationOutcome.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	25, // 9: lindm.agent.v1.ResourceExecutionChallenge.issued_at:type_name -> google.protobuf.Timestamp
+	25, // 10: lindm.agent.v1.ResourceExecutionChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 11: lindm.agent.v1.ResourceExecutionChallenge.ref:type_name -> lindm.resource.v1.ResourceRef
+	27, // 12: lindm.agent.v1.ResourceExecutionChallenge.operation:type_name -> lindm.resource.v1.ResourceOperation
+	6,  // 13: lindm.agent.v1.ResourceExecutionStartGrant.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
+	25, // 14: lindm.agent.v1.ResourceExecutionStartGrant.not_before:type_name -> google.protobuf.Timestamp
+	25, // 15: lindm.agent.v1.ResourceExecutionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 16: lindm.agent.v1.ResourceExecutionRecord.intent:type_name -> lindm.agent.v1.ResourceExecutionIntent
+	29, // 17: lindm.agent.v1.ResourceExecutionRecord.native_plan:type_name -> lindm.resource.v1.ResourcePlan
+	30, // 18: lindm.agent.v1.ResourceExecutionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	25, // 19: lindm.agent.v1.ResourceExecutionRecord.accepted_at:type_name -> google.protobuf.Timestamp
+	0,  // 20: lindm.agent.v1.ResourceExecutionRecord.state:type_name -> lindm.agent.v1.ResourceExecutionState
+	1,  // 21: lindm.agent.v1.ResourceExecutionRecord.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	6,  // 22: lindm.agent.v1.ResourceExecutionRecord.challenge:type_name -> lindm.agent.v1.ResourceExecutionChallenge
+	25, // 23: lindm.agent.v1.ResourceExecutionRecord.started_at:type_name -> google.protobuf.Timestamp
+	25, // 24: lindm.agent.v1.ResourceExecutionRecord.completed_at:type_name -> google.protobuf.Timestamp
+	31, // 25: lindm.agent.v1.ResourceExecutionRecord.verification:type_name -> lindm.resource.v1.ResourceVerification
+	25, // 26: lindm.agent.v1.ResourceExecutionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
+	5,  // 27: lindm.agent.v1.ResourceExecutionRecord.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
+	24, // 28: lindm.agent.v1.ResourceExecutionRecord.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
+	32, // 29: lindm.agent.v1.ResourceExecutionRecord.firewall_evidence:type_name -> lindm.agent.v1.ConnectivityVerificationEvidence
+	17, // 30: lindm.agent.v1.PrepareResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	29, // 31: lindm.agent.v1.PrepareResourceExecutionResponse.native_plan:type_name -> lindm.resource.v1.ResourcePlan
+	17, // 32: lindm.agent.v1.StartResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	17, // 33: lindm.agent.v1.GetResourceExecutionResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	17, // 34: lindm.agent.v1.CancelResourcePreparationResponse.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	0,  // 35: lindm.agent.v1.ResourceExecutionStatus.state:type_name -> lindm.agent.v1.ResourceExecutionState
+	1,  // 36: lindm.agent.v1.ResourceExecutionStatus.failure:type_name -> lindm.agent.v1.ResourceExecutionFailure
+	25, // 37: lindm.agent.v1.ResourceExecutionStatus.accepted_at:type_name -> google.protobuf.Timestamp
+	25, // 38: lindm.agent.v1.ResourceExecutionStatus.started_at:type_name -> google.protobuf.Timestamp
+	25, // 39: lindm.agent.v1.ResourceExecutionStatus.completed_at:type_name -> google.protobuf.Timestamp
+	33, // 40: lindm.agent.v1.ResourceExecutionStatus.before:type_name -> lindm.resource.v1.ResourceObservation
+	31, // 41: lindm.agent.v1.ResourceExecutionStatus.verification:type_name -> lindm.resource.v1.ResourceVerification
+	5,  // 42: lindm.agent.v1.ResourceExecutionStatus.preparation_outcome:type_name -> lindm.agent.v1.ResourcePreparationOutcome
+	18, // 43: lindm.agent.v1.ResourceExecutionStatus.remediations:type_name -> lindm.agent.v1.ResourceActionRemediation
+	24, // 44: lindm.agent.v1.ResourceExecutionStatus.admission_refusal:type_name -> lindm.agent.v1.ResourceAdmissionRefusal
+	34, // 45: lindm.agent.v1.ResourceActionRemediation.target:type_name -> lindm.agent.v1.StorageTarget
+	35, // 46: lindm.agent.v1.ResourceActionRemediation.escrow_rotate:type_name -> google.protobuf.Empty
+	35, // 47: lindm.agent.v1.ResourceActionRemediation.tpm2_bind:type_name -> google.protobuf.Empty
+	25, // 48: lindm.agent.v1.ResourceExecutionAttestation.issued_at:type_name -> google.protobuf.Timestamp
+	25, // 49: lindm.agent.v1.ResourceExecutionAttestation.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 50: lindm.agent.v1.ResourceExecutionAttestation.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	23, // 51: lindm.agent.v1.ResourceOwnershipBinding.sources:type_name -> lindm.agent.v1.ResourceOwnershipSource
+	36, // 52: lindm.agent.v1.ResourceOwnershipBinding.policy:type_name -> lindm.resource.v1.OwnershipPolicy
+	28, // 53: lindm.agent.v1.ResourceAdmissionRefusal.ref:type_name -> lindm.resource.v1.ResourceRef
+	27, // 54: lindm.agent.v1.ResourceAdmissionRefusal.operation:type_name -> lindm.resource.v1.ResourceOperation
+	2,  // 55: lindm.agent.v1.ResourceAdmissionRefusal.reason:type_name -> lindm.agent.v1.ResourceAdmissionRefusalReason
+	56, // [56:56] is the sub-list for method output_type
+	56, // [56:56] is the sub-list for method input_type
+	56, // [56:56] is the sub-list for extension type_name
+	56, // [56:56] is the sub-list for extension extendee
+	0,  // [0:56] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_service_execution_proto_init() }
@@ -1625,15 +2422,20 @@ func file_lindm_agent_v1_service_execution_proto_init() {
 	if File_lindm_agent_v1_service_execution_proto != nil {
 		return
 	}
-	file_lindm_agent_v1_service_proto_init()
+	file_lindm_agent_v1_connectivity_guard_proto_init()
+	file_lindm_agent_v1_device_actions_proto_init()
 	file_lindm_agent_v1_trust_proto_init()
+	file_lindm_agent_v1_service_execution_proto_msgTypes[15].OneofWrappers = []any{
+		(*ResourceActionRemediation_EscrowRotate)(nil),
+		(*ResourceActionRemediation_Tpm2Bind)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_service_execution_proto_rawDesc), len(file_lindm_agent_v1_service_execution_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   14,
+			NumEnums:      3,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

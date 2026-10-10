@@ -13,23 +13,23 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/device/v1/service_dispatch.proto.
  */
 export const file_lindm_device_v1_service_dispatch: GenFile = /*@__PURE__*/
-  fileDesc("CiZsaW5kbS9kZXZpY2UvdjEvc2VydmljZV9kaXNwYXRjaC5wcm90bxIPbGluZG0uZGV2aWNlLnYxIt0BCgtTZXJ2aWNlV29yaxIbCglhY3Rpb25faWQYASABKAlCCLpIBXIDsAEBEiQKD2ludGVudF9lbnZlbG9wZRgCIAEoDEILukgIegYQARiAgAESJwoUc3RhcnRfZ3JhbnRfZW52ZWxvcGUYAyABKAxCCbpIBnoEGICAARIdCgxyZXN1bHRfbm9uY2UYBCABKAxCB7pIBHoCaCASQwoXcmVzdWx0X25vbmNlX2V4cGlyZXNfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQEiQQoVR2V0U2VydmljZVdvcmtSZXF1ZXN0EigKDXNlc3Npb25fZXBvY2gYASABKARCEbpIDjIMGP//////////fyAAIkQKFkdldFNlcnZpY2VXb3JrUmVzcG9uc2USKgoEd29yaxgBIAEoCzIcLmxpbmRtLmRldmljZS52MS5TZXJ2aWNlV29yayKLAQocQXV0aG9yaXplU2VydmljZVN0YXJ0UmVxdWVzdBIoCg1zZXNzaW9uX2Vwb2NoGAEgASgEQhG6SA4yDBj//////////38gABIbCglhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEiQKD2NoYWxsZW5nZV9wcm9vZhgDIAEoDEILukgIegYQARiAgAEiSgodQXV0aG9yaXplU2VydmljZVN0YXJ0UmVzcG9uc2USKQoUc3RhcnRfZ3JhbnRfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIABIrQBChpSZXBvcnRTZXJ2aWNlUmVzdWx0UmVxdWVzdBIoCg1zZXNzaW9uX2Vwb2NoGAEgASgEQhG6SA4yDBj//////////38gABIbCglhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEikKFGF0dGVzdGF0aW9uX2VudmVsb3BlGAMgASgMQgu6SAh6BhABGICABBIkCg9jZXJ0aWZpY2F0ZV9wZW0YBCABKAxCC7pICHoGEAEYgIABIi0KG1JlcG9ydFNlcnZpY2VSZXN1bHRSZXNwb25zZRIOCgZjbG9zZWQYASABKAhCJFoibGluZG0vZ2VuL2xpbmRtL2RldmljZS92MTtkZXZpY2V2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiZsaW5kbS9kZXZpY2UvdjEvc2VydmljZV9kaXNwYXRjaC5wcm90bxIPbGluZG0uZGV2aWNlLnYxIp4DCgxSZXNvdXJjZVdvcmsSGwoJYWN0aW9uX2lkGAEgASgJQgi6SAVyA7ABARIkCg9pbnRlbnRfZW52ZWxvcGUYAiABKAxCC7pICHoGEAEYgIAIEicKFHN0YXJ0X2dyYW50X2VudmVsb3BlGAMgASgMQgm6SAZ6BBiAgAESHQoMcmVzdWx0X25vbmNlGAQgASgMQge6SAR6AmggEkMKF3Jlc3VsdF9ub25jZV9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhoKEmNhbmNlbF9wcmVwYXJhdGlvbhgGIAEoCDqhAbpInQEamgEKHnJlc291cmNlX3dvcmsuY2FuY2VsX3VuZ3JhbnRlZBI1cHJlcGFyYXRpb24gY2FuY2VsbGF0aW9uIGNhbm5vdCBjYXJyeSBzdGFydCBhdXRob3JpdHkaQSF0aGlzLmNhbmNlbF9wcmVwYXJhdGlvbiB8fCB0aGlzLnN0YXJ0X2dyYW50X2VudmVsb3BlLnNpemUoKSA9PSAwIkIKFkdldFJlc291cmNlV29ya1JlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAAiRgoXR2V0UmVzb3VyY2VXb3JrUmVzcG9uc2USKwoEd29yaxgBIAEoCzIdLmxpbmRtLmRldmljZS52MS5SZXNvdXJjZVdvcmsijAEKHUF1dGhvcml6ZVJlc291cmNlU3RhcnRSZXF1ZXN0EigKDXNlc3Npb25fZXBvY2gYASABKARCEbpIDjIMGP//////////fyAAEhsKCWFjdGlvbl9pZBgCIAEoCUIIukgFcgOwAQESJAoPY2hhbGxlbmdlX3Byb29mGAMgASgMQgu6SAh6BhABGICAASJLCh5BdXRob3JpemVSZXNvdXJjZVN0YXJ0UmVzcG9uc2USKQoUc3RhcnRfZ3JhbnRfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIABIroEChtSZXBvcnRSZXNvdXJjZVJlc3VsdFJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASGwoJYWN0aW9uX2lkGAIgASgJQgi6SAVyA7ABARInChRhdHRlc3RhdGlvbl9lbnZlbG9wZRgDIAEoDEIJukgGegQYgIAQEiIKD2NlcnRpZmljYXRlX3BlbRgEIAEoDEIJukgGegQYgIABEkgKDm5ldmVyX3ByZXBhcmVkGAUgASgLMjAubGluZG0uZGV2aWNlLnYxLlJlc291cmNlUHJlcGFyYXRpb25DYW5jZWxsYXRpb246vAK6SLgCGrUCChhyZXNvdXJjZV9yZXN1bHQuZXZpZGVuY2USZGEgcmVzdWx0IGNhcnJpZXMgZWl0aGVyIHNpZ25lZCBuYXRpdmUgaGlzdG9yeSBvciBhbiBleGFjdCBuZXZlci1wcmVwYXJlZCBjYW5jZWxsYXRpb24gYWNrbm93bGVkZ21lbnQasgFoYXModGhpcy5uZXZlcl9wcmVwYXJlZCkgPyAodGhpcy5hdHRlc3RhdGlvbl9lbnZlbG9wZS5zaXplKCkgPT0gMCAmJiB0aGlzLmNlcnRpZmljYXRlX3BlbS5zaXplKCkgPT0gMCkgOiAodGhpcy5hdHRlc3RhdGlvbl9lbnZlbG9wZS5zaXplKCkgPiAwICYmIHRoaXMuY2VydGlmaWNhdGVfcGVtLnNpemUoKSA+IDApImAKH1Jlc291cmNlUHJlcGFyYXRpb25DYW5jZWxsYXRpb24SHgoNaW50ZW50X3NoYTI1NhgBIAEoDEIHukgEegJoIBIdCgxyZXN1bHRfbm9uY2UYAiABKAxCB7pIBHoCaCAiLgocUmVwb3J0UmVzb3VyY2VSZXN1bHRSZXNwb25zZRIOCgZjbG9zZWQYASABKAhCJFoibGluZG0vZ2VuL2xpbmRtL2RldmljZS92MTtkZXZpY2V2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
- * Server-owned systemd service work for the authenticated device generation.
+ * Server-owned resource work for the authenticated device generation.
  * The server retains every signed byte; retries return those exact bytes and
  * never mint new authority for an existing action.
  *
- * @generated from message lindm.device.v1.ServiceWork
+ * @generated from message lindm.device.v1.ResourceWork
  */
-export type ServiceWork = Message<"lindm.device.v1.ServiceWork"> & {
+export type ResourceWork = Message<"lindm.device.v1.ResourceWork"> & {
   /**
    * @generated from field: string action_id = 1;
    */
   actionId: string;
 
   /**
-   * Plan-role DSSE ServiceExecutionIntent. Authorizes preflight only.
+   * Plan-role DSSE ResourceExecutionIntent. Authorizes preflight only.
    *
    * @generated from field: bytes intent_envelope = 2;
    */
@@ -37,14 +37,14 @@ export type ServiceWork = Message<"lindm.device.v1.ServiceWork"> & {
 
   /**
    * Previously issued exact start-role grant, if any. Present after a lost
-   * AuthorizeServiceStart response; it is never a fresh authorization.
+   * AuthorizeResourceStart response; it is never a fresh authorization.
    *
    * @generated from field: bytes start_grant_envelope = 3;
    */
   startGrantEnvelope: Uint8Array;
 
   /**
-   * Fresh server-selected nonce for one ReportServiceResult attestation.
+   * Fresh server-selected nonce for one ReportResourceResult attestation.
    *
    * @generated from field: bytes result_nonce = 4;
    */
@@ -54,19 +54,27 @@ export type ServiceWork = Message<"lindm.device.v1.ServiceWork"> & {
    * @generated from field: google.protobuf.Timestamp result_nonce_expires_at = 5;
    */
   resultNonceExpiresAt?: Timestamp | undefined;
+
+  /**
+   * Stop only this intent's ungranted preparation and attest its terminal result.
+   * The server keeps the action open until owned staging cleanup is acknowledged.
+   *
+   * @generated from field: bool cancel_preparation = 6;
+   */
+  cancelPreparation: boolean;
 };
 
 /**
- * Describes the message lindm.device.v1.ServiceWork.
- * Use `create(ServiceWorkSchema)` to create a new message.
+ * Describes the message lindm.device.v1.ResourceWork.
+ * Use `create(ResourceWorkSchema)` to create a new message.
  */
-export const ServiceWorkSchema: GenMessage<ServiceWork> = /*@__PURE__*/
+export const ResourceWorkSchema: GenMessage<ResourceWork> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 0);
 
 /**
- * @generated from message lindm.device.v1.GetServiceWorkRequest
+ * @generated from message lindm.device.v1.GetResourceWorkRequest
  */
-export type GetServiceWorkRequest = Message<"lindm.device.v1.GetServiceWorkRequest"> & {
+export type GetResourceWorkRequest = Message<"lindm.device.v1.GetResourceWorkRequest"> & {
   /**
    * @generated from field: uint64 session_epoch = 1;
    */
@@ -74,35 +82,35 @@ export type GetServiceWorkRequest = Message<"lindm.device.v1.GetServiceWorkReque
 };
 
 /**
- * Describes the message lindm.device.v1.GetServiceWorkRequest.
- * Use `create(GetServiceWorkRequestSchema)` to create a new message.
+ * Describes the message lindm.device.v1.GetResourceWorkRequest.
+ * Use `create(GetResourceWorkRequestSchema)` to create a new message.
  */
-export const GetServiceWorkRequestSchema: GenMessage<GetServiceWorkRequest> = /*@__PURE__*/
+export const GetResourceWorkRequestSchema: GenMessage<GetResourceWorkRequest> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 1);
 
 /**
- * @generated from message lindm.device.v1.GetServiceWorkResponse
+ * @generated from message lindm.device.v1.GetResourceWorkResponse
  */
-export type GetServiceWorkResponse = Message<"lindm.device.v1.GetServiceWorkResponse"> & {
+export type GetResourceWorkResponse = Message<"lindm.device.v1.GetResourceWorkResponse"> & {
   /**
    * Absent means no current action needs this device. It is not compliance.
    *
-   * @generated from field: lindm.device.v1.ServiceWork work = 1;
+   * @generated from field: lindm.device.v1.ResourceWork work = 1;
    */
-  work?: ServiceWork | undefined;
+  work?: ResourceWork | undefined;
 };
 
 /**
- * Describes the message lindm.device.v1.GetServiceWorkResponse.
- * Use `create(GetServiceWorkResponseSchema)` to create a new message.
+ * Describes the message lindm.device.v1.GetResourceWorkResponse.
+ * Use `create(GetResourceWorkResponseSchema)` to create a new message.
  */
-export const GetServiceWorkResponseSchema: GenMessage<GetServiceWorkResponse> = /*@__PURE__*/
+export const GetResourceWorkResponseSchema: GenMessage<GetResourceWorkResponse> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 2);
 
 /**
- * @generated from message lindm.device.v1.AuthorizeServiceStartRequest
+ * @generated from message lindm.device.v1.AuthorizeResourceStartRequest
  */
-export type AuthorizeServiceStartRequest = Message<"lindm.device.v1.AuthorizeServiceStartRequest"> & {
+export type AuthorizeResourceStartRequest = Message<"lindm.device.v1.AuthorizeResourceStartRequest"> & {
   /**
    * @generated from field: uint64 session_epoch = 1;
    */
@@ -114,7 +122,7 @@ export type AuthorizeServiceStartRequest = Message<"lindm.device.v1.AuthorizeSer
   actionId: string;
 
   /**
-   * Exact executor-returned device-key DSSE ServiceExecutionChallenge.
+   * Exact executor-returned device-key DSSE ResourceExecutionChallenge.
    *
    * @generated from field: bytes challenge_proof = 3;
    */
@@ -122,18 +130,18 @@ export type AuthorizeServiceStartRequest = Message<"lindm.device.v1.AuthorizeSer
 };
 
 /**
- * Describes the message lindm.device.v1.AuthorizeServiceStartRequest.
- * Use `create(AuthorizeServiceStartRequestSchema)` to create a new message.
+ * Describes the message lindm.device.v1.AuthorizeResourceStartRequest.
+ * Use `create(AuthorizeResourceStartRequestSchema)` to create a new message.
  */
-export const AuthorizeServiceStartRequestSchema: GenMessage<AuthorizeServiceStartRequest> = /*@__PURE__*/
+export const AuthorizeResourceStartRequestSchema: GenMessage<AuthorizeResourceStartRequest> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 3);
 
 /**
- * @generated from message lindm.device.v1.AuthorizeServiceStartResponse
+ * @generated from message lindm.device.v1.AuthorizeResourceStartResponse
  */
-export type AuthorizeServiceStartResponse = Message<"lindm.device.v1.AuthorizeServiceStartResponse"> & {
+export type AuthorizeResourceStartResponse = Message<"lindm.device.v1.AuthorizeResourceStartResponse"> & {
   /**
-   * Start-role DSSE ServiceExecutionStartGrant. An exact retry returns the
+   * Start-role DSSE ResourceExecutionStartGrant. An exact retry returns the
    * original bytes; a lapsed challenge requires a new server action.
    *
    * @generated from field: bytes start_grant_envelope = 1;
@@ -142,16 +150,16 @@ export type AuthorizeServiceStartResponse = Message<"lindm.device.v1.AuthorizeSe
 };
 
 /**
- * Describes the message lindm.device.v1.AuthorizeServiceStartResponse.
- * Use `create(AuthorizeServiceStartResponseSchema)` to create a new message.
+ * Describes the message lindm.device.v1.AuthorizeResourceStartResponse.
+ * Use `create(AuthorizeResourceStartResponseSchema)` to create a new message.
  */
-export const AuthorizeServiceStartResponseSchema: GenMessage<AuthorizeServiceStartResponse> = /*@__PURE__*/
+export const AuthorizeResourceStartResponseSchema: GenMessage<AuthorizeResourceStartResponse> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 4);
 
 /**
- * @generated from message lindm.device.v1.ReportServiceResultRequest
+ * @generated from message lindm.device.v1.ReportResourceResultRequest
  */
-export type ReportServiceResultRequest = Message<"lindm.device.v1.ReportServiceResultRequest"> & {
+export type ReportResourceResultRequest = Message<"lindm.device.v1.ReportResourceResultRequest"> & {
   /**
    * @generated from field: uint64 session_epoch = 1;
    */
@@ -163,7 +171,7 @@ export type ReportServiceResultRequest = Message<"lindm.device.v1.ReportServiceR
   actionId: string;
 
   /**
-   * Exact executor AttestServiceExecution output for the issued result nonce.
+   * Exact executor AttestResourceExecution output for the issued result nonce.
    *
    * @generated from field: bytes attestation_envelope = 3;
    */
@@ -173,19 +181,48 @@ export type ReportServiceResultRequest = Message<"lindm.device.v1.ReportServiceR
    * @generated from field: bytes certificate_pem = 4;
    */
   certificatePem: Uint8Array;
+
+  /**
+   * Authenticated cancellation acknowledgment only, never native evidence.
+   *
+   * @generated from field: lindm.device.v1.ResourcePreparationCancellation never_prepared = 5;
+   */
+  neverPrepared?: ResourcePreparationCancellation | undefined;
 };
 
 /**
- * Describes the message lindm.device.v1.ReportServiceResultRequest.
- * Use `create(ReportServiceResultRequestSchema)` to create a new message.
+ * Describes the message lindm.device.v1.ReportResourceResultRequest.
+ * Use `create(ReportResourceResultRequestSchema)` to create a new message.
  */
-export const ReportServiceResultRequestSchema: GenMessage<ReportServiceResultRequest> = /*@__PURE__*/
+export const ReportResourceResultRequestSchema: GenMessage<ReportResourceResultRequest> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_service_dispatch, 5);
 
 /**
- * @generated from message lindm.device.v1.ReportServiceResultResponse
+ * @generated from message lindm.device.v1.ResourcePreparationCancellation
  */
-export type ReportServiceResultResponse = Message<"lindm.device.v1.ReportServiceResultResponse"> & {
+export type ResourcePreparationCancellation = Message<"lindm.device.v1.ResourcePreparationCancellation"> & {
+  /**
+   * @generated from field: bytes intent_sha256 = 1;
+   */
+  intentSha256: Uint8Array;
+
+  /**
+   * @generated from field: bytes result_nonce = 2;
+   */
+  resultNonce: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.device.v1.ResourcePreparationCancellation.
+ * Use `create(ResourcePreparationCancellationSchema)` to create a new message.
+ */
+export const ResourcePreparationCancellationSchema: GenMessage<ResourcePreparationCancellation> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_service_dispatch, 6);
+
+/**
+ * @generated from message lindm.device.v1.ReportResourceResultResponse
+ */
+export type ReportResourceResultResponse = Message<"lindm.device.v1.ReportResourceResultResponse"> & {
   /**
    * True when the server will issue no further work for this action.
    *
@@ -195,9 +232,9 @@ export type ReportServiceResultResponse = Message<"lindm.device.v1.ReportService
 };
 
 /**
- * Describes the message lindm.device.v1.ReportServiceResultResponse.
- * Use `create(ReportServiceResultResponseSchema)` to create a new message.
+ * Describes the message lindm.device.v1.ReportResourceResultResponse.
+ * Use `create(ReportResourceResultResponseSchema)` to create a new message.
  */
-export const ReportServiceResultResponseSchema: GenMessage<ReportServiceResultResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_device_v1_service_dispatch, 6);
+export const ReportResourceResultResponseSchema: GenMessage<ReportResourceResultResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_service_dispatch, 7);
 

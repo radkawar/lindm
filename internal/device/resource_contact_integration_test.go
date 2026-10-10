@@ -29,18 +29,18 @@ func TestResourceAuthenticatedContactPreservesNativeFreshness(t *testing.T) {
 			t.Fatalf("authenticated contact not recorded: %v", err)
 		}
 	}
-	var work *devicev1.ServiceWork
+	var work *devicev1.ResourceWork
 	contact(func() { work = f.work(t) })
 	contact(func() { f.start(t, work) })
-	result := f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, true)
+	result := f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true)
 	contact(func() {
-		if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(result)); err != nil {
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(result)); err != nil {
 			t.Fatal(err)
 		}
 	})
 	// Complete the dependent resource so every native proof can then expire.
 	work = f.work(t)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
 		t.Fatal(err)
 	}
 	ageCompliance(t, f, 31*time.Minute)
@@ -50,7 +50,7 @@ func TestResourceAuthenticatedContactPreservesNativeFreshness(t *testing.T) {
 		}
 	})
 	contact(func() {
-		if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(result)); err != nil {
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(result)); err != nil {
 			t.Fatal(err)
 		}
 	})

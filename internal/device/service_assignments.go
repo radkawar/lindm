@@ -148,6 +148,9 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 			return nil, mapErr(err)
 		}
 	}
+	if resourceAdoptionRequired(resources) && consumption == nil {
+		return nil, approvalError(identity.ErrApprovalRequired)
+	}
 	document, err := proto.Marshal(assignment)
 	if err != nil {
 		return nil, mapErr(err)
@@ -162,6 +165,15 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	if err := insertResourceRows(ctx, q, id, resources); err != nil {
 		return nil, mapErr(err)
 	}
+	if resourceAdoptionRequired(resources) {
+		approvalID, err := uuid.Parse(req.Msg.GetApprovalId())
+		if err != nil {
+			return nil, approvalError(identity.ErrApprovalInvalid)
+		}
+		if err := q.SetResourceAssignmentAdoptionApproval(ctx, devicedb.SetResourceAssignmentAdoptionApprovalParams{ID: id, AdoptionApprovalID: &approvalID}); err != nil {
+			return nil, mapErr(err)
+		}
+	}
 	if head.ID != uuid.Nil {
 		if err := q.RecordResourceReleases(ctx, devicedb.RecordResourceReleasesParams{NewAssignmentID: id, OldAssignmentID: head.ID, RequestedAt: timestamptz(now)}); err != nil {
 			return nil, mapErr(err)
@@ -172,7 +184,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	}
 	action, err := q.GetOpenServiceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
-		if err := closeUnstartedServiceAction(ctx, q, action, "assignment_changed", now); err != nil {
+		if err := closeUnstartedServiceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return nil, mapErr(err)
 		}
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -292,11 +304,11 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			if err != nil {
 				return nil, mapErr(err)
 			}
-			intent := new(agentv1.ServiceExecutionIntent)
+			intent := new(agentv1.ResourceExecutionIntent)
 			if err := proto.Unmarshal(action.IntentDocument, intent); err != nil {
 				return nil, mapErr(errInternalState)
 			}
-			response.RecentActions = append(response.RecentActions, &adminv1.DeviceResourceAction{AssignmentId: action.AssignmentID.String(), ResourceId: action.ResourceID.String(), Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: intent.GetDesired().GetUnit()}, Action: summary})
+			response.RecentActions = append(response.RecentActions, &adminv1.DeviceResourceAction{AssignmentId: action.AssignmentID.String(), ResourceId: action.ResourceID.String(), Ref: intent.GetDesired().GetRef(), Action: summary})
 		}
 		releases, err := q.ListResourceReleases(ctx, *device.CurrentGenerationID)
 		if err != nil {
@@ -388,7 +400,7 @@ func serviceActionSummary(action devicedb.ResourceAction) (*adminv1.ServiceActio
 	}
 	summary := &adminv1.ServiceActionSummary{ActionId: action.ID.String(), ResourceSequence: uint64(action.ResourceSequence), IssuedAt: protoTime(action.IssuedAt), ExpiresAt: protoTime(action.ExpiresAt), StartAuthorizedAt: protoTime(action.StartAuthorizedAt), ClosedReason: action.ClosedReason, ClosedAt: protoTime(action.ClosedAt), ActionRevision: revision, AttestedAt: protoTime(action.AttestedAt), ReceivedAt: protoTime(action.ReceivedAt)}
 	if len(action.StatusDocument) != 0 {
-		summary.Status = new(agentv1.ServiceExecutionStatus)
+		summary.Status = new(agentv1.ResourceExecutionStatus)
 		if err := proto.Unmarshal(action.StatusDocument, summary.Status); err != nil {
 			return nil, errInternalState
 		}

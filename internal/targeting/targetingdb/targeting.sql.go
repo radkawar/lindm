@@ -14,7 +14,7 @@ import (
 
 const currentExecutionHealth = `-- name: CurrentExecutionHealth :one
 SELECT (CASE
- WHEN bool_or(r.disposition IN (4,5) AND r.reason <> 'outcome_unknown') THEN 2
+ WHEN bool_or(r.disposition IN (4,5) AND r.reason NOT IN ('outcome_unknown','verification_unknown','not_applicable')) THEN 2
  WHEN bool_or(r.disposition=6) THEN 4
  WHEN count(r.resource_id)>0 AND bool_and(r.disposition=3 AND r.last_verified_at IS NOT NULL
   AND r.last_verified_at>=$1::timestamptz

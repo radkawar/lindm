@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/resource_native.proto";
+import "lindm/agent/v1/resource_ownership.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+enum ConnectivityGuardPhase {
+  CONNECTIVITY_GUARD_PHASE_UNSPECIFIED = 0;
+  CONNECTIVITY_GUARD_PHASE_ARMED = 1;
+  CONNECTIVITY_GUARD_PHASE_APPLIED = 2;
+  CONNECTIVITY_GUARD_PHASE_CONFIRMED = 3;
+  CONNECTIVITY_GUARD_PHASE_COMMITTED = 4;
+  CONNECTIVITY_GUARD_PHASE_ROLLED_BACK = 5;
+  CONNECTIVITY_GUARD_PHASE_CONFLICT = 6;
+}
+// Exact inverse is typed and recompiled, never an arbitrary native program.
+message ConnectivityGuardRecord {
+  uint32 version = 1 [(buf.validate.field).uint32.const = 1];
+  NativeResourceTransactionRequest request = 2 [(buf.validate.field).required = true];
+  string boot_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 deadline_boottime_ns = 4 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  ConnectivityGuardPhase phase = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ResourceOwnershipSnapshot applied = 6;
+  bytes confirmation_receipt = 7 [(buf.validate.field).bytes.max_len = 524288];
+  bytes nonce = 8 [(buf.validate.field).bytes.len = 32];
+  uint32 worker_pid = 9 [(buf.validate.field).uint32.gt = 0];
+  uint64 worker_start_ticks = 10 [(buf.validate.field).uint64.gt = 0];
+}

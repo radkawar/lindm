@@ -75,11 +75,20 @@ func parseTruthActiveSession(data []byte) (*inventoryv1.ActiveSession, error) {
 			return nil, errors.New("invalid native remote-session state")
 		}
 	}
-	return &inventoryv1.ActiveSession{
+	session := &inventoryv1.ActiveSession{
 		UserName:     truthString(properties["Name"]),
 		SessionClass: truthString(properties["Class"]),
 		SessionType:  truthString(properties["Type"]),
 		Seat:         truthString(properties["Seat"]),
 		Remote:       remote,
-	}, nil
+	}
+	// A seat independently does not apply to manager, background, remote or
+	// tty sessions when that context was read natively.
+	class, kind := session.GetSessionClass(), session.GetSessionType()
+	if session.GetSeat().GetStatus() == truthUnavailable && class.GetStatus() == truthSuccess &&
+		kind.GetStatus() == truthSuccess && remote.GetStatus() == truthSuccess &&
+		(class.GetValue() == "manager" || class.GetValue() == "background" || remote.GetValue() || kind.GetValue() == "tty") {
+		session.Seat.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE
+	}
+	return session, nil
 }

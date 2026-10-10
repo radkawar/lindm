@@ -124,14 +124,14 @@ func (s *Service) recoveryPlatform() recoveryBootPlatform {
 func (s *Service) recoveryStageRequest(intent *agentv1.DeviceActionIntent, boot string, devices []string) (recoveryboot.StageRequest, error) {
 	cfg, recovery := s.recoveryConfig, intent.GetSpec().GetSanitize().GetRecovery()
 	if cfg == nil || recovery == nil || recovery.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI || !bytes.Equal(cfg.ImageSHA256, recovery.GetImageSha256()) {
-		return recoveryboot.StageRequest{}, errServiceRejected
+		return recoveryboot.StageRequest{}, errResourceRejected
 	}
 	if cfg.ImageSize < 0 || s.admit(&agentv1.RecoveryBootConfig{ImageFile: cfg.ImagePath, ImageSha256: cfg.ImageSHA256, ImageSize: uint64(cfg.ImageSize), SignerCertificateFile: cfg.CertificatePath, SignerCertificateSha256: cfg.CertificateSHA256, EspDirectory: cfg.ESPPath, StateDirectory: cfg.StateDirectory, Custody: cfg.Custody, ExpectedPcr11Sha256: cfg.ExpectedPCR11SHA256}) != nil {
-		return recoveryboot.StageRequest{}, errServiceRejected
+		return recoveryboot.StageRequest{}, errResourceRejected
 	}
 	media, err := digestMessage(intent.GetSpec().GetSanitize().GetTarget())
 	if err != nil || !bytes.Equal(media, recovery.GetMediaSha256()) {
-		return recoveryboot.StageRequest{}, errServiceRejected
+		return recoveryboot.StageRequest{}, errResourceRejected
 	}
 	return recoveryboot.StageRequest{ImagePath: cfg.ImagePath, ImageSHA256: bytes.Clone(cfg.ImageSHA256), ImageSize: cfg.ImageSize, CertificatePath: cfg.CertificatePath, CertificateSHA256: bytes.Clone(cfg.CertificateSHA256), ESPPath: cfg.ESPPath, StateDirectory: cfg.StateDirectory, ActionID: intent.GetActionId(), SourceBootID: boot, TargetDevices: devices}, nil
 }

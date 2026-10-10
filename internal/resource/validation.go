@@ -59,7 +59,7 @@ func validateCanonicalScalars(message protoreflect.Message) error {
 			return errors.New("resource: package_repository_ecosystem_mismatch")
 		}
 	case *resourcev1.NativePackageRecord:
-		if !packageSourceMatches(typed.GetPackage(), typed.GetSource()) {
+		if typed.GetProvenanceKnown() && !packageSourceMatches(typed.GetPackage(), typed.GetSource()) {
 			return errors.New("resource: package_record_ecosystem_mismatch")
 		}
 	case *resourcev1.PackageTransactionEntry:
@@ -194,6 +194,8 @@ func isUUIDField(message, field string) bool {
 		return field == "credential_id" || field == "issuer_profile_id"
 	case "ReleaseUpgradeTarget":
 		return field == "approval_id"
+	case "EncryptionComplianceObservation":
+		return field == "root_luks_uuid" || field == "root_gpt_disk_guid"
 	default:
 		return false
 	}
@@ -290,6 +292,17 @@ func ValidateObservation(observation *resourcev1.ResourceObservation) error {
 	case *resourcev1.ResourceObservation_CertificateEnrollment:
 		key, err = subjectKey(observed.CertificateEnrollment.GetSubject())
 		key = observed.CertificateEnrollment.GetCredentialId() + "/" + key
+	case *resourcev1.ResourceObservation_ManagedFile:
+		key = observed.ManagedFile.GetPath()
+	case *resourcev1.ResourceObservation_Sysctl:
+		key = observed.Sysctl.GetKey()
+	case *resourcev1.ResourceObservation_SystemdDefinition:
+		key = observed.SystemdDefinition.GetCanonicalKey()
+		if effective := observed.SystemdDefinition.GetEffective(); effective != nil && systemdDefinitionKey(effective) != key {
+			return errors.New("resource: definition_observation_identity_mismatch")
+		}
+	case *resourcev1.ResourceObservation_EncryptionCompliance:
+		key = "system/root"
 	default:
 		return errors.New("resource: unknown_observation_arm")
 	}
@@ -302,8 +315,8 @@ func ValidateObservation(observation *resourcev1.ResourceObservation) error {
 	return nil
 }
 
-// ValidatePlan binds the typed desired arm to the plan ref and digest. Native
-// observations, locks, ledger revision and actual inverse remain executor checks.
+// ValidatePlan binds canonical desired and before evidence to the envelope.
+// Native locks, ledger custody and actual inverse remain executor checks.
 func ValidatePlan(plan *resourcev1.ResourcePlan) error {
 	if err := validateEnvelope(plan, MaxPlanBytes); err != nil {
 		return err
@@ -311,19 +324,32 @@ func ValidatePlan(plan *resourcev1.ResourcePlan) error {
 	message := plan.ProtoReflect()
 	arm := message.WhichOneof(message.Descriptor().Oneofs().ByName("plan"))
 	native := message.Get(arm).Message()
-	desiredField := native.Descriptor().Fields().ByName("desired")
-	desired := &resourcev1.ResourceDesiredState{Ref: plan.GetRef()}
-	desiredMessage := desired.ProtoReflect()
-	desiredMessage.Set(desiredMessage.Descriptor().Fields().ByNumber(arm.Number()), native.Get(desiredField))
-	digest, err := DesiredDigest(desired)
+	digest, err := DesiredDigest(PlanDesired(plan))
 	if err != nil {
 		return err
 	}
 	if !bytes.Equal(digest[:], plan.GetDesiredSha256()) {
 		return errors.New("resource: plan_desired_digest_mismatch")
 	}
+	if !RefEqual(plan.GetRef(), plan.GetBefore().GetRef()) || !proto.Equal(plan.GetBackend(), plan.GetBefore().GetMetadata().GetBackend()) {
+		return errors.New("resource: plan_observation_binding_mismatch")
+	}
+	observationDigest, err := ObservationDigest(plan.GetBefore())
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(observationDigest[:], plan.GetObservationSha256()) {
+		return errors.New("resource: plan_observation_digest_mismatch")
+	}
+	if beforeField := native.Descriptor().Fields().ByName("before"); beforeField != nil {
+		beforeMessage := plan.GetBefore().ProtoReflect()
+		observedField := beforeMessage.WhichOneof(beforeMessage.Descriptor().Oneofs().ByName("observed"))
+		if !proto.Equal(native.Get(beforeField).Message().Interface(), beforeMessage.Get(observedField).Message().Interface()) {
+			return errors.New("resource: plan_typed_before_mismatch")
+		}
+	}
 	inverseField := native.Descriptor().Fields().ByName("inverse")
-	if native.Has(inverseField) {
+	if inverseField != nil && native.Has(inverseField) {
 		inverse := native.Get(inverseField).Message()
 		revision := inverse.Get(inverse.Descriptor().Fields().ByName("ledger_revision_sha256")).Bytes()
 		if !bytes.Equal(revision, plan.GetOwnershipRevisionSha256()) {

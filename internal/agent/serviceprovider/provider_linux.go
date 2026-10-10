@@ -9,11 +9,15 @@
 // links/units. Enabled/disabled evidence does not establish link ownership or
 // authorize ownership-safe profile removal. Persistent link changes reload the
 // native manager, which also incorporates other pending definitions. This
-// provider never installs definitions.
+// provider never installs definitions. Its resourcev1 envelope binds the native
+// evidence and reconcile operation; release refuses unknown prior ownership
+// rather than inventing a restoration baseline.
 package serviceprovider
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net"
@@ -23,9 +27,13 @@ import (
 	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/resource"
 )
 
 const Capability = "systemd.service.v1"
@@ -34,7 +42,10 @@ var (
 	ErrUnsupported    = errors.New("unsupported service operation")
 	ErrConflict       = errors.New("service precondition conflict")
 	ErrOutcomeUnknown = errors.New("service effect outcome unknown")
-	ErrNotConverged   = errors.New("service state not converged")
+	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("service state not converged"))
+	// ErrBaselineUnknown identifies release refusal without implying ownership
+	// or a restorable baseline for preexisting native service state.
+	ErrBaselineUnknown = errors.Join(ErrUnsupported, errors.New("baseline_unknown"))
 )
 
 const (
@@ -46,23 +57,36 @@ const (
 	managerInterface = "org.freedesktop.systemd1.Manager"
 )
 
+// Config contains executor-owned context, never transport-supplied native facts.
+// Ownership binds the signed profile resource; it does not establish an undo
+// baseline for preexisting systemd state. No ownership journal is consulted:
+// release remains baseline_unknown rather than claiming a restorable ledger.
+type Config struct {
+	ExecutorIncarnation string
+	Ownership           *agentv1.ResourceOwnershipBinding
+	Platform            *resourcev1.PlatformProduct
+}
+
 // Provider serializes its own operations, but does not lock out external systemd
 // clients. Close may interrupt an operation. A canceled in-flight operation can
 // retire the connection; reopen it rather than retrying an uncertain effect.
 // The zero value is not an open provider.
 type Provider struct {
-	conn      *dbus.Conn
-	socket    *net.UnixConn
-	owner     string
-	gate      chan struct{}
-	closeOnce sync.Once
-	closeErr  error
+	conn              *dbus.Conn
+	socket            *net.UnixConn
+	owner             string
+	gate              chan struct{}
+	closeOnce         sync.Once
+	closeErr          error
+	incarnation       string
+	backend           *resourcev1.BackendSelection
+	ownershipRevision []byte
 }
 
 // Open connects only to the root-owned peer at the fixed local system bus socket.
 // ctx bounds dial, EXTERNAL authentication, Hello and subscription, not the
 // lifetime of the returned connection. Interactive authorization is never used.
-func Open(ctx context.Context) (*Provider, error) {
+func Open(ctx context.Context, config Config) (*Provider, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: nil context", ErrUnsupported)
 	}
@@ -74,6 +98,23 @@ func Open(ctx context.Context) (*Provider, error) {
 	if _, err := validator(); err != nil {
 		return nil, err
 	}
+	incarnation, err := uuid.Parse(config.ExecutorIncarnation)
+	if err != nil || incarnation == uuid.Nil || incarnation.String() != config.ExecutorIncarnation || config.Ownership == nil || config.Platform == nil {
+		return nil, fmt.Errorf("%w: missing executor context", ErrUnsupported)
+	}
+	if err := validateMessage(config.Ownership); err != nil {
+		return nil, err
+	}
+	if err := validateMessage(config.Platform); err != nil {
+		return nil, err
+	}
+	binding, err := (proto.MarshalOptions{Deterministic: true}).Marshal(config.Ownership)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256.New()
+	_, _ = hash.Write([]byte("lindm.systemd-ownership-baseline-unknown.v1\x00"))
+	_, _ = hash.Write(binding)
 	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
 	if err != nil {
 		return nil, fmt.Errorf("connect system bus: %w", err)
@@ -99,7 +140,10 @@ func Open(ctx context.Context) (*Provider, error) {
 		_ = socket.Close()
 		return nil, fmt.Errorf("authenticate system bus: %w", err)
 	}
-	p := &Provider{conn: conn, socket: socket, gate: make(chan struct{}, 1)}
+	p := &Provider{
+		conn: conn, socket: socket, gate: make(chan struct{}, 1),
+		incarnation: config.ExecutorIncarnation, ownershipRevision: hash.Sum(nil),
+	}
 	p.gate <- struct{}{}
 	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", dbus.FlagNoAutoStart, systemdName).Store(&p.owner); err != nil {
 		_ = p.Close()
@@ -109,6 +153,24 @@ func Open(ctx context.Context) (*Provider, error) {
 	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetConnectionUnixUser", dbus.FlagNoAutoStart, p.owner).Store(&ownerUID); err != nil || ownerUID != 0 {
 		_ = p.Close()
 		return nil, fmt.Errorf("%w: systemd bus owner must be root: %v", ErrUnsupported, err)
+	}
+	var version dbus.Variant
+	if err := conn.Object(p.owner, managerPath).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", dbus.FlagNoAutoStart, managerInterface, "Version").Store(&version); err != nil {
+		_ = p.Close()
+		return nil, fmt.Errorf("read systemd version: %w", err)
+	}
+	var nativeVersion string
+	if err := version.Store(&nativeVersion); err != nil {
+		_ = p.Close()
+		return nil, fmt.Errorf("%w: systemd version: %v", ErrUnsupported, err)
+	}
+	p.backend = &resourcev1.BackendSelection{
+		Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: nativeVersion,
+		ProviderVersion: "systemd.service.v1", Product: proto.CloneOf(config.Platform),
+	}
+	if err := validateMessage(p.backend); err != nil {
+		_ = p.Close()
+		return nil, err
 	}
 	if err := p.manager(ctx, "Subscribe").Err; err != nil {
 		_ = p.Close()
@@ -223,7 +285,7 @@ func (p *Provider) begin(ctx context.Context) (context.Context, func(), error) {
 	}, nil
 }
 
-func (p *Provider) Observe(ctx context.Context, unit string) (*agentv1.ServiceObservation, error) {
+func (p *Provider) Observe(ctx context.Context, unit string) (*resourcev1.ResourceObservation, error) {
 	if err := validateUnit(unit); err != nil {
 		return nil, err
 	}
@@ -232,26 +294,40 @@ func (p *Provider) Observe(ctx context.Context, unit string) (*agentv1.ServiceOb
 		return nil, err
 	}
 	defer finish()
-	return p.observe(ctx, unit)
+	native, err := p.observe(ctx, unit)
+	if err != nil {
+		return nil, err
+	}
+	return observationEnvelope(native, p.incarnation, p.backend), nil
 }
 
-func (p *Provider) Plan(ctx context.Context, desired *agentv1.ServiceDesiredState) (*agentv1.ServicePlan, error) {
-	if err := validateMessage(desired); err != nil {
-		return nil, err
+func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesiredState, operation resourcev1.ResourceOperation) (*resourcev1.ResourcePlan, error) {
+	if err := resource.ValidateDesired(desired); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, err)
+	}
+	if desired.GetSystemdService() == nil {
+		return nil, fmt.Errorf("%w: non-systemd resource", ErrUnsupported)
+	}
+	switch operation {
+	case resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE:
+	case resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE:
+		return nil, ErrBaselineUnknown
+	default:
+		return nil, fmt.Errorf("%w: unknown resource operation", ErrUnsupported)
 	}
 	ctx, finish, err := p.begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer finish()
-	before, err := p.observe(ctx, desired.GetUnit())
+	before, err := p.observe(ctx, desired.GetSystemdService().GetUnit())
 	if err != nil {
 		return nil, err
 	}
-	return planFor(desired, before)
+	return planFor(desired, observationEnvelope(before, p.incarnation, p.backend), p.ownershipRevision)
 }
 
-func (p *Provider) Verify(ctx context.Context, plan *agentv1.ServicePlan) (*agentv1.ServiceVerification, error) {
+func (p *Provider) Verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
 	if err := ValidatePlan(plan); err != nil {
 		return nil, err
 	}
@@ -260,17 +336,34 @@ func (p *Provider) Verify(ctx context.Context, plan *agentv1.ServicePlan) (*agen
 		return nil, err
 	}
 	defer finish()
+	if err := p.checkBinding(plan, false); err != nil {
+		return nil, err
+	}
 	return p.verify(ctx, plan)
 }
 
-func (p *Provider) verify(ctx context.Context, plan *agentv1.ServicePlan) (*agentv1.ServiceVerification, error) {
-	after, err := p.observe(ctx, plan.GetDesired().GetUnit())
+func (p *Provider) verify(ctx context.Context, plan *resourcev1.ResourcePlan) (*resourcev1.ResourceVerification, error) {
+	after, err := p.observe(ctx, plan.GetSystemdService().GetDesired().GetUnit())
 	if err != nil {
 		return nil, err
 	}
-	result := verification(plan, after)
-	if !result.GetConverged() {
+	result, err := verification(plan, after, p.incarnation)
+	if err != nil {
+		return nil, err
+	}
+	if result.GetDisposition() != resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED {
 		return result, ErrNotConverged
 	}
 	return result, nil
+}
+
+func (p *Provider) checkBinding(plan *resourcev1.ResourcePlan, applying bool) error {
+	// Read-only restart reconciliation must not replay effects, but can report
+	// fresh evidence for a RUNNING record admitted by a previous incarnation.
+	if (applying && p.incarnation != plan.GetBefore().GetMetadata().GetExecutorIncarnation()) ||
+		!proto.Equal(p.backend, plan.GetBackend()) ||
+		!bytes.Equal(p.ownershipRevision, plan.GetOwnershipRevisionSha256()) {
+		return fmt.Errorf("%w: executor or ownership binding changed", ErrConflict)
+	}
+	return nil
 }

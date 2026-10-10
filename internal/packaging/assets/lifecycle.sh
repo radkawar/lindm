@@ -21,6 +21,8 @@ SYSUSERS=/usr/lib/sysusers.d/lindm.conf
 TMPFILES=/usr/lib/tmpfiles.d/lindm.conf
 EXECUTOR_UNIT=lindm-executor.service
 AGENT_UNIT=lindm-agent.service
+FIREWALL_RESTORE_UNIT=lindm-firewall-restore.service
+CONNECTIVITY_GUARD_UNIT=lindm-connectivity-guard.service
 
 fail() {
 	printf 'lindm-agent: %s\n' "$1" >&2
@@ -99,11 +101,15 @@ configure() {
 	ensure_dir "$PARENT" 0 0 755
 	ensure_dir "$EXECUTOR" 0 0 700
 	ensure_dir "$AGENT" "$account_uid" "$account_gid" 700
+	ensure_dir "$PARENT/firewall" 0 0 700
+	ensure_dir "$PARENT/connectivity-guard" 0 0 700
 	if [ -d /run ]; then
 		systemd-tmpfiles --create "$TMPFILES" || fail "systemd-tmpfiles failed"
 	fi
 	if systemd_running; then
 		systemctl daemon-reload || fail "systemctl daemon-reload failed"
+		# Firewall restoration and its rollback supervisor ship disabled; the
+		# firewall resource kind is not qualified and stays server-gated.
 		systemctl enable "$EXECUTOR_UNIT" "$AGENT_UNIT" || fail "systemctl enable failed"
 		systemctl restart "$EXECUTOR_UNIT" || fail "executor failed to start"
 		systemctl restart "$AGENT_UNIT" || fail "network agent failed to start"
@@ -112,13 +118,13 @@ configure() {
 
 stop_units() {
 	if systemd_running; then
-		systemctl stop "$AGENT_UNIT" "$EXECUTOR_UNIT" || fail "systemctl stop failed"
+		systemctl stop "$AGENT_UNIT" "$EXECUTOR_UNIT" "$FIREWALL_RESTORE_UNIT" "$CONNECTIVITY_GUARD_UNIT" || fail "systemctl stop failed"
 	fi
 }
 
 disable_units() {
 	if systemd_running; then
-		systemctl disable "$AGENT_UNIT" "$EXECUTOR_UNIT" || fail "systemctl disable failed"
+		systemctl disable "$AGENT_UNIT" "$EXECUTOR_UNIT" "$FIREWALL_RESTORE_UNIT" || fail "systemctl disable failed"
 	fi
 }
 

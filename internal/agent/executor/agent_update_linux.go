@@ -67,7 +67,7 @@ func (s *Service) updateEngine(ctx context.Context) (*update.Engine, error) {
 		return nil, err
 	}
 	if s.recoveryPending != nil {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if loaded.state.GetDeviceId() == "" {
 		return nil, errPendingEnrollment
@@ -106,7 +106,7 @@ func (s *Service) ExchangeAgentUpdate(ctx context.Context, req *connect.Request[
 	if req.Msg.GetRequestId() == "" {
 		if !s.actionMu.TryLock() {
 			s.mu.Unlock()
-			return nil, mapError(errServiceRejected)
+			return nil, mapError(errResourceRejected)
 		}
 		blocked, scanErr := s.store.DeviceActionsBlockUpdate(ctx)
 		if scanErr == nil && !blocked {
@@ -119,7 +119,7 @@ func (s *Service) ExchangeAgentUpdate(ctx context.Context, req *connect.Request[
 		}
 		if blocked {
 			s.mu.Unlock()
-			return nil, mapError(errServiceRejected)
+			return nil, mapError(errResourceRejected)
 		}
 	}
 	s.operations.Add(1)
@@ -147,7 +147,7 @@ func (s *Service) GetAgentUpdate(ctx context.Context, req *connect.Request[agent
 	}
 	defer s.mu.Unlock()
 	if s.liveRoot != nil {
-		return nil, mapError(errServiceRejected)
+		return nil, mapError(errResourceRejected)
 	}
 	engine, err := s.updateEngine(ctx)
 	if err != nil {

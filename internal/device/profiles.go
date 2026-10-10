@@ -31,6 +31,11 @@ func (s *Service) PublishProfileRevision(ctx context.Context, req *connect.Reque
 	if err := s.rules.Validate(req.Msg); err != nil {
 		return nil, invalid("invalid_profile_request")
 	}
+	for _, item := range req.Msg.GetSpec().GetResources() {
+		if item.GetOwnership().GetAdoptionApprovalId() != "" {
+			return nil, invalid("profile_adoption_approval_must_be_assignment_bound")
+		}
+	}
 	if s.identity == nil {
 		return nil, rpcError(connect.CodeFailedPrecondition, "profile_authorization_unavailable")
 	}

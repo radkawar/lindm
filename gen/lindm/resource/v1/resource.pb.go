@@ -89,7 +89,7 @@ func (VerificationDisposition) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_resource_v1_resource_proto_rawDescGZIP(), []int{0}
 }
 
-// Phase 1 is a control-plane vocabulary, not an expansion of executor authority.
+// Closed vocabulary; execution authority separately binds exact capabilities.
 // Supplied refs are compared to the domain-derived identity. Unknown fields are
 // rejected recursively; serialized limits are enforced by internal/resource.
 type ResourceDesiredState struct {
@@ -117,6 +117,10 @@ type ResourceDesiredState struct {
 	//	*ResourceDesiredState_SnapApp
 	//	*ResourceDesiredState_CertificateEnrollment
 	//	*ResourceDesiredState_DirectoryClient
+	//	*ResourceDesiredState_ManagedFile
+	//	*ResourceDesiredState_Sysctl
+	//	*ResourceDesiredState_SystemdDefinition
+	//	*ResourceDesiredState_EncryptionCompliance
 	State         isResourceDesiredState_State `protobuf_oneof:"state"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -346,6 +350,42 @@ func (x *ResourceDesiredState) GetDirectoryClient() *DirectoryClientDesired {
 	return nil
 }
 
+func (x *ResourceDesiredState) GetManagedFile() *ManagedFileDesired {
+	if x != nil {
+		if x, ok := x.State.(*ResourceDesiredState_ManagedFile); ok {
+			return x.ManagedFile
+		}
+	}
+	return nil
+}
+
+func (x *ResourceDesiredState) GetSysctl() *SysctlDesired {
+	if x != nil {
+		if x, ok := x.State.(*ResourceDesiredState_Sysctl); ok {
+			return x.Sysctl
+		}
+	}
+	return nil
+}
+
+func (x *ResourceDesiredState) GetSystemdDefinition() *SystemdDefinitionDesired {
+	if x != nil {
+		if x, ok := x.State.(*ResourceDesiredState_SystemdDefinition); ok {
+			return x.SystemdDefinition
+		}
+	}
+	return nil
+}
+
+func (x *ResourceDesiredState) GetEncryptionCompliance() *EncryptionComplianceDesired {
+	if x != nil {
+		if x, ok := x.State.(*ResourceDesiredState_EncryptionCompliance); ok {
+			return x.EncryptionCompliance
+		}
+	}
+	return nil
+}
+
 type isResourceDesiredState_State interface {
 	isResourceDesiredState_State()
 }
@@ -430,6 +470,22 @@ type ResourceDesiredState_DirectoryClient struct {
 	DirectoryClient *DirectoryClientDesired `protobuf:"bytes,29,opt,name=directory_client,json=directoryClient,proto3,oneof"`
 }
 
+type ResourceDesiredState_ManagedFile struct {
+	ManagedFile *ManagedFileDesired `protobuf:"bytes,30,opt,name=managed_file,json=managedFile,proto3,oneof"`
+}
+
+type ResourceDesiredState_Sysctl struct {
+	Sysctl *SysctlDesired `protobuf:"bytes,31,opt,name=sysctl,proto3,oneof"`
+}
+
+type ResourceDesiredState_SystemdDefinition struct {
+	SystemdDefinition *SystemdDefinitionDesired `protobuf:"bytes,32,opt,name=systemd_definition,json=systemdDefinition,proto3,oneof"`
+}
+
+type ResourceDesiredState_EncryptionCompliance struct {
+	EncryptionCompliance *EncryptionComplianceDesired `protobuf:"bytes,33,opt,name=encryption_compliance,json=encryptionCompliance,proto3,oneof"`
+}
+
 func (*ResourceDesiredState_SystemdService) isResourceDesiredState_State() {}
 
 func (*ResourceDesiredState_LocalGroup) isResourceDesiredState_State() {}
@@ -470,6 +526,14 @@ func (*ResourceDesiredState_CertificateEnrollment) isResourceDesiredState_State(
 
 func (*ResourceDesiredState_DirectoryClient) isResourceDesiredState_State() {}
 
+func (*ResourceDesiredState_ManagedFile) isResourceDesiredState_State() {}
+
+func (*ResourceDesiredState_Sysctl) isResourceDesiredState_State() {}
+
+func (*ResourceDesiredState_SystemdDefinition) isResourceDesiredState_State() {}
+
+func (*ResourceDesiredState_EncryptionCompliance) isResourceDesiredState_State() {}
+
 type ResourceObservation struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Ref      *ResourceRef           `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
@@ -496,6 +560,10 @@ type ResourceObservation struct {
 	//	*ResourceObservation_SnapApp
 	//	*ResourceObservation_CertificateEnrollment
 	//	*ResourceObservation_DirectoryClient
+	//	*ResourceObservation_ManagedFile
+	//	*ResourceObservation_Sysctl
+	//	*ResourceObservation_SystemdDefinition
+	//	*ResourceObservation_EncryptionCompliance
 	Observed      isResourceObservation_Observed `protobuf_oneof:"observed"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -732,6 +800,42 @@ func (x *ResourceObservation) GetDirectoryClient() *DirectoryClientObservation {
 	return nil
 }
 
+func (x *ResourceObservation) GetManagedFile() *ManagedFileObservation {
+	if x != nil {
+		if x, ok := x.Observed.(*ResourceObservation_ManagedFile); ok {
+			return x.ManagedFile
+		}
+	}
+	return nil
+}
+
+func (x *ResourceObservation) GetSysctl() *SysctlObservation {
+	if x != nil {
+		if x, ok := x.Observed.(*ResourceObservation_Sysctl); ok {
+			return x.Sysctl
+		}
+	}
+	return nil
+}
+
+func (x *ResourceObservation) GetSystemdDefinition() *SystemdDefinitionObservation {
+	if x != nil {
+		if x, ok := x.Observed.(*ResourceObservation_SystemdDefinition); ok {
+			return x.SystemdDefinition
+		}
+	}
+	return nil
+}
+
+func (x *ResourceObservation) GetEncryptionCompliance() *EncryptionComplianceObservation {
+	if x != nil {
+		if x, ok := x.Observed.(*ResourceObservation_EncryptionCompliance); ok {
+			return x.EncryptionCompliance
+		}
+	}
+	return nil
+}
+
 type isResourceObservation_Observed interface {
 	isResourceObservation_Observed()
 }
@@ -816,6 +920,22 @@ type ResourceObservation_DirectoryClient struct {
 	DirectoryClient *DirectoryClientObservation `protobuf:"bytes,29,opt,name=directory_client,json=directoryClient,proto3,oneof"`
 }
 
+type ResourceObservation_ManagedFile struct {
+	ManagedFile *ManagedFileObservation `protobuf:"bytes,30,opt,name=managed_file,json=managedFile,proto3,oneof"`
+}
+
+type ResourceObservation_Sysctl struct {
+	Sysctl *SysctlObservation `protobuf:"bytes,31,opt,name=sysctl,proto3,oneof"`
+}
+
+type ResourceObservation_SystemdDefinition struct {
+	SystemdDefinition *SystemdDefinitionObservation `protobuf:"bytes,32,opt,name=systemd_definition,json=systemdDefinition,proto3,oneof"`
+}
+
+type ResourceObservation_EncryptionCompliance struct {
+	EncryptionCompliance *EncryptionComplianceObservation `protobuf:"bytes,33,opt,name=encryption_compliance,json=encryptionCompliance,proto3,oneof"`
+}
+
 func (*ResourceObservation_SystemdService) isResourceObservation_Observed() {}
 
 func (*ResourceObservation_LocalGroup) isResourceObservation_Observed() {}
@@ -856,6 +976,14 @@ func (*ResourceObservation_CertificateEnrollment) isResourceObservation_Observed
 
 func (*ResourceObservation_DirectoryClient) isResourceObservation_Observed() {}
 
+func (*ResourceObservation_ManagedFile) isResourceObservation_Observed() {}
+
+func (*ResourceObservation_Sysctl) isResourceObservation_Observed() {}
+
+func (*ResourceObservation_SystemdDefinition) isResourceObservation_Observed() {}
+
+func (*ResourceObservation_EncryptionCompliance) isResourceObservation_Observed() {}
+
 type ResourcePlan struct {
 	state                   protoimpl.MessageState `protogen:"open.v1"`
 	Ref                     *ResourceRef           `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
@@ -866,6 +994,7 @@ type ResourcePlan struct {
 	Claims                  []*ResourceClaim       `protobuf:"bytes,6,rep,name=claims,proto3" json:"claims,omitempty"`
 	OwnershipRevisionSha256 []byte                 `protobuf:"bytes,7,opt,name=ownership_revision_sha256,json=ownershipRevisionSha256,proto3" json:"ownership_revision_sha256,omitempty"`
 	Safety                  *PlanSafety            `protobuf:"bytes,8,opt,name=safety,proto3" json:"safety,omitempty"`
+	Before                  *ResourceObservation   `protobuf:"bytes,9,opt,name=before,proto3" json:"before,omitempty"`
 	// Types that are valid to be assigned to Plan:
 	//
 	//	*ResourcePlan_SystemdService
@@ -888,6 +1017,10 @@ type ResourcePlan struct {
 	//	*ResourcePlan_SnapApp
 	//	*ResourcePlan_CertificateEnrollment
 	//	*ResourcePlan_DirectoryClient
+	//	*ResourcePlan_ManagedFile
+	//	*ResourcePlan_Sysctl
+	//	*ResourcePlan_SystemdDefinition
+	//	*ResourcePlan_EncryptionCompliance
 	Plan          isResourcePlan_Plan `protobuf_oneof:"plan"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -975,6 +1108,13 @@ func (x *ResourcePlan) GetOwnershipRevisionSha256() []byte {
 func (x *ResourcePlan) GetSafety() *PlanSafety {
 	if x != nil {
 		return x.Safety
+	}
+	return nil
+}
+
+func (x *ResourcePlan) GetBefore() *ResourceObservation {
+	if x != nil {
+		return x.Before
 	}
 	return nil
 }
@@ -1166,6 +1306,42 @@ func (x *ResourcePlan) GetDirectoryClient() *DirectoryClientPlan {
 	return nil
 }
 
+func (x *ResourcePlan) GetManagedFile() *ManagedFilePlan {
+	if x != nil {
+		if x, ok := x.Plan.(*ResourcePlan_ManagedFile); ok {
+			return x.ManagedFile
+		}
+	}
+	return nil
+}
+
+func (x *ResourcePlan) GetSysctl() *SysctlPlan {
+	if x != nil {
+		if x, ok := x.Plan.(*ResourcePlan_Sysctl); ok {
+			return x.Sysctl
+		}
+	}
+	return nil
+}
+
+func (x *ResourcePlan) GetSystemdDefinition() *SystemdDefinitionPlan {
+	if x != nil {
+		if x, ok := x.Plan.(*ResourcePlan_SystemdDefinition); ok {
+			return x.SystemdDefinition
+		}
+	}
+	return nil
+}
+
+func (x *ResourcePlan) GetEncryptionCompliance() *EncryptionCompliancePlan {
+	if x != nil {
+		if x, ok := x.Plan.(*ResourcePlan_EncryptionCompliance); ok {
+			return x.EncryptionCompliance
+		}
+	}
+	return nil
+}
+
 type isResourcePlan_Plan interface {
 	isResourcePlan_Plan()
 }
@@ -1250,6 +1426,22 @@ type ResourcePlan_DirectoryClient struct {
 	DirectoryClient *DirectoryClientPlan `protobuf:"bytes,29,opt,name=directory_client,json=directoryClient,proto3,oneof"`
 }
 
+type ResourcePlan_ManagedFile struct {
+	ManagedFile *ManagedFilePlan `protobuf:"bytes,30,opt,name=managed_file,json=managedFile,proto3,oneof"`
+}
+
+type ResourcePlan_Sysctl struct {
+	Sysctl *SysctlPlan `protobuf:"bytes,31,opt,name=sysctl,proto3,oneof"`
+}
+
+type ResourcePlan_SystemdDefinition struct {
+	SystemdDefinition *SystemdDefinitionPlan `protobuf:"bytes,32,opt,name=systemd_definition,json=systemdDefinition,proto3,oneof"`
+}
+
+type ResourcePlan_EncryptionCompliance struct {
+	EncryptionCompliance *EncryptionCompliancePlan `protobuf:"bytes,33,opt,name=encryption_compliance,json=encryptionCompliance,proto3,oneof"`
+}
+
 func (*ResourcePlan_SystemdService) isResourcePlan_Plan() {}
 
 func (*ResourcePlan_LocalGroup) isResourcePlan_Plan() {}
@@ -1290,6 +1482,14 @@ func (*ResourcePlan_CertificateEnrollment) isResourcePlan_Plan() {}
 
 func (*ResourcePlan_DirectoryClient) isResourcePlan_Plan() {}
 
+func (*ResourcePlan_ManagedFile) isResourcePlan_Plan() {}
+
+func (*ResourcePlan_Sysctl) isResourcePlan_Plan() {}
+
+func (*ResourcePlan_SystemdDefinition) isResourcePlan_Plan() {}
+
+func (*ResourcePlan_EncryptionCompliance) isResourcePlan_Plan() {}
+
 type ResourceVerification struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	Ref           *ResourceRef            `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
@@ -1319,6 +1519,10 @@ type ResourceVerification struct {
 	//	*ResourceVerification_SnapApp
 	//	*ResourceVerification_CertificateEnrollment
 	//	*ResourceVerification_DirectoryClient
+	//	*ResourceVerification_ManagedFile
+	//	*ResourceVerification_Sysctl
+	//	*ResourceVerification_SystemdDefinition
+	//	*ResourceVerification_EncryptionCompliance
 	Checks        isResourceVerification_Checks `protobuf_oneof:"checks"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1576,6 +1780,42 @@ func (x *ResourceVerification) GetDirectoryClient() *DirectoryClientChecks {
 	return nil
 }
 
+func (x *ResourceVerification) GetManagedFile() *ManagedFileChecks {
+	if x != nil {
+		if x, ok := x.Checks.(*ResourceVerification_ManagedFile); ok {
+			return x.ManagedFile
+		}
+	}
+	return nil
+}
+
+func (x *ResourceVerification) GetSysctl() *SysctlChecks {
+	if x != nil {
+		if x, ok := x.Checks.(*ResourceVerification_Sysctl); ok {
+			return x.Sysctl
+		}
+	}
+	return nil
+}
+
+func (x *ResourceVerification) GetSystemdDefinition() *SystemdDefinitionChecks {
+	if x != nil {
+		if x, ok := x.Checks.(*ResourceVerification_SystemdDefinition); ok {
+			return x.SystemdDefinition
+		}
+	}
+	return nil
+}
+
+func (x *ResourceVerification) GetEncryptionCompliance() *EncryptionComplianceChecks {
+	if x != nil {
+		if x, ok := x.Checks.(*ResourceVerification_EncryptionCompliance); ok {
+			return x.EncryptionCompliance
+		}
+	}
+	return nil
+}
+
 type isResourceVerification_Checks interface {
 	isResourceVerification_Checks()
 }
@@ -1660,6 +1900,22 @@ type ResourceVerification_DirectoryClient struct {
 	DirectoryClient *DirectoryClientChecks `protobuf:"bytes,29,opt,name=directory_client,json=directoryClient,proto3,oneof"`
 }
 
+type ResourceVerification_ManagedFile struct {
+	ManagedFile *ManagedFileChecks `protobuf:"bytes,30,opt,name=managed_file,json=managedFile,proto3,oneof"`
+}
+
+type ResourceVerification_Sysctl struct {
+	Sysctl *SysctlChecks `protobuf:"bytes,31,opt,name=sysctl,proto3,oneof"`
+}
+
+type ResourceVerification_SystemdDefinition struct {
+	SystemdDefinition *SystemdDefinitionChecks `protobuf:"bytes,32,opt,name=systemd_definition,json=systemdDefinition,proto3,oneof"`
+}
+
+type ResourceVerification_EncryptionCompliance struct {
+	EncryptionCompliance *EncryptionComplianceChecks `protobuf:"bytes,33,opt,name=encryption_compliance,json=encryptionCompliance,proto3,oneof"`
+}
+
 func (*ResourceVerification_SystemdService) isResourceVerification_Checks() {}
 
 func (*ResourceVerification_LocalGroup) isResourceVerification_Checks() {}
@@ -1700,11 +1956,19 @@ func (*ResourceVerification_CertificateEnrollment) isResourceVerification_Checks
 
 func (*ResourceVerification_DirectoryClient) isResourceVerification_Checks() {}
 
+func (*ResourceVerification_ManagedFile) isResourceVerification_Checks() {}
+
+func (*ResourceVerification_Sysctl) isResourceVerification_Checks() {}
+
+func (*ResourceVerification_SystemdDefinition) isResourceVerification_Checks() {}
+
+func (*ResourceVerification_EncryptionCompliance) isResourceVerification_Checks() {}
+
 var File_lindm_resource_v1_resource_proto protoreflect.FileDescriptor
 
 const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\n" +
-	" lindm/resource/v1/resource.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a lindm/resource/v1/accounts.proto\x1a\x1elindm/resource/v1/checks.proto\x1a\x1elindm/resource/v1/common.proto\x1a#lindm/resource/v1/credentials.proto\x1a lindm/resource/v1/identity.proto\x1a\x1flindm/resource/v1/network.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/software.proto\"\xeb\x14\n" +
+	" lindm/resource/v1/resource.proto\x12\x11lindm.resource.v1\x1a\x1bbuf/validate/validate.proto\x1a lindm/resource/v1/accounts.proto\x1a\x1elindm/resource/v1/checks.proto\x1a\x1elindm/resource/v1/common.proto\x1a#lindm/resource/v1/credentials.proto\x1a\x1clindm/resource/v1/host.proto\x1a lindm/resource/v1/identity.proto\x1a\x1flindm/resource/v1/network.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/software.proto\"\x8d\x19\n" +
 	"\x14ResourceDesiredState\x128\n" +
 	"\x03ref\x18\x01 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12S\n" +
 	"\x0fsystemd_service\x18\n" +
@@ -1733,9 +1997,15 @@ const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\x0fpassword_policy\x18\x1a \x01(\v2(.lindm.resource.v1.PasswordPolicyDesiredH\x00R\x0epasswordPolicy\x12>\n" +
 	"\bsnap_app\x18\x1b \x01(\v2!.lindm.resource.v1.SnapAppDesiredH\x00R\asnapApp\x12h\n" +
 	"\x16certificate_enrollment\x18\x1c \x01(\v2/.lindm.resource.v1.CertificateEnrollmentDesiredH\x00R\x15certificateEnrollment\x12V\n" +
-	"\x10directory_client\x18\x1d \x01(\v2).lindm.resource.v1.DirectoryClientDesiredH\x00R\x0fdirectoryClient:\xb0\b\xbaH\xac\b\x1a\xa9\b\n" +
-	"\x15resource_desired.kind\x12(resource kind must match the desired arm\x1a\xe5\a(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))B\x0e\n" +
-	"\x05state\x12\x05\xbaH\x02\b\x01\"\x8e\x16\n" +
+	"\x10directory_client\x18\x1d \x01(\v2).lindm.resource.v1.DirectoryClientDesiredH\x00R\x0fdirectoryClient\x12J\n" +
+	"\fmanaged_file\x18\x1e \x01(\v2%.lindm.resource.v1.ManagedFileDesiredH\x00R\vmanagedFile\x12:\n" +
+	"\x06sysctl\x18\x1f \x01(\v2 .lindm.resource.v1.SysctlDesiredH\x00R\x06sysctl\x12\\\n" +
+	"\x12systemd_definition\x18  \x01(\v2+.lindm.resource.v1.SystemdDefinitionDesiredH\x00R\x11systemdDefinition\x12e\n" +
+	"\x15encryption_compliance\x18! \x01(\v2..lindm.resource.v1.EncryptionComplianceDesiredH\x00R\x14encryptionCompliance:\x85\n" +
+	"\xbaH\x81\n" +
+	"\x1a\xfe\t\n" +
+	"\x15resource_desired.kind\x12(resource kind must match the desired arm\x1a\xba\t(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))B\x0e\n" +
+	"\x05state\x12\x05\xbaH\x02\b\x01\"\xc0\x1a\n" +
 	"\x13ResourceObservation\x128\n" +
 	"\x03ref\x18\x01 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12J\n" +
 	"\bmetadata\x18\x02 \x01(\v2&.lindm.resource.v1.ObservationMetadataB\x06\xbaH\x03\xc8\x01\x01R\bmetadata\x12W\n" +
@@ -1765,9 +2035,16 @@ const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\x0fpassword_policy\x18\x1a \x01(\v2,.lindm.resource.v1.PasswordPolicyObservationH\x00R\x0epasswordPolicy\x12B\n" +
 	"\bsnap_app\x18\x1b \x01(\v2%.lindm.resource.v1.SnapAppObservationH\x00R\asnapApp\x12l\n" +
 	"\x16certificate_enrollment\x18\x1c \x01(\v23.lindm.resource.v1.CertificateEnrollmentObservationH\x00R\x15certificateEnrollment\x12Z\n" +
-	"\x10directory_client\x18\x1d \x01(\v2-.lindm.resource.v1.DirectoryClientObservationH\x00R\x0fdirectoryClient:\xb5\b\xbaH\xb1\b\x1a\xae\b\n" +
-	"\x19resource_observation.kind\x12)resource kind must match the observed arm\x1a\xe5\a(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))B\x11\n" +
-	"\bobserved\x12\x05\xbaH\x02\b\x01\"\xa5\"\n" +
+	"\x10directory_client\x18\x1d \x01(\v2-.lindm.resource.v1.DirectoryClientObservationH\x00R\x0fdirectoryClient\x12N\n" +
+	"\fmanaged_file\x18\x1e \x01(\v2).lindm.resource.v1.ManagedFileObservationH\x00R\vmanagedFile\x12>\n" +
+	"\x06sysctl\x18\x1f \x01(\v2$.lindm.resource.v1.SysctlObservationH\x00R\x06sysctl\x12`\n" +
+	"\x12systemd_definition\x18  \x01(\v2/.lindm.resource.v1.SystemdDefinitionObservationH\x00R\x11systemdDefinition\x12i\n" +
+	"\x15encryption_compliance\x18! \x01(\v22.lindm.resource.v1.EncryptionComplianceObservationH\x00R\x14encryptionCompliance:\x8a\n" +
+	"\xbaH\x86\n" +
+	"\x1a\x83\n" +
+	"\n" +
+	"\x19resource_observation.kind\x12)resource kind must match the observed arm\x1a\xba\t(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))B\x11\n" +
+	"\bobserved\x12\x05\xbaH\x02\b\x01\"\xae)\n" +
 	"\fResourcePlan\x128\n" +
 	"\x03ref\x18\x01 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12N\n" +
 	"\toperation\x18\x02 \x01(\x0e2$.lindm.resource.v1.ResourceOperationB\n" +
@@ -1777,7 +2054,8 @@ const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\abackend\x18\x05 \x01(\v2#.lindm.resource.v1.BackendSelectionB\x06\xbaH\x03\xc8\x01\x01R\abackend\x12C\n" +
 	"\x06claims\x18\x06 \x03(\v2 .lindm.resource.v1.ResourceClaimB\t\xbaH\x06\x92\x01\x03\x10\x80 R\x06claims\x12C\n" +
 	"\x19ownership_revision_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\x17ownershipRevisionSha256\x12=\n" +
-	"\x06safety\x18\b \x01(\v2\x1d.lindm.resource.v1.PlanSafetyB\x06\xbaH\x03\xc8\x01\x01R\x06safety\x12P\n" +
+	"\x06safety\x18\b \x01(\v2\x1d.lindm.resource.v1.PlanSafetyB\x06\xbaH\x03\xc8\x01\x01R\x06safety\x12F\n" +
+	"\x06before\x18\t \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12P\n" +
 	"\x0fsystemd_service\x18\n" +
 	" \x01(\v2%.lindm.resource.v1.SystemdServicePlanH\x00R\x0esystemdService\x12D\n" +
 	"\vlocal_group\x18\v \x01(\v2!.lindm.resource.v1.LocalGroupPlanH\x00R\n" +
@@ -1804,11 +2082,14 @@ const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\x0fpassword_policy\x18\x1a \x01(\v2%.lindm.resource.v1.PasswordPolicyPlanH\x00R\x0epasswordPolicy\x12;\n" +
 	"\bsnap_app\x18\x1b \x01(\v2\x1e.lindm.resource.v1.SnapAppPlanH\x00R\asnapApp\x12e\n" +
 	"\x16certificate_enrollment\x18\x1c \x01(\v2,.lindm.resource.v1.CertificateEnrollmentPlanH\x00R\x15certificateEnrollment\x12S\n" +
-	"\x10directory_client\x18\x1d \x01(\v2&.lindm.resource.v1.DirectoryClientPlanH\x00R\x0fdirectoryClient:\xe7\x12\xbaH\xe3\x12\x1a\xa3\b\n" +
-	"\x12resource_plan.kind\x12%resource kind must match the plan arm\x1a\xe5\a(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))\x1a\xba\n" +
-	"\n" +
-	"\x1dresource_plan.release_inverse\x12?release requires a ledger-bound executor-computed typed inverse\x1a\xd7\tthis.operation != 2 || (has(this.systemd_service) && has(this.systemd_service.inverse)) || (has(this.local_group) && has(this.local_group.inverse)) || (has(this.local_user) && has(this.local_user.inverse)) || (has(this.sudo_rule) && has(this.sudo_rule.inverse)) || (has(this.ssh_server) && has(this.ssh_server.inverse)) || (has(this.time_sync) && has(this.time_sync.inverse)) || (has(this.trust_ca) && has(this.trust_ca.inverse)) || (has(this.firewall_zone) && has(this.firewall_zone.inverse)) || (has(this.network_connection) && has(this.network_connection.inverse)) || (has(this.dns) && has(this.dns.inverse)) || (has(this.proxy) && has(this.proxy.inverse)) || (has(this.native_package) && has(this.native_package.inverse)) || (has(this.repository) && has(this.repository.inverse)) || (has(this.flatpak_app) && has(this.flatpak_app.inverse)) || (has(this.os_update) && has(this.os_update.inverse)) || (has(this.session_policy) && has(this.session_policy.inverse)) || (has(this.password_policy) && has(this.password_policy.inverse)) || (has(this.snap_app) && has(this.snap_app.inverse)) || (has(this.certificate_enrollment) && has(this.certificate_enrollment.inverse)) || (has(this.directory_client) && has(this.directory_client.inverse))B\r\n" +
-	"\x04plan\x12\x05\xbaH\x02\b\x01\"\xfe\"\n" +
+	"\x10directory_client\x18\x1d \x01(\v2&.lindm.resource.v1.DirectoryClientPlanH\x00R\x0fdirectoryClient\x12G\n" +
+	"\fmanaged_file\x18\x1e \x01(\v2\".lindm.resource.v1.ManagedFilePlanH\x00R\vmanagedFile\x127\n" +
+	"\x06sysctl\x18\x1f \x01(\v2\x1d.lindm.resource.v1.SysctlPlanH\x00R\x06sysctl\x12Y\n" +
+	"\x12systemd_definition\x18  \x01(\v2(.lindm.resource.v1.SystemdDefinitionPlanH\x00R\x11systemdDefinition\x12b\n" +
+	"\x15encryption_compliance\x18! \x01(\v2+.lindm.resource.v1.EncryptionCompliancePlanH\x00R\x14encryptionCompliance:\xe7\x16\xbaH\xe3\x16\x1a\xf8\t\n" +
+	"\x12resource_plan.kind\x12%resource kind must match the plan arm\x1a\xba\t(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))\x1a\xe5\f\n" +
+	"\x1dresource_plan.release_inverse\x12amutating resource release requires a ledger-bound inverse; compliance release is observation only\x1a\xe0\vthis.operation != 2 || (has(this.systemd_service) && has(this.systemd_service.inverse)) || (has(this.local_group) && has(this.local_group.inverse)) || (has(this.local_user) && has(this.local_user.inverse)) || (has(this.sudo_rule) && has(this.sudo_rule.inverse)) || (has(this.ssh_server) && has(this.ssh_server.inverse)) || (has(this.time_sync) && has(this.time_sync.inverse)) || (has(this.trust_ca) && has(this.trust_ca.inverse)) || (has(this.firewall_zone) && has(this.firewall_zone.inverse)) || (has(this.network_connection) && has(this.network_connection.inverse)) || (has(this.dns) && has(this.dns.inverse)) || (has(this.proxy) && has(this.proxy.inverse)) || (has(this.native_package) && has(this.native_package.inverse)) || (has(this.repository) && has(this.repository.inverse)) || (has(this.flatpak_app) && has(this.flatpak_app.inverse)) || (has(this.os_update) && has(this.os_update.inverse)) || (has(this.session_policy) && has(this.session_policy.inverse)) || (has(this.password_policy) && has(this.password_policy.inverse)) || (has(this.snap_app) && has(this.snap_app.inverse)) || (has(this.certificate_enrollment) && has(this.certificate_enrollment.inverse)) || (has(this.directory_client) && has(this.directory_client.inverse)) || (has(this.managed_file) && has(this.managed_file.inverse)) || (has(this.sysctl) && has(this.sysctl.inverse)) || (has(this.systemd_definition) && has(this.systemd_definition.inverse)) || (has(this.encryption_compliance) && this.encryption_compliance.change == 5)B\r\n" +
+	"\x04plan\x12\x05\xbaH\x02\b\x01\"\xac+\n" +
 	"\x14ResourceVerification\x128\n" +
 	"\x03ref\x18\x01 \x01(\v2\x1e.lindm.resource.v1.ResourceRefB\x06\xbaH\x03\xc8\x01\x01R\x03ref\x12.\n" +
 	"\x0edesired_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\rdesiredSha256\x12(\n" +
@@ -1843,11 +2124,16 @@ const file_lindm_resource_v1_resource_proto_rawDesc = "" +
 	"\x0fpassword_policy\x18\x1a \x01(\v2'.lindm.resource.v1.PasswordPolicyChecksH\x00R\x0epasswordPolicy\x12=\n" +
 	"\bsnap_app\x18\x1b \x01(\v2 .lindm.resource.v1.SnapAppChecksH\x00R\asnapApp\x12g\n" +
 	"\x16certificate_enrollment\x18\x1c \x01(\v2..lindm.resource.v1.CertificateEnrollmentChecksH\x00R\x15certificateEnrollment\x12U\n" +
-	"\x10directory_client\x18\x1d \x01(\v2(.lindm.resource.v1.DirectoryClientChecksH\x00R\x0fdirectoryClient:\xdc\x14\xbaH\xd8\x14\x1a\xad\b\n" +
-	"\x1aresource_verification.kind\x12'resource kind must match the checks arm\x1a\xe5\a(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client))\x1a\xdd\x01\n" +
-	"!resource_verification.observation\x12:verification must bind the same resource after-observation\x1a|this.ref == this.after.ref && (!has(this.systemd_service) || this.systemd_service.observation == this.after.systemd_service)\x1a\xc5\n" +
+	"\x10directory_client\x18\x1d \x01(\v2(.lindm.resource.v1.DirectoryClientChecksH\x00R\x0fdirectoryClient\x12I\n" +
+	"\fmanaged_file\x18\x1e \x01(\v2$.lindm.resource.v1.ManagedFileChecksH\x00R\vmanagedFile\x129\n" +
+	"\x06sysctl\x18\x1f \x01(\v2\x1f.lindm.resource.v1.SysctlChecksH\x00R\x06sysctl\x12[\n" +
+	"\x12systemd_definition\x18  \x01(\v2*.lindm.resource.v1.SystemdDefinitionChecksH\x00R\x11systemdDefinition\x12d\n" +
+	"\x15encryption_compliance\x18! \x01(\v2-.lindm.resource.v1.EncryptionComplianceChecksH\x00R\x14encryptionCompliance:\xc1\x1a\xbaH\xbd\x1a\x1a\x82\n" +
 	"\n" +
-	"\x1fresource_verification.converged\x12Oconvergence requires successful native observation and all kind-specific checks\x1a\xd0\tthis.disposition != 1 || (this.after.metadata.observation_status == 1 && ((has(this.systemd_service) && this.systemd_service.converged) || (has(this.local_group) && this.local_group.converged) || (has(this.local_user) && this.local_user.converged) || (has(this.sudo_rule) && this.sudo_rule.converged) || (has(this.ssh_server) && this.ssh_server.converged) || (has(this.time_sync) && this.time_sync.converged) || (has(this.trust_ca) && this.trust_ca.converged) || (has(this.firewall_zone) && this.firewall_zone.converged) || (has(this.network_connection) && this.network_connection.converged) || (has(this.dns) && this.dns.converged) || (has(this.proxy) && this.proxy.converged) || (has(this.native_package) && this.native_package.converged) || (has(this.repository) && this.repository.converged) || (has(this.flatpak_app) && this.flatpak_app.converged) || (has(this.os_update) && this.os_update.converged) || (has(this.session_policy) && this.session_policy.converged) || (has(this.password_policy) && this.password_policy.converged) || (has(this.snap_app) && this.snap_app.converged) || (has(this.certificate_enrollment) && this.certificate_enrollment.converged) || (has(this.directory_client) && this.directory_client.converged)))B\x0f\n" +
+	"\x1aresource_verification.kind\x12'resource kind must match the checks arm\x1a\xba\t(this.ref.kind == 1 && has(this.systemd_service)) || (this.ref.kind == 2 && has(this.local_group)) || (this.ref.kind == 3 && has(this.local_user)) || (this.ref.kind == 4 && has(this.sudo_rule)) || (this.ref.kind == 5 && has(this.ssh_server)) || (this.ref.kind == 6 && has(this.time_sync)) || (this.ref.kind == 7 && has(this.trust_ca)) || (this.ref.kind == 8 && has(this.firewall_zone)) || (this.ref.kind == 9 && has(this.network_connection)) || (this.ref.kind == 10 && has(this.dns)) || (this.ref.kind == 11 && has(this.proxy)) || (this.ref.kind == 12 && has(this.native_package)) || (this.ref.kind == 13 && has(this.repository)) || (this.ref.kind == 14 && has(this.flatpak_app)) || (this.ref.kind == 15 && has(this.os_update)) || (this.ref.kind == 16 && has(this.session_policy)) || (this.ref.kind == 17 && has(this.password_policy)) || (this.ref.kind == 18 && has(this.snap_app)) || (this.ref.kind == 19 && has(this.certificate_enrollment)) || (this.ref.kind == 20 && has(this.directory_client)) || (this.ref.kind == 21 && has(this.managed_file)) || (this.ref.kind == 22 && has(this.sysctl)) || (this.ref.kind == 23 && has(this.systemd_definition)) || (this.ref.kind == 24 && has(this.encryption_compliance))\x1a\xdd\x01\n" +
+	"!resource_verification.observation\x12:verification must bind the same resource after-observation\x1a|this.ref == this.after.ref && (!has(this.systemd_service) || this.systemd_service.observation == this.after.systemd_service)\x1a\xc3\f\n" +
+	"\x1fresource_verification.converged\x12Oconvergence requires successful native observation and all kind-specific checks\x1a\xce\vthis.disposition != 1 || (this.after.metadata.observation_status == 1 && ((has(this.systemd_service) && this.systemd_service.converged) || (has(this.local_group) && this.local_group.converged) || (has(this.local_user) && this.local_user.converged) || (has(this.sudo_rule) && this.sudo_rule.converged) || (has(this.ssh_server) && this.ssh_server.converged) || (has(this.time_sync) && this.time_sync.converged) || (has(this.trust_ca) && this.trust_ca.converged) || (has(this.firewall_zone) && this.firewall_zone.converged) || (has(this.network_connection) && this.network_connection.converged) || (has(this.dns) && this.dns.converged) || (has(this.proxy) && this.proxy.converged) || (has(this.native_package) && this.native_package.converged) || (has(this.repository) && this.repository.converged) || (has(this.flatpak_app) && this.flatpak_app.converged) || (has(this.os_update) && this.os_update.converged) || (has(this.session_policy) && this.session_policy.converged) || (has(this.password_policy) && this.password_policy.converged) || (has(this.snap_app) && this.snap_app.converged) || (has(this.certificate_enrollment) && this.certificate_enrollment.converged) || (has(this.directory_client) && this.directory_client.converged) || (has(this.managed_file) && this.managed_file.converged) || (has(this.sysctl) && this.sysctl.converged) || (has(this.systemd_definition) && this.systemd_definition.converged) || (has(this.encryption_compliance) && this.encryption_compliance.converged)))\x1a\x8f\x02\n" +
+	")resource_verification.encryption_evidence\x12Cencryption convergence cannot be inferred from absent root evidence\x1a\x9c\x01this.disposition != 1 || !has(this.encryption_compliance) || (has(this.after.encryption_compliance.luks_root) && this.after.encryption_compliance.luks_root)B\x0f\n" +
 	"\x06checks\x12\x05\xbaH\x02\b\x01*\x92\x03\n" +
 	"\x17VerificationDisposition\x12(\n" +
 	"$VERIFICATION_DISPOSITION_UNSPECIFIED\x10\x00\x12&\n" +
@@ -1901,169 +2187,202 @@ var file_lindm_resource_v1_resource_proto_goTypes = []any{
 	(*SnapAppDesired)(nil),                   // 23: lindm.resource.v1.SnapAppDesired
 	(*CertificateEnrollmentDesired)(nil),     // 24: lindm.resource.v1.CertificateEnrollmentDesired
 	(*DirectoryClientDesired)(nil),           // 25: lindm.resource.v1.DirectoryClientDesired
-	(*ObservationMetadata)(nil),              // 26: lindm.resource.v1.ObservationMetadata
-	(*SystemdServiceObservation)(nil),        // 27: lindm.resource.v1.SystemdServiceObservation
-	(*LocalGroupObservation)(nil),            // 28: lindm.resource.v1.LocalGroupObservation
-	(*LocalUserObservation)(nil),             // 29: lindm.resource.v1.LocalUserObservation
-	(*SudoRuleObservation)(nil),              // 30: lindm.resource.v1.SudoRuleObservation
-	(*SSHServerObservation)(nil),             // 31: lindm.resource.v1.SSHServerObservation
-	(*TimeSyncObservation)(nil),              // 32: lindm.resource.v1.TimeSyncObservation
-	(*TrustCAObservation)(nil),               // 33: lindm.resource.v1.TrustCAObservation
-	(*FirewallZoneObservation)(nil),          // 34: lindm.resource.v1.FirewallZoneObservation
-	(*NetworkConnectionObservation)(nil),     // 35: lindm.resource.v1.NetworkConnectionObservation
-	(*DNSObservation)(nil),                   // 36: lindm.resource.v1.DNSObservation
-	(*ProxyObservation)(nil),                 // 37: lindm.resource.v1.ProxyObservation
-	(*NativePackageObservation)(nil),         // 38: lindm.resource.v1.NativePackageObservation
-	(*RepositoryObservation)(nil),            // 39: lindm.resource.v1.RepositoryObservation
-	(*FlatpakAppObservation)(nil),            // 40: lindm.resource.v1.FlatpakAppObservation
-	(*OSUpdateObservation)(nil),              // 41: lindm.resource.v1.OSUpdateObservation
-	(*SessionPolicyObservation)(nil),         // 42: lindm.resource.v1.SessionPolicyObservation
-	(*PasswordPolicyObservation)(nil),        // 43: lindm.resource.v1.PasswordPolicyObservation
-	(*SnapAppObservation)(nil),               // 44: lindm.resource.v1.SnapAppObservation
-	(*CertificateEnrollmentObservation)(nil), // 45: lindm.resource.v1.CertificateEnrollmentObservation
-	(*DirectoryClientObservation)(nil),       // 46: lindm.resource.v1.DirectoryClientObservation
-	(ResourceOperation)(0),                   // 47: lindm.resource.v1.ResourceOperation
-	(*BackendSelection)(nil),                 // 48: lindm.resource.v1.BackendSelection
-	(*ResourceClaim)(nil),                    // 49: lindm.resource.v1.ResourceClaim
-	(*PlanSafety)(nil),                       // 50: lindm.resource.v1.PlanSafety
-	(*SystemdServicePlan)(nil),               // 51: lindm.resource.v1.SystemdServicePlan
-	(*LocalGroupPlan)(nil),                   // 52: lindm.resource.v1.LocalGroupPlan
-	(*LocalUserPlan)(nil),                    // 53: lindm.resource.v1.LocalUserPlan
-	(*SudoRulePlan)(nil),                     // 54: lindm.resource.v1.SudoRulePlan
-	(*SSHServerPlan)(nil),                    // 55: lindm.resource.v1.SSHServerPlan
-	(*TimeSyncPlan)(nil),                     // 56: lindm.resource.v1.TimeSyncPlan
-	(*TrustCAPlan)(nil),                      // 57: lindm.resource.v1.TrustCAPlan
-	(*FirewallZonePlan)(nil),                 // 58: lindm.resource.v1.FirewallZonePlan
-	(*NetworkConnectionPlan)(nil),            // 59: lindm.resource.v1.NetworkConnectionPlan
-	(*DNSPlan)(nil),                          // 60: lindm.resource.v1.DNSPlan
-	(*ProxyPlan)(nil),                        // 61: lindm.resource.v1.ProxyPlan
-	(*NativePackagePlan)(nil),                // 62: lindm.resource.v1.NativePackagePlan
-	(*RepositoryPlan)(nil),                   // 63: lindm.resource.v1.RepositoryPlan
-	(*FlatpakAppPlan)(nil),                   // 64: lindm.resource.v1.FlatpakAppPlan
-	(*OSUpdatePlan)(nil),                     // 65: lindm.resource.v1.OSUpdatePlan
-	(*SessionPolicyPlan)(nil),                // 66: lindm.resource.v1.SessionPolicyPlan
-	(*PasswordPolicyPlan)(nil),               // 67: lindm.resource.v1.PasswordPolicyPlan
-	(*SnapAppPlan)(nil),                      // 68: lindm.resource.v1.SnapAppPlan
-	(*CertificateEnrollmentPlan)(nil),        // 69: lindm.resource.v1.CertificateEnrollmentPlan
-	(*DirectoryClientPlan)(nil),              // 70: lindm.resource.v1.DirectoryClientPlan
-	(*SystemdServiceChecks)(nil),             // 71: lindm.resource.v1.SystemdServiceChecks
-	(*LocalGroupChecks)(nil),                 // 72: lindm.resource.v1.LocalGroupChecks
-	(*LocalUserChecks)(nil),                  // 73: lindm.resource.v1.LocalUserChecks
-	(*SudoRuleChecks)(nil),                   // 74: lindm.resource.v1.SudoRuleChecks
-	(*SSHServerChecks)(nil),                  // 75: lindm.resource.v1.SSHServerChecks
-	(*TimeSyncChecks)(nil),                   // 76: lindm.resource.v1.TimeSyncChecks
-	(*TrustCAChecks)(nil),                    // 77: lindm.resource.v1.TrustCAChecks
-	(*FirewallZoneChecks)(nil),               // 78: lindm.resource.v1.FirewallZoneChecks
-	(*NetworkConnectionChecks)(nil),          // 79: lindm.resource.v1.NetworkConnectionChecks
-	(*DNSChecks)(nil),                        // 80: lindm.resource.v1.DNSChecks
-	(*ProxyChecks)(nil),                      // 81: lindm.resource.v1.ProxyChecks
-	(*NativePackageChecks)(nil),              // 82: lindm.resource.v1.NativePackageChecks
-	(*RepositoryChecks)(nil),                 // 83: lindm.resource.v1.RepositoryChecks
-	(*FlatpakAppChecks)(nil),                 // 84: lindm.resource.v1.FlatpakAppChecks
-	(*OSUpdateChecks)(nil),                   // 85: lindm.resource.v1.OSUpdateChecks
-	(*SessionPolicyChecks)(nil),              // 86: lindm.resource.v1.SessionPolicyChecks
-	(*PasswordPolicyChecks)(nil),             // 87: lindm.resource.v1.PasswordPolicyChecks
-	(*SnapAppChecks)(nil),                    // 88: lindm.resource.v1.SnapAppChecks
-	(*CertificateEnrollmentChecks)(nil),      // 89: lindm.resource.v1.CertificateEnrollmentChecks
-	(*DirectoryClientChecks)(nil),            // 90: lindm.resource.v1.DirectoryClientChecks
+	(*ManagedFileDesired)(nil),               // 26: lindm.resource.v1.ManagedFileDesired
+	(*SysctlDesired)(nil),                    // 27: lindm.resource.v1.SysctlDesired
+	(*SystemdDefinitionDesired)(nil),         // 28: lindm.resource.v1.SystemdDefinitionDesired
+	(*EncryptionComplianceDesired)(nil),      // 29: lindm.resource.v1.EncryptionComplianceDesired
+	(*ObservationMetadata)(nil),              // 30: lindm.resource.v1.ObservationMetadata
+	(*SystemdServiceObservation)(nil),        // 31: lindm.resource.v1.SystemdServiceObservation
+	(*LocalGroupObservation)(nil),            // 32: lindm.resource.v1.LocalGroupObservation
+	(*LocalUserObservation)(nil),             // 33: lindm.resource.v1.LocalUserObservation
+	(*SudoRuleObservation)(nil),              // 34: lindm.resource.v1.SudoRuleObservation
+	(*SSHServerObservation)(nil),             // 35: lindm.resource.v1.SSHServerObservation
+	(*TimeSyncObservation)(nil),              // 36: lindm.resource.v1.TimeSyncObservation
+	(*TrustCAObservation)(nil),               // 37: lindm.resource.v1.TrustCAObservation
+	(*FirewallZoneObservation)(nil),          // 38: lindm.resource.v1.FirewallZoneObservation
+	(*NetworkConnectionObservation)(nil),     // 39: lindm.resource.v1.NetworkConnectionObservation
+	(*DNSObservation)(nil),                   // 40: lindm.resource.v1.DNSObservation
+	(*ProxyObservation)(nil),                 // 41: lindm.resource.v1.ProxyObservation
+	(*NativePackageObservation)(nil),         // 42: lindm.resource.v1.NativePackageObservation
+	(*RepositoryObservation)(nil),            // 43: lindm.resource.v1.RepositoryObservation
+	(*FlatpakAppObservation)(nil),            // 44: lindm.resource.v1.FlatpakAppObservation
+	(*OSUpdateObservation)(nil),              // 45: lindm.resource.v1.OSUpdateObservation
+	(*SessionPolicyObservation)(nil),         // 46: lindm.resource.v1.SessionPolicyObservation
+	(*PasswordPolicyObservation)(nil),        // 47: lindm.resource.v1.PasswordPolicyObservation
+	(*SnapAppObservation)(nil),               // 48: lindm.resource.v1.SnapAppObservation
+	(*CertificateEnrollmentObservation)(nil), // 49: lindm.resource.v1.CertificateEnrollmentObservation
+	(*DirectoryClientObservation)(nil),       // 50: lindm.resource.v1.DirectoryClientObservation
+	(*ManagedFileObservation)(nil),           // 51: lindm.resource.v1.ManagedFileObservation
+	(*SysctlObservation)(nil),                // 52: lindm.resource.v1.SysctlObservation
+	(*SystemdDefinitionObservation)(nil),     // 53: lindm.resource.v1.SystemdDefinitionObservation
+	(*EncryptionComplianceObservation)(nil),  // 54: lindm.resource.v1.EncryptionComplianceObservation
+	(ResourceOperation)(0),                   // 55: lindm.resource.v1.ResourceOperation
+	(*BackendSelection)(nil),                 // 56: lindm.resource.v1.BackendSelection
+	(*ResourceClaim)(nil),                    // 57: lindm.resource.v1.ResourceClaim
+	(*PlanSafety)(nil),                       // 58: lindm.resource.v1.PlanSafety
+	(*SystemdServicePlan)(nil),               // 59: lindm.resource.v1.SystemdServicePlan
+	(*LocalGroupPlan)(nil),                   // 60: lindm.resource.v1.LocalGroupPlan
+	(*LocalUserPlan)(nil),                    // 61: lindm.resource.v1.LocalUserPlan
+	(*SudoRulePlan)(nil),                     // 62: lindm.resource.v1.SudoRulePlan
+	(*SSHServerPlan)(nil),                    // 63: lindm.resource.v1.SSHServerPlan
+	(*TimeSyncPlan)(nil),                     // 64: lindm.resource.v1.TimeSyncPlan
+	(*TrustCAPlan)(nil),                      // 65: lindm.resource.v1.TrustCAPlan
+	(*FirewallZonePlan)(nil),                 // 66: lindm.resource.v1.FirewallZonePlan
+	(*NetworkConnectionPlan)(nil),            // 67: lindm.resource.v1.NetworkConnectionPlan
+	(*DNSPlan)(nil),                          // 68: lindm.resource.v1.DNSPlan
+	(*ProxyPlan)(nil),                        // 69: lindm.resource.v1.ProxyPlan
+	(*NativePackagePlan)(nil),                // 70: lindm.resource.v1.NativePackagePlan
+	(*RepositoryPlan)(nil),                   // 71: lindm.resource.v1.RepositoryPlan
+	(*FlatpakAppPlan)(nil),                   // 72: lindm.resource.v1.FlatpakAppPlan
+	(*OSUpdatePlan)(nil),                     // 73: lindm.resource.v1.OSUpdatePlan
+	(*SessionPolicyPlan)(nil),                // 74: lindm.resource.v1.SessionPolicyPlan
+	(*PasswordPolicyPlan)(nil),               // 75: lindm.resource.v1.PasswordPolicyPlan
+	(*SnapAppPlan)(nil),                      // 76: lindm.resource.v1.SnapAppPlan
+	(*CertificateEnrollmentPlan)(nil),        // 77: lindm.resource.v1.CertificateEnrollmentPlan
+	(*DirectoryClientPlan)(nil),              // 78: lindm.resource.v1.DirectoryClientPlan
+	(*ManagedFilePlan)(nil),                  // 79: lindm.resource.v1.ManagedFilePlan
+	(*SysctlPlan)(nil),                       // 80: lindm.resource.v1.SysctlPlan
+	(*SystemdDefinitionPlan)(nil),            // 81: lindm.resource.v1.SystemdDefinitionPlan
+	(*EncryptionCompliancePlan)(nil),         // 82: lindm.resource.v1.EncryptionCompliancePlan
+	(*SystemdServiceChecks)(nil),             // 83: lindm.resource.v1.SystemdServiceChecks
+	(*LocalGroupChecks)(nil),                 // 84: lindm.resource.v1.LocalGroupChecks
+	(*LocalUserChecks)(nil),                  // 85: lindm.resource.v1.LocalUserChecks
+	(*SudoRuleChecks)(nil),                   // 86: lindm.resource.v1.SudoRuleChecks
+	(*SSHServerChecks)(nil),                  // 87: lindm.resource.v1.SSHServerChecks
+	(*TimeSyncChecks)(nil),                   // 88: lindm.resource.v1.TimeSyncChecks
+	(*TrustCAChecks)(nil),                    // 89: lindm.resource.v1.TrustCAChecks
+	(*FirewallZoneChecks)(nil),               // 90: lindm.resource.v1.FirewallZoneChecks
+	(*NetworkConnectionChecks)(nil),          // 91: lindm.resource.v1.NetworkConnectionChecks
+	(*DNSChecks)(nil),                        // 92: lindm.resource.v1.DNSChecks
+	(*ProxyChecks)(nil),                      // 93: lindm.resource.v1.ProxyChecks
+	(*NativePackageChecks)(nil),              // 94: lindm.resource.v1.NativePackageChecks
+	(*RepositoryChecks)(nil),                 // 95: lindm.resource.v1.RepositoryChecks
+	(*FlatpakAppChecks)(nil),                 // 96: lindm.resource.v1.FlatpakAppChecks
+	(*OSUpdateChecks)(nil),                   // 97: lindm.resource.v1.OSUpdateChecks
+	(*SessionPolicyChecks)(nil),              // 98: lindm.resource.v1.SessionPolicyChecks
+	(*PasswordPolicyChecks)(nil),             // 99: lindm.resource.v1.PasswordPolicyChecks
+	(*SnapAppChecks)(nil),                    // 100: lindm.resource.v1.SnapAppChecks
+	(*CertificateEnrollmentChecks)(nil),      // 101: lindm.resource.v1.CertificateEnrollmentChecks
+	(*DirectoryClientChecks)(nil),            // 102: lindm.resource.v1.DirectoryClientChecks
+	(*ManagedFileChecks)(nil),                // 103: lindm.resource.v1.ManagedFileChecks
+	(*SysctlChecks)(nil),                     // 104: lindm.resource.v1.SysctlChecks
+	(*SystemdDefinitionChecks)(nil),          // 105: lindm.resource.v1.SystemdDefinitionChecks
+	(*EncryptionComplianceChecks)(nil),       // 106: lindm.resource.v1.EncryptionComplianceChecks
 }
 var file_lindm_resource_v1_resource_proto_depIdxs = []int32{
-	5,  // 0: lindm.resource.v1.ResourceDesiredState.ref:type_name -> lindm.resource.v1.ResourceRef
-	6,  // 1: lindm.resource.v1.ResourceDesiredState.systemd_service:type_name -> lindm.resource.v1.SystemdServiceDesired
-	7,  // 2: lindm.resource.v1.ResourceDesiredState.local_group:type_name -> lindm.resource.v1.LocalGroupDesired
-	8,  // 3: lindm.resource.v1.ResourceDesiredState.local_user:type_name -> lindm.resource.v1.LocalUserDesired
-	9,  // 4: lindm.resource.v1.ResourceDesiredState.sudo_rule:type_name -> lindm.resource.v1.SudoRuleDesired
-	10, // 5: lindm.resource.v1.ResourceDesiredState.ssh_server:type_name -> lindm.resource.v1.SSHServerDesired
-	11, // 6: lindm.resource.v1.ResourceDesiredState.time_sync:type_name -> lindm.resource.v1.TimeSyncDesired
-	12, // 7: lindm.resource.v1.ResourceDesiredState.trust_ca:type_name -> lindm.resource.v1.TrustCADesired
-	13, // 8: lindm.resource.v1.ResourceDesiredState.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneDesired
-	14, // 9: lindm.resource.v1.ResourceDesiredState.network_connection:type_name -> lindm.resource.v1.NetworkConnectionDesired
-	15, // 10: lindm.resource.v1.ResourceDesiredState.dns:type_name -> lindm.resource.v1.DNSDesired
-	16, // 11: lindm.resource.v1.ResourceDesiredState.proxy:type_name -> lindm.resource.v1.ProxyDesired
-	17, // 12: lindm.resource.v1.ResourceDesiredState.native_package:type_name -> lindm.resource.v1.NativePackageDesired
-	18, // 13: lindm.resource.v1.ResourceDesiredState.repository:type_name -> lindm.resource.v1.RepositoryDesired
-	19, // 14: lindm.resource.v1.ResourceDesiredState.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppDesired
-	20, // 15: lindm.resource.v1.ResourceDesiredState.os_update:type_name -> lindm.resource.v1.OSUpdateDesired
-	21, // 16: lindm.resource.v1.ResourceDesiredState.session_policy:type_name -> lindm.resource.v1.SessionPolicyDesired
-	22, // 17: lindm.resource.v1.ResourceDesiredState.password_policy:type_name -> lindm.resource.v1.PasswordPolicyDesired
-	23, // 18: lindm.resource.v1.ResourceDesiredState.snap_app:type_name -> lindm.resource.v1.SnapAppDesired
-	24, // 19: lindm.resource.v1.ResourceDesiredState.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
-	25, // 20: lindm.resource.v1.ResourceDesiredState.directory_client:type_name -> lindm.resource.v1.DirectoryClientDesired
-	5,  // 21: lindm.resource.v1.ResourceObservation.ref:type_name -> lindm.resource.v1.ResourceRef
-	26, // 22: lindm.resource.v1.ResourceObservation.metadata:type_name -> lindm.resource.v1.ObservationMetadata
-	27, // 23: lindm.resource.v1.ResourceObservation.systemd_service:type_name -> lindm.resource.v1.SystemdServiceObservation
-	28, // 24: lindm.resource.v1.ResourceObservation.local_group:type_name -> lindm.resource.v1.LocalGroupObservation
-	29, // 25: lindm.resource.v1.ResourceObservation.local_user:type_name -> lindm.resource.v1.LocalUserObservation
-	30, // 26: lindm.resource.v1.ResourceObservation.sudo_rule:type_name -> lindm.resource.v1.SudoRuleObservation
-	31, // 27: lindm.resource.v1.ResourceObservation.ssh_server:type_name -> lindm.resource.v1.SSHServerObservation
-	32, // 28: lindm.resource.v1.ResourceObservation.time_sync:type_name -> lindm.resource.v1.TimeSyncObservation
-	33, // 29: lindm.resource.v1.ResourceObservation.trust_ca:type_name -> lindm.resource.v1.TrustCAObservation
-	34, // 30: lindm.resource.v1.ResourceObservation.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneObservation
-	35, // 31: lindm.resource.v1.ResourceObservation.network_connection:type_name -> lindm.resource.v1.NetworkConnectionObservation
-	36, // 32: lindm.resource.v1.ResourceObservation.dns:type_name -> lindm.resource.v1.DNSObservation
-	37, // 33: lindm.resource.v1.ResourceObservation.proxy:type_name -> lindm.resource.v1.ProxyObservation
-	38, // 34: lindm.resource.v1.ResourceObservation.native_package:type_name -> lindm.resource.v1.NativePackageObservation
-	39, // 35: lindm.resource.v1.ResourceObservation.repository:type_name -> lindm.resource.v1.RepositoryObservation
-	40, // 36: lindm.resource.v1.ResourceObservation.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppObservation
-	41, // 37: lindm.resource.v1.ResourceObservation.os_update:type_name -> lindm.resource.v1.OSUpdateObservation
-	42, // 38: lindm.resource.v1.ResourceObservation.session_policy:type_name -> lindm.resource.v1.SessionPolicyObservation
-	43, // 39: lindm.resource.v1.ResourceObservation.password_policy:type_name -> lindm.resource.v1.PasswordPolicyObservation
-	44, // 40: lindm.resource.v1.ResourceObservation.snap_app:type_name -> lindm.resource.v1.SnapAppObservation
-	45, // 41: lindm.resource.v1.ResourceObservation.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentObservation
-	46, // 42: lindm.resource.v1.ResourceObservation.directory_client:type_name -> lindm.resource.v1.DirectoryClientObservation
-	5,  // 43: lindm.resource.v1.ResourcePlan.ref:type_name -> lindm.resource.v1.ResourceRef
-	47, // 44: lindm.resource.v1.ResourcePlan.operation:type_name -> lindm.resource.v1.ResourceOperation
-	48, // 45: lindm.resource.v1.ResourcePlan.backend:type_name -> lindm.resource.v1.BackendSelection
-	49, // 46: lindm.resource.v1.ResourcePlan.claims:type_name -> lindm.resource.v1.ResourceClaim
-	50, // 47: lindm.resource.v1.ResourcePlan.safety:type_name -> lindm.resource.v1.PlanSafety
-	51, // 48: lindm.resource.v1.ResourcePlan.systemd_service:type_name -> lindm.resource.v1.SystemdServicePlan
-	52, // 49: lindm.resource.v1.ResourcePlan.local_group:type_name -> lindm.resource.v1.LocalGroupPlan
-	53, // 50: lindm.resource.v1.ResourcePlan.local_user:type_name -> lindm.resource.v1.LocalUserPlan
-	54, // 51: lindm.resource.v1.ResourcePlan.sudo_rule:type_name -> lindm.resource.v1.SudoRulePlan
-	55, // 52: lindm.resource.v1.ResourcePlan.ssh_server:type_name -> lindm.resource.v1.SSHServerPlan
-	56, // 53: lindm.resource.v1.ResourcePlan.time_sync:type_name -> lindm.resource.v1.TimeSyncPlan
-	57, // 54: lindm.resource.v1.ResourcePlan.trust_ca:type_name -> lindm.resource.v1.TrustCAPlan
-	58, // 55: lindm.resource.v1.ResourcePlan.firewall_zone:type_name -> lindm.resource.v1.FirewallZonePlan
-	59, // 56: lindm.resource.v1.ResourcePlan.network_connection:type_name -> lindm.resource.v1.NetworkConnectionPlan
-	60, // 57: lindm.resource.v1.ResourcePlan.dns:type_name -> lindm.resource.v1.DNSPlan
-	61, // 58: lindm.resource.v1.ResourcePlan.proxy:type_name -> lindm.resource.v1.ProxyPlan
-	62, // 59: lindm.resource.v1.ResourcePlan.native_package:type_name -> lindm.resource.v1.NativePackagePlan
-	63, // 60: lindm.resource.v1.ResourcePlan.repository:type_name -> lindm.resource.v1.RepositoryPlan
-	64, // 61: lindm.resource.v1.ResourcePlan.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppPlan
-	65, // 62: lindm.resource.v1.ResourcePlan.os_update:type_name -> lindm.resource.v1.OSUpdatePlan
-	66, // 63: lindm.resource.v1.ResourcePlan.session_policy:type_name -> lindm.resource.v1.SessionPolicyPlan
-	67, // 64: lindm.resource.v1.ResourcePlan.password_policy:type_name -> lindm.resource.v1.PasswordPolicyPlan
-	68, // 65: lindm.resource.v1.ResourcePlan.snap_app:type_name -> lindm.resource.v1.SnapAppPlan
-	69, // 66: lindm.resource.v1.ResourcePlan.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentPlan
-	70, // 67: lindm.resource.v1.ResourcePlan.directory_client:type_name -> lindm.resource.v1.DirectoryClientPlan
-	5,  // 68: lindm.resource.v1.ResourceVerification.ref:type_name -> lindm.resource.v1.ResourceRef
-	2,  // 69: lindm.resource.v1.ResourceVerification.after:type_name -> lindm.resource.v1.ResourceObservation
-	0,  // 70: lindm.resource.v1.ResourceVerification.disposition:type_name -> lindm.resource.v1.VerificationDisposition
-	71, // 71: lindm.resource.v1.ResourceVerification.systemd_service:type_name -> lindm.resource.v1.SystemdServiceChecks
-	72, // 72: lindm.resource.v1.ResourceVerification.local_group:type_name -> lindm.resource.v1.LocalGroupChecks
-	73, // 73: lindm.resource.v1.ResourceVerification.local_user:type_name -> lindm.resource.v1.LocalUserChecks
-	74, // 74: lindm.resource.v1.ResourceVerification.sudo_rule:type_name -> lindm.resource.v1.SudoRuleChecks
-	75, // 75: lindm.resource.v1.ResourceVerification.ssh_server:type_name -> lindm.resource.v1.SSHServerChecks
-	76, // 76: lindm.resource.v1.ResourceVerification.time_sync:type_name -> lindm.resource.v1.TimeSyncChecks
-	77, // 77: lindm.resource.v1.ResourceVerification.trust_ca:type_name -> lindm.resource.v1.TrustCAChecks
-	78, // 78: lindm.resource.v1.ResourceVerification.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneChecks
-	79, // 79: lindm.resource.v1.ResourceVerification.network_connection:type_name -> lindm.resource.v1.NetworkConnectionChecks
-	80, // 80: lindm.resource.v1.ResourceVerification.dns:type_name -> lindm.resource.v1.DNSChecks
-	81, // 81: lindm.resource.v1.ResourceVerification.proxy:type_name -> lindm.resource.v1.ProxyChecks
-	82, // 82: lindm.resource.v1.ResourceVerification.native_package:type_name -> lindm.resource.v1.NativePackageChecks
-	83, // 83: lindm.resource.v1.ResourceVerification.repository:type_name -> lindm.resource.v1.RepositoryChecks
-	84, // 84: lindm.resource.v1.ResourceVerification.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppChecks
-	85, // 85: lindm.resource.v1.ResourceVerification.os_update:type_name -> lindm.resource.v1.OSUpdateChecks
-	86, // 86: lindm.resource.v1.ResourceVerification.session_policy:type_name -> lindm.resource.v1.SessionPolicyChecks
-	87, // 87: lindm.resource.v1.ResourceVerification.password_policy:type_name -> lindm.resource.v1.PasswordPolicyChecks
-	88, // 88: lindm.resource.v1.ResourceVerification.snap_app:type_name -> lindm.resource.v1.SnapAppChecks
-	89, // 89: lindm.resource.v1.ResourceVerification.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentChecks
-	90, // 90: lindm.resource.v1.ResourceVerification.directory_client:type_name -> lindm.resource.v1.DirectoryClientChecks
-	91, // [91:91] is the sub-list for method output_type
-	91, // [91:91] is the sub-list for method input_type
-	91, // [91:91] is the sub-list for extension type_name
-	91, // [91:91] is the sub-list for extension extendee
-	0,  // [0:91] is the sub-list for field type_name
+	5,   // 0: lindm.resource.v1.ResourceDesiredState.ref:type_name -> lindm.resource.v1.ResourceRef
+	6,   // 1: lindm.resource.v1.ResourceDesiredState.systemd_service:type_name -> lindm.resource.v1.SystemdServiceDesired
+	7,   // 2: lindm.resource.v1.ResourceDesiredState.local_group:type_name -> lindm.resource.v1.LocalGroupDesired
+	8,   // 3: lindm.resource.v1.ResourceDesiredState.local_user:type_name -> lindm.resource.v1.LocalUserDesired
+	9,   // 4: lindm.resource.v1.ResourceDesiredState.sudo_rule:type_name -> lindm.resource.v1.SudoRuleDesired
+	10,  // 5: lindm.resource.v1.ResourceDesiredState.ssh_server:type_name -> lindm.resource.v1.SSHServerDesired
+	11,  // 6: lindm.resource.v1.ResourceDesiredState.time_sync:type_name -> lindm.resource.v1.TimeSyncDesired
+	12,  // 7: lindm.resource.v1.ResourceDesiredState.trust_ca:type_name -> lindm.resource.v1.TrustCADesired
+	13,  // 8: lindm.resource.v1.ResourceDesiredState.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneDesired
+	14,  // 9: lindm.resource.v1.ResourceDesiredState.network_connection:type_name -> lindm.resource.v1.NetworkConnectionDesired
+	15,  // 10: lindm.resource.v1.ResourceDesiredState.dns:type_name -> lindm.resource.v1.DNSDesired
+	16,  // 11: lindm.resource.v1.ResourceDesiredState.proxy:type_name -> lindm.resource.v1.ProxyDesired
+	17,  // 12: lindm.resource.v1.ResourceDesiredState.native_package:type_name -> lindm.resource.v1.NativePackageDesired
+	18,  // 13: lindm.resource.v1.ResourceDesiredState.repository:type_name -> lindm.resource.v1.RepositoryDesired
+	19,  // 14: lindm.resource.v1.ResourceDesiredState.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppDesired
+	20,  // 15: lindm.resource.v1.ResourceDesiredState.os_update:type_name -> lindm.resource.v1.OSUpdateDesired
+	21,  // 16: lindm.resource.v1.ResourceDesiredState.session_policy:type_name -> lindm.resource.v1.SessionPolicyDesired
+	22,  // 17: lindm.resource.v1.ResourceDesiredState.password_policy:type_name -> lindm.resource.v1.PasswordPolicyDesired
+	23,  // 18: lindm.resource.v1.ResourceDesiredState.snap_app:type_name -> lindm.resource.v1.SnapAppDesired
+	24,  // 19: lindm.resource.v1.ResourceDesiredState.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentDesired
+	25,  // 20: lindm.resource.v1.ResourceDesiredState.directory_client:type_name -> lindm.resource.v1.DirectoryClientDesired
+	26,  // 21: lindm.resource.v1.ResourceDesiredState.managed_file:type_name -> lindm.resource.v1.ManagedFileDesired
+	27,  // 22: lindm.resource.v1.ResourceDesiredState.sysctl:type_name -> lindm.resource.v1.SysctlDesired
+	28,  // 23: lindm.resource.v1.ResourceDesiredState.systemd_definition:type_name -> lindm.resource.v1.SystemdDefinitionDesired
+	29,  // 24: lindm.resource.v1.ResourceDesiredState.encryption_compliance:type_name -> lindm.resource.v1.EncryptionComplianceDesired
+	5,   // 25: lindm.resource.v1.ResourceObservation.ref:type_name -> lindm.resource.v1.ResourceRef
+	30,  // 26: lindm.resource.v1.ResourceObservation.metadata:type_name -> lindm.resource.v1.ObservationMetadata
+	31,  // 27: lindm.resource.v1.ResourceObservation.systemd_service:type_name -> lindm.resource.v1.SystemdServiceObservation
+	32,  // 28: lindm.resource.v1.ResourceObservation.local_group:type_name -> lindm.resource.v1.LocalGroupObservation
+	33,  // 29: lindm.resource.v1.ResourceObservation.local_user:type_name -> lindm.resource.v1.LocalUserObservation
+	34,  // 30: lindm.resource.v1.ResourceObservation.sudo_rule:type_name -> lindm.resource.v1.SudoRuleObservation
+	35,  // 31: lindm.resource.v1.ResourceObservation.ssh_server:type_name -> lindm.resource.v1.SSHServerObservation
+	36,  // 32: lindm.resource.v1.ResourceObservation.time_sync:type_name -> lindm.resource.v1.TimeSyncObservation
+	37,  // 33: lindm.resource.v1.ResourceObservation.trust_ca:type_name -> lindm.resource.v1.TrustCAObservation
+	38,  // 34: lindm.resource.v1.ResourceObservation.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneObservation
+	39,  // 35: lindm.resource.v1.ResourceObservation.network_connection:type_name -> lindm.resource.v1.NetworkConnectionObservation
+	40,  // 36: lindm.resource.v1.ResourceObservation.dns:type_name -> lindm.resource.v1.DNSObservation
+	41,  // 37: lindm.resource.v1.ResourceObservation.proxy:type_name -> lindm.resource.v1.ProxyObservation
+	42,  // 38: lindm.resource.v1.ResourceObservation.native_package:type_name -> lindm.resource.v1.NativePackageObservation
+	43,  // 39: lindm.resource.v1.ResourceObservation.repository:type_name -> lindm.resource.v1.RepositoryObservation
+	44,  // 40: lindm.resource.v1.ResourceObservation.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppObservation
+	45,  // 41: lindm.resource.v1.ResourceObservation.os_update:type_name -> lindm.resource.v1.OSUpdateObservation
+	46,  // 42: lindm.resource.v1.ResourceObservation.session_policy:type_name -> lindm.resource.v1.SessionPolicyObservation
+	47,  // 43: lindm.resource.v1.ResourceObservation.password_policy:type_name -> lindm.resource.v1.PasswordPolicyObservation
+	48,  // 44: lindm.resource.v1.ResourceObservation.snap_app:type_name -> lindm.resource.v1.SnapAppObservation
+	49,  // 45: lindm.resource.v1.ResourceObservation.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentObservation
+	50,  // 46: lindm.resource.v1.ResourceObservation.directory_client:type_name -> lindm.resource.v1.DirectoryClientObservation
+	51,  // 47: lindm.resource.v1.ResourceObservation.managed_file:type_name -> lindm.resource.v1.ManagedFileObservation
+	52,  // 48: lindm.resource.v1.ResourceObservation.sysctl:type_name -> lindm.resource.v1.SysctlObservation
+	53,  // 49: lindm.resource.v1.ResourceObservation.systemd_definition:type_name -> lindm.resource.v1.SystemdDefinitionObservation
+	54,  // 50: lindm.resource.v1.ResourceObservation.encryption_compliance:type_name -> lindm.resource.v1.EncryptionComplianceObservation
+	5,   // 51: lindm.resource.v1.ResourcePlan.ref:type_name -> lindm.resource.v1.ResourceRef
+	55,  // 52: lindm.resource.v1.ResourcePlan.operation:type_name -> lindm.resource.v1.ResourceOperation
+	56,  // 53: lindm.resource.v1.ResourcePlan.backend:type_name -> lindm.resource.v1.BackendSelection
+	57,  // 54: lindm.resource.v1.ResourcePlan.claims:type_name -> lindm.resource.v1.ResourceClaim
+	58,  // 55: lindm.resource.v1.ResourcePlan.safety:type_name -> lindm.resource.v1.PlanSafety
+	2,   // 56: lindm.resource.v1.ResourcePlan.before:type_name -> lindm.resource.v1.ResourceObservation
+	59,  // 57: lindm.resource.v1.ResourcePlan.systemd_service:type_name -> lindm.resource.v1.SystemdServicePlan
+	60,  // 58: lindm.resource.v1.ResourcePlan.local_group:type_name -> lindm.resource.v1.LocalGroupPlan
+	61,  // 59: lindm.resource.v1.ResourcePlan.local_user:type_name -> lindm.resource.v1.LocalUserPlan
+	62,  // 60: lindm.resource.v1.ResourcePlan.sudo_rule:type_name -> lindm.resource.v1.SudoRulePlan
+	63,  // 61: lindm.resource.v1.ResourcePlan.ssh_server:type_name -> lindm.resource.v1.SSHServerPlan
+	64,  // 62: lindm.resource.v1.ResourcePlan.time_sync:type_name -> lindm.resource.v1.TimeSyncPlan
+	65,  // 63: lindm.resource.v1.ResourcePlan.trust_ca:type_name -> lindm.resource.v1.TrustCAPlan
+	66,  // 64: lindm.resource.v1.ResourcePlan.firewall_zone:type_name -> lindm.resource.v1.FirewallZonePlan
+	67,  // 65: lindm.resource.v1.ResourcePlan.network_connection:type_name -> lindm.resource.v1.NetworkConnectionPlan
+	68,  // 66: lindm.resource.v1.ResourcePlan.dns:type_name -> lindm.resource.v1.DNSPlan
+	69,  // 67: lindm.resource.v1.ResourcePlan.proxy:type_name -> lindm.resource.v1.ProxyPlan
+	70,  // 68: lindm.resource.v1.ResourcePlan.native_package:type_name -> lindm.resource.v1.NativePackagePlan
+	71,  // 69: lindm.resource.v1.ResourcePlan.repository:type_name -> lindm.resource.v1.RepositoryPlan
+	72,  // 70: lindm.resource.v1.ResourcePlan.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppPlan
+	73,  // 71: lindm.resource.v1.ResourcePlan.os_update:type_name -> lindm.resource.v1.OSUpdatePlan
+	74,  // 72: lindm.resource.v1.ResourcePlan.session_policy:type_name -> lindm.resource.v1.SessionPolicyPlan
+	75,  // 73: lindm.resource.v1.ResourcePlan.password_policy:type_name -> lindm.resource.v1.PasswordPolicyPlan
+	76,  // 74: lindm.resource.v1.ResourcePlan.snap_app:type_name -> lindm.resource.v1.SnapAppPlan
+	77,  // 75: lindm.resource.v1.ResourcePlan.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentPlan
+	78,  // 76: lindm.resource.v1.ResourcePlan.directory_client:type_name -> lindm.resource.v1.DirectoryClientPlan
+	79,  // 77: lindm.resource.v1.ResourcePlan.managed_file:type_name -> lindm.resource.v1.ManagedFilePlan
+	80,  // 78: lindm.resource.v1.ResourcePlan.sysctl:type_name -> lindm.resource.v1.SysctlPlan
+	81,  // 79: lindm.resource.v1.ResourcePlan.systemd_definition:type_name -> lindm.resource.v1.SystemdDefinitionPlan
+	82,  // 80: lindm.resource.v1.ResourcePlan.encryption_compliance:type_name -> lindm.resource.v1.EncryptionCompliancePlan
+	5,   // 81: lindm.resource.v1.ResourceVerification.ref:type_name -> lindm.resource.v1.ResourceRef
+	2,   // 82: lindm.resource.v1.ResourceVerification.after:type_name -> lindm.resource.v1.ResourceObservation
+	0,   // 83: lindm.resource.v1.ResourceVerification.disposition:type_name -> lindm.resource.v1.VerificationDisposition
+	83,  // 84: lindm.resource.v1.ResourceVerification.systemd_service:type_name -> lindm.resource.v1.SystemdServiceChecks
+	84,  // 85: lindm.resource.v1.ResourceVerification.local_group:type_name -> lindm.resource.v1.LocalGroupChecks
+	85,  // 86: lindm.resource.v1.ResourceVerification.local_user:type_name -> lindm.resource.v1.LocalUserChecks
+	86,  // 87: lindm.resource.v1.ResourceVerification.sudo_rule:type_name -> lindm.resource.v1.SudoRuleChecks
+	87,  // 88: lindm.resource.v1.ResourceVerification.ssh_server:type_name -> lindm.resource.v1.SSHServerChecks
+	88,  // 89: lindm.resource.v1.ResourceVerification.time_sync:type_name -> lindm.resource.v1.TimeSyncChecks
+	89,  // 90: lindm.resource.v1.ResourceVerification.trust_ca:type_name -> lindm.resource.v1.TrustCAChecks
+	90,  // 91: lindm.resource.v1.ResourceVerification.firewall_zone:type_name -> lindm.resource.v1.FirewallZoneChecks
+	91,  // 92: lindm.resource.v1.ResourceVerification.network_connection:type_name -> lindm.resource.v1.NetworkConnectionChecks
+	92,  // 93: lindm.resource.v1.ResourceVerification.dns:type_name -> lindm.resource.v1.DNSChecks
+	93,  // 94: lindm.resource.v1.ResourceVerification.proxy:type_name -> lindm.resource.v1.ProxyChecks
+	94,  // 95: lindm.resource.v1.ResourceVerification.native_package:type_name -> lindm.resource.v1.NativePackageChecks
+	95,  // 96: lindm.resource.v1.ResourceVerification.repository:type_name -> lindm.resource.v1.RepositoryChecks
+	96,  // 97: lindm.resource.v1.ResourceVerification.flatpak_app:type_name -> lindm.resource.v1.FlatpakAppChecks
+	97,  // 98: lindm.resource.v1.ResourceVerification.os_update:type_name -> lindm.resource.v1.OSUpdateChecks
+	98,  // 99: lindm.resource.v1.ResourceVerification.session_policy:type_name -> lindm.resource.v1.SessionPolicyChecks
+	99,  // 100: lindm.resource.v1.ResourceVerification.password_policy:type_name -> lindm.resource.v1.PasswordPolicyChecks
+	100, // 101: lindm.resource.v1.ResourceVerification.snap_app:type_name -> lindm.resource.v1.SnapAppChecks
+	101, // 102: lindm.resource.v1.ResourceVerification.certificate_enrollment:type_name -> lindm.resource.v1.CertificateEnrollmentChecks
+	102, // 103: lindm.resource.v1.ResourceVerification.directory_client:type_name -> lindm.resource.v1.DirectoryClientChecks
+	103, // 104: lindm.resource.v1.ResourceVerification.managed_file:type_name -> lindm.resource.v1.ManagedFileChecks
+	104, // 105: lindm.resource.v1.ResourceVerification.sysctl:type_name -> lindm.resource.v1.SysctlChecks
+	105, // 106: lindm.resource.v1.ResourceVerification.systemd_definition:type_name -> lindm.resource.v1.SystemdDefinitionChecks
+	106, // 107: lindm.resource.v1.ResourceVerification.encryption_compliance:type_name -> lindm.resource.v1.EncryptionComplianceChecks
+	108, // [108:108] is the sub-list for method output_type
+	108, // [108:108] is the sub-list for method input_type
+	108, // [108:108] is the sub-list for extension type_name
+	108, // [108:108] is the sub-list for extension extendee
+	0,   // [0:108] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_resource_proto_init() }
@@ -2075,6 +2394,7 @@ func file_lindm_resource_v1_resource_proto_init() {
 	file_lindm_resource_v1_checks_proto_init()
 	file_lindm_resource_v1_common_proto_init()
 	file_lindm_resource_v1_credentials_proto_init()
+	file_lindm_resource_v1_host_proto_init()
 	file_lindm_resource_v1_identity_proto_init()
 	file_lindm_resource_v1_network_proto_init()
 	file_lindm_resource_v1_observations_proto_init()
@@ -2101,6 +2421,10 @@ func file_lindm_resource_v1_resource_proto_init() {
 		(*ResourceDesiredState_SnapApp)(nil),
 		(*ResourceDesiredState_CertificateEnrollment)(nil),
 		(*ResourceDesiredState_DirectoryClient)(nil),
+		(*ResourceDesiredState_ManagedFile)(nil),
+		(*ResourceDesiredState_Sysctl)(nil),
+		(*ResourceDesiredState_SystemdDefinition)(nil),
+		(*ResourceDesiredState_EncryptionCompliance)(nil),
 	}
 	file_lindm_resource_v1_resource_proto_msgTypes[1].OneofWrappers = []any{
 		(*ResourceObservation_SystemdService)(nil),
@@ -2123,6 +2447,10 @@ func file_lindm_resource_v1_resource_proto_init() {
 		(*ResourceObservation_SnapApp)(nil),
 		(*ResourceObservation_CertificateEnrollment)(nil),
 		(*ResourceObservation_DirectoryClient)(nil),
+		(*ResourceObservation_ManagedFile)(nil),
+		(*ResourceObservation_Sysctl)(nil),
+		(*ResourceObservation_SystemdDefinition)(nil),
+		(*ResourceObservation_EncryptionCompliance)(nil),
 	}
 	file_lindm_resource_v1_resource_proto_msgTypes[2].OneofWrappers = []any{
 		(*ResourcePlan_SystemdService)(nil),
@@ -2145,6 +2473,10 @@ func file_lindm_resource_v1_resource_proto_init() {
 		(*ResourcePlan_SnapApp)(nil),
 		(*ResourcePlan_CertificateEnrollment)(nil),
 		(*ResourcePlan_DirectoryClient)(nil),
+		(*ResourcePlan_ManagedFile)(nil),
+		(*ResourcePlan_Sysctl)(nil),
+		(*ResourcePlan_SystemdDefinition)(nil),
+		(*ResourcePlan_EncryptionCompliance)(nil),
 	}
 	file_lindm_resource_v1_resource_proto_msgTypes[3].OneofWrappers = []any{
 		(*ResourceVerification_SystemdService)(nil),
@@ -2167,6 +2499,10 @@ func file_lindm_resource_v1_resource_proto_init() {
 		(*ResourceVerification_SnapApp)(nil),
 		(*ResourceVerification_CertificateEnrollment)(nil),
 		(*ResourceVerification_DirectoryClient)(nil),
+		(*ResourceVerification_ManagedFile)(nil),
+		(*ResourceVerification_Sysctl)(nil),
+		(*ResourceVerification_SystemdDefinition)(nil),
+		(*ResourceVerification_EncryptionCompliance)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bindResourceReleaseAction = `-- name: BindResourceReleaseAction :exec
+UPDATE resource_actions SET release_id = $2 WHERE id = $1 AND release_id IS NULL
+`
+
+type BindResourceReleaseActionParams struct {
+	ID        uuid.UUID
+	ReleaseID *uuid.UUID
+}
+
+func (q *Queries) BindResourceReleaseAction(ctx context.Context, arg BindResourceReleaseActionParams) error {
+	_, err := q.db.Exec(ctx, bindResourceReleaseAction, arg.ID, arg.ReleaseID)
+	return err
+}
+
 const blockServiceAssignment = `-- name: BlockServiceAssignment :exec
 UPDATE resource_assignments SET blocked_reason = $2 WHERE id = $1
 `
@@ -42,7 +56,7 @@ func (q *Queries) CloseServiceAction(ctx context.Context, arg CloseServiceAction
 }
 
 const getOpenServiceAction = `-- name: GetOpenServiceAction :one
-SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success FROM resource_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDATE
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDATE
 `
 
 func (q *Queries) GetOpenServiceAction(ctx context.Context, deviceID uuid.UUID) (ResourceAction, error) {
@@ -73,12 +87,61 @@ func (q *Queries) GetOpenServiceAction(ctx context.Context, deviceID uuid.UUID) 
 		&i.AttestedAt,
 		&i.ReceivedAt,
 		&i.ReadOnlySuccess,
+		&i.ReleaseID,
+	)
+	return i, err
+}
+
+const getResourceAssignmentByID = `-- name: GetResourceAssignmentByID :one
+SELECT id, device_id, generation_id, request_id, request_digest, actor_id, authorization_version, revision_id, document, assigned_at, reconcile_interval_seconds, blocked_reason, adoption_approval_id FROM resource_assignments WHERE id = $1
+`
+
+func (q *Queries) GetResourceAssignmentByID(ctx context.Context, id uuid.UUID) (ResourceAssignment, error) {
+	row := q.db.QueryRow(ctx, getResourceAssignmentByID, id)
+	var i ResourceAssignment
+	err := row.Scan(
+		&i.ID,
+		&i.DeviceID,
+		&i.GenerationID,
+		&i.RequestID,
+		&i.RequestDigest,
+		&i.ActorID,
+		&i.AuthorizationVersion,
+		&i.RevisionID,
+		&i.Document,
+		&i.AssignedAt,
+		&i.ReconcileIntervalSeconds,
+		&i.BlockedReason,
+		&i.AdoptionApprovalID,
+	)
+	return i, err
+}
+
+const getResourceRelease = `-- name: GetResourceRelease :one
+SELECT id, generation_id, source_assignment_id, resource_id, resource_kind, canonical_key, superseding_assignment_id, state, reason, requested_at, completed_at FROM resource_releases WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetResourceRelease(ctx context.Context, id uuid.UUID) (ResourceRelease, error) {
+	row := q.db.QueryRow(ctx, getResourceRelease, id)
+	var i ResourceRelease
+	err := row.Scan(
+		&i.ID,
+		&i.GenerationID,
+		&i.SourceAssignmentID,
+		&i.ResourceID,
+		&i.ResourceKind,
+		&i.CanonicalKey,
+		&i.SupersedingAssignmentID,
+		&i.State,
+		&i.Reason,
+		&i.RequestedAt,
+		&i.CompletedAt,
 	)
 	return i, err
 }
 
 const getServiceAction = `-- name: GetServiceAction :one
-SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success FROM resource_actions WHERE id = $1
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE id = $1
 `
 
 func (q *Queries) GetServiceAction(ctx context.Context, id uuid.UUID) (ResourceAction, error) {
@@ -109,12 +172,13 @@ func (q *Queries) GetServiceAction(ctx context.Context, id uuid.UUID) (ResourceA
 		&i.AttestedAt,
 		&i.ReceivedAt,
 		&i.ReadOnlySuccess,
+		&i.ReleaseID,
 	)
 	return i, err
 }
 
 const getServiceAssignment = `-- name: GetServiceAssignment :one
-SELECT a.id, a.device_id, a.generation_id, a.request_id, a.request_digest, a.actor_id, a.authorization_version, a.revision_id, a.document, a.assigned_at, a.reconcile_interval_seconds, a.blocked_reason FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1
+SELECT a.id, a.device_id, a.generation_id, a.request_id, a.request_digest, a.actor_id, a.authorization_version, a.revision_id, a.document, a.assigned_at, a.reconcile_interval_seconds, a.blocked_reason, a.adoption_approval_id FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1
 `
 
 func (q *Queries) GetServiceAssignment(ctx context.Context, generationID uuid.UUID) (ResourceAssignment, error) {
@@ -133,12 +197,13 @@ func (q *Queries) GetServiceAssignment(ctx context.Context, generationID uuid.UU
 		&i.AssignedAt,
 		&i.ReconcileIntervalSeconds,
 		&i.BlockedReason,
+		&i.AdoptionApprovalID,
 	)
 	return i, err
 }
 
 const getServiceAssignmentRequest = `-- name: GetServiceAssignmentRequest :one
-SELECT id, device_id, generation_id, request_id, request_digest, actor_id, authorization_version, revision_id, document, assigned_at, reconcile_interval_seconds, blocked_reason FROM resource_assignments WHERE request_id = $1
+SELECT id, device_id, generation_id, request_id, request_digest, actor_id, authorization_version, revision_id, document, assigned_at, reconcile_interval_seconds, blocked_reason, adoption_approval_id FROM resource_assignments WHERE request_id = $1
 `
 
 func (q *Queries) GetServiceAssignmentRequest(ctx context.Context, requestID uuid.UUID) (ResourceAssignment, error) {
@@ -157,6 +222,7 @@ func (q *Queries) GetServiceAssignmentRequest(ctx context.Context, requestID uui
 		&i.AssignedAt,
 		&i.ReconcileIntervalSeconds,
 		&i.BlockedReason,
+		&i.AdoptionApprovalID,
 	)
 	return i, err
 }
@@ -282,8 +348,45 @@ func (q *Queries) InsertServiceResource(ctx context.Context, arg InsertServiceRe
 	return err
 }
 
+const latestResourceReleaseAction = `-- name: LatestResourceReleaseAction :one
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE release_id = $1 ORDER BY resource_sequence DESC LIMIT 1
+`
+
+func (q *Queries) LatestResourceReleaseAction(ctx context.Context, releaseID *uuid.UUID) (ResourceAction, error) {
+	row := q.db.QueryRow(ctx, latestResourceReleaseAction, releaseID)
+	var i ResourceAction
+	err := row.Scan(
+		&i.ID,
+		&i.DeviceID,
+		&i.GenerationID,
+		&i.AssignmentID,
+		&i.ResourceID,
+		&i.ResourceSequence,
+		&i.IntentEnvelope,
+		&i.IntentDocument,
+		&i.IssuedAt,
+		&i.ExpiresAt,
+		&i.ChallengeProof,
+		&i.StartGrantEnvelope,
+		&i.StartAuthorizedAt,
+		&i.ClosedAt,
+		&i.ClosedReason,
+		&i.ResultNonce,
+		&i.NonceExpiresAt,
+		&i.ActionRevision,
+		&i.AttestationEnvelope,
+		&i.AttestationCertificate,
+		&i.StatusDocument,
+		&i.AttestedAt,
+		&i.ReceivedAt,
+		&i.ReadOnlySuccess,
+		&i.ReleaseID,
+	)
+	return i, err
+}
+
 const latestServiceAction = `-- name: LatestServiceAction :one
-SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success FROM resource_actions WHERE assignment_id = $1 AND resource_id = $2 ORDER BY resource_sequence DESC LIMIT 1
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE assignment_id = $1 AND resource_id = $2 ORDER BY resource_sequence DESC LIMIT 1
 `
 
 type LatestServiceActionParams struct {
@@ -319,6 +422,7 @@ func (q *Queries) LatestServiceAction(ctx context.Context, arg LatestServiceActi
 		&i.AttestedAt,
 		&i.ReceivedAt,
 		&i.ReadOnlySuccess,
+		&i.ReleaseID,
 	)
 	return i, err
 }
@@ -398,7 +502,7 @@ func (q *Queries) ListServiceResources(ctx context.Context, assignmentID uuid.UU
 }
 
 const lockServiceAction = `-- name: LockServiceAction :one
-SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success FROM resource_actions WHERE id = $1 FOR UPDATE
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockServiceAction(ctx context.Context, id uuid.UUID) (ResourceAction, error) {
@@ -429,12 +533,13 @@ func (q *Queries) LockServiceAction(ctx context.Context, id uuid.UUID) (Resource
 		&i.AttestedAt,
 		&i.ReceivedAt,
 		&i.ReadOnlySuccess,
+		&i.ReleaseID,
 	)
 	return i, err
 }
 
 const lockServiceAssignment = `-- name: LockServiceAssignment :one
-SELECT a.id, a.device_id, a.generation_id, a.request_id, a.request_digest, a.actor_id, a.authorization_version, a.revision_id, a.document, a.assigned_at, a.reconcile_interval_seconds, a.blocked_reason FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1 FOR UPDATE OF h, a
+SELECT a.id, a.device_id, a.generation_id, a.request_id, a.request_digest, a.actor_id, a.authorization_version, a.revision_id, a.document, a.assigned_at, a.reconcile_interval_seconds, a.blocked_reason, a.adoption_approval_id FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1 FOR UPDATE OF h, a
 `
 
 func (q *Queries) LockServiceAssignment(ctx context.Context, generationID uuid.UUID) (ResourceAssignment, error) {
@@ -453,6 +558,7 @@ func (q *Queries) LockServiceAssignment(ctx context.Context, generationID uuid.U
 		&i.AssignedAt,
 		&i.ReconcileIntervalSeconds,
 		&i.BlockedReason,
+		&i.AdoptionApprovalID,
 	)
 	return i, err
 }
@@ -484,6 +590,46 @@ func (q *Queries) NextServiceSequence(ctx context.Context, arg NextServiceSequen
 	return sequence, err
 }
 
+const pendingResourceReleases = `-- name: PendingResourceReleases :many
+SELECT r.id, r.generation_id, r.source_assignment_id, r.resource_id, r.resource_kind, r.canonical_key, r.superseding_assignment_id, r.state, r.reason, r.requested_at, r.completed_at FROM resource_releases r
+JOIN resource_assignment_resources original ON original.assignment_id = r.source_assignment_id AND original.resource_id = r.resource_id
+WHERE r.generation_id = $1 AND r.state = 'pending'
+ORDER BY original.position DESC, r.requested_at, r.id
+LIMIT 256
+`
+
+func (q *Queries) PendingResourceReleases(ctx context.Context, generationID uuid.UUID) ([]ResourceRelease, error) {
+	rows, err := q.db.Query(ctx, pendingResourceReleases, generationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResourceRelease{}
+	for rows.Next() {
+		var i ResourceRelease
+		if err := rows.Scan(
+			&i.ID,
+			&i.GenerationID,
+			&i.SourceAssignmentID,
+			&i.ResourceID,
+			&i.ResourceKind,
+			&i.CanonicalKey,
+			&i.SupersedingAssignmentID,
+			&i.State,
+			&i.Reason,
+			&i.RequestedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const pruneServiceReadOnlySuccesses = `-- name: PruneServiceReadOnlySuccesses :exec
 DELETE FROM resource_actions WHERE id IN (
     SELECT a.id FROM resource_actions a WHERE a.generation_id = $1 AND a.read_only_success
@@ -497,7 +643,7 @@ func (q *Queries) PruneServiceReadOnlySuccesses(ctx context.Context, generationI
 }
 
 const recentServiceActions = `-- name: RecentServiceActions :many
-SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success FROM resource_actions WHERE generation_id = $1 ORDER BY issued_at DESC, id DESC LIMIT 50
+SELECT id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, start_grant_envelope, start_authorized_at, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, attested_at, received_at, read_only_success, release_id FROM resource_actions WHERE generation_id = $1 ORDER BY issued_at DESC, id DESC LIMIT 50
 `
 
 func (q *Queries) RecentServiceActions(ctx context.Context, generationID uuid.UUID) ([]ResourceAction, error) {
@@ -534,6 +680,7 @@ func (q *Queries) RecentServiceActions(ctx context.Context, generationID uuid.UU
 			&i.AttestedAt,
 			&i.ReceivedAt,
 			&i.ReadOnlySuccess,
+			&i.ReleaseID,
 		); err != nil {
 			return nil, err
 		}
@@ -565,6 +712,23 @@ func (q *Queries) RecordResourceReleases(ctx context.Context, arg RecordResource
 	return err
 }
 
+const requestResourcePreparationCancellation = `-- name: RequestResourcePreparationCancellation :exec
+UPDATE resource_actions SET closed_reason = $2
+WHERE id = $1 AND closed_at IS NULL AND closed_reason = '' AND octet_length(start_grant_envelope) = 0
+`
+
+type RequestResourcePreparationCancellationParams struct {
+	ID           uuid.UUID
+	ClosedReason string
+}
+
+// Cancellation retains the one-open-action fence until the executor reports
+// terminal owned staging cleanup. The first cancellation reason is immutable.
+func (q *Queries) RequestResourcePreparationCancellation(ctx context.Context, arg RequestResourcePreparationCancellationParams) error {
+	_, err := q.db.Exec(ctx, requestResourcePreparationCancellation, arg.ID, arg.ClosedReason)
+	return err
+}
+
 const serviceDispatchCapacity = `-- name: ServiceDispatchCapacity :one
 SELECT (SELECT count(*) FROM resource_assignments a WHERE a.generation_id = $1)::bigint AS assignments,
        (SELECT count(*) FROM resource_actions w WHERE w.generation_id = $1 AND NOT w.read_only_success)::bigint AS actions
@@ -591,6 +755,41 @@ func (q *Queries) ServiceDispatchClock(ctx context.Context) (pgtype.Timestamptz,
 	var column_1 pgtype.Timestamptz
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const setResourceAssignmentAdoptionApproval = `-- name: SetResourceAssignmentAdoptionApproval :exec
+UPDATE resource_assignments SET adoption_approval_id = $2 WHERE id = $1
+`
+
+type SetResourceAssignmentAdoptionApprovalParams struct {
+	ID                 uuid.UUID
+	AdoptionApprovalID *uuid.UUID
+}
+
+func (q *Queries) SetResourceAssignmentAdoptionApproval(ctx context.Context, arg SetResourceAssignmentAdoptionApprovalParams) error {
+	_, err := q.db.Exec(ctx, setResourceAssignmentAdoptionApproval, arg.ID, arg.AdoptionApprovalID)
+	return err
+}
+
+const setResourceReleaseState = `-- name: SetResourceReleaseState :exec
+UPDATE resource_releases SET state = $2, reason = $3, completed_at = $4 WHERE id = $1
+`
+
+type SetResourceReleaseStateParams struct {
+	ID          uuid.UUID
+	State       string
+	Reason      string
+	CompletedAt pgtype.Timestamptz
+}
+
+func (q *Queries) SetResourceReleaseState(ctx context.Context, arg SetResourceReleaseStateParams) error {
+	_, err := q.db.Exec(ctx, setResourceReleaseState,
+		arg.ID,
+		arg.State,
+		arg.Reason,
+		arg.CompletedAt,
+	)
+	return err
 }
 
 const setServiceAssignmentHead = `-- name: SetServiceAssignmentHead :exec

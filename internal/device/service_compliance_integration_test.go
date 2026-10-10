@@ -30,11 +30,11 @@ func TestServiceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 	if state.GetResources()[0].GetCompliance() != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_UNKNOWN {
 		t.Fatal("unobserved resource reported compliant")
 	}
-	var last *devicev1.ReportServiceResultRequest
+	var last *devicev1.ReportResourceResultRequest
 	for range 2 {
 		work := f.work(t)
-		last = f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, false)
-		if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(last)); err != nil {
+		last = f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false)
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(last)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -49,7 +49,7 @@ func TestServiceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 	}
 	ageCompliance(t, f, 11*time.Minute)
 	// A retry acknowledges retained evidence; it cannot turn old evidence fresh.
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(last)); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(last)); err != nil {
 		t.Fatal(err)
 	}
 	for _, resource := range complianceState(t, f).GetResources() {
@@ -59,26 +59,26 @@ func TestServiceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 	}
 	work := f.work(t)
 	intent := f.intent(t, work)
-	if intent.GetDesired().GetUnit() != "zzz-first.service" || intent.GetResourceSequence() != 2 || len(work.GetStartGrantEnvelope()) != 0 {
+	if intent.GetDesired().GetRef().GetCanonicalKey() != "zzz-first.service" || intent.GetResourceSequence() != 2 || len(work.GetStartGrantEnvelope()) != 0 {
 		t.Fatal("recheck lost dependency order, fresh sequence or read-only preparation")
 	}
 	if f.work(t).GetActionId() != work.GetActionId() {
 		t.Fatal("periodic check minted concurrent work")
 	}
-	// GetServiceWork rotates the nonce; use the currently issued one.
+	// GetResourceWork rotates the nonce; use the currently issued one.
 	work = f.work(t)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
 		t.Fatal(err)
 	}
 	dependent := f.work(t)
-	if f.intent(t, dependent).GetDesired().GetUnit() != "aaa-dependent.service" {
+	if f.intent(t, dependent).GetDesired().GetRef().GetCanonicalKey() != "aaa-dependent.service" {
 		t.Fatal("reverified dependency did not release due dependent")
 	}
 	f.start(t, dependent)
 	if complianceState(t, f).GetResources()[1].GetCompliance() != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION {
 		t.Fatal("known drift remained compliant during remediation")
 	}
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, dependent, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, dependent, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
 		t.Fatal(err)
 	}
 	if complianceState(t, f).GetResources()[1].GetCompliance() != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_DRIFT_REMEDIATED {
@@ -91,14 +91,14 @@ func TestServiceComplianceRecheckAuthorizationFence(t *testing.T) {
 	f.assign(t, nil)
 	for range 2 {
 		work := f.work(t)
-		if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
 			t.Fatal(err)
 		}
 	}
 	ageCompliance(t, f, 16*time.Minute)
 	work := f.work(t)
 	f.directory.membership(t, false)
-	_, err := f.service.AuthorizeServiceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeServiceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}))
+	_, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}))
 	dispatchError(t, err, connect.CodePermissionDenied, "authority_changed")
 	assertDispatchClosure(t, f, work.GetActionId(), "authority_changed")
 	if f.work(t) != nil {
@@ -115,11 +115,11 @@ func TestServiceComplianceReadOnlyHistoryBound(t *testing.T) {
 	// Retain a genuine granted success and a non-success without a grant.
 	granted := f.work(t)
 	f.start(t, granted)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, granted, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, granted, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true))); err != nil {
 		t.Fatal(err)
 	}
 	expired := f.work(t)
-	if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, expired, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_EXPIRED, false))); err != nil {
+	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, expired, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, false))); err != nil {
 		t.Fatal(err)
 	}
 	var firstReadOnly string
@@ -129,7 +129,7 @@ func TestServiceComplianceReadOnlyHistoryBound(t *testing.T) {
 		if i == 0 {
 			firstReadOnly = work.GetActionId()
 		}
-		if _, err := f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
+		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(f.result(t, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, false))); err != nil {
 			t.Fatal(err)
 		}
 	}

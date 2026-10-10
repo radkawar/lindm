@@ -84,10 +84,11 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	for _, procedure := range []string{
 		agentv1connect.ExecutorServiceGetExecutionTrustProcedure,
 		agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure,
-		agentv1connect.ExecutorServicePrepareServiceExecutionProcedure,
-		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
-		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,
-		agentv1connect.ExecutorServiceAttestServiceExecutionProcedure,
+		agentv1connect.ExecutorServicePrepareResourceExecutionProcedure,
+		agentv1connect.ExecutorServiceCancelResourcePreparationProcedure,
+		agentv1connect.ExecutorServiceStartResourceExecutionProcedure,
+		agentv1connect.ExecutorServiceGetResourceExecutionProcedure,
+		agentv1connect.ExecutorServiceAttestResourceExecutionProcedure,
 		agentv1connect.ExecutorServicePrepareDeviceActionProcedure,
 		agentv1connect.ExecutorServiceStartDeviceActionProcedure,
 		agentv1connect.ExecutorServiceGetDeviceActionProcedure,
@@ -166,16 +167,19 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	if _, err := client.UpdateExecutionTrust(t.Context(), connect.NewRequest(&agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: []byte{1}})); err != nil {
 		t.Fatalf("admitted UID was denied execution trust relay: %v", err)
 	}
-	if _, err := client.PrepareServiceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareServiceExecutionRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := client.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("service intent request bypassed eager schema: %v", err)
 	}
-	if _, err := client.StartServiceExecution(t.Context(), connect.NewRequest(&agentv1.StartServiceExecutionRequest{ActionId: "not-a-uuid", StartGrantEnvelope: []byte{1}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := client.StartResourceExecution(t.Context(), connect.NewRequest(&agentv1.StartResourceExecutionRequest{ActionId: "not-a-uuid", StartGrantEnvelope: []byte{1}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("service start request bypassed eager schema: %v", err)
 	}
-	if _, err := client.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: "not-a-uuid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := client.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: "not-a-uuid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("service lookup request bypassed eager schema: %v", err)
 	}
-	if _, err := client.AttestServiceExecution(t.Context(), connect.NewRequest(&agentv1.AttestServiceExecutionRequest{ActionId: "5a7df67f-8c0c-4404-95a0-828d7e3a1989", Nonce: make([]byte, 31)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := client.CancelResourcePreparation(t.Context(), connect.NewRequest(&agentv1.CancelResourcePreparationRequest{ActionId: "5a7df67f-8c0c-4404-95a0-828d7e3a1989", IntentSha256: make([]byte, 31)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("preparation cancellation accepted a truncated intent digest: %v", err)
+	}
+	if _, err := client.AttestResourceExecution(t.Context(), connect.NewRequest(&agentv1.AttestResourceExecutionRequest{ActionId: "5a7df67f-8c0c-4404-95a0-828d7e3a1989", Nonce: make([]byte, 31)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("service attestation accepted a truncated nonce: %v", err)
 	}
 	if os.Geteuid() != 0 {

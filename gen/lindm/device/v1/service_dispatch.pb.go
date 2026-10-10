@@ -23,38 +23,41 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Server-owned systemd service work for the authenticated device generation.
+// Server-owned resource work for the authenticated device generation.
 // The server retains every signed byte; retries return those exact bytes and
 // never mint new authority for an existing action.
-type ServiceWork struct {
+type ResourceWork struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ActionId string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	// Plan-role DSSE ServiceExecutionIntent. Authorizes preflight only.
+	// Plan-role DSSE ResourceExecutionIntent. Authorizes preflight only.
 	IntentEnvelope []byte `protobuf:"bytes,2,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
 	// Previously issued exact start-role grant, if any. Present after a lost
-	// AuthorizeServiceStart response; it is never a fresh authorization.
+	// AuthorizeResourceStart response; it is never a fresh authorization.
 	StartGrantEnvelope []byte `protobuf:"bytes,3,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
-	// Fresh server-selected nonce for one ReportServiceResult attestation.
+	// Fresh server-selected nonce for one ReportResourceResult attestation.
 	ResultNonce          []byte                 `protobuf:"bytes,4,opt,name=result_nonce,json=resultNonce,proto3" json:"result_nonce,omitempty"`
 	ResultNonceExpiresAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=result_nonce_expires_at,json=resultNonceExpiresAt,proto3" json:"result_nonce_expires_at,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Stop only this intent's ungranted preparation and attest its terminal result.
+	// The server keeps the action open until owned staging cleanup is acknowledged.
+	CancelPreparation bool `protobuf:"varint,6,opt,name=cancel_preparation,json=cancelPreparation,proto3" json:"cancel_preparation,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
-func (x *ServiceWork) Reset() {
-	*x = ServiceWork{}
+func (x *ResourceWork) Reset() {
+	*x = ResourceWork{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceWork) String() string {
+func (x *ResourceWork) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceWork) ProtoMessage() {}
+func (*ResourceWork) ProtoMessage() {}
 
-func (x *ServiceWork) ProtoReflect() protoreflect.Message {
+func (x *ResourceWork) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -66,67 +69,74 @@ func (x *ServiceWork) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceWork.ProtoReflect.Descriptor instead.
-func (*ServiceWork) Descriptor() ([]byte, []int) {
+// Deprecated: Use ResourceWork.ProtoReflect.Descriptor instead.
+func (*ResourceWork) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ServiceWork) GetActionId() string {
+func (x *ResourceWork) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ServiceWork) GetIntentEnvelope() []byte {
+func (x *ResourceWork) GetIntentEnvelope() []byte {
 	if x != nil {
 		return x.IntentEnvelope
 	}
 	return nil
 }
 
-func (x *ServiceWork) GetStartGrantEnvelope() []byte {
+func (x *ResourceWork) GetStartGrantEnvelope() []byte {
 	if x != nil {
 		return x.StartGrantEnvelope
 	}
 	return nil
 }
 
-func (x *ServiceWork) GetResultNonce() []byte {
+func (x *ResourceWork) GetResultNonce() []byte {
 	if x != nil {
 		return x.ResultNonce
 	}
 	return nil
 }
 
-func (x *ServiceWork) GetResultNonceExpiresAt() *timestamppb.Timestamp {
+func (x *ResourceWork) GetResultNonceExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ResultNonceExpiresAt
 	}
 	return nil
 }
 
-type GetServiceWorkRequest struct {
+func (x *ResourceWork) GetCancelPreparation() bool {
+	if x != nil {
+		return x.CancelPreparation
+	}
+	return false
+}
+
+type GetResourceWorkRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionEpoch  uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceWorkRequest) Reset() {
-	*x = GetServiceWorkRequest{}
+func (x *GetResourceWorkRequest) Reset() {
+	*x = GetResourceWorkRequest{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceWorkRequest) String() string {
+func (x *GetResourceWorkRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceWorkRequest) ProtoMessage() {}
+func (*GetResourceWorkRequest) ProtoMessage() {}
 
-func (x *GetServiceWorkRequest) ProtoReflect() protoreflect.Message {
+func (x *GetResourceWorkRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -138,40 +148,40 @@ func (x *GetServiceWorkRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceWorkRequest.ProtoReflect.Descriptor instead.
-func (*GetServiceWorkRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetResourceWorkRequest.ProtoReflect.Descriptor instead.
+func (*GetResourceWorkRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GetServiceWorkRequest) GetSessionEpoch() uint64 {
+func (x *GetResourceWorkRequest) GetSessionEpoch() uint64 {
 	if x != nil {
 		return x.SessionEpoch
 	}
 	return 0
 }
 
-type GetServiceWorkResponse struct {
+type GetResourceWorkResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Absent means no current action needs this device. It is not compliance.
-	Work          *ServiceWork `protobuf:"bytes,1,opt,name=work,proto3" json:"work,omitempty"`
+	Work          *ResourceWork `protobuf:"bytes,1,opt,name=work,proto3" json:"work,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceWorkResponse) Reset() {
-	*x = GetServiceWorkResponse{}
+func (x *GetResourceWorkResponse) Reset() {
+	*x = GetResourceWorkResponse{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceWorkResponse) String() string {
+func (x *GetResourceWorkResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceWorkResponse) ProtoMessage() {}
+func (*GetResourceWorkResponse) ProtoMessage() {}
 
-func (x *GetServiceWorkResponse) ProtoReflect() protoreflect.Message {
+func (x *GetResourceWorkResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -183,42 +193,42 @@ func (x *GetServiceWorkResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceWorkResponse.ProtoReflect.Descriptor instead.
-func (*GetServiceWorkResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetResourceWorkResponse.ProtoReflect.Descriptor instead.
+func (*GetResourceWorkResponse) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetServiceWorkResponse) GetWork() *ServiceWork {
+func (x *GetResourceWorkResponse) GetWork() *ResourceWork {
 	if x != nil {
 		return x.Work
 	}
 	return nil
 }
 
-type AuthorizeServiceStartRequest struct {
+type AuthorizeResourceStartRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	SessionEpoch uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
 	ActionId     string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	// Exact executor-returned device-key DSSE ServiceExecutionChallenge.
+	// Exact executor-returned device-key DSSE ResourceExecutionChallenge.
 	ChallengeProof []byte `protobuf:"bytes,3,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *AuthorizeServiceStartRequest) Reset() {
-	*x = AuthorizeServiceStartRequest{}
+func (x *AuthorizeResourceStartRequest) Reset() {
+	*x = AuthorizeResourceStartRequest{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AuthorizeServiceStartRequest) String() string {
+func (x *AuthorizeResourceStartRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AuthorizeServiceStartRequest) ProtoMessage() {}
+func (*AuthorizeResourceStartRequest) ProtoMessage() {}
 
-func (x *AuthorizeServiceStartRequest) ProtoReflect() protoreflect.Message {
+func (x *AuthorizeResourceStartRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -230,55 +240,55 @@ func (x *AuthorizeServiceStartRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AuthorizeServiceStartRequest.ProtoReflect.Descriptor instead.
-func (*AuthorizeServiceStartRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use AuthorizeResourceStartRequest.ProtoReflect.Descriptor instead.
+func (*AuthorizeResourceStartRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *AuthorizeServiceStartRequest) GetSessionEpoch() uint64 {
+func (x *AuthorizeResourceStartRequest) GetSessionEpoch() uint64 {
 	if x != nil {
 		return x.SessionEpoch
 	}
 	return 0
 }
 
-func (x *AuthorizeServiceStartRequest) GetActionId() string {
+func (x *AuthorizeResourceStartRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *AuthorizeServiceStartRequest) GetChallengeProof() []byte {
+func (x *AuthorizeResourceStartRequest) GetChallengeProof() []byte {
 	if x != nil {
 		return x.ChallengeProof
 	}
 	return nil
 }
 
-type AuthorizeServiceStartResponse struct {
+type AuthorizeResourceStartResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Start-role DSSE ServiceExecutionStartGrant. An exact retry returns the
+	// Start-role DSSE ResourceExecutionStartGrant. An exact retry returns the
 	// original bytes; a lapsed challenge requires a new server action.
 	StartGrantEnvelope []byte `protobuf:"bytes,1,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
-func (x *AuthorizeServiceStartResponse) Reset() {
-	*x = AuthorizeServiceStartResponse{}
+func (x *AuthorizeResourceStartResponse) Reset() {
+	*x = AuthorizeResourceStartResponse{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AuthorizeServiceStartResponse) String() string {
+func (x *AuthorizeResourceStartResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AuthorizeServiceStartResponse) ProtoMessage() {}
+func (*AuthorizeResourceStartResponse) ProtoMessage() {}
 
-func (x *AuthorizeServiceStartResponse) ProtoReflect() protoreflect.Message {
+func (x *AuthorizeResourceStartResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -290,43 +300,45 @@ func (x *AuthorizeServiceStartResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AuthorizeServiceStartResponse.ProtoReflect.Descriptor instead.
-func (*AuthorizeServiceStartResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use AuthorizeResourceStartResponse.ProtoReflect.Descriptor instead.
+func (*AuthorizeResourceStartResponse) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *AuthorizeServiceStartResponse) GetStartGrantEnvelope() []byte {
+func (x *AuthorizeResourceStartResponse) GetStartGrantEnvelope() []byte {
 	if x != nil {
 		return x.StartGrantEnvelope
 	}
 	return nil
 }
 
-type ReportServiceResultRequest struct {
+type ReportResourceResultRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	SessionEpoch uint64                 `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
 	ActionId     string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	// Exact executor AttestServiceExecution output for the issued result nonce.
+	// Exact executor AttestResourceExecution output for the issued result nonce.
 	AttestationEnvelope []byte `protobuf:"bytes,3,opt,name=attestation_envelope,json=attestationEnvelope,proto3" json:"attestation_envelope,omitempty"`
 	CertificatePem      []byte `protobuf:"bytes,4,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Authenticated cancellation acknowledgment only, never native evidence.
+	NeverPrepared *ResourcePreparationCancellation `protobuf:"bytes,5,opt,name=never_prepared,json=neverPrepared,proto3" json:"never_prepared,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReportServiceResultRequest) Reset() {
-	*x = ReportServiceResultRequest{}
+func (x *ReportResourceResultRequest) Reset() {
+	*x = ReportResourceResultRequest{}
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReportServiceResultRequest) String() string {
+func (x *ReportResourceResultRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReportServiceResultRequest) ProtoMessage() {}
+func (*ReportResourceResultRequest) ProtoMessage() {}
 
-func (x *ReportServiceResultRequest) ProtoReflect() protoreflect.Message {
+func (x *ReportResourceResultRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -338,40 +350,99 @@ func (x *ReportServiceResultRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReportServiceResultRequest.ProtoReflect.Descriptor instead.
-func (*ReportServiceResultRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ReportResourceResultRequest.ProtoReflect.Descriptor instead.
+func (*ReportResourceResultRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ReportServiceResultRequest) GetSessionEpoch() uint64 {
+func (x *ReportResourceResultRequest) GetSessionEpoch() uint64 {
 	if x != nil {
 		return x.SessionEpoch
 	}
 	return 0
 }
 
-func (x *ReportServiceResultRequest) GetActionId() string {
+func (x *ReportResourceResultRequest) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ReportServiceResultRequest) GetAttestationEnvelope() []byte {
+func (x *ReportResourceResultRequest) GetAttestationEnvelope() []byte {
 	if x != nil {
 		return x.AttestationEnvelope
 	}
 	return nil
 }
 
-func (x *ReportServiceResultRequest) GetCertificatePem() []byte {
+func (x *ReportResourceResultRequest) GetCertificatePem() []byte {
 	if x != nil {
 		return x.CertificatePem
 	}
 	return nil
 }
 
-type ReportServiceResultResponse struct {
+func (x *ReportResourceResultRequest) GetNeverPrepared() *ResourcePreparationCancellation {
+	if x != nil {
+		return x.NeverPrepared
+	}
+	return nil
+}
+
+type ResourcePreparationCancellation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IntentSha256  []byte                 `protobuf:"bytes,1,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
+	ResultNonce   []byte                 `protobuf:"bytes,2,opt,name=result_nonce,json=resultNonce,proto3" json:"result_nonce,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourcePreparationCancellation) Reset() {
+	*x = ResourcePreparationCancellation{}
+	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourcePreparationCancellation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourcePreparationCancellation) ProtoMessage() {}
+
+func (x *ResourcePreparationCancellation) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourcePreparationCancellation.ProtoReflect.Descriptor instead.
+func (*ResourcePreparationCancellation) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ResourcePreparationCancellation) GetIntentSha256() []byte {
+	if x != nil {
+		return x.IntentSha256
+	}
+	return nil
+}
+
+func (x *ResourcePreparationCancellation) GetResultNonce() []byte {
+	if x != nil {
+		return x.ResultNonce
+	}
+	return nil
+}
+
+type ReportResourceResultResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// True when the server will issue no further work for this action.
 	Closed        bool `protobuf:"varint,1,opt,name=closed,proto3" json:"closed,omitempty"`
@@ -379,21 +450,21 @@ type ReportServiceResultResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ReportServiceResultResponse) Reset() {
-	*x = ReportServiceResultResponse{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+func (x *ReportResourceResultResponse) Reset() {
+	*x = ReportResourceResultResponse{}
+	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ReportServiceResultResponse) String() string {
+func (x *ReportResourceResultResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ReportServiceResultResponse) ProtoMessage() {}
+func (*ReportResourceResultResponse) ProtoMessage() {}
 
-func (x *ReportServiceResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+func (x *ReportResourceResultResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,12 +475,12 @@ func (x *ReportServiceResultResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ReportServiceResultResponse.ProtoReflect.Descriptor instead.
-func (*ReportServiceResultResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{6}
+// Deprecated: Use ReportResourceResultResponse.ProtoReflect.Descriptor instead.
+func (*ReportResourceResultResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ReportServiceResultResponse) GetClosed() bool {
+func (x *ReportResourceResultResponse) GetClosed() bool {
 	if x != nil {
 		return x.Closed
 	}
@@ -420,29 +491,36 @@ var File_lindm_device_v1_service_dispatch_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_service_dispatch_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/device/v1/service_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xae\x02\n" +
-	"\vServiceWork\x12%\n" +
+	"&lindm/device/v1/service_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x04\n" +
+	"\fResourceWork\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x124\n" +
-	"\x0fintent_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eintentEnvelope\x12;\n" +
+	"\x0fintent_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x12;\n" +
 	"\x14start_grant_envelope\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x12startGrantEnvelope\x12*\n" +
 	"\fresult_nonce\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\vresultNonce\x12Y\n" +
-	"\x17result_nonce_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x14resultNonceExpiresAt\"O\n" +
-	"\x15GetServiceWorkRequest\x126\n" +
-	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"J\n" +
-	"\x16GetServiceWorkResponse\x120\n" +
-	"\x04work\x18\x01 \x01(\v2\x1c.lindm.device.v1.ServiceWorkR\x04work\"\xb3\x01\n" +
-	"\x1cAuthorizeServiceStartRequest\x126\n" +
+	"\x17result_nonce_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x14resultNonceExpiresAt\x12-\n" +
+	"\x12cancel_preparation\x18\x06 \x01(\bR\x11cancelPreparation:\xa1\x01\xbaH\x9d\x01\x1a\x9a\x01\n" +
+	"\x1eresource_work.cancel_ungranted\x125preparation cancellation cannot carry start authority\x1aA!this.cancel_preparation || this.start_grant_envelope.size() == 0\"P\n" +
+	"\x16GetResourceWorkRequest\x126\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"L\n" +
+	"\x17GetResourceWorkResponse\x121\n" +
+	"\x04work\x18\x01 \x01(\v2\x1d.lindm.device.v1.ResourceWorkR\x04work\"\xb4\x01\n" +
+	"\x1dAuthorizeResourceStartRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12%\n" +
 	"\taction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x124\n" +
-	"\x0fchallenge_proof\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0echallengeProof\"^\n" +
-	"\x1dAuthorizeServiceStartResponse\x12=\n" +
-	"\x14start_grant_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x12startGrantEnvelope\"\xf1\x01\n" +
-	"\x1aReportServiceResultRequest\x126\n" +
+	"\x0fchallenge_proof\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0echallengeProof\"_\n" +
+	"\x1eAuthorizeResourceStartResponse\x12=\n" +
+	"\x14start_grant_envelope\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x12startGrantEnvelope\"\x86\x05\n" +
+	"\x1bReportResourceResultRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12%\n" +
-	"\taction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12>\n" +
-	"\x14attestation_envelope\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x04R\x13attestationEnvelope\x124\n" +
-	"\x0fcertificate_pem\x18\x04 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0ecertificatePem\"5\n" +
-	"\x1bReportServiceResultResponse\x12\x16\n" +
+	"\taction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12<\n" +
+	"\x14attestation_envelope\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x10R\x13attestationEnvelope\x122\n" +
+	"\x0fcertificate_pem\x18\x04 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x0ecertificatePem\x12W\n" +
+	"\x0enever_prepared\x18\x05 \x01(\v20.lindm.device.v1.ResourcePreparationCancellationR\rneverPrepared:\xbc\x02\xbaH\xb8\x02\x1a\xb5\x02\n" +
+	"\x18resource_result.evidence\x12da result carries either signed native history or an exact never-prepared cancellation acknowledgment\x1a\xb2\x01has(this.never_prepared) ? (this.attestation_envelope.size() == 0 && this.certificate_pem.size() == 0) : (this.attestation_envelope.size() > 0 && this.certificate_pem.size() > 0)\"{\n" +
+	"\x1fResourcePreparationCancellation\x12,\n" +
+	"\rintent_sha256\x18\x01 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12*\n" +
+	"\fresult_nonce\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\vresultNonce\"6\n" +
+	"\x1cReportResourceResultResponse\x12\x16\n" +
 	"\x06closed\x18\x01 \x01(\bR\x06closedB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
@@ -457,25 +535,27 @@ func file_lindm_device_v1_service_dispatch_proto_rawDescGZIP() []byte {
 	return file_lindm_device_v1_service_dispatch_proto_rawDescData
 }
 
-var file_lindm_device_v1_service_dispatch_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_lindm_device_v1_service_dispatch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_device_v1_service_dispatch_proto_goTypes = []any{
-	(*ServiceWork)(nil),                   // 0: lindm.device.v1.ServiceWork
-	(*GetServiceWorkRequest)(nil),         // 1: lindm.device.v1.GetServiceWorkRequest
-	(*GetServiceWorkResponse)(nil),        // 2: lindm.device.v1.GetServiceWorkResponse
-	(*AuthorizeServiceStartRequest)(nil),  // 3: lindm.device.v1.AuthorizeServiceStartRequest
-	(*AuthorizeServiceStartResponse)(nil), // 4: lindm.device.v1.AuthorizeServiceStartResponse
-	(*ReportServiceResultRequest)(nil),    // 5: lindm.device.v1.ReportServiceResultRequest
-	(*ReportServiceResultResponse)(nil),   // 6: lindm.device.v1.ReportServiceResultResponse
-	(*timestamppb.Timestamp)(nil),         // 7: google.protobuf.Timestamp
+	(*ResourceWork)(nil),                    // 0: lindm.device.v1.ResourceWork
+	(*GetResourceWorkRequest)(nil),          // 1: lindm.device.v1.GetResourceWorkRequest
+	(*GetResourceWorkResponse)(nil),         // 2: lindm.device.v1.GetResourceWorkResponse
+	(*AuthorizeResourceStartRequest)(nil),   // 3: lindm.device.v1.AuthorizeResourceStartRequest
+	(*AuthorizeResourceStartResponse)(nil),  // 4: lindm.device.v1.AuthorizeResourceStartResponse
+	(*ReportResourceResultRequest)(nil),     // 5: lindm.device.v1.ReportResourceResultRequest
+	(*ResourcePreparationCancellation)(nil), // 6: lindm.device.v1.ResourcePreparationCancellation
+	(*ReportResourceResultResponse)(nil),    // 7: lindm.device.v1.ReportResourceResultResponse
+	(*timestamppb.Timestamp)(nil),           // 8: google.protobuf.Timestamp
 }
 var file_lindm_device_v1_service_dispatch_proto_depIdxs = []int32{
-	7, // 0: lindm.device.v1.ServiceWork.result_nonce_expires_at:type_name -> google.protobuf.Timestamp
-	0, // 1: lindm.device.v1.GetServiceWorkResponse.work:type_name -> lindm.device.v1.ServiceWork
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	8, // 0: lindm.device.v1.ResourceWork.result_nonce_expires_at:type_name -> google.protobuf.Timestamp
+	0, // 1: lindm.device.v1.GetResourceWorkResponse.work:type_name -> lindm.device.v1.ResourceWork
+	6, // 2: lindm.device.v1.ReportResourceResultRequest.never_prepared:type_name -> lindm.device.v1.ResourcePreparationCancellation
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_lindm_device_v1_service_dispatch_proto_init() }
@@ -489,7 +569,7 @@ func file_lindm_device_v1_service_dispatch_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_service_dispatch_proto_rawDesc), len(file_lindm_device_v1_service_dispatch_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -325,13 +325,13 @@ func TestDeviceActionScopeOfflineAndQuarantineRestrictions(t *testing.T) {
 	if until.After(time.Now().Add(331 * time.Second)) {
 		t.Fatal("quarantine restriction unbounded")
 	}
-	if _, err := f.svc.GetServiceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("quarantine service authority admitted: %v", err)
 	}
 	if _, err := f.svc.pool.Exec(t.Context(), "UPDATE device_action_restrictions SET quarantine_until=clock_timestamp()-interval '1 second' WHERE device_id=$1", f.principal.DeviceID); err != nil {
 		t.Fatal(err)
 	}
-	if work, err := f.svc.GetServiceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetServiceWorkRequest{SessionEpoch: 1})); err != nil || work.Msg.GetWork() != nil {
+	if work, err := f.svc.GetResourceWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetResourceWorkRequest{SessionEpoch: 1})); err != nil || work.Msg.GetWork() != nil {
 		t.Fatalf("expired quarantine prevented an empty service poll: %v", err)
 	}
 	var quarantined bool

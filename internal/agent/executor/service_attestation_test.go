@@ -15,28 +15,28 @@ import (
 	"lindm/internal/trust"
 )
 
-func attestService(t *testing.T, f *serviceFixture, status *agentv1.ServiceExecutionStatus) (*agentv1.AttestServiceExecutionResponse, *agentv1.ServiceExecutionAttestation) {
+func attestService(t *testing.T, f *serviceFixture, status *agentv1.ResourceExecutionStatus) (*agentv1.AttestResourceExecutionResponse, *agentv1.ResourceExecutionAttestation) {
 	t.Helper()
 	nonce := [32]byte{1, 2, 3}
-	response, err := f.svc.AttestServiceExecution(t.Context(), connect.NewRequest(&agentv1.AttestServiceExecutionRequest{ActionId: status.GetActionId(), Nonce: nonce[:]}))
+	response, err := f.svc.AttestResourceExecution(t.Context(), connect.NewRequest(&agentv1.AttestResourceExecutionRequest{ActionId: status.GetActionId(), Nonce: nonce[:]}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	state := durable(t, f.svc)
-	binding := &trust.ServiceAttestationBinding{
+	binding := &trust.ResourceAttestationBinding{
 		DeploymentID: f.fix.deploy, DeviceID: uuid.MustParse(state.GetDeviceId()),
 		EnrollmentGeneration: uuid.MustParse(state.GetEnrollmentGeneration()),
 		SessionEpoch:         state.GetSessionEpoch(), ActionID: uuid.MustParse(status.GetActionId()),
 		IntentSHA256: [32]byte(status.GetIntentSha256()), Nonce: nonce,
 	}
-	verified, err := f.svc.authority.VerifyServiceAttestation(t.Context(), response.Msg.GetAttestationEnvelope(), response.Msg.GetCertificatePem(), f.fix.ca, binding, f.svc.now(), 0)
+	verified, err := f.svc.authority.VerifyResourceAttestation(t.Context(), response.Msg.GetAttestationEnvelope(), response.Msg.GetCertificatePem(), f.fix.ca, binding, f.svc.now(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return response.Msg, verified
 }
 
-func TestServiceAttestationPreservesHistoryAfterRevocationAndClockRollback(t *testing.T) {
+func TestResourceAttestationPreservesHistoryAfterRevocationAndClockRollback(t *testing.T) {
 	f := newServiceFixture(t, true)
 	intent := f.intent(t, 1)
 	prepared, _ := f.prepare(t, intent)
@@ -64,7 +64,7 @@ func TestServiceAttestationPreservesHistoryAfterRevocationAndClockRollback(t *te
 	}
 }
 
-func TestServiceAttestationDoesNotConsumeOrExpirePreparedWork(t *testing.T) {
+func TestResourceAttestationDoesNotConsumeOrExpirePreparedWork(t *testing.T) {
 	f := newServiceFixture(t, false)
 	pauseServiceConsumer(t, f.svc)
 	intent := f.intent(t, 1)
@@ -74,12 +74,12 @@ func TestServiceAttestationDoesNotConsumeOrExpirePreparedWork(t *testing.T) {
 	f.bootClock.Add(uint64(time.Minute))
 	_, attestation := attestService(t, f, prepared.GetStatus())
 	after, afterRevision := serviceRow(t, f.svc, intent.GetActionId())
-	if attestation.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_PREPARED || !proto.Equal(before, after) || afterRevision != revision || f.native.applies.Load() != 0 {
+	if attestation.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || !proto.Equal(before, after) || afterRevision != revision || f.native.applies.Load() != 0 {
 		t.Fatal("history attestation acted as a work transition or effect authorization")
 	}
 }
 
-func TestServiceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
+func TestResourceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
 	for _, fence := range []string{"expired-certificate", "pending-renewal", "pending-session", "other-boot"} {
 		t.Run(fence, func(t *testing.T) {
 			f := newServiceFixture(t, true)
@@ -98,13 +98,13 @@ func TestServiceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
 					session(t, f.svc)
 				}
 			}
-			_, err := f.svc.AttestServiceExecution(t.Context(), connect.NewRequest(&agentv1.AttestServiceExecutionRequest{ActionId: intent.GetActionId(), Nonce: make([]byte, 32)}))
+			_, err := f.svc.AttestResourceExecution(t.Context(), connect.NewRequest(&agentv1.AttestResourceExecutionRequest{ActionId: intent.GetActionId(), Nonce: make([]byte, 32)}))
 			if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 				t.Fatalf("unusable identity/session authenticated a report: %v", err)
 			}
 			// The historical local read remains available; it is not a remotely
 			// authenticated report and must not acquire the new signing fences.
-			local, err := f.svc.GetServiceExecution(t.Context(), connect.NewRequest(&agentv1.GetServiceExecutionRequest{ActionId: intent.GetActionId()}))
+			local, err := f.svc.GetResourceExecution(t.Context(), connect.NewRequest(&agentv1.GetResourceExecutionRequest{ActionId: intent.GetActionId()}))
 			if err != nil || !proto.Equal(local.Msg.GetStatus(), prepared.GetStatus()) {
 				t.Fatalf("signing fence made historical local evidence unavailable: %v", err)
 			}
@@ -112,7 +112,7 @@ func TestServiceAttestationRequiresCurrentIdentityAndSession(t *testing.T) {
 	}
 }
 
-func TestServiceAttestationClipsLifetimeToActiveCertificate(t *testing.T) {
+func TestResourceAttestationClipsLifetimeToActiveCertificate(t *testing.T) {
 	f := newServiceFixture(t, true)
 	prepared, _ := f.prepare(t, f.intent(t, 1))
 	f.wall.Store(f.now.Add(24*time.Hour - 5*time.Second).UnixNano())
@@ -122,7 +122,7 @@ func TestServiceAttestationClipsLifetimeToActiveCertificate(t *testing.T) {
 	}
 }
 
-func TestServiceAttestationUsesRenewedKeyForOriginalExecutionHistory(t *testing.T) {
+func TestResourceAttestationUsesRenewedKeyForOriginalExecutionHistory(t *testing.T) {
 	f := newServiceFixture(t, false)
 	intent := f.intent(t, 1)
 	f.prepare(t, intent)
@@ -147,7 +147,7 @@ func TestServiceAttestationUsesRenewedKeyForOriginalExecutionHistory(t *testing.
 	if !bytes.Equal(response.GetCertificatePem(), nextCertificate) || bytes.Equal(response.GetCertificatePem(), original.GetChallengeCertificatePem()) || !proto.Equal(attestation.GetStatus(), status) {
 		t.Fatal("renewal replaced history or retained the old attestation certificate")
 	}
-	if err := f.svc.authority.Verify(t.Context(), response.GetAttestationEnvelope(), new(agentv1.ServiceExecutionAttestation), 1, publicOf(state.GetIdentityPrivateKey())); err == nil {
+	if err := f.svc.authority.Verify(t.Context(), response.GetAttestationEnvelope(), new(agentv1.ResourceExecutionAttestation), 1, publicOf(state.GetIdentityPrivateKey())); err == nil {
 		t.Fatal("renewed attestation was signed by the retired identity key")
 	}
 }

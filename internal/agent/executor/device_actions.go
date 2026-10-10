@@ -68,7 +68,7 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 	}
 	if s.agentUpdateBusy() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	intent, err := s.currentDeviceActionIntent(ctx, loaded, req.GetIntentEnvelope())
 	if err != nil {
@@ -77,11 +77,11 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 	}
 	if intent.GetSpec().GetSanitize().GetRecovery() != nil {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	if s.actionProvider == nil || !s.actionMu.TryLock() {
 		s.mu.Unlock()
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	s.operations.Add(1)
 	ctx, cancel := context.WithCancel(ctx)
@@ -100,13 +100,13 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 		return nil, err
 	}
 	if plan == nil || !proto.Equal(plan.GetSpec(), intent.GetSpec()) || !plan.GetBefore().GetSupported() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	plan.ActionId = intent.GetActionId()
 	if rotate := intent.GetSpec().GetEscrowRotate(); rotate != nil {
 		binding := plan.GetRecoveryBinding()
 		if binding == nil || binding.GetLuksUuid() != rotate.GetTarget().GetLuksUuid() {
-			return nil, errServiceRejected
+			return nil, errResourceRejected
 		}
 		// Native planning freezes the free slot. Only root-owned identity fields
 		// are filled here; changing the slot would break the signed OAEP label.
@@ -122,7 +122,7 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 	}
 	defer s.mu.Unlock()
 	if s.agentUpdateBusy() {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	loaded, err = s.enrolled(ctx)
 	if err != nil {
@@ -140,7 +140,7 @@ func (s *Service) prepareDeviceAction(ctx context.Context, req *agentv1.PrepareD
 		return nil, errInternal
 	}
 	if _, err := s.store.AcceptDeviceAction(ctx, loaded.revision, loaded.execution.revision, record); err != nil {
-		return nil, s.serviceStoreError(err)
+		return nil, s.resourceStoreError(err)
 	}
 	return deviceActionPreparation(record), nil
 }
@@ -172,18 +172,18 @@ func (s *Service) lookupDeviceActionIntent(encoded []byte) (string, error) {
 }
 
 func (s *Service) currentDeviceActionIntent(ctx context.Context, loaded *bound, envelope []byte) (*agentv1.DeviceActionIntent, error) {
-	if err := s.serviceIdentitySession(loaded); err != nil {
+	if err := s.resourceIdentitySession(loaded); err != nil {
 		return nil, err
 	}
 	if loaded.execution.delegation == nil || s.now().Before(loaded.execution.state.GetAcceptedAt().AsTime()) {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	intent, err := loaded.execution.verifier.VerifyDeviceActionIntent(ctx, loaded.execution.root, loaded.execution.delegation, envelope, s.now())
 	if err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
 	if !deviceActionTarget(loaded, intent) {
-		return nil, errServiceRejected
+		return nil, errResourceRejected
 	}
 	return intent, nil
 }
@@ -219,7 +219,7 @@ func (s *Service) makeDeviceActionChallenge(ctx context.Context, loaded *bound, 
 	}
 	lifetime := expires.Sub(now)
 	if lifetime <= 0 || ns > math.MaxInt64-uint64(lifetime) {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	planDigest, err := digestMessage(record.GetNativePlan())
 	if err != nil {
@@ -245,14 +245,14 @@ func (s *Service) makeDeviceActionChallenge(ctx context.Context, loaded *bound, 
 func (s *Service) deviceActionDeadline(record *agentv1.DeviceActionRecord) error {
 	c := record.GetChallenge()
 	if c == nil || c.GetExecutorIncarnation() != s.incarnation || s.now().Before(c.GetIssuedAt().AsTime()) || !s.now().Before(c.GetExpiresAt().AsTime()) {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	boot, err := s.bootID()
 	if err != nil {
 		return err
 	}
 	if boot != c.GetBootId() {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	ns, err := s.boottime()
 	if err != nil {
@@ -261,7 +261,7 @@ func (s *Service) deviceActionDeadline(record *agentv1.DeviceActionRecord) error
 	lifetime := uint64(c.GetExpiresAt().AsTime().Sub(c.GetIssuedAt().AsTime()))
 	deadline := record.GetChallengeBoottimeNs()
 	if deadline < lifetime || ns < deadline-lifetime || ns >= deadline {
-		return errServiceExpired
+		return errResourceExpired
 	}
 	return nil
 }
@@ -275,7 +275,7 @@ func (s *Service) authorizeDeviceActionStart(ctx context.Context, loaded *bound,
 	}
 	grant, err := loaded.execution.verifier.VerifyDeviceActionStart(ctx, loaded.execution.root, loaded.execution.delegation, envelope, record.GetIntent(), record.GetChallenge(), s.now())
 	if err != nil {
-		return nil, serviceAuthorityError(ctx, err)
+		return nil, resourceAuthorityError(ctx, err)
 	}
 	return grant, nil
 }
@@ -317,7 +317,7 @@ func (s *Service) expireDeviceAction(ctx context.Context, loaded *bound, record 
 	}
 	if err := s.deviceActionDeadline(record); err == nil {
 		return nil
-	} else if !errors.Is(err, errServiceExpired) {
+	} else if !errors.Is(err, errResourceExpired) {
 		return err
 	}
 	next := proto.CloneOf(record)
