@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
 import {
   Table,
   TableBody,
@@ -46,24 +49,28 @@ export function ProfilesView({
 
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Resource profiles</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">These rows are catalog heads.</p>
-          <details className="text-xs text-muted-foreground">
-            <summary className="w-fit cursor-pointer py-1">Catalog scope</summary>
-            <p className="mt-2">{CATALOG_SEMANTICS}</p>
-          </details>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-            Refresh
-          </Button>
-          {canPermission(principal, "profiles.manage") ? (
-            <Button render={<Link to="/profiles/new" />}>Publish a profile</Button>
-          ) : null}
-        </div>
-      </div>
+      <PageHeader
+        title="Profiles"
+        description="Reusable resource configurations. Each row shows the latest published revision."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              disabled={list.isFetching}
+              onClick={() => void list.refetch()}
+            >
+              Refresh
+            </Button>
+            {canPermission(principal, "profiles.manage") ? (
+              <Button render={<Link to="/profiles/new" />}>Create profile</Button>
+            ) : null}
+          </>
+        }
+      />
+      <details className="text-xs text-muted-foreground">
+        <summary className="w-fit cursor-pointer py-1">Publishing and deployment</summary>
+        <p className="mt-2">{CATALOG_SEMANTICS}</p>
+      </details>
       {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
           <AlertTitle>A publish request is still open</AlertTitle>
@@ -94,12 +101,9 @@ export function ProfilesView({
         </Alert>
       ) : null}
       {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Profile list failed"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
+        <RpcError failure={failure}>
+          {list.data ? <p>The profiles below are from the last successful refresh.</p> : null}
+        </RpcError>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="profile-page-size">Page size</Label>
@@ -123,14 +127,10 @@ export function ProfilesView({
         </div>
       ) : null}
       {list.isSuccess && list.data.profiles.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          {pageToken === ""
-            ? "No resource profiles are in the catalog."
-            : "This page has no resource profiles."}
-        </p>
+        <EmptyState
+          title={pageToken === "" ? "No profiles yet" : "No profiles on this page"}
+          description="Create a profile here, then assign its published revision in Rollouts."
+        />
       ) : null}
       {list.data && list.data.profiles.length > 0 ? (
         <Table>

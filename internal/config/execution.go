@@ -15,8 +15,9 @@ import (
 // The authority store persists their original acceptance for historical replay.
 // Online plan/start private keys are a separate resource and are not stored here.
 type ExecutionBootstrap struct {
-	RootJSON []byte
-	Envelope []byte
+	RootJSON        []byte
+	Envelope        []byte
+	ReleaseRootJSON []byte
 }
 
 func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap, *trust.ExecutionVerifier, error) {
@@ -75,5 +76,5 @@ func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap
 	if err != nil {
 		return nil, nil, fmt.Errorf("execution bootstrap reuses a server TLS key: %w", err)
 	}
-	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope}, verifier, nil
+	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope, ReleaseRootJSON: verified.Bundle.GetReleaseRootJson()}, verifier, nil
 }

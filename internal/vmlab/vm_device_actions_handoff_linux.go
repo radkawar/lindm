@@ -3,15 +3,19 @@
 package vmlab
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -36,6 +40,9 @@ type actionSignedHandoffEvidence struct {
 	RequesterID          string                            `json:"requester_id"`
 	ApproverID           string                            `json:"approver_id"`
 	Method               string                            `json:"method"`
+	NVMeScope            *agentv1.NVMeSanitizeScope        `json:"approved_nvme_scope,omitempty"`
+	RecoveryReadiness    *adminv1.RecoveryReadiness        `json:"preapproval_recovery_readiness,omitempty"`
+	ReadinessRefresh     *actionDispatchEvidence           `json:"readiness_inventory_refresh,omitempty"`
 	ServerState          string                            `json:"server_state"`
 	Verification         *agentv1.DeviceActionVerification `json:"server_verified_scoped_result"`
 	PoweroffObservedAt   time.Time                         `json:"recovery_poweroff_observed_at"`
@@ -152,6 +159,9 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		return evidence, err
 	}
 	evidence.RecoveryImageSHA256, evidence.RecoveryImageSize = hex.EncodeToString(artifact.SHA256), artifact.Size
+	if err := fixture.PublishRecoveryArtifact(ctx, artifact.Path, artifact.SHA256); err != nil {
+		return evidence, fmt.Errorf("publish exact signed recovery release: %w", err)
+	}
 	evidence.PredictedPCR11SHA256 = hex.EncodeToString(artifact.PCR11SHA256)
 	evidence.ClosureSHA256, err = dispatchFileDigest(artifact.ClosurePath)
 	if err != nil {
@@ -179,15 +189,55 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	if err := waitNativeActionPresence(ctx, control.session, evidence.DeviceID); err != nil {
 		return evidence, err
 	}
+	// A service restart can resume the previous immutable inventory spool.
+	// Request a real signed refresh after changing local recovery configuration;
+	// do not confuse fresh contact with a new root readiness observation.
+	refresh := actionRequestFor(evidence.DeviceID, evidence.EnrollmentGeneration, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}})
+	evidence.ReadinessRefresh, _, err = dispatchNativeAction(ctx, vm, control.session, refresh, nil, false)
+	if err != nil {
+		return evidence, fmt.Errorf("publish reconfigured recovery readiness: %w", err)
+	}
 	media, err := trust.DeviceActionDigest(qualification.GetTarget())
 	if err != nil {
 		return evidence, err
 	}
 	sanitize := &agentv1.SanitizeAction{Target: qualification.GetTarget(), Method: method, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: artifact.SHA256, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, MediaSha256: media[:]}}
 	if bus == "nvme" {
-		sanitize.NvmeScope = &agentv1.NVMeSanitizeScope{NamespaceId: 1, ControllerWide: false}
+		topology, err := vm.run(ctx, "lsblk --json --tree --bytes --output PATH,TYPE,SIZE,WWN,SERIAL,UUID,FSTYPE", nil, 1<<20, 15*time.Second)
+		if err != nil {
+			return evidence, err
+		}
+		currentPath, err := actionWholeDiskPath(topology, qualification.GetTarget())
+		if err != nil {
+			return evidence, err
+		}
+		targetJSON, err := protojson.Marshal(qualification.GetTarget())
+		if err != nil {
+			return evidence, err
+		}
+		observed, err := vm.runResult(ctx, "sudo -n "+guestLifecycleProbe+" guest nvme-identity "+nativeQuote(currentPath), bytes.NewReader(targetJSON), 16<<10, 90*time.Second)
+		if err != nil {
+			return evidence, fmt.Errorf("observe approved native NVMe identity: %w", err)
+		}
+		if observed.ExitCode != 0 || len(observed.Stderr) != 0 {
+			// This read-only identity probe carries no key material.
+			return evidence, fmt.Errorf("observe approved native NVMe identity: exit=%d stderr=%q", observed.ExitCode, observed.Stderr)
+		}
+		scope := new(agentv1.NVMeSanitizeScope)
+		if err := protojson.Unmarshal(observed.Stdout, scope); err != nil {
+			return evidence, err
+		}
+		if err := protovalidate.Validate(scope); err != nil {
+			return evidence, err
+		}
+		sanitize.NvmeScope = scope
+		evidence.NVMeScope = proto.CloneOf(scope)
 	}
 	request := actionRequestFor(evidence.DeviceID, evidence.EnrollmentGeneration, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: sanitize}})
+	evidence.RecoveryReadiness, err = waitRecoveryReadiness(ctx, control.session, evidence.DeviceID, artifact.SHA256)
+	if err != nil {
+		return evidence, err
+	}
 	finishDiagnostics, err := observeActionGuest(ctx, vm)
 	if err != nil {
 		return evidence, err
@@ -202,6 +252,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		return evidence, err
 	}
 	evidence.ActionID = created.Msg.GetAction().GetActionId()
+	defer func() { err = diagnoseNativeAction(ctx, vm, evidence.ActionID, err) }()
 	if err := lifecycleCommand(ctx, vm, "verify signed recovery dispatch relay", "systemctl is-active --quiet lindm-agent.service"); err != nil {
 		return evidence, err
 	}
@@ -261,11 +312,40 @@ func waitOriginalRecoveryResult(ctx context.Context, owner *devlab.OwnerSession,
 		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED:
 			return status, nil
 		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED, agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED:
-			return nil, errors.New("original signed recovery action failed or expired")
+			return nil, fmt.Errorf("original signed recovery action ended %s/%s", status.GetState(), status.GetFailure())
 		}
 		select {
 		case <-ctx.Done():
-			return nil, errors.New("original signed recovery action did not produce a verified terminal result")
+			return nil, fmt.Errorf("original signed recovery action deadline at %s/%s", status.GetState(), status.GetFailure())
+		case <-ticker.C:
+		}
+	}
+}
+
+// A native observation plus authenticated release size must precede asking the
+// two humans to approve. Poll only read-only inventory publication, never an
+// approval or action mutation.
+func waitRecoveryReadiness(ctx context.Context, owner *devlab.OwnerSession, deviceID string, image []byte) (*adminv1.RecoveryReadiness, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var last *adminv1.RecoveryReadiness
+	for {
+		response, err := owner.Admin.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: deviceID, ActionKind: "sanitize", RecoveryImageSha256: image}))
+		if err != nil {
+			return last, fmt.Errorf("read recovery readiness after %s: %w", last.GetReason(), err)
+		}
+		last = response.Msg.GetRecoveryReadiness()
+		if last.GetReady() && bytes.Equal(last.GetObservation().GetConfiguredImageSha256(), image) {
+			return last, nil
+		}
+		if last.GetReason() == "device_action_esp_insufficient" {
+			return last, fmt.Errorf("recovery preapproval: %s needed=%d available=%d", last.GetReason(), last.GetNeededBytes(), last.GetAvailableBytes())
+		}
+		select {
+		case <-ctx.Done():
+			return last, fmt.Errorf("recovery readiness publication deadline: %s: %w", last.GetReason(), ctx.Err())
 		case <-ticker.C:
 		}
 	}

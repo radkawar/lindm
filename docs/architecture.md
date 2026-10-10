@@ -580,9 +580,10 @@ reduces exposure; it cannot withstand an already compromised kernel/root executo
 ### Imperative device actions and recovery custody
 
 `DeviceActionSpec` is a closed `action` oneof, separate from service desired state:
-recovery rotation, TPM2 binding, session lock, quarantine/release, LUKS crypto erase,
-and non-encrypted-media sanitization. Neither plan data nor a transport peer can
-choose an executable, shell command or unchecked block-device path. The root-owned
+recovery rotation, TPM2 binding, session lock/release, quarantine/release, restart,
+shutdown, refresh inventory, LUKS crypto erase, and non-encrypted-media sanitization.
+Neither plan data nor a transport peer can choose an executable, shell command or
+unchecked block-device path. The root-owned
 agent configuration independently qualifies native targets by LUKS UUID, serial/
 WWN and size. Unsupported topology or missing recovery qualification is a refusal,
 not a degraded success. Inventory support is necessary but not execution authority.
@@ -597,6 +598,103 @@ digest and expiry. The network process relays bytes and never spools offline sta
 Postgres migration `00008_device_actions.sql` owns action/escrow records; executor
 SQLite records own local effects. An interrupted irreversible effect is durably
 `OUTCOME_UNKNOWN`, never automatically restarted when a lease or session changes.
+
+Restart and shutdown require `remote_execution.run`; inventory refresh requires
+both `fleet.read` and `inventory.manage`, with independent device-scope checks.
+None mandates two-person approval by default; deployment approval policy still
+applies to the exact immutable request. Fresh online challenge/start authority,
+audit, replay protection and the one-open-action fence remain common. Refresh can
+repair absent or stale inventory rather than requiring an existing fresh snapshot.
+The closed action-permission registry also drives approval binding, decisions,
+inbox visibility and pending counts; new action kinds cannot require a separate
+inbox allow-list. Approval labels are scoped server projections of requester and
+approver display names (falling back to usernames) and target hostname, not
+unrestricted account/device lookups performed by the console.
+The online signing keys must themselves be delegated the exact action capability
+for both plan and start roles. Missing deployment enablement is
+`FAILED_PRECONDITION` with `device_action_capability_not_delegated`, plus
+`Lindm-Action-Capability` and `Lindm-Signer-Role` metadata, not an internal error or
+implicit grant. Disposable console/lab delegations explicitly include all closed
+device actions and service execution; production delegates remain chosen and
+quorum-signed by the offline owner.
+The console population's synthetic inventory declares zero users/sessions explicitly;
+storage, TPM and encryption availability remain unavailable rather than implying
+observed hardware or native execution proof.
+
+Power requests use the authenticated local logind D-Bus, with the root-owned
+`allow_power_actions` opt-in. Optional `delay_seconds` is bounded to 0–3600 and an
+optional printable user message to 512 characters. Immediate requests use
+`RebootWithFlags`/`PowerOffWithFlags` with root inhibitor checking; delayed requests
+use native `ScheduleShutdown`. Existing pending schedules and blocking inhibitors
+are refused rather than replaced. A supported `SetWallMessage` delivers the notice;
+the executor rechecks the unchanged grant deadline afterward, before requesting
+power. Systemd 255 does not recheck newly acquired block inhibitors when an already
+authorized schedule fires; native delay inhibitors remain effective. This is a
+[native scheduling limitation](https://www.freedesktop.org/software/systemd/man/255/org.freedesktop.login1.html),
+not an executor timer or shell fallback.
+
+Native acceptance is not completion. Restart remains `OUTCOME_UNKNOWN` until
+startup observes a boot UUID different from the signed challenge, then records
+`SUCCEEDED` with both UUID evidence and the protected consumed grant. Reopening
+the executor in the same boot cannot confirm or repeat it. This proves a later boot,
+not workload health or causal attribution of an independently initiated reboot.
+Shutdown records `outcome_unknown_until_contact`; even later contact or another
+boot is not proof that the host powered off, and the action never falsely becomes
+successful. Independent VM/power evidence is required for that claim.
+
+Refresh consumes the same fresh grant, then triggers immediate full host and
+package collection through the existing single-owner spool/upload pipeline.
+The exact granted refresh durably binds one new host sequence and one full package
+snapshot sequence on the action, without waiting for ordinary inventory cooldowns.
+Only postchallenge collections can claim those slots; stale routine admissions
+cannot spend them, and repeated new uploads or failed package attempts cannot
+borrow an unrestricted bypass. The agent first durably queues fresh full evidence,
+then supersedes older pending payloads without inventing acknowledgements or
+reusing allocated sequences. Already-fresh pending domains remain immutable.
+The server atomically retires older staging snapshots under the fresh grant,
+retaining their exact receipts and releasing bulk quota before reserving new data.
+Collection or local queuing alone cannot succeed. The server signs a separate
+publication receipt only after both bound observations have committed after action
+admission; it binds action, generation, intent/start-grant digests, host/package
+sequences and snapshot ID. Confirmation names only the action and current session:
+the server reconstructs the exact tuple from its durable admission slots, not from
+caller-selected sequences or mutable latest-host state. The executor verifies and
+journals that receipt before reporting success with `verification.inventory_sequence`.
+Receipt recovery runs before collection, so lost commit/confirmation responses
+and process restarts cannot force a second upload after the one-use slots were spent.
+
+Native NVMe sanitize approvals carry an explicit `NVMeSanitizeScope.identity`.
+The two human reviewers approve either `namespace-nid` (the observed WWN matches
+Identify Namespace NGUID/EUI-64) or `controller-serial-nsid` (namespace identifiers
+are absent or the kernel discarded them). Both bases freeze Identify Controller
+VID, SSVID, serial, model and firmware, plus namespace ID, byte size and LBA format/
+data-size shift. Controller facts come from native Identify admin ioctls, not
+sysfs strings. The latter basis requires the kernel-observed canonical
+VID/serial/model/NSID fallback WWN to agree with those native facts; it never
+invents an EUI-64 or silently relaxes namespace identity. The approved basis and
+all fields remain in the specification digest, native plan and result evidence.
+Execution re-reads the same identity immediately before the sanitize command;
+changed controller, namespace, layout or identity basis is a refusal requiring
+new approval, never an automatic downgrade. Shared-controller, unsupported
+command-scope and offline/off-target restrictions still apply independently.
+
+Signed recovery approvals require a fresh read-only readiness observation from
+the root executor, published alongside host inventory. It identifies the current
+boot and ESP UUID/path, available bytes and allocation unit, Secure Boot state and
+running UKI-capable loader. Missing, failed, stale, future-dated or wrong-boot
+evidence is unavailable, never an assumed empty or ready machine.
+
+The server obtains the exact UKI length and SHA-256 from authenticated offline
+TUF target metadata at `recovery/<sha256>.efi`, anchored by the deployment's
+verified release bootstrap and protected rollback checkpoint. Neither an action
+request nor the agent's locally configured size is release-size authority.
+Approval creation and action admission compare allocation-rounded signed length
+against observed free space and expose the needed/available byte counts. The
+native pre-start preflight and final staging copy independently recheck current
+capacity; inventory readiness is not execution authority or a space reservation.
+Insufficient capacity refuses with `device_action_esp_insufficient`. A copy race
+or other stage failure removes only its newly owned partial file and retains the
+native error; it never deletes an existing unrelated ESP file or extends a grant.
 
 Lock is a named Linux mechanism, not activation lock: the root executor calls
 logind `LockSessions` on the authenticated local system D-Bus and waits for
@@ -877,11 +975,63 @@ rows only after its existing approval, authorization-version and activation fenc
 
 Host inventory carries a bounded `inventory.v1.NativeDetails` observation alongside
 OS/boot identity. CPU, memory, storage/encryption, interfaces, firmware/Secure Boot,
-TPM, chassis/battery, logind session **counts**, local account names/UIDs/shells,
-module count, boot/uptime and package-backend/application observations each retain
-explicit collection status. Absence, denied access and collection failure are not
-successful empty measurements. Local accounts do not include password hashes, home
-contents or login history; logind does not publish session identities.
+TPM, chassis/battery, logind session counts and active sessions, local account
+names/UIDs/shells, module count, boot/uptime and package-backend/application
+observations each retain explicit collection status. Absence, denied access and
+collection failure are not successful empty measurements. Local accounts do not
+include password hashes, home contents or login history.
+
+Each network interface carries independent IPv4/IPv6 default-route observations.
+Bounded native reads of `/proc/net/route` and `/proc/net/ipv6_route` mark every
+UP, non-REJECT destination-default route interface, not a guessed first interface
+or a promise about policy routing or reachability. A valid empty table means
+successful false; missing, denied or malformed tables retain per-family failures.
+Historical records lack these fields rather than asserting no default route.
+
+Active logind sessions expose username, session class/type, seat and remote flag
+with per-field availability; only sessions whose native `Active` property is true
+are included. Collection failure is distinct from a successful empty list, and
+an absent seat is unavailable. These personal data use the existing host inventory
+admission, bounded storage and device-scoped `fleet.read` authorization, not a
+separate identity or login-history store.
+
+Admin `Device` exposes `agent_release`, `agent_protocol_version` and
+`agent_version_accepted_at` from the current generation's latest accepted signed
+session acquisition in detail, list and JSON export projections. Missing reports
+remain unreported; retired-generation reports never become current. Acceptance
+time is the server's time, not a claim of binary integrity or current liveness.
+
+Storage rows retain per-field observation status for transport, model, serial,
+firmware, WWN/EUI, partition UUID/type, filesystem UUID, and LUKS UUID/version.
+Public LUKS summaries contain keyslot/token counts and token types only: never
+keys, token payloads, salts, digests or header bytes. Unique backing-disk links
+and root ancestry come from the same bounded topology observation. Missing
+partition serial/WWN inherit only from that observed disk, while container size
+remains the container's size. Explicitly observed absent filesystem signatures
+mean no known encryption signature, not proof that arbitrary bytes are plaintext;
+missing fields and ambiguous ancestry remain unavailable.
+LUKS2 collection cross-checks the text UUID/version and public slot/token summary
+against bounded JSON metadata from the same pinned read-only descriptor. It
+retains only counts and sorted token types; disagreement invalidates the summary.
+LUKS1 has no token capability and does not invent a successful empty token list.
+
+The network process leaves storage unavailable until it receives the executor's
+bounded read-only storage observation, combined with recovery readiness over the
+authenticated local RPC. Standalone `inspect` retains the caller's privileges
+and reports denied fields rather than inventing identities. NVMe Identify reuses
+the action provider's namespace-NID or controller-serial/NSID identity basis;
+inventory never silently changes basis or grants controller-wide authority.
+
+`ListDeviceStorageTargets` applies scoped `fleet.read` before returning exact
+`StorageTarget` and optional `NVMeSanitizeScope` messages for the selected action
+kind, plus display facts, generation, host sequence and collection/receipt times.
+Only complete identities are selectable. Stale observations remain distinguishable
+from missing or historical identity fields. Creation and start revalidate against
+the latest published five-minute-fresh inventory and reject mismatched tuples;
+live-root crypto erase must cover the complete observed encrypted set. Native
+qualification, signed approval and destructive preflight remain independent
+requirements. `controller_wide` is an explicit signed human choice, not an
+inventory assertion; namespace ID and every native identity field still match.
 
 The latest accepted host sequence stores the validated canonical native-details
 protobuf in `host_observations.details`, with a 768 KiB storage ceiling. Admission
@@ -917,9 +1067,10 @@ and attributes without gaining control over label-based authorization. Flatpak
 application inventory is system-installation-only and excludes runtimes; the agent
 does not traverse employee home directories. Snap inventory is system-wide.
 
-Fleet search combines exact OS/version, all requested labels and typed attribute
-equalities, and inclusive last-seen bounds. Keyset cursors preserve enrollment/ID
-ordering and a fixed enrollment cutoff, bind actor/filter/current scope and
+Fleet search combines exact OS/version and signed-session agent release, literal
+hostname prefix, all requested labels and typed attribute equalities, and inclusive
+last-seen bounds. Keyset cursors preserve enrollment/ID ordering and a fixed
+enrollment cutoff, bind actor/filter/current scope and
 list-versus-export format, and expire after 15 minutes. They do not freeze changing
 host projections. CSV/JSON export uses the same authorization and filters, at most
 200 devices per bounded page; each page is a standalone CSV with header or JSON

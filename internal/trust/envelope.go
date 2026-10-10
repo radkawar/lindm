@@ -39,6 +39,7 @@ const (
 	DeviceActionStartType              = "application/vnd.lindm.device-action-start.v1+protobuf"
 	DeviceActionAttestationType        = "application/vnd.lindm.device-action-attestation.v1+protobuf"
 	DeviceActionEscrowReceiptType      = "application/vnd.lindm.device-action-escrow-receipt.v1+protobuf"
+	DeviceActionInventoryReceiptType   = "application/vnd.lindm.device-action-inventory-receipt.v1+protobuf"
 	DeviceActionRecoveryHandoffType    = "application/vnd.lindm.device-action-recovery-handoff.v1+protobuf"
 	DeviceActionRecoveryCredentialType = "application/vnd.lindm.device-action-recovery-credential.v1+protobuf"
 	DeviceActionRecoveryBootType       = "application/vnd.lindm.device-action-recovery-boot.v1+protobuf"
@@ -65,6 +66,7 @@ func New() (*Authority, error) {
 		&agentv1.ServiceExecutionAttestation{},
 		&agentv1.DeviceActionIntent{}, &agentv1.DeviceActionChallenge{}, &agentv1.DeviceActionStartGrant{},
 		&agentv1.DeviceActionAttestation{}, &agentv1.DeviceActionEscrowReceipt{},
+		&agentv1.DeviceActionInventoryReceipt{},
 		&agentv1.DeviceActionRecoveryHandoff{}, &agentv1.DeviceActionRecoveryCredential{}, &agentv1.DeviceActionRecoveryBootGrant{},
 		&agentv1.RecoveryRequestProof{}, &agentv1.RecoveryCheckpointReceipt{}, &agentv1.RecoveryCheckpoint{},
 		&enrollmentv1.ProvisioningRetrieval{},
@@ -124,6 +126,8 @@ func payloadType(message proto.Message) (string, error) {
 		return DeviceActionAttestationType, nil
 	case *agentv1.DeviceActionEscrowReceipt:
 		return DeviceActionEscrowReceiptType, nil
+	case *agentv1.DeviceActionInventoryReceipt:
+		return DeviceActionInventoryReceiptType, nil
 	case *agentv1.DeviceActionRecoveryHandoff:
 		return DeviceActionRecoveryHandoffType, nil
 	case *agentv1.DeviceActionRecoveryCredential:

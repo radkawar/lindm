@@ -36,12 +36,16 @@ type actionRecoveryFixture struct {
 func newActionRecoveryFixture(t *testing.T) *actionRecoveryFixture {
 	t.Helper()
 	f := newDeviceActionFixture(t)
-	target := &agentv1.StorageTarget{Serial: "isolated-original-root", SizeBytes: 1 << 30}
+	target := &agentv1.StorageTarget{Wwn: "isolated-original-root-wwn", Serial: "isolated-original-root", SizeBytes: 1 << 30}
+	f.observeStorageTargets(t, target)
+	client, imageDigest := recoveryArtifactFixture(t, []byte("signed recovery admission fixture"))
+	f.svc.recoveryArtifacts = client
+	f.observeRecoveryReadiness(t, recoveryObservationFixture(time.Now()))
 	media, err := trust.DeviceActionDigest(target)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: bytes.Repeat([]byte{7}, 32), MediaSha256: media[:], BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}}}}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: target, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_OVERWRITE, Recovery: &agentv1.RecoveryBootSpec{ImageSha256: imageDigest, MediaSha256: media[:], BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}}}}
 	request := f.request(spec)
 	f.approval(t, request)
 	f.create(t, request)
@@ -188,6 +192,15 @@ func (f *actionRecoveryFixture) resultRequest(t *testing.T, state agentv1.Device
 	request.RequestProof = f.proof(t, agentv1.RecoveryOperation_RECOVERY_OPERATION_REPORT_RESULT, recoveryResultPayload(request))
 	return request
 }
+func TestDeviceActionRecoveryWorkCarriesUnchangedCurrentTrust(t *testing.T) {
+	f := newActionRecoveryFixture(t)
+	work := f.acquire(t)
+	update := work.GetTrustUpdate()
+	if update == nil || len(update.GetRootTransitions()) != 0 || !bytes.Equal(update.GetDelegationEnvelope(), f.journal.GetDelegationEnvelope()) {
+		t.Fatal("recovery work omitted unchanged current signed authority")
+	}
+}
+
 func TestDeviceActionRecoveryDurableCheckpointReplayAndTerminal(t *testing.T) {
 	f := newActionRecoveryFixture(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)

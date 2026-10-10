@@ -83,6 +83,7 @@ type Config struct {
 	Escrow                       *escrow.Custody
 	EscrowRevealApprovalRequired bool
 	ReleasePublisher             *releaseupdate.Publisher
+	RecoveryArtifacts            *releaseupdate.Client
 	// Production composition always enables the release gate. Direct service
 	// fixtures must explicitly supply real build identity to exercise it.
 	RequireReleaseCompatibility bool
@@ -111,6 +112,7 @@ type Service struct {
 	escrow               *escrow.Custody
 	revealApproval       bool
 	releasePublisher     *releaseupdate.Publisher
+	recoveryArtifacts    *releaseupdate.Client
 	requireCompatibility bool
 	serverRelease        string
 	serverProtocol       uint32
@@ -205,11 +207,13 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.CreateDeviceActionRequest{},
 			&adminv1.GetDeviceActionsRequest{},
 			&adminv1.GetDeviceActionRequest{},
+			&adminv1.ListDeviceStorageTargetsRequest{},
 			&adminv1.GetDeviceEncryptionRequest{},
 			&adminv1.RevealRecoveryKeyRequest{},
 			&devicev1.GetDeviceActionWorkRequest{},
 			&devicev1.AuthorizeDeviceActionStartRequest{},
 			&devicev1.ReportDeviceActionResultRequest{},
+			&devicev1.ConfirmRefreshInventoryPublicationRequest{},
 			&devicev1.RegisterDeviceActionRecoveryRequest{},
 			&recoveryv1.AcquireRecoveryWorkRequest{},
 			&recoveryv1.AuthorizeRecoveryStartRequest{},
@@ -272,6 +276,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		signing:              cfg.ExecutionSigning,
 		advisories:           cfg.Advisories,
 		releasePublisher:     cfg.ReleasePublisher,
+		recoveryArtifacts:    cfg.RecoveryArtifacts,
 		requireCompatibility: cfg.RequireReleaseCompatibility,
 		serverRelease:        cfg.ServerRelease,
 		serverProtocol:       cfg.ServerProtocol,

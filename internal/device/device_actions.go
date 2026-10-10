@@ -1,9 +1,12 @@
 package device
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"errors"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -20,22 +23,7 @@ import (
 )
 
 func deviceActionPermission(spec *agentv1.DeviceActionSpec) identity.Permission {
-	if destructiveDeviceAction(spec) {
-		return identity.PermissionExecuteDestructive
-	}
-	if spec.GetEscrowRotate() != nil || spec.GetTpm2Bind() != nil {
-		return identity.PermissionManageEncryption
-	}
-	if spec.GetLockSessions() != nil {
-		return identity.PermissionLockDevice
-	}
-	if spec.GetReleaseLock() != nil {
-		return identity.PermissionReleaseLockDevice
-	}
-	if spec.GetQuarantine() != nil || spec.GetReleaseQuarantine() != nil {
-		return identity.PermissionQuarantineDevice
-	}
-	return identity.PermissionRunRemoteExecution
+	return identity.DeviceActionPermission(spec)
 }
 func destructiveDeviceAction(spec *agentv1.DeviceActionSpec) bool {
 	return spec.GetCryptoErase() != nil || spec.GetSanitize() != nil
@@ -93,9 +81,13 @@ func actionMessage(row devicedb.DeviceAction) (*adminv1.DeviceAction, error) {
 	return result, nil
 }
 
-// Inventory gates availability, not destructive authority. Exact target and native
-// capabilities are independently established by the root-owned signed preflight.
+// Inventory gates freshness and exact observed selection, not destructive
+// authority. Root-owned signed preflight independently qualifies native effects.
 func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation uuid.UUID, spec *agentv1.DeviceActionSpec, now time.Time) error {
+	// Refresh repairs missing or stale inventory; its signed start is still online.
+	if spec.GetRefreshInventory() != nil {
+		return nil
+	}
 	host, err := q.GetHostObservation(ctx, generation)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return rpcError(connect.CodeFailedPrecondition, "device_action_inventory_unavailable")
@@ -103,7 +95,7 @@ func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation
 	if err != nil {
 		return err
 	}
-	if !host.ReceivedAt.Valid || now.Sub(host.ReceivedAt.Time) > 5*time.Minute || host.ReceivedAt.Time.After(now) {
+	if !actionInventoryFresh(host, now) {
 		return rpcError(connect.CodeFailedPrecondition, "device_action_inventory_stale")
 	}
 	details := new(inventoryv1.NativeDetails)
@@ -114,10 +106,8 @@ func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation
 	if spec.GetTpm2Bind() != nil && !tpm2Available(details.GetTpm()) {
 		return rpcError(connect.CodeFailedPrecondition, "device_action_tpm2_unavailable")
 	}
-	if spec.GetEscrowRotate() != nil || spec.GetTpm2Bind() != nil || destructiveDeviceAction(spec) {
-		if details.GetStorage().GetStatus() != success || len(details.GetStorage().GetDevices()) == 0 {
-			return rpcError(connect.CodeFailedPrecondition, "device_action_storage_unavailable")
-		}
+	if err := requireObservedStorageTargets(details, spec); err != nil {
+		return err
 	}
 	if spec.GetLockSessions() != nil && details.GetSessions().GetSessions().GetStatus() != success {
 		return rpcError(connect.CodeFailedPrecondition, "device_action_sessions_unavailable")
@@ -225,4 +215,72 @@ func tpm2Available(tpm *inventoryv1.TpmDetails) bool {
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	return tpm.GetPresent().GetStatus() == success && tpm.GetPresent().GetValue() &&
 		tpm.GetVersion().GetStatus() == success && tpm.GetVersion().GetValue() == "2"
+}
+
+type refreshInventoryAdmission struct {
+	challengeIssuedAt time.Time
+	startAuthorizedAt time.Time
+}
+
+// The caller holds the device lock and claims only a new, validated collection.
+// Binding in the ingestion transaction preserves the allowance across stale
+// routine admissions and rolls it back if any later admission step fails.
+func claimRefreshInventoryAdmission(ctx context.Context, q *devicedb.Queries, deviceID, generationID uuid.UUID, sequence int64, started, received time.Time, packageSnapshot bool) (refreshInventoryAdmission, error) {
+	action, err := q.GetOpenDeviceAction(ctx, deviceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return refreshInventoryAdmission{}, nil
+	}
+	if err != nil {
+		return refreshInventoryAdmission{}, err
+	}
+	if action.GenerationID != generationID || action.Capability != "device.refresh-inventory.v1" || !action.StartAuthorizedAt.Valid || len(action.StartGrantEnvelope) == 0 {
+		return refreshInventoryAdmission{}, nil
+	}
+	if (packageSnapshot && action.InventoryPackageSequence != 0) || (!packageSnapshot && action.InventoryHostSequence != 0) {
+		return refreshInventoryAdmission{}, nil
+	}
+	challenge := new(agentv1.DeviceActionChallenge)
+	if proto.Unmarshal(action.ChallengeDocument, challenge) != nil || challenge.GetIssuedAt() == nil {
+		return refreshInventoryAdmission{}, errInternalState
+	}
+	issued := challenge.GetIssuedAt().AsTime()
+	if started.Before(issued) {
+		return refreshInventoryAdmission{}, nil
+	}
+	var claimed int64
+	if packageSnapshot {
+		claimed, err = q.ClaimDeviceActionPackageAdmission(ctx, devicedb.ClaimDeviceActionPackageAdmissionParams{ID: action.ID, Sequence: sequence})
+	} else {
+		claimed, err = q.ClaimDeviceActionHostAdmission(ctx, devicedb.ClaimDeviceActionHostAdmissionParams{ID: action.ID, Sequence: sequence, ReceivedAt: timestamptz(received)})
+	}
+	if err != nil {
+		return refreshInventoryAdmission{}, err
+	}
+	if claimed != 1 {
+		return refreshInventoryAdmission{}, errInternalState
+	}
+	return refreshInventoryAdmission{challengeIssuedAt: issued, startAuthorizedAt: action.StartAuthorizedAt.Time}, nil
+}
+
+// A configured online key is not authority for capabilities absent from the
+// operator-approved delegation. Detect that prerequisite before signing work.
+func deviceActionSignerDelegated(delegation *agentv1.ExecutionDelegation, key ed25519.PrivateKey, role agentv1.ExecutionSignerRole, capability string) bool {
+	if len(key) != ed25519.PrivateKeySize {
+		return false
+	}
+	public := key[ed25519.SeedSize:]
+	for _, delegate := range delegation.GetDelegates() {
+		if delegate.GetRole() == role && slices.Contains(delegate.GetCapabilities(), capability) && bytes.Equal(delegate.GetKey().GetPublicKey(), public) {
+			return true
+		}
+	}
+	return false
+}
+
+func deviceActionCapabilityError(capability, role string) error {
+	failure := connect.NewError(connect.CodeFailedPrecondition, errors.New("device_action_capability_not_delegated"))
+	failure.Meta().Set("Lindm-Reason", "device_action_capability_not_delegated")
+	failure.Meta().Set("Lindm-Action-Capability", capability)
+	failure.Meta().Set("Lindm-Signer-Role", role)
+	return failure
 }

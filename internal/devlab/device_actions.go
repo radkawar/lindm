@@ -20,7 +20,7 @@ import (
 
 // ConfigureDeviceActions installs private online signing and independent escrow
 // transport/wrapping keys in the owned server, with two-person reveal required.
-// The exact eight-action delegation still needs normal Admin API admission. No
+// The exact action delegation still needs normal Admin API admission. No
 // service execution or wildcard capability is granted. Call once before actions;
 // restarting preserves all accounts, sessions and the isolated database.
 func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1.UpdateExecutionTrustRequest, error) {
@@ -34,23 +34,9 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 	if document.Proto.GetEscrow() != nil || document.Proto.GetExecutionSigning() != nil {
 		return nil, errors.New("device action custody is already configured")
 	}
-	specs := []*agentv1.DeviceActionSpec{
-		{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{}}},
-		{Action: &agentv1.DeviceActionSpec_Tpm2Bind{Tpm2Bind: &agentv1.TPM2BindAction{}}},
-		{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}},
-		{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{}}},
-		{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{}}},
-		{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{}}},
-		{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{}}},
-		{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{}}},
-	}
-	capabilities := make([]string, 0, len(specs))
-	for _, spec := range specs {
-		capability, err := trust.DeviceActionCapability(spec)
-		if err != nil {
-			return nil, err
-		}
-		capabilities = append(capabilities, capability)
+	capabilities, err := deviceActionCapabilities()
+	if err != nil {
+		return nil, err
 	}
 	keys, err := createExecutionTrustExercise(ctx, f.repository, capabilities)
 	if err != nil {
@@ -95,4 +81,31 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 		return nil, err
 	}
 	return keys.Initial, nil
+}
+
+// Keep disposable console and native action lanes on the same exact capability
+// registry. Production authority remains explicitly supplied by its offline owner.
+func deviceActionCapabilities() ([]string, error) {
+	specs := []*agentv1.DeviceActionSpec{
+		{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: &agentv1.EscrowRotateAction{}}},
+		{Action: &agentv1.DeviceActionSpec_Tpm2Bind{Tpm2Bind: &agentv1.TPM2BindAction{}}},
+		{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}},
+		{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{}}},
+		{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{}}},
+		{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{}}},
+		{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{}}},
+		{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{}}},
+		{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{}}},
+		{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}},
+		{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}},
+	}
+	capabilities := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		capability, err := trust.DeviceActionCapability(spec)
+		if err != nil {
+			return nil, err
+		}
+		capabilities = append(capabilities, capability)
+	}
+	return capabilities, nil
 }

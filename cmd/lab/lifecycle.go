@@ -36,6 +36,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	serviceExecution := flags.Bool("service-execution", false, "exercise packaged signed service execution and retained journal evidence; implies execution-trust")
 	controlPlaneTrust := flags.Bool("control-plane-trust", false, "exercise isolated real control-plane authority and automatic installed agent trust synchronization")
 	lindmd := flags.String("lindmd", "", "prebuilt current lindmd binary (required with -control-plane-trust)")
+	localAuthority := flags.Bool("local-authority", false, "use isolated local authority with -control-plane-trust instead of Keycloak")
 	record := flags.String("record", "", "write successful lifecycle evidence to a new private file")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
@@ -94,7 +95,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: *probe, RedHatTokenFile: *redhatToken, First: first, Second: second, APT: apt, Arch: arch, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution, ControlPlaneTrust: *controlPlaneTrust, LindmdBinary: *lindmd})
+	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: *probe, RedHatTokenFile: *redhatToken, First: first, Second: second, APT: apt, Arch: arch, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution, ControlPlaneTrust: *controlPlaneTrust, LindmdBinary: *lindmd, LocalAuthority: *localAuthority})
 	if err != nil {
 		return err
 	}

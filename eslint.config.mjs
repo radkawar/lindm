@@ -20,6 +20,24 @@ export default defineConfig([
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/[\\u2013\\u2014]/]",
+          message:
+            "Use sentence-case console copy with commas, colons or periods, not long dashes.",
+        },
+        {
+          selector: "TemplateElement[value.cooked=/[\\u2013\\u2014]/]",
+          message:
+            "Use sentence-case console copy with commas, colons or periods, not long dashes.",
+        },
+        {
+          selector: "JSXText[value=/[\\u2013\\u2014]/]",
+          message:
+            "Use sentence-case console copy with commas, colons or periods, not long dashes.",
+        },
+      ],
     },
   },
   {

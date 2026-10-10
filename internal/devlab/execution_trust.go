@@ -38,7 +38,19 @@ type ExecutionTrustExercise struct {
 }
 
 func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result *ExecutionTrustExercise, err error) {
-	return createExecutionTrustExercise(ctx, repoRoot, []string{"systemd.service.v1"})
+	capabilities, err := defaultExecutionCapabilities()
+	if err != nil {
+		return nil, err
+	}
+	return createExecutionTrustExercise(ctx, repoRoot, capabilities)
+}
+
+func defaultExecutionCapabilities() ([]string, error) {
+	actions, err := deviceActionCapabilities()
+	if err != nil {
+		return nil, err
+	}
+	return append(actions, "systemd.service.v1"), nil
 }
 
 func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabilities []string) (result *ExecutionTrustExercise, err error) {

@@ -22,17 +22,18 @@ const (
 type nvmeController struct {
 	serial, model, firmware string
 	id, oacs                uint16
+	vid, ssvid              uint16
 	cmic, fna               byte
 	sanicap, namespaces     uint32
 	digest                  [sha256.Size]byte
 }
 
 type nvmeNamespace struct {
-	size   uint64
-	lbaf   byte
-	nguid  [16]byte
-	eui64  [8]byte
-	digest [sha256.Size]byte
+	size        uint64
+	lbaf, shift byte
+	nguid       [16]byte
+	eui64       [8]byte
+	digest      [sha256.Size]byte
 }
 
 type nvmeSanitizeStatus struct {
@@ -46,7 +47,7 @@ func nvmeASCII(data []byte) (string, error) {
 			return "", fmt.Errorf("%w: nvme_identity_encoding", ErrUnsupported)
 		}
 	}
-	value := strings.TrimSpace(string(data))
+	value := strings.TrimRight(string(data), " ")
 	if value == "" {
 		return "", fmt.Errorf("%w: nvme_identity_absent", ErrUnsupported)
 	}
@@ -67,6 +68,11 @@ func parseNVMeController(data []byte) (nvmeController, error) {
 	}
 	if result.firmware, err = nvmeASCII(data[64:72]); err != nil {
 		return result, err
+	}
+	result.vid = binary.LittleEndian.Uint16(data[0:2])
+	result.ssvid = binary.LittleEndian.Uint16(data[2:4])
+	if result.vid == 0 {
+		return result, fmt.Errorf("%w: nvme_vendor_identity_absent", ErrUnsupported)
 	}
 	result.cmic = data[76]
 	result.id = binary.LittleEndian.Uint16(data[78:80])
@@ -96,24 +102,21 @@ func parseNVMeNamespace(data []byte) (nvmeNamespace, error) {
 		return result, fmt.Errorf("%w: nvme_namespace_layout", ErrUnsupported)
 	}
 	format := data[128+int(result.lbaf)*4 : 132+int(result.lbaf)*4]
-	shift := format[2]
-	if binary.LittleEndian.Uint16(format[:2]) != 0 || shift < 9 || shift > 12 {
+	result.shift = format[2]
+	if binary.LittleEndian.Uint16(format[:2]) != 0 || result.shift < 9 || result.shift > 12 {
 		return result, fmt.Errorf("%w: nvme_lba_layout", ErrUnsupported)
 	}
 	blocks := binary.LittleEndian.Uint64(data[:8])
 	capacity := binary.LittleEndian.Uint64(data[8:16])
-	if blocks == 0 || capacity == 0 || capacity > blocks || blocks > (uint64(1)<<63-1)>>shift {
+	if blocks == 0 || capacity == 0 || capacity > blocks || blocks > (uint64(1)<<63-1)>>result.shift {
 		return result, fmt.Errorf("%w: nvme_namespace_capacity", ErrUnsupported)
 	}
-	result.size = blocks << shift
+	result.size = blocks << result.shift
 	if result.size < 4096 {
 		return result, ErrUnsupported
 	}
 	copy(result.nguid[:], data[104:120])
 	copy(result.eui64[:], data[120:128])
-	if result.nguid == [16]byte{} && result.eui64 == [8]byte{} {
-		return result, fmt.Errorf("%w: nvme_namespace_identity_absent", ErrUnsupported)
-	}
 	// NUSE and FPI are mutable operation counters, not identity/layout. Clear
 	// precisely those bytes in the canonical hash so post-erase readback binds
 	// the same namespace despite changed utilization/progress counters.
@@ -133,6 +136,13 @@ func (n nvmeNamespace) matchesWWN(wwn string) bool {
 	// the distinct namespace-identification-descriptor implementation; refuse it.
 	return n.nguid != [16]byte{} && wwn == "eui."+hex.EncodeToString(n.nguid[:]) ||
 		n.eui64 != [8]byte{} && wwn == "eui."+hex.EncodeToString(n.eui64[:])
+}
+
+func (c nvmeController) fallbackWWN(nsid uint32) string {
+	// Linux drivers/nvme/host/sysfs.c:wwid_show uses this only when no NID
+	// survives the kernel's namespace-identifier checks. Derive it from native
+	// Identify bytes, never a controller pathname or sysfs identity lookup.
+	return fmt.Sprintf("nvme.%04x-%x-%x-%08x", c.vid, c.serial, c.model, nsid)
 }
 
 func parseNVMeNamespaceList(data []byte) ([]uint32, error) {

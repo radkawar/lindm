@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { newRequestId } from "@/lib/ids";
@@ -28,14 +30,10 @@ export function RolloutsView() {
   const principal = usePrincipal();
   return (
     <section className="grid min-w-0 gap-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Rollouts and resource targets</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Assign immutable profile revisions to devices or existing groups. Preview captures an
-          exact device-generation snapshot; activation is a separate audited operation. Rollout
-          selection, pause and promotion do not prove native application or compliance.
-        </p>
-      </header>
+      <PageHeader
+        title="Rollouts"
+        description="Assign profile revisions to devices and groups. Preview device resources before activation. Rollout progress does not confirm device compliance."
+      />
       <TargetPreviewView />
       {canPermission(principal, "resources.assign", true) ? (
         <>
@@ -44,8 +42,8 @@ export function RolloutsView() {
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Global assignment and rollout administration requires unrestricted resource assignment
-          permission. Device-scoped preview and activation remain subject to server authorization.
+          Managing assignments and rollouts requires unrestricted resource assignment permission.
+          You can preview and activate devices within your authorized scope.
         </p>
       )}
     </section>
@@ -106,7 +104,9 @@ function Assignments() {
                   <p className="text-sm">
                     Revision {candidate.revision.toString()} · priority{" "}
                     {candidate.assignment.priority} ·{" "}
-                    {candidate.assignment.disabled ? "Disabled" : "Enabled"}
+                    <StatusBadge status={candidate.assignment.disabled ? "neutral" : "info"}>
+                      {candidate.assignment.disabled ? "Disabled" : "Enabled"}
+                    </StatusBadge>
                   </p>
                   <details>
                     <summary className="cursor-pointer text-sm">
@@ -156,8 +156,7 @@ function Rollouts() {
       <CardHeader>
         <CardTitle>Rollout rings</CardTitle>
         <CardDescription>
-          Define deterministic cohorts, cumulative percentages, canary/observation minima, soak and
-          health-age limits. Server health gates remain authoritative.
+          Deploy in stages with canary devices, observation periods and health requirements.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
@@ -216,7 +215,9 @@ function RolloutCard({ state }: { state: RolloutState }) {
       <p className="text-sm">
         Revision {state.revision.toString()} · ring{" "}
         {rollout.rings[state.ringIndex]?.name ?? "Not recorded"} ·{" "}
-        {state.paused ? "Paused" : "Running"}
+        <StatusBadge status={state.paused ? "warning" : "info"}>
+          {state.paused ? "Paused" : "Running"}
+        </StatusBadge>
       </p>
       {state.pauseReason ? <p className="text-sm">Pause reason: {state.pauseReason}</p> : null}
       <p className="text-sm">

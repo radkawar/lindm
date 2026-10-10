@@ -1,17 +1,20 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { isUnauthenticated } from "@/lib/errors";
+import { isUnauthenticated, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import {
   CreateAccountRequestSchema,
@@ -45,13 +48,13 @@ export function Accounts() {
   const [scopes, setScopes] = useState<DeviceScope[]>([]);
   const [enrollment, setEnrollment] = useState<AccountEnrollment | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<RpcFailure | null>(null);
   const csrf = session.data?.csrfToken ?? "";
 
   async function perform(action: () => Promise<AccountEnrollment | void>) {
     if (busy || !csrf || lifetime.signal.aborted) return;
     setBusy(true);
-    setError("");
+    setError(null);
     setEnrollment(null);
     try {
       const result = await action();
@@ -67,8 +70,13 @@ export function Accounts() {
       if (!lifetime.signal.aborted) {
         if (isUnauthenticated(failure))
           await client.invalidateQueries({ queryKey: sessionQueryKey });
+        // Account responses can contain enrollment secrets. Keep decoder errors out of diagnostics.
         setError(
-          "Account operation failed. Refresh the account list before trying again; the operation may have completed.",
+          toRpcFailure(
+            failure instanceof ConnectError
+              ? failure
+              : new ConnectError("Account change could not be confirmed.", Code.Unknown),
+          ),
         );
       }
     } finally {
@@ -94,24 +102,23 @@ export function Accounts() {
 
   return (
     <section className="grid min-w-0 gap-6" aria-busy={accounts.isFetching || busy}>
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Local administrator accounts</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Authorized account managers can create, disable, change roles or reset authenticators.
+      <PageHeader
+        title="Local accounts"
+        description="Manage administrator access, roles and authenticators."
+      />
+      <details className="text-xs text-muted-foreground">
+        <summary className="w-fit cursor-pointer py-1">Authenticator resets</summary>
+        <p className="mt-2">
+          Resetting revokes access and requires a new password and authenticator enrollment.
         </p>
-        <details className="text-xs text-muted-foreground">
-          <summary className="w-fit cursor-pointer py-1">Authenticator reset requirements</summary>
-          <p className="mt-2">
-            Reset revokes access and requires new password and WebAuthn enrollment.
-          </p>
-        </details>
-      </header>
+      </details>
       <IdentitySettings />
       {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Account operation not confirmed</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <RpcError failure={error}>
+          {error.ambiguous ? (
+            <p>Refresh the account list before trying again. The change may have completed.</p>
+          ) : null}
+        </RpcError>
       ) : null}
       {busy ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm text-muted-foreground">
@@ -190,18 +197,15 @@ export function Accounts() {
         </div>
       ) : null}
       {accounts.isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Accounts unavailable</AlertTitle>
-          <AlertDescription>Unable to load accounts.</AlertDescription>
-        </Alert>
+        <RpcError failure={toRpcFailure(accounts.error)}>
+          {accounts.data ? <p>The accounts below are from the last successful refresh.</p> : null}
+        </RpcError>
       ) : null}
-      {accounts.data?.accounts.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No local administrator accounts.
-        </p>
+      {!accounts.isError && accounts.data?.accounts.length === 0 ? (
+        <EmptyState
+          title="No local accounts"
+          description="Create an account to grant console access."
+        />
       ) : null}
       <div className="grid min-w-0 gap-4">
         {accounts.data?.accounts.map((account) => (
@@ -268,13 +272,15 @@ function AccountEditor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="break-words font-semibold">{account.username}</h2>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={account.enabled ? "secondary" : "outline"}>
+          <StatusBadge status={account.enabled ? "success" : "neutral"}>
             {account.enabled ? "Enabled" : "Disabled"}
-          </Badge>
-          <Badge variant="outline">
+          </StatusBadge>
+          <StatusBadge status={account.enrolled ? "success" : "warning"}>
             {account.enrolled ? "Authenticator enrolled" : "Awaiting enrollment"}
-          </Badge>
-          {account.breakGlass ? <Badge variant="destructive">Break-glass owner</Badge> : null}
+          </StatusBadge>
+          {account.breakGlass ? (
+            <StatusBadge status="warning">Break-glass owner</StatusBadge>
+          ) : null}
         </div>
       </div>
       <label className="grid gap-2 text-sm font-medium">

@@ -1,6 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
+import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +26,8 @@ export function LocalForm({
   const [secret, setSecret] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<RpcFailure | null>(null);
+  const [notice, setNotice] = useState("");
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
 
@@ -34,7 +37,8 @@ export function LocalForm({
     const controller = new AbortController();
     active.current = controller;
     setBusy(true);
-    setError("");
+    setError(null);
+    setNotice("");
     try {
       if (
         !window.isSecureContext ||
@@ -42,7 +46,8 @@ export function LocalForm({
         typeof PublicKeyCredential.parseCreationOptionsFromJSON !== "function" ||
         typeof PublicKeyCredential.parseRequestOptionsFromJSON !== "function"
       ) {
-        throw new Error("Use a current browser supporting WebAuthn JSON over HTTPS.");
+        setNotice("Use a current browser with WebAuthn support over HTTPS.");
+        return;
       }
       const challenge = enrollment
         ? await beginEnrollment(
@@ -80,7 +85,11 @@ export function LocalForm({
       await onSuccess();
     } catch (failure) {
       if (!controller.signal.aborted) {
-        setError(failure instanceof Error ? failure.message : "Authentication failed.");
+        if (failure instanceof DOMException && failure.name === "NotAllowedError") {
+          setNotice("Authenticator verification was not completed. Try again when you are ready.");
+        } else {
+          setError(toRpcFailure(failure));
+        }
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -151,12 +160,13 @@ export function LocalForm({
           ? "Set your password, then register a security key or passkey with user verification. Enrollment does not sign you in."
           : "After your password is accepted, verify with your registered security key or passkey."}
       </p>
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>{enrollment ? "Enrollment failed" : "Sign-in failed"}</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+      {notice ? (
+        <Alert>
+          <AlertTitle>Authenticator required</AlertTitle>
+          <AlertDescription>{notice}</AlertDescription>
         </Alert>
       ) : null}
+      {error ? <RpcError failure={error} /> : null}
       <Button type="submit" disabled={busy}>
         {busy ? "Waiting for authenticator…" : enrollment ? "Enroll account" : "Sign in locally"}
       </Button>

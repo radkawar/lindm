@@ -1,12 +1,14 @@
 import {
   CryptoEraseMode,
   DeviceActionState,
+  NvmeIdentityBasis,
   RecoveryBootMode,
   SanitizeMethod,
   type DeviceActionSpec,
   type DeviceActionVerification,
   type StorageTarget,
 } from "../../../gen/lindm/agent/v1/device_actions_pb";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Fact } from "./observations";
 
 export type DeviceActionKind = NonNullable<DeviceActionSpec["action"]["case"]>;
@@ -17,8 +19,11 @@ export const actionLabels: Record<DeviceActionKind, string> = {
   releaseLock: "Release owned account lock",
   quarantine: "Quarantine network",
   releaseQuarantine: "Release quarantine",
-  cryptoErase: "Crypto erase",
+  cryptoErase: "Wipe encrypted storage",
   sanitize: "Sanitize offline unencrypted disk",
+  restart: "Restart device",
+  shutdown: "Shut down device",
+  refreshInventory: "Refresh inventory",
 };
 export const actionPermissions: Record<DeviceActionKind, string> = {
   escrowRotate: "encryption.manage",
@@ -29,28 +34,31 @@ export const actionPermissions: Record<DeviceActionKind, string> = {
   releaseQuarantine: "actions.quarantine",
   cryptoErase: "destructive.execute",
   sanitize: "destructive.execute",
+  restart: "remote_execution.run",
+  shutdown: "remote_execution.run",
+  refreshInventory: "inventory.manage",
 };
 export const actionStateLabels: Record<DeviceActionState, string> = {
   [DeviceActionState.UNSPECIFIED]: "No protected result",
-  [DeviceActionState.PREPARED]: "Prepared — not started",
-  [DeviceActionState.QUEUED]: "Start accepted — not completed",
-  [DeviceActionState.RUNNING]: "Running — outcome not yet known",
+  [DeviceActionState.PREPARED]: "Prepared, not started",
+  [DeviceActionState.QUEUED]: "Start accepted, not completed",
+  [DeviceActionState.RUNNING]: "Running, outcome not yet known",
   [DeviceActionState.SUCCEEDED]: "Verified by device",
   [DeviceActionState.FAILED]: "Failed",
-  [DeviceActionState.OUTCOME_UNKNOWN]: "OUTCOME UNKNOWN — do not repeat effects",
+  [DeviceActionState.OUTCOME_UNKNOWN]: "Outcome unknown, do not repeat effects",
   [DeviceActionState.EXPIRED]: "Expired",
   [DeviceActionState.AWAITING_ESCROW]: "Awaiting durable escrow receipt / local credential",
-  [DeviceActionState.RETIRING_ESCROW]: "Retiring old managed slot — outcome not yet known",
+  [DeviceActionState.RETIRING_ESCROW]: "Retiring old managed slot, outcome not yet known",
 };
 
 export const sanitizeMethodLabels: Record<SanitizeMethod, string> = {
   [SanitizeMethod.UNSPECIFIED]: "Unsupported / unspecified",
   [SanitizeMethod.OVERWRITE]: "Overwrite rotational media with sampling",
   [SanitizeMethod.DISCARD]: "Qualified zero-after-discard with sampling",
-  [SanitizeMethod.NVME_FORMAT_USER_DATA]: "NVMe Format — user-data erase",
-  [SanitizeMethod.NVME_FORMAT_CRYPTO_ERASE]: "NVMe Format — cryptographic erase",
-  [SanitizeMethod.NVME_SANITIZE_BLOCK_ERASE]: "NVMe Sanitize — block erase",
-  [SanitizeMethod.NVME_SANITIZE_CRYPTO_ERASE]: "NVMe Sanitize — cryptographic erase",
+  [SanitizeMethod.NVME_FORMAT_USER_DATA]: "NVMe format: user-data erase",
+  [SanitizeMethod.NVME_FORMAT_CRYPTO_ERASE]: "NVMe format: cryptographic erase",
+  [SanitizeMethod.NVME_SANITIZE_BLOCK_ERASE]: "NVMe sanitize: block erase",
+  [SanitizeMethod.NVME_SANITIZE_CRYPTO_ERASE]: "NVMe sanitize: cryptographic erase",
 };
 export const sanitizeMethods = [
   SanitizeMethod.OVERWRITE,
@@ -89,7 +97,7 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
           <p>
             Execution mode:{" "}
             {action.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER
-              ? "Live-root header erasure — complete frozen volume set; unconditional power-off"
+              ? "Live-root header erasure: complete frozen volume set; unconditional power-off"
               : action.value.mode === CryptoEraseMode.OFFLINE
                 ? "Offline exact-volume erasure"
                 : "Unsupported / unspecified mode"}
@@ -111,20 +119,36 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
             <span className="break-all font-mono">{action.value.escrowKeyId}</span>
           </Fact>
           <Fact label="Retire old lindm-owned slot">
-            {action.value.retireKeyslot ?? "None — preserve old slots"}
+            {action.value.retireKeyslot ?? "None: preserve old slots"}
           </Fact>
         </dl>
       ) : null}
       {action.case === "tpm2Bind" ? <p>PCR policy: {action.value.pcrs.join(", ")}</p> : null}
+      {action.case === "restart" || action.case === "shutdown" ? (
+        <dl className="grid gap-2 text-sm">
+          <Fact label="Delay (seconds)">{action.value.delaySeconds ?? "Not specified"}</Fact>
+          <Fact label="User notification">{action.value.message || "None"}</Fact>
+          <Fact label="Completion evidence">
+            {action.case === "restart"
+              ? "A new boot must be observed before restart is confirmed."
+              : "Native acceptance does not prove power-off. Loss of contact remains an unknown outcome."}
+          </Fact>
+        </dl>
+      ) : null}
+      {action.case === "refreshInventory" ? (
+        <p>
+          Collect and publish a new full inventory snapshot. Collection alone is not completion.
+        </p>
+      ) : null}
       {action.case === "lockSessions" ? (
         <dl className="grid gap-2 text-sm">
           <Fact label="Terminate interactive sessions">
-            {action.value.terminateSessions ? "Yes — unsaved work may be lost" : "No — lock only"}
+            {action.value.terminateSessions ? "Yes: unsaved work may be lost" : "No: lock only"}
           </Fact>
           <Fact label="Disable local login">
             {action.value.allHumanAccounts
               ? "All eligible local human accounts"
-              : action.value.usernames.join(", ") || "None — session lock only"}
+              : action.value.usernames.join(", ") || "None: session lock only"}
           </Fact>
           <Fact label="Protected accounts">
             Root and the device&apos;s root-owned protected-account list are always excluded.
@@ -148,10 +172,48 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
       ) : null}
       {action.case === "sanitize" && action.value.nvmeScope ? (
         <dl className="grid gap-2 text-sm">
+          <Fact label="Approved NVMe identity basis">
+            <strong>
+              {action.value.nvmeScope.identity?.basis === NvmeIdentityBasis.NAMESPACE_NID
+                ? "Namespace NID (NGUID/EUI-64)"
+                : action.value.nvmeScope.identity?.basis ===
+                    NvmeIdentityBasis.CONTROLLER_SERIAL_NSID
+                  ? "Controller serial + namespace ID (namespace identifiers absent or rejected by kernel)"
+                  : "Not specified"}
+            </strong>
+          </Fact>
+          {action.value.nvmeScope.identity ? (
+            <>
+              <Fact label="Approved vendor ID (VID, decimal)">
+                {action.value.nvmeScope.identity.vendorId}
+              </Fact>
+              <Fact label="Approved subsystem vendor ID (SSVID, decimal)">
+                {action.value.nvmeScope.identity.subsystemVendorId}
+              </Fact>
+              <Fact label="Approved controller serial">
+                {action.value.nvmeScope.identity.controllerSerial}
+              </Fact>
+              <Fact label="Approved controller model">
+                {action.value.nvmeScope.identity.controllerModel}
+              </Fact>
+              <Fact label="Approved controller firmware">
+                {action.value.nvmeScope.identity.controllerFirmware}
+              </Fact>
+              <Fact label="Approved namespace size (bytes)">
+                {action.value.nvmeScope.identity.namespaceSizeBytes.toString()}
+              </Fact>
+              <Fact label="Approved LBA format index">
+                {action.value.nvmeScope.identity.lbaFormat}
+              </Fact>
+              <Fact label="Approved LBA data size shift (LBADS)">
+                {action.value.nvmeScope.identity.lbaDataSizeShift}
+              </Fact>
+            </>
+          ) : null}
           <Fact label="Exact NVMe namespace ID">{action.value.nvmeScope.namespaceId}</Fact>
           <Fact label="Approved command scope">
             {action.value.nvmeScope.controllerWide
-              ? "Controller-wide — all qualified namespaces affected"
+              ? "Entire controller: all qualified namespaces affected"
               : "Selected namespace only"}
           </Fact>
         </dl>
@@ -201,22 +263,27 @@ export function CryptoEraseVerificationView({
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <Fact label="Header extent (bytes)">{result.headerBytes.toString()}</Fact>
             <Fact label="Native luksErase">
-              {result.nativeLuksErase ? "Confirmed" : "Not confirmed"}
+              <StatusBadge status={result.nativeLuksErase ? "success" : "warning"}>
+                {result.nativeLuksErase ? "Confirmed" : "Not confirmed"}
+              </StatusBadge>
             </Fact>
             <Fact label="Raw zero verification">
-              {result.rawZeroVerified ? "Confirmed" : "Not confirmed"}
+              <StatusBadge status={result.rawZeroVerified ? "success" : "warning"}>
+                {result.rawZeroVerified ? "Confirmed" : "Not confirmed"}
+              </StatusBadge>
             </Fact>
             <Fact label="LUKS metadata absent">
-              {result.metadataAbsent ? "Confirmed" : "Not confirmed"}
+              <StatusBadge status={result.metadataAbsent ? "success" : "warning"}>
+                {result.metadataAbsent ? "Confirmed" : "Not confirmed"}
+              </StatusBadge>
             </Fact>
             <Fact label="Evidence">{result.evidence || "Not reported"}</Fact>
           </dl>
         </div>
       ))}
       <p className="text-sm text-muted-foreground">
-        Only server-accepted, nonce-bound proof for every frozen member can establish aggregate
-        completion. Local header destruction does not delete server escrow, backups, or active
-        volume keys before power-off.
+        Completion requires accepted, nonce-bound results for every selected volume. Erasing local
+        headers leaves server escrow and backups intact; active volume keys remain until power-off.
       </p>
     </div>
   );
@@ -235,7 +302,9 @@ export function NativeSanitizeVerificationView({
       <h4 className="font-semibold">Native NVMe sanitation evidence</h4>
       <dl className="grid gap-2 text-sm sm:grid-cols-2">
         <Fact label="Command completed">
-          {native.nativeCommandCompleted ? "Confirmed" : "Not confirmed"}
+          <StatusBadge status={native.nativeCommandCompleted ? "success" : "warning"}>
+            {native.nativeCommandCompleted ? "Confirmed" : "Not confirmed"}
+          </StatusBadge>
         </Fact>
         <Fact label="Controller serial / model">
           {scope ? `${scope.controllerSerial} / ${scope.controllerModel}` : "Not reported"}

@@ -18,7 +18,9 @@ import (
 
 func TestDeviceActionLiveRootAggregateRequiresVolatileExactProof(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	targets := []*agentv1.StorageTarget{{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}, {LuksUuid: uuid.NewString(), SizeBytes: 2 << 30}}
+	targets := []*agentv1.StorageTarget{fixtureStorageTarget(uuid.NewString()), fixtureStorageTarget(uuid.NewString())}
+	targets[1].SizeBytes = 2 << 30
+	f.observeStorageTargets(t, targets...)
 	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: targets}}}
 	request := f.request(spec)
 	f.approval(t, request)

@@ -60,6 +60,10 @@ func TestDeviceScopeReadMatrix(t *testing.T) {
 			_, err := f.svc.GetDeviceActions(ctx, connect.NewRequest(&adminv1.GetDeviceActionsRequest{DeviceId: id}))
 			return err
 		}},
+		{"ListDeviceStorageTargets", func(ctx context.Context, id string) error {
+			_, err := f.svc.ListDeviceStorageTargets(ctx, connect.NewRequest(&adminv1.ListDeviceStorageTargetsRequest{DeviceId: id, ActionKind: "sanitize"}))
+			return err
+		}},
 	}
 	for _, role := range []string{"owner", "admin", "operator", "helpdesk", "auditor"} {
 		for _, reader := range readers {

@@ -18,28 +18,10 @@ func nativeWipeScenarios(ctx context.Context, manifest *labv1.ImageManifest, opt
 	}
 	defer func() { err = finishDiagnostics(err) }()
 	result.WipePhase = options.WipePhase
-	result.DesktopBefore, err = waitActionDesktop(ctx, machine.vm, false)
-	if err != nil {
-		return err
-	}
-	request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}})
-	result.Lock, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
-	if err != nil {
-		return err
-	}
-	result.DesktopAfter, err = waitActionDesktop(ctx, machine.vm, true)
-	if err != nil {
-		return err
-	}
-	request = actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{LockActionId: result.Lock.ActionID}}})
-	result.LockRelease, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
-	if err != nil {
+	if err = nativeLockScenarios(ctx, machine, control, result); err != nil {
 		return err
 	}
 	if err = nativeQuarantineScenarios(ctx, machine, control, result); err != nil {
-		return err
-	}
-	if err := nativeAccountLockScenarios(ctx, machine, control, result); err != nil {
 		return err
 	}
 	offline, err := nativeOfflineDenial(ctx, machine.vm, control.session, machine.deviceID, machine.generation)

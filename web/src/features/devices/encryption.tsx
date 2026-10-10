@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -16,14 +17,16 @@ import {
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
-import { DeviceActionForm } from "./action-form";
-import { StorageTargetView } from "./action-display";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { actionLabels, actionPermissions, StorageTargetView } from "./action-display";
 import { deviceActionsQueryOptions, deviceEncryptionQueryOptions } from "./action-queries";
 import { Fact, ObservedTime } from "./observations";
-import { RecoveryKeyReveal } from "./recovery-reveal";
 
 export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const [luksUuid, setLuksUuid] = useState("");
   const [volumePageToken, setVolumePageToken] = useState("");
   const history = useQuery(deviceActionsQueryOptions(lifetime, deviceId, volumePageToken));
@@ -85,19 +88,17 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
           />
           <details className="text-sm text-muted-foreground">
             <summary className="cursor-pointer font-medium">
-              Changing volume dismisses a displayed recovery key.
+              Where these volume choices come from
             </summary>
             <p className="mt-2">
               Choices come from real encryption records and this page of action history. Browse
-              older action records to find other managed volumes; changing volume dismisses a
-              displayed recovery key.
+              older action records to find other managed volumes.
             </p>
           </details>
           {historyFailure ? (
-            <p role="alert" className="text-destructive">
-              Volume history unavailable: {historyFailure.message}. Only volumes identified by the
-              current encryption response can be selected.
-            </p>
+            <RpcError failure={historyFailure} title="Volume history unavailable">
+              <p>Only volumes identified by the current encryption response can be selected.</p>
+            </RpcError>
           ) : null}
           <div className="flex gap-2">
             <Button
@@ -120,14 +121,7 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
           Refresh encryption and escrow
         </Button>
         {query.isPending ? <p role="status">Loading encryption custody…</p> : null}
-        {failure ? (
-          <Alert variant="destructive">
-            <AlertTitle>
-              {failure.denied ? "Encryption access denied" : "Encryption status unavailable"}
-            </AlertTitle>
-            <AlertDescription>{failure.message}</AlertDescription>
-          </Alert>
-        ) : null}
+        {failure ? <RpcError failure={failure} /> : null}
         {observed ? (
           <>
             <h3 className="font-semibold">
@@ -139,13 +133,17 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
               </Fact>
               <Fact label="Last action preflight">
                 {observed.supported ? "Supported for its exact action" : "Unsupported"}
-                {observed.reason ? ` — ${observed.reason}` : ""}
+                {observed.reason ? `: ${observed.reason}` : ""}
               </Fact>
               <Fact label="Encrypted target">
-                {observed.encrypted ? "Yes" : "No (this observation only)"}
+                <StatusBadge status={observed.encrypted ? "success" : "warning"}>
+                  {observed.encrypted ? "Encrypted" : "Not encrypted (this observation only)"}
+                </StatusBadge>
               </Fact>
               <Fact label="TPM 2.0 bound">
-                {observed.tpm2Bound ? "Yes" : "No (this observation only)"}
+                <StatusBadge status={observed.tpm2Bound ? "success" : "neutral"}>
+                  {observed.tpm2Bound ? "Bound" : "Not bound (this observation only)"}
+                </StatusBadge>
               </Fact>
               <Fact label="lindm-owned keyslots">
                 {observed.lindmKeyslots.length
@@ -209,7 +207,7 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
             <h3 className="font-semibold">
               {luksUuid
                 ? "Recovery escrow for selected volume"
-                : "Latest recovery escrow — exact LUKS volume"}
+                : "Latest recovery escrow for an exact LUKS volume"}
             </h3>
             <dl className="grid gap-3 sm:grid-cols-2">
               <Fact label="Escrow action">
@@ -221,16 +219,20 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
                 <ObservedTime value={escrow.storedAt} server />
               </Fact>
               <Fact label="Old managed-slot retirement">
-                {escrow.retirementConfirmed
-                  ? "Confirmed"
-                  : "Not confirmed — custody is not completed rotation"}
+                <StatusBadge status={escrow.retirementConfirmed ? "success" : "warning"}>
+                  {escrow.retirementConfirmed ? "Confirmed" : "Not confirmed"}
+                </StatusBadge>
               </Fact>
             </dl>
-            <RecoveryKeyReveal
-              key={`${lifetime.generation}:${deviceId}:${luksUuid}:${escrow.actionId}`}
-              deviceId={deviceId}
-              actionId={escrow.actionId}
-            />
+            {canPermission(principal, "recovery_keys.read") ? (
+              <Link
+                to="/devices/$deviceId/recovery/$actionId"
+                params={{ deviceId, actionId: escrow.actionId }}
+                className="w-fit text-sm underline"
+              >
+                Reveal recovery key
+              </Link>
+            ) : null}
           </>
         ) : data ? (
           <details className="text-sm">
@@ -242,12 +244,30 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
             </p>
           </details>
         ) : null}
-        <DeviceActionForm
-          key={`${lifetime.generation}:${deviceId}:${luksUuid}`}
-          deviceId={deviceId}
-          mode="encryption"
-          selectedLuksUuid={luksUuid}
-        />
+        <div className="flex flex-wrap gap-4">
+          {(["escrowRotate", "tpm2Bind"] as const)
+            .filter((kind) => canPermission(principal, actionPermissions[kind]))
+            .map((kind) => (
+              <Link
+                key={kind}
+                to="/devices/$deviceId/actions/new/$kind"
+                params={{ deviceId, kind }}
+                search={{ luksUuid }}
+                className="text-sm underline"
+              >
+                {actionLabels[kind]}
+              </Link>
+            ))}
+          {canPermission(principal, "device.revoke") ? (
+            <Link
+              to="/devices/$deviceId/recovery-enrollment"
+              params={{ deviceId }}
+              className="text-sm underline"
+            >
+              Recover device enrollment
+            </Link>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

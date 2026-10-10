@@ -164,6 +164,8 @@ type DeviceActionProviderConfig struct {
 	// Root is always protected, even when omitted here. Keep break-glass and
 	// administrator login paths in this root-owned list.
 	ProtectedAccounts []string `protobuf:"bytes,12,rep,name=protected_accounts,json=protectedAccounts,proto3" json:"protected_accounts,omitempty"`
+	// Explicit native logind restart/shutdown opt-in; not remote authority.
+	AllowPowerActions bool `protobuf:"varint,13,opt,name=allow_power_actions,json=allowPowerActions,proto3" json:"allow_power_actions,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -280,6 +282,13 @@ func (x *DeviceActionProviderConfig) GetProtectedAccounts() []string {
 		return x.ProtectedAccounts
 	}
 	return nil
+}
+
+func (x *DeviceActionProviderConfig) GetAllowPowerActions() bool {
+	if x != nil {
+		return x.AllowPowerActions
+	}
+	return false
 }
 
 type QualifiedActionTarget struct {
@@ -636,7 +645,7 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x0fspool_directory\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0espoolDirectory\x12S\n" +
 	"\x0faction_provider\x18\x06 \x01(\v2*.lindm.agent.v1.DeviceActionProviderConfigR\x0eactionProvider\x12G\n" +
 	"\rrecovery_boot\x18\a \x01(\v2\".lindm.agent.v1.RecoveryBootConfigR\frecoveryBoot\x12;\n" +
-	"\aupdates\x18\b \x01(\v2!.lindm.agent.v1.AgentUpdateConfigR\aupdates\"\xe1\x05\n" +
+	"\aupdates\x18\b \x01(\v2!.lindm.agent.v1.AgentUpdateConfigR\aupdates\"\x91\x06\n" +
 	"\x1aDeviceActionProviderConfig\x12I\n" +
 	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
 	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +
@@ -651,7 +660,8 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x16allow_recovery_handoff\x18\n" +
 	" \x01(\bR\x14allowRecoveryHandoff\x12,\n" +
 	"\x12allow_account_lock\x18\v \x01(\bR\x10allowAccountLock\x12_\n" +
-	"\x12protected_accounts\x18\f \x03(\tB0\xbaH-\x92\x01*\x10\x80\x01\x18\x01\"#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\x11protectedAccounts\"\x9f\x04\n" +
+	"\x12protected_accounts\x18\f \x03(\tB0\xbaH-\x92\x01*\x10\x80\x01\x18\x01\"#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\x11protectedAccounts\x12.\n" +
+	"\x13allow_power_actions\x18\r \x01(\bR\x11allowPowerActions\"\x9f\x04\n" +
 	"\x15QualifiedActionTarget\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
 	"\x16owner_recovery_keyslot\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\x14ownerRecoveryKeyslot\x126\n" +

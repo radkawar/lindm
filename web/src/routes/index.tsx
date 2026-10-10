@@ -1,6 +1,8 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { RpcError } from "@/components/ui/rpc-error";
+import { toRpcFailure } from "@/lib/errors";
 import { SignIn } from "@/features/auth/sign-in";
 import { sessionQueryOptions } from "@/features/auth/queries";
 
@@ -20,9 +22,11 @@ function HomeRoute() {
   if (session.isError) {
     return (
       <main className="mx-auto max-w-md p-8">
-        <Alert variant="destructive">
-          <AlertDescription>{session.error.message}</AlertDescription>
-        </Alert>
+        <RpcError failure={toRpcFailure(session.error)}>
+          <Button variant="outline" onClick={() => void session.refetch()}>
+            Retry session check
+          </Button>
+        </RpcError>
       </main>
     );
   }

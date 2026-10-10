@@ -97,6 +97,45 @@ func TestEncryptedUnlockSerialRejectsRepeatedPrompt(t *testing.T) {
 	}
 }
 
+func TestEncryptedUnlockSerialRejectsFailureWithoutRepeatedPrompt(t *testing.T) {
+	for _, message := range []string{
+		"No key available with this passphrase.",
+		"Failed to activate with specified passphrase. (Passphrase incorrect?)",
+	} {
+		t.Run(message, func(t *testing.T) {
+			host, guest := net.Pipe()
+			defer func() { _ = host.Close(); _ = guest.Close() }()
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				if _, err := io.WriteString(guest, "Please enter passphrase for disk fixture: "); err != nil {
+					done <- err
+					return
+				}
+				if _, err := io.ReadFull(guest, make([]byte, len("wrong-key\r"))); err != nil {
+					done <- err
+					return
+				}
+				for _, part := range []string{message[:len(message)/2], message[len(message)/2:]} {
+					if _, err := io.WriteString(guest, part); err != nil {
+						done <- err
+						return
+					}
+				}
+				done <- nil
+			}()
+			seen, err := unlockEncryptedSerial(ctx, host, "wrong-key")
+			if !seen || err == nil || err.Error() != "encrypted boot rejected unlock secret" {
+				t.Fatalf("expected explicit passphrase rejection, seen=%v err=%v", seen, err)
+			}
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestEncryptedPromptDoesNotMatchLogin(t *testing.T) {
 	for _, text := range []string{"lindm-lab login:", "Password:", "Enter your password:", "systemd-ask-password: service starting"} {
 		if encryptedUnlockPrompt(text) {

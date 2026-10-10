@@ -7,13 +7,13 @@ import {
   type RevealRecoveryKeyRequest,
 } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { validateInventory } from "./validation";
@@ -21,9 +21,11 @@ import { validateInventory } from "./validation";
 export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; actionId: string }) {
   const lifetime = useAuthLifetime();
   const [reason, setReason] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [approvalId, setApprovalId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState("");
+  const [failure, setFailure] = useState<RpcFailure | null>(null);
+  const [notice, setNotice] = useState("");
   const [approvalState, setApprovalState] = useState<ApprovalState | null>(null);
   const [ambiguous, setAmbiguous] = useState<"reveal" | "approval" | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
@@ -69,6 +71,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
 
   function capture() {
     if (!request.current) {
+      if (confirmation !== deviceId)
+        throw new Error("Type the exact device ID to confirm recovery-key access.");
       const payload = create(RevealRecoveryKeyRequestSchema, {
         requestId: newRequestId(),
         deviceId,
@@ -92,7 +96,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
       lifetime.signal.aborted
     )
       return;
-    setFailure("");
+    setFailure(null);
+    setNotice("");
     try {
       const payload = capture();
       inFlight.current = true;
@@ -117,10 +122,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
         const result = toRpcFailure(error);
         setAmbiguous(result.ambiguous ? "approval" : null);
-        setFailure(
-          `${result.ambiguous ? "Approval delivery unknown. Retry the exact approval request. " : ""}${result.message}`,
-        );
-        toast.error(
+        setFailure(result);
+        toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
           result.ambiguous ? "Approval delivery unknown" : "Recovery approval request failed",
           {
             description: "Review the inline result and captured request before continuing.",
@@ -144,7 +147,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
     )
       return;
     hide();
-    setFailure("");
+    setFailure(null);
+    setNotice("");
     try {
       const payload = capture();
       inFlight.current = true;
@@ -169,12 +173,16 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
         )
       ) {
         response.recoveryKey.fill(0);
-        setFailure("Recovery key has an unsupported encoding; no key was displayed.");
+        setFailure(
+          toRpcFailure(
+            new Error("Recovery key has an unsupported encoding; no key was displayed."),
+          ),
+        );
         return;
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         response.recoveryKey.fill(0);
-        setFailure(
+        setNotice(
           "The response arrived while this page was hidden; the recovery key was dismissed.",
         );
         return;
@@ -188,10 +196,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
       if (!controller.signal.aborted && !lifetime.signal.aborted) {
         const result = toRpcFailure(error);
         setAmbiguous(result.ambiguous ? "reveal" : null);
-        setFailure(
-          `${result.ambiguous ? "Delivery unknown. Retry keeps the exact request; no new reveal is issued automatically. " : ""}${result.message}`,
-        );
-        toast.error(
+        setFailure(result);
+        toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
           result.ambiguous ? "Recovery key delivery unknown" : "Recovery key request failed",
           {
             description: "Review the inline result and captured request before continuing.",
@@ -206,11 +212,14 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
 
   return (
     <div className="grid gap-3 rounded-md border p-3">
-      <p className="text-sm">
-        Recovery-key access requires its dedicated permission, an audit reason, and recent step-up
-        authentication. A policy may also require approval. The key is dismissed after 30 seconds,
-        on blur, or on navigation; browser memory cannot be guaranteed erased.
-      </p>
+      <details className="text-sm text-muted-foreground">
+        <summary className="cursor-pointer">Recovery access requirements</summary>
+        <p className="mt-2">
+          Access requires its dedicated permission, an audit reason, and recent step-up
+          authentication. A policy may require approval. The key is dismissed after 30 seconds, on
+          blur, or on navigation; browser memory cannot be guaranteed erased.
+        </p>
+      </details>
       <Label htmlFor={`reveal-reason-${actionId}`}>Recovery-key access reason</Label>
       <Textarea
         id={`reveal-reason-${actionId}`}
@@ -220,6 +229,19 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
       />
       <Label htmlFor={`reveal-approval-${actionId}`}>Approval receipt ID</Label>
       <Input id={`reveal-approval-${actionId}`} value={approvalId} readOnly autoComplete="off" />
+      <Label htmlFor={`reveal-confirmation-${actionId}`}>
+        Type the device ID to confirm access
+      </Label>
+      <Input
+        id={`reveal-confirmation-${actionId}`}
+        value={confirmation}
+        onChange={(event) => setConfirmation(event.target.value)}
+        readOnly={busy || request.current !== null}
+        autoComplete="off"
+      />
+      <p className="text-sm text-muted-foreground">
+        This reveals a sensitive recovery key for the exact escrow action shown above.
+      </p>
       {approvalState !== null ? (
         <p>
           Last observed approval: {ApprovalState[approvalState]}.{" "}
@@ -228,11 +250,11 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
           </Link>
         </p>
       ) : null}
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>Recovery key not revealed</AlertTitle>
-          <AlertDescription>{failure}</AlertDescription>
-        </Alert>
+      {failure ? <RpcError failure={failure} title="Recovery key not revealed" /> : null}
+      {notice ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {notice}
+        </p>
       ) : null}
       <div className="flex gap-2">
         <Button
@@ -261,7 +283,8 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
               request.current = null;
               setApprovalId("");
               setApprovalState(null);
-              setFailure("");
+              setFailure(null);
+              setNotice("");
             }}
           >
             Prepare different access request

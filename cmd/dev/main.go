@@ -30,7 +30,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   recreate-database  DESTROY only lindm, terminate its connections, reprovision,
          migrate and bootstrap. Requires -confirm-delete; preserves other databases.
 
-Options: -root <repository> (default .), -timeout <duration> (default 10m).
+Options: -root <repository> (default .), -timeout <duration> (default 10m;
+40m for test-integration).
 Init/up accept -authentication local|keycloak (default keycloak). A fixture's mode
 is immutable. Local mode does not start or contact an IdP.
 Reset and recreate-database accept -confirm-delete. Requires Linux, Go, Docker
@@ -63,7 +64,14 @@ func run() error {
 	}
 	flags := flag.NewFlagSet(verb, flag.ContinueOnError)
 	root := flags.String("root", ".", "repository root")
-	timeout := flags.Duration("timeout", 10*time.Minute, "overall command deadline")
+	// The integration suite runs every package under -race against real
+	// PostgreSQL with a 15-minute per-binary deadline, so its overall deadline
+	// must exceed that; lab operations keep the shorter default.
+	defaultTimeout := 10 * time.Minute
+	if verb == "test-integration" {
+		defaultTimeout = 40 * time.Minute
+	}
+	timeout := flags.Duration("timeout", defaultTimeout, "overall command deadline")
 	var confirm bool
 	authentication := "keycloak"
 	if verb == "init" || verb == "up" {

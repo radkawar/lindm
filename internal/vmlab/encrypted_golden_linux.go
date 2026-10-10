@@ -116,6 +116,9 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
+	if opts.RequireCachedGolden {
+		return nil, errors.New("pinned encrypted golden is absent; provision it explicitly with lab vm encrypted before read-only inspection")
+	}
 	verified, err := (Fetcher{}).Fetch(ctx, m, opts.CacheDir)
 	if err != nil {
 		return nil, err

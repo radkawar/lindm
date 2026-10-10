@@ -1,5 +1,5 @@
 import { DeviceState } from "../../../gen/lindm/admin/v1/admin_pb";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const labels: Record<DeviceState, string> = {
   [DeviceState.UNSPECIFIED]: "Not reported",
@@ -11,19 +11,19 @@ const labels: Record<DeviceState, string> = {
 
 export function DeviceLifecycleBadge({ state }: { state: DeviceState }) {
   return (
-    <Badge
-      variant={
+    <StatusBadge
+      dot
+      status={
         state === DeviceState.ACTIVE
           ? "success"
           : state === DeviceState.REVOKED
             ? "destructive"
             : state === DeviceState.PENDING || state === DeviceState.RECOVERY_HOLD
               ? "warning"
-              : "outline"
+              : "neutral"
       }
     >
-      <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
       {labels[state] ?? "Unknown state"}
-    </Badge>
+    </StatusBadge>
   );
 }

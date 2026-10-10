@@ -111,6 +111,10 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return fmt.Errorf("initialize release repository: %w", err)
 	}
+	recoveryArtifacts, err := newRecoveryArtifacts(resources)
+	if err != nil {
+		return fmt.Errorf("initialize recovery artifact verification: %w", err)
+	}
 	devices, err := device.New(pool, device.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
@@ -123,6 +127,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		Escrow:                       resources.Escrow,
 		EscrowRevealApprovalRequired: resources.EscrowRevealApprovalRequired,
 		ReleasePublisher:             releasePublisher,
+		RecoveryArtifacts:            recoveryArtifacts,
 		ServerRelease:                buildinfo.Current().Version,
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
@@ -189,6 +194,8 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		adminMux.Handle(path, auth.RequireSession(handler))
 	}
 	path, handler = devices.EnrollmentHandler()
+	adminMux.Handle(path, handler)
+	path, handler = devices.RecoveryHandler()
 	adminMux.Handle(path, handler)
 	adminMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

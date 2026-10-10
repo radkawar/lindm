@@ -151,7 +151,11 @@ SELECT
     d.host_received_at,
     d.package_attempt_received_at,
     d.snapshot_received_at,
-    g.current_snapshot_id
+    g.current_snapshot_id,
+    coalesce(r.agent_release, '')::text AS agent_release,
+    coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
+    r.reported_at AS agent_version_accepted_at
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
 WHERE d.id = sqlc.arg('id');

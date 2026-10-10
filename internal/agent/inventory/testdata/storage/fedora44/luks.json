@@ -1,0 +1,8 @@
+{
+  "keyslots": {
+    "0": {
+      "type": "luks2"
+    }
+  },
+  "tokens": {}
+}

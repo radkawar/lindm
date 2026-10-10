@@ -113,13 +113,13 @@ func TestStorageEncryptionAndNetworkBoundaries(t *testing.T) {
 	if storage.Status != success || len(storage.Devices) != 4 {
 		t.Fatalf("storage: %v", storage)
 	}
-	for i, want := range []string{"", "luks", "dm-crypt", "inherited-dm-crypt"} {
+	for i, want := range []string{"none", "luks", "dm-crypt", "inherited-dm-crypt"} {
 		if storage.Devices[i].Encryption.Value != want {
 			t.Fatalf("encryption %d: %v", i, storage.Devices[i])
 		}
 	}
-	if storage.Devices[0].Encryption.Status != unavailable {
-		t.Fatal("missing filesystem must not imply unencrypted")
+	if storage.Devices[0].Encryption.Status != success {
+		t.Fatal("explicit null signature must remain distinct from an omitted source field")
 	}
 	for _, data := range []string{`{}`, `{"blockdevices":null}`, `{"blockdevices":[{"name":"sda","type":"disk","size":-1}]}`, `{"blockdevices":[]} {}`} {
 		if got := parseStorage(strings.NewReader(data)); got.Status != invalid || len(got.Devices) != 0 {
@@ -157,15 +157,15 @@ func TestApplicationsAndSessionCounts(t *testing.T) {
 	if got := parseApplications(strings.NewReader(strings.Repeat("a\t1\tx86_64\n", 2049)), "flatpak"); got.Status != capacity || len(got.Applications) != 0 {
 		t.Fatalf("app limit: %v", got)
 	}
-	count, status := parseSessionCount(strings.NewReader(`{"type":"a(uso)","data":[[[1000,"private-user","/org/freedesktop/login1/user/_1000"]]]}`), "a(uso)")
-	if status != success || count != 1 {
-		t.Fatalf("session count: %d %v", count, status)
+	rows, status := parseSessionRows(strings.NewReader(`{"type":"a(uso)","data":[[[1000,"private-user","/org/freedesktop/login1/user/_1000"]]]}`), "a(uso)")
+	if status != success || len(rows) != 1 {
+		t.Fatalf("session count: %d %v", len(rows), status)
 	}
-	count, status = parseSessionCount(strings.NewReader(`{"type":"a(susso)","data":[[]]}`), "a(susso)")
-	if status != success || count != 0 {
-		t.Fatalf("real empty sessions: %d %v", count, status)
+	rows, status = parseSessionRows(strings.NewReader(`{"type":"a(susso)","data":[[]]}`), "a(susso)")
+	if status != success || len(rows) != 0 {
+		t.Fatalf("real empty sessions: %d %v", len(rows), status)
 	}
-	_, status = parseSessionCount(strings.NewReader(`{"type":"a(uso)","data":[[["bad","user","/path"]]]}`), "a(uso)")
+	_, status = parseSessionRows(strings.NewReader(`{"type":"a(uso)","data":[[["bad","user","/path"]]]}`), "a(uso)")
 	if status != invalid {
 		t.Fatalf("malformed D-Bus UID: %v", status)
 	}
@@ -313,7 +313,7 @@ func TestNativeFailuresDiscardPartialDetails(t *testing.T) {
 		}
 		return commandFailure
 	}
-	if got := collectStorage(context.Background(), run); got.Status != commandFailure || len(got.Devices) != 0 {
+	if got := collectStorage(context.Background(), detailSources{run: run}); got.Status != commandFailure || len(got.Devices) != 0 {
 		t.Fatalf("partial storage: %v", got)
 	}
 	if got := collectNetwork(context.Background(), run); got.Status != commandFailure || len(got.Interfaces) != 0 {

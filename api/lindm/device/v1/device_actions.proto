@@ -21,6 +21,8 @@ message DeviceActionWork {
   bool recovery_handoff = 7;
   bytes recovery_credential_envelope = 8 [(buf.validate.field).bytes.max_len = 65536];
   bytes recovery_boot_grant_envelope = 9 [(buf.validate.field).bytes.max_len = 65536];
+  // Durable publication proof lets the executor resolve a lost refresh response.
+  bytes inventory_receipt_envelope = 10 [(buf.validate.field).bytes.max_len = 16384];
 }
 message GetDeviceActionWorkRequest {
   uint64 session_epoch = 1 [(buf.validate.field).uint64 = {

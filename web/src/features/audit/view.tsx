@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -36,31 +38,22 @@ export function AuditView({
 
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Audit</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Local append history for this deployment.
-          </p>
-          <details className="text-xs text-muted-foreground">
-            <summary className="w-fit cursor-pointer py-1">Audit limitations</summary>
-            <p className="mt-2">
-              It is not an external tamper-proof trail. Secrets are not recorded here.
-            </p>
-          </details>
-        </div>
-        <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
-          Refresh
-        </Button>
-      </div>
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Audit list failed"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      <PageHeader
+        title="Audit"
+        description="Local append history for this deployment."
+        actions={
+          <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
+            Refresh
+          </Button>
+        }
+      />
+      <details className="text-xs text-muted-foreground">
+        <summary className="w-fit cursor-pointer py-1">Audit limitations</summary>
+        <p className="mt-2">
+          This is not an external tamper-proof trail. Secrets are not recorded here.
+        </p>
+      </details>
+      {failure ? <RpcError failure={failure} /> : null}
       <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="audit-page-size">Page size</Label>
         <SelectField
@@ -85,12 +78,9 @@ export function AuditView({
         </div>
       ) : null}
       {list.isSuccess && list.data.events.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          {pageToken === "" ? "No audit events are recorded." : "This page has no audit events."}
-        </p>
+        <EmptyState
+          title={pageToken === "" ? "No audit events recorded" : "No audit events on this page"}
+        />
       ) : null}
       {list.data && list.data.events.length > 0 ? (
         <Table>
@@ -127,7 +117,7 @@ export function AuditView({
                     {event.actorId.trim() || "Unknown actor"}
                   </TableCell>
                   <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                    {event.reason.trim() || "—"}
+                    {event.reason.trim() || "Not recorded"}
                   </TableCell>
                 </TableRow>
               );

@@ -12,6 +12,47 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimDeviceActionHostAdmission = `-- name: ClaimDeviceActionHostAdmission :execrows
+UPDATE device_actions SET inventory_host_sequence = $1, inventory_host_received_at = $2
+WHERE id = $3 AND inventory_host_sequence = 0 AND closed_at IS NULL
+AND capability = 'device.refresh-inventory.v1' AND start_authorized_at IS NOT NULL
+`
+
+type ClaimDeviceActionHostAdmissionParams struct {
+	Sequence   int64
+	ReceivedAt pgtype.Timestamptz
+	ID         uuid.UUID
+}
+
+// Admission slots bind the first fresh collection, even when the routine limiter
+// would admit it. The caller holds the device/action locks in the ingestion tx.
+func (q *Queries) ClaimDeviceActionHostAdmission(ctx context.Context, arg ClaimDeviceActionHostAdmissionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimDeviceActionHostAdmission, arg.Sequence, arg.ReceivedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const claimDeviceActionPackageAdmission = `-- name: ClaimDeviceActionPackageAdmission :execrows
+UPDATE device_actions SET inventory_package_sequence = $1
+WHERE id = $2 AND inventory_package_sequence = 0 AND closed_at IS NULL
+AND capability = 'device.refresh-inventory.v1' AND start_authorized_at IS NOT NULL
+`
+
+type ClaimDeviceActionPackageAdmissionParams struct {
+	Sequence int64
+	ID       uuid.UUID
+}
+
+func (q *Queries) ClaimDeviceActionPackageAdmission(ctx context.Context, arg ClaimDeviceActionPackageAdmissionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimDeviceActionPackageAdmission, arg.Sequence, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeDeviceAction = `-- name: CloseDeviceAction :exec
 UPDATE device_actions SET closed_at = $1, closed_reason = $2 WHERE id = $3
 `
@@ -49,7 +90,7 @@ func (q *Queries) ExpireDeviceActionQuarantine(ctx context.Context, deviceID uui
 }
 
 const getDeviceAction = `-- name: GetDeviceAction :one
-SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope FROM device_actions WHERE id = $1
+SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions WHERE id = $1
 `
 
 func (q *Queries) GetDeviceAction(ctx context.Context, id uuid.UUID) (DeviceAction, error) {
@@ -86,6 +127,11 @@ func (q *Queries) GetDeviceAction(ctx context.Context, id uuid.UUID) (DeviceActi
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
@@ -109,8 +155,43 @@ func (q *Queries) GetDeviceActionEscrow(ctx context.Context, actionID uuid.UUID)
 	return i, err
 }
 
+const getDeviceActionInventoryPublication = `-- name: GetDeviceActionInventoryPublication :one
+SELECT s.id AS snapshot_id, s.sequence AS package_sequence,
+       a.inventory_host_sequence AS host_sequence,
+       greatest(s.committed_at, a.inventory_host_received_at)::timestamptz AS published_at
+FROM device_actions a
+JOIN package_snapshots s ON s.generation_id = a.generation_id
+    AND s.device_id = a.device_id AND s.sequence = a.inventory_package_sequence
+WHERE a.id = $1
+  AND a.inventory_host_sequence > 0
+  AND a.inventory_host_received_at >= a.start_authorized_at
+  AND s.state IN ('committed', 'superseded')
+  AND s.committed_at >= a.start_authorized_at
+`
+
+type GetDeviceActionInventoryPublicationRow struct {
+	SnapshotID      uuid.UUID
+	PackageSequence int64
+	HostSequence    int64
+	PublishedAt     pgtype.Timestamptz
+}
+
+// Admission claims prove postchallenge collection. The host receipt is retained
+// on the action because the latest host observation can be overwritten later.
+func (q *Queries) GetDeviceActionInventoryPublication(ctx context.Context, actionID uuid.UUID) (GetDeviceActionInventoryPublicationRow, error) {
+	row := q.db.QueryRow(ctx, getDeviceActionInventoryPublication, actionID)
+	var i GetDeviceActionInventoryPublicationRow
+	err := row.Scan(
+		&i.SnapshotID,
+		&i.PackageSequence,
+		&i.HostSequence,
+		&i.PublishedAt,
+	)
+	return i, err
+}
+
 const getDeviceActionRequest = `-- name: GetDeviceActionRequest :one
-SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope FROM device_actions WHERE request_id = $1
+SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions WHERE request_id = $1
 `
 
 func (q *Queries) GetDeviceActionRequest(ctx context.Context, requestID uuid.UUID) (DeviceAction, error) {
@@ -147,6 +228,11 @@ func (q *Queries) GetDeviceActionRequest(ctx context.Context, requestID uuid.UUI
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
@@ -171,7 +257,7 @@ func (q *Queries) GetDeviceActionRestriction(ctx context.Context, deviceID uuid.
 }
 
 const getOpenDeviceAction = `-- name: GetOpenDeviceAction :one
-SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope FROM device_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDATE
+SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDATE
 `
 
 func (q *Queries) GetOpenDeviceAction(ctx context.Context, deviceID uuid.UUID) (DeviceAction, error) {
@@ -208,6 +294,11 @@ func (q *Queries) GetOpenDeviceAction(ctx context.Context, deviceID uuid.UUID) (
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
@@ -293,7 +384,7 @@ func (q *Queries) InsertDeviceActionEscrow(ctx context.Context, arg InsertDevice
 }
 
 const latestDeviceActionEscrow = `-- name: LatestDeviceActionEscrow :one
-SELECT a.id, a.device_id, a.generation_id, a.capability, a.luks_uuids, a.request_id, a.request_digest, a.request_document, a.actor_id, a.authorization_version, a.approval_id, a.intent_envelope, a.intent_document, a.issued_at, a.expires_at, a.challenge_proof, a.challenge_document, a.start_grant_envelope, a.start_authorized_at, a.outcome_unknown, a.closed_at, a.closed_reason, a.result_nonce, a.nonce_expires_at, a.action_revision, a.attestation_envelope, a.attestation_certificate, a.status_document, a.received_at, a.escrow_receipt_envelope FROM device_actions a JOIN device_action_escrow e ON e.action_id = a.id
+SELECT a.id, a.device_id, a.generation_id, a.capability, a.luks_uuids, a.request_id, a.request_digest, a.request_document, a.actor_id, a.authorization_version, a.approval_id, a.intent_envelope, a.intent_document, a.issued_at, a.expires_at, a.challenge_proof, a.challenge_document, a.start_grant_envelope, a.start_authorized_at, a.outcome_unknown, a.closed_at, a.closed_reason, a.result_nonce, a.nonce_expires_at, a.action_revision, a.attestation_envelope, a.attestation_certificate, a.status_document, a.received_at, a.escrow_receipt_envelope, a.inventory_receipt_envelope, a.inventory_receipt_document, a.inventory_host_sequence, a.inventory_host_received_at, a.inventory_package_sequence FROM device_actions a JOIN device_action_escrow e ON e.action_id = a.id
 JOIN devices d ON d.id = a.device_id AND d.current_generation_id = a.generation_id
 WHERE a.device_id = $1 AND ($2::uuid IS NULL OR a.luks_uuids @> ARRAY[$2::uuid])
 ORDER BY e.committed_at DESC, a.id DESC LIMIT 1
@@ -338,12 +429,17 @@ func (q *Queries) LatestDeviceActionEscrow(ctx context.Context, arg LatestDevice
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
 
 const latestDeviceActionObservation = `-- name: LatestDeviceActionObservation :one
-SELECT a.id, a.device_id, a.generation_id, a.capability, a.luks_uuids, a.request_id, a.request_digest, a.request_document, a.actor_id, a.authorization_version, a.approval_id, a.intent_envelope, a.intent_document, a.issued_at, a.expires_at, a.challenge_proof, a.challenge_document, a.start_grant_envelope, a.start_authorized_at, a.outcome_unknown, a.closed_at, a.closed_reason, a.result_nonce, a.nonce_expires_at, a.action_revision, a.attestation_envelope, a.attestation_certificate, a.status_document, a.received_at, a.escrow_receipt_envelope FROM device_actions a JOIN devices d ON d.id = a.device_id AND d.current_generation_id = a.generation_id
+SELECT a.id, a.device_id, a.generation_id, a.capability, a.luks_uuids, a.request_id, a.request_digest, a.request_document, a.actor_id, a.authorization_version, a.approval_id, a.intent_envelope, a.intent_document, a.issued_at, a.expires_at, a.challenge_proof, a.challenge_document, a.start_grant_envelope, a.start_authorized_at, a.outcome_unknown, a.closed_at, a.closed_reason, a.result_nonce, a.nonce_expires_at, a.action_revision, a.attestation_envelope, a.attestation_certificate, a.status_document, a.received_at, a.escrow_receipt_envelope, a.inventory_receipt_envelope, a.inventory_receipt_document, a.inventory_host_sequence, a.inventory_host_received_at, a.inventory_package_sequence FROM device_actions a JOIN devices d ON d.id = a.device_id AND d.current_generation_id = a.generation_id
 WHERE a.device_id = $1 AND octet_length(a.status_document) > 0
 AND ($2::uuid IS NULL OR a.luks_uuids @> ARRAY[$2::uuid])
 AND a.capability IN ('device.escrow-rotate.v1', 'device.tpm2-bind.v1', 'device.crypto-erase.v1', 'device.sanitize.v1')
@@ -389,12 +485,17 @@ func (q *Queries) LatestDeviceActionObservation(ctx context.Context, arg LatestD
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
 
 const listDeviceActions = `-- name: ListDeviceActions :many
-SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope FROM device_actions
+SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions
 WHERE device_id = $1
 AND (NOT $2::boolean OR (issued_at, id) < ($3::timestamptz, $4::uuid))
 ORDER BY issued_at DESC, id DESC LIMIT $5
@@ -454,6 +555,11 @@ func (q *Queries) ListDeviceActions(ctx context.Context, arg ListDeviceActionsPa
 			&i.StatusDocument,
 			&i.ReceivedAt,
 			&i.EscrowReceiptEnvelope,
+			&i.InventoryReceiptEnvelope,
+			&i.InventoryReceiptDocument,
+			&i.InventoryHostSequence,
+			&i.InventoryHostReceivedAt,
+			&i.InventoryPackageSequence,
 		); err != nil {
 			return nil, err
 		}
@@ -495,7 +601,7 @@ func (q *Queries) ListDeviceEscrowedVolumes(ctx context.Context, deviceID uuid.U
 }
 
 const lockDeviceAction = `-- name: LockDeviceAction :one
-SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope FROM device_actions WHERE id = $1 FOR UPDATE
+SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockDeviceAction(ctx context.Context, id uuid.UUID) (DeviceAction, error) {
@@ -532,6 +638,11 @@ func (q *Queries) LockDeviceAction(ctx context.Context, id uuid.UUID) (DeviceAct
 		&i.StatusDocument,
 		&i.ReceivedAt,
 		&i.EscrowReceiptEnvelope,
+		&i.InventoryReceiptEnvelope,
+		&i.InventoryReceiptDocument,
+		&i.InventoryHostSequence,
+		&i.InventoryHostReceivedAt,
+		&i.InventoryPackageSequence,
 	)
 	return i, err
 }
@@ -588,6 +699,21 @@ func (q *Queries) SetDeviceActionGrant(ctx context.Context, arg SetDeviceActionG
 		arg.StartAuthorizedAt,
 		arg.ID,
 	)
+	return err
+}
+
+const setDeviceActionInventoryReceipt = `-- name: SetDeviceActionInventoryReceipt :exec
+UPDATE device_actions SET inventory_receipt_envelope = $1, inventory_receipt_document = $2 WHERE id = $3
+`
+
+type SetDeviceActionInventoryReceiptParams struct {
+	InventoryReceiptEnvelope []byte
+	InventoryReceiptDocument []byte
+	ID                       uuid.UUID
+}
+
+func (q *Queries) SetDeviceActionInventoryReceipt(ctx context.Context, arg SetDeviceActionInventoryReceiptParams) error {
+	_, err := q.db.Exec(ctx, setDeviceActionInventoryReceipt, arg.InventoryReceiptEnvelope, arg.InventoryReceiptDocument, arg.ID)
 	return err
 }
 

@@ -5,6 +5,7 @@ package lindm.admin.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/recovery_readiness.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
@@ -107,4 +108,52 @@ message RevealRecoveryKeyResponse {
     min_len: 1
     max_len: 4096
   }];
+}
+
+// Observed selection only, not native qualification or execution authority.
+message DeviceStorageTarget {
+  lindm.agent.v1.StorageTarget target = 1 [(buf.validate.field).required = true];
+  lindm.agent.v1.NVMeSanitizeScope nvme = 2;
+  string name = 3;
+  uint64 size_bytes = 4;
+  string model = 5;
+  string encryption = 6;
+  string mountpoint = 7;
+  bool root_backing = 8;
+}
+message ListDeviceStorageTargetsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string action_kind = 2 [(buf.validate.field).string = {
+    in: [
+      "escrow_rotate",
+      "tpm2_bind",
+      "crypto_erase",
+      "sanitize"
+    ]
+  }];
+  // Select exact offline-signed recovery/<sha256>.efi target metadata.
+  optional bytes recovery_image_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+}
+message ListDeviceStorageTargetsResponse {
+  repeated DeviceStorageTarget targets = 1;
+  string enrollment_generation = 2;
+  uint64 host_sequence = 3;
+  google.protobuf.Timestamp received_at = 4;
+  // Finish time of the observed host collection, not server receipt time.
+  google.protobuf.Timestamp observed_at = 5;
+  // The same five-minute receipt freshness gate used before signing actions.
+  bool fresh = 6;
+  string unavailable_reason = 7;
+  RecoveryReadiness recovery_readiness = 8;
+}
+
+// Admission for the selected signed artifact, never native execution authority.
+message RecoveryReadiness {
+  lindm.agent.v1.RecoveryReadinessObservation observation = 1;
+  bool ready = 2;
+  string reason = 3;
+  bytes image_sha256 = 4;
+  uint64 image_size = 5;
+  uint64 needed_bytes = 6;
+  uint64 available_bytes = 7;
 }

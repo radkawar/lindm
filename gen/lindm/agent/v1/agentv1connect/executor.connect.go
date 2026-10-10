@@ -66,6 +66,9 @@ const (
 	// ExecutorServiceGetExecutionTrustProcedure is the fully-qualified name of the ExecutorService's
 	// GetExecutionTrust RPC.
 	ExecutorServiceGetExecutionTrustProcedure = "/lindm.agent.v1.ExecutorService/GetExecutionTrust"
+	// ExecutorServiceGetRecoveryReadinessProcedure is the fully-qualified name of the ExecutorService's
+	// GetRecoveryReadiness RPC.
+	ExecutorServiceGetRecoveryReadinessProcedure = "/lindm.agent.v1.ExecutorService/GetRecoveryReadiness"
 	// ExecutorServicePrepareServiceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's PrepareServiceExecution RPC.
 	ExecutorServicePrepareServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/PrepareServiceExecution"
@@ -93,6 +96,9 @@ const (
 	// ExecutorServiceConfirmDeviceActionEscrowProcedure is the fully-qualified name of the
 	// ExecutorService's ConfirmDeviceActionEscrow RPC.
 	ExecutorServiceConfirmDeviceActionEscrowProcedure = "/lindm.agent.v1.ExecutorService/ConfirmDeviceActionEscrow"
+	// ExecutorServiceConfirmDeviceActionInventoryProcedure is the fully-qualified name of the
+	// ExecutorService's ConfirmDeviceActionInventory RPC.
+	ExecutorServiceConfirmDeviceActionInventoryProcedure = "/lindm.agent.v1.ExecutorService/ConfirmDeviceActionInventory"
 	// ExecutorServicePrepareDeviceActionRecoveryProcedure is the fully-qualified name of the
 	// ExecutorService's PrepareDeviceActionRecovery RPC.
 	ExecutorServicePrepareDeviceActionRecoveryProcedure = "/lindm.agent.v1.ExecutorService/PrepareDeviceActionRecovery"
@@ -153,6 +159,8 @@ type ExecutorServiceClient interface {
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
 	// Reads protected public trust facts, not fresh resource observations.
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
+	// Reads native recovery capability and ESP capacity without changing boot state.
+	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
 	// Verifies signed desired intent and records native preflight/challenge before
 	// replying. No native effect; callers cannot supply a plan or challenge.
 	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
@@ -169,6 +177,7 @@ type ExecutorServiceClient interface {
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	AttestDeviceAction(context.Context, *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error)
 	ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error)
+	ConfirmDeviceActionInventory(context.Context, *connect.Request[v1.ConfirmDeviceActionInventoryRequest]) (*connect.Response[v1.ConfirmDeviceActionInventoryResponse], error)
 	PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error)
 	CommitDeviceActionRecovery(context.Context, *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error)
 	// Root-only one-use owner credential; never persisted or returned.
@@ -258,6 +267,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("GetExecutionTrust")),
 			connect.WithClientOptions(opts...),
 		),
+		getRecoveryReadiness: connect.NewClient[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetRecoveryReadinessProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareServiceExecution: connect.NewClient[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareServiceExecutionProcedure,
@@ -312,6 +327,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionEscrow")),
 			connect.WithClientOptions(opts...),
 		),
+		confirmDeviceActionInventory: connect.NewClient[v1.ConfirmDeviceActionInventoryRequest, v1.ConfirmDeviceActionInventoryResponse](
+			httpClient,
+			baseURL+ExecutorServiceConfirmDeviceActionInventoryProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionInventory")),
+			connect.WithClientOptions(opts...),
+		),
 		prepareDeviceActionRecovery: connect.NewClient[v1.PrepareDeviceActionRecoveryRequest, v1.PrepareDeviceActionRecoveryResponse](
 			httpClient,
 			baseURL+ExecutorServicePrepareDeviceActionRecoveryProcedure,
@@ -364,6 +385,7 @@ type executorServiceClient struct {
 	commitRenewal                *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
 	updateExecutionTrust         *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
 	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
+	getRecoveryReadiness         *connect.Client[v1.GetRecoveryReadinessRequest, v1.GetRecoveryReadinessResponse]
 	prepareServiceExecution      *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
 	startServiceExecution        *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
 	getServiceExecution          *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
@@ -373,6 +395,7 @@ type executorServiceClient struct {
 	getDeviceAction              *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
 	attestDeviceAction           *connect.Client[v1.AttestDeviceActionRequest, v1.AttestDeviceActionResponse]
 	confirmDeviceActionEscrow    *connect.Client[v1.ConfirmDeviceActionEscrowRequest, v1.ConfirmDeviceActionEscrowResponse]
+	confirmDeviceActionInventory *connect.Client[v1.ConfirmDeviceActionInventoryRequest, v1.ConfirmDeviceActionInventoryResponse]
 	prepareDeviceActionRecovery  *connect.Client[v1.PrepareDeviceActionRecoveryRequest, v1.PrepareDeviceActionRecoveryResponse]
 	commitDeviceActionRecovery   *connect.Client[v1.CommitDeviceActionRecoveryRequest, v1.CommitDeviceActionRecoveryResponse]
 	supplyDeviceActionCredential *connect.Client[v1.SupplyDeviceActionCredentialRequest, v1.SupplyDeviceActionCredentialResponse]
@@ -436,6 +459,11 @@ func (c *executorServiceClient) GetExecutionTrust(ctx context.Context, req *conn
 	return c.getExecutionTrust.CallUnary(ctx, req)
 }
 
+// GetRecoveryReadiness calls lindm.agent.v1.ExecutorService.GetRecoveryReadiness.
+func (c *executorServiceClient) GetRecoveryReadiness(ctx context.Context, req *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error) {
+	return c.getRecoveryReadiness.CallUnary(ctx, req)
+}
+
 // PrepareServiceExecution calls lindm.agent.v1.ExecutorService.PrepareServiceExecution.
 func (c *executorServiceClient) PrepareServiceExecution(ctx context.Context, req *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
 	return c.prepareServiceExecution.CallUnary(ctx, req)
@@ -479,6 +507,11 @@ func (c *executorServiceClient) AttestDeviceAction(ctx context.Context, req *con
 // ConfirmDeviceActionEscrow calls lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow.
 func (c *executorServiceClient) ConfirmDeviceActionEscrow(ctx context.Context, req *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error) {
 	return c.confirmDeviceActionEscrow.CallUnary(ctx, req)
+}
+
+// ConfirmDeviceActionInventory calls lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory.
+func (c *executorServiceClient) ConfirmDeviceActionInventory(ctx context.Context, req *connect.Request[v1.ConfirmDeviceActionInventoryRequest]) (*connect.Response[v1.ConfirmDeviceActionInventoryResponse], error) {
+	return c.confirmDeviceActionInventory.CallUnary(ctx, req)
 }
 
 // PrepareDeviceActionRecovery calls lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery.
@@ -552,6 +585,8 @@ type ExecutorServiceHandler interface {
 	UpdateExecutionTrust(context.Context, *connect.Request[v1.UpdateExecutionTrustRequest]) (*connect.Response[v1.UpdateExecutionTrustResponse], error)
 	// Reads protected public trust facts, not fresh resource observations.
 	GetExecutionTrust(context.Context, *connect.Request[v1.GetExecutionTrustRequest]) (*connect.Response[v1.GetExecutionTrustResponse], error)
+	// Reads native recovery capability and ESP capacity without changing boot state.
+	GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error)
 	// Verifies signed desired intent and records native preflight/challenge before
 	// replying. No native effect; callers cannot supply a plan or challenge.
 	PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error)
@@ -568,6 +603,7 @@ type ExecutorServiceHandler interface {
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	AttestDeviceAction(context.Context, *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error)
 	ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error)
+	ConfirmDeviceActionInventory(context.Context, *connect.Request[v1.ConfirmDeviceActionInventoryRequest]) (*connect.Response[v1.ConfirmDeviceActionInventoryResponse], error)
 	PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error)
 	CommitDeviceActionRecovery(context.Context, *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error)
 	// Root-only one-use owner credential; never persisted or returned.
@@ -653,6 +689,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("GetExecutionTrust")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceGetRecoveryReadinessHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetRecoveryReadinessProcedure,
+		svc.GetRecoveryReadiness,
+		connect.WithSchema(executorServiceMethods.ByName("GetRecoveryReadiness")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServicePrepareServiceExecutionHandler := connect.NewUnaryHandler(
 		ExecutorServicePrepareServiceExecutionProcedure,
 		svc.PrepareServiceExecution,
@@ -705,6 +747,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		ExecutorServiceConfirmDeviceActionEscrowProcedure,
 		svc.ConfirmDeviceActionEscrow,
 		connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionEscrow")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceConfirmDeviceActionInventoryHandler := connect.NewUnaryHandler(
+		ExecutorServiceConfirmDeviceActionInventoryProcedure,
+		svc.ConfirmDeviceActionInventory,
+		connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionInventory")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServicePrepareDeviceActionRecoveryHandler := connect.NewUnaryHandler(
@@ -767,6 +815,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceUpdateExecutionTrustHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetExecutionTrustProcedure:
 			executorServiceGetExecutionTrustHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetRecoveryReadinessProcedure:
+			executorServiceGetRecoveryReadinessHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareServiceExecutionProcedure:
 			executorServicePrepareServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceStartServiceExecutionProcedure:
@@ -785,6 +835,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceAttestDeviceActionHandler.ServeHTTP(w, r)
 		case ExecutorServiceConfirmDeviceActionEscrowProcedure:
 			executorServiceConfirmDeviceActionEscrowHandler.ServeHTTP(w, r)
+		case ExecutorServiceConfirmDeviceActionInventoryProcedure:
+			executorServiceConfirmDeviceActionInventoryHandler.ServeHTTP(w, r)
 		case ExecutorServicePrepareDeviceActionRecoveryProcedure:
 			executorServicePrepareDeviceActionRecoveryHandler.ServeHTTP(w, r)
 		case ExecutorServiceCommitDeviceActionRecoveryProcedure:
@@ -850,6 +902,10 @@ func (UnimplementedExecutorServiceHandler) GetExecutionTrust(context.Context, *c
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetExecutionTrust is not implemented"))
 }
 
+func (UnimplementedExecutorServiceHandler) GetRecoveryReadiness(context.Context, *connect.Request[v1.GetRecoveryReadinessRequest]) (*connect.Response[v1.GetRecoveryReadinessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetRecoveryReadiness is not implemented"))
+}
+
 func (UnimplementedExecutorServiceHandler) PrepareServiceExecution(context.Context, *connect.Request[v1.PrepareServiceExecutionRequest]) (*connect.Response[v1.PrepareServiceExecutionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareServiceExecution is not implemented"))
 }
@@ -884,6 +940,10 @@ func (UnimplementedExecutorServiceHandler) AttestDeviceAction(context.Context, *
 
 func (UnimplementedExecutorServiceHandler) ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) ConfirmDeviceActionInventory(context.Context, *connect.Request[v1.ConfirmDeviceActionInventoryRequest]) (*connect.Response[v1.ConfirmDeviceActionInventoryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ConfirmDeviceActionInventory is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error) {

@@ -83,7 +83,7 @@ func (s *Service) GetDeviceActionWork(ctx context.Context, req *connect.Request[
 	if err := q.SetDeviceActionNonce(ctx, devicedb.SetDeviceActionNonceParams{ID: action.ID, ResultNonce: nonce[:], NonceExpiresAt: timestamptz(expires)}); err != nil {
 		return nil, mapErr(err)
 	}
-	work := &devicev1.DeviceActionWork{ActionId: action.ID.String(), IntentEnvelope: action.IntentEnvelope, StartGrantEnvelope: action.StartGrantEnvelope, ResultNonce: nonce[:], ResultNonceExpiresAt: timestamppb.New(expires), EscrowReceiptEnvelope: action.EscrowReceiptEnvelope}
+	work := &devicev1.DeviceActionWork{ActionId: action.ID.String(), IntentEnvelope: action.IntentEnvelope, StartGrantEnvelope: action.StartGrantEnvelope, ResultNonce: nonce[:], ResultNonceExpiresAt: timestamppb.New(expires), EscrowReceiptEnvelope: action.EscrowReceiptEnvelope, InventoryReceiptEnvelope: action.InventoryReceiptEnvelope}
 	intent, err := actionIntent(action)
 	if err != nil {
 		return nil, mapErr(err)
@@ -234,6 +234,11 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 	if err := requireDeviceScope(ctx, q, authorization.Principal(), permission, principal.DeviceID); err != nil {
 		return nil, mapErr(err)
 	}
+	if intent.GetSpec().GetRefreshInventory() != nil {
+		if err := requireDeviceScope(ctx, q, authorization.Principal(), identity.PermissionReadFleet, principal.DeviceID); err != nil {
+			return nil, mapErr(err)
+		}
+	}
 	if err := requireActionInventory(ctx, q, principal.GenerationID, intent.GetSpec(), now); err != nil {
 		return nil, mapErr(err)
 	}
@@ -245,6 +250,9 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 	}
 	if err := requireLockActionRestriction(ctx, q, principal.DeviceID, principal.GenerationID, intent.GetSpec()); err != nil {
 		return nil, mapErr(err)
+	}
+	if !deviceActionSignerDelegated(snapshot.Delegation, s.signing.StartKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, action.Capability) {
+		return nil, deviceActionCapabilityError(action.Capability, "start")
 	}
 	plan := challenge.GetNativePlan()
 	planDigest, err := actionDigest(plan)

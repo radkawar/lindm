@@ -6,6 +6,7 @@ import type { SessionPrincipal } from "../../../gen/lindm/auth/v1/auth_pb";
 import { ThemeToggle } from "./theme-toggle";
 import { navigation, visibleNavigation } from "./navigation";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Menu } from "@base-ui/react/menu";
 import {
   Breadcrumb,
@@ -55,7 +56,7 @@ export function ConsoleShell({
   const currentPage = navigation.find(
     (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
   );
-  const title = currentPage?.label ?? "Control plane";
+  const title = currentPage?.label ?? "Console";
   const isDetail = currentPage && pathname !== currentPage.to;
   return (
     <SidebarProvider>
@@ -72,9 +73,16 @@ export function ConsoleShell({
           </div>
         </SidebarHeader>
         <SidebarContent className="py-3">
-          {(["Workspace", "Security", "Administration"] as const).map((group) => (
-            <NavigationGroup key={group} group={group} pathname={pathname} principal={principal} />
-          ))}
+          <nav aria-label="Main navigation">
+            {(["Fleet", "Security", "Administration"] as const).map((group) => (
+              <NavigationGroup
+                key={group}
+                group={group}
+                pathname={pathname}
+                principal={principal}
+              />
+            ))}
+          </nav>
         </SidebarContent>
         <SidebarFooter className="border-t p-3">
           <Menu.Root>
@@ -96,9 +104,11 @@ export function ConsoleShell({
                 <Menu.Popup className="min-w-56 border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none">
                   <div className="grid gap-2 border-b p-3">
                     <span className="max-w-64 truncate font-medium">{userLabel}</span>
-                    <Badge variant={principal.breakGlass ? "destructive" : "secondary"}>
-                      {principal.breakGlass ? "Break-glass session" : role || "No role"}
-                    </Badge>
+                    {principal.breakGlass ? (
+                      <StatusBadge status="warning">Break-glass session</StatusBadge>
+                    ) : (
+                      <Badge variant="secondary">{role || "No role"}</Badge>
+                    )}
                   </div>
                   <Menu.Item
                     disabled={loggingOut}
@@ -122,28 +132,40 @@ export function ConsoleShell({
             orientation="vertical"
             className="mr-2 data-vertical:h-4 data-vertical:self-auto"
           />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
+              <BreadcrumbItem className={isDetail ? "hidden sm:inline-flex" : "min-w-0"}>
                 {isDetail ? (
                   <BreadcrumbLink render={<Link to={currentPage.to} />}>{title}</BreadcrumbLink>
                 ) : (
-                  <BreadcrumbPage>{title}</BreadcrumbPage>
+                  <BreadcrumbPage className="truncate">{title}</BreadcrumbPage>
                 )}
               </BreadcrumbItem>
               {isDetail ? (
                 <>
-                  <BreadcrumbSeparator />
+                  <BreadcrumbSeparator className="hidden sm:block" />
                   <BreadcrumbItem>
                     <BreadcrumbPage>
-                      {pathname.endsWith("/new") ? "Create" : "Details"}
+                      {currentPage.to === "/devices"
+                        ? pathname.includes("/actions/new/")
+                          ? "New action"
+                          : pathname.includes("/actions/")
+                            ? "Action status"
+                            : pathname.includes("/recovery/")
+                              ? "Recovery key"
+                              : pathname.endsWith("/recovery-enrollment")
+                                ? "Recover enrollment"
+                                : "Device details"
+                        : pathname.endsWith("/new")
+                          ? "Create profile"
+                          : "Profile details"}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
               ) : null}
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {commandPalette}
             <ThemeToggle />
           </div>

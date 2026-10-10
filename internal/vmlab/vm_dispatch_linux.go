@@ -46,10 +46,14 @@ WantedBy=multi-user.target
 
 type VMDispatchOptions struct {
 	Repository, CacheDir, WorkDir, DiagnosticsDir, LabBinary, LindmdBinary string
+	BuildRepository                                                        string
 	RedHatTokenFile                                                        string
 	Hardware                                                               *VMHardwareOptions
 	Hold                                                                   time.Duration
 	Progress                                                               io.Writer
+	// LocalAuthority uses the real password/WebAuthn authority without an IdP.
+	LocalAuthority bool
+	PowerActions   bool
 }
 
 type VMDispatchScenario struct {
@@ -93,6 +97,7 @@ type VMDispatchResult struct {
 	Failure                string                          `json:"failure,omitempty"`
 	ClockSkew              []*VMDispatchClockEvidence      `json:"clock_skew,omitempty"`
 	Hold                   *VMDispatchHoldEvidence         `json:"hold,omitempty"`
+	Power                  *VMPowerEvidence                `json:"power,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -152,7 +157,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	default:
 		return result, errors.New("dispatch packages require a supported guest architecture")
 	}
-	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: options.Repository, Revision: "connected-dispatch-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
+	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: VMBuildRepository(options.Repository, options.BuildRepository), Revision: "connected-dispatch-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
 	if err != nil {
 		return result, err
 	}
@@ -188,7 +193,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err != nil {
 		return result, err
 	}
-	defer func() { err = errors.Join(err, vm.close()) }()
+	defer func() {
+		if result.Power != nil && result.Power.QEMUExited {
+			err = errors.Join(err, vm.closeAfterExpectedExit())
+		} else {
+			err = errors.Join(err, vm.close())
+		}
+	}()
 	vm.captureDiagnostics = options.DiagnosticsDir != ""
 	defer func() {
 		if err != nil && options.DiagnosticsDir != "" {
@@ -255,7 +266,13 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	}
 	result.Baseline = "inactive/disabled; persistent start witness absent"
 	openFixture := devlab.OpenAuthorityFixture
+	if options.LocalAuthority {
+		openFixture = devlab.OpenLocalAuthorityFixture
+	}
 	if options.Hold > 0 {
+		if options.LocalAuthority {
+			return result, errors.New("local-authority dispatch does not reserve the shared console origin")
+		}
 		openFixture = devlab.OpenConsoleAuthorityFixture
 	}
 	fixture, err := openFixture(ctx, options.Repository, options.LindmdBinary)
@@ -309,6 +326,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if _, err := waitVMExecutionTrust(ctx, vm, authority, delegation); err != nil {
+		return result, err
+	}
+	if options.PowerActions {
+		result.Power = new(VMPowerEvidence)
+		err = exerciseNativePower(ctx, vm, control, fixture, result, result.Power)
 		return result, err
 	}
 	hold := func() error {

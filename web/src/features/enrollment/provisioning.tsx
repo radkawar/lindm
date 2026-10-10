@@ -11,8 +11,9 @@ import {
   type RevokeProvisioningTokenRequest,
 } from "../../../gen/lindm/admin/v1/provisioning_pb";
 import { DeviceMetadataSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,9 +64,9 @@ export function ProvisioningTokens() {
             Refresh tokens
           </Button>
           {list.isPending ? <p role="status">Loading tokens…</p> : null}
-          {list.error ? <EnrollmentFailure failure={toRpcFailure(list.error)} /> : null}
+          {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
           {!list.error && list.data?.tokens.length === 0 ? (
-            <p>No tokens in the current scope.</p>
+            <EmptyState title="No provisioning tokens in your scope" />
           ) : null}
           {!list.error &&
             list.data?.tokens.map((token) => (
@@ -189,9 +190,8 @@ function IssueProvisioningToken({
           }}
         >
           <p className="text-sm text-muted-foreground">
-            Boot-injected, bounded, reusable only within the fixed scope below. The server rechecks
-            your current authority for labels, groups and profile assignment; entering an ID grants
-            no authority.
+            Use this token during installation. Its expiry, use limit and assignments are fixed when
+            issued. You can assign only labels, groups and profiles you are authorized to manage.
           </p>
           <fieldset className="grid gap-3" disabled={busy || captured !== null || completed}>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -212,7 +212,7 @@ function IssueProvisioningToken({
               Labels (space separated)
               <Input name="labels" />
             </label>
-            <Label htmlFor="token-owner-kind">Owner preassignment</Label>
+            <Label htmlFor="token-owner-kind">Assign owner</Label>
             <SelectField
               id="token-owner-kind"
               value={ownerKind}
@@ -235,7 +235,7 @@ function IssueProvisioningToken({
               <Textarea name="groups" spellCheck={false} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Immutable service profile revision UUID
+              Service profile revision ID
               <Input name="profile" spellCheck={false} />
             </label>
             <details className="grid gap-2 border p-3">
@@ -265,7 +265,7 @@ function IssueProvisioningToken({
               Request {captured.requestId}. Retries retain this exact scope and assignments.
             </p>
           ) : null}
-          {failure ? <EnrollmentFailure failure={failure} /> : null}
+          {failure ? <RpcError failure={failure} /> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={busy || completed}>
               {busy ? "Creating…" : captured ? "Retry exact request" : "Create provisioning token"}
@@ -355,7 +355,7 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
     <article className="grid gap-3 border p-4">
       <div className="flex flex-wrap justify-between gap-2">
         <h3 className="break-all font-mono text-sm">{token.tokenId}</h3>
-        <Badge variant="outline">{state}</Badge>
+        <StatusBadge status={state === "Available" ? "success" : "neutral"}>{state}</StatusBadge>
       </div>
       <p className="text-sm">
         {token.usedCount} / {token.maxUses} uses ·{" "}
@@ -402,7 +402,7 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
                 <Textarea name="reason" required />
               </label>
             </fieldset>
-            {failure ? <EnrollmentFailure failure={failure} /> : null}
+            {failure ? <RpcError failure={failure} /> : null}
             <Button type="submit" className="w-fit" variant="destructive" disabled={busy}>
               {busy ? "Revoking…" : captured ? "Retry exact revocation" : "Revoke token"}
             </Button>
@@ -410,23 +410,5 @@ function TokenRow({ token, onRevoked }: { token: ProvisioningToken; onRevoked: (
         </details>
       ) : null}
     </article>
-  );
-}
-
-export function EnrollmentFailure({ failure }: { failure: RpcFailure }) {
-  return (
-    <Alert variant="destructive">
-      <AlertTitle>
-        {failure.denied
-          ? "Not authorized in current scope"
-          : failure.ambiguous
-            ? "Outcome unknown"
-            : "Request failed"}
-      </AlertTitle>
-      <AlertDescription>
-        {failure.codeName}: {failure.message}
-        {failure.ambiguous ? " Retry the same request; do not assume it failed." : ""}
-      </AlertDescription>
-    </Alert>
   );
 }

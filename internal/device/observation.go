@@ -86,7 +86,11 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 			accepted = uint64(sequence)
 			return q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(authority.now), ID: authority.device.ID})
 		default:
-			if !rateAllowed(authority.generation.LastHostAdmissionAt, authority.now) {
+			refresh, err := claimRefreshInventoryAdmission(ctx, q, authority.device.ID, principal.GenerationID, sequence, observation.GetStartedAt().AsTime(), authority.now, false)
+			if err != nil {
+				return err
+			}
+			if refresh.challengeIssuedAt.IsZero() && !rateAllowed(authority.generation.LastHostAdmissionAt, authority.now) {
 				return errRateLimited
 			}
 			fields, err := hostFields(observation)

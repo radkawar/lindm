@@ -443,26 +443,105 @@ func (x *GetAgentUpdateResponse) GetStatus() *AgentUpdateStatus {
 	return nil
 }
 
+// Bounded sanitized native failure output; telemetry, never success authority.
+type NativeUpdateDiagnostic struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Manager  string                 `protobuf:"bytes,1,opt,name=manager,proto3" json:"manager,omitempty"`
+	Phase    string                 `protobuf:"bytes,2,opt,name=phase,proto3" json:"phase,omitempty"`
+	ExitCode int32                  `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	// Eight 512-byte lines also cap the total at 4096 bytes.
+	ErrorLines    []string `protobuf:"bytes,4,rep,name=error_lines,json=errorLines,proto3" json:"error_lines,omitempty"`
+	Truncated     bool     `protobuf:"varint,5,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NativeUpdateDiagnostic) Reset() {
+	*x = NativeUpdateDiagnostic{}
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NativeUpdateDiagnostic) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NativeUpdateDiagnostic) ProtoMessage() {}
+
+func (x *NativeUpdateDiagnostic) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NativeUpdateDiagnostic.ProtoReflect.Descriptor instead.
+func (*NativeUpdateDiagnostic) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *NativeUpdateDiagnostic) GetManager() string {
+	if x != nil {
+		return x.Manager
+	}
+	return ""
+}
+
+func (x *NativeUpdateDiagnostic) GetPhase() string {
+	if x != nil {
+		return x.Phase
+	}
+	return ""
+}
+
+func (x *NativeUpdateDiagnostic) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *NativeUpdateDiagnostic) GetErrorLines() []string {
+	if x != nil {
+		return x.ErrorLines
+	}
+	return nil
+}
+
+func (x *NativeUpdateDiagnostic) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
 // Diagnostic facts are historical, not claims of current package health.
 type AgentUpdateStatus struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Enabled           bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	Phase             string                 `protobuf:"bytes,2,opt,name=phase,proto3" json:"phase,omitempty"`
-	Version           string                 `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
-	TransactionId     string                 `protobuf:"bytes,4,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	Reason            string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
-	ObservedAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	AttemptStartedAt  *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=attempt_started_at,json=attemptStartedAt,proto3" json:"attempt_started_at,omitempty"`
-	AttemptFinishedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=attempt_finished_at,json=attemptFinishedAt,proto3" json:"attempt_finished_at,omitempty"`
-	LastOutcome       string                 `protobuf:"bytes,9,opt,name=last_outcome,json=lastOutcome,proto3" json:"last_outcome,omitempty"`
-	LastMetadataAt    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=last_metadata_at,json=lastMetadataAt,proto3" json:"last_metadata_at,omitempty"`
+	state             protoimpl.MessageState  `protogen:"open.v1"`
+	Enabled           bool                    `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Phase             string                  `protobuf:"bytes,2,opt,name=phase,proto3" json:"phase,omitempty"`
+	Version           string                  `protobuf:"bytes,3,opt,name=version,proto3" json:"version,omitempty"`
+	TransactionId     string                  `protobuf:"bytes,4,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	Reason            string                  `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	ObservedAt        *timestamppb.Timestamp  `protobuf:"bytes,6,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	AttemptStartedAt  *timestamppb.Timestamp  `protobuf:"bytes,7,opt,name=attempt_started_at,json=attemptStartedAt,proto3" json:"attempt_started_at,omitempty"`
+	AttemptFinishedAt *timestamppb.Timestamp  `protobuf:"bytes,8,opt,name=attempt_finished_at,json=attemptFinishedAt,proto3" json:"attempt_finished_at,omitempty"`
+	LastOutcome       string                  `protobuf:"bytes,9,opt,name=last_outcome,json=lastOutcome,proto3" json:"last_outcome,omitempty"`
+	LastMetadataAt    *timestamppb.Timestamp  `protobuf:"bytes,10,opt,name=last_metadata_at,json=lastMetadataAt,proto3" json:"last_metadata_at,omitempty"`
+	NativeDiagnostic  *NativeUpdateDiagnostic `protobuf:"bytes,11,opt,name=native_diagnostic,json=nativeDiagnostic,proto3" json:"native_diagnostic,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AgentUpdateStatus) Reset() {
 	*x = AgentUpdateStatus{}
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -474,7 +553,7 @@ func (x *AgentUpdateStatus) String() string {
 func (*AgentUpdateStatus) ProtoMessage() {}
 
 func (x *AgentUpdateStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -487,7 +566,7 @@ func (x *AgentUpdateStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateStatus.ProtoReflect.Descriptor instead.
 func (*AgentUpdateStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AgentUpdateStatus) GetEnabled() bool {
@@ -560,6 +639,13 @@ func (x *AgentUpdateStatus) GetLastMetadataAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AgentUpdateStatus) GetNativeDiagnostic() *NativeUpdateDiagnostic {
+	if x != nil {
+		return x.NativeDiagnostic
+	}
+	return nil
+}
+
 // Root-owned durable state, not an RPC request. The transaction is immutable once
 // admitted; helper completion never substitutes for native installed observation.
 type AgentUpdateTransaction struct {
@@ -584,7 +670,7 @@ type AgentUpdateTransaction struct {
 
 func (x *AgentUpdateTransaction) Reset() {
 	*x = AgentUpdateTransaction{}
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +682,7 @@ func (x *AgentUpdateTransaction) String() string {
 func (*AgentUpdateTransaction) ProtoMessage() {}
 
 func (x *AgentUpdateTransaction) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -609,7 +695,7 @@ func (x *AgentUpdateTransaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateTransaction.ProtoReflect.Descriptor instead.
 func (*AgentUpdateTransaction) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AgentUpdateTransaction) GetId() string {
@@ -701,13 +787,14 @@ type AgentUpdateJournal struct {
 	AttemptFinishedAt *timestamppb.Timestamp  `protobuf:"bytes,8,opt,name=attempt_finished_at,json=attemptFinishedAt,proto3" json:"attempt_finished_at,omitempty"`
 	LastOutcome       string                  `protobuf:"bytes,9,opt,name=last_outcome,json=lastOutcome,proto3" json:"last_outcome,omitempty"`
 	LastMetadataAt    *timestamppb.Timestamp  `protobuf:"bytes,10,opt,name=last_metadata_at,json=lastMetadataAt,proto3" json:"last_metadata_at,omitempty"`
+	NativeDiagnostic  *NativeUpdateDiagnostic `protobuf:"bytes,11,opt,name=native_diagnostic,json=nativeDiagnostic,proto3" json:"native_diagnostic,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AgentUpdateJournal) Reset() {
 	*x = AgentUpdateJournal{}
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -719,7 +806,7 @@ func (x *AgentUpdateJournal) String() string {
 func (*AgentUpdateJournal) ProtoMessage() {}
 
 func (x *AgentUpdateJournal) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +819,7 @@ func (x *AgentUpdateJournal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateJournal.ProtoReflect.Descriptor instead.
 func (*AgentUpdateJournal) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AgentUpdateJournal) GetFormatVersion() uint32 {
@@ -805,18 +892,26 @@ func (x *AgentUpdateJournal) GetLastMetadataAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *AgentUpdateJournal) GetNativeDiagnostic() *NativeUpdateDiagnostic {
+	if x != nil {
+		return x.NativeDiagnostic
+	}
+	return nil
+}
+
 // The detached helper's durable boundary, independently readable after reboot.
 type AgentUpdateHelperState struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Phase         string                 `protobuf:"bytes,1,opt,name=phase,proto3" json:"phase,omitempty"`
-	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState  `protogen:"open.v1"`
+	Phase            string                  `protobuf:"bytes,1,opt,name=phase,proto3" json:"phase,omitempty"`
+	ObservedAt       *timestamppb.Timestamp  `protobuf:"bytes,2,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	NativeDiagnostic *NativeUpdateDiagnostic `protobuf:"bytes,3,opt,name=native_diagnostic,json=nativeDiagnostic,proto3" json:"native_diagnostic,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *AgentUpdateHelperState) Reset() {
 	*x = AgentUpdateHelperState{}
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +923,7 @@ func (x *AgentUpdateHelperState) String() string {
 func (*AgentUpdateHelperState) ProtoMessage() {}
 
 func (x *AgentUpdateHelperState) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_update_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_update_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +936,7 @@ func (x *AgentUpdateHelperState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentUpdateHelperState.ProtoReflect.Descriptor instead.
 func (*AgentUpdateHelperState) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_update_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AgentUpdateHelperState) GetPhase() string {
@@ -854,6 +949,13 @@ func (x *AgentUpdateHelperState) GetPhase() string {
 func (x *AgentUpdateHelperState) GetObservedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *AgentUpdateHelperState) GetNativeDiagnostic() *NativeUpdateDiagnostic {
+	if x != nil {
+		return x.NativeDiagnostic
 	}
 	return nil
 }
@@ -891,20 +993,31 @@ const file_lindm_agent_v1_update_proto_rawDesc = "" +
 	"\x15poll_interval_seconds\x18\x04 \x01(\rR\x13pollIntervalSeconds\"\x17\n" +
 	"\x15GetAgentUpdateRequest\"S\n" +
 	"\x16GetAgentUpdateResponse\x129\n" +
-	"\x06status\x18\x01 \x01(\v2!.lindm.agent.v1.AgentUpdateStatusR\x06status\"\xd8\x03\n" +
+	"\x06status\x18\x01 \x01(\v2!.lindm.agent.v1.AgentUpdateStatusR\x06status\"\x9b\x03\n" +
+	"\x16NativeUpdateDiagnostic\x12\x83\x01\n" +
+	"\amanager\x18\x01 \x01(\tBi\xbaHfrdR\aapt-getR\x04dpkgR\n" +
+	"dpkg-queryR\bdpkg-debR\x03rpmR\x03dnfR\x06zypperR\x06pacmanR\vlindm-agentR\tsystemctlR\vsystemd-runR\amanager\x12]\n" +
+	"\x05phase\x18\x02 \x01(\tBG\xbaHDrBR\n" +
+	"validationR\bsimulateR\x05applyR\tconfigureR\brecoveryR\x0epayload_verifyR\x05phase\x120\n" +
+	"\texit_code\x18\x03 \x01(\x05B\x13\xbaH\x10\x1a\x0e\x18\xff\x01(\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01R\bexitCode\x12L\n" +
+	"\verror_lines\x18\x04 \x03(\tB+\xbaH(\x92\x01%\x10\b\"!r\x1f\x10\x01(\x80\x042\x18^[^\\x00-\\x1f\\x7f-\\x9f]*$R\n" +
+	"errorLines\x12\x1c\n" +
+	"\ttruncated\x18\x05 \x01(\bR\ttruncated\"\xd9\x05\n" +
 	"\x11AgentUpdateStatus\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x14\n" +
-	"\x05phase\x18\x02 \x01(\tR\x05phase\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\tR\aversion\x12%\n" +
-	"\x0etransaction_id\x18\x04 \x01(\tR\rtransactionId\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\x12;\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12{\n" +
+	"\x05phase\x18\x02 \x01(\tBe\xbaHbr`R\bdisabledR\x04idleR\bcheckingR\x06stagedR\bapplyingR\n" +
+	"installingR\tinstalledR\brejectedR\x11recovery_requiredR\x05phase\x12!\n" +
+	"\aversion\x18\x03 \x01(\tB\a\xbaH\x04r\x02(@R\aversion\x122\n" +
+	"\x0etransaction_id\x18\x04 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\rtransactionId\x12.\n" +
+	"\x06reason\x18\x05 \x01(\tB\x16\xbaH\x13r\x11(\x80\x022\f^[a-z0-9_]*$R\x06reason\x12;\n" +
 	"\vobserved_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"observedAt\x12H\n" +
 	"\x12attempt_started_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x10attemptStartedAt\x12J\n" +
-	"\x13attempt_finished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x11attemptFinishedAt\x12!\n" +
-	"\flast_outcome\x18\t \x01(\tR\vlastOutcome\x12D\n" +
+	"\x13attempt_finished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x11attemptFinishedAt\x128\n" +
+	"\flast_outcome\x18\t \x01(\tB\x15\xbaH\x12r\x10(@2\f^[a-z0-9_]*$R\vlastOutcome\x12D\n" +
 	"\x10last_metadata_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\x0elastMetadataAt\"\xc6\x05\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\x0elastMetadataAt\x12S\n" +
+	"\x11native_diagnostic\x18\v \x01(\v2&.lindm.agent.v1.NativeUpdateDiagnosticR\x10nativeDiagnostic\"\xc6\x05\n" +
 	"\x16AgentUpdateTransaction\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12=\n" +
 	"\aversion\x18\x02 \x01(\tB#\xbaH r\x1e\x18@2\x1a^[0-9]+[.][0-9]+[.][0-9]+$R\aversion\x12L\n" +
@@ -921,7 +1034,7 @@ const file_lindm_agent_v1_update_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\x15previousNativeVersion\x12R\n" +
 	"\x13verified_expires_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x11verifiedExpiresAt\x12N\n" +
-	"\x10previous_version\x18\v \x01(\tB#\xbaH r\x1e\x18@2\x1a^[0-9]+[.][0-9]+[.][0-9]+$R\x0fpreviousVersion\"\x8c\a\n" +
+	"\x10previous_version\x18\v \x01(\tB#\xbaH r\x1e\x18@2\x1a^[0-9]+[.][0-9]+[.][0-9]+$R\x0fpreviousVersion\"\xe1\a\n" +
 	"\x12AgentUpdateJournal\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x124\n" +
 	"\x11installed_version\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18@R\x10installedVersion\x12H\n" +
@@ -934,13 +1047,15 @@ const file_lindm_agent_v1_update_proto_rawDesc = "" +
 	"\x13attempt_finished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x11attemptFinishedAt\x12*\n" +
 	"\flast_outcome\x18\t \x01(\tB\a\xbaH\x04r\x02\x18@R\vlastOutcome\x12D\n" +
 	"\x10last_metadata_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\x0elastMetadataAt:\xf9\x01\xbaH\xf5\x01\x1a\xf2\x01\n" +
-	"\x1aupdate_journal.transaction\x12Lonly idle state omits a transaction; installed state binds its exact version\x1a\x85\x01(this.phase == 'idle') == !has(this.transaction) && (this.phase != 'installed' || this.installed_version == this.transaction.version)\"\xae\x01\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\x0elastMetadataAt\x12S\n" +
+	"\x11native_diagnostic\x18\v \x01(\v2&.lindm.agent.v1.NativeUpdateDiagnosticR\x10nativeDiagnostic:\xf9\x01\xbaH\xf5\x01\x1a\xf2\x01\n" +
+	"\x1aupdate_journal.transaction\x12Lonly idle state omits a transaction; installed state binds its exact version\x1a\x85\x01(this.phase == 'idle') == !has(this.transaction) && (this.phase != 'installed' || this.installed_version == this.transaction.version)\"\x83\x02\n" +
 	"\x16AgentUpdateHelperState\x12O\n" +
 	"\x05phase\x18\x01 \x01(\tB9\xbaH6r4R\n" +
 	"installingR\tinstalledR\brejectedR\x11recovery_requiredR\x05phase\x12C\n" +
 	"\vobserved_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"observedAt*\xbe\x01\n" +
+	"observedAt\x12S\n" +
+	"\x11native_diagnostic\x18\x03 \x01(\v2&.lindm.agent.v1.NativeUpdateDiagnosticR\x10nativeDiagnostic*\xbe\x01\n" +
 	"\x13NativeUpdateManager\x12%\n" +
 	"!NATIVE_UPDATE_MANAGER_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19NATIVE_UPDATE_MANAGER_APT\x10\x01\x12\x1d\n" +
@@ -961,7 +1076,7 @@ func file_lindm_agent_v1_update_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_update_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_agent_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_lindm_agent_v1_update_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_lindm_agent_v1_update_proto_goTypes = []any{
 	(NativeUpdateManager)(0),            // 0: lindm.agent.v1.NativeUpdateManager
 	(*AgentUpdateConfig)(nil),           // 1: lindm.agent.v1.AgentUpdateConfig
@@ -970,35 +1085,39 @@ var file_lindm_agent_v1_update_proto_goTypes = []any{
 	(*ExchangeAgentUpdateResponse)(nil), // 4: lindm.agent.v1.ExchangeAgentUpdateResponse
 	(*GetAgentUpdateRequest)(nil),       // 5: lindm.agent.v1.GetAgentUpdateRequest
 	(*GetAgentUpdateResponse)(nil),      // 6: lindm.agent.v1.GetAgentUpdateResponse
-	(*AgentUpdateStatus)(nil),           // 7: lindm.agent.v1.AgentUpdateStatus
-	(*AgentUpdateTransaction)(nil),      // 8: lindm.agent.v1.AgentUpdateTransaction
-	(*AgentUpdateJournal)(nil),          // 9: lindm.agent.v1.AgentUpdateJournal
-	(*AgentUpdateHelperState)(nil),      // 10: lindm.agent.v1.AgentUpdateHelperState
-	(*timestamppb.Timestamp)(nil),       // 11: google.protobuf.Timestamp
+	(*NativeUpdateDiagnostic)(nil),      // 7: lindm.agent.v1.NativeUpdateDiagnostic
+	(*AgentUpdateStatus)(nil),           // 8: lindm.agent.v1.AgentUpdateStatus
+	(*AgentUpdateTransaction)(nil),      // 9: lindm.agent.v1.AgentUpdateTransaction
+	(*AgentUpdateJournal)(nil),          // 10: lindm.agent.v1.AgentUpdateJournal
+	(*AgentUpdateHelperState)(nil),      // 11: lindm.agent.v1.AgentUpdateHelperState
+	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_update_proto_depIdxs = []int32{
 	0,  // 0: lindm.agent.v1.AgentUpdateConfig.manager:type_name -> lindm.agent.v1.NativeUpdateManager
 	3,  // 1: lindm.agent.v1.ExchangeAgentUpdateResponse.fetch:type_name -> lindm.agent.v1.AgentUpdateFetch
-	7,  // 2: lindm.agent.v1.ExchangeAgentUpdateResponse.status:type_name -> lindm.agent.v1.AgentUpdateStatus
-	7,  // 3: lindm.agent.v1.GetAgentUpdateResponse.status:type_name -> lindm.agent.v1.AgentUpdateStatus
-	11, // 4: lindm.agent.v1.AgentUpdateStatus.observed_at:type_name -> google.protobuf.Timestamp
-	11, // 5: lindm.agent.v1.AgentUpdateStatus.attempt_started_at:type_name -> google.protobuf.Timestamp
-	11, // 6: lindm.agent.v1.AgentUpdateStatus.attempt_finished_at:type_name -> google.protobuf.Timestamp
-	11, // 7: lindm.agent.v1.AgentUpdateStatus.last_metadata_at:type_name -> google.protobuf.Timestamp
-	0,  // 8: lindm.agent.v1.AgentUpdateTransaction.manager:type_name -> lindm.agent.v1.NativeUpdateManager
-	11, // 9: lindm.agent.v1.AgentUpdateTransaction.admitted_at:type_name -> google.protobuf.Timestamp
-	11, // 10: lindm.agent.v1.AgentUpdateTransaction.verified_expires_at:type_name -> google.protobuf.Timestamp
-	8,  // 11: lindm.agent.v1.AgentUpdateJournal.transaction:type_name -> lindm.agent.v1.AgentUpdateTransaction
-	11, // 12: lindm.agent.v1.AgentUpdateJournal.observed_at:type_name -> google.protobuf.Timestamp
-	11, // 13: lindm.agent.v1.AgentUpdateJournal.attempt_started_at:type_name -> google.protobuf.Timestamp
-	11, // 14: lindm.agent.v1.AgentUpdateJournal.attempt_finished_at:type_name -> google.protobuf.Timestamp
-	11, // 15: lindm.agent.v1.AgentUpdateJournal.last_metadata_at:type_name -> google.protobuf.Timestamp
-	11, // 16: lindm.agent.v1.AgentUpdateHelperState.observed_at:type_name -> google.protobuf.Timestamp
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	8,  // 2: lindm.agent.v1.ExchangeAgentUpdateResponse.status:type_name -> lindm.agent.v1.AgentUpdateStatus
+	8,  // 3: lindm.agent.v1.GetAgentUpdateResponse.status:type_name -> lindm.agent.v1.AgentUpdateStatus
+	12, // 4: lindm.agent.v1.AgentUpdateStatus.observed_at:type_name -> google.protobuf.Timestamp
+	12, // 5: lindm.agent.v1.AgentUpdateStatus.attempt_started_at:type_name -> google.protobuf.Timestamp
+	12, // 6: lindm.agent.v1.AgentUpdateStatus.attempt_finished_at:type_name -> google.protobuf.Timestamp
+	12, // 7: lindm.agent.v1.AgentUpdateStatus.last_metadata_at:type_name -> google.protobuf.Timestamp
+	7,  // 8: lindm.agent.v1.AgentUpdateStatus.native_diagnostic:type_name -> lindm.agent.v1.NativeUpdateDiagnostic
+	0,  // 9: lindm.agent.v1.AgentUpdateTransaction.manager:type_name -> lindm.agent.v1.NativeUpdateManager
+	12, // 10: lindm.agent.v1.AgentUpdateTransaction.admitted_at:type_name -> google.protobuf.Timestamp
+	12, // 11: lindm.agent.v1.AgentUpdateTransaction.verified_expires_at:type_name -> google.protobuf.Timestamp
+	9,  // 12: lindm.agent.v1.AgentUpdateJournal.transaction:type_name -> lindm.agent.v1.AgentUpdateTransaction
+	12, // 13: lindm.agent.v1.AgentUpdateJournal.observed_at:type_name -> google.protobuf.Timestamp
+	12, // 14: lindm.agent.v1.AgentUpdateJournal.attempt_started_at:type_name -> google.protobuf.Timestamp
+	12, // 15: lindm.agent.v1.AgentUpdateJournal.attempt_finished_at:type_name -> google.protobuf.Timestamp
+	12, // 16: lindm.agent.v1.AgentUpdateJournal.last_metadata_at:type_name -> google.protobuf.Timestamp
+	7,  // 17: lindm.agent.v1.AgentUpdateJournal.native_diagnostic:type_name -> lindm.agent.v1.NativeUpdateDiagnostic
+	12, // 18: lindm.agent.v1.AgentUpdateHelperState.observed_at:type_name -> google.protobuf.Timestamp
+	7,  // 19: lindm.agent.v1.AgentUpdateHelperState.native_diagnostic:type_name -> lindm.agent.v1.NativeUpdateDiagnostic
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_update_proto_init() }
@@ -1012,7 +1131,7 @@ func file_lindm_agent_v1_update_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_update_proto_rawDesc), len(file_lindm_agent_v1_update_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

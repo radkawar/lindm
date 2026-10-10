@@ -47,6 +47,7 @@ func run(ctx context.Context, args []string) error {
 	uuid := flags.String("state-uuid", "", "off-target ext4 UUID mounted by recovery init")
 	espUUID := flags.String("esp-uuid", "", "required qualified FAT ESP volume UUID (ABCD-1234)")
 	epoch := flags.Int64("source-date-epoch", 0, "reproducible initramfs/kernel image build timestamp")
+	serialConsole := flags.String("serial-console", "", "optional signed diagnostic UART: ttyS0,115200n8 or ttyAMA0,115200")
 	var files, executables fileFlags
 	flags.Var(&files, "file", "repeat DESTINATION=SHA256:PATH for approved library, module, CA or public trust material")
 	flags.Var(&executables, "executable", "repeat DESTINATION=SHA256:PATH for approved native recovery helper")
@@ -56,7 +57,7 @@ func run(ctx context.Context, args []string) error {
 	if flags.NArg() != 0 {
 		return errors.New("unexpected positional arguments")
 	}
-	request := recoveryboot.BuildRequest{OutputDirectory: *output, SigningKey: *key, StateUUID: *uuid, ESPUUID: *espUUID, SourceDateEpoch: *epoch}
+	request := recoveryboot.BuildRequest{OutputDirectory: *output, SigningKey: *key, StateUUID: *uuid, ESPUUID: *espUUID, SourceDateEpoch: *epoch, SerialConsole: *serialConsole}
 	for _, input := range []struct {
 		value  string
 		target *recoveryboot.Ingredient

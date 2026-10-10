@@ -24,7 +24,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
-import { EnrollmentFailure } from "./provisioning";
+import { RpcError } from "@/components/ui/rpc-error";
 import { enrollmentFailure, validateEnrollment } from "./validation";
 import { downloadEnrollmentFile } from "./download";
 
@@ -32,7 +32,7 @@ export function OfflineEnrollment() {
   return (
     <section className="grid gap-4" aria-label="Offline enrollment">
       <Alert>
-        <AlertTitle>Offline-site signed file-pair enrollment</AlertTitle>
+        <AlertTitle>Offline enrollment</AlertTitle>
         <AlertDescription>
           Use the same signed installed package and independently authenticated deployment trust.
           Signed files do not contain the provisioning token or device private key. Transfer them
@@ -145,7 +145,7 @@ function OfflineAuthorization() {
         >
           <fieldset className="grid gap-3" disabled={busy || captured !== null || !!document}>
             <label className="grid gap-1.5 text-sm font-medium">
-              Provisioning token (one-time page memory)
+              Provisioning token secret
               <Input name="token" type="password" autoComplete="off" required spellCheck={false} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
@@ -153,7 +153,7 @@ function OfflineAuthorization() {
               <Input name="lifetime" type="number" defaultValue="3600" required />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Authenticated execution root JSON (derive its version and protobuf digest)
+              Verified execution root (JSON file)
               <Input
                 type="file"
                 accept="application/json,.json"
@@ -171,7 +171,7 @@ function OfflineAuthorization() {
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">
-              Authenticated root SHA-256 (base64 of deterministic protobuf root digest)
+              Root SHA-256 (base64 protobuf digest)
               <Input
                 name="rootDigest"
                 required
@@ -193,11 +193,10 @@ function OfflineAuthorization() {
           </fieldset>
           {captured ? (
             <p className="break-all text-xs text-muted-foreground">
-              Request {captured.requestId}; retry preserves the same token and trust binding in
-              component memory.
+              Request {captured.requestId}. Retries keep the same token and trust binding.
             </p>
           ) : null}
-          {failure ? <EnrollmentFailure failure={failure} /> : null}
+          {failure ? <RpcError failure={failure} /> : null}
           <Button type="submit" className="w-fit" disabled={busy || !!document}>
             {busy
               ? "Issuing…"
@@ -363,9 +362,7 @@ function OfflineExchange() {
             }
             onClick={() => void exchange("export")}
           >
-            {attempt?.action === "export"
-              ? "Retry exact export"
-              : "Export signed response after approval"}
+            {attempt?.action === "export" ? "Retry exact export" : "Export signed response"}
           </Button>
         </div>
         {status ? (
@@ -373,7 +370,7 @@ function OfflineExchange() {
             {status}
           </p>
         ) : null}
-        {failure ? <EnrollmentFailure failure={failure} /> : null}
+        {failure ? <RpcError failure={failure} /> : null}
         {document ? (
           <OfflineDocument
             name="lindm-offline-response.json"

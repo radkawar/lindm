@@ -18,16 +18,23 @@ WHERE a.state = 'pending' AND a.expires_at > CURRENT_TIMESTAMP
     a.permission = ANY($1::text[])
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($2::jsonb -> a.permission, '[]'::jsonb)))
   )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(coalesce($3::jsonb -> a.permission, '[]'::jsonb)) required
+    WHERE a.device_id IS NULL
+       OR NOT device_scope_matches(a.device_id, (required ->> 'unrestricted')::boolean, required -> 'scopes')
+  )
   AND (
-    a.requester_id = $3
-    OR $4::boolean
-    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $5::jsonb))
+    a.requester_id = $4
+    OR $5::boolean
+    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $6::jsonb))
   )
 `
 
 type CountVisiblePendingApprovalsParams struct {
 	UnrestrictedPermissions []string
 	Scopes                  []byte
+	RequiredScopes          []byte
 	ActorID                 uuid.UUID
 	ManageUnrestricted      bool
 	ManageScopes            []byte
@@ -38,6 +45,7 @@ func (q *Queries) CountVisiblePendingApprovals(ctx context.Context, arg CountVis
 	row := q.db.QueryRow(ctx, countVisiblePendingApprovals,
 		arg.UnrestrictedPermissions,
 		arg.Scopes,
+		arg.RequiredScopes,
 		arg.ActorID,
 		arg.ManageUnrestricted,
 		arg.ManageScopes,

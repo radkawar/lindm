@@ -91,6 +91,9 @@ message ReleaseRepositoryConfig {
   string directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   // Absent signing disables mutation but still permits verified update retrieval.
   ReleaseRepositorySigning signing = 2;
+  // Private persistent TUF verification checkpoint, outside the public repository.
+  // Required to admit recovery handoff; root trust comes from execution_bootstrap.
+  optional string verification_state_directory = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
 message ReleaseRepositorySigning {
   // Protected directory with rollout.pem, snapshot.pem and timestamp.pem only.

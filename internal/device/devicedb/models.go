@@ -19,36 +19,41 @@ type AuditEvent struct {
 }
 
 type DeviceAction struct {
-	ID                     uuid.UUID
-	DeviceID               uuid.UUID
-	GenerationID           uuid.UUID
-	Capability             string
-	LuksUuids              []uuid.UUID
-	RequestID              uuid.UUID
-	RequestDigest          []byte
-	RequestDocument        []byte
-	ActorID                uuid.UUID
-	AuthorizationVersion   int64
-	ApprovalID             *uuid.UUID
-	IntentEnvelope         []byte
-	IntentDocument         []byte
-	IssuedAt               pgtype.Timestamptz
-	ExpiresAt              pgtype.Timestamptz
-	ChallengeProof         []byte
-	ChallengeDocument      []byte
-	StartGrantEnvelope     []byte
-	StartAuthorizedAt      pgtype.Timestamptz
-	OutcomeUnknown         bool
-	ClosedAt               pgtype.Timestamptz
-	ClosedReason           string
-	ResultNonce            []byte
-	NonceExpiresAt         pgtype.Timestamptz
-	ActionRevision         pgtype.Numeric
-	AttestationEnvelope    []byte
-	AttestationCertificate []byte
-	StatusDocument         []byte
-	ReceivedAt             pgtype.Timestamptz
-	EscrowReceiptEnvelope  []byte
+	ID                       uuid.UUID
+	DeviceID                 uuid.UUID
+	GenerationID             uuid.UUID
+	Capability               string
+	LuksUuids                []uuid.UUID
+	RequestID                uuid.UUID
+	RequestDigest            []byte
+	RequestDocument          []byte
+	ActorID                  uuid.UUID
+	AuthorizationVersion     int64
+	ApprovalID               *uuid.UUID
+	IntentEnvelope           []byte
+	IntentDocument           []byte
+	IssuedAt                 pgtype.Timestamptz
+	ExpiresAt                pgtype.Timestamptz
+	ChallengeProof           []byte
+	ChallengeDocument        []byte
+	StartGrantEnvelope       []byte
+	StartAuthorizedAt        pgtype.Timestamptz
+	OutcomeUnknown           bool
+	ClosedAt                 pgtype.Timestamptz
+	ClosedReason             string
+	ResultNonce              []byte
+	NonceExpiresAt           pgtype.Timestamptz
+	ActionRevision           pgtype.Numeric
+	AttestationEnvelope      []byte
+	AttestationCertificate   []byte
+	StatusDocument           []byte
+	ReceivedAt               pgtype.Timestamptz
+	EscrowReceiptEnvelope    []byte
+	InventoryReceiptEnvelope []byte
+	InventoryReceiptDocument []byte
+	InventoryHostSequence    int64
+	InventoryHostReceivedAt  pgtype.Timestamptz
+	InventoryPackageSequence int64
 }
 
 type DeviceActionEscrow struct {
@@ -108,6 +113,14 @@ type DeviceActionRestriction struct {
 	QuarantineUntil pgtype.Timestamptz
 	ActionID        uuid.UUID
 	UpdatedAt       pgtype.Timestamptz
+}
+
+type DeviceAgentUpdateReport struct {
+	GenerationID uuid.UUID
+	SessionEpoch int64
+	Status       []byte
+	EventDigest  []byte
+	ReceivedAt   pgtype.Timestamptz
 }
 
 type DeviceGroup struct {

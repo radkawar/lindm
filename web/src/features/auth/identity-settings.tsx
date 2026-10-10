@@ -1,5 +1,7 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { queryOptions, useQuery } from "@tanstack/react-query";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
@@ -26,7 +28,7 @@ export function IdentitySettings() {
         Read-only deployment configuration. Change identity connectors in the server configuration.
       </p>
       {query.isPending ? <p role="status">Loading identity settings…</p> : null}
-      {query.isError ? <p role="alert">{toRpcFailure(query.error).message}</p> : null}
+      {query.isError ? <RpcError failure={toRpcFailure(query.error)} /> : null}
       {settings && !query.isError ? (
         <>
           <dl className="grid gap-2 sm:grid-cols-2">
@@ -38,10 +40,16 @@ export function IdentitySettings() {
             <dd>{settings.brokerEnabled ? settings.upstreamSource : "Not configured"}</dd>
             <dt>SCIM provisioning</dt>
             <dd>
-              {settings.scimEnabled ? "Enabled (supplemental revocation only)" : "Not configured"}
+              <StatusBadge status={settings.scimEnabled ? "info" : "neutral"}>
+                {settings.scimEnabled ? "Enabled (revocation only)" : "Not configured"}
+              </StatusBadge>
             </dd>
             <dt>Local break-glass</dt>
-            <dd>{settings.breakGlassEnabled ? "Configured" : "Not configured"}</dd>
+            <dd>
+              <StatusBadge status={settings.breakGlassEnabled ? "warning" : "neutral"}>
+                {settings.breakGlassEnabled ? "Configured" : "Not configured"}
+              </StatusBadge>
+            </dd>
             <dt>External refresh bound</dt>
             <dd>
               {settings.refreshIntervalSeconds
@@ -56,13 +64,17 @@ export function IdentitySettings() {
             </dd>
             <dt>Your current authority</dt>
             <dd>
-              {settings.localAuthority
-                ? "Current local database authority"
-                : settings.current
-                  ? "Current external observation"
-                  : "Not current"}
+              <StatusBadge
+                status={settings.localAuthority || settings.current ? "success" : "warning"}
+              >
+                {settings.localAuthority
+                  ? "Current local authority"
+                  : settings.current
+                    ? "Current external observation"
+                    : "Not current"}
+              </StatusBadge>
             </dd>
-            <dt>Your last authoritative observation</dt>
+            <dt>Your last identity check</dt>
             <dd>
               {settings.observedAt
                 ? timestampDate(settings.observedAt).toLocaleString()
@@ -70,9 +82,8 @@ export function IdentitySettings() {
             </dd>
           </dl>
           <p className="text-sm text-muted-foreground">
-            Freshness describes only your signed-in principal, not directory-wide health or upstream
-            propagation delay. SCIM never establishes freshness or adds group grants. Failed or
-            stale external observations deny access.
+            This status covers your account, not the whole directory. Stale or failed identity
+            checks block access. SCIM does not refresh this check or grant group permissions.
           </p>
         </>
       ) : null}

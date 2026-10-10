@@ -61,6 +61,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{},
 		&agentv1.GetExecutionTrustRequest{},
+		&agentv1.GetRecoveryReadinessRequest{},
 		&agentv1.PrepareServiceExecutionRequest{},
 		&agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{},
@@ -70,6 +71,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.GetDeviceActionRequest{},
 		&agentv1.AttestDeviceActionRequest{},
 		&agentv1.ConfirmDeviceActionEscrowRequest{},
+		&agentv1.ConfirmDeviceActionInventoryRequest{},
 		&agentv1.SupplyDeviceActionCredentialRequest{},
 		&agentv1.PrepareDeviceActionRecoveryRequest{},
 		&agentv1.CommitDeviceActionRecoveryRequest{},
@@ -154,6 +156,7 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceCommitRenewalProcedure ||
 		procedure == agentv1connect.ExecutorServiceUpdateExecutionTrustProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetExecutionTrustProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceStartServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetServiceExecutionProcedure ||
@@ -163,6 +166,7 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceGetDeviceActionProcedure ||
 		procedure == agentv1connect.ExecutorServiceAttestDeviceActionProcedure ||
 		procedure == agentv1connect.ExecutorServiceConfirmDeviceActionEscrowProcedure ||
+		procedure == agentv1connect.ExecutorServiceConfirmDeviceActionInventoryProcedure ||
 		procedure == agentv1connect.ExecutorServicePrepareDeviceActionRecoveryProcedure ||
 		procedure == agentv1connect.ExecutorServiceCommitDeviceActionRecoveryProcedure ||
 		procedure == agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure ||

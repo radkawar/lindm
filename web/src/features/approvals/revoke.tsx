@@ -7,13 +7,13 @@ import {
   RevokeDeviceRequestSchema,
   type RevokeDeviceRequest,
 } from "../../../gen/lindm/admin/v1/approvals_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
-import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
 
 export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
@@ -48,10 +48,11 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
       if (!lifetime.signal.aborted) {
         const next = toRpcFailure(error);
         setFailure(next);
-        toast.error(
-          next.ambiguous ? "Approval request outcome unknown" : "Approval request failed",
+        const { tone, title } = classifyRpcFailure(next);
+        toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
+          title,
           {
-            description: "Review the inline result before continuing.",
+            description: "Review the inline approval request result before continuing.",
           },
         );
         if (!next.ambiguous) setPayload(null);
@@ -63,7 +64,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
 
   return (
     <form
-      className="grid min-w-0 gap-3 border border-destructive/30 bg-destructive/5 p-4"
+      className="grid min-w-0 gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         void requestApproval();
@@ -93,7 +94,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         <Button
           className="w-fit"
           type="submit"
-          variant="destructive"
+          variant="default"
           disabled={busy || reason.trim() === ""}
         >
           {busy
@@ -104,17 +105,9 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         </Button>
       )}
       {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>
-            {failure.ambiguous ? "Outcome unknown" : "Approval request failed"}
-          </AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-            {failure.ambiguous
-              ? " The outcome is unknown; retry uses the same request ID and payload."
-              : ""}
-          </AlertDescription>
-        </Alert>
+        <RpcError failure={failure}>
+          {failure.ambiguous ? <p>Retry uses the same request ID and payload.</p> : null}
+        </RpcError>
       ) : null}
     </form>
   );

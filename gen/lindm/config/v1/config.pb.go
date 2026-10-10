@@ -242,9 +242,12 @@ type ReleaseRepositoryConfig struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Directory string                 `protobuf:"bytes,1,opt,name=directory,proto3" json:"directory,omitempty"`
 	// Absent signing disables mutation but still permits verified update retrieval.
-	Signing       *ReleaseRepositorySigning `protobuf:"bytes,2,opt,name=signing,proto3" json:"signing,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Signing *ReleaseRepositorySigning `protobuf:"bytes,2,opt,name=signing,proto3" json:"signing,omitempty"`
+	// Private persistent TUF verification checkpoint, outside the public repository.
+	// Required to admit recovery handoff; root trust comes from execution_bootstrap.
+	VerificationStateDirectory *string `protobuf:"bytes,3,opt,name=verification_state_directory,json=verificationStateDirectory,proto3,oneof" json:"verification_state_directory,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *ReleaseRepositoryConfig) Reset() {
@@ -289,6 +292,13 @@ func (x *ReleaseRepositoryConfig) GetSigning() *ReleaseRepositorySigning {
 		return x.Signing
 	}
 	return nil
+}
+
+func (x *ReleaseRepositoryConfig) GetVerificationStateDirectory() string {
+	if x != nil && x.VerificationStateDirectory != nil {
+		return *x.VerificationStateDirectory
+	}
+	return ""
 }
 
 type ReleaseRepositorySigning struct {
@@ -1778,10 +1788,12 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)\x1a\xb6\x04\n" +
 	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)B\x19\n" +
 	"\x17_inventory_budget_bytesB\x14\n" +
-	"\x12_device_public_url\"\x87\x01\n" +
+	"\x12_device_public_url\"\xfa\x01\n" +
 	"\x17ReleaseRepositoryConfig\x12'\n" +
 	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\x12C\n" +
-	"\asigning\x18\x02 \x01(\v2).lindm.config.v1.ReleaseRepositorySigningR\asigning\"C\n" +
+	"\asigning\x18\x02 \x01(\v2).lindm.config.v1.ReleaseRepositorySigningR\asigning\x12P\n" +
+	"\x1cverification_state_directory\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x1averificationStateDirectory\x88\x01\x01B\x1f\n" +
+	"\x1d_verification_state_directory\"C\n" +
 	"\x18ReleaseRepositorySigning\x12'\n" +
 	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\"\xed\x04\n" +
 	"\x0eAdvisoryConfig\x12=\n" +
@@ -1997,6 +2009,7 @@ func file_lindm_config_v1_config_proto_init() {
 		return
 	}
 	file_lindm_config_v1_config_proto_msgTypes[0].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[1].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[3].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[10].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[13].OneofWrappers = []any{

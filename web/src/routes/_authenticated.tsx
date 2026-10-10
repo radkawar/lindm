@@ -10,6 +10,8 @@ import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { CommandPalette } from "@/app/command-palette";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RpcError } from "@/components/ui/rpc-error";
+import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ context }) => {
@@ -27,7 +29,7 @@ function AuthenticatedLayout() {
   const principal = session.data;
   const lifetime = useSyncExternalStore(subscribeAuthLifetime, getAuthLifetime);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
+  const [logoutError, setLogoutError] = useState<RpcFailure | null>(null);
 
   useEffect(() => {
     if (session.isSuccess && session.data === null) {
@@ -56,13 +58,13 @@ function AuthenticatedLayout() {
       }
       onLogout={() => {
         setLoggingOut(true);
-        setLogoutError("");
+        setLogoutError(null);
         void logout(queryClient, principal.csrfToken)
           .then(() => {
             return router.navigate({ to: "/" });
           })
           .catch((error: unknown) => {
-            setLogoutError(error instanceof Error ? error.message : "Sign-out failed.");
+            setLogoutError(toRpcFailure(error));
           })
           .finally(() => setLoggingOut(false));
       }}
@@ -70,14 +72,14 @@ function AuthenticatedLayout() {
       {principal.breakGlass ? (
         <div
           role="alert"
-          className="sticky top-0 z-50 rounded border-2 border-destructive bg-background p-4 text-destructive"
+          className="sticky top-0 z-50 border-2 border-warning bg-background p-4 text-warning"
         >
-          <strong>Break-glass emergency session — restricted and audited</strong>
+          <strong>Break-glass emergency session: restricted and audited</strong>
           <p>Incident: {principal.incidentReason}</p>
           <p>Sign out to end this emergency session when the incident is resolved.</p>
         </div>
       ) : null}
-      {logoutError !== "" ? <p role="alert">{logoutError}</p> : null}
+      {logoutError ? <RpcError failure={logoutError} title="Sign-out failed" /> : null}
       <AuthLifetimeContext key={lifetime.generation} value={lifetime}>
         <PrincipalContext value={principal}>
           <main id="main" tabIndex={-1} className="min-w-0 outline-none">

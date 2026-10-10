@@ -3,6 +3,7 @@ package devlab
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -32,6 +33,16 @@ func OpenReleaseAuthorityFixture(ctx context.Context, repository, binary string)
 		return nil, nil, err
 	}
 	return fixture, fixture.releasePublisher, nil
+}
+
+// PublishRecoveryArtifact makes this exact signed UKI an authenticated offline
+// targets-role release. Its length is measured by the publisher, never supplied
+// by the action requester or inferred from guest inventory.
+func (f *AuthorityFixture) PublishRecoveryArtifact(ctx context.Context, source string, digest []byte) error {
+	if f.releasePublisher == nil || len(digest) != 32 {
+		return errors.New("recovery artifact requires an isolated release authority and SHA-256")
+	}
+	return f.releasePublisher.PublishArtifact(ctx, "recovery/"+hex.EncodeToString(digest)+".efi", source)
 }
 
 func (s *OwnerSession) ReleaseManagement() releasemanagementv1connect.ReleaseManagementServiceClient {
@@ -154,7 +165,7 @@ func (f *AuthorityFixture) configureReleaseRepository(ctx context.Context, cfg *
 	if err := os.WriteFile(filepath.Join(f.directory, "bootstrap.dsse.json"), envelope, 0600); err != nil {
 		return err
 	}
-	cfg.ReleaseRepository = &configv1.ReleaseRepositoryConfig{Directory: directory, Signing: &configv1.ReleaseRepositorySigning{Directory: onlineCustody}}
+	cfg.ReleaseRepository = &configv1.ReleaseRepositoryConfig{Directory: directory, Signing: &configv1.ReleaseRepositorySigning{Directory: onlineCustody}, VerificationStateDirectory: proto.String(filepath.Join(f.directory, "release-verification"))}
 	f.releasePublisher = publisher
 	return nil
 }

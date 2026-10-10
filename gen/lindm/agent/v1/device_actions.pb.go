@@ -182,6 +182,55 @@ func (SanitizeMethod) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{2}
 }
 
+type NvmeIdentityBasis int32
+
+const (
+	NvmeIdentityBasis_NVME_IDENTITY_BASIS_UNSPECIFIED            NvmeIdentityBasis = 0
+	NvmeIdentityBasis_NVME_IDENTITY_BASIS_NAMESPACE_NID          NvmeIdentityBasis = 1
+	NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID NvmeIdentityBasis = 2
+)
+
+// Enum value maps for NvmeIdentityBasis.
+var (
+	NvmeIdentityBasis_name = map[int32]string{
+		0: "NVME_IDENTITY_BASIS_UNSPECIFIED",
+		1: "NVME_IDENTITY_BASIS_NAMESPACE_NID",
+		2: "NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID",
+	}
+	NvmeIdentityBasis_value = map[string]int32{
+		"NVME_IDENTITY_BASIS_UNSPECIFIED":            0,
+		"NVME_IDENTITY_BASIS_NAMESPACE_NID":          1,
+		"NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID": 2,
+	}
+)
+
+func (x NvmeIdentityBasis) Enum() *NvmeIdentityBasis {
+	p := new(NvmeIdentityBasis)
+	*p = x
+	return p
+}
+
+func (x NvmeIdentityBasis) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NvmeIdentityBasis) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[3].Descriptor()
+}
+
+func (NvmeIdentityBasis) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[3]
+}
+
+func (x NvmeIdentityBasis) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NvmeIdentityBasis.Descriptor instead.
+func (NvmeIdentityBasis) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{3}
+}
+
 type DeviceActionState int32
 
 const (
@@ -236,11 +285,11 @@ func (x DeviceActionState) String() string {
 }
 
 func (DeviceActionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[3].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[4].Descriptor()
 }
 
 func (DeviceActionState) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[3]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[4]
 }
 
 func (x DeviceActionState) Number() protoreflect.EnumNumber {
@@ -249,7 +298,7 @@ func (x DeviceActionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceActionState.Descriptor instead.
 func (DeviceActionState) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{4}
 }
 
 type DeviceActionFailure int32
@@ -303,11 +352,11 @@ func (x DeviceActionFailure) String() string {
 }
 
 func (DeviceActionFailure) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_device_actions_proto_enumTypes[4].Descriptor()
+	return file_lindm_agent_v1_device_actions_proto_enumTypes[5].Descriptor()
 }
 
 func (DeviceActionFailure) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_device_actions_proto_enumTypes[4]
+	return &file_lindm_agent_v1_device_actions_proto_enumTypes[5]
 }
 
 func (x DeviceActionFailure) Number() protoreflect.EnumNumber {
@@ -316,7 +365,7 @@ func (x DeviceActionFailure) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceActionFailure.Descriptor instead.
 func (DeviceActionFailure) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{5}
 }
 
 // Stable native identity, never a caller-selected device path. Providers require
@@ -988,17 +1037,128 @@ func (x *RecoveryBootSpec) GetMediaSha256() []byte {
 	return nil
 }
 
+// Explicit human-approved native identity. Changing the basis or any field
+// requires new approval; native execution never falls back to another basis.
+type NVMeSanitizeIdentity struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Basis              NvmeIdentityBasis      `protobuf:"varint,1,opt,name=basis,proto3,enum=lindm.agent.v1.NvmeIdentityBasis" json:"basis,omitempty"`
+	VendorId           uint32                 `protobuf:"varint,2,opt,name=vendor_id,json=vendorId,proto3" json:"vendor_id,omitempty"`
+	SubsystemVendorId  uint32                 `protobuf:"varint,3,opt,name=subsystem_vendor_id,json=subsystemVendorId,proto3" json:"subsystem_vendor_id,omitempty"`
+	ControllerSerial   string                 `protobuf:"bytes,4,opt,name=controller_serial,json=controllerSerial,proto3" json:"controller_serial,omitempty"`
+	ControllerModel    string                 `protobuf:"bytes,5,opt,name=controller_model,json=controllerModel,proto3" json:"controller_model,omitempty"`
+	ControllerFirmware string                 `protobuf:"bytes,6,opt,name=controller_firmware,json=controllerFirmware,proto3" json:"controller_firmware,omitempty"`
+	NamespaceSizeBytes uint64                 `protobuf:"varint,7,opt,name=namespace_size_bytes,json=namespaceSizeBytes,proto3" json:"namespace_size_bytes,omitempty"`
+	LbaFormat          uint32                 `protobuf:"varint,8,opt,name=lba_format,json=lbaFormat,proto3" json:"lba_format,omitempty"`
+	LbaDataSizeShift   uint32                 `protobuf:"varint,9,opt,name=lba_data_size_shift,json=lbaDataSizeShift,proto3" json:"lba_data_size_shift,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *NVMeSanitizeIdentity) Reset() {
+	*x = NVMeSanitizeIdentity{}
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NVMeSanitizeIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NVMeSanitizeIdentity) ProtoMessage() {}
+
+func (x *NVMeSanitizeIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NVMeSanitizeIdentity.ProtoReflect.Descriptor instead.
+func (*NVMeSanitizeIdentity) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *NVMeSanitizeIdentity) GetBasis() NvmeIdentityBasis {
+	if x != nil {
+		return x.Basis
+	}
+	return NvmeIdentityBasis_NVME_IDENTITY_BASIS_UNSPECIFIED
+}
+
+func (x *NVMeSanitizeIdentity) GetVendorId() uint32 {
+	if x != nil {
+		return x.VendorId
+	}
+	return 0
+}
+
+func (x *NVMeSanitizeIdentity) GetSubsystemVendorId() uint32 {
+	if x != nil {
+		return x.SubsystemVendorId
+	}
+	return 0
+}
+
+func (x *NVMeSanitizeIdentity) GetControllerSerial() string {
+	if x != nil {
+		return x.ControllerSerial
+	}
+	return ""
+}
+
+func (x *NVMeSanitizeIdentity) GetControllerModel() string {
+	if x != nil {
+		return x.ControllerModel
+	}
+	return ""
+}
+
+func (x *NVMeSanitizeIdentity) GetControllerFirmware() string {
+	if x != nil {
+		return x.ControllerFirmware
+	}
+	return ""
+}
+
+func (x *NVMeSanitizeIdentity) GetNamespaceSizeBytes() uint64 {
+	if x != nil {
+		return x.NamespaceSizeBytes
+	}
+	return 0
+}
+
+func (x *NVMeSanitizeIdentity) GetLbaFormat() uint32 {
+	if x != nil {
+		return x.LbaFormat
+	}
+	return 0
+}
+
+func (x *NVMeSanitizeIdentity) GetLbaDataSizeShift() uint32 {
+	if x != nil {
+		return x.LbaDataSizeShift
+	}
+	return 0
+}
+
 type NVMeSanitizeScope struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	NamespaceId    uint32                 `protobuf:"varint,1,opt,name=namespace_id,json=namespaceId,proto3" json:"namespace_id,omitempty"`
 	ControllerWide bool                   `protobuf:"varint,2,opt,name=controller_wide,json=controllerWide,proto3" json:"controller_wide,omitempty"`
+	Identity       *NVMeSanitizeIdentity  `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NVMeSanitizeScope) Reset() {
 	*x = NVMeSanitizeScope{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1010,7 +1170,7 @@ func (x *NVMeSanitizeScope) String() string {
 func (*NVMeSanitizeScope) ProtoMessage() {}
 
 func (x *NVMeSanitizeScope) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1023,7 +1183,7 @@ func (x *NVMeSanitizeScope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NVMeSanitizeScope.ProtoReflect.Descriptor instead.
 func (*NVMeSanitizeScope) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{11}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *NVMeSanitizeScope) GetNamespaceId() uint32 {
@@ -1038,6 +1198,13 @@ func (x *NVMeSanitizeScope) GetControllerWide() bool {
 		return x.ControllerWide
 	}
 	return false
+}
+
+func (x *NVMeSanitizeScope) GetIdentity() *NVMeSanitizeIdentity {
+	if x != nil {
+		return x.Identity
+	}
+	return nil
 }
 
 type NVMeSanitizePlan struct {
@@ -1062,7 +1229,7 @@ type NVMeSanitizePlan struct {
 
 func (x *NVMeSanitizePlan) Reset() {
 	*x = NVMeSanitizePlan{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1074,7 +1241,7 @@ func (x *NVMeSanitizePlan) String() string {
 func (*NVMeSanitizePlan) ProtoMessage() {}
 
 func (x *NVMeSanitizePlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1087,7 +1254,7 @@ func (x *NVMeSanitizePlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NVMeSanitizePlan.ProtoReflect.Descriptor instead.
 func (*NVMeSanitizePlan) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{12}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NVMeSanitizePlan) GetScope() *NVMeSanitizeScope {
@@ -1189,7 +1356,7 @@ type NVMeSanitizeVerification struct {
 
 func (x *NVMeSanitizeVerification) Reset() {
 	*x = NVMeSanitizeVerification{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1201,7 +1368,7 @@ func (x *NVMeSanitizeVerification) String() string {
 func (*NVMeSanitizeVerification) ProtoMessage() {}
 
 func (x *NVMeSanitizeVerification) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1214,7 +1381,7 @@ func (x *NVMeSanitizeVerification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NVMeSanitizeVerification.ProtoReflect.Descriptor instead.
 func (*NVMeSanitizeVerification) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{13}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NVMeSanitizeVerification) GetObservedScope() *NVMeSanitizePlan {
@@ -1280,7 +1447,7 @@ type SanitizeAction struct {
 
 func (x *SanitizeAction) Reset() {
 	*x = SanitizeAction{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1292,7 +1459,7 @@ func (x *SanitizeAction) String() string {
 func (*SanitizeAction) ProtoMessage() {}
 
 func (x *SanitizeAction) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1305,7 +1472,7 @@ func (x *SanitizeAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SanitizeAction.ProtoReflect.Descriptor instead.
 func (*SanitizeAction) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{14}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SanitizeAction) GetTarget() *StorageTarget {
@@ -1336,6 +1503,147 @@ func (x *SanitizeAction) GetNvmeScope() *NVMeSanitizeScope {
 	return nil
 }
 
+// Native logind power operations. Delay is scheduled by logind, not a script.
+type RestartAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DelaySeconds  *uint32                `protobuf:"varint,1,opt,name=delay_seconds,json=delaySeconds,proto3,oneof" json:"delay_seconds,omitempty"`
+	Message       *string                `protobuf:"bytes,2,opt,name=message,proto3,oneof" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestartAction) Reset() {
+	*x = RestartAction{}
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestartAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestartAction) ProtoMessage() {}
+
+func (x *RestartAction) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestartAction.ProtoReflect.Descriptor instead.
+func (*RestartAction) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RestartAction) GetDelaySeconds() uint32 {
+	if x != nil && x.DelaySeconds != nil {
+		return *x.DelaySeconds
+	}
+	return 0
+}
+
+func (x *RestartAction) GetMessage() string {
+	if x != nil && x.Message != nil {
+		return *x.Message
+	}
+	return ""
+}
+
+type ShutdownAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DelaySeconds  *uint32                `protobuf:"varint,1,opt,name=delay_seconds,json=delaySeconds,proto3,oneof" json:"delay_seconds,omitempty"`
+	Message       *string                `protobuf:"bytes,2,opt,name=message,proto3,oneof" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShutdownAction) Reset() {
+	*x = ShutdownAction{}
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShutdownAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShutdownAction) ProtoMessage() {}
+
+func (x *ShutdownAction) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShutdownAction.ProtoReflect.Descriptor instead.
+func (*ShutdownAction) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ShutdownAction) GetDelaySeconds() uint32 {
+	if x != nil && x.DelaySeconds != nil {
+		return *x.DelaySeconds
+	}
+	return 0
+}
+
+func (x *ShutdownAction) GetMessage() string {
+	if x != nil && x.Message != nil {
+		return *x.Message
+	}
+	return ""
+}
+
+type RefreshInventoryAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefreshInventoryAction) Reset() {
+	*x = RefreshInventoryAction{}
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefreshInventoryAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefreshInventoryAction) ProtoMessage() {}
+
+func (x *RefreshInventoryAction) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefreshInventoryAction.ProtoReflect.Descriptor instead.
+func (*RefreshInventoryAction) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{18}
+}
+
 // Closed immutable action specification. No executable, command, script, path,
 // arbitrary native arguments, or generic extension map exists in this contract.
 type DeviceActionSpec struct {
@@ -1350,6 +1658,9 @@ type DeviceActionSpec struct {
 	//	*DeviceActionSpec_CryptoErase
 	//	*DeviceActionSpec_Sanitize
 	//	*DeviceActionSpec_ReleaseLock
+	//	*DeviceActionSpec_Restart
+	//	*DeviceActionSpec_Shutdown
+	//	*DeviceActionSpec_RefreshInventory
 	Action        isDeviceActionSpec_Action `protobuf_oneof:"action"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1357,7 +1668,7 @@ type DeviceActionSpec struct {
 
 func (x *DeviceActionSpec) Reset() {
 	*x = DeviceActionSpec{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1369,7 +1680,7 @@ func (x *DeviceActionSpec) String() string {
 func (*DeviceActionSpec) ProtoMessage() {}
 
 func (x *DeviceActionSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1382,7 +1693,7 @@ func (x *DeviceActionSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionSpec.ProtoReflect.Descriptor instead.
 func (*DeviceActionSpec) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{15}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeviceActionSpec) GetAction() isDeviceActionSpec_Action {
@@ -1464,6 +1775,33 @@ func (x *DeviceActionSpec) GetReleaseLock() *ReleaseLockAction {
 	return nil
 }
 
+func (x *DeviceActionSpec) GetRestart() *RestartAction {
+	if x != nil {
+		if x, ok := x.Action.(*DeviceActionSpec_Restart); ok {
+			return x.Restart
+		}
+	}
+	return nil
+}
+
+func (x *DeviceActionSpec) GetShutdown() *ShutdownAction {
+	if x != nil {
+		if x, ok := x.Action.(*DeviceActionSpec_Shutdown); ok {
+			return x.Shutdown
+		}
+	}
+	return nil
+}
+
+func (x *DeviceActionSpec) GetRefreshInventory() *RefreshInventoryAction {
+	if x != nil {
+		if x, ok := x.Action.(*DeviceActionSpec_RefreshInventory); ok {
+			return x.RefreshInventory
+		}
+	}
+	return nil
+}
+
 type isDeviceActionSpec_Action interface {
 	isDeviceActionSpec_Action()
 }
@@ -1500,6 +1838,18 @@ type DeviceActionSpec_ReleaseLock struct {
 	ReleaseLock *ReleaseLockAction `protobuf:"bytes,8,opt,name=release_lock,json=releaseLock,proto3,oneof"`
 }
 
+type DeviceActionSpec_Restart struct {
+	Restart *RestartAction `protobuf:"bytes,9,opt,name=restart,proto3,oneof"`
+}
+
+type DeviceActionSpec_Shutdown struct {
+	Shutdown *ShutdownAction `protobuf:"bytes,10,opt,name=shutdown,proto3,oneof"`
+}
+
+type DeviceActionSpec_RefreshInventory struct {
+	RefreshInventory *RefreshInventoryAction `protobuf:"bytes,11,opt,name=refresh_inventory,json=refreshInventory,proto3,oneof"`
+}
+
 func (*DeviceActionSpec_EscrowRotate) isDeviceActionSpec_Action() {}
 
 func (*DeviceActionSpec_Tpm2Bind) isDeviceActionSpec_Action() {}
@@ -1516,6 +1866,12 @@ func (*DeviceActionSpec_Sanitize) isDeviceActionSpec_Action() {}
 
 func (*DeviceActionSpec_ReleaseLock) isDeviceActionSpec_Action() {}
 
+func (*DeviceActionSpec_Restart) isDeviceActionSpec_Action() {}
+
+func (*DeviceActionSpec_Shutdown) isDeviceActionSpec_Action() {}
+
+func (*DeviceActionSpec_RefreshInventory) isDeviceActionSpec_Action() {}
+
 // Public token inventory only: no native token blobs, sealed secrets or keys.
 type LUKSTokenObservation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1528,7 +1884,7 @@ type LUKSTokenObservation struct {
 
 func (x *LUKSTokenObservation) Reset() {
 	*x = LUKSTokenObservation{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1540,7 +1896,7 @@ func (x *LUKSTokenObservation) String() string {
 func (*LUKSTokenObservation) ProtoMessage() {}
 
 func (x *LUKSTokenObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1553,7 +1909,7 @@ func (x *LUKSTokenObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LUKSTokenObservation.ProtoReflect.Descriptor instead.
 func (*LUKSTokenObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{16}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *LUKSTokenObservation) GetTokenId() uint32 {
@@ -1602,13 +1958,14 @@ type DeviceActionObservation struct {
 	// Public account names only. Shadow credentials never enter remote evidence.
 	DisabledAccounts  []string `protobuf:"bytes,18,rep,name=disabled_accounts,json=disabledAccounts,proto3" json:"disabled_accounts,omitempty"`
 	PreservedAccounts []string `protobuf:"bytes,19,rep,name=preserved_accounts,json=preservedAccounts,proto3" json:"preserved_accounts,omitempty"`
+	BootId            string   `protobuf:"bytes,20,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DeviceActionObservation) Reset() {
 	*x = DeviceActionObservation{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1620,7 +1977,7 @@ func (x *DeviceActionObservation) String() string {
 func (*DeviceActionObservation) ProtoMessage() {}
 
 func (x *DeviceActionObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1633,7 +1990,7 @@ func (x *DeviceActionObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionObservation.ProtoReflect.Descriptor instead.
 func (*DeviceActionObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{17}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeviceActionObservation) GetObservedAt() *timestamppb.Timestamp {
@@ -1769,6 +2126,13 @@ func (x *DeviceActionObservation) GetPreservedAccounts() []string {
 	return nil
 }
 
+func (x *DeviceActionObservation) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
 type DeviceActionPlan struct {
 	state              protoimpl.MessageState   `protogen:"open.v1"`
 	Spec               *DeviceActionSpec        `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
@@ -1782,7 +2146,7 @@ type DeviceActionPlan struct {
 
 func (x *DeviceActionPlan) Reset() {
 	*x = DeviceActionPlan{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1794,7 +2158,7 @@ func (x *DeviceActionPlan) String() string {
 func (*DeviceActionPlan) ProtoMessage() {}
 
 func (x *DeviceActionPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1807,7 +2171,7 @@ func (x *DeviceActionPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionPlan.ProtoReflect.Descriptor instead.
 func (*DeviceActionPlan) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{18}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeviceActionPlan) GetSpec() *DeviceActionSpec {
@@ -1861,7 +2225,7 @@ type DeviceActionEscrow struct {
 
 func (x *DeviceActionEscrow) Reset() {
 	*x = DeviceActionEscrow{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1873,7 +2237,7 @@ func (x *DeviceActionEscrow) String() string {
 func (*DeviceActionEscrow) ProtoMessage() {}
 
 func (x *DeviceActionEscrow) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1886,7 +2250,7 @@ func (x *DeviceActionEscrow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionEscrow.ProtoReflect.Descriptor instead.
 func (*DeviceActionEscrow) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{19}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DeviceActionEscrow) GetEscrowKeyId() string {
@@ -1946,13 +2310,19 @@ type DeviceActionVerification struct {
 	Escrow             *DeviceActionEscrow        `protobuf:"bytes,4,opt,name=escrow,proto3" json:"escrow,omitempty"`
 	CryptoEraseResults []*CryptoEraseTargetResult `protobuf:"bytes,5,rep,name=crypto_erase_results,json=cryptoEraseResults,proto3" json:"crypto_erase_results,omitempty"`
 	NvmeSanitize       *NVMeSanitizeVerification  `protobuf:"bytes,6,opt,name=nvme_sanitize,json=nvmeSanitize,proto3" json:"nvme_sanitize,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Current boot observed after the consumed restart; differs from challenge.
+	BootId string `protobuf:"bytes,7,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	// Published full snapshot, not merely a collected or queued snapshot.
+	InventorySequence uint64 `protobuf:"varint,8,opt,name=inventory_sequence,json=inventorySequence,proto3" json:"inventory_sequence,omitempty"`
+	// Native acceptance is not proof that power-off or reboot completed.
+	PowerRequestAccepted bool `protobuf:"varint,9,opt,name=power_request_accepted,json=powerRequestAccepted,proto3" json:"power_request_accepted,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *DeviceActionVerification) Reset() {
 	*x = DeviceActionVerification{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1964,7 +2334,7 @@ func (x *DeviceActionVerification) String() string {
 func (*DeviceActionVerification) ProtoMessage() {}
 
 func (x *DeviceActionVerification) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1977,7 +2347,7 @@ func (x *DeviceActionVerification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionVerification.ProtoReflect.Descriptor instead.
 func (*DeviceActionVerification) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{20}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DeviceActionVerification) GetVerified() bool {
@@ -2022,6 +2392,27 @@ func (x *DeviceActionVerification) GetNvmeSanitize() *NVMeSanitizeVerification {
 	return nil
 }
 
+func (x *DeviceActionVerification) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
+func (x *DeviceActionVerification) GetInventorySequence() uint64 {
+	if x != nil {
+		return x.InventorySequence
+	}
+	return 0
+}
+
+func (x *DeviceActionVerification) GetPowerRequestAccepted() bool {
+	if x != nil {
+		return x.PowerRequestAccepted
+	}
+	return false
+}
+
 // Plan-role DSSE, preflight only. SHA256 is deterministic protobuf of spec.
 type DeviceActionIntent struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -2045,7 +2436,7 @@ type DeviceActionIntent struct {
 
 func (x *DeviceActionIntent) Reset() {
 	*x = DeviceActionIntent{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2057,7 +2448,7 @@ func (x *DeviceActionIntent) String() string {
 func (*DeviceActionIntent) ProtoMessage() {}
 
 func (x *DeviceActionIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2070,7 +2461,7 @@ func (x *DeviceActionIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionIntent.ProtoReflect.Descriptor instead.
 func (*DeviceActionIntent) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{21}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DeviceActionIntent) GetDeploymentId() string {
@@ -2195,7 +2586,7 @@ type DeviceActionChallenge struct {
 
 func (x *DeviceActionChallenge) Reset() {
 	*x = DeviceActionChallenge{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[22]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2598,7 @@ func (x *DeviceActionChallenge) String() string {
 func (*DeviceActionChallenge) ProtoMessage() {}
 
 func (x *DeviceActionChallenge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[22]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2220,7 +2611,7 @@ func (x *DeviceActionChallenge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionChallenge.ProtoReflect.Descriptor instead.
 func (*DeviceActionChallenge) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{22}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *DeviceActionChallenge) GetDeploymentId() string {
@@ -2341,7 +2732,7 @@ type DeviceActionApprovalBinding struct {
 
 func (x *DeviceActionApprovalBinding) Reset() {
 	*x = DeviceActionApprovalBinding{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[23]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2353,7 +2744,7 @@ func (x *DeviceActionApprovalBinding) String() string {
 func (*DeviceActionApprovalBinding) ProtoMessage() {}
 
 func (x *DeviceActionApprovalBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[23]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2366,7 +2757,7 @@ func (x *DeviceActionApprovalBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionApprovalBinding.ProtoReflect.Descriptor instead.
 func (*DeviceActionApprovalBinding) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{23}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DeviceActionApprovalBinding) GetDeviceId() string {
@@ -2408,7 +2799,7 @@ type DeviceActionHumanApproval struct {
 
 func (x *DeviceActionHumanApproval) Reset() {
 	*x = DeviceActionHumanApproval{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[24]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2420,7 +2811,7 @@ func (x *DeviceActionHumanApproval) String() string {
 func (*DeviceActionHumanApproval) ProtoMessage() {}
 
 func (x *DeviceActionHumanApproval) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[24]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2433,7 +2824,7 @@ func (x *DeviceActionHumanApproval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionHumanApproval.ProtoReflect.Descriptor instead.
 func (*DeviceActionHumanApproval) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{24}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *DeviceActionHumanApproval) GetActorId() string {
@@ -2473,7 +2864,7 @@ type DeviceActionStartGrant struct {
 
 func (x *DeviceActionStartGrant) Reset() {
 	*x = DeviceActionStartGrant{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[25]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2485,7 +2876,7 @@ func (x *DeviceActionStartGrant) String() string {
 func (*DeviceActionStartGrant) ProtoMessage() {}
 
 func (x *DeviceActionStartGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[25]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2498,7 +2889,7 @@ func (x *DeviceActionStartGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionStartGrant.ProtoReflect.Descriptor instead.
 func (*DeviceActionStartGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{25}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DeviceActionStartGrant) GetChallenge() *DeviceActionChallenge {
@@ -2558,43 +2949,46 @@ func (x *DeviceActionStartGrant) GetApprovals() []*DeviceActionHumanApproval {
 }
 
 type DeviceActionRecord struct {
-	state                      protoimpl.MessageState    `protogen:"open.v1"`
-	FormatVersion              uint32                    `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
-	InstallationId             string                    `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	IntentEnvelope             []byte                    `protobuf:"bytes,3,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
-	IntentSha256               []byte                    `protobuf:"bytes,4,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
-	Intent                     *DeviceActionIntent       `protobuf:"bytes,5,opt,name=intent,proto3" json:"intent,omitempty"`
-	NativePlan                 *DeviceActionPlan         `protobuf:"bytes,6,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
-	AcceptedRoot               *ExecutionRoot            `protobuf:"bytes,7,opt,name=accepted_root,json=acceptedRoot,proto3" json:"accepted_root,omitempty"`
-	AcceptedDelegationEnvelope []byte                    `protobuf:"bytes,8,opt,name=accepted_delegation_envelope,json=acceptedDelegationEnvelope,proto3" json:"accepted_delegation_envelope,omitempty"`
-	AcceptedAt                 *timestamppb.Timestamp    `protobuf:"bytes,9,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
-	State                      DeviceActionState         `protobuf:"varint,10,opt,name=state,proto3,enum=lindm.agent.v1.DeviceActionState" json:"state,omitempty"`
-	Failure                    DeviceActionFailure       `protobuf:"varint,11,opt,name=failure,proto3,enum=lindm.agent.v1.DeviceActionFailure" json:"failure,omitempty"`
-	Challenge                  *DeviceActionChallenge    `protobuf:"bytes,12,opt,name=challenge,proto3" json:"challenge,omitempty"`
-	ChallengeProof             []byte                    `protobuf:"bytes,13,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
-	ChallengeBoottimeNs        uint64                    `protobuf:"varint,14,opt,name=challenge_boottime_ns,json=challengeBoottimeNs,proto3" json:"challenge_boottime_ns,omitempty"`
-	StartGrantEnvelope         []byte                    `protobuf:"bytes,15,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
-	StartGrantSha256           []byte                    `protobuf:"bytes,16,opt,name=start_grant_sha256,json=startGrantSha256,proto3" json:"start_grant_sha256,omitempty"`
-	StartedAt                  *timestamppb.Timestamp    `protobuf:"bytes,17,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	CompletedAt                *timestamppb.Timestamp    `protobuf:"bytes,18,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	Verification               *DeviceActionVerification `protobuf:"bytes,19,opt,name=verification,proto3" json:"verification,omitempty"`
-	ChallengeCertificatePem    []byte                    `protobuf:"bytes,20,opt,name=challenge_certificate_pem,json=challengeCertificatePem,proto3" json:"challenge_certificate_pem,omitempty"`
-	GrantAcceptedAt            *timestamppb.Timestamp    `protobuf:"bytes,21,opt,name=grant_accepted_at,json=grantAcceptedAt,proto3" json:"grant_accepted_at,omitempty"`
-	EscrowReceiptEnvelope      []byte                    `protobuf:"bytes,22,opt,name=escrow_receipt_envelope,json=escrowReceiptEnvelope,proto3" json:"escrow_receipt_envelope,omitempty"`
-	EscrowConfirmedAt          *timestamppb.Timestamp    `protobuf:"bytes,23,opt,name=escrow_confirmed_at,json=escrowConfirmedAt,proto3" json:"escrow_confirmed_at,omitempty"`
-	ReceiptRoot                *ExecutionRoot            `protobuf:"bytes,24,opt,name=receipt_root,json=receiptRoot,proto3" json:"receipt_root,omitempty"`
-	ReceiptDelegationEnvelope  []byte                    `protobuf:"bytes,25,opt,name=receipt_delegation_envelope,json=receiptDelegationEnvelope,proto3" json:"receipt_delegation_envelope,omitempty"`
-	HandoffProof               []byte                    `protobuf:"bytes,26,opt,name=handoff_proof,json=handoffProof,proto3" json:"handoff_proof,omitempty"`
-	RecoveryCredentialEnvelope []byte                    `protobuf:"bytes,27,opt,name=recovery_credential_envelope,json=recoveryCredentialEnvelope,proto3" json:"recovery_credential_envelope,omitempty"`
-	RecoveryBootGrantEnvelope  []byte                    `protobuf:"bytes,28,opt,name=recovery_boot_grant_envelope,json=recoveryBootGrantEnvelope,proto3" json:"recovery_boot_grant_envelope,omitempty"`
-	RecoveryBootGrantSha256    []byte                    `protobuf:"bytes,29,opt,name=recovery_boot_grant_sha256,json=recoveryBootGrantSha256,proto3" json:"recovery_boot_grant_sha256,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	state                              protoimpl.MessageState    `protogen:"open.v1"`
+	FormatVersion                      uint32                    `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
+	InstallationId                     string                    `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	IntentEnvelope                     []byte                    `protobuf:"bytes,3,opt,name=intent_envelope,json=intentEnvelope,proto3" json:"intent_envelope,omitempty"`
+	IntentSha256                       []byte                    `protobuf:"bytes,4,opt,name=intent_sha256,json=intentSha256,proto3" json:"intent_sha256,omitempty"`
+	Intent                             *DeviceActionIntent       `protobuf:"bytes,5,opt,name=intent,proto3" json:"intent,omitempty"`
+	NativePlan                         *DeviceActionPlan         `protobuf:"bytes,6,opt,name=native_plan,json=nativePlan,proto3" json:"native_plan,omitempty"`
+	AcceptedRoot                       *ExecutionRoot            `protobuf:"bytes,7,opt,name=accepted_root,json=acceptedRoot,proto3" json:"accepted_root,omitempty"`
+	AcceptedDelegationEnvelope         []byte                    `protobuf:"bytes,8,opt,name=accepted_delegation_envelope,json=acceptedDelegationEnvelope,proto3" json:"accepted_delegation_envelope,omitempty"`
+	AcceptedAt                         *timestamppb.Timestamp    `protobuf:"bytes,9,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	State                              DeviceActionState         `protobuf:"varint,10,opt,name=state,proto3,enum=lindm.agent.v1.DeviceActionState" json:"state,omitempty"`
+	Failure                            DeviceActionFailure       `protobuf:"varint,11,opt,name=failure,proto3,enum=lindm.agent.v1.DeviceActionFailure" json:"failure,omitempty"`
+	Challenge                          *DeviceActionChallenge    `protobuf:"bytes,12,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	ChallengeProof                     []byte                    `protobuf:"bytes,13,opt,name=challenge_proof,json=challengeProof,proto3" json:"challenge_proof,omitempty"`
+	ChallengeBoottimeNs                uint64                    `protobuf:"varint,14,opt,name=challenge_boottime_ns,json=challengeBoottimeNs,proto3" json:"challenge_boottime_ns,omitempty"`
+	StartGrantEnvelope                 []byte                    `protobuf:"bytes,15,opt,name=start_grant_envelope,json=startGrantEnvelope,proto3" json:"start_grant_envelope,omitempty"`
+	StartGrantSha256                   []byte                    `protobuf:"bytes,16,opt,name=start_grant_sha256,json=startGrantSha256,proto3" json:"start_grant_sha256,omitempty"`
+	StartedAt                          *timestamppb.Timestamp    `protobuf:"bytes,17,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt                        *timestamppb.Timestamp    `protobuf:"bytes,18,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	Verification                       *DeviceActionVerification `protobuf:"bytes,19,opt,name=verification,proto3" json:"verification,omitempty"`
+	ChallengeCertificatePem            []byte                    `protobuf:"bytes,20,opt,name=challenge_certificate_pem,json=challengeCertificatePem,proto3" json:"challenge_certificate_pem,omitempty"`
+	GrantAcceptedAt                    *timestamppb.Timestamp    `protobuf:"bytes,21,opt,name=grant_accepted_at,json=grantAcceptedAt,proto3" json:"grant_accepted_at,omitempty"`
+	EscrowReceiptEnvelope              []byte                    `protobuf:"bytes,22,opt,name=escrow_receipt_envelope,json=escrowReceiptEnvelope,proto3" json:"escrow_receipt_envelope,omitempty"`
+	EscrowConfirmedAt                  *timestamppb.Timestamp    `protobuf:"bytes,23,opt,name=escrow_confirmed_at,json=escrowConfirmedAt,proto3" json:"escrow_confirmed_at,omitempty"`
+	ReceiptRoot                        *ExecutionRoot            `protobuf:"bytes,24,opt,name=receipt_root,json=receiptRoot,proto3" json:"receipt_root,omitempty"`
+	ReceiptDelegationEnvelope          []byte                    `protobuf:"bytes,25,opt,name=receipt_delegation_envelope,json=receiptDelegationEnvelope,proto3" json:"receipt_delegation_envelope,omitempty"`
+	HandoffProof                       []byte                    `protobuf:"bytes,26,opt,name=handoff_proof,json=handoffProof,proto3" json:"handoff_proof,omitempty"`
+	RecoveryCredentialEnvelope         []byte                    `protobuf:"bytes,27,opt,name=recovery_credential_envelope,json=recoveryCredentialEnvelope,proto3" json:"recovery_credential_envelope,omitempty"`
+	RecoveryBootGrantEnvelope          []byte                    `protobuf:"bytes,28,opt,name=recovery_boot_grant_envelope,json=recoveryBootGrantEnvelope,proto3" json:"recovery_boot_grant_envelope,omitempty"`
+	RecoveryBootGrantSha256            []byte                    `protobuf:"bytes,29,opt,name=recovery_boot_grant_sha256,json=recoveryBootGrantSha256,proto3" json:"recovery_boot_grant_sha256,omitempty"`
+	InventoryReceiptEnvelope           []byte                    `protobuf:"bytes,30,opt,name=inventory_receipt_envelope,json=inventoryReceiptEnvelope,proto3" json:"inventory_receipt_envelope,omitempty"`
+	InventoryReceiptRoot               *ExecutionRoot            `protobuf:"bytes,31,opt,name=inventory_receipt_root,json=inventoryReceiptRoot,proto3" json:"inventory_receipt_root,omitempty"`
+	InventoryReceiptDelegationEnvelope []byte                    `protobuf:"bytes,32,opt,name=inventory_receipt_delegation_envelope,json=inventoryReceiptDelegationEnvelope,proto3" json:"inventory_receipt_delegation_envelope,omitempty"`
+	unknownFields                      protoimpl.UnknownFields
+	sizeCache                          protoimpl.SizeCache
 }
 
 func (x *DeviceActionRecord) Reset() {
 	*x = DeviceActionRecord{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[26]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2606,7 +3000,7 @@ func (x *DeviceActionRecord) String() string {
 func (*DeviceActionRecord) ProtoMessage() {}
 
 func (x *DeviceActionRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[26]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2619,7 +3013,7 @@ func (x *DeviceActionRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionRecord.ProtoReflect.Descriptor instead.
 func (*DeviceActionRecord) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{26}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *DeviceActionRecord) GetFormatVersion() uint32 {
@@ -2825,6 +3219,27 @@ func (x *DeviceActionRecord) GetRecoveryBootGrantSha256() []byte {
 	return nil
 }
 
+func (x *DeviceActionRecord) GetInventoryReceiptEnvelope() []byte {
+	if x != nil {
+		return x.InventoryReceiptEnvelope
+	}
+	return nil
+}
+
+func (x *DeviceActionRecord) GetInventoryReceiptRoot() *ExecutionRoot {
+	if x != nil {
+		return x.InventoryReceiptRoot
+	}
+	return nil
+}
+
+func (x *DeviceActionRecord) GetInventoryReceiptDelegationEnvelope() []byte {
+	if x != nil {
+		return x.InventoryReceiptDelegationEnvelope
+	}
+	return nil
+}
+
 type DeviceActionStatus struct {
 	state        protoimpl.MessageState    `protogen:"open.v1"`
 	ActionId     string                    `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
@@ -2841,14 +3256,15 @@ type DeviceActionStatus struct {
 	VolatileResult bool `protobuf:"varint,10,opt,name=volatile_result,json=volatileResult,proto3" json:"volatile_result,omitempty"`
 	// The live-root effect gate has consumed authority; only pinned-session
 	// reporting may continue. This may be true while RUNNING.
-	ReportOnly    bool `protobuf:"varint,11,opt,name=report_only,json=reportOnly,proto3" json:"report_only,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ReportOnly       bool `protobuf:"varint,11,opt,name=report_only,json=reportOnly,proto3" json:"report_only,omitempty"`
+	RefreshInventory bool `protobuf:"varint,12,opt,name=refresh_inventory,json=refreshInventory,proto3" json:"refresh_inventory,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DeviceActionStatus) Reset() {
 	*x = DeviceActionStatus{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[27]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2860,7 +3276,7 @@ func (x *DeviceActionStatus) String() string {
 func (*DeviceActionStatus) ProtoMessage() {}
 
 func (x *DeviceActionStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[27]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2873,7 +3289,7 @@ func (x *DeviceActionStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionStatus.ProtoReflect.Descriptor instead.
 func (*DeviceActionStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{27}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *DeviceActionStatus) GetActionId() string {
@@ -2953,6 +3369,13 @@ func (x *DeviceActionStatus) GetReportOnly() bool {
 	return false
 }
 
+func (x *DeviceActionStatus) GetRefreshInventory() bool {
+	if x != nil {
+		return x.RefreshInventory
+	}
+	return false
+}
+
 type DeviceActionAttestation struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId         string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
@@ -2970,7 +3393,7 @@ type DeviceActionAttestation struct {
 
 func (x *DeviceActionAttestation) Reset() {
 	*x = DeviceActionAttestation{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[28]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2982,7 +3405,7 @@ func (x *DeviceActionAttestation) String() string {
 func (*DeviceActionAttestation) ProtoMessage() {}
 
 func (x *DeviceActionAttestation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[28]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2995,7 +3418,7 @@ func (x *DeviceActionAttestation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionAttestation.ProtoReflect.Descriptor instead.
 func (*DeviceActionAttestation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{28}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DeviceActionAttestation) GetDeploymentId() string {
@@ -3084,7 +3507,7 @@ type DeviceActionEscrowReceipt struct {
 
 func (x *DeviceActionEscrowReceipt) Reset() {
 	*x = DeviceActionEscrowReceipt{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[29]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3096,7 +3519,7 @@ func (x *DeviceActionEscrowReceipt) String() string {
 func (*DeviceActionEscrowReceipt) ProtoMessage() {}
 
 func (x *DeviceActionEscrowReceipt) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[29]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3109,7 +3532,7 @@ func (x *DeviceActionEscrowReceipt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceActionEscrowReceipt.ProtoReflect.Descriptor instead.
 func (*DeviceActionEscrowReceipt) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{29}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeviceActionEscrowReceipt) GetDeploymentId() string {
@@ -3212,7 +3635,7 @@ type PrepareDeviceActionRequest struct {
 
 func (x *PrepareDeviceActionRequest) Reset() {
 	*x = PrepareDeviceActionRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[30]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3224,7 +3647,7 @@ func (x *PrepareDeviceActionRequest) String() string {
 func (*PrepareDeviceActionRequest) ProtoMessage() {}
 
 func (x *PrepareDeviceActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[30]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3237,7 +3660,7 @@ func (x *PrepareDeviceActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareDeviceActionRequest.ProtoReflect.Descriptor instead.
 func (*PrepareDeviceActionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{30}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *PrepareDeviceActionRequest) GetIntentEnvelope() []byte {
@@ -3258,7 +3681,7 @@ type PrepareDeviceActionResponse struct {
 
 func (x *PrepareDeviceActionResponse) Reset() {
 	*x = PrepareDeviceActionResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[31]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3270,7 +3693,7 @@ func (x *PrepareDeviceActionResponse) String() string {
 func (*PrepareDeviceActionResponse) ProtoMessage() {}
 
 func (x *PrepareDeviceActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[31]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3283,7 +3706,7 @@ func (x *PrepareDeviceActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareDeviceActionResponse.ProtoReflect.Descriptor instead.
 func (*PrepareDeviceActionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{31}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *PrepareDeviceActionResponse) GetStatus() *DeviceActionStatus {
@@ -3317,7 +3740,7 @@ type StartDeviceActionRequest struct {
 
 func (x *StartDeviceActionRequest) Reset() {
 	*x = StartDeviceActionRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[32]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3329,7 +3752,7 @@ func (x *StartDeviceActionRequest) String() string {
 func (*StartDeviceActionRequest) ProtoMessage() {}
 
 func (x *StartDeviceActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[32]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3342,7 +3765,7 @@ func (x *StartDeviceActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDeviceActionRequest.ProtoReflect.Descriptor instead.
 func (*StartDeviceActionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{32}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *StartDeviceActionRequest) GetActionId() string {
@@ -3368,7 +3791,7 @@ type StartDeviceActionResponse struct {
 
 func (x *StartDeviceActionResponse) Reset() {
 	*x = StartDeviceActionResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[33]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3380,7 +3803,7 @@ func (x *StartDeviceActionResponse) String() string {
 func (*StartDeviceActionResponse) ProtoMessage() {}
 
 func (x *StartDeviceActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[33]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3393,7 +3816,7 @@ func (x *StartDeviceActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDeviceActionResponse.ProtoReflect.Descriptor instead.
 func (*StartDeviceActionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{33}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *StartDeviceActionResponse) GetStatus() *DeviceActionStatus {
@@ -3412,7 +3835,7 @@ type GetDeviceActionRequest struct {
 
 func (x *GetDeviceActionRequest) Reset() {
 	*x = GetDeviceActionRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[34]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3424,7 +3847,7 @@ func (x *GetDeviceActionRequest) String() string {
 func (*GetDeviceActionRequest) ProtoMessage() {}
 
 func (x *GetDeviceActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[34]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3437,7 +3860,7 @@ func (x *GetDeviceActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceActionRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceActionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{34}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetDeviceActionRequest) GetActionId() string {
@@ -3456,7 +3879,7 @@ type GetDeviceActionResponse struct {
 
 func (x *GetDeviceActionResponse) Reset() {
 	*x = GetDeviceActionResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[35]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3468,7 +3891,7 @@ func (x *GetDeviceActionResponse) String() string {
 func (*GetDeviceActionResponse) ProtoMessage() {}
 
 func (x *GetDeviceActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[35]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3481,7 +3904,7 @@ func (x *GetDeviceActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceActionResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceActionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{35}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetDeviceActionResponse) GetStatus() *DeviceActionStatus {
@@ -3501,7 +3924,7 @@ type AttestDeviceActionRequest struct {
 
 func (x *AttestDeviceActionRequest) Reset() {
 	*x = AttestDeviceActionRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[36]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3513,7 +3936,7 @@ func (x *AttestDeviceActionRequest) String() string {
 func (*AttestDeviceActionRequest) ProtoMessage() {}
 
 func (x *AttestDeviceActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[36]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3526,7 +3949,7 @@ func (x *AttestDeviceActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestDeviceActionRequest.ProtoReflect.Descriptor instead.
 func (*AttestDeviceActionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{36}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *AttestDeviceActionRequest) GetActionId() string {
@@ -3553,7 +3976,7 @@ type AttestDeviceActionResponse struct {
 
 func (x *AttestDeviceActionResponse) Reset() {
 	*x = AttestDeviceActionResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[37]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3565,7 +3988,7 @@ func (x *AttestDeviceActionResponse) String() string {
 func (*AttestDeviceActionResponse) ProtoMessage() {}
 
 func (x *AttestDeviceActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[37]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3578,7 +4001,7 @@ func (x *AttestDeviceActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestDeviceActionResponse.ProtoReflect.Descriptor instead.
 func (*AttestDeviceActionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{37}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *AttestDeviceActionResponse) GetAttestationEnvelope() []byte {
@@ -3605,7 +4028,7 @@ type ConfirmDeviceActionEscrowRequest struct {
 
 func (x *ConfirmDeviceActionEscrowRequest) Reset() {
 	*x = ConfirmDeviceActionEscrowRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[38]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3617,7 +4040,7 @@ func (x *ConfirmDeviceActionEscrowRequest) String() string {
 func (*ConfirmDeviceActionEscrowRequest) ProtoMessage() {}
 
 func (x *ConfirmDeviceActionEscrowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[38]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3630,7 +4053,7 @@ func (x *ConfirmDeviceActionEscrowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmDeviceActionEscrowRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmDeviceActionEscrowRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{38}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ConfirmDeviceActionEscrowRequest) GetActionId() string {
@@ -3656,7 +4079,7 @@ type ConfirmDeviceActionEscrowResponse struct {
 
 func (x *ConfirmDeviceActionEscrowResponse) Reset() {
 	*x = ConfirmDeviceActionEscrowResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[39]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3668,7 +4091,7 @@ func (x *ConfirmDeviceActionEscrowResponse) String() string {
 func (*ConfirmDeviceActionEscrowResponse) ProtoMessage() {}
 
 func (x *ConfirmDeviceActionEscrowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[39]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3681,7 +4104,7 @@ func (x *ConfirmDeviceActionEscrowResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ConfirmDeviceActionEscrowResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmDeviceActionEscrowResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{39}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ConfirmDeviceActionEscrowResponse) GetStatus() *DeviceActionStatus {
@@ -3705,7 +4128,7 @@ type RecoveryKeyBinding struct {
 
 func (x *RecoveryKeyBinding) Reset() {
 	*x = RecoveryKeyBinding{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[40]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3717,7 +4140,7 @@ func (x *RecoveryKeyBinding) String() string {
 func (*RecoveryKeyBinding) ProtoMessage() {}
 
 func (x *RecoveryKeyBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[40]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3730,7 +4153,7 @@ func (x *RecoveryKeyBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryKeyBinding.ProtoReflect.Descriptor instead.
 func (*RecoveryKeyBinding) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{40}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RecoveryKeyBinding) GetDeviceId() string {
@@ -3779,7 +4202,7 @@ type SupplyDeviceActionCredentialRequest struct {
 
 func (x *SupplyDeviceActionCredentialRequest) Reset() {
 	*x = SupplyDeviceActionCredentialRequest{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[41]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3791,7 +4214,7 @@ func (x *SupplyDeviceActionCredentialRequest) String() string {
 func (*SupplyDeviceActionCredentialRequest) ProtoMessage() {}
 
 func (x *SupplyDeviceActionCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[41]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3804,7 +4227,7 @@ func (x *SupplyDeviceActionCredentialRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use SupplyDeviceActionCredentialRequest.ProtoReflect.Descriptor instead.
 func (*SupplyDeviceActionCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{41}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *SupplyDeviceActionCredentialRequest) GetActionId() string {
@@ -3829,7 +4252,7 @@ type SupplyDeviceActionCredentialResponse struct {
 
 func (x *SupplyDeviceActionCredentialResponse) Reset() {
 	*x = SupplyDeviceActionCredentialResponse{}
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[42]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3841,7 +4264,7 @@ func (x *SupplyDeviceActionCredentialResponse) String() string {
 func (*SupplyDeviceActionCredentialResponse) ProtoMessage() {}
 
 func (x *SupplyDeviceActionCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[42]
+	mi := &file_lindm_agent_v1_device_actions_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3854,7 +4277,7 @@ func (x *SupplyDeviceActionCredentialResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use SupplyDeviceActionCredentialResponse.ProtoReflect.Descriptor instead.
 func (*SupplyDeviceActionCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{42}
+	return file_lindm_agent_v1_device_actions_proto_rawDescGZIP(), []int{46}
 }
 
 var File_lindm_agent_v1_device_actions_proto protoreflect.FileDescriptor
@@ -3914,11 +4337,24 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\fimage_sha256\x18\x01 \x01(\fB\a\xbaH\x04z\x02h R\vimageSha256\x12I\n" +
 	"\tboot_mode\x18\x02 \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bbootMode\x12*\n" +
-	"\fmedia_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\vmediaSha256\"n\n" +
+	"\fmedia_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\vmediaSha256\"\xa6\x04\n" +
+	"\x14NVMeSanitizeIdentity\x12C\n" +
+	"\x05basis\x18\x01 \x01(\x0e2!.lindm.agent.v1.NvmeIdentityBasisB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05basis\x12(\n" +
+	"\tvendor_id\x18\x02 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\x03(\x01R\bvendorId\x129\n" +
+	"\x13subsystem_vendor_id\x18\x03 \x01(\rB\t\xbaH\x06*\x04\x18\xff\xff\x03R\x11subsystemVendorId\x12@\n" +
+	"\x11controller_serial\x18\x04 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18\x142\b^[ -~]+$R\x10controllerSerial\x12>\n" +
+	"\x10controller_model\x18\x05 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18(2\b^[ -~]+$R\x0fcontrollerModel\x12D\n" +
+	"\x13controller_firmware\x18\x06 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18\b2\b^[ -~]+$R\x12controllerFirmware\x12:\n" +
+	"\x14namespace_size_bytes\x18\a \x01(\x04B\b\xbaH\x052\x03(\x80 R\x12namespaceSizeBytes\x12&\n" +
+	"\n" +
+	"lba_format\x18\b \x01(\rB\a\xbaH\x04*\x02\x18\x0fR\tlbaFormat\x128\n" +
+	"\x13lba_data_size_shift\x18\t \x01(\rB\t\xbaH\x06*\x04\x18\f(\tR\x10lbaDataSizeShift\"\xb8\x01\n" +
 	"\x11NVMeSanitizeScope\x120\n" +
 	"\fnamespace_id\x18\x01 \x01(\rB\r\xbaH\n" +
 	"*\b\x18\xfe\xff\xff\xff\x0f(\x01R\vnamespaceId\x12'\n" +
-	"\x0fcontroller_wide\x18\x02 \x01(\bR\x0econtrollerWide\"\xab\x05\n" +
+	"\x0fcontroller_wide\x18\x02 \x01(\bR\x0econtrollerWide\x12H\n" +
+	"\bidentity\x18\x03 \x01(\v2$.lindm.agent.v1.NVMeSanitizeIdentityB\x06\xbaH\x03\xc8\x01\x01R\bidentity\"\xab\x05\n" +
 	"\x10NVMeSanitizePlan\x12?\n" +
 	"\x05scope\x18\x01 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeB\x06\xbaH\x03\xc8\x01\x01R\x05scope\x127\n" +
 	"\x11controller_serial\x18\x02 \x01(\tB\n" +
@@ -3944,16 +4380,30 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x18sanitize_command_dword10\x18\x04 \x01(\rR\x16sanitizeCommandDword10\x12,\n" +
 	"\rsample_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02\x18 R\fsampleSha256\x12+\n" +
 	"\fsamples_read\x18\x06 \x01(\rB\b\xbaH\x05*\x03\x18\x81\x02R\vsamplesRead\x128\n" +
-	"\x18native_command_completed\x18\a \x01(\bR\x16nativeCommandCompleted\"\x8f\x04\n" +
+	"\x18native_command_completed\x18\a \x01(\bR\x16nativeCommandCompleted\"\xaa\x06\n" +
 	"\x0eSanitizeAction\x12=\n" +
 	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12B\n" +
 	"\x06method\x18\x02 \x01(\x0e2\x1e.lindm.agent.v1.SanitizeMethodB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06method\x12<\n" +
 	"\brecovery\x18\x03 \x01(\v2 .lindm.agent.v1.RecoveryBootSpecR\brecovery\x12@\n" +
 	"\n" +
-	"nvme_scope\x18\x04 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeR\tnvmeScope:\xf9\x01\xbaH\xf5\x01\x1a\x92\x01\n" +
-	"\x15sanitize.native_scope\x12Mnative methods require exact namespace scope; generic methods cannot carry it\x1a*(this.method >= 3) == has(this.nvme_scope)\x1a^\n" +
-	"\x14sanitize.unencrypted\x12)sanitize targets unencrypted storage only\x1a\x1bthis.target.luks_uuid == ''\"\xe4\x04\n" +
+	"nvme_scope\x18\x04 \x01(\v2!.lindm.agent.v1.NVMeSanitizeScopeR\tnvmeScope:\x94\x04\xbaH\x90\x04\x1a\x92\x01\n" +
+	"\x15sanitize.native_scope\x12Mnative methods require exact namespace scope; generic methods cannot carry it\x1a*(this.method >= 3) == has(this.nvme_scope)\x1a\x98\x02\n" +
+	"\x18sanitize.native_identity\x12Sapproved native controller serial and namespace size must match the selected target\x1a\xa6\x01!has(this.nvme_scope) || (this.nvme_scope.identity.controller_serial == this.target.serial && this.nvme_scope.identity.namespace_size_bytes == this.target.size_bytes)\x1a^\n" +
+	"\x14sanitize.unencrypted\x12)sanitize targets unencrypted storage only\x1a\x1bthis.target.luks_uuid == ''\"\x9f\x01\n" +
+	"\rRestartAction\x122\n" +
+	"\rdelay_seconds\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\x90\x1cH\x00R\fdelaySeconds\x88\x01\x01\x12<\n" +
+	"\amessage\x18\x02 \x01(\tB\x1d\xbaH\x1ar\x18\x18\x80\x042\x13^[^\\x00-\\x1f\\x7f]*$H\x01R\amessage\x88\x01\x01B\x10\n" +
+	"\x0e_delay_secondsB\n" +
+	"\n" +
+	"\b_message\"\xa0\x01\n" +
+	"\x0eShutdownAction\x122\n" +
+	"\rdelay_seconds\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\x90\x1cH\x00R\fdelaySeconds\x88\x01\x01\x12<\n" +
+	"\amessage\x18\x02 \x01(\tB\x1d\xbaH\x1ar\x18\x18\x80\x042\x13^[^\\x00-\\x1f\\x7f]*$H\x01R\amessage\x88\x01\x01B\x10\n" +
+	"\x0e_delay_secondsB\n" +
+	"\n" +
+	"\b_message\"\x18\n" +
+	"\x16RefreshInventoryAction\"\xb4\x06\n" +
 	"\x10DeviceActionSpec\x12I\n" +
 	"\rescrow_rotate\x18\x01 \x01(\v2\".lindm.agent.v1.EscrowRotateActionH\x00R\fescrowRotate\x12=\n" +
 	"\ttpm2_bind\x18\x02 \x01(\v2\x1e.lindm.agent.v1.TPM2BindActionH\x00R\btpm2Bind\x12I\n" +
@@ -3964,13 +4414,17 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x12release_quarantine\x18\x05 \x01(\v2'.lindm.agent.v1.ReleaseQuarantineActionH\x00R\x11releaseQuarantine\x12F\n" +
 	"\fcrypto_erase\x18\x06 \x01(\v2!.lindm.agent.v1.CryptoEraseActionH\x00R\vcryptoErase\x12<\n" +
 	"\bsanitize\x18\a \x01(\v2\x1e.lindm.agent.v1.SanitizeActionH\x00R\bsanitize\x12F\n" +
-	"\frelease_lock\x18\b \x01(\v2!.lindm.agent.v1.ReleaseLockActionH\x00R\vreleaseLockB\x0f\n" +
+	"\frelease_lock\x18\b \x01(\v2!.lindm.agent.v1.ReleaseLockActionH\x00R\vreleaseLock\x129\n" +
+	"\arestart\x18\t \x01(\v2\x1d.lindm.agent.v1.RestartActionH\x00R\arestart\x12<\n" +
+	"\bshutdown\x18\n" +
+	" \x01(\v2\x1e.lindm.agent.v1.ShutdownActionH\x00R\bshutdown\x12U\n" +
+	"\x11refresh_inventory\x18\v \x01(\v2&.lindm.agent.v1.RefreshInventoryActionH\x00R\x10refreshInventoryB\x0f\n" +
 	"\x06action\x12\x05\xbaH\x02\b\x01\"\x9b\x01\n" +
 	"\x14LUKSTokenObservation\x12\"\n" +
 	"\btoken_id\x18\x01 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\atokenId\x121\n" +
 	"\x04type\x18\x02 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18\x80\x012\x11^[A-Za-z0-9_.-]+$R\x04type\x12,\n" +
 	"\bkeyslots\x18\x03 \x03(\rB\x10\xbaH\r\x92\x01\n" +
-	"\x10 \x18\x01\"\x04*\x02\x18\x1fR\bkeyslots\"\xc0\t\n" +
+	"\x10 \x18\x01\"\x04*\x02\x18\x1fR\bkeyslots\"\xe6\t\n" +
 	"\x17DeviceActionObservation\x12C\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"observedAt\x12\x1c\n" +
@@ -3997,7 +4451,8 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x14crypto_erase_targets\x18\x10 \x03(\v2%.lindm.agent.v1.CryptoEraseTargetPlanB\b\xbaH\x05\x92\x01\x02\x10\bR\x12cryptoEraseTargets\x12E\n" +
 	"\rnvme_sanitize\x18\x11 \x01(\v2 .lindm.agent.v1.NVMeSanitizePlanR\fnvmeSanitize\x126\n" +
 	"\x11disabled_accounts\x18\x12 \x03(\tB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\x10disabledAccounts\x128\n" +
-	"\x12preserved_accounts\x18\x13 \x03(\tB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\x11preservedAccounts:\xb0\x01\xbaH\xac\x01\x1a\xa9\x01\n" +
+	"\x12preserved_accounts\x18\x13 \x03(\tB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\x11preservedAccounts\x12$\n" +
+	"\aboot_id\x18\x14 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06bootId:\xb0\x01\xbaH\xac\x01\x1a\xa9\x01\n" +
 	"#device_action_observation.token_ids\x12\x1fnative token IDs must be unique\x1aathis.luks_tokens.all(t, this.luks_tokens.filter(other, other.token_id == t.token_id).size() == 1)\"\xf2\x02\n" +
 	"\x10DeviceActionPlan\x12<\n" +
 	"\x04spec\x18\x01 \x01(\v2 .lindm.agent.v1.DeviceActionSpecB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12G\n" +
@@ -4015,14 +4470,18 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"newKeyslot\x12%\n" +
 	"\tluks_uuid\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bluksUuid\x120\n" +
 	"\x0fmetadata_sha256\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x0emetadataSha256\x12\"\n" +
-	"\btoken_id\x18\a \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\atokenId\"\xc9\x05\n" +
+	"\btoken_id\x18\a \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\atokenId\"\xe5\x06\n" +
 	"\x18DeviceActionVerification\x12\x1a\n" +
 	"\bverified\x18\x01 \x01(\bR\bverified\x12E\n" +
 	"\x05after\x18\x02 \x01(\v2'.lindm.agent.v1.DeviceActionObservationB\x06\xbaH\x03\xc8\x01\x01R\x05after\x12$\n" +
 	"\bevidence\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\bevidence\x12:\n" +
 	"\x06escrow\x18\x04 \x01(\v2\".lindm.agent.v1.DeviceActionEscrowR\x06escrow\x12c\n" +
 	"\x14crypto_erase_results\x18\x05 \x03(\v2'.lindm.agent.v1.CryptoEraseTargetResultB\b\xbaH\x05\x92\x01\x02\x10\bR\x12cryptoEraseResults\x12M\n" +
-	"\rnvme_sanitize\x18\x06 \x01(\v2(.lindm.agent.v1.NVMeSanitizeVerificationR\fnvmeSanitize:\xb3\x02\xbaH\xaf\x02\x1a\xac\x02\n" +
+	"\rnvme_sanitize\x18\x06 \x01(\v2(.lindm.agent.v1.NVMeSanitizeVerificationR\fnvmeSanitize\x12$\n" +
+	"\aboot_id\x18\a \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06bootId\x12>\n" +
+	"\x12inventory_sequence\x18\b \x01(\x04B\x0f\xbaH\f2\n" +
+	"\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7fR\x11inventorySequence\x124\n" +
+	"\x16power_request_accepted\x18\t \x01(\bR\x14powerRequestAccepted:\xb3\x02\xbaH\xaf\x02\x1a\xac\x02\n" +
 	"\x1fdevice_action_verification.nvme\x12Overified native sanitize requires completed command and exact sampling evidence\x1a\xb7\x01!this.verified || !has(this.nvme_sanitize) || (this.nvme_sanitize.native_command_completed && this.nvme_sanitize.samples_read == 257u && this.nvme_sanitize.sample_sha256.size() == 32)\"\x98\t\n" +
 	"\x12DeviceActionIntent\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
@@ -4092,7 +4551,7 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12Q\n" +
 	"\tapprovals\x18\b \x03(\v2).lindm.agent.v1.DeviceActionHumanApprovalB\b\xbaH\x05\x92\x01\x02\x10\x02R\tapprovals:\xf9\x02\xbaH\xf5\x02\x1a\xd7\x01\n" +
 	"\x1cdevice_action_start.validity\x12+grant must fit challenge and thirty seconds\x1a\x89\x01this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at\x1a\x98\x01\n" +
-	"\x1cdevice_action_start.distinct\x12!approvals require distinct humans\x1aUthis.approvals.all(a, this.approvals.filter(b, b.actor_id == a.actor_id).size() == 1)\"\xaf\"\n" +
+	"\x1cdevice_action_start.distinct\x12!approvals require distinct humans\x1aUthis.approvals.all(a, this.approvals.filter(b, b.actor_id == a.actor_id).size() == 1)\"\xab$\n" +
 	"\x12DeviceActionRecord\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x124\n" +
@@ -4129,14 +4588,16 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\rhandoff_proof\x18\x1a \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\fhandoffProof\x12K\n" +
 	"\x1crecovery_credential_envelope\x18\x1b \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x1arecoveryCredentialEnvelope\x12J\n" +
 	"\x1crecovery_boot_grant_envelope\x18\x1c \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x19recoveryBootGrantEnvelope\x12D\n" +
-	"\x1arecovery_boot_grant_sha256\x18\x1d \x01(\fB\a\xbaH\x04z\x02\x18 R\x17recoveryBootGrantSha256:\x9e\x13\xbaH\x9a\x13\x1a\xab\x02\n" +
+	"\x1arecovery_boot_grant_sha256\x18\x1d \x01(\fB\a\xbaH\x04z\x02\x18 R\x17recoveryBootGrantSha256\x12G\n" +
+	"\x1ainventory_receipt_envelope\x18\x1e \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x18inventoryReceiptEnvelope\x12S\n" +
+	"\x16inventory_receipt_root\x18\x1f \x01(\v2\x1d.lindm.agent.v1.ExecutionRootR\x14inventoryReceiptRoot\x12\\\n" +
+	"%inventory_receipt_delegation_envelope\x18  \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\"inventoryReceiptDelegationEnvelope:\x9e\x13\xbaH\x9a\x13\x1a\xab\x02\n" +
 	"\x1cdevice_action_record.receipt\x128consumed receipt must retain its accepted trust snapshot\x1a\xd0\x01(this.escrow_receipt_envelope.size() > 0) == has(this.escrow_confirmed_at) && has(this.escrow_confirmed_at) == has(this.receipt_root) && has(this.receipt_root) == (this.receipt_delegation_envelope.size() > 0)\x1aj\n" +
 	"\x19device_action_record.spec\x12\"native plan must match signed spec\x1a)this.native_plan.spec == this.intent.spec\x1a\xb0\x02\n" +
 	"\x1edevice_action_record.challenge\x12#challenge evidence must be complete\x1a\xe8\x01has(this.challenge) == (this.challenge_proof.size() > 0) && has(this.challenge) == (this.challenge_boottime_ns > 0u) && (has(this.challenge) ? this.challenge_certificate_pem.size() >= 64 : this.challenge_certificate_pem.size() == 0)\x1a\x99\a\n" +
 	"\x1adevice_action_record.grant\x12<one exact effect or boot grant must retain complete evidence\x1a\xbc\x06(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && this.recovery_boot_grant_envelope.size() == 0 && this.recovery_boot_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && this.recovery_boot_grant_envelope.size() == 0 && this.recovery_boot_grant_sha256.size() == 0 && has(this.challenge) && has(this.grant_accepted_at)) || (this.recovery_boot_grant_envelope.size() > 0 && this.recovery_boot_grant_sha256.size() == 32 && this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && has(this.challenge) && has(this.grant_accepted_at) && this.handoff_proof.size() > 0 && this.recovery_credential_envelope.size() > 0 && has(this.intent.spec.sanitize) && has(this.intent.spec.sanitize.recovery))\x1a\x9f\x05\n" +
 	"\x1edevice_action_record.lifecycle\x12\x1astate must retain evidence\x1a\xe0\x04((this.state <= 3 || this.state >= 8) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && !has(this.grant_accepted_at) && !has(this.started_at))) && (this.state != 2 || (has(this.grant_accepted_at) && !has(this.started_at))) && (this.state != 3 || (has(this.grant_accepted_at) && has(this.started_at))) && (this.state != 4 || (has(this.verification) && this.verification.verified)) && (this.state < 8 || (has(this.started_at) && has(this.verification) && has(this.verification.escrow))) && (this.state != 9 || (this.escrow_receipt_envelope.size() > 0 && has(this.escrow_confirmed_at)))\x1a\x8c\x01\n" +
-	"\x1cdevice_action_record.failure\x12/pending or successful work cannot carry failure\x1a;(this.state <= 4 || this.state >= 8) == (this.failure == 1)\"\xfb\n" +
-	"\n" +
+	"\x1cdevice_action_record.failure\x12/pending or successful work cannot carry failure\x1a;(this.state <= 4 || this.state >= 8) == (this.failure == 1)\"\xa8\v\n" +
 	"\x12DeviceActionStatus\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12,\n" +
 	"\rintent_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fintentSha256\x12C\n" +
@@ -4154,7 +4615,8 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"\x0fvolatile_result\x18\n" +
 	" \x01(\bR\x0evolatileResult\x12\x1f\n" +
 	"\vreport_only\x18\v \x01(\bR\n" +
-	"reportOnly:\xdf\x05\xbaH\xdb\x05\x1a\xb4\x01\n" +
+	"reportOnly\x12+\n" +
+	"\x11refresh_inventory\x18\f \x01(\bR\x10refreshInventory:\xdf\x05\xbaH\xdb\x05\x1a\xb4\x01\n" +
 	"\x1ddevice_action_status.volatile\x12\"volatile evidence must be terminal\x1ao!this.volatile_result || (has(this.started_at) && has(this.completed_at) && this.state >= 4 && this.state <= 7)\x1a\x92\x03\n" +
 	"\x1edevice_action_status.lifecycle\x12\x1astate must retain evidence\x1a\xd3\x02((this.state <= 3 || this.state >= 8) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.verified)) && (this.state < 8 || (has(this.started_at) && has(this.verification) && has(this.verification.escrow)))\x1a\x8c\x01\n" +
 	"\x1cdevice_action_status.failure\x12/pending or successful work cannot carry failure\x1a;(this.state <= 4 || this.state >= 8) == (this.failure == 1)\"\xbe\x05\n" +
@@ -4242,7 +4704,11 @@ const file_lindm_agent_v1_device_actions_proto_rawDesc = "" +
 	"%SANITIZE_METHOD_NVME_FORMAT_USER_DATA\x10\x03\x12,\n" +
 	"(SANITIZE_METHOD_NVME_FORMAT_CRYPTO_ERASE\x10\x04\x12-\n" +
 	")SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE\x10\x05\x12.\n" +
-	"*SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE\x10\x06*\xfa\x02\n" +
+	"*SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE\x10\x06*\x8f\x01\n" +
+	"\x11NvmeIdentityBasis\x12#\n" +
+	"\x1fNVME_IDENTITY_BASIS_UNSPECIFIED\x10\x00\x12%\n" +
+	"!NVME_IDENTITY_BASIS_NAMESPACE_NID\x10\x01\x12.\n" +
+	"*NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID\x10\x02*\xfa\x02\n" +
 	"\x11DeviceActionState\x12#\n" +
 	"\x1fDEVICE_ACTION_STATE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cDEVICE_ACTION_STATE_PREPARED\x10\x01\x12\x1e\n" +
@@ -4277,142 +4743,153 @@ func file_lindm_agent_v1_device_actions_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_device_actions_proto_rawDescData
 }
 
-var file_lindm_agent_v1_device_actions_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_lindm_agent_v1_device_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_lindm_agent_v1_device_actions_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_lindm_agent_v1_device_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
 var file_lindm_agent_v1_device_actions_proto_goTypes = []any{
 	(CryptoEraseMode)(0),                         // 0: lindm.agent.v1.CryptoEraseMode
 	(RecoveryBootMode)(0),                        // 1: lindm.agent.v1.RecoveryBootMode
 	(SanitizeMethod)(0),                          // 2: lindm.agent.v1.SanitizeMethod
-	(DeviceActionState)(0),                       // 3: lindm.agent.v1.DeviceActionState
-	(DeviceActionFailure)(0),                     // 4: lindm.agent.v1.DeviceActionFailure
-	(*StorageTarget)(nil),                        // 5: lindm.agent.v1.StorageTarget
-	(*EscrowRotateAction)(nil),                   // 6: lindm.agent.v1.EscrowRotateAction
-	(*TPM2BindAction)(nil),                       // 7: lindm.agent.v1.TPM2BindAction
-	(*LockSessionsAction)(nil),                   // 8: lindm.agent.v1.LockSessionsAction
-	(*ReleaseLockAction)(nil),                    // 9: lindm.agent.v1.ReleaseLockAction
-	(*QuarantineAction)(nil),                     // 10: lindm.agent.v1.QuarantineAction
-	(*ReleaseQuarantineAction)(nil),              // 11: lindm.agent.v1.ReleaseQuarantineAction
-	(*CryptoEraseAction)(nil),                    // 12: lindm.agent.v1.CryptoEraseAction
-	(*CryptoEraseTargetPlan)(nil),                // 13: lindm.agent.v1.CryptoEraseTargetPlan
-	(*CryptoEraseTargetResult)(nil),              // 14: lindm.agent.v1.CryptoEraseTargetResult
-	(*RecoveryBootSpec)(nil),                     // 15: lindm.agent.v1.RecoveryBootSpec
-	(*NVMeSanitizeScope)(nil),                    // 16: lindm.agent.v1.NVMeSanitizeScope
-	(*NVMeSanitizePlan)(nil),                     // 17: lindm.agent.v1.NVMeSanitizePlan
-	(*NVMeSanitizeVerification)(nil),             // 18: lindm.agent.v1.NVMeSanitizeVerification
-	(*SanitizeAction)(nil),                       // 19: lindm.agent.v1.SanitizeAction
-	(*DeviceActionSpec)(nil),                     // 20: lindm.agent.v1.DeviceActionSpec
-	(*LUKSTokenObservation)(nil),                 // 21: lindm.agent.v1.LUKSTokenObservation
-	(*DeviceActionObservation)(nil),              // 22: lindm.agent.v1.DeviceActionObservation
-	(*DeviceActionPlan)(nil),                     // 23: lindm.agent.v1.DeviceActionPlan
-	(*DeviceActionEscrow)(nil),                   // 24: lindm.agent.v1.DeviceActionEscrow
-	(*DeviceActionVerification)(nil),             // 25: lindm.agent.v1.DeviceActionVerification
-	(*DeviceActionIntent)(nil),                   // 26: lindm.agent.v1.DeviceActionIntent
-	(*DeviceActionChallenge)(nil),                // 27: lindm.agent.v1.DeviceActionChallenge
-	(*DeviceActionApprovalBinding)(nil),          // 28: lindm.agent.v1.DeviceActionApprovalBinding
-	(*DeviceActionHumanApproval)(nil),            // 29: lindm.agent.v1.DeviceActionHumanApproval
-	(*DeviceActionStartGrant)(nil),               // 30: lindm.agent.v1.DeviceActionStartGrant
-	(*DeviceActionRecord)(nil),                   // 31: lindm.agent.v1.DeviceActionRecord
-	(*DeviceActionStatus)(nil),                   // 32: lindm.agent.v1.DeviceActionStatus
-	(*DeviceActionAttestation)(nil),              // 33: lindm.agent.v1.DeviceActionAttestation
-	(*DeviceActionEscrowReceipt)(nil),            // 34: lindm.agent.v1.DeviceActionEscrowReceipt
-	(*PrepareDeviceActionRequest)(nil),           // 35: lindm.agent.v1.PrepareDeviceActionRequest
-	(*PrepareDeviceActionResponse)(nil),          // 36: lindm.agent.v1.PrepareDeviceActionResponse
-	(*StartDeviceActionRequest)(nil),             // 37: lindm.agent.v1.StartDeviceActionRequest
-	(*StartDeviceActionResponse)(nil),            // 38: lindm.agent.v1.StartDeviceActionResponse
-	(*GetDeviceActionRequest)(nil),               // 39: lindm.agent.v1.GetDeviceActionRequest
-	(*GetDeviceActionResponse)(nil),              // 40: lindm.agent.v1.GetDeviceActionResponse
-	(*AttestDeviceActionRequest)(nil),            // 41: lindm.agent.v1.AttestDeviceActionRequest
-	(*AttestDeviceActionResponse)(nil),           // 42: lindm.agent.v1.AttestDeviceActionResponse
-	(*ConfirmDeviceActionEscrowRequest)(nil),     // 43: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
-	(*ConfirmDeviceActionEscrowResponse)(nil),    // 44: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
-	(*RecoveryKeyBinding)(nil),                   // 45: lindm.agent.v1.RecoveryKeyBinding
-	(*SupplyDeviceActionCredentialRequest)(nil),  // 46: lindm.agent.v1.SupplyDeviceActionCredentialRequest
-	(*SupplyDeviceActionCredentialResponse)(nil), // 47: lindm.agent.v1.SupplyDeviceActionCredentialResponse
-	(*timestamppb.Timestamp)(nil),                // 48: google.protobuf.Timestamp
-	(*ExecutionRoot)(nil),                        // 49: lindm.agent.v1.ExecutionRoot
+	(NvmeIdentityBasis)(0),                       // 3: lindm.agent.v1.NvmeIdentityBasis
+	(DeviceActionState)(0),                       // 4: lindm.agent.v1.DeviceActionState
+	(DeviceActionFailure)(0),                     // 5: lindm.agent.v1.DeviceActionFailure
+	(*StorageTarget)(nil),                        // 6: lindm.agent.v1.StorageTarget
+	(*EscrowRotateAction)(nil),                   // 7: lindm.agent.v1.EscrowRotateAction
+	(*TPM2BindAction)(nil),                       // 8: lindm.agent.v1.TPM2BindAction
+	(*LockSessionsAction)(nil),                   // 9: lindm.agent.v1.LockSessionsAction
+	(*ReleaseLockAction)(nil),                    // 10: lindm.agent.v1.ReleaseLockAction
+	(*QuarantineAction)(nil),                     // 11: lindm.agent.v1.QuarantineAction
+	(*ReleaseQuarantineAction)(nil),              // 12: lindm.agent.v1.ReleaseQuarantineAction
+	(*CryptoEraseAction)(nil),                    // 13: lindm.agent.v1.CryptoEraseAction
+	(*CryptoEraseTargetPlan)(nil),                // 14: lindm.agent.v1.CryptoEraseTargetPlan
+	(*CryptoEraseTargetResult)(nil),              // 15: lindm.agent.v1.CryptoEraseTargetResult
+	(*RecoveryBootSpec)(nil),                     // 16: lindm.agent.v1.RecoveryBootSpec
+	(*NVMeSanitizeIdentity)(nil),                 // 17: lindm.agent.v1.NVMeSanitizeIdentity
+	(*NVMeSanitizeScope)(nil),                    // 18: lindm.agent.v1.NVMeSanitizeScope
+	(*NVMeSanitizePlan)(nil),                     // 19: lindm.agent.v1.NVMeSanitizePlan
+	(*NVMeSanitizeVerification)(nil),             // 20: lindm.agent.v1.NVMeSanitizeVerification
+	(*SanitizeAction)(nil),                       // 21: lindm.agent.v1.SanitizeAction
+	(*RestartAction)(nil),                        // 22: lindm.agent.v1.RestartAction
+	(*ShutdownAction)(nil),                       // 23: lindm.agent.v1.ShutdownAction
+	(*RefreshInventoryAction)(nil),               // 24: lindm.agent.v1.RefreshInventoryAction
+	(*DeviceActionSpec)(nil),                     // 25: lindm.agent.v1.DeviceActionSpec
+	(*LUKSTokenObservation)(nil),                 // 26: lindm.agent.v1.LUKSTokenObservation
+	(*DeviceActionObservation)(nil),              // 27: lindm.agent.v1.DeviceActionObservation
+	(*DeviceActionPlan)(nil),                     // 28: lindm.agent.v1.DeviceActionPlan
+	(*DeviceActionEscrow)(nil),                   // 29: lindm.agent.v1.DeviceActionEscrow
+	(*DeviceActionVerification)(nil),             // 30: lindm.agent.v1.DeviceActionVerification
+	(*DeviceActionIntent)(nil),                   // 31: lindm.agent.v1.DeviceActionIntent
+	(*DeviceActionChallenge)(nil),                // 32: lindm.agent.v1.DeviceActionChallenge
+	(*DeviceActionApprovalBinding)(nil),          // 33: lindm.agent.v1.DeviceActionApprovalBinding
+	(*DeviceActionHumanApproval)(nil),            // 34: lindm.agent.v1.DeviceActionHumanApproval
+	(*DeviceActionStartGrant)(nil),               // 35: lindm.agent.v1.DeviceActionStartGrant
+	(*DeviceActionRecord)(nil),                   // 36: lindm.agent.v1.DeviceActionRecord
+	(*DeviceActionStatus)(nil),                   // 37: lindm.agent.v1.DeviceActionStatus
+	(*DeviceActionAttestation)(nil),              // 38: lindm.agent.v1.DeviceActionAttestation
+	(*DeviceActionEscrowReceipt)(nil),            // 39: lindm.agent.v1.DeviceActionEscrowReceipt
+	(*PrepareDeviceActionRequest)(nil),           // 40: lindm.agent.v1.PrepareDeviceActionRequest
+	(*PrepareDeviceActionResponse)(nil),          // 41: lindm.agent.v1.PrepareDeviceActionResponse
+	(*StartDeviceActionRequest)(nil),             // 42: lindm.agent.v1.StartDeviceActionRequest
+	(*StartDeviceActionResponse)(nil),            // 43: lindm.agent.v1.StartDeviceActionResponse
+	(*GetDeviceActionRequest)(nil),               // 44: lindm.agent.v1.GetDeviceActionRequest
+	(*GetDeviceActionResponse)(nil),              // 45: lindm.agent.v1.GetDeviceActionResponse
+	(*AttestDeviceActionRequest)(nil),            // 46: lindm.agent.v1.AttestDeviceActionRequest
+	(*AttestDeviceActionResponse)(nil),           // 47: lindm.agent.v1.AttestDeviceActionResponse
+	(*ConfirmDeviceActionEscrowRequest)(nil),     // 48: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	(*ConfirmDeviceActionEscrowResponse)(nil),    // 49: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	(*RecoveryKeyBinding)(nil),                   // 50: lindm.agent.v1.RecoveryKeyBinding
+	(*SupplyDeviceActionCredentialRequest)(nil),  // 51: lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	(*SupplyDeviceActionCredentialResponse)(nil), // 52: lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	(*timestamppb.Timestamp)(nil),                // 53: google.protobuf.Timestamp
+	(*ExecutionRoot)(nil),                        // 54: lindm.agent.v1.ExecutionRoot
 }
 var file_lindm_agent_v1_device_actions_proto_depIdxs = []int32{
-	5,  // 0: lindm.agent.v1.EscrowRotateAction.target:type_name -> lindm.agent.v1.StorageTarget
-	5,  // 1: lindm.agent.v1.TPM2BindAction.target:type_name -> lindm.agent.v1.StorageTarget
-	5,  // 2: lindm.agent.v1.CryptoEraseAction.target:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 0: lindm.agent.v1.EscrowRotateAction.target:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 1: lindm.agent.v1.TPM2BindAction.target:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 2: lindm.agent.v1.CryptoEraseAction.target:type_name -> lindm.agent.v1.StorageTarget
 	0,  // 3: lindm.agent.v1.CryptoEraseAction.mode:type_name -> lindm.agent.v1.CryptoEraseMode
-	5,  // 4: lindm.agent.v1.CryptoEraseAction.targets:type_name -> lindm.agent.v1.StorageTarget
-	5,  // 5: lindm.agent.v1.CryptoEraseTargetPlan.target:type_name -> lindm.agent.v1.StorageTarget
-	5,  // 6: lindm.agent.v1.CryptoEraseTargetResult.target:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 4: lindm.agent.v1.CryptoEraseAction.targets:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 5: lindm.agent.v1.CryptoEraseTargetPlan.target:type_name -> lindm.agent.v1.StorageTarget
+	6,  // 6: lindm.agent.v1.CryptoEraseTargetResult.target:type_name -> lindm.agent.v1.StorageTarget
 	1,  // 7: lindm.agent.v1.RecoveryBootSpec.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
-	16, // 8: lindm.agent.v1.NVMeSanitizePlan.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	17, // 9: lindm.agent.v1.NVMeSanitizeVerification.observed_scope:type_name -> lindm.agent.v1.NVMeSanitizePlan
-	5,  // 10: lindm.agent.v1.SanitizeAction.target:type_name -> lindm.agent.v1.StorageTarget
-	2,  // 11: lindm.agent.v1.SanitizeAction.method:type_name -> lindm.agent.v1.SanitizeMethod
-	15, // 12: lindm.agent.v1.SanitizeAction.recovery:type_name -> lindm.agent.v1.RecoveryBootSpec
-	16, // 13: lindm.agent.v1.SanitizeAction.nvme_scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	6,  // 14: lindm.agent.v1.DeviceActionSpec.escrow_rotate:type_name -> lindm.agent.v1.EscrowRotateAction
-	7,  // 15: lindm.agent.v1.DeviceActionSpec.tpm2_bind:type_name -> lindm.agent.v1.TPM2BindAction
-	8,  // 16: lindm.agent.v1.DeviceActionSpec.lock_sessions:type_name -> lindm.agent.v1.LockSessionsAction
-	10, // 17: lindm.agent.v1.DeviceActionSpec.quarantine:type_name -> lindm.agent.v1.QuarantineAction
-	11, // 18: lindm.agent.v1.DeviceActionSpec.release_quarantine:type_name -> lindm.agent.v1.ReleaseQuarantineAction
-	12, // 19: lindm.agent.v1.DeviceActionSpec.crypto_erase:type_name -> lindm.agent.v1.CryptoEraseAction
-	19, // 20: lindm.agent.v1.DeviceActionSpec.sanitize:type_name -> lindm.agent.v1.SanitizeAction
-	9,  // 21: lindm.agent.v1.DeviceActionSpec.release_lock:type_name -> lindm.agent.v1.ReleaseLockAction
-	48, // 22: lindm.agent.v1.DeviceActionObservation.observed_at:type_name -> google.protobuf.Timestamp
-	5,  // 23: lindm.agent.v1.DeviceActionObservation.target:type_name -> lindm.agent.v1.StorageTarget
-	21, // 24: lindm.agent.v1.DeviceActionObservation.luks_tokens:type_name -> lindm.agent.v1.LUKSTokenObservation
-	13, // 25: lindm.agent.v1.DeviceActionObservation.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
-	17, // 26: lindm.agent.v1.DeviceActionObservation.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizePlan
-	20, // 27: lindm.agent.v1.DeviceActionPlan.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	22, // 28: lindm.agent.v1.DeviceActionPlan.before:type_name -> lindm.agent.v1.DeviceActionObservation
-	45, // 29: lindm.agent.v1.DeviceActionPlan.recovery_binding:type_name -> lindm.agent.v1.RecoveryKeyBinding
-	13, // 30: lindm.agent.v1.DeviceActionPlan.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
-	22, // 31: lindm.agent.v1.DeviceActionVerification.after:type_name -> lindm.agent.v1.DeviceActionObservation
-	24, // 32: lindm.agent.v1.DeviceActionVerification.escrow:type_name -> lindm.agent.v1.DeviceActionEscrow
-	14, // 33: lindm.agent.v1.DeviceActionVerification.crypto_erase_results:type_name -> lindm.agent.v1.CryptoEraseTargetResult
-	18, // 34: lindm.agent.v1.DeviceActionVerification.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizeVerification
-	48, // 35: lindm.agent.v1.DeviceActionIntent.not_before:type_name -> google.protobuf.Timestamp
-	48, // 36: lindm.agent.v1.DeviceActionIntent.expires_at:type_name -> google.protobuf.Timestamp
-	20, // 37: lindm.agent.v1.DeviceActionIntent.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	48, // 38: lindm.agent.v1.DeviceActionChallenge.issued_at:type_name -> google.protobuf.Timestamp
-	48, // 39: lindm.agent.v1.DeviceActionChallenge.expires_at:type_name -> google.protobuf.Timestamp
-	23, // 40: lindm.agent.v1.DeviceActionChallenge.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	48, // 41: lindm.agent.v1.DeviceActionApprovalBinding.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 42: lindm.agent.v1.DeviceActionHumanApproval.binding:type_name -> lindm.agent.v1.DeviceActionApprovalBinding
-	27, // 43: lindm.agent.v1.DeviceActionStartGrant.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
-	48, // 44: lindm.agent.v1.DeviceActionStartGrant.not_before:type_name -> google.protobuf.Timestamp
-	48, // 45: lindm.agent.v1.DeviceActionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
-	29, // 46: lindm.agent.v1.DeviceActionStartGrant.approvals:type_name -> lindm.agent.v1.DeviceActionHumanApproval
-	26, // 47: lindm.agent.v1.DeviceActionRecord.intent:type_name -> lindm.agent.v1.DeviceActionIntent
-	23, // 48: lindm.agent.v1.DeviceActionRecord.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	49, // 49: lindm.agent.v1.DeviceActionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	48, // 50: lindm.agent.v1.DeviceActionRecord.accepted_at:type_name -> google.protobuf.Timestamp
-	3,  // 51: lindm.agent.v1.DeviceActionRecord.state:type_name -> lindm.agent.v1.DeviceActionState
-	4,  // 52: lindm.agent.v1.DeviceActionRecord.failure:type_name -> lindm.agent.v1.DeviceActionFailure
-	27, // 53: lindm.agent.v1.DeviceActionRecord.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
-	48, // 54: lindm.agent.v1.DeviceActionRecord.started_at:type_name -> google.protobuf.Timestamp
-	48, // 55: lindm.agent.v1.DeviceActionRecord.completed_at:type_name -> google.protobuf.Timestamp
-	25, // 56: lindm.agent.v1.DeviceActionRecord.verification:type_name -> lindm.agent.v1.DeviceActionVerification
-	48, // 57: lindm.agent.v1.DeviceActionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
-	48, // 58: lindm.agent.v1.DeviceActionRecord.escrow_confirmed_at:type_name -> google.protobuf.Timestamp
-	49, // 59: lindm.agent.v1.DeviceActionRecord.receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
-	3,  // 60: lindm.agent.v1.DeviceActionStatus.state:type_name -> lindm.agent.v1.DeviceActionState
-	4,  // 61: lindm.agent.v1.DeviceActionStatus.failure:type_name -> lindm.agent.v1.DeviceActionFailure
-	48, // 62: lindm.agent.v1.DeviceActionStatus.accepted_at:type_name -> google.protobuf.Timestamp
-	48, // 63: lindm.agent.v1.DeviceActionStatus.started_at:type_name -> google.protobuf.Timestamp
-	48, // 64: lindm.agent.v1.DeviceActionStatus.completed_at:type_name -> google.protobuf.Timestamp
-	22, // 65: lindm.agent.v1.DeviceActionStatus.before:type_name -> lindm.agent.v1.DeviceActionObservation
-	25, // 66: lindm.agent.v1.DeviceActionStatus.verification:type_name -> lindm.agent.v1.DeviceActionVerification
-	48, // 67: lindm.agent.v1.DeviceActionAttestation.issued_at:type_name -> google.protobuf.Timestamp
-	48, // 68: lindm.agent.v1.DeviceActionAttestation.expires_at:type_name -> google.protobuf.Timestamp
-	32, // 69: lindm.agent.v1.DeviceActionAttestation.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	48, // 70: lindm.agent.v1.DeviceActionEscrowReceipt.stored_at:type_name -> google.protobuf.Timestamp
-	32, // 71: lindm.agent.v1.PrepareDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	23, // 72: lindm.agent.v1.PrepareDeviceActionResponse.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
-	32, // 73: lindm.agent.v1.StartDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	32, // 74: lindm.agent.v1.GetDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	32, // 75: lindm.agent.v1.ConfirmDeviceActionEscrowResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	76, // [76:76] is the sub-list for method output_type
-	76, // [76:76] is the sub-list for method input_type
-	76, // [76:76] is the sub-list for extension type_name
-	76, // [76:76] is the sub-list for extension extendee
-	0,  // [0:76] is the sub-list for field type_name
+	3,  // 8: lindm.agent.v1.NVMeSanitizeIdentity.basis:type_name -> lindm.agent.v1.NvmeIdentityBasis
+	17, // 9: lindm.agent.v1.NVMeSanitizeScope.identity:type_name -> lindm.agent.v1.NVMeSanitizeIdentity
+	18, // 10: lindm.agent.v1.NVMeSanitizePlan.scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	19, // 11: lindm.agent.v1.NVMeSanitizeVerification.observed_scope:type_name -> lindm.agent.v1.NVMeSanitizePlan
+	6,  // 12: lindm.agent.v1.SanitizeAction.target:type_name -> lindm.agent.v1.StorageTarget
+	2,  // 13: lindm.agent.v1.SanitizeAction.method:type_name -> lindm.agent.v1.SanitizeMethod
+	16, // 14: lindm.agent.v1.SanitizeAction.recovery:type_name -> lindm.agent.v1.RecoveryBootSpec
+	18, // 15: lindm.agent.v1.SanitizeAction.nvme_scope:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	7,  // 16: lindm.agent.v1.DeviceActionSpec.escrow_rotate:type_name -> lindm.agent.v1.EscrowRotateAction
+	8,  // 17: lindm.agent.v1.DeviceActionSpec.tpm2_bind:type_name -> lindm.agent.v1.TPM2BindAction
+	9,  // 18: lindm.agent.v1.DeviceActionSpec.lock_sessions:type_name -> lindm.agent.v1.LockSessionsAction
+	11, // 19: lindm.agent.v1.DeviceActionSpec.quarantine:type_name -> lindm.agent.v1.QuarantineAction
+	12, // 20: lindm.agent.v1.DeviceActionSpec.release_quarantine:type_name -> lindm.agent.v1.ReleaseQuarantineAction
+	13, // 21: lindm.agent.v1.DeviceActionSpec.crypto_erase:type_name -> lindm.agent.v1.CryptoEraseAction
+	21, // 22: lindm.agent.v1.DeviceActionSpec.sanitize:type_name -> lindm.agent.v1.SanitizeAction
+	10, // 23: lindm.agent.v1.DeviceActionSpec.release_lock:type_name -> lindm.agent.v1.ReleaseLockAction
+	22, // 24: lindm.agent.v1.DeviceActionSpec.restart:type_name -> lindm.agent.v1.RestartAction
+	23, // 25: lindm.agent.v1.DeviceActionSpec.shutdown:type_name -> lindm.agent.v1.ShutdownAction
+	24, // 26: lindm.agent.v1.DeviceActionSpec.refresh_inventory:type_name -> lindm.agent.v1.RefreshInventoryAction
+	53, // 27: lindm.agent.v1.DeviceActionObservation.observed_at:type_name -> google.protobuf.Timestamp
+	6,  // 28: lindm.agent.v1.DeviceActionObservation.target:type_name -> lindm.agent.v1.StorageTarget
+	26, // 29: lindm.agent.v1.DeviceActionObservation.luks_tokens:type_name -> lindm.agent.v1.LUKSTokenObservation
+	14, // 30: lindm.agent.v1.DeviceActionObservation.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
+	19, // 31: lindm.agent.v1.DeviceActionObservation.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizePlan
+	25, // 32: lindm.agent.v1.DeviceActionPlan.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	27, // 33: lindm.agent.v1.DeviceActionPlan.before:type_name -> lindm.agent.v1.DeviceActionObservation
+	50, // 34: lindm.agent.v1.DeviceActionPlan.recovery_binding:type_name -> lindm.agent.v1.RecoveryKeyBinding
+	14, // 35: lindm.agent.v1.DeviceActionPlan.crypto_erase_targets:type_name -> lindm.agent.v1.CryptoEraseTargetPlan
+	27, // 36: lindm.agent.v1.DeviceActionVerification.after:type_name -> lindm.agent.v1.DeviceActionObservation
+	29, // 37: lindm.agent.v1.DeviceActionVerification.escrow:type_name -> lindm.agent.v1.DeviceActionEscrow
+	15, // 38: lindm.agent.v1.DeviceActionVerification.crypto_erase_results:type_name -> lindm.agent.v1.CryptoEraseTargetResult
+	20, // 39: lindm.agent.v1.DeviceActionVerification.nvme_sanitize:type_name -> lindm.agent.v1.NVMeSanitizeVerification
+	53, // 40: lindm.agent.v1.DeviceActionIntent.not_before:type_name -> google.protobuf.Timestamp
+	53, // 41: lindm.agent.v1.DeviceActionIntent.expires_at:type_name -> google.protobuf.Timestamp
+	25, // 42: lindm.agent.v1.DeviceActionIntent.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	53, // 43: lindm.agent.v1.DeviceActionChallenge.issued_at:type_name -> google.protobuf.Timestamp
+	53, // 44: lindm.agent.v1.DeviceActionChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 45: lindm.agent.v1.DeviceActionChallenge.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	53, // 46: lindm.agent.v1.DeviceActionApprovalBinding.expires_at:type_name -> google.protobuf.Timestamp
+	33, // 47: lindm.agent.v1.DeviceActionHumanApproval.binding:type_name -> lindm.agent.v1.DeviceActionApprovalBinding
+	32, // 48: lindm.agent.v1.DeviceActionStartGrant.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	53, // 49: lindm.agent.v1.DeviceActionStartGrant.not_before:type_name -> google.protobuf.Timestamp
+	53, // 50: lindm.agent.v1.DeviceActionStartGrant.expires_at:type_name -> google.protobuf.Timestamp
+	34, // 51: lindm.agent.v1.DeviceActionStartGrant.approvals:type_name -> lindm.agent.v1.DeviceActionHumanApproval
+	31, // 52: lindm.agent.v1.DeviceActionRecord.intent:type_name -> lindm.agent.v1.DeviceActionIntent
+	28, // 53: lindm.agent.v1.DeviceActionRecord.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	54, // 54: lindm.agent.v1.DeviceActionRecord.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	53, // 55: lindm.agent.v1.DeviceActionRecord.accepted_at:type_name -> google.protobuf.Timestamp
+	4,  // 56: lindm.agent.v1.DeviceActionRecord.state:type_name -> lindm.agent.v1.DeviceActionState
+	5,  // 57: lindm.agent.v1.DeviceActionRecord.failure:type_name -> lindm.agent.v1.DeviceActionFailure
+	32, // 58: lindm.agent.v1.DeviceActionRecord.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	53, // 59: lindm.agent.v1.DeviceActionRecord.started_at:type_name -> google.protobuf.Timestamp
+	53, // 60: lindm.agent.v1.DeviceActionRecord.completed_at:type_name -> google.protobuf.Timestamp
+	30, // 61: lindm.agent.v1.DeviceActionRecord.verification:type_name -> lindm.agent.v1.DeviceActionVerification
+	53, // 62: lindm.agent.v1.DeviceActionRecord.grant_accepted_at:type_name -> google.protobuf.Timestamp
+	53, // 63: lindm.agent.v1.DeviceActionRecord.escrow_confirmed_at:type_name -> google.protobuf.Timestamp
+	54, // 64: lindm.agent.v1.DeviceActionRecord.receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
+	54, // 65: lindm.agent.v1.DeviceActionRecord.inventory_receipt_root:type_name -> lindm.agent.v1.ExecutionRoot
+	4,  // 66: lindm.agent.v1.DeviceActionStatus.state:type_name -> lindm.agent.v1.DeviceActionState
+	5,  // 67: lindm.agent.v1.DeviceActionStatus.failure:type_name -> lindm.agent.v1.DeviceActionFailure
+	53, // 68: lindm.agent.v1.DeviceActionStatus.accepted_at:type_name -> google.protobuf.Timestamp
+	53, // 69: lindm.agent.v1.DeviceActionStatus.started_at:type_name -> google.protobuf.Timestamp
+	53, // 70: lindm.agent.v1.DeviceActionStatus.completed_at:type_name -> google.protobuf.Timestamp
+	27, // 71: lindm.agent.v1.DeviceActionStatus.before:type_name -> lindm.agent.v1.DeviceActionObservation
+	30, // 72: lindm.agent.v1.DeviceActionStatus.verification:type_name -> lindm.agent.v1.DeviceActionVerification
+	53, // 73: lindm.agent.v1.DeviceActionAttestation.issued_at:type_name -> google.protobuf.Timestamp
+	53, // 74: lindm.agent.v1.DeviceActionAttestation.expires_at:type_name -> google.protobuf.Timestamp
+	37, // 75: lindm.agent.v1.DeviceActionAttestation.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	53, // 76: lindm.agent.v1.DeviceActionEscrowReceipt.stored_at:type_name -> google.protobuf.Timestamp
+	37, // 77: lindm.agent.v1.PrepareDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	28, // 78: lindm.agent.v1.PrepareDeviceActionResponse.native_plan:type_name -> lindm.agent.v1.DeviceActionPlan
+	37, // 79: lindm.agent.v1.StartDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	37, // 80: lindm.agent.v1.GetDeviceActionResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	37, // 81: lindm.agent.v1.ConfirmDeviceActionEscrowResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	82, // [82:82] is the sub-list for method output_type
+	82, // [82:82] is the sub-list for method input_type
+	82, // [82:82] is the sub-list for extension type_name
+	82, // [82:82] is the sub-list for extension extendee
+	0,  // [0:82] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_device_actions_proto_init() }
@@ -4422,7 +4899,9 @@ func file_lindm_agent_v1_device_actions_proto_init() {
 	}
 	file_lindm_agent_v1_trust_proto_init()
 	file_lindm_agent_v1_device_actions_proto_msgTypes[1].OneofWrappers = []any{}
-	file_lindm_agent_v1_device_actions_proto_msgTypes[15].OneofWrappers = []any{
+	file_lindm_agent_v1_device_actions_proto_msgTypes[16].OneofWrappers = []any{}
+	file_lindm_agent_v1_device_actions_proto_msgTypes[17].OneofWrappers = []any{}
+	file_lindm_agent_v1_device_actions_proto_msgTypes[19].OneofWrappers = []any{
 		(*DeviceActionSpec_EscrowRotate)(nil),
 		(*DeviceActionSpec_Tpm2Bind)(nil),
 		(*DeviceActionSpec_LockSessions)(nil),
@@ -4431,14 +4910,17 @@ func file_lindm_agent_v1_device_actions_proto_init() {
 		(*DeviceActionSpec_CryptoErase)(nil),
 		(*DeviceActionSpec_Sanitize)(nil),
 		(*DeviceActionSpec_ReleaseLock)(nil),
+		(*DeviceActionSpec_Restart)(nil),
+		(*DeviceActionSpec_Shutdown)(nil),
+		(*DeviceActionSpec_RefreshInventory)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_device_actions_proto_rawDesc), len(file_lindm_agent_v1_device_actions_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   43,
+			NumEnums:      6,
+			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

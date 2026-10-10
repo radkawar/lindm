@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
@@ -70,6 +71,21 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 	}
 	response := &adminv1.GetDeviceResponse{Device: device}
 	if row.CurrentGenerationID != nil {
+		update, err := q.GetAgentUpdateReport(ctx, *row.CurrentGenerationID)
+		if err != nil && err != pgx.ErrNoRows {
+			return nil, mapErr(err)
+		}
+		if err == nil {
+			response.AgentUpdate = new(agentv1.AgentUpdateStatus)
+			if err := proto.Unmarshal(update.Status, response.AgentUpdate); err != nil {
+				return nil, mapErr(errInternalState)
+			}
+			receivedAt, ok := finiteTime(update.ReceivedAt)
+			if !ok {
+				return nil, mapErr(errInternalState)
+			}
+			response.AgentUpdateReceivedAt = timestamppb.New(receivedAt)
+		}
 		host, err := q.GetHostObservation(ctx, *row.CurrentGenerationID)
 		if err != nil && err != pgx.ErrNoRows {
 			return nil, mapErr(err)
@@ -299,6 +315,8 @@ func deviceFromDetail(row devicedb.GetDeviceDetailRow) (*adminv1.Device, error) 
 		HostSequence: uint64(row.HostSequence), PackageSequence: uint64(row.PackageSequence),
 		HostReceivedAt: protoTime(row.HostReceivedAt), PackageAttemptReceivedAt: protoTime(row.PackageAttemptReceivedAt),
 		SnapshotReceivedAt: protoTime(row.SnapshotReceivedAt), PublishedSnapshotSequence: uint64(row.PublishedSequence),
+		AgentRelease: row.AgentRelease, AgentProtocolVersion: uint32(row.AgentProtocolVersion),
+		AgentVersionAcceptedAt: protoTime(row.AgentVersionAcceptedAt),
 	}, nil
 }
 

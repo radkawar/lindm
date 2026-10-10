@@ -71,7 +71,7 @@ func approveUnattendedGuest(ctx context.Context, vm *guestVM, owner, approver *d
 	if services.Msg.GetAssignment() != nil || len(services.Msg.GetRecentActions()) != 0 {
 		return errors.New("pending device received executable service assignment before approval")
 	}
-	approved, err := approver.Admin.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: target.GetApprovalId(), Reason: unattendedReason}))
+	approved, err := approver.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: target.GetApprovalId(), Reason: unattendedReason}))
 	if err != nil {
 		return vmControlPlaneError("independently approve enrollment", err)
 	}

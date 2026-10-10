@@ -59,7 +59,13 @@ func synchronize(ctx context.Context, executor agentv1connect.ExecutorServiceCli
 	if err != nil {
 		return nil, err
 	}
-	state, err := rpc(ctx, authority.servers.device.GetSyncState, &devicev1.GetSyncStateRequest{SessionEpoch: authority.epoch})
+	update, err := rpc(ctx, executor.GetAgentUpdate, &agentv1.GetAgentUpdateRequest{})
+	if err != nil {
+		return nil, err
+	}
+	// Read the root's durable result on every heartbeat. There is no network
+	// acknowledgement to lose across restart and no transport-invented health.
+	state, err := rpc(ctx, authority.servers.device.GetSyncState, &devicev1.GetSyncStateRequest{SessionEpoch: authority.epoch, AgentUpdate: update.GetStatus()})
 	if err != nil {
 		return nil, err
 	}

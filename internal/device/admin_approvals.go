@@ -83,7 +83,7 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 		return nil, mapErr(err)
 	}
 	defer s.release()
-	approval, err := s.identity.CreateApproval(ctx, actor.ID, req.Msg, s.approvalScope)
+	approval, err := s.identity.CreateApproval(ctx, actor.ID, req.Msg, s.recoveryReadinessApprovalScope(req.Msg.GetCreateDeviceAction()))
 	if err != nil {
 		return nil, approvalError(err)
 	}

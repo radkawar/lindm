@@ -18,6 +18,7 @@ import "lindm/admin/v1/provisioning.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
+import "lindm/agent/v1/update.proto";
 import "lindm/inventory/v1/observation.proto";
 import "lindm/validation/v1/string_rules.proto";
 
@@ -70,6 +71,7 @@ service AdminService {
   rpc GetDeviceActions(GetDeviceActionsRequest) returns (GetDeviceActionsResponse);
   rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);
   rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);
+  rpc ListDeviceStorageTargets(ListDeviceStorageTargetsRequest) returns (ListDeviceStorageTargetsResponse);
   rpc RevealRecoveryKey(RevealRecoveryKeyRequest) returns (RevealRecoveryKeyResponse);
   rpc ListDeviceGroups(ListDeviceGroupsRequest) returns (ListDeviceGroupsResponse);
   rpc SetDeviceGroup(SetDeviceGroupRequest) returns (SetDeviceGroupResponse);
@@ -128,6 +130,12 @@ message Device {
   // resources. Absent if unassigned or any resource has never been verified.
   // This is historical evidence, not a claim that compliance is currently fresh.
   google.protobuf.Timestamp last_verified_at = 20;
+  // Current generation's latest accepted device-signed session acquisition.
+  // Empty release/zero protocol mean unreported; absent time means no acquisition.
+  // This is reported build identity, not server-verified executable integrity.
+  string agent_release = 21 [(buf.validate.field).string.max_len = 128];
+  uint32 agent_protocol_version = 22 [(buf.validate.field).uint32.lte = 2147483647];
+  google.protobuf.Timestamp agent_version_accepted_at = 23;
 }
 
 message ListDevicesRequest {
@@ -193,6 +201,9 @@ message GetDeviceResponse {
   PackageSnapshotDetail current_snapshot = 4;
   // Open upload, if one is still staging. Not a published inventory.
   PackageSnapshotDetail staging_snapshot = 5;
+  // Absent means unknown. Reports are session-fenced telemetry, not health proof.
+  lindm.agent.v1.AgentUpdateStatus agent_update = 6;
+  google.protobuf.Timestamp agent_update_received_at = 7;
 }
 
 message ListDevicePackagesRequest {

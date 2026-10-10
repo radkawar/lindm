@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package lindm.device.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/device/v1;devicev1";
+
+message ConfirmRefreshInventoryPublicationRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message ConfirmRefreshInventoryPublicationResponse {
+  bytes receipt_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}

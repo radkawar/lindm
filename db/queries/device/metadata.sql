@@ -64,6 +64,10 @@ WITH page AS MATERIALIZED (
       AND (sqlc.arg('os_id')::text = '' OR d.os_id = sqlc.arg('os_id'))
       AND (sqlc.arg('os_version')::text = '' OR d.os_version = sqlc.arg('os_version'))
       AND starts_with(d.hostname, sqlc.arg('name_prefix')::text)
+      AND (sqlc.arg('agent_release')::text = '' OR EXISTS (
+          SELECT 1 FROM device_release_reports r
+          WHERE r.generation_id = d.current_generation_id AND r.agent_release = sqlc.arg('agent_release')::text
+      ))
       AND (sqlc.narg('seen_from')::timestamptz IS NULL OR d.last_seen_at >= sqlc.narg('seen_from')::timestamptz)
       AND (sqlc.narg('seen_until')::timestamptz IS NULL OR d.last_seen_at <= sqlc.narg('seen_until')::timestamptz)
       AND d.metadata @> sqlc.arg('metadata_filter')::jsonb
@@ -75,9 +79,13 @@ SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.archi
     coalesce(g.host_sequence, 0)::bigint AS host_sequence,
     coalesce(g.package_sequence, 0)::bigint AS package_sequence,
     d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.metadata,
-    compliance.compliance_rank, compliance.last_verified_at
+    compliance.compliance_rank, compliance.last_verified_at,
+    coalesce(r.agent_release, '')::text AS agent_release,
+    coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
+    r.reported_at AS agent_version_accepted_at
 FROM page d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
 CROSS JOIN LATERAL (
     -- Explicit worst rank, independent of protobuf enum numbering:
     -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.

@@ -25,6 +25,9 @@ func TestDeviceActionApprovalPermissions(t *testing.T) {
 		{"release", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{}}}, PermissionQuarantineDevice},
 		{"crypto erase", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{}}}, PermissionExecuteDestructive},
 		{"sanitize", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{}}}, PermissionExecuteDestructive},
+		{"restart", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{}}}, PermissionRunRemoteExecution},
+		{"shutdown", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}}, PermissionRunRemoteExecution},
+		{"refresh inventory", &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}, PermissionManageInventory},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

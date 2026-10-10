@@ -17,7 +17,7 @@ import (
 
 const (
 	deviceActionsPerCycle       = 4
-	deviceActionDispatchTimeout = 2 * time.Minute
+	deviceActionDispatchTimeout = 5 * time.Minute
 	deviceActionPollTimeout     = 10 * time.Second
 	deviceActionPollInterval    = 500 * time.Millisecond
 )
@@ -79,6 +79,29 @@ func (m *managementLoop) relayDeviceAction(ctx context.Context, work *devicev1.D
 			return false, errors.Join(phaseErr, err)
 		}
 		slog.Warn("device action phase incomplete; reporting protected history", "action_id", work.GetActionId(), "error", phaseErr)
+	}
+	if !reportOnly && status.GetRefreshInventory() && len(work.GetInventoryReceiptEnvelope()) != 0 && (status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN) {
+		confirmed, err := rpc(ctx, m.executor.ConfirmDeviceActionInventory, &agentv1.ConfirmDeviceActionInventoryRequest{ActionId: work.GetActionId(), ReceiptEnvelope: work.GetInventoryReceiptEnvelope()})
+		if err != nil {
+			return false, err
+		}
+		status = confirmed.GetStatus()
+		if err := checkDeviceActionStatus(status, work.GetActionId(), digest); err != nil {
+			return false, err
+		}
+	}
+	if !reportOnly && status.GetRefreshInventory() && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING {
+		if m.refreshInventory == nil {
+			return false, errors.New("inventory refresh transport is unavailable")
+		}
+		if err := m.refreshInventory(ctx, status); err != nil {
+			return false, fmt.Errorf("publish refreshed inventory: %w", err)
+		}
+		var err error
+		status, err = m.deviceActionStatus(ctx, work.GetActionId(), digest)
+		if err != nil {
+			return false, err
+		}
 	}
 	if !reportOnly && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_AWAITING_ESCROW && len(work.GetEscrowReceiptEnvelope()) != 0 {
 		var err error

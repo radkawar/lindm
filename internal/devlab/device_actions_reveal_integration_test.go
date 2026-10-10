@@ -4,7 +4,6 @@ package devlab
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -15,11 +14,7 @@ import (
 )
 
 func TestNativeRevealReasonAuthorization(t *testing.T) {
-	binary := os.Getenv("LINDM_NATIVE_SERVER_BINARY")
-	repository := os.Getenv("LINDM_NATIVE_REPOSITORY")
-	if binary == "" || repository == "" {
-		t.Skip("requires stamped native server and initialized repository")
-	}
+	binary, repository := nativeServer(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 	fixture, err := OpenDeviceActionAuthorityFixture(ctx, repository, binary)

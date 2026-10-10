@@ -43,10 +43,11 @@ type Resources struct {
 	// IntegrationEncryptionKey protects destination credentials at rest.
 	IntegrationEncryptionKey []byte
 	// Escrow uses distinct ingress and wrapping keys, never inventory storage.
-	Escrow                       *escrow.Custody
-	EscrowRevealApprovalRequired bool
-	ReleaseRepositoryDirectory   string
-	ReleaseSigningDirectory      string
+	Escrow                            *escrow.Custody
+	EscrowRevealApprovalRequired      bool
+	ReleaseRepositoryDirectory        string
+	ReleaseSigningDirectory           string
+	ReleaseVerificationStateDirectory string
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -146,6 +147,9 @@ func (d *Document) Resolve() (*Resources, error) {
 		result.ReleaseRepositoryDirectory = reference(base, release.GetDirectory())
 		if release.GetSigning() != nil {
 			result.ReleaseSigningDirectory = reference(base, release.GetSigning().GetDirectory())
+		}
+		if release.GetVerificationStateDirectory() != "" {
+			result.ReleaseVerificationStateDirectory = reference(base, release.GetVerificationStateDirectory())
 		}
 	}
 

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Read-only root observation, not authorization or readiness for an artifact.
+// The server derives artifact readiness from its authenticated release size.
+message RecoveryReadinessObservation {
+  google.protobuf.Timestamp observed_at = 1 [(buf.validate.field).required = true];
+  string boot_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  bool available = 3;
+  string reason = 4 [(buf.validate.field).string.max_len = 256];
+  string esp_uuid = 5 [(buf.validate.field).string.max_len = 64];
+  string esp_path = 6 [(buf.validate.field).string.max_len = 4096];
+  uint64 free_bytes = 7;
+  uint64 allocation_unit_bytes = 8;
+  bool secure_boot = 9;
+  bool uki_capable = 10;
+  // Local configured identity only, never release-size authority for admission.
+  optional bytes configured_image_sha256 = 11 [(buf.validate.field).bytes.len = 32];
+  optional uint64 configured_image_size = 12 [(buf.validate.field).uint64.gt = 0];
+  option (buf.validate.message).cel = {
+    id: "recovery_readiness.availability"
+    message: "available observations need native identity and capability; failures need a reason"
+    expression: "this.available ? (this.boot_id != '' && this.reason == '' && this.esp_uuid != '' && this.esp_path != '' && this.allocation_unit_bytes > 0u && this.secure_boot && this.uki_capable) : this.reason != ''"
+  };
+}
+
+message GetRecoveryReadinessRequest {}
+
+message GetRecoveryReadinessResponse {
+  RecoveryReadinessObservation observation = 1 [(buf.validate.field).required = true];
+  // Canonical inventory.StorageDetails protobuf from the same root observer.
+  // Kept opaque here to avoid the inventory-to-agent schema import cycle.
+  bytes storage_details = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  google.protobuf.Timestamp storage_observed_at = 3 [(buf.validate.field).required = true];
+}

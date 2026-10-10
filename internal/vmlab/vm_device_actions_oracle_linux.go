@@ -83,6 +83,33 @@ func actionNativeTargets(data []byte) ([]actionNativeTarget, error) {
 	return targets, nil
 }
 
+// Device node numbers are boot-local, not part of approved media identity.
+func actionWholeDiskPath(data []byte, expected *agentv1.StorageTarget) (string, error) {
+	if len(data) > 1<<20 || expected.GetLuksUuid() != "" || expected.GetWwn() == "" || expected.GetSerial() == "" || expected.GetSizeBytes() == 0 {
+		return "", errors.New("incomplete whole-disk identity or oversized topology")
+	}
+	var topology struct {
+		Devices []actionBlockNode `json:"blockdevices"`
+	}
+	if err := json.Unmarshal(data, &topology); err != nil {
+		return "", err
+	}
+	var matched string
+	for _, node := range topology.Devices {
+		if node.Type != "disk" || node.WWN != expected.GetWwn() || node.Serial != expected.GetSerial() || node.Size != expected.GetSizeBytes() {
+			continue
+		}
+		if matched != "" || !strings.HasPrefix(node.Path, "/dev/") || strings.ContainsAny(node.Path, "\n\r\x00") {
+			return "", errors.New("ambiguous or invalid current whole-disk path")
+		}
+		matched = node.Path
+	}
+	if matched == "" {
+		return "", errors.New("approved whole-disk identity is absent after reboot")
+	}
+	return matched, nil
+}
+
 func observeActionTargets(ctx context.Context, vm *EncryptedVM) ([]actionNativeTarget, error) {
 	data, err := vm.Run(ctx, "sudo -n lsblk --json --tree --bytes --output PATH,TYPE,SIZE,WWN,SERIAL,UUID,FSTYPE", nil)
 	if err != nil {

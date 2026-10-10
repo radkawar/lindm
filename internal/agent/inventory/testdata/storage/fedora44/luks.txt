@@ -1,0 +1,5 @@
+Version:       	2
+UUID:          	76cd66e8-7d6f-4779-b224-fbd3ac2455ce
+Keyslots:
+  0: luks2
+Tokens:

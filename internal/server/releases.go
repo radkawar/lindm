@@ -57,3 +57,35 @@ func newReleaseRepository(resources *config.Resources) (http.Handler, *releaseup
 	}
 	return handler, publisher, nil
 }
+
+// Recovery admission uses the installation's authenticated bootstrap, never
+// repository/root.json as a new trust anchor. Its checkpoint stays private.
+func newRecoveryArtifacts(resources *config.Resources) (*releaseupdate.Client, error) {
+	state := resources.ReleaseVerificationStateDirectory
+	if state == "" {
+		return nil, nil
+	}
+	if resources.ReleaseRepositoryDirectory == "" || resources.ExecutionBootstrap == nil || len(resources.ExecutionBootstrap.ReleaseRootJSON) == 0 {
+		return nil, errors.New("recovery artifact verification requires repository and authenticated execution bootstrap")
+	}
+	directory, err := filepath.Abs(resources.ReleaseRepositoryDirectory)
+	if err != nil {
+		return nil, err
+	}
+	state, err = filepath.Abs(state)
+	if err != nil {
+		return nil, err
+	}
+	relative, err := filepath.Rel(directory, state)
+	if err != nil {
+		return nil, err
+	}
+	if relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return nil, errors.New("release verification checkpoint must be outside the published repository")
+	}
+	// NewClient and DirectoryFetch reject linked directories and files.
+	return releaseupdate.NewClient(releaseupdate.ClientConfig{
+		StateDir: state, BootstrapRoot: resources.ExecutionBootstrap.ReleaseRootJSON,
+		Fetch: releaseupdate.DirectoryFetch(directory),
+	})
+}

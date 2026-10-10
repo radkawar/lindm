@@ -5,6 +5,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"io"
 	"os"
@@ -35,7 +37,7 @@ operation = sys.argv[1]
 sys.argv = ["/usr/sbin/subscription-manager", operation]
 if operation == "register":
     material = json.load(sys.stdin)
-    sys.argv += ["--org", material["organization_id"], "--activationkey", material["activation_key"]]
+    sys.argv += ["--org", material["organization_id"], "--activationkey", material["activation_key"], "--name", material["run_name"]]
     del material
 runpy.run_path("/usr/sbin/subscription-manager", run_name="__main__")
 `
@@ -84,7 +86,31 @@ func guestRedHat(ctx context.Context, operation string) error {
 		if err := owner.Close(); err != nil {
 			return errors.New("cannot close Red Hat guest ownership marker")
 		}
-		return runRedHatSubscription(ctx, "register", payload)
+		if err := runRedHatSubscription(ctx, "register", payload); err != nil {
+			return err
+		}
+		credentials := new(labv1.RedHatRegistrationCredentials)
+		defer proto.Reset(credentials)
+		if err := protojson.Unmarshal(payload, credentials); err != nil {
+			return errors.New("cannot recover validated Red Hat registration name")
+		}
+		certificate, err := os.ReadFile(redHatConsumerCertificate)
+		if err != nil {
+			return errors.New("cannot read native Red Hat consumer certificate")
+		}
+		defer clear(certificate)
+		identity, err := redHatCertificateIdentity(certificate, credentials.GetRunName())
+		if err != nil {
+			return err
+		}
+		output, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(identity)
+		if err != nil {
+			return errors.New("cannot encode public Red Hat consumer identity")
+		}
+		if _, err := os.Stdout.Write(output); err != nil {
+			return errors.New("cannot deliver public Red Hat consumer identity")
+		}
+		return nil
 	case "redhat-unregister":
 		if _, err := os.Lstat(redHatGuestOwner); errors.Is(err, os.ErrNotExist) {
 			return nil // Registration never crossed the owned mutation boundary.
@@ -164,6 +190,24 @@ func runRedHatSubscription(ctx context.Context, operation string, payload []byte
 		return errors.New("redhat subscription-manager operation failed (native output suppressed)")
 	}
 	return nil
+}
+
+func redHatCertificateIdentity(data []byte, runName string) (*labv1.RedHatRegistrationIdentity, error) {
+	block, rest := pem.Decode(data)
+	if block == nil || block.Type != "CERTIFICATE" || len(bytes.TrimSpace(rest)) != 0 {
+		return nil, errors.New("invalid native Red Hat consumer certificate")
+	}
+	certificate, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, errors.New("invalid native Red Hat consumer certificate")
+	}
+	// RHSM's consumer identity certificate uses the consumer UUID as its CN.
+	// Never expose the remaining certificate subject (which contains account data).
+	identity := &labv1.RedHatRegistrationIdentity{RunName: runName, ConsumerUuid: certificate.Subject.CommonName}
+	if err := protovalidate.Validate(identity); err != nil {
+		return nil, errors.New("invalid native Red Hat consumer identity")
+	}
+	return identity, nil
 }
 
 func decodeRedHatGuestInput(data []byte) ([]byte, error) {

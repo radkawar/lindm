@@ -413,7 +413,9 @@ type DeviceFilter struct {
 	LastSeenUntil *timestamppb.Timestamp     `protobuf:"bytes,6,opt,name=last_seen_until,json=lastSeenUntil,proto3" json:"last_seen_until,omitempty"`
 	// Case-sensitive literal prefix of hostname, the device's displayed name.
 	// Percent, underscore and backslash are ordinary characters, not wildcards.
-	NamePrefix    string `protobuf:"bytes,7,opt,name=name_prefix,json=namePrefix,proto3" json:"name_prefix,omitempty"`
+	NamePrefix string `protobuf:"bytes,7,opt,name=name_prefix,json=namePrefix,proto3" json:"name_prefix,omitempty"`
+	// Exact current-generation signed-session release; empty disables this filter.
+	AgentRelease  string `protobuf:"bytes,8,opt,name=agent_release,json=agentRelease,proto3" json:"agent_release,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -493,6 +495,13 @@ func (x *DeviceFilter) GetLastSeenUntil() *timestamppb.Timestamp {
 func (x *DeviceFilter) GetNamePrefix() string {
 	if x != nil {
 		return x.NamePrefix
+	}
+	return ""
+}
+
+func (x *DeviceFilter) GetAgentRelease() string {
+	if x != nil {
+		return x.AgentRelease
 	}
 	return ""
 }
@@ -961,7 +970,7 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
 	"\x05value\x18\x02 \x01(\v2\x1e.lindm.admin.v1.AttributeValueR\x05value:\x028\x01B\a\n" +
-	"\x05owner\"\xef\x05\n" +
+	"\x05owner\"\xa2\x06\n" +
 	"\fDeviceFilter\x12!\n" +
 	"\x05os_id\x18\x01 \x01(\tB\f\xbaH\tr\a\x18\x80 \xba\x01\x01\x00R\x04osId\x12+\n" +
 	"\n" +
@@ -973,7 +982,8 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x0elast_seen_from\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\flastSeenFrom\x12B\n" +
 	"\x0flast_seen_until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rlastSeenUntil\x12-\n" +
 	"\vname_prefix\x18\a \x01(\tB\f\xbaH\tr\a\x18\x80 \xba\x01\x01\x00R\n" +
-	"namePrefix\x1a]\n" +
+	"namePrefix\x121\n" +
+	"\ragent_release\x18\b \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\fagentRelease\x1a]\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
 	"\x05value\x18\x02 \x01(\v2\x1e.lindm.admin.v1.AttributeValueR\x05value:\x028\x01:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +

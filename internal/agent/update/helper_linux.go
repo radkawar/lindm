@@ -70,13 +70,13 @@ func launchHelper(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 	// No dependency on lindm-executor/agent services: package scripts can replace
 	// or stop them without killing this independently owned cgroup. systemd's
 	// PrivateNetwork and AF_UNIX fence also cover native package manager scripts.
-	_, err := nativeCommand(ctx, "/usr/bin/systemd-run", "--quiet", "--no-block", "--collect", "--unit="+helperUnit(tx), "--property=Slice=lindm-updates.slice", "--property=Type=exec", "--property=PrivateNetwork=yes", "--property=RestrictAddressFamilies=AF_UNIX", "--property=RuntimeMaxSec=1800", "--property=UMask=0077", "--property=StandardOutput=journal", "--property=StandardError=journal", filepath.Join(directory, "helper"), "update-apply", "-transaction", directory)
+	_, err := nativeCommand(ctx, "apply", "/usr/bin/systemd-run", "--quiet", "--no-block", "--collect", "--unit="+helperUnit(tx), "--property=Slice=lindm-updates.slice", "--property=Type=exec", "--property=PrivateNetwork=yes", "--property=RestrictAddressFamilies=AF_UNIX", "--property=RuntimeMaxSec=1800", "--property=UMask=0077", "--property=StandardOutput=journal", "--property=StandardError=journal", filepath.Join(directory, "helper"), "update-apply", "-transaction", directory)
 	return err
 }
 
 func helperActive(ctx context.Context, tx *agentv1.AgentUpdateTransaction) (bool, error) {
 	for _, unit := range []string{helperUnit(tx), recoveryUnit} {
-		out, err := nativeCommand(ctx, "/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,SubState", unit)
+		out, err := nativeCommand(ctx, "recovery", "/usr/bin/systemctl", "show", "--property=LoadState,ActiveState,SubState", unit)
 		fields := make(map[string]string)
 		for line := range strings.SplitSeq(string(out), "\n") {
 			if k, v, ok := strings.Cut(line, "="); ok {
@@ -136,16 +136,6 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 	if filepath.Base(directory) != tx.GetId() {
 		return errors.New("native update transaction directory mismatch")
 	}
-	if err := mutablePlatform(tx.GetManager()); err != nil {
-		return err
-	}
-	if err := validatePackage(ctx, directory, tx); err != nil {
-		return err
-	}
-	prior, err := observeInstalled(ctx, tx.GetManager())
-	if err != nil {
-		return err
-	}
 	previous := &agentv1.AgentUpdateHelperState{}
 	readErr := journal.ReadUpdateRecord(directory, "helper.pb", previous)
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
@@ -156,16 +146,8 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 			return err
 		}
 	}
-	if !recoverablePredecessor(prior, tx, previous.GetPhase()) {
-		return errors.New("native package changed outside admitted transaction")
-	}
-	if previous.GetPhase() == "installed" && prior.matchesTransaction(tx) == nil {
-		if err := verifyInstalledPayload(ctx, tx); err != nil {
-			return err
-		}
-		return removeRecoveryUnit(ctx, directory)
-	}
 	completed := false
+	operation := "validation"
 	defer func() {
 		if resultErr == nil || completed {
 			return
@@ -175,8 +157,33 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 			phase = "rejected"
 			resultErr = errors.Join(resultErr, removeRecoveryUnit(ctx, directory))
 		}
-		resultErr = errors.Join(resultErr, journal.WriteUpdateRecord(directory, "helper.pb", &agentv1.AgentUpdateHelperState{Phase: phase, ObservedAt: timestamppb.Now()}))
+		resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), operation)
+		resultErr = errors.Join(resultErr, writeHelperState(directory, phase, previous, resultErr))
 	}()
+	if err := mutablePlatform(tx.GetManager()); err != nil {
+		return err
+	}
+	if err := validatePackage(ctx, directory, tx); err != nil {
+		return err
+	}
+	operation = "recovery"
+	prior, err := observeInstalled(ctx, tx.GetManager(), operation)
+	if err != nil {
+		return err
+	}
+	if !recoverablePredecessor(prior, tx, previous.GetPhase()) {
+		return errors.New("native package changed outside admitted transaction")
+	}
+	if previous.GetPhase() == "installed" && prior.matchesTransaction(tx) == nil {
+		if err := verifyInstalledPayload(ctx, tx); err != nil {
+			return err
+		}
+		if err := writeHelperState(directory, "installed", previous, nil); err != nil {
+			return err
+		}
+		completed = true
+		return removeRecoveryUnit(ctx, directory)
+	}
 	if err := authorizeNativeEffect(ctx, tx, prior, previous.GetPhase()); err != nil {
 		return err
 	}
@@ -185,7 +192,7 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 	if err := installRecoveryUnit(ctx, directory); err != nil {
 		return err
 	}
-	if err := journal.WriteUpdateRecord(directory, "helper.pb", &agentv1.AgentUpdateHelperState{Phase: "installing", ObservedAt: timestamppb.Now()}); err != nil {
+	if err := writeHelperState(directory, "installing", previous, nil); err != nil {
 		return err
 	}
 	if err := applyPackage(ctx, directory, tx, prior, readErr == nil, func() error {
@@ -193,21 +200,34 @@ func Apply(ctx context.Context, directory string) (resultErr error) {
 	}); err != nil {
 		return err
 	}
-	installed, err := observeInstalled(ctx, tx.GetManager())
+	installed, err := observeInstalled(ctx, tx.GetManager(), "payload_verify")
 	if err != nil {
 		return err
 	}
 	if err := installed.matchesTransaction(tx); err != nil {
-		return err
+		return withNativeDiagnostic(err, managerExecutable(tx.GetManager()), "payload_verify")
 	}
 	if err := verifyInstalledPayload(ctx, tx); err != nil {
 		return err
 	}
-	if err := journal.WriteUpdateRecord(directory, "helper.pb", &agentv1.AgentUpdateHelperState{Phase: "installed", ObservedAt: timestamppb.Now()}); err != nil {
+	if err := writeHelperState(directory, "installed", previous, nil); err != nil {
 		return err
 	}
 	completed = true
 	return removeRecoveryUnit(ctx, directory)
+}
+
+// Keep the last failure while a rebooted helper is checking/recovering. Only a
+// verified installed checkpoint clears it; a missing new diagnostic is not success.
+func writeHelperState(directory, phase string, previous *agentv1.AgentUpdateHelperState, failure error) error {
+	diagnostic := previous.GetNativeDiagnostic()
+	if next := diagnosticForError(failure); next != nil {
+		diagnostic = next
+	}
+	if phase == "installed" {
+		diagnostic = nil
+	}
+	return journal.WriteUpdateRecord(directory, "helper.pb", &agentv1.AgentUpdateHelperState{Phase: phase, ObservedAt: timestamppb.Now(), NativeDiagnostic: diagnostic})
 }
 
 func recoveryUnitBytes(directory string) []byte {
@@ -282,7 +302,7 @@ func installRecoveryUnit(ctx context.Context, directory string) error {
 	if err := unix.Fsync(fd); err != nil {
 		return err
 	}
-	_, err = nativeCommand(ctx, "/usr/bin/systemctl", "daemon-reload")
+	_, err = nativeCommand(ctx, "recovery", "/usr/bin/systemctl", "daemon-reload")
 	return err
 }
 
@@ -337,7 +357,7 @@ func removeRecoveryUnit(ctx context.Context, directory string) error {
 	if err := syncDirectory(unitDirectory); err != nil {
 		return err
 	}
-	_, err = nativeCommand(ctx, "/usr/bin/systemctl", "daemon-reload")
+	_, err = nativeCommand(ctx, "recovery", "/usr/bin/systemctl", "daemon-reload")
 	return err
 }
 

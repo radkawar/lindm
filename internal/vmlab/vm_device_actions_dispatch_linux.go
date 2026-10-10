@@ -41,14 +41,11 @@ func approveNativeAction(ctx context.Context, owner, approver *devlab.OwnerSessi
 	if err := owner.StepUp(ctx); err != nil {
 		return err
 	}
-	if err := approver.StepUp(ctx); err != nil {
-		return err
-	}
 	created, err := owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 300, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: request}}))
 	if err != nil {
 		return err
 	}
-	approved, err := approver.Admin.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent native VM destructive qualification approval"}))
+	approved, err := approver.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent native VM destructive qualification approval"}))
 	if err != nil {
 		return err
 	}
@@ -63,7 +60,9 @@ func prepareActionStatusFile(ctx context.Context, vm *guestVM, actionID string) 
 	if !vmValidID(actionID) {
 		return "", errors.New("invalid action ID")
 	}
-	path := "/run/lindm/native-action-" + actionID + ".json"
+	// A failed transport can leave its request file behind. Diagnostics use a
+	// separate connection and must not collide with that still-owned file.
+	path := "/run/lindm/native-action-" + actionID + "-" + uuid.NewString() + ".json"
 	data, err := protojson.Marshal(&agentv1.GetDeviceActionRequest{ActionId: actionID})
 	if err != nil {
 		return "", err
@@ -102,6 +101,7 @@ func dispatchNativeAction(ctx context.Context, vm *guestVM, owner *devlab.OwnerS
 		return nil, nil, err
 	}
 	id := created.Msg.GetAction().GetActionId()
+	defer func() { err = diagnoseNativeAction(ctx, vm, id, err) }()
 	path, err := prepareActionStatusFile(ctx, vm, id)
 	if err != nil {
 		return nil, nil, err

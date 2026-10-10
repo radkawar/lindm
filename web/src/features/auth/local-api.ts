@@ -50,6 +50,7 @@ async function request(path: string, body?: JsonValue, csrfToken?: string, signa
         : response.status === 403
           ? Code.PermissionDenied
           : Code.Unknown,
+      response.headers,
     );
   }
   return response;

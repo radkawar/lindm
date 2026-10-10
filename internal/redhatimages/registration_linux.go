@@ -156,18 +156,12 @@ func (c *Client) deleteRegistration(ctx context.Context, name string) error {
 	return nil
 }
 
-// CleanupRegistrations explicitly deletes leftover keys in the exact owned
-// namespace. Stop all active lab lanes first: activation keys have no API lease
-// expiry. Other keys are never changed and names never appear in the result.
-func (c *Client) CleanupRegistrations(ctx context.Context, confirmed bool) (int, error) {
-	if !confirmed {
-		return 0, errors.New("redhatimages: leftover activation-key cleanup requires explicit confirmation and stopped lab lanes")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
+// listRegistrations reads the complete unpaginated v2 activation-key list.
+// Names remain private to the client and never appear in cleanup evidence.
+func (c *Client) listRegistrations(ctx context.Context) ([]string, error) {
 	response, err := c.registrationRequest(ctx, http.MethodGet, "/activation_keys", nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	var listed struct {
 		Body []struct {
@@ -177,25 +171,27 @@ func (c *Client) CleanupRegistrations(ctx context.Context, confirmed bool) (int,
 	decodeErr := decodeBounded(response.Body, &listed)
 	closeErr := response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("redhatimages: activation-key list HTTP status %d", response.StatusCode)
+		return nil, fmt.Errorf("redhatimages: activation-key list HTTP status %d", response.StatusCode)
 	}
 	if err := errors.Join(decodeErr, closeErr); err != nil {
-		return 0, err
+		return nil, err
 	}
-	if len(listed.Body) > 1000 {
-		return 0, errors.New("redhatimages: activation-key cleanup list exceeds 1000 entries")
+	if listed.Body == nil || len(listed.Body) > 1000 {
+		return nil, errors.New("redhatimages: invalid activation-key list or exceeds 1000 entries")
 	}
-	deleted := 0
+	var names []string
+	seen := make(map[string]bool)
 	for _, key := range listed.Body {
 		if !ownedRegistration(key.Name) {
 			continue
 		}
-		if err := c.deleteRegistration(ctx, key.Name); err != nil {
-			return deleted, err
+		if seen[key.Name] {
+			return nil, errors.New("redhatimages: duplicate activation-key list entry")
 		}
-		deleted++
+		seen[key.Name] = true
+		names = append(names, key.Name)
 	}
-	return deleted, nil
+	return names, nil
 }
 
 func (c *Client) registrationRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {

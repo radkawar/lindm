@@ -149,6 +149,9 @@ func (s *Service) GetSyncState(ctx context.Context, req *connect.Request[devicev
 	if req.Msg == nil || !validSessionEpoch(req.Msg.GetSessionEpoch()) {
 		return nil, invalid("session_epoch")
 	}
+	if err := s.rules.Validate(req.Msg); err != nil {
+		return nil, invalid("agent_update")
+	}
 	var response *devicev1.GetSyncStateResponse
 	err := s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
 		authority, err := s.lockAuthority(ctx, q, principal)
@@ -157,6 +160,9 @@ func (s *Service) GetSyncState(ctx context.Context, req *connect.Request[devicev
 		}
 		if uint64(authority.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
 			return errSessionFenced
+		}
+		if err := recordAgentUpdate(ctx, q, principal, req.Msg.GetSessionEpoch(), req.Msg.GetAgentUpdate(), authority.now); err != nil {
+			return err
 		}
 		if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(authority.now), ID: principal.DeviceID}); err != nil {
 			return err

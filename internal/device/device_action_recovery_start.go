@@ -46,9 +46,15 @@ func (s *Service) AcquireRecoveryWork(ctx context.Context, req *connect.Request[
 		return nil, mapErr(err)
 	}
 	delegationDigest := sha256.Sum256(admission.row.DelegationEnvelope)
-	_, update, err := s.execution.ForDevice(ctx, tx, admission.credential.GetRootVersion(), admission.credential.GetDelegationVersion(), admission.credential.GetHandoff().GetIntent().GetRecoveryEpoch(), rootDigest[:], delegationDigest[:])
+	snapshot, update, err := s.execution.ForDevice(ctx, tx, admission.credential.GetRootVersion(), admission.credential.GetDelegationVersion(), admission.credential.GetHandoff().GetIntent().GetRecoveryEpoch(), rootDigest[:], delegationDigest[:])
 	if err != nil {
 		return nil, executionError(err)
+	}
+	if update == nil {
+		// Recovery must revalidate current signed authority on every acquire,
+		// even when the handoff already carried these exact versions. Ordinary
+		// inventory's "no update" optimization is not its protocol contract.
+		update = &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: snapshot.DelegationEnvelope}
 	}
 	q := devicedb.New(tx)
 	action, row, now, err := lockRecovery(ctx, q, admission, true)

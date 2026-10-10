@@ -2,17 +2,31 @@ package devlab
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+// integrationServerRelease stamps the lindmd binary that native-server
+// integration tests drive; release fixtures require a real x.y.z stamp.
+const integrationServerRelease = "0.1.0"
+
 // TestIntegration runs the real Keycloak fresh-authorization smoke followed by
-// PostgreSQL regressions against private per-test schemas. Credentials are passed
-// only in-process or in the child environment, never command arguments.
-func TestIntegration(ctx context.Context, repoRoot string) error {
-	return locked(ctx, repoRoot, func(root string) error {
+// PostgreSQL regressions against private per-test schemas. Native-server
+// regressions drive a freshly built, release-stamped lindmd against the
+// initialized fixture. Credentials are passed only in-process or in the child
+// environment, never command arguments.
+//
+// The fixture lock covers only the preflight. Native-server fixtures acquire it
+// themselves while they mutate shared trust material, so holding it across the
+// test run would deadlock them.
+func TestIntegration(ctx context.Context, repoRoot string) (resultErr error) {
+	var root string
+	var dsn []byte
+	if err := locked(ctx, repoRoot, func(lockedRoot string) error {
+		root = lockedRoot
 		dir := FixturePath(root)
 		if err := validateFixture(dir); err != nil {
 			return err
@@ -29,19 +43,28 @@ func TestIntegration(ctx context.Context, repoRoot string) error {
 				return fmt.Errorf("real fresh-authorization smoke: %w", err)
 			}
 		}
-		dsn, err := os.ReadFile(filepath.Join(dir, "migration-database-url"))
-		if err != nil {
-			return err
+		dsn, err = os.ReadFile(filepath.Join(dir, "migration-database-url"))
+		return err
+	}); err != nil {
+		return err
+	}
+	work, err := os.MkdirTemp("", "lindm-integration-")
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(work)) }()
+	server := filepath.Join(work, "lindmd")
+	if err := command(ctx, root, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease, "-o", server, "./cmd/lindmd"); err != nil {
+		return fmt.Errorf("build native integration server: %w", err)
+	}
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "LINDM_TEST_DATABASE_URL=") && !strings.HasPrefix(value, "LINDM_NATIVE_SERVER_BINARY=") && !strings.HasPrefix(value, "LINDM_NATIVE_REPOSITORY=") {
+			env = append(env, value)
 		}
-		env := make([]string, 0, len(os.Environ())+1)
-		for _, value := range os.Environ() {
-			if !strings.HasPrefix(value, "LINDM_TEST_DATABASE_URL=") {
-				env = append(env, value)
-			}
-		}
-		env = append(env, "LINDM_TEST_DATABASE_URL="+strings.TrimSpace(string(dsn)))
-		// The device suite alone runs about six minutes under -race against real
-		// PostgreSQL; a per-binary deadline below that reports false timeouts.
-		return command(ctx, root, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=15m", "./internal/...")
-	})
+	}
+	env = append(env, "LINDM_TEST_DATABASE_URL="+strings.TrimSpace(string(dsn)), "LINDM_NATIVE_SERVER_BINARY="+server, "LINDM_NATIVE_REPOSITORY="+root)
+	// The device suite alone runs about six minutes under -race against real
+	// PostgreSQL; a per-binary deadline below that reports false timeouts.
+	return command(ctx, root, env, "go", "test", "-race", "-tags=integration", "-count=1", "-timeout=15m", "./internal/...")
 }

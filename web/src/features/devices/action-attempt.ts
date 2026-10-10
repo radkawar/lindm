@@ -8,6 +8,7 @@ export type DeviceActionAttempt = {
   payload: CreateDeviceActionRequest;
   specSha256: string;
   status: "frozen" | "inflight" | "ambiguous" | "rejected" | "accepted";
+  actionId?: string;
   failure: RpcFailure | null;
   approvalId: string;
   approvalAmbiguous: boolean;

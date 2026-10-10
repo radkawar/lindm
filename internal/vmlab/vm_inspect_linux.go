@@ -219,7 +219,7 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 		return nil, err
 	}
 	if err := compareVMDetails(before.details, after.details, observation.Host.Details); err != nil {
-		return nil, err
+		return nil, saveInspectComparisonFailure(ctx, vm, options.DiagnosticsDir, before.details, after.details, observation.Host.Details, err)
 	}
 	if err := compareInspectHardware(&hardware, observation.Host.Details); err != nil {
 		return nil, err

@@ -41,6 +41,101 @@ local offline-compatible option. Offline release root/targets signing custody is
 never bundled into the online server image. Provide rotation/revocation drills with
 overlap, missed rotations, old agents, expired certs and lost keys.
 
+### Offline owner execution delegation
+
+`lindmctl execution delegation sign` is an offline owner operation, not an admin
+login or a server-side capability upgrade. It makes no network requests and never
+loads development keys. Run it on the owner's isolated signing workstation with
+the real deployment's authenticated execution root, associated quorum-signed
+bootstrap, and sufficient distinct offline root signers. Private keys remain
+offline; do not copy them into the server, executor, lab, or command arguments.
+The software signer accepts one unencrypted Ed25519 PKCS#8 `PRIVATE KEY` PEM
+block per `-signer` file. It does not claim HSM custody.
+
+All input files, including public root/bootstrap and the declaration, must be
+singly linked regular files owned by the invoking user with mode `0600`, in
+directories owned by that user with mode `0700`. Directory ancestry is checked
+without following symlinks; untrusted owners and non-sticky directories writable
+by other users are rejected. The output has the same protected-directory and
+file-mode requirements. Provision the authenticated public inputs through the
+owner's trusted channel, not from an unverified declaration or online server
+response. The root, bootstrap, CA certificates and release trust must be currently
+valid. This command does not rotate roots or invent a historical bootstrap
+acceptance time.
+
+Prepare `delegation.json` as strict protobuf JSON for
+`lindm.agent.v1.ExecutionDelegation` in
+`api/lindm/agent/v1/execution_trust.proto`. Unknown fields are rejected. Explicitly
+set `deploymentId`, `rootVersion`, the next deployment-global `version`,
+`minimumRecoveryEpoch`, `notBefore`, `expiresAt`, and `delegates`. Each delegate
+contains its public `key` (`keyId`: lowercase SHA-256 of DER SubjectPublicKeyInfo;
+`publicKey`: base64-encoded 32-byte Ed25519 public key), one `role`
+(`EXECUTION_SIGNER_ROLE_PLAN` or `EXECUTION_SIGNER_ROLE_START`), and its exact
+`capabilities` array. A key has only one role. Plan and start keys must be distinct
+from offline root, transport, device-CA and release keys. Production admission
+also reserves deployment-local keys such as the server TLS leaf.
+
+Select only the capabilities the owner approves, independently for each role:
+
+| Operation          | Exact capability               |
+| ------------------ | ------------------------------ |
+| Rotate escrow      | `device.escrow-rotate.v1`      |
+| Bind TPM2          | `device.tpm2-bind.v1`          |
+| Lock sessions      | `device.lock-sessions.v1`      |
+| Release lock       | `device.release-lock.v1`       |
+| Quarantine         | `device.quarantine.v1`         |
+| Release quarantine | `device.release-quarantine.v1` |
+| Crypto erase       | `device.crypto-erase.v1`       |
+| Sanitize           | `device.sanitize.v1`           |
+| Restart            | `device.restart.v1`            |
+| Shut down          | `device.shutdown.v1`           |
+| Refresh inventory  | `device.refresh-inventory.v1`  |
+| Systemd services   | `systemd.service.v1`           |
+| Offline enrollment | `enrollment.offline.v1`        |
+
+For example, selecting only `["device.refresh-inventory.v1"]` on both plan and
+start delegates permits that protocol without granting restart or shutdown.
+No capability defaults, wildcards, prefixes, unknown versions, or arbitrary script
+authority are accepted. Omission never grants permission. An explicitly empty
+`delegates` array revokes all online signer authority; the review labels it as
+such. Adding new software support never modifies an existing signed delegation.
+
+After reviewing the complete declaration, sign it with the root quorum. This
+example advances recorded delegation version 7 and retains recovery epoch 3;
+replace those counters with the authenticated deployment state. Both counter flags
+are required, even when their explicitly approved initial value is zero:
+
+```sh
+lindmctl execution delegation sign \
+  -root /offline/lindm/execution-root.json \
+  -bootstrap /offline/lindm/bootstrap.dsse.json \
+  -declaration /offline/lindm/delegation.json \
+  -signer /offline/lindm/owner-a.pem \
+  -signer /offline/lindm/owner-b.pem \
+  -previous-version 7 -minimum-recovery-epoch 3 \
+  -out /offline/lindm/delegation-v8.dsse.json
+```
+
+The command checks the typed declaration and supported capability set, signs using
+`trust.Authority`, then proves the result with the production DSSE execution
+verifier, including quorum, key-domain separation, root binding, version/epoch
+fences and validity. It also checks the production trust-update envelope bound.
+Only then does stdout list the deployment, root/delegation versions, recovery
+epoch, validity, quorum count, envelope SHA-256 and every exact key ID, role and
+capability. It never prints private key material or input contents on parse errors.
+Review these public facts before approving distribution.
+
+Output is synced and atomically published without replacing any existing path,
+including a symlink. A failed verification publishes nothing. An output/reporting
+error after publication may leave the complete file present: inspect the file and
+its reviewed digest rather than blindly retrying or removing existing authority.
+The command does not install or mutate server/device trust. Transfer only the
+public DSSE envelope through the authenticated `UpdateExecutionAuthority` admin
+workflow; admission and device synchronization retain their independent root,
+rollback, authorization and key-custody checks. Owner delegation permits specific
+online signers, not a bypass of RBAC, step-up, human approvals, fresh start grants,
+native preflight, or recovery safety.
+
 ### Agent directory custody
 
 Privileged agent configuration, execution inputs and runtime paths share the
@@ -803,6 +898,17 @@ Default retention proposal: 30 days detailed observations, 90 days action output
 Recovery secrets live only while required by approved policy. Audit/legal hold takes
 precedence over ordinary purge, with encryption and restricted access. Capacity sizing
 must use these retention settings, not a nearly empty demonstration database.
+
+Active logind session usernames, session class/type, seat and remote flag are
+personal data. They are collected only as bounded current host inventory, not
+login history, and are visible only through device-scoped `fleet.read` access
+like other inventory. Collection and per-field availability remain explicit;
+an unavailable read must not be interpreted as no logged-in users. Retention
+follows inventory snapshot retention, including applicable backup and legal-hold
+policy, with no independent longer-lived session-identity store. The current
+host snapshot replaces these fields on the next accepted report, including a
+failed collection; inventory does not retain earlier successful identities as
+fallback values. Limit fleet-read scopes and backup access accordingly.
 
 Incident runbooks are release artifacts: credential/release-key compromise, malicious
 package/policy, lost recovery key, mass lockout, failed migration, ransomware/restore,

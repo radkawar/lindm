@@ -131,6 +131,31 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 	if err := validateLiveRootResult(intent.GetSpec(), admittedChallenge, status); err != nil {
 		return nil, err
 	}
+	if err := validatePowerActionResult(intent.GetSpec(), admittedChallenge, status); err != nil {
+		return nil, err
+	}
+	if intent.GetSpec().GetRefreshInventory() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+		sequence := status.GetVerification().GetInventorySequence()
+		if sequence == 0 || !status.GetVerification().GetVerified() || !status.GetVerification().GetAfter().GetSupported() || admittedChallenge.GetIssuedAt() == nil {
+			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_unverified")
+		}
+		if action.InventoryPackageSequence != int64(sequence) {
+			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
+		}
+		if len(action.InventoryReceiptEnvelope) == 0 {
+			return nil, rpcError(connect.CodeFailedPrecondition, "device_action_inventory_receipt_required")
+		}
+		// This document was committed with the verified server-signed receipt.
+		// Do not reverify historical custody with a possibly rotated current key
+		// or require the mutable latest host row to retain the admitted sequence.
+		receipt := new(agentv1.DeviceActionInventoryReceipt)
+		if proto.Unmarshal(action.InventoryReceiptDocument, receipt) != nil || receipt.GetActionId() != id.String() || receipt.GetDeviceId() != principal.DeviceID.String() || receipt.GetEnrollmentGeneration() != principal.GenerationID.String() {
+			return nil, mapErr(errInternalState)
+		}
+		if receipt.GetPackageSequence() != sequence || receipt.GetHostSequence() != uint64(action.InventoryHostSequence) {
+			return nil, rpcError(connect.CodePermissionDenied, "device_action_inventory_receipt_mismatch")
+		}
+	}
 	incoming := status.GetVerification().GetEscrow()
 	if incoming != nil {
 		if intent.GetSpec().GetEscrowRotate() == nil || len(action.StartGrantEnvelope) == 0 || s.escrow == nil || incoming.GetEscrowKeyId() != s.escrow.KeyID() || incoming.GetLuksUuid() != intent.GetSpec().GetEscrowRotate().GetTarget().GetLuksUuid() {
@@ -228,4 +253,25 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 	return noStore(&devicev1.ReportDeviceActionResultResponse{Closed: terminal, EscrowReceiptEnvelope: receipt}), nil
+}
+
+func validatePowerActionResult(spec *agentv1.DeviceActionSpec, challenge *agentv1.DeviceActionChallenge, status *agentv1.DeviceActionStatus) error {
+	verification := status.GetVerification()
+	if spec.GetShutdown() != nil {
+		// An accepted request or later contact proves neither power-off nor its
+		// duration. Preserve the signed evidence, never convert it to success.
+		if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED || verification.GetVerified() {
+			return rpcError(connect.CodePermissionDenied, "device_action_shutdown_unverifiable")
+		}
+		if verification.GetPowerRequestAccepted() && (status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN || verification.GetEvidence() != "outcome_unknown_until_contact") {
+			return rpcError(connect.CodePermissionDenied, "device_action_shutdown_outcome_unknown")
+		}
+	}
+	if spec.GetRestart() != nil && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+		boot := verification.GetBootId()
+		if challenge.GetBootId() == "" || boot == "" || boot == challenge.GetBootId() || boot != verification.GetAfter().GetBootId() || !verification.GetVerified() || !verification.GetAfter().GetSupported() {
+			return rpcError(connect.CodePermissionDenied, "device_action_restart_unverified")
+		}
+	}
+	return nil
 }

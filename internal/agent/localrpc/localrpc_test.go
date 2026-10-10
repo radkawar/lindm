@@ -83,6 +83,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	}
 	for _, procedure := range []string{
 		agentv1connect.ExecutorServiceGetExecutionTrustProcedure,
+		agentv1connect.ExecutorServiceGetRecoveryReadinessProcedure,
 		agentv1connect.ExecutorServicePrepareServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,
@@ -92,6 +93,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		agentv1connect.ExecutorServiceGetDeviceActionProcedure,
 		agentv1connect.ExecutorServiceAttestDeviceActionProcedure,
 		agentv1connect.ExecutorServiceConfirmDeviceActionEscrowProcedure,
+		agentv1connect.ExecutorServiceConfirmDeviceActionInventoryProcedure,
 		agentv1connect.ExecutorServicePrepareDeviceActionRecoveryProcedure,
 		agentv1connect.ExecutorServiceCommitDeviceActionRecoveryProcedure,
 		agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure,

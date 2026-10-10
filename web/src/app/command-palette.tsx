@@ -6,6 +6,7 @@ import type { SessionPrincipal } from "../../gen/lindm/auth/v1/auth_pb";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { devicesQueryOptions } from "@/features/devices/queries";
 import { visibleNavigation } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
@@ -92,9 +93,10 @@ export function CommandPalette({
                   </p>
                 ) : null}
                 {devices.isError ? (
-                  <p className="px-3 py-2 text-xs text-destructive" role="alert">
-                    {toRpcFailure(devices.error).message}
-                  </p>
+                  <RpcError
+                    failure={toRpcFailure(devices.error)}
+                    title="Device search unavailable"
+                  />
                 ) : null}
                 {!devices.isError && devices.data ? (
                   <CommandGroup heading="Devices · first 200 authorized devices">

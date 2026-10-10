@@ -234,9 +234,13 @@ type Approval struct {
 	//	*Approval_ApprovePendingEnrollment
 	//	*Approval_RecoverDevice
 	//	*Approval_ActivateTargetPreview
-	Payload       isApproval_Payload `protobuf_oneof:"payload"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Payload isApproval_Payload `protobuf_oneof:"payload"`
+	// Current labels projected only for authorized approval responses.
+	RequesterDisplayName string `protobuf:"bytes,20,opt,name=requester_display_name,json=requesterDisplayName,proto3" json:"requester_display_name,omitempty"`
+	ApproverDisplayName  string `protobuf:"bytes,21,opt,name=approver_display_name,json=approverDisplayName,proto3" json:"approver_display_name,omitempty"`
+	DeviceHostname       string `protobuf:"bytes,22,opt,name=device_hostname,json=deviceHostname,proto3" json:"device_hostname,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Approval) Reset() {
@@ -423,6 +427,27 @@ func (x *Approval) GetActivateTargetPreview() *ActivateTargetPreviewRequest {
 		}
 	}
 	return nil
+}
+
+func (x *Approval) GetRequesterDisplayName() string {
+	if x != nil {
+		return x.RequesterDisplayName
+	}
+	return ""
+}
+
+func (x *Approval) GetApproverDisplayName() string {
+	if x != nil {
+		return x.ApproverDisplayName
+	}
+	return ""
+}
+
+func (x *Approval) GetDeviceHostname() string {
+	if x != nil {
+		return x.DeviceHostname
+	}
+	return ""
 }
 
 type isApproval_Payload interface {
@@ -1019,7 +1044,8 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x06update\x18\x01 \x01(\v2+.lindm.agent.v1.UpdateExecutionTrustRequestB\x06\xbaH\x03\xc8\x01\x01R\x06update\x12!\n" +
 	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12,\n" +
 	"\vapproval_id\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\n" +
-	"approvalId\"\xd1\t\n" +
+	"approvalId\"\xe4\n" +
+	"\n" +
 	"\bApproval\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12\x1f\n" +
@@ -1045,7 +1071,10 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x13reveal_recovery_key\x18\x10 \x01(\v2(.lindm.admin.v1.RevealRecoveryKeyRequestH\x00R\x11revealRecoveryKey\x12o\n" +
 	"\x1aapprove_pending_enrollment\x18\x11 \x01(\v2/.lindm.admin.v1.ApprovePendingEnrollmentRequestH\x00R\x18approvePendingEnrollment\x12]\n" +
 	"\x0erecover_device\x18\x12 \x01(\v24.lindm.admin.v1.CreateRecoveryEnrollmentGrantRequestH\x00R\rrecoverDevice\x12f\n" +
-	"\x17activate_target_preview\x18\x13 \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreviewB\t\n" +
+	"\x17activate_target_preview\x18\x13 \x01(\v2,.lindm.admin.v1.ActivateTargetPreviewRequestH\x00R\x15activateTargetPreview\x124\n" +
+	"\x16requester_display_name\x18\x14 \x01(\tR\x14requesterDisplayName\x122\n" +
+	"\x15approver_display_name\x18\x15 \x01(\tR\x13approverDisplayName\x12'\n" +
+	"\x0fdevice_hostname\x18\x16 \x01(\tR\x0edeviceHostnameB\t\n" +
 	"\apayload\"\xf8\x06\n" +
 	"\x15CreateApprovalRequest\x125\n" +
 	"\x10lifetime_seconds\x18\x01 \x01(\rB\n" +

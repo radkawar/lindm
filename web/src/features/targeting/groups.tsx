@@ -23,9 +23,9 @@ export function DynamicGroupsView() {
       <header className="space-y-2">
         <h2 className="text-2xl font-semibold tracking-tight">Dynamic targeting groups</h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Static targets use the existing authorization device groups. Dynamic groups evaluate typed
-          inventory predicates and static group references; they never grant authorization
-          membership. Missing or stale inventory remains unknown, not an automatic inclusion.
+          Match devices by inventory rules for resource assignments. Dynamic groups do not grant
+          access. Missing or stale inventory remains unknown and does not automatically include a
+          device.
         </p>
       </header>
       <TargetMutation

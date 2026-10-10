@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
-import { EnrollmentFailure } from "./provisioning";
+import { RpcError } from "@/components/ui/rpc-error";
 import { pendingEnrollmentsQueryOptions } from "./queries";
 
 export function PendingEnrollments() {
@@ -35,9 +36,9 @@ export function PendingEnrollments() {
           </Link>
         </div>
         {list.isPending ? <p role="status">Loading enrollment transactions…</p> : null}
-        {list.error ? <EnrollmentFailure failure={toRpcFailure(list.error)} /> : null}
+        {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
         {!list.error && list.data?.enrollments.length === 0 ? (
-          <p>No enrollment transactions in the current scope.</p>
+          <EmptyState title="No enrollment transactions in your scope" />
         ) : null}
         {!list.error &&
           list.data?.enrollments.map((enrollment) => (
@@ -50,7 +51,13 @@ export function PendingEnrollments() {
                 >
                   Device {enrollment.deviceId}
                 </Link>
-                <Badge variant="outline">{enrollment.state.replaceAll("_", " ")}</Badge>
+                <StatusBadge
+                  status={enrollment.state === "pending_approval" ? "warning" : "neutral"}
+                >
+                  {enrollment.state === "pending_approval"
+                    ? "Awaiting approval"
+                    : enrollment.state.replaceAll("_", " ")}
+                </StatusBadge>
               </div>
               <dl className="grid gap-1 break-all text-sm sm:grid-cols-2">
                 <dt className="text-muted-foreground">Transaction</dt>

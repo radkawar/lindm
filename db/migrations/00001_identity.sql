@@ -228,7 +228,7 @@ CREATE TABLE approval_requests (
   action text NOT NULL CHECK (action IN ('device.revoke', 'device.recover', 'enrollment.approve', 'resources.assign', 'resources.activate_preview', 'execution_trust.manage', 'device.action', 'recovery_key.reveal')),
   permission text NOT NULL CHECK (
     (action IN ('device.revoke', 'resources.assign', 'execution_trust.manage') AND permission = action)
-    OR (action = 'device.action' AND permission IN ('encryption.manage', 'actions.lock', 'actions.release-lock', 'actions.quarantine', 'destructive.execute'))
+    OR (action = 'device.action' AND permission IN ('encryption.manage', 'actions.lock', 'actions.release-lock', 'actions.quarantine', 'destructive.execute', 'remote_execution.run', 'inventory.manage'))
     OR (action = 'resources.activate_preview' AND permission = 'resources.assign')
     OR (action = 'recovery_key.reveal' AND permission = 'recovery_keys.read')
     OR (action = 'device.recover' AND permission = 'device.revoke')

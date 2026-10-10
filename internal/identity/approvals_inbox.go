@@ -57,7 +57,7 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	}
 	visibility.AfterID = after
 	visibility.RowLimit = int32(limit + 1)
-	var rows []identitydb.ApprovalRequest
+	var rows []identitydb.ListVisibleApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
 		for _, authorization := range authorizations {
 			if err := s.LockAuthorization(ctx, tx, authorization, authorization.permission); err != nil {
@@ -76,13 +76,13 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	}
 	next := ""
 	if len(rows) > limit {
-		last := rows[limit-1].ID
+		last := rows[limit-1].ApprovalRequest.ID
 		next = base64.RawURLEncoding.EncodeToString(last[:])
 		rows = rows[:limit]
 	}
 	out := make([]*adminv1.Approval, 0, len(rows))
-	for _, row := range rows {
-		item, err := approvalMessage(row, s.clock())
+	for i := range rows {
+		item, err := approvalMessage((*approvalProjection)(&rows[i]), s.clock())
 		if err != nil {
 			return nil, "", err
 		}
@@ -91,15 +91,38 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	return out, next, nil
 }
 
+type approvalRequiredScope struct {
+	Unrestricted bool            `json:"unrestricted"`
+	Scopes       json.RawMessage `json:"scopes"`
+}
+
+func approvalRequiredScopes(principal Principal, permission Permission) ([]approvalRequiredScope, error) {
+	var required []approvalRequiredScope
+	for _, grant := range approvalPermissionRequirements[permission] {
+		entry := approvalRequiredScope{Scopes: json.RawMessage("[]")}
+		if Authorize(principal, grant) {
+			all, scopes := DeviceScopes(principal, grant)
+			encoded, err := approvalScopesJSON(scopes)
+			if err != nil {
+				return nil, err
+			}
+			entry.Unrestricted, entry.Scopes = all, encoded
+		}
+		required = append(required, entry)
+	}
+	return required, nil
+}
+
 // approvalInboxVisibility is shared by the paged inbox and its pending count.
 // An action grant alone never grants access to another requester's inbox.
 func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) ([]*Authorization, identitydb.ListVisibleApprovalsParams, error) {
-	permissions := []Permission{PermissionManageEnrollment, PermissionRevokeDevice, PermissionAssignResources, PermissionManageExecutionTrust, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionExecuteDestructive, PermissionReadRecoveryKeys}
+	permissions := approvalInboxPermissions
 	authorizations := make([]*Authorization, 0, len(permissions))
 	visibility := identitydb.ListVisibleApprovalsParams{
 		ActorID: actor, UnrestrictedPermissions: make([]string, 0, len(permissions)), ManageScopes: []byte("[]"),
 	}
 	scopes := make(map[string]json.RawMessage, len(permissions))
+	requiredScopes := make(map[string][]approvalRequiredScope)
 	for _, permission := range permissions {
 		authorization, err := s.AuthorizeFresh(ctx, actor, permission)
 		if errors.Is(err, ErrAuthorizationDenied) {
@@ -111,6 +134,12 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 		principal := authorization.Principal()
 		if principal.ServiceAccount {
 			continue
+		}
+		if len(approvalPermissionRequirements[permission]) != 0 {
+			requiredScopes[string(permission)], err = approvalRequiredScopes(principal, permission)
+			if err != nil {
+				return nil, visibility, err
+			}
 		}
 		authorizations = append(authorizations, authorization)
 		all, restricted := DeviceScopes(principal, permission)
@@ -132,6 +161,10 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 	}
 	var err error
 	visibility.Scopes, err = json.Marshal(scopes)
+	if err != nil {
+		return nil, visibility, err
+	}
+	visibility.RequiredScopes, err = json.Marshal(requiredScopes)
 	return authorizations, visibility, err
 }
 
@@ -157,6 +190,7 @@ func (s *Service) CountPendingApprovals(ctx context.Context, actor uuid.UUID) (i
 		count, err = q.CountVisiblePendingApprovals(ctx, identitydb.CountVisiblePendingApprovalsParams{
 			ActorID: actor, UnrestrictedPermissions: visibility.UnrestrictedPermissions,
 			Scopes: visibility.Scopes, ManageUnrestricted: visibility.ManageUnrestricted, ManageScopes: visibility.ManageScopes,
+			RequiredScopes: visibility.RequiredScopes,
 		})
 		if err != nil {
 			return s.dbErr(err)

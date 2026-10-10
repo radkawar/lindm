@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
@@ -57,11 +58,7 @@ export function AttributeDefinitions() {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {failure ? (
-          <p role="alert" className="text-sm text-destructive">
-            {failure.codeName}: {failure.message}
-          </p>
-        ) : null}
+        {failure ? <RpcError failure={failure} /> : null}
         {definitions.isPending ? <p role="status">Loading definitions…</p> : null}
         {data ? (
           <Table>
@@ -168,12 +165,15 @@ function DefinitionForm({
     onError: (error) => {
       const failure = toRpcFailure(error);
       if (!lifetime.signal.aborted) {
-        toast.error(
-          failure.ambiguous ? "Definition save outcome unknown" : "Definition not saved",
-          {
-            description: "Review the inline result and captured request before continuing.",
-          },
-        );
+        toast[
+          classifyRpcFailure(failure).tone === "destructive"
+            ? "error"
+            : classifyRpcFailure(failure).tone === "warning"
+              ? "warning"
+              : "message"
+        ](failure.ambiguous ? "Definition save outcome unknown" : "Definition not saved", {
+          description: "Review the inline result and captured request before continuing.",
+        });
       }
     },
     onSettled: () => {
@@ -263,10 +263,9 @@ function DefinitionForm({
         <p className="break-all font-mono text-xs">Request ID {captured.requestId}</p>
       ) : null}
       {failure ? (
-        <p role="alert" className="text-sm text-destructive">
-          {failure.codeName}: {failure.message}
-          {failure.ambiguous ? " Outcome unknown; retry the same captured request." : ""}
-        </p>
+        <RpcError failure={failure}>
+          <p>{failure.ambiguous ? " Outcome unknown; retry the same captured request." : ""}</p>
+        </RpcError>
       ) : null}
       {inputError ? (
         <p role="alert" className="text-sm text-destructive">

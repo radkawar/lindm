@@ -40,6 +40,42 @@ func TestActionNativeTargetsInheritExactParentIdentity(t *testing.T) {
 	}
 }
 
+func TestActionWholeDiskPathFollowsIdentityAcrossRenumbering(t *testing.T) {
+	target := &agentv1.StorageTarget{Wwn: "root-wwn", Serial: "root-serial", SizeBytes: 4 << 30}
+	root := actionBlockNode{Path: "/dev/nvme1n1", Type: "disk", WWN: target.Wwn, Serial: target.Serial, Size: target.SizeBytes}
+	state := actionBlockNode{Path: "/dev/nvme0n1", Type: "disk", WWN: "state-wwn", Serial: "state-serial", Size: 1 << 30, Filesystem: "ext4"}
+	encode := func(nodes ...actionBlockNode) []byte {
+		t.Helper()
+		data, err := json.Marshal(map[string]any{"blockdevices": nodes})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	data := encode(state, root)
+	if path, err := actionWholeDiskPath(data, target); err != nil || path != root.Path {
+		t.Fatalf("renumbered approved root not resolved: %q %v", path, err)
+	}
+	for _, change := range []func(*agentv1.StorageTarget){
+		func(target *agentv1.StorageTarget) { target.Wwn = "changed" },
+		func(target *agentv1.StorageTarget) { target.Serial = "changed" },
+		func(target *agentv1.StorageTarget) { target.SizeBytes++ },
+		func(target *agentv1.StorageTarget) { target.LuksUuid = "not-a-whole-disk" },
+	} {
+		changed := proto.CloneOf(target)
+		change(changed)
+		if _, err := actionWholeDiskPath(data, changed); err == nil {
+			t.Fatal("changed frozen identity selected a disk")
+		}
+	}
+	if _, err := actionWholeDiskPath(encode(root, root), target); err == nil {
+		t.Fatal("duplicate disk identity accepted")
+	}
+	if _, err := actionWholeDiskPath(data, nil); err == nil {
+		t.Fatal("absent approved identity accepted")
+	}
+}
+
 func TestActionHeaderSlotsRequireExactUniqueUUID(t *testing.T) {
 	uuid := "11111111-1111-4111-8111-111111111111"
 	header := EncryptedHeader{UUID: uuid, JSON: json.RawMessage(`{"keyslots":{"0":{},"3":{}}}`)}

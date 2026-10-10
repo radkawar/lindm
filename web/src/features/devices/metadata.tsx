@@ -16,7 +16,8 @@ import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
@@ -120,7 +121,13 @@ function MetadataForm({
     onError: (error) => {
       const failure = toRpcFailure(error);
       if (!lifetime.signal.aborted) {
-        toast.error(failure.ambiguous ? "Metadata save outcome unknown" : "Metadata not saved", {
+        toast[
+          classifyRpcFailure(failure).tone === "destructive"
+            ? "error"
+            : classifyRpcFailure(failure).tone === "warning"
+              ? "warning"
+              : "message"
+        ](failure.ambiguous ? "Metadata save outcome unknown" : "Metadata not saved", {
           description: "Review the inline result and captured request before continuing.",
         });
       }
@@ -225,12 +232,13 @@ function MetadataForm({
         <p className="break-all font-mono text-xs">Request ID {captured.requestId}</p>
       ) : null}
       {failure ? (
-        <p role="alert" className="text-sm text-destructive">
-          {failure.codeName}: {failure.message}
-          {failure.ambiguous
-            ? " The outcome is unknown. Retry the captured request without changing its ID or payload."
-            : ""}
-        </p>
+        <RpcError failure={failure}>
+          <p>
+            {failure.ambiguous
+              ? " The outcome is unknown. Retry the captured request without changing its ID or payload."
+              : ""}
+          </p>
+        </RpcError>
       ) : null}
       {inputError ? (
         <p role="alert" className="text-sm text-destructive">

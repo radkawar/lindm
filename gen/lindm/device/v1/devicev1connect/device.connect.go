@@ -81,6 +81,9 @@ const (
 	// DeviceServiceRegisterDeviceActionRecoveryProcedure is the fully-qualified name of the
 	// DeviceService's RegisterDeviceActionRecovery RPC.
 	DeviceServiceRegisterDeviceActionRecoveryProcedure = "/lindm.device.v1.DeviceService/RegisterDeviceActionRecovery"
+	// DeviceServiceConfirmRefreshInventoryPublicationProcedure is the fully-qualified name of the
+	// DeviceService's ConfirmRefreshInventoryPublication RPC.
+	DeviceServiceConfirmRefreshInventoryPublicationProcedure = "/lindm.device.v1.DeviceService/ConfirmRefreshInventoryPublication"
 )
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
@@ -106,6 +109,7 @@ type DeviceServiceClient interface {
 	AuthorizeDeviceActionStart(context.Context, *connect.Request[v1.AuthorizeDeviceActionStartRequest]) (*connect.Response[v1.AuthorizeDeviceActionStartResponse], error)
 	ReportDeviceActionResult(context.Context, *connect.Request[v1.ReportDeviceActionResultRequest]) (*connect.Response[v1.ReportDeviceActionResultResponse], error)
 	RegisterDeviceActionRecovery(context.Context, *connect.Request[v1.RegisterDeviceActionRecoveryRequest]) (*connect.Response[v1.RegisterDeviceActionRecoveryResponse], error)
+	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
 }
 
 // NewDeviceServiceClient constructs a client for the lindm.device.v1.DeviceService service. By
@@ -215,27 +219,34 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("RegisterDeviceActionRecovery")),
 			connect.WithClientOptions(opts...),
 		),
+		confirmRefreshInventoryPublication: connect.NewClient[v1.ConfirmRefreshInventoryPublicationRequest, v1.ConfirmRefreshInventoryPublicationResponse](
+			httpClient,
+			baseURL+DeviceServiceConfirmRefreshInventoryPublicationProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("ConfirmRefreshInventoryPublication")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // deviceServiceClient implements DeviceServiceClient.
 type deviceServiceClient struct {
-	acquireSession               *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
-	getSyncState                 *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
-	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
-	reportHostObservation        *connect.Client[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse]
-	reportPackageAttempt         *connect.Client[v1.ReportPackageAttemptRequest, v1.ReportPackageAttemptResponse]
-	beginPackageSnapshot         *connect.Client[v1.BeginPackageSnapshotRequest, v1.BeginPackageSnapshotResponse]
-	putPackageBatch              *connect.Client[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse]
-	commitPackageSnapshot        *connect.Client[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse]
-	renewIdentity                *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
-	getServiceWork               *connect.Client[v1.GetServiceWorkRequest, v1.GetServiceWorkResponse]
-	authorizeServiceStart        *connect.Client[v1.AuthorizeServiceStartRequest, v1.AuthorizeServiceStartResponse]
-	reportServiceResult          *connect.Client[v1.ReportServiceResultRequest, v1.ReportServiceResultResponse]
-	getDeviceActionWork          *connect.Client[v1.GetDeviceActionWorkRequest, v1.GetDeviceActionWorkResponse]
-	authorizeDeviceActionStart   *connect.Client[v1.AuthorizeDeviceActionStartRequest, v1.AuthorizeDeviceActionStartResponse]
-	reportDeviceActionResult     *connect.Client[v1.ReportDeviceActionResultRequest, v1.ReportDeviceActionResultResponse]
-	registerDeviceActionRecovery *connect.Client[v1.RegisterDeviceActionRecoveryRequest, v1.RegisterDeviceActionRecoveryResponse]
+	acquireSession                     *connect.Client[v1.AcquireSessionRequest, v1.AcquireSessionResponse]
+	getSyncState                       *connect.Client[v1.GetSyncStateRequest, v1.GetSyncStateResponse]
+	getExecutionTrust                  *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
+	reportHostObservation              *connect.Client[v1.ReportHostObservationRequest, v1.ReportHostObservationResponse]
+	reportPackageAttempt               *connect.Client[v1.ReportPackageAttemptRequest, v1.ReportPackageAttemptResponse]
+	beginPackageSnapshot               *connect.Client[v1.BeginPackageSnapshotRequest, v1.BeginPackageSnapshotResponse]
+	putPackageBatch                    *connect.Client[v1.PutPackageBatchRequest, v1.PutPackageBatchResponse]
+	commitPackageSnapshot              *connect.Client[v1.CommitPackageSnapshotRequest, v1.CommitPackageSnapshotResponse]
+	renewIdentity                      *connect.Client[v1.RenewIdentityRequest, v1.RenewIdentityResponse]
+	getServiceWork                     *connect.Client[v1.GetServiceWorkRequest, v1.GetServiceWorkResponse]
+	authorizeServiceStart              *connect.Client[v1.AuthorizeServiceStartRequest, v1.AuthorizeServiceStartResponse]
+	reportServiceResult                *connect.Client[v1.ReportServiceResultRequest, v1.ReportServiceResultResponse]
+	getDeviceActionWork                *connect.Client[v1.GetDeviceActionWorkRequest, v1.GetDeviceActionWorkResponse]
+	authorizeDeviceActionStart         *connect.Client[v1.AuthorizeDeviceActionStartRequest, v1.AuthorizeDeviceActionStartResponse]
+	reportDeviceActionResult           *connect.Client[v1.ReportDeviceActionResultRequest, v1.ReportDeviceActionResultResponse]
+	registerDeviceActionRecovery       *connect.Client[v1.RegisterDeviceActionRecoveryRequest, v1.RegisterDeviceActionRecoveryResponse]
+	confirmRefreshInventoryPublication *connect.Client[v1.ConfirmRefreshInventoryPublicationRequest, v1.ConfirmRefreshInventoryPublicationResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -318,6 +329,12 @@ func (c *deviceServiceClient) RegisterDeviceActionRecovery(ctx context.Context, 
 	return c.registerDeviceActionRecovery.CallUnary(ctx, req)
 }
 
+// ConfirmRefreshInventoryPublication calls
+// lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication.
+func (c *deviceServiceClient) ConfirmRefreshInventoryPublication(ctx context.Context, req *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error) {
+	return c.confirmRefreshInventoryPublication.CallUnary(ctx, req)
+}
+
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
@@ -341,6 +358,7 @@ type DeviceServiceHandler interface {
 	AuthorizeDeviceActionStart(context.Context, *connect.Request[v1.AuthorizeDeviceActionStartRequest]) (*connect.Response[v1.AuthorizeDeviceActionStartResponse], error)
 	ReportDeviceActionResult(context.Context, *connect.Request[v1.ReportDeviceActionResultRequest]) (*connect.Response[v1.ReportDeviceActionResultResponse], error)
 	RegisterDeviceActionRecovery(context.Context, *connect.Request[v1.RegisterDeviceActionRecoveryRequest]) (*connect.Response[v1.RegisterDeviceActionRecoveryResponse], error)
+	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
 }
 
 // NewDeviceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -446,6 +464,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("RegisterDeviceActionRecovery")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServiceConfirmRefreshInventoryPublicationHandler := connect.NewUnaryHandler(
+		DeviceServiceConfirmRefreshInventoryPublicationProcedure,
+		svc.ConfirmRefreshInventoryPublication,
+		connect.WithSchema(deviceServiceMethods.ByName("ConfirmRefreshInventoryPublication")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DeviceServiceAcquireSessionProcedure:
@@ -480,6 +504,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceReportDeviceActionResultHandler.ServeHTTP(w, r)
 		case DeviceServiceRegisterDeviceActionRecoveryProcedure:
 			deviceServiceRegisterDeviceActionRecoveryHandler.ServeHTTP(w, r)
+		case DeviceServiceConfirmRefreshInventoryPublicationProcedure:
+			deviceServiceConfirmRefreshInventoryPublicationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -551,4 +577,8 @@ func (UnimplementedDeviceServiceHandler) ReportDeviceActionResult(context.Contex
 
 func (UnimplementedDeviceServiceHandler) RegisterDeviceActionRecovery(context.Context, *connect.Request[v1.RegisterDeviceActionRecoveryRequest]) (*connect.Response[v1.RegisterDeviceActionRecoveryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.RegisterDeviceActionRecovery is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication is not implemented"))
 }

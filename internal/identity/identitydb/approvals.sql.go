@@ -131,6 +131,54 @@ func (q *Queries) GetApprovalForMutation(ctx context.Context, arg GetApprovalFor
 	return i, err
 }
 
+const getApprovalProjection = `-- name: GetApprovalProjection :one
+SELECT a.id, a.requester_id, a.requester_version, a.action, a.permission, a.device_id, a.mutation_id, a.payload, a.payload_sha256, a.created_at, a.expires_at, a.state, a.approver_id, a.approver_version, a.decision_reason, a.consumed_at,
+  coalesce(nullif(requester.display_name, ''), requester_account.username, '')::text AS requester_display_name,
+  coalesce(nullif(approver.display_name, ''), approver_account.username, '')::text AS approver_display_name,
+  coalesce(d.hostname, '')::text AS device_hostname
+FROM approval_requests a
+LEFT JOIN principals requester ON requester.id = a.requester_id
+LEFT JOIN local_accounts requester_account ON requester_account.id = requester.id
+LEFT JOIN principals approver ON approver.id = a.approver_id
+LEFT JOIN local_accounts approver_account ON approver_account.id = approver.id
+LEFT JOIN devices d ON d.id = a.device_id
+WHERE a.id = $1
+`
+
+type GetApprovalProjectionRow struct {
+	ApprovalRequest      ApprovalRequest
+	RequesterDisplayName string
+	ApproverDisplayName  string
+	DeviceHostname       string
+}
+
+func (q *Queries) GetApprovalProjection(ctx context.Context, id uuid.UUID) (GetApprovalProjectionRow, error) {
+	row := q.db.QueryRow(ctx, getApprovalProjection, id)
+	var i GetApprovalProjectionRow
+	err := row.Scan(
+		&i.ApprovalRequest.ID,
+		&i.ApprovalRequest.RequesterID,
+		&i.ApprovalRequest.RequesterVersion,
+		&i.ApprovalRequest.Action,
+		&i.ApprovalRequest.Permission,
+		&i.ApprovalRequest.DeviceID,
+		&i.ApprovalRequest.MutationID,
+		&i.ApprovalRequest.Payload,
+		&i.ApprovalRequest.PayloadSha256,
+		&i.ApprovalRequest.CreatedAt,
+		&i.ApprovalRequest.ExpiresAt,
+		&i.ApprovalRequest.State,
+		&i.ApprovalRequest.ApproverID,
+		&i.ApprovalRequest.ApproverVersion,
+		&i.ApprovalRequest.DecisionReason,
+		&i.ApprovalRequest.ConsumedAt,
+		&i.RequesterDisplayName,
+		&i.ApproverDisplayName,
+		&i.DeviceHostname,
+	)
+	return i, err
+}
+
 const insertApproval = `-- name: InsertApproval :one
 INSERT INTO approval_requests (id, requester_id, requester_version, action, permission, device_id, mutation_id, payload, payload_sha256, created_at, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, statement_timestamp(), statement_timestamp() + make_interval(secs => $10::int))
@@ -186,35 +234,59 @@ func (q *Queries) InsertApproval(ctx context.Context, arg InsertApprovalParams) 
 }
 
 const listVisibleApprovals = `-- name: ListVisibleApprovals :many
-SELECT id, requester_id, requester_version, action, permission, device_id, mutation_id, payload, payload_sha256, created_at, expires_at, state, approver_id, approver_version, decision_reason, consumed_at FROM approval_requests a
+SELECT a.id, a.requester_id, a.requester_version, a.action, a.permission, a.device_id, a.mutation_id, a.payload, a.payload_sha256, a.created_at, a.expires_at, a.state, a.approver_id, a.approver_version, a.decision_reason, a.consumed_at,
+  coalesce(nullif(requester.display_name, ''), requester_account.username, '')::text AS requester_display_name,
+  coalesce(nullif(approver.display_name, ''), approver_account.username, '')::text AS approver_display_name,
+  coalesce(d.hostname, '')::text AS device_hostname
+FROM approval_requests a
+LEFT JOIN principals requester ON requester.id = a.requester_id
+LEFT JOIN local_accounts requester_account ON requester_account.id = requester.id
+LEFT JOIN principals approver ON approver.id = a.approver_id
+LEFT JOIN local_accounts approver_account ON approver_account.id = approver.id
+LEFT JOIN devices d ON d.id = a.device_id
 WHERE a.id > $1::uuid
   AND (
     a.permission = ANY($2::text[])
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($3::jsonb -> a.permission, '[]'::jsonb)))
   )
-  AND (
-    a.requester_id = $4
-    OR $5::boolean
-    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $6::jsonb))
+  AND NOT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(coalesce($4::jsonb -> a.permission, '[]'::jsonb)) required
+    WHERE a.device_id IS NULL
+       OR NOT device_scope_matches(a.device_id, (required ->> 'unrestricted')::boolean, required -> 'scopes')
   )
-ORDER BY a.id LIMIT $7
+  AND (
+    a.requester_id = $5
+    OR $6::boolean
+    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $7::jsonb))
+  )
+ORDER BY a.id LIMIT $8
 `
 
 type ListVisibleApprovalsParams struct {
 	AfterID                 uuid.UUID
 	UnrestrictedPermissions []string
 	Scopes                  []byte
+	RequiredScopes          []byte
 	ActorID                 uuid.UUID
 	ManageUnrestricted      bool
 	ManageScopes            []byte
 	RowLimit                int32
 }
 
-func (q *Queries) ListVisibleApprovals(ctx context.Context, arg ListVisibleApprovalsParams) ([]ApprovalRequest, error) {
+type ListVisibleApprovalsRow struct {
+	ApprovalRequest      ApprovalRequest
+	RequesterDisplayName string
+	ApproverDisplayName  string
+	DeviceHostname       string
+}
+
+func (q *Queries) ListVisibleApprovals(ctx context.Context, arg ListVisibleApprovalsParams) ([]ListVisibleApprovalsRow, error) {
 	rows, err := q.db.Query(ctx, listVisibleApprovals,
 		arg.AfterID,
 		arg.UnrestrictedPermissions,
 		arg.Scopes,
+		arg.RequiredScopes,
 		arg.ActorID,
 		arg.ManageUnrestricted,
 		arg.ManageScopes,
@@ -224,26 +296,29 @@ func (q *Queries) ListVisibleApprovals(ctx context.Context, arg ListVisibleAppro
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ApprovalRequest{}
+	items := []ListVisibleApprovalsRow{}
 	for rows.Next() {
-		var i ApprovalRequest
+		var i ListVisibleApprovalsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.RequesterID,
-			&i.RequesterVersion,
-			&i.Action,
-			&i.Permission,
-			&i.DeviceID,
-			&i.MutationID,
-			&i.Payload,
-			&i.PayloadSha256,
-			&i.CreatedAt,
-			&i.ExpiresAt,
-			&i.State,
-			&i.ApproverID,
-			&i.ApproverVersion,
-			&i.DecisionReason,
-			&i.ConsumedAt,
+			&i.ApprovalRequest.ID,
+			&i.ApprovalRequest.RequesterID,
+			&i.ApprovalRequest.RequesterVersion,
+			&i.ApprovalRequest.Action,
+			&i.ApprovalRequest.Permission,
+			&i.ApprovalRequest.DeviceID,
+			&i.ApprovalRequest.MutationID,
+			&i.ApprovalRequest.Payload,
+			&i.ApprovalRequest.PayloadSha256,
+			&i.ApprovalRequest.CreatedAt,
+			&i.ApprovalRequest.ExpiresAt,
+			&i.ApprovalRequest.State,
+			&i.ApprovalRequest.ApproverID,
+			&i.ApprovalRequest.ApproverVersion,
+			&i.ApprovalRequest.DecisionReason,
+			&i.ApprovalRequest.ConsumedAt,
+			&i.RequesterDisplayName,
+			&i.ApproverDisplayName,
+			&i.DeviceHostname,
 		); err != nil {
 			return nil, err
 		}

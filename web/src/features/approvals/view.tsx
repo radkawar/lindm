@@ -2,6 +2,7 @@ import { toJsonString } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -10,18 +11,42 @@ import {
   type Approval,
 } from "../../../gen/lindm/admin/v1/approvals_pb";
 import type { RevealRecoveryKeyResponse } from "../../../gen/lindm/admin/v1/device_actions_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
-import { canPermission } from "@/lib/permissions";
-import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { canPermission, permissionLabels } from "@/lib/permissions";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { approvalsQueryOptions } from "./queries";
+import { actionLabels, DeviceActionSpecView } from "@/features/devices/action-display";
+import { RecoveryReadinessView } from "@/features/devices/recovery-readiness";
+
+const APPROVAL_STATES: Record<ApprovalState, string> = {
+  [ApprovalState.UNSPECIFIED]: "Unknown",
+  [ApprovalState.PENDING]: "Pending",
+  [ApprovalState.APPROVED]: "Approved",
+  [ApprovalState.REJECTED]: "Rejected",
+  [ApprovalState.CONSUMED]: "Consumed",
+  [ApprovalState.EXPIRED]: "Expired",
+};
+
+const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> = {
+  revokeDevice: "Revoke device access",
+  setResourceAssignment: "Change resource assignment",
+  updateExecutionAuthority: "Update execution trust",
+  createDeviceAction: "Run device action",
+  revealRecoveryKey: "Reveal recovery key",
+  approvePendingEnrollment: "Approve device enrollment",
+  recoverDevice: "Recover device enrollment",
+  activateTargetPreview: "Activate assignment rollout",
+};
 
 export function ApprovalsView() {
   const lifetime = useAuthLifetime();
@@ -49,20 +74,16 @@ export function ApprovalsView() {
   const failure = list.error ? toRpcFailure(list.error) : null;
   return (
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Approval inbox</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Review the exact target, action and payload digest before deciding. Requesters cannot
-          approve their own requests. The server rechecks scope, authority and expiry at decision
-          and execution.
-        </p>
-      </header>
+      <PageHeader
+        title="Approval inbox"
+        description="Review each action and its exact target before approving or rejecting it."
+      />
       {revealed ? (
         <section
-          className="grid min-w-0 gap-3 border-2 border-destructive bg-destructive/5 p-4"
+          className="grid min-w-0 gap-3 border border-warning/30 bg-warning/10 p-4"
           aria-label="Revealed recovery key"
         >
-          <h2 className="font-semibold">Recovery key — sensitive</h2>
+          <h2 className="font-semibold">Sensitive recovery key</h2>
           <p>
             Keep this key in trusted custody. It remains only in page memory for 30 seconds and is
             cleared when dismissed, focus changes, or you leave.
@@ -90,22 +111,8 @@ export function ApprovalsView() {
           <Skeleton className="h-40 w-full" />
         </div>
       ) : null}
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Approvals unavailable"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {list.data?.approvals.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No approvals on this page.
-        </p>
-      ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
+      {list.data?.approvals.length === 0 ? <EmptyState title="No approvals on this page" /> : null}
       {list.data?.approvals.map((approval) => (
         <ApprovalCard
           key={`${approval.id}:${approval.state}`}
@@ -151,6 +158,40 @@ function ApprovalCard({
     action: "approve" | "reject" | "execute";
     reason: string;
   } | null>(null);
+  const actionRequest =
+    approval.payload.case === "createDeviceAction" ? approval.payload.value : undefined;
+  const actionSpec = actionRequest?.spec;
+  const effect = actionSpec?.action.case
+    ? actionLabels[actionSpec.action.case]
+    : approval.payload.case
+      ? approvalEffects[approval.payload.case]
+      : "Review requested action";
+  const recovery =
+    actionSpec?.action.case === "sanitize" ? actionSpec.action.value.recovery : undefined;
+  const readiness = useQuery({
+    queryKey: ["approval-recovery-readiness", lifetime.generation, approval.id] as const,
+    meta: { authGeneration: lifetime.generation },
+    enabled: !!recovery,
+    retry: false,
+    refetchInterval: 10_000,
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.listDeviceStorageTargets(
+        {
+          deviceId: actionRequest!.deviceId,
+          actionKind: "sanitize",
+          recoveryImageSha256: recovery!.imageSha256,
+        },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+  });
+  const currentReadiness =
+    !readiness.error && readiness.data?.enrollmentGeneration === actionRequest?.enrollmentGeneration
+      ? readiness.data?.recoveryReadiness
+      : undefined;
+  const recoveryReady = !recovery || currentReadiness?.ready === true;
   const unexpired =
     !!approval.expiresAt && timestampDate(approval.expiresAt).getTime() > Date.now();
   const decisionAllowed =
@@ -243,7 +284,7 @@ function ApprovalCard({
       }
       lifetime.signal.throwIfAborted();
       setCompleted(true);
-      toast.success("Approval operation completed");
+      toast.success("Approval operation accepted");
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
       if (exact.action === "execute") {
         await client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
@@ -255,10 +296,11 @@ function ApprovalCard({
       if (!lifetime.signal.aborted) {
         const next = toRpcFailure(error);
         setFailure(next);
-        toast.error(
-          next.ambiguous ? "Approval operation outcome unknown" : "Approval operation failed",
+        const { tone, title } = classifyRpcFailure(next);
+        toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
+          title,
           {
-            description: "Review the inline result and exact payload before continuing.",
+            description: "Review the inline approval result and exact payload before continuing.",
           },
         );
         if (!next.ambiguous) setAttempt(null);
@@ -271,39 +313,63 @@ function ApprovalCard({
   return (
     <article className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="break-words font-semibold">{approval.action}</h2>
-        <Badge variant={approval.state === ApprovalState.PENDING ? "outline" : "secondary"}>
-          {ApprovalState[approval.state]}
-        </Badge>
+        <h2 className="break-words font-semibold">
+          {effect}
+          {approval.deviceId ? ` on ${approval.deviceHostname.trim() || "unnamed device"}` : ""}
+        </h2>
+        <StatusBadge
+          status={
+            approval.state === ApprovalState.REJECTED
+              ? "destructive"
+              : approval.state === ApprovalState.EXPIRED
+                ? "warning"
+                : approval.state === ApprovalState.APPROVED
+                  ? "success"
+                  : approval.state === ApprovalState.PENDING
+                    ? "info"
+                    : "neutral"
+          }
+        >
+          {APPROVAL_STATES[approval.state] ?? "Unknown"}
+        </StatusBadge>
       </div>
-      <dl className="grid gap-4 break-all text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
-        <div>
-          <dt>Approval ID</dt>
-          <dd>{approval.id}</dd>
-        </div>
+      <dl className="grid gap-4 break-words text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
         <div>
           <dt>Target</dt>
-          <dd>{approval.deviceId || "Control-plane execution authority"}</dd>
-        </div>
-        <div>
-          <dt>Permission</dt>
-          <dd>{approval.permission}</dd>
-        </div>
-        <div>
-          <dt>Payload SHA-256</dt>
-          <dd className="font-mono">
-            {Array.from(approval.payloadSha256, (byte) => byte.toString(16).padStart(2, "0")).join(
-              "",
+          <dd>
+            {approval.deviceId ? (
+              <Link
+                to="/devices/$deviceId"
+                params={{ deviceId: approval.deviceId }}
+                search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
+                className="underline underline-offset-4"
+              >
+                {approval.deviceHostname.trim() || "Device name unavailable"}
+              </Link>
+            ) : approval.payload.case === "activateTargetPreview" ? (
+              "Assignment rollout"
+            ) : approval.payload.case === "approvePendingEnrollment" ? (
+              "Pending device enrollment"
+            ) : (
+              "Deployment"
             )}
           </dd>
         </div>
         <div>
+          <dt>Permission</dt>
+          <dd>{permissionLabels[approval.permission] ?? "Unrecognized permission"}</dd>
+        </div>
+        <div>
           <dt>Requester</dt>
-          <dd>{approval.requesterId}</dd>
+          <dd>{approval.requesterDisplayName.trim() || "Requester name unavailable"}</dd>
         </div>
         <div>
           <dt>Approver / decision actor</dt>
-          <dd>{approval.approverId || "Not decided"}</dd>
+          <dd>
+            {approval.approverId
+              ? approval.approverDisplayName.trim() || "Decision actor name unavailable"
+              : "Not decided"}
+          </dd>
         </div>
         <div>
           <dt>Created</dt>
@@ -320,11 +386,60 @@ function ApprovalCard({
           <dt>Decision reason</dt>
           <dd>{approval.decisionReason || "Not decided"}</dd>
         </div>
+        {actionRequest?.reason ? (
+          <div className="sm:col-span-2">
+            <dt>Request reason</dt>
+            <dd className="whitespace-pre-wrap">{actionRequest.reason}</dd>
+          </div>
+        ) : null}
       </dl>
+      {actionRequest ? <DeviceActionSpecView spec={actionSpec} /> : null}
+      {recovery ? (
+        readiness.error ? (
+          <RpcError failure={toRpcFailure(readiness.error)} />
+        ) : readiness.isPending ? (
+          <p role="status">Checking recovery readiness…</p>
+        ) : (
+          <RecoveryReadinessView readiness={currentReadiness} />
+        )
+      ) : null}
       <details className="min-w-0 border bg-muted/30 p-3">
-        <summary className="cursor-pointer text-sm font-medium">
-          Exact server-stored payload and approval
-        </summary>
+        <summary className="cursor-pointer text-sm font-medium">Details</summary>
+        <dl className="mt-3 grid gap-3 break-all text-sm sm:grid-cols-2 [&_dt]:text-muted-foreground">
+          <div>
+            <dt>Approval ID</dt>
+            <dd>{approval.id}</dd>
+          </div>
+          <div>
+            <dt>Device ID</dt>
+            <dd>{approval.deviceId || "Not device-specific"}</dd>
+          </div>
+          <div>
+            <dt>Requester ID</dt>
+            <dd>{approval.requesterId}</dd>
+          </div>
+          <div>
+            <dt>Decision actor ID</dt>
+            <dd>{approval.approverId || "Not decided"}</dd>
+          </div>
+          <div>
+            <dt>Action identifier</dt>
+            <dd>{approval.action}</dd>
+          </div>
+          <div>
+            <dt>Permission identifier</dt>
+            <dd>{approval.permission}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt>Payload SHA-256</dt>
+            <dd className="font-mono">
+              {Array.from(approval.payloadSha256, (byte) =>
+                byte.toString(16).padStart(2, "0"),
+              ).join("")}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-4 text-sm font-medium">Exact server-stored payload and approval</p>
         <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
           {toJsonString(ApprovalSchema, approval, { prettySpaces: 2 })}
         </pre>
@@ -343,7 +458,10 @@ function ApprovalCard({
           <div className="flex flex-wrap gap-2">
             <Button
               disabled={
-                busy || reason.trim() === "" || (attempt !== null && attempt.action !== "approve")
+                busy ||
+                (!recoveryReady && !(failure?.ambiguous && attempt?.action === "approve")) ||
+                reason.trim() === "" ||
+                (attempt !== null && attempt.action !== "approve")
               }
               onClick={() => void act("approve")}
             >
@@ -365,7 +483,7 @@ function ApprovalCard({
         <Button
           className="w-fit"
           variant="destructive"
-          disabled={busy}
+          disabled={busy || (!recoveryReady && !failure?.ambiguous)}
           onClick={() => void act("execute")}
         >
           {failure?.ambiguous ? "Retry exact approved execution" : "Execute exact approved payload"}
@@ -378,19 +496,17 @@ function ApprovalCard({
       ) : null}
       {completed ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm">
-          Operation completed.
+          Operation accepted by the server.
         </p>
       ) : null}
       {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.ambiguous ? "Outcome unknown" : "Operation failed"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-            {failure.ambiguous
-              ? " Outcome unknown. Refresh first; any explicit retry preserves the same ID and exact payload."
-              : ""}
-          </AlertDescription>
-        </Alert>
+        <RpcError failure={failure}>
+          {failure.ambiguous ? (
+            <p>
+              Refresh first. Any explicit retry preserves the same request ID and exact payload.
+            </p>
+          ) : null}
+        </RpcError>
       ) : null}
     </article>
   );

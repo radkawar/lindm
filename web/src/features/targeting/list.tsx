@@ -1,4 +1,5 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toRpcFailure } from "@/lib/errors";
@@ -16,14 +17,7 @@ export function ListStatus({
 }) {
   if (error) {
     const failure = toRpcFailure(error);
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>{failure.denied ? "Not authorized" : `${noun} unavailable`}</AlertTitle>
-        <AlertDescription>
-          {failure.codeName}: {failure.message}
-        </AlertDescription>
-      </Alert>
-    );
+    return <RpcError failure={failure} />;
   }
   if (pending)
     return (
@@ -32,15 +26,7 @@ export function ListStatus({
         <Skeleton className="h-32 w-full" />
       </div>
     );
-  if (empty)
-    return (
-      <p
-        role="status"
-        className="border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground"
-      >
-        No {noun} on this page.
-      </p>
-    );
+  if (empty) return <EmptyState title={`No ${noun} on this page`} />;
   return null;
 }
 

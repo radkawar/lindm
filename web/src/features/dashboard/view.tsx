@@ -3,7 +3,6 @@ import { Link } from "@tanstack/react-router";
 import {
   ActivityIcon,
   ArrowUpRightIcon,
-  ChartNoAxesCombinedIcon,
   InfoIcon,
   RefreshCwIcon,
   ServerIcon,
@@ -13,7 +12,10 @@ import type { ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Pie, PieChart, XAxis, YAxis } from "recharts";
 import type { FleetRecentAction } from "../../../gen/lindm/admin/v1/fleet_summary_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -83,29 +85,29 @@ export function DashboardView() {
 
   return (
     <section className="grid min-w-0 gap-5" aria-busy={summary.isFetching}>
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <p>Your fleet at a glance.</p>
+      <PageHeader
+        title="Dashboard"
+        description="Recorded evidence across your authorized fleet."
+        actions={
+          <>
             <Help label="About fleet counts">
               Server-calculated counts cover every device in your authorized scope, not an
               inventory-page sample. Counts describe recorded evidence, not live presence.
             </Help>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!canReadFleet || summary.isFetching}
-          onClick={() => {
-            if (!lifetime.signal.aborted) void summary.refetch();
-          }}
-        >
-          <RefreshCwIcon aria-hidden="true" />
-          Refresh
-        </Button>
-      </header>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canReadFleet || summary.isFetching}
+              onClick={() => {
+                if (!lifetime.signal.aborted) void summary.refetch();
+              }}
+            >
+              <RefreshCwIcon aria-hidden="true" />
+              {summary.isFetching ? "Refreshing…" : "Refresh"}
+            </Button>
+          </>
+        }
+      />
 
       {!canReadFleet ? (
         <Alert>
@@ -120,12 +122,7 @@ export function DashboardView() {
           </AlertDescription>
         </Alert>
       ) : failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Fleet summary unavailable"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
+        <RpcError failure={failure} title="Fleet summary unavailable" />
       ) : summary.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
           Loading fleet summary…
@@ -145,7 +142,7 @@ export function DashboardView() {
               title="Active enrollments"
               value={lifecycle?.activeDevices}
               detail="Currently enrolled devices."
-              help="Active describes enrollment lifecycle only. It does not establish online presence, device health or compliance."
+              help="Active means enrolled. Check contact, inventory and compliance separately."
             />
             <Metric
               title="Stale contact"
@@ -185,7 +182,7 @@ export function DashboardView() {
             <Panel
               title="Operating systems"
               description="Devices by observed OS and version."
-              help="Latest successful host observations across your authorized fleet. The twenty largest OS/version groups are shown; Other is the exact count in all remaining groups. Missing OS or version is shown as Not reported. An observation is not proof of current inventory freshness."
+              help="The latest successful host reports across your authorized fleet. Shows the twenty largest OS/version groups; Other contains the rest. Missing values appear as Not reported. Check device inventory timestamps for freshness."
             >
               {operatingSystems ? (
                 <DistributionChart kind="donut" rows={osRows} label="Devices" />
@@ -218,7 +215,7 @@ export function DashboardView() {
             <Panel
               title="Open advisory findings"
               description="Affected findings by severity."
-              help="Canonical affected findings across your fleet scope, not distinct devices. Other includes unspecified severity. Accepted and unknown findings are excluded, not considered fixed. Distro package coverage is not a complete vulnerability assessment. Evaluated does not mean unaffected; zero open findings does not establish that devices are clean. Stale or unsupported evidence remains unknown."
+              help="Counts affected findings, not devices. Accepted and unknown findings are excluded but are not fixed. Other includes unspecified severity. Missing or stale coverage can hide findings, so zero findings does not mean no exposure."
             >
               {findings ? (
                 <>
@@ -241,7 +238,7 @@ export function DashboardView() {
             <Panel
               title="Fleet status"
               description="Enrollment and recorded contact."
-              help="Exact device counts across your fleet scope. Active enrollment does not establish compliance or connectivity. Contact uses server receipt times across all enrollment states; recent contact is not proof of inventory freshness or live presence. Age is evaluated at the displayed fleet evidence time, with the exact threshold included in recent contact. Missing contact remains unknown."
+              help="Counts enrollment and last server contact across your authorized fleet. Recent contact means at or within the displayed threshold at the summary time. It is separate from inventory freshness and compliance. Missing contact remains unknown."
             >
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="grid content-start gap-3">
@@ -302,7 +299,7 @@ export function DashboardView() {
                     className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
                   >
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      {action.kind === "service" ? (
+                      {action.kind === "resource" ? (
                         <Settings2Icon className="size-4" aria-hidden="true" />
                       ) : action.kind === "device" ? (
                         <ServerIcon className="size-4" aria-hidden="true" />
@@ -313,8 +310,8 @@ export function DashboardView() {
                     <div className="grid min-w-0 flex-1 gap-1">
                       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                         <span className="break-all text-sm font-medium">
-                          {action.kind === "service"
-                            ? `Service action · ${action.unit || action.resourceId || "Resource not recorded"}`
+                          {action.kind === "resource"
+                            ? `Resource action · ${action.unit || action.resourceId || "Resource not recorded"}`
                             : action.kind === "device"
                               ? action.capability || "Capability not recorded"
                               : "Unknown action kind"}
@@ -337,10 +334,10 @@ export function DashboardView() {
                 ))}
               </ul>
             ) : (
-              <div className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
-                <ActivityIcon className="size-5" aria-hidden="true" />
-                <p>No action records in your authorized fleet scope.</p>
-              </div>
+              <EmptyState
+                title="No recent action records"
+                description="No device or service actions were found in your authorized fleet scope."
+              />
             )}
           </Panel>
         </>
@@ -466,10 +463,7 @@ function DistributionChart({
   return (
     <div className="grid gap-3">
       {total === 0n ? (
-        <div className="flex h-36 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <ChartNoAxesCombinedIcon className="size-6" aria-hidden="true" />
-          <p className="text-xs">No {label.toLowerCase()} in this summary.</p>
-        </div>
+        <EmptyState title={`No ${label.toLowerCase()} in this summary`} />
       ) : kind === "donut" ? (
         <div className="relative">
           <ChartContainer
@@ -565,7 +559,7 @@ function DistributionChart({
               }
               cursor={false}
             />
-            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false} />
+            <Bar dataKey="count" maxBarSize={40} isAnimationActive={false} />
           </BarChart>
         </ChartContainer>
       )}
@@ -614,7 +608,15 @@ function ActionRecord({ action }: { action: FleetRecentAction }) {
         className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Server action record details"
       >
-        <Badge variant={action.outcomeUnknown ? "destructive" : "outline"} className="text-xs">
+        <StatusBadge
+          status={
+            action.outcomeUnknown
+              ? "warning"
+              : action.closedAt || action.closedReason
+                ? "neutral"
+                : "info"
+          }
+        >
           {action.outcomeUnknown
             ? "Outcome unknown"
             : action.closedAt || action.closedReason
@@ -622,13 +624,13 @@ function ActionRecord({ action }: { action: FleetRecentAction }) {
               : action.startAuthorizedAt
                 ? "Start authorized"
                 : "Issued"}
-        </Badge>
+        </StatusBadge>
       </TooltipTrigger>
       <TooltipContent className="max-w-sm">
         <div className="grid gap-1 break-all">
           <p>
-            {action.kind === "service"
-              ? "Service action"
+            {action.kind === "resource"
+              ? "Resource action"
               : action.kind === "device"
                 ? "Device action"
                 : "Unknown action kind"}{" "}

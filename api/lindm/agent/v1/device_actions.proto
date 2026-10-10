@@ -160,12 +160,52 @@ enum SanitizeMethod {
   SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE = 5;
   SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE = 6;
 }
+enum NvmeIdentityBasis {
+  NVME_IDENTITY_BASIS_UNSPECIFIED = 0;
+  NVME_IDENTITY_BASIS_NAMESPACE_NID = 1;
+  NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID = 2;
+}
+// Explicit human-approved native identity. Changing the basis or any field
+// requires new approval; native execution never falls back to another basis.
+message NVMeSanitizeIdentity {
+  NvmeIdentityBasis basis = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  uint32 vendor_id = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  uint32 subsystem_vendor_id = 3 [(buf.validate.field).uint32.lte = 65535];
+  string controller_serial = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 20
+    pattern: "^[ -~]+$"
+  }];
+  string controller_model = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 40
+    pattern: "^[ -~]+$"
+  }];
+  string controller_firmware = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 8
+    pattern: "^[ -~]+$"
+  }];
+  uint64 namespace_size_bytes = 7 [(buf.validate.field).uint64.gte = 4096];
+  uint32 lba_format = 8 [(buf.validate.field).uint32.lte = 15];
+  uint32 lba_data_size_shift = 9 [(buf.validate.field).uint32 = {
+    gte: 9
+    lte: 12
+  }];
+}
 message NVMeSanitizeScope {
   uint32 namespace_id = 1 [(buf.validate.field).uint32 = {
     gte: 1
     lte: 4294967294
   }];
   bool controller_wide = 2;
+  NVMeSanitizeIdentity identity = 3 [(buf.validate.field).required = true];
 }
 message NVMeSanitizePlan {
   NVMeSanitizeScope scope = 1 [(buf.validate.field).required = true];
@@ -227,11 +267,33 @@ message SanitizeAction {
     expression: "(this.method >= 3) == has(this.nvme_scope)"
   };
   option (buf.validate.message).cel = {
+    id: "sanitize.native_identity"
+    message: "approved native controller serial and namespace size must match the selected target"
+    expression: "!has(this.nvme_scope) || (this.nvme_scope.identity.controller_serial == this.target.serial && this.nvme_scope.identity.namespace_size_bytes == this.target.size_bytes)"
+  };
+  option (buf.validate.message).cel = {
     id: "sanitize.unencrypted"
     message: "sanitize targets unencrypted storage only"
     expression: "this.target.luks_uuid == ''"
   };
 }
+// Native logind power operations. Delay is scheduled by logind, not a script.
+message RestartAction {
+  optional uint32 delay_seconds = 1 [(buf.validate.field).uint32.lte = 3600];
+  optional string message = 2 [(buf.validate.field).string = {
+    max_len: 512
+    pattern: "^[^\\x00-\\x1f\\x7f]*$"
+  }];
+}
+message ShutdownAction {
+  optional uint32 delay_seconds = 1 [(buf.validate.field).uint32.lte = 3600];
+  optional string message = 2 [(buf.validate.field).string = {
+    max_len: 512
+    pattern: "^[^\\x00-\\x1f\\x7f]*$"
+  }];
+}
+message RefreshInventoryAction {}
+
 // Closed immutable action specification. No executable, command, script, path,
 // arbitrary native arguments, or generic extension map exists in this contract.
 message DeviceActionSpec {
@@ -245,6 +307,9 @@ message DeviceActionSpec {
     CryptoEraseAction crypto_erase = 6;
     SanitizeAction sanitize = 7;
     ReleaseLockAction release_lock = 8;
+    RestartAction restart = 9;
+    ShutdownAction shutdown = 10;
+    RefreshInventoryAction refresh_inventory = 11;
   }
 }
 // Public token inventory only: no native token blobs, sealed secrets or keys.
@@ -299,6 +364,10 @@ message DeviceActionObservation {
   // Public account names only. Shadow credentials never enter remote evidence.
   repeated string disabled_accounts = 18 [(buf.validate.field).repeated.max_items = 128];
   repeated string preserved_accounts = 19 [(buf.validate.field).repeated.max_items = 128];
+  string boot_id = 20 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
   option (buf.validate.message).cel = {
     id: "device_action_observation.token_ids"
     message: "native token IDs must be unique"
@@ -332,6 +401,15 @@ message DeviceActionVerification {
   DeviceActionEscrow escrow = 4;
   repeated CryptoEraseTargetResult crypto_erase_results = 5 [(buf.validate.field).repeated.max_items = 8];
   NVMeSanitizeVerification nvme_sanitize = 6;
+  // Current boot observed after the consumed restart; differs from challenge.
+  string boot_id = 7 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  // Published full snapshot, not merely a collected or queued snapshot.
+  uint64 inventory_sequence = 8 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  // Native acceptance is not proof that power-off or reboot completed.
+  bool power_request_accepted = 9;
   option (buf.validate.message).cel = {
     id: "device_action_verification.nvme"
     message: "verified native sanitize requires completed command and exact sampling evidence"
@@ -511,6 +589,9 @@ message DeviceActionRecord {
   bytes recovery_credential_envelope = 27 [(buf.validate.field).bytes.max_len = 65536];
   bytes recovery_boot_grant_envelope = 28 [(buf.validate.field).bytes.max_len = 65536];
   bytes recovery_boot_grant_sha256 = 29 [(buf.validate.field).bytes.max_len = 32];
+  bytes inventory_receipt_envelope = 30 [(buf.validate.field).bytes.max_len = 16384];
+  ExecutionRoot inventory_receipt_root = 31;
+  bytes inventory_receipt_delegation_envelope = 32 [(buf.validate.field).bytes.max_len = 16384];
   option (buf.validate.message).cel = {
     id: "device_action_record.receipt"
     message: "consumed receipt must retain its accepted trust snapshot"
@@ -564,6 +645,7 @@ message DeviceActionStatus {
   // The live-root effect gate has consumed authority; only pinned-session
   // reporting may continue. This may be true while RUNNING.
   bool report_only = 11;
+  bool refresh_inventory = 12;
   option (buf.validate.message).cel = {
     id: "device_action_status.volatile"
     message: "volatile evidence must be terminal"

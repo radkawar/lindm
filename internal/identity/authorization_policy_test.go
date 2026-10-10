@@ -125,6 +125,7 @@ func TestConfiguredSensitiveApprovalPermissions(t *testing.T) {
 	for _, permission := range []Permission{
 		PermissionAssignResources, PermissionManageExecutionTrust,
 		PermissionRunRemoteExecution, PermissionReadRecoveryKeys,
+		PermissionManageInventory,
 		PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice,
 	} {
 		t.Run(string(permission), func(t *testing.T) {

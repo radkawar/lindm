@@ -6,6 +6,19 @@ RETURNING *;
 -- name: GetApproval :one
 SELECT * FROM approval_requests WHERE id = sqlc.arg(id);
 
+-- name: GetApprovalProjection :one
+SELECT sqlc.embed(a),
+  coalesce(nullif(requester.display_name, ''), requester_account.username, '')::text AS requester_display_name,
+  coalesce(nullif(approver.display_name, ''), approver_account.username, '')::text AS approver_display_name,
+  coalesce(d.hostname, '')::text AS device_hostname
+FROM approval_requests a
+LEFT JOIN principals requester ON requester.id = a.requester_id
+LEFT JOIN local_accounts requester_account ON requester_account.id = requester.id
+LEFT JOIN principals approver ON approver.id = a.approver_id
+LEFT JOIN local_accounts approver_account ON approver_account.id = approver.id
+LEFT JOIN devices d ON d.id = a.device_id
+WHERE a.id = sqlc.arg(id);
+
 -- name: GetApprovalForMutation :one
 SELECT * FROM approval_requests
 WHERE requester_id = sqlc.arg(requester_id) AND action = sqlc.arg(action) AND mutation_id = sqlc.arg(mutation_id);
@@ -23,11 +36,26 @@ UPDATE approval_requests SET state = 'consumed', consumed_at = clock_timestamp()
 WHERE id = sqlc.arg(id) AND state = 'approved' AND expires_at > clock_timestamp();
 
 -- name: ListVisibleApprovals :many
-SELECT * FROM approval_requests a
+SELECT sqlc.embed(a),
+  coalesce(nullif(requester.display_name, ''), requester_account.username, '')::text AS requester_display_name,
+  coalesce(nullif(approver.display_name, ''), approver_account.username, '')::text AS approver_display_name,
+  coalesce(d.hostname, '')::text AS device_hostname
+FROM approval_requests a
+LEFT JOIN principals requester ON requester.id = a.requester_id
+LEFT JOIN local_accounts requester_account ON requester_account.id = requester.id
+LEFT JOIN principals approver ON approver.id = a.approver_id
+LEFT JOIN local_accounts approver_account ON approver_account.id = approver.id
+LEFT JOIN devices d ON d.id = a.device_id
 WHERE a.id > sqlc.arg(after_id)::uuid
   AND (
     a.permission = ANY(sqlc.arg(unrestricted_permissions)::text[])
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce(sqlc.arg(scopes)::jsonb -> a.permission, '[]'::jsonb)))
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(coalesce(sqlc.arg(required_scopes)::jsonb -> a.permission, '[]'::jsonb)) required
+    WHERE a.device_id IS NULL
+       OR NOT device_scope_matches(a.device_id, (required ->> 'unrestricted')::boolean, required -> 'scopes')
   )
   AND (
     a.requester_id = sqlc.arg(actor_id)

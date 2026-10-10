@@ -2,11 +2,11 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
-import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { clearCsrfToken } from "@/lib/rpc";
 
 // Pending requests (including write-only keys) stay only in component memory.
@@ -44,10 +44,11 @@ export function useIntegrationAction() {
         }
         if (!next.ambiguous) pending.current = null;
         setFailure(next);
-        toast.error(
-          next.ambiguous ? "Integration outcome unknown" : "Integration operation failed",
+        const { tone, title } = classifyRpcFailure(next);
+        toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
+          title,
           {
-            description: "Review the inline result before making another change.",
+            description: "Review the inline integration result before making another change.",
           },
         );
       }
@@ -67,14 +68,8 @@ export function useIntegrationAction() {
     perform,
     blocked: busy || failure?.ambiguous === true,
     feedback: failure ? (
-      <Alert variant="destructive">
-        <AlertTitle>
-          {failure.ambiguous ? "Outcome unknown" : "Integration operation failed"}
-        </AlertTitle>
-        <AlertDescription className="grid gap-3">
-          <p>
-            {failure.codeName}: {failure.message}
-          </p>
+      <RpcError failure={failure}>
+        <div className="grid gap-3">
           {failure.ambiguous ? (
             <>
               <p>
@@ -91,8 +86,8 @@ export function useIntegrationAction() {
               </Button>
             </>
           ) : null}
-        </AlertDescription>
-      </Alert>
+        </div>
+      </RpcError>
     ) : busy ? (
       <p role="status" className="border bg-muted/30 p-3 text-sm text-muted-foreground">
         Working…

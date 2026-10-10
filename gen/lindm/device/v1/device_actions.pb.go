@@ -35,8 +35,10 @@ type DeviceActionWork struct {
 	RecoveryHandoff            bool   `protobuf:"varint,7,opt,name=recovery_handoff,json=recoveryHandoff,proto3" json:"recovery_handoff,omitempty"`
 	RecoveryCredentialEnvelope []byte `protobuf:"bytes,8,opt,name=recovery_credential_envelope,json=recoveryCredentialEnvelope,proto3" json:"recovery_credential_envelope,omitempty"`
 	RecoveryBootGrantEnvelope  []byte `protobuf:"bytes,9,opt,name=recovery_boot_grant_envelope,json=recoveryBootGrantEnvelope,proto3" json:"recovery_boot_grant_envelope,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// Durable publication proof lets the executor resolve a lost refresh response.
+	InventoryReceiptEnvelope []byte `protobuf:"bytes,10,opt,name=inventory_receipt_envelope,json=inventoryReceiptEnvelope,proto3" json:"inventory_receipt_envelope,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *DeviceActionWork) Reset() {
@@ -128,6 +130,13 @@ func (x *DeviceActionWork) GetRecoveryCredentialEnvelope() []byte {
 func (x *DeviceActionWork) GetRecoveryBootGrantEnvelope() []byte {
 	if x != nil {
 		return x.RecoveryBootGrantEnvelope
+	}
+	return nil
+}
+
+func (x *DeviceActionWork) GetInventoryReceiptEnvelope() []byte {
+	if x != nil {
+		return x.InventoryReceiptEnvelope
 	}
 	return nil
 }
@@ -569,7 +578,7 @@ var File_lindm_device_v1_device_actions_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_device_actions_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/device/v1/device_actions.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x04\n" +
+	"$lindm/device/v1/device_actions.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\x05\n" +
 	"\x10DeviceActionWork\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x124\n" +
 	"\x0fintent_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x02R\x0eintentEnvelope\x12;\n" +
@@ -579,7 +588,9 @@ const file_lindm_device_v1_device_actions_proto_rawDesc = "" +
 	"\x17escrow_receipt_envelope\x18\x06 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x15escrowReceiptEnvelope\x12)\n" +
 	"\x10recovery_handoff\x18\a \x01(\bR\x0frecoveryHandoff\x12K\n" +
 	"\x1crecovery_credential_envelope\x18\b \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x1arecoveryCredentialEnvelope\x12J\n" +
-	"\x1crecovery_boot_grant_envelope\x18\t \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x19recoveryBootGrantEnvelope\"T\n" +
+	"\x1crecovery_boot_grant_envelope\x18\t \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x19recoveryBootGrantEnvelope\x12G\n" +
+	"\x1ainventory_receipt_envelope\x18\n" +
+	" \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x18inventoryReceiptEnvelope\"T\n" +
 	"\x1aGetDeviceActionWorkRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\"T\n" +
 	"\x1bGetDeviceActionWorkResponse\x125\n" +

@@ -38,12 +38,13 @@ func TestLiveRootPoweroffUnitIsPackagedButNeverAutoStarted(t *testing.T) {
 		"CapabilityBoundingSet=CAP_SYS_BOOT CAP_IPC_LOCK CAP_WAKE_ALARM", "PrivateDevices=yes",
 		"RestrictAddressFamilies=AF_UNIX", "MemorySwapMax=0",
 		"LimitMEMLOCK=infinity", "LimitCORE=0", "OOMScoreAdjust=-1000",
+		"ProtectClock=no", "SystemCallFilter=@system-service reboot", "SystemCallFilter=~@clock",
 	} {
 		if !strings.Contains(string(unit), "\n"+required+"\n") {
 			t.Errorf("missing armed helper boundary %q", required)
 		}
 	}
-	for _, forbidden := range []string{"[Install]", "PartOf=", "Requires=", "DeviceAllow="} {
+	for _, forbidden := range []string{"[Install]", "PartOf=", "Requires=", "DeviceAllow=", "\nProtectClock=yes\n", "CAP_SYS_TIME"} {
 		if strings.Contains(string(unit), forbidden) {
 			t.Errorf("armed helper must not inherit dependency/device authority %q", forbidden)
 		}

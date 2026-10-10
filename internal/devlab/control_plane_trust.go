@@ -219,7 +219,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
-	if mode == authorityReleaseUpdates {
+	if mode == authorityReleaseUpdates || mode == authorityDeviceActions {
 		if err := f.configureReleaseRepository(ctx, cfg, material); err != nil {
 			return nil, err
 		}

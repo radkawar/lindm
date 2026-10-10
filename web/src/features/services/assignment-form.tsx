@@ -16,7 +16,8 @@ import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { setAssignmentAttempt, useAssignmentAttempt, type AssignmentAttempt } from "./attempt";
@@ -58,6 +59,7 @@ export function ResourceAssignmentForm({
   const [intervalSeconds, setIntervalSeconds] = useState(defaultIntervalSeconds);
   const [requestId, setRequestId] = useState(newRequestId);
   const [errors, setErrors] = useState<string[]>([]);
+  const [rpcFailure, setRpcFailure] = useState<RpcFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(
     attempt?.failure?.message === "approval_required",
@@ -116,7 +118,13 @@ export function ResourceAssignmentForm({
         failure,
       });
       if (!lifetime.signal.aborted) {
-        toast.error(failure.ambiguous ? "Assignment outcome unknown" : "Assignment not accepted", {
+        toast[
+          classifyRpcFailure(failure).tone === "destructive"
+            ? "error"
+            : classifyRpcFailure(failure).tone === "warning"
+              ? "warning"
+              : "message"
+        ](failure.ambiguous ? "Assignment outcome unknown" : "Assignment not accepted", {
           description: "Review the inline result before continuing.",
         });
       }
@@ -176,6 +184,7 @@ export function ResourceAssignmentForm({
     if (!attempt || approvalBusy || lifetime.signal.aborted) return;
     setApprovalBusy(true);
     setErrors([]);
+    setRpcFailure(null);
     try {
       const result = await adminClient.createApproval(
         {
@@ -193,13 +202,16 @@ export function ResourceAssignmentForm({
       if (!lifetime.signal.aborted) {
         const failure = toRpcFailure(error);
         setApprovalAmbiguous(failure.ambiguous);
-        setErrors([failure.message]);
-        toast.error(
-          failure.ambiguous ? "Approval request outcome unknown" : "Approval request failed",
-          {
-            description: "Review the inline result before continuing.",
-          },
-        );
+        setRpcFailure(failure);
+        toast[
+          classifyRpcFailure(failure).tone === "destructive"
+            ? "error"
+            : classifyRpcFailure(failure).tone === "warning"
+              ? "warning"
+              : "message"
+        ](failure.ambiguous ? "Approval request outcome unknown" : "Approval request failed", {
+          description: "Review the inline result before continuing.",
+        });
       }
     } finally {
       if (!lifetime.signal.aborted) setApprovalBusy(false);
@@ -216,6 +228,7 @@ export function ResourceAssignmentForm({
       return;
     setRefreshing(true);
     setErrors([]);
+    setRpcFailure(null);
     try {
       await queryClient.fetchQuery(resourceStateQueryOptions(lifetime, deviceId));
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
@@ -229,7 +242,7 @@ export function ResourceAssignmentForm({
       setIntervalSeconds(defaultIntervalSeconds);
     } catch (error) {
       if (getAuthLifetime() === lifetime && !lifetime.signal.aborted)
-        setErrors([toRpcFailure(error).message]);
+        setRpcFailure(toRpcFailure(error));
     } finally {
       setRefreshing(false);
     }
@@ -319,14 +332,7 @@ export function ResourceAssignmentForm({
               Refresh profiles
             </Button>
           </div>
-          {headFailure ? (
-            <Alert variant="destructive">
-              <AlertTitle>Profile heads unavailable</AlertTitle>
-              <AlertDescription>
-                {headFailure.codeName}: {headFailure.message}
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          {headFailure ? <RpcError failure={headFailure} title="Profile list unavailable" /> : null}
         </>
       )}
       <Label htmlFor="service-reconcile-interval">Reconciliation interval (seconds)</Label>
@@ -344,8 +350,8 @@ export function ResourceAssignmentForm({
         aria-describedby="service-reconcile-interval-help"
       />
       <p id="service-reconcile-interval-help" className="text-sm text-muted-foreground">
-        Default: 15 minutes. Allowed range: {intervalMin}–{intervalMax} seconds. Checks verify and
-        remediate drift while the profile is assigned.
+        Default: 15 minutes. Allowed range: {intervalMin} to {intervalMax} seconds. Checks verify
+        and remediate drift while the profile is assigned.
       </p>
       <Label htmlFor="service-assignment-reason">Reason (required)</Label>
       <Textarea
@@ -363,6 +369,7 @@ export function ResourceAssignmentForm({
         {(attempt ? attempt.payload.expectedAssignmentId : expectedAssignmentId) ??
           "none (never assigned)"}
       </p>
+      {rpcFailure ? <RpcError failure={rpcFailure} /> : null}
       {errors.length ? (
         <Alert variant="destructive">
           <AlertTitle>Cannot prepare assignment</AlertTitle>
@@ -376,21 +383,13 @@ export function ResourceAssignmentForm({
         </Alert>
       ) : null}
       {attempt?.failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>
+        <RpcError failure={attempt.failure}>
+          <p>
             {attempt.status === "ambiguous"
-              ? "Assignment outcome unknown"
-              : attempt.failure.denied
-                ? "Not authorized to assign resources"
-                : "Assignment rejected"}
-          </AlertTitle>
-          <AlertDescription>
-            {attempt.failure.codeName}: {attempt.failure.message}
-            {attempt.status === "ambiguous"
-              ? " Retry the exact request; do not send a replacement."
-              : " Refresh the assignment before preparing a new request."}
-          </AlertDescription>
-        </Alert>
+              ? "Retry the exact request; do not send a replacement."
+              : "Refresh the assignment before preparing a new request."}
+          </p>
+        </RpcError>
       ) : null}
       {attempt?.status === "succeeded" ? (
         <p role="status" className="border bg-muted/30 p-3 text-sm">

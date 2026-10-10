@@ -9,6 +9,9 @@ BB=/bin/busybox
 fail() { $BB poweroff -f; exit 1; }
 trap fail EXIT INT TERM
 $BB mount -t devtmpfs devtmpfs /dev
+# The archive contains directories, not static device nodes. Rebind PID 1's
+# standard streams after devtmpfs creates the kernel-selected console.
+exec </dev/console >/dev/console 2>&1
 $BB mount -t proc proc /proc
 $BB mount -t sysfs sysfs /sys
 $BB mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run

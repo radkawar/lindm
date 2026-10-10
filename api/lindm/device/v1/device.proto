@@ -5,7 +5,9 @@ package lindm.device.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/agent/v1/update.proto";
 import "lindm/device/v1/device_actions.proto";
+import "lindm/device/v1/inventory_refresh.proto";
 import "lindm/device/v1/service_dispatch.proto";
 import "lindm/inventory/v1/observation.proto";
 
@@ -33,6 +35,7 @@ service DeviceService {
   rpc AuthorizeDeviceActionStart(AuthorizeDeviceActionStartRequest) returns (AuthorizeDeviceActionStartResponse);
   rpc ReportDeviceActionResult(ReportDeviceActionResultRequest) returns (ReportDeviceActionResultResponse);
   rpc RegisterDeviceActionRecovery(RegisterDeviceActionRecoveryRequest) returns (RegisterDeviceActionRecoveryResponse);
+  rpc ConfirmRefreshInventoryPublication(ConfirmRefreshInventoryPublicationRequest) returns (ConfirmRefreshInventoryPublicationResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {
@@ -51,6 +54,8 @@ message GetSyncStateRequest {
     gt: 0
     lte: 9223372036854775807
   }];
+  // Optional diagnostic telemetry from the executor, not a signed health proof.
+  lindm.agent.v1.AgentUpdateStatus agent_update = 2;
 }
 message GetSyncStateResponse {
   uint64 session_epoch = 1;

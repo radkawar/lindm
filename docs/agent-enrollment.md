@@ -822,12 +822,16 @@ plus that hold duration so owned cleanup and evidence writing can finish. Run
 the guests sequentially when sharing host VM capacity.
 
 Device revocation and cleanup use the normal two-human approval workflow. A
-separate test-owned Keycloak administrator is created and authenticated through
-code/PKCE only when the first tracked device needs revocation, then deleted at
-cleanup. Deferring that otherwise-unused session prevents long native scenarios
-from consuming its 30-minute idle lifetime before approval. No keepalive,
-authentication bypass or automatic mutation retry is introduced. The record
-includes the requester/approver IDs and exact approval.
+separate test-owned Keycloak administrator is created only when the first tracked
+device needs revocation, then deleted at cleanup. Every independent decision uses
+the shared laboratory approval helper to authenticate afresh: code/PKCE for the
+directory fixture, password plus WebAuthn for local native fixtures. This also
+handles sessions expired during long scenarios or invalidated by account
+revoke/restore negatives. HTTP 401 on logout means the old session has no logout
+authority; it never substitutes for the required new login. Disabled accounts
+still cannot authenticate. No timeout extension, keepalive, authentication bypass
+or automatic mutation retry is introduced. The record includes the
+requester/approver IDs and exact approval.
 
 Use new record paths. This command builds the real agent into a development-signed
 RPM or signed APT archive using the lifecycle package path, installs it in an owned

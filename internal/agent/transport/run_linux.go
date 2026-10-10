@@ -42,6 +42,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	}
 	defer func() { resultErr = errors.Join(resultErr, cleanup()) }()
 	r := &runner{document: document, executor: executor, status: &agentv1.TransportStatus{}, authorityGate: make(authorityGate, 1)}
+	r.refreshes = make(chan inventoryRefreshJob)
+	r.collectInventory = inventory.CollectForUpload
 	defer r.cache.Close()
 	defer func() {
 		if r.store != nil {
@@ -57,7 +59,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	if err := r.report(ctx); err != nil {
 		return err
 	}
-	management := &managementLoop{executor: executor, gate: r.authorityGate}
+	management := &managementLoop{executor: executor, gate: r.authorityGate, refreshInventory: r.requestInventoryRefresh}
 	stopManagement := management.start(ctx)
 	defer stopManagement()
 	stopUpdates := startAgentUpdates(ctx, executor)
@@ -85,6 +87,9 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 			timer.Stop()
 			return r.stopped()
 		case <-timer.C:
+		case job := <-r.refreshes:
+			timer.Stop()
+			job.done <- r.refreshInventory(job.ctx, job.status)
 		}
 	}
 }
@@ -94,15 +99,17 @@ func heartbeatDelay() time.Duration {
 }
 
 type runner struct {
-	document       *config.Document
-	executor       agentv1connect.ExecutorServiceClient
-	cache          connectionCache
-	authorityGate  authorityGate
-	store          *spool.Store
-	identity       spool.Identity
-	status         *agentv1.TransportStatus
-	nextCollection time.Time
-	waiting        *inventoryv1.NativeObservation
+	document         *config.Document
+	executor         agentv1connect.ExecutorServiceClient
+	cache            connectionCache
+	authorityGate    authorityGate
+	store            *spool.Store
+	identity         spool.Identity
+	status           *agentv1.TransportStatus
+	nextCollection   time.Time
+	waiting          *inventoryv1.NativeObservation
+	refreshes        chan inventoryRefreshJob
+	collectInventory func(context.Context) (*inventoryv1.NativeObservation, error)
 }
 
 func (r *runner) cycle(ctx context.Context) error {
@@ -176,7 +183,7 @@ func (r *runner) bind(ctx context.Context, connection *agentv1.GetConnectionResp
 func (r *runner) collect(ctx context.Context) error {
 	call, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	observation, err := inventory.Collect(call)
+	observation, err := r.collectNativeObservation(call)
 	r.nextCollection = time.Now().Add(collectionInterval)
 	if err != nil {
 		return fmt.Errorf("collect native observation: %w", err)

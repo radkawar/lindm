@@ -1,0 +1,161 @@
+P: /devices/pci0000:00/0000:00:03.0/virtio2/host0/target0:0:0/0:0:0:0/block/sda
+N: sda
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/sda
+E: DEVTYPE=disk
+E: MAJOR=8
+E: MINOR=0
+E: ID_MODEL=QEMU_HARDDISK
+E: ID_REVISION=2.5+
+E: ID_WWN_WITH_EXTENSION=0x5000000000000001
+E: ID_WWN=0x5000000000000001
+E: ID_BUS=scsi
+E: ID_SERIAL=35000000000000001
+E: ID_SERIAL_SHORT=5000000000000001
+
+P: /devices/pci0000:00/0000:00:03.0/virtio2/host0/target0:0:0/0:0:0:0/block/sda/sda1
+N: sda1
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/sda1
+E: DEVTYPE=partition
+E: MAJOR=8
+E: MINOR=1
+E: ID_MODEL=QEMU_HARDDISK
+E: ID_REVISION=2.5+
+E: ID_WWN_WITH_EXTENSION=0x5000000000000001
+E: ID_WWN=0x5000000000000001
+E: ID_BUS=scsi
+E: ID_SERIAL=35000000000000001
+E: ID_SERIAL_SHORT=5000000000000001
+E: ID_FS_UUID=BE73-6040
+E: ID_FS_VERSION=FAT32
+E: ID_FS_TYPE=vfat
+E: ID_PART_ENTRY_UUID=fe0ddd3f-1541-46af-88f7-980bf5398174
+E: ID_PART_ENTRY_TYPE=c12a7328-f81f-11d2-ba4b-00a0c93ec93b
+
+P: /devices/pci0000:00/0000:00:03.0/virtio2/host0/target0:0:0/0:0:0:0/block/sda/sda2
+N: sda2
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/sda2
+E: DEVTYPE=partition
+E: MAJOR=8
+E: MINOR=2
+E: ID_MODEL=QEMU_HARDDISK
+E: ID_REVISION=2.5+
+E: ID_WWN_WITH_EXTENSION=0x5000000000000001
+E: ID_WWN=0x5000000000000001
+E: ID_BUS=scsi
+E: ID_SERIAL=35000000000000001
+E: ID_SERIAL_SHORT=5000000000000001
+E: ID_FS_UUID=679a8412-23c9-469a-bdeb-32012285d6b3
+E: ID_FS_VERSION=1.0
+E: ID_FS_TYPE=ext4
+E: ID_PART_ENTRY_UUID=5d5fc853-3be2-4326-9e4c-cd23570a766d
+E: ID_PART_ENTRY_TYPE=0fc63daf-8483-4772-8e79-3d69d8477de4
+
+P: /devices/pci0000:00/0000:00:03.0/virtio2/host0/target0:0:0/0:0:0:0/block/sda/sda3
+N: sda3
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/sda3
+E: DEVTYPE=partition
+E: MAJOR=8
+E: MINOR=3
+E: ID_MODEL=QEMU_HARDDISK
+E: ID_REVISION=2.5+
+E: ID_WWN_WITH_EXTENSION=0x5000000000000001
+E: ID_WWN=0x5000000000000001
+E: ID_BUS=scsi
+E: ID_SERIAL=35000000000000001
+E: ID_SERIAL_SHORT=5000000000000001
+E: ID_FS_VERSION=2
+E: ID_FS_UUID=f393f8b5-f6bf-41a0-81fd-736cf10b6d9d
+E: ID_FS_TYPE=crypto_LUKS
+E: ID_PART_ENTRY_UUID=4ad7342a-a892-460b-9f86-346e1f374060
+E: ID_PART_ENTRY_TYPE=0fc63daf-8483-4772-8e79-3d69d8477de4
+
+P: /devices/virtual/block/loop0
+N: loop0
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop0
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=0
+
+P: /devices/virtual/block/loop1
+N: loop1
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop1
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=1
+
+P: /devices/virtual/block/loop2
+N: loop2
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop2
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=2
+
+P: /devices/virtual/block/loop3
+N: loop3
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop3
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=3
+
+P: /devices/virtual/block/loop4
+N: loop4
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop4
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=4
+
+P: /devices/virtual/block/loop5
+N: loop5
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop5
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=5
+
+P: /devices/virtual/block/loop6
+N: loop6
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop6
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=6
+
+P: /devices/virtual/block/loop7
+N: loop7
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/loop7
+E: DEVTYPE=disk
+E: MAJOR=7
+E: MINOR=7
+
+P: /devices/virtual/block/dm-0
+N: dm-0
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/dm-0
+E: DEVTYPE=disk
+E: MAJOR=252
+E: MINOR=0
+E: ID_FS_UUID=Uq6z6t-EEon-3zO9-xgbz-Xxv6-7YJw-zZSDDa
+E: ID_FS_VERSION=LVM2 001
+E: ID_FS_TYPE=LVM2_member
+
+P: /devices/virtual/block/dm-1
+N: dm-1
+E: SUBSYSTEM=block
+E: DEVNAME=/dev/dm-1
+E: DEVTYPE=disk
+E: MAJOR=252
+E: MINOR=1
+E: ID_FS_UUID=2efb93fb-96a8-42dd-a0ed-3ba24dd2eba6
+E: ID_FS_VERSION=1.0
+E: ID_FS_TYPE=ext4
+

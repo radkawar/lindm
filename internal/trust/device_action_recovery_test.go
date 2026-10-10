@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,8 +234,16 @@ func TestRecoveryCredentialAndRequestArePurposeBound(t *testing.T) {
 			}
 		})
 	}
-	if _, err := f.authority.VerifyRecoveryRequestProof(t.Context(), executionSign(t, f.authority, proof, f.recoveryKey), envelope, credential, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, payload, f.now.Add(30*time.Second)); err == nil {
-		t.Fatal("expired request proof accepted")
+	if _, err := f.authority.VerifyRecoveryRequestProof(t.Context(), executionSign(t, f.authority, proof, f.recoveryKey), envelope, credential, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, payload, f.now.Add(30*time.Second)); !errors.Is(err, ErrRecoveryRequestExpired) {
+		t.Fatalf("expired request diagnostic: %v", err)
+	}
+	if _, err := f.authority.VerifyRecoveryRequestProof(t.Context(), executionSign(t, f.authority, proof, f.recoveryKey), envelope, credential, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, payload, f.now.Add(-time.Nanosecond)); !errors.Is(err, ErrRecoveryRequestClockAhead) {
+		t.Fatalf("future-issued request diagnostic: %v", err)
+	}
+	changed := proto.CloneOf(proof)
+	changed.PayloadSha256[0] ^= 0xff
+	if _, err := f.authority.VerifyRecoveryRequestProof(t.Context(), executionSign(t, f.authority, changed, f.recoveryKey), envelope, credential, agentv1.RecoveryOperation_RECOVERY_OPERATION_ACQUIRE_WORK, payload, f.now); !errors.Is(err, ErrRecoveryRequestPayloadMismatch) {
+		t.Fatalf("changed payload diagnostic: %v", err)
 	}
 }
 
@@ -248,6 +258,9 @@ func TestRecoveryCheckpointReceiptBindsConsumedEffect(t *testing.T) {
 	envelope := executionSign(t, f.authority, receipt, f.startKey)
 	if _, err := f.verifier.VerifyRecoveryCheckpointReceipt(t.Context(), f.root, f.delegation, envelope, checkpoint, f.now); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := f.verifier.VerifyRecoveryCheckpointReceipt(t.Context(), f.root, f.delegation, envelope, checkpoint, f.now.Add(-time.Nanosecond)); err == nil || !strings.Contains(err.Error(), "recovery_checkpoint_clock_behind") {
+		t.Fatalf("future signed receipt was not precisely refused: %v", err)
 	}
 	for _, change := range []func(*agentv1.RecoveryCheckpoint){
 		func(c *agentv1.RecoveryCheckpoint) { c.GrantSha256[0] ^= 1 },

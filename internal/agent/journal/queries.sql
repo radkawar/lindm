@@ -82,7 +82,7 @@ SELECT * FROM device_actions WHERE action_id = ?;
 SELECT * FROM device_actions WHERE action_id > ? ORDER BY action_id LIMIT 1;
 
 -- name: NextUnfinishedDeviceAction :one
-SELECT * FROM device_actions WHERE action_id > ? AND state IN (1, 2, 3, 8, 9) ORDER BY action_id LIMIT 1;
+SELECT * FROM device_actions WHERE action_id > ? AND state IN (1, 2, 3, 6, 8, 9) ORDER BY action_id LIMIT 1;
 
 -- name: NextUpdateInterlockDeviceAction :one
 SELECT * FROM device_actions WHERE action_id > ? AND state IN (2, 3, 6, 8, 9) ORDER BY action_id LIMIT 1;

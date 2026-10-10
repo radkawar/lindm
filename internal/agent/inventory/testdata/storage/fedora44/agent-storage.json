@@ -1,0 +1,614 @@
+{
+  "status":  "COLLECTION_STATUS_SUCCESS",
+  "devices":  [
+    {
+      "name":  "sda",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "disk"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "25769803776"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "none"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  true
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "sda1",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "part"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "sda"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "629145600"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "vfat"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "/boot/efi"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "none"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "65473b76-3f13-43d4-b737-085c6a41ccf1"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "76BD-6C58"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS"
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "sda2",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "part"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "sda"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "2147483648"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "xfs"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "/boot"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "none"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "db138258-2138-4dd3-917b-3ce18699eec4"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0fc63daf-8483-4772-8e79-3d69d8477de4"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "3e21b30c-e705-4bcf-9647-0ff726a0a174"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS"
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "sda3",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "part"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "sda"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "22991077376"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "crypto_LUKS"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "luks"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "7090f80e-01b4-445c-b483-a52305eb7ae2"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0fc63daf-8483-4772-8e79-3d69d8477de4"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "76cd66e8-7d6f-4779-b224-fbd3ac2455ce"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "1"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_SUCCESS"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  true
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "luks-76cd66e8-7d6f-4779-b224-fbd3ac2455ce",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "crypt"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "sda3"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "22974300160"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "LVM2_member"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "dm-crypt"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "tf3SFO-f5nx-0UnB-cIrn-etlA-bTW3-J0TGJ7"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  true
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "fedora_lindm--lab-root",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "lvm"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "luks-76cd66e8-7d6f-4779-b224-fbd3ac2455ce"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "16106127360"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "xfs"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "/"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "inherited-dm-crypt"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "scsi"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "QEMU HARDDISK"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "lindm-lab-0"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "2.5+"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0x5000000000000001"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "0a94e5c2-aa05-4e59-a317-c8759cafa9d1"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "sda"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  true
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name":  "zram0",
+      "type":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "disk"
+      },
+      "parent":  {
+        "status":  "COLLECTION_STATUS_UNAVAILABLE"
+      },
+      "sizeBytes":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "4052746240"
+      },
+      "filesystem":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "swap"
+      },
+      "mountpoint":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "[SWAP]"
+      },
+      "encryption":  {
+        "status":  "COLLECTION_STATUS_SUCCESS",
+        "value":  "none"
+      },
+      "identity":  {
+        "transport":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "model":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "serial":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "firmware":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "wwn":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "eui":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "partitionType":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "filesystemUuid":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "8c3f01f4-d699-46a0-af01-6a9741679926"
+        },
+        "luksUuid":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksVersion":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksKeyslotCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenCount":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "luksTokenTypes":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        },
+        "backingDisk":  {
+          "status":  "COLLECTION_STATUS_SUCCESS",
+          "value":  "zram0"
+        },
+        "rootBacking":  {
+          "status":  "COLLECTION_STATUS_SUCCESS"
+        },
+        "nvme":  {
+          "status":  "COLLECTION_STATUS_UNAVAILABLE"
+        }
+      }
+    }
+  ]
+}

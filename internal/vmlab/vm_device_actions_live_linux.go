@@ -82,28 +82,30 @@ type actionRejectedBootEvidence struct {
 }
 
 type actionLiveEraseEvidence struct {
-	ReportBlocked            bool                               `json:"report_blocked"`
-	DeviceID                 string                             `json:"original_device_id"`
-	Firmware                 *EncryptedFirmwareEvidence         `json:"firmware"`
-	Runtime                  *vmRuntimeEvidence                 `json:"runtime"`
-	RecipeVersion            string                             `json:"installer_recipe_version"`
-	Targets                  []actionNativeTarget               `json:"frozen_targets"`
-	Escrows                  []*actionDispatchEvidence          `json:"escrows"`
-	RecoveryBoot             *actionBootEvidence                `json:"pre_erase_recovery_boot"`
-	DataRecoveryVerified     bool                               `json:"data_recovery_verified_before_erase"`
-	ActionID                 string                             `json:"action_id"`
-	ApprovalID               string                             `json:"approval_id"`
-	RequesterID              string                             `json:"requester_id"`
-	ApproverID               string                             `json:"approver_id"`
-	ServerState              string                             `json:"server_state"`
-	AttestedBeforePoweroff   bool                               `json:"attested_before_poweroff"`
-	Results                  []*agentv1.CryptoEraseTargetResult `json:"attested_target_results"`
-	PoweroffTimer            *actionPoweroffTimerEvidence       `json:"independent_poweroff_timer"`
-	ForcedPoweroffObservedAt time.Time                          `json:"forced_poweroff_observed_at"`
-	AllHeadersAbsent         bool                               `json:"all_headers_absent"`
-	RejectedBoots            []actionRejectedBootEvidence       `json:"post_erase_boots"`
-	DestructiveDenials       []actionDenialEvidence             `json:"destructive_approval_denials"`
-	Boundary                 string                             `json:"boundary"`
+	ReportBlocked             bool                               `json:"report_blocked"`
+	DeviceID                  string                             `json:"original_device_id"`
+	Firmware                  *EncryptedFirmwareEvidence         `json:"firmware"`
+	Runtime                   *vmRuntimeEvidence                 `json:"runtime"`
+	RecipeVersion             string                             `json:"installer_recipe_version"`
+	Targets                   []actionNativeTarget               `json:"frozen_targets"`
+	Escrows                   []*actionDispatchEvidence          `json:"escrows"`
+	ProvisionInventoryRefresh *actionDispatchEvidence            `json:"provision_inventory_refresh,omitempty"`
+	RecoveryBoot              *actionBootEvidence                `json:"pre_erase_recovery_boot"`
+	DataRecoveryVerified      bool                               `json:"data_recovery_verified_before_erase"`
+	ActionID                  string                             `json:"action_id"`
+	ApprovalID                string                             `json:"approval_id"`
+	RequesterID               string                             `json:"requester_id"`
+	ApproverID                string                             `json:"approver_id"`
+	ServerState               string                             `json:"server_state"`
+	AttestedBeforePoweroff    bool                               `json:"attested_before_poweroff"`
+	Results                   []*agentv1.CryptoEraseTargetResult `json:"attested_target_results"`
+	RootDiagnostic            *liveRootDiagnostic                `json:"live_root_diagnostic,omitempty"`
+	PoweroffTimer             *actionPoweroffTimerEvidence       `json:"independent_poweroff_timer"`
+	ForcedPoweroffObservedAt  time.Time                          `json:"forced_poweroff_observed_at"`
+	AllHeadersAbsent          bool                               `json:"all_headers_absent"`
+	RejectedBoots             []actionRejectedBootEvidence       `json:"post_erase_boots"`
+	DestructiveDenials        []actionDenialEvidence             `json:"destructive_approval_denials"`
+	Boundary                  string                             `json:"boundary"`
 }
 
 func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, approver *devlab.OwnerSession, delegation *agentv1.UpdateExecutionTrustRequest, reportBlocked bool) (_ *actionLiveEraseEvidence, err error) {
@@ -146,6 +148,13 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 	}
 	if err := waitNativeActionPresence(ctx, control.session, machine.deviceID); err != nil {
 		return evidence, err
+	}
+	// The just-formatted data volume has a new LUKS identity. Publish that
+	// protected native observation before requesting either escrow action.
+	refresh := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}})
+	evidence.ProvisionInventoryRefresh, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, refresh, nil, false)
+	if err != nil {
+		return evidence, fmt.Errorf("publish formatted live-root target inventory: %w", err)
 	}
 	custody, err := control.session.Admin.GetDeviceEncryption(ctx, connect.NewRequest(&adminv1.GetDeviceEncryptionRequest{DeviceId: machine.deviceID}))
 	if err != nil {
@@ -203,6 +212,15 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 	if err := waitNativeActionPresence(ctx, control.session, machine.deviceID); err != nil {
 		return evidence, err
 	}
+	finishDiagnostics, err := observeActionGuest(ctx, machine.vm.guest)
+	if err != nil {
+		return evidence, err
+	}
+	defer func() {
+		if finishDiagnostics != nil {
+			err = finishDiagnostics(err)
+		}
+	}()
 	request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: targets}}})
 	if !reportBlocked {
 		// The same complete target set remains locally qualified in either
@@ -229,6 +247,7 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 		return evidence, err
 	}
 	evidence.ActionID = created.Msg.GetAction().GetActionId()
+	defer func() { err = diagnoseNativeAction(ctx, machine.vm.guest, evidence.ActionID, err) }()
 	started := time.Now()
 	if reportBlocked {
 		input, err := protojson.Marshal(&agentv1.GetDeviceActionRequest{ActionId: evidence.ActionID})
@@ -257,7 +276,13 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 		if err := lifecycleCommand(ctx, machine.vm.guest, "verify live aggregate erase relay", "systemctl is-active --quiet lindm-agent.service"); err != nil {
 			return evidence, err
 		}
+		finishRootDiagnostic := monitorLiveRoot(ctx, machine.vm.guest, evidence.ActionID)
 		status, err := waitLiveEraseAttestation(ctx, machine.vm, control.session, evidence.ActionID)
+		evidence.RootDiagnostic = finishRootDiagnostic()
+		if status != nil {
+			evidence.ServerState = status.GetState().String()
+			evidence.Results = status.GetVerification().GetCryptoEraseResults()
+		}
 		if err != nil {
 			return evidence, err
 		}
@@ -296,6 +321,10 @@ func nativeLiveEraseScenario(ctx context.Context, manifest *labv1.ImageManifest,
 		}
 		evidence.ServerState = state.Msg.GetAction().GetStatus().GetState().String()
 	}
+	// Release the post-unlock console observer before deliberately attempting
+	// the later credential-rejection boots.
+	_ = finishDiagnostics(nil)
+	finishDiagnostics = nil
 	if err := machine.connection.Close(); err != nil {
 		return evidence, err
 	}
@@ -340,19 +369,19 @@ func waitLiveEraseAttestation(ctx context.Context, vm *EncryptedVM, owner *devla
 		if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 			select {
 			case <-vm.guest.done:
-				return nil, errors.New("live-root attestation was not observed while the original machine was still running")
+				return status, errors.New("live-root attestation was not observed while the original machine was still running")
 			default:
 				return status, nil
 			}
 		}
 		if status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED || status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED {
-			return nil, errors.New("live-root erase did not reach verified native completion")
+			return status, errors.New("live-root erase did not reach verified native completion")
 		}
 		select {
 		case <-ctx.Done():
-			return nil, errors.New("live-root final attestation deadline")
+			return status, errors.New("live-root final attestation deadline")
 		case <-vm.guest.done:
-			return nil, errors.New("original machine powered off before attestation was observed")
+			return status, errors.New("original machine powered off before attestation was observed")
 		case <-ticker.C:
 		}
 	}

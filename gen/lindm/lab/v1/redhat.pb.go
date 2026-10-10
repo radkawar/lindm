@@ -133,8 +133,10 @@ type RedHatRegistrationCredentials struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	ActivationKey  string                 `protobuf:"bytes,2,opt,name=activation_key,json=activationKey,proto3" json:"activation_key,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Public random identity, generated independently from the secret activation key.
+	RunName       string `protobuf:"bytes,3,opt,name=run_name,json=runName,proto3" json:"run_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RedHatRegistrationCredentials) Reset() {
@@ -181,6 +183,67 @@ func (x *RedHatRegistrationCredentials) GetActivationKey() string {
 	return ""
 }
 
+func (x *RedHatRegistrationCredentials) GetRunName() string {
+	if x != nil {
+		return x.RunName
+	}
+	return ""
+}
+
+// RedHatRegistrationIdentity is the only permitted guest registration output.
+// The UUID comes from the native consumer certificate, not the activation key.
+type RedHatRegistrationIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunName       string                 `protobuf:"bytes,1,opt,name=run_name,json=runName,proto3" json:"run_name,omitempty"`
+	ConsumerUuid  string                 `protobuf:"bytes,2,opt,name=consumer_uuid,json=consumerUuid,proto3" json:"consumer_uuid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RedHatRegistrationIdentity) Reset() {
+	*x = RedHatRegistrationIdentity{}
+	mi := &file_lindm_lab_v1_redhat_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RedHatRegistrationIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RedHatRegistrationIdentity) ProtoMessage() {}
+
+func (x *RedHatRegistrationIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_lab_v1_redhat_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RedHatRegistrationIdentity.ProtoReflect.Descriptor instead.
+func (*RedHatRegistrationIdentity) Descriptor() ([]byte, []int) {
+	return file_lindm_lab_v1_redhat_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RedHatRegistrationIdentity) GetRunName() string {
+	if x != nil {
+		return x.RunName
+	}
+	return ""
+}
+
+func (x *RedHatRegistrationIdentity) GetConsumerUuid() string {
+	if x != nil {
+		return x.ConsumerUuid
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_redhat_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_redhat_proto_rawDesc = "" +
@@ -201,10 +264,15 @@ const file_lindm_lab_v1_redhat_proto_rawDesc = "" +
 	"\fmetadata_url\x18\b \x01(\tB\v\xbaH\br\x06\x18\xc8\x01\x88\x01\x01R\vmetadataUrl:\xd7\x03\xbaH\xd3\x03\x1at\n" +
 	"\x19vendor_receipt.chronology\x120vendor publication must not postdate acquisition\x1a%this.published_at <= this.acquired_at\x1a\x8b\x01\n" +
 	"\x17vendor_receipt.filename\x12+filename must identify the exact RHEL minor\x1aCthis.image_filename == 'rhel-' + this.version + '-x86_64-kvm.qcow2'\x1a\xcc\x01\n" +
-	"\x16vendor_receipt.catalog\x12Fmetadata must identify the exact Red Hat RHEL version and architecture\x1ajthis.metadata_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/x86_64'\"\xa5\x01\n" +
+	"\x16vendor_receipt.catalog\x12Fmetadata must identify the exact Red Hat RHEL version and architecture\x1ajthis.metadata_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/x86_64'\"\xe6\x02\n" +
 	"\x1dRedHatRegistrationCredentials\x12<\n" +
 	"\x0forganization_id\x18\x01 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18 2\b^[0-9]+$R\x0eorganizationId\x12F\n" +
-	"\x0eactivation_key\x18\x02 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\ractivationKeyB\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
+	"\x0eactivation_key\x18\x02 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\ractivationKey\x12:\n" +
+	"\brun_name\x18\x03 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\arunName:\x82\x01\xbaH\x7f\x1a}\n" +
+	"\x1fredhat_registration.public_name\x124public run name must not disclose the activation key\x1a$this.run_name != this.activation_key\"\xeb\x01\n" +
+	"\x1aRedHatRegistrationIdentity\x12:\n" +
+	"\brun_name\x18\x01 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\arunName\x12\x90\x01\n" +
+	"\rconsumer_uuid\x18\x02 \x01(\tBk\xbaHhrf2>^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$Z$00000000-0000-0000-0000-000000000000R\fconsumerUuidB\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
 
 var (
 	file_lindm_lab_v1_redhat_proto_rawDescOnce sync.Once
@@ -218,15 +286,16 @@ func file_lindm_lab_v1_redhat_proto_rawDescGZIP() []byte {
 	return file_lindm_lab_v1_redhat_proto_rawDescData
 }
 
-var file_lindm_lab_v1_redhat_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_lindm_lab_v1_redhat_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lindm_lab_v1_redhat_proto_goTypes = []any{
 	(*VendorImageReceipt)(nil),            // 0: lindm.lab.v1.VendorImageReceipt
 	(*RedHatRegistrationCredentials)(nil), // 1: lindm.lab.v1.RedHatRegistrationCredentials
-	(*timestamppb.Timestamp)(nil),         // 2: google.protobuf.Timestamp
+	(*RedHatRegistrationIdentity)(nil),    // 2: lindm.lab.v1.RedHatRegistrationIdentity
+	(*timestamppb.Timestamp)(nil),         // 3: google.protobuf.Timestamp
 }
 var file_lindm_lab_v1_redhat_proto_depIdxs = []int32{
-	2, // 0: lindm.lab.v1.VendorImageReceipt.published_at:type_name -> google.protobuf.Timestamp
-	2, // 1: lindm.lab.v1.VendorImageReceipt.acquired_at:type_name -> google.protobuf.Timestamp
+	3, // 0: lindm.lab.v1.VendorImageReceipt.published_at:type_name -> google.protobuf.Timestamp
+	3, // 1: lindm.lab.v1.VendorImageReceipt.acquired_at:type_name -> google.protobuf.Timestamp
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -245,7 +314,7 @@ func file_lindm_lab_v1_redhat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_lab_v1_redhat_proto_rawDesc), len(file_lindm_lab_v1_redhat_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

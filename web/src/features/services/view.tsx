@@ -2,7 +2,6 @@ import { toJsonString } from "@bufbuild/protobuf";
 import { ResourceDesiredStateSchema } from "../../../gen/lindm/resource/v1/resource_pb";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { Layers } from "lucide-react";
 import {
   ResourceCompliance,
   ResourceDisposition,
@@ -13,8 +12,9 @@ import {
   ServiceExecutionState,
 } from "../../../gen/lindm/agent/v1/service_execution_pb";
 import { type ServiceObservation } from "../../../gen/lindm/agent/v1/service_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,7 +36,9 @@ import { ResourceAssignmentForm } from "./assignment-form";
 import { resourceStateQueryOptions } from "./queries";
 
 function enumLabel(value: string | undefined): string {
-  return value?.toLowerCase().replaceAll("_", " ") ?? "Unknown";
+  if (!value) return "Unknown";
+  const label = value.toLowerCase().replaceAll("_", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export function DeviceResources({
@@ -87,15 +89,9 @@ export function DeviceResources({
           </div>
         ) : null}
         {failure ? (
-          <Alert variant="destructive">
-            <AlertTitle>
-              {failure.denied ? "Not authorized to read resources" : "Resource state unavailable"}
-            </AlertTitle>
-            <AlertDescription>
-              {failure.codeName}: {failure.message}
-              {state.data ? " Previously loaded state below may be stale." : ""}
-            </AlertDescription>
-          </Alert>
+          <RpcError failure={failure} title="Service state unavailable">
+            {state.data ? <p>Previously loaded state below may be stale.</p> : null}
+          </RpcError>
         ) : null}
         {state.data ? (
           <>
@@ -106,7 +102,7 @@ export function DeviceResources({
                   <p>
                     {assignment.profileId
                       ? `${assignment.profileName} · revision ${assignment.revisionNumber.toString()}`
-                      : "None — release state is recorded below"}
+                      : "None. Release state is recorded below."}
                   </p>
                   <p className="break-all">
                     Assigned by {assignment.actorId} at{" "}
@@ -121,7 +117,7 @@ export function DeviceResources({
                   </p>
                 </>
               ) : (
-                <p>None — this device has never been assigned a resource profile.</p>
+                <p>No resource profile has been assigned to this device.</p>
               )}
             </div>
             {state.data.resources.length ? (
@@ -168,18 +164,22 @@ export function DeviceResources({
                         </p>
                       </TableCell>
                       <TableCell className="min-w-64 align-top">
-                        <Badge
-                          variant={
-                            resource.compliance === ResourceCompliance.ATTENTION ||
-                            resource.compliance === ResourceCompliance.STALE
+                        <StatusBadge
+                          status={
+                            resource.compliance === ResourceCompliance.ATTENTION
                               ? "destructive"
-                              : "secondary"
+                              : resource.compliance === ResourceCompliance.STALE
+                                ? "warning"
+                                : resource.compliance === ResourceCompliance.COMPLIANT ||
+                                    resource.compliance === ResourceCompliance.DRIFT_REMEDIATED
+                                  ? "success"
+                                  : "neutral"
                           }
                         >
                           {resource.compliance === ResourceCompliance.UNSPECIFIED
-                            ? "unknown"
+                            ? "Unknown"
                             : enumLabel(ResourceCompliance[resource.compliance])}
-                        </Badge>
+                        </StatusBadge>
                         <p className="mt-2 whitespace-normal">
                           Last verified (server received):{" "}
                           {resource.lastVerifiedAt
@@ -194,19 +194,23 @@ export function DeviceResources({
                         </p>
                       </TableCell>
                       <TableCell className="align-top">
-                        <Badge
-                          variant={
-                            resource.disposition === ResourceDisposition.ATTENTION ||
-                            resource.disposition === ResourceDisposition.BLOCKED ||
-                            resource.disposition === ResourceDisposition.UNSUPPORTED
+                        <StatusBadge
+                          status={
+                            resource.disposition === ResourceDisposition.ATTENTION
                               ? "destructive"
-                              : "secondary"
+                              : resource.disposition === ResourceDisposition.BLOCKED
+                                ? "warning"
+                                : resource.disposition === ResourceDisposition.SUCCEEDED
+                                  ? "success"
+                                  : resource.disposition === ResourceDisposition.IN_PROGRESS
+                                    ? "info"
+                                    : "neutral"
                           }
                         >
                           {enumLabel(ResourceDisposition[resource.disposition])}
-                        </Badge>
+                        </StatusBadge>
                         <p className="mt-2 whitespace-normal break-words">
-                          {resource.reason || "—"}
+                          {resource.reason || "No reason reported"}
                         </p>
                         {resource.disposition === ResourceDisposition.ATTENTION ? (
                           <p className="mt-2 whitespace-normal">
@@ -222,18 +226,11 @@ export function DeviceResources({
                 </TableBody>
               </Table>
             ) : (
-              <div className="flex flex-col items-center gap-3 border border-dashed px-4 py-10 text-center">
-                <span className="rounded-full bg-muted p-3 text-muted-foreground">
-                  <Layers className="size-6" aria-hidden="true" />
-                </span>
-                <div className="space-y-1">
-                  <p className="font-medium">No managed resources</p>
-                  <p className="text-sm text-muted-foreground">
-                    Assign a resource profile to define this device’s desired state.
-                  </p>
-                </div>
-                {canPermission(principal, "resources.assign") ? emptyAction : null}
-              </div>
+              <EmptyState
+                title="No managed resources"
+                description="Assign a resource profile to define this device's desired state."
+                action={canPermission(principal, "resources.assign") ? emptyAction : undefined}
+              />
             )}
             <div className="grid gap-2">
               <h3 className="font-semibold">Ownership-safe releases</h3>
@@ -261,7 +258,9 @@ export function DeviceResources({
                           {release.ref?.canonicalKey ?? "Unknown"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{release.state || "Unknown"}</Badge>
+                          <StatusBadge status={release.completedAt ? "success" : "warning"}>
+                            {enumLabel(release.state)}
+                          </StatusBadge>
                           <p className="mt-1 whitespace-normal">
                             {release.reason || "No reason reported"}
                           </p>
@@ -321,26 +320,28 @@ export function DeviceResources({
                           {recent.ref?.kind ?? "Unknown"} /{" "}
                           {recent.ref?.canonicalKey ?? "Not reported"}
                         </TableCell>
-                        <TableCell>{recent.action?.resourceSequence.toString() ?? "—"}</TableCell>
+                        <TableCell>
+                          {recent.action?.resourceSequence.toString() ?? "Not reported"}
+                        </TableCell>
                         <TableCell>
                           <span className="font-mono" title={recent.assignmentId}>
                             {recent.assignmentId.slice(0, 8)}
                           </span>{" "}
-                          <Badge variant="secondary">
+                          <StatusBadge status="neutral">
                             {recent.assignmentId === assignment?.assignmentId
-                              ? "current"
-                              : "previous head"}
-                          </Badge>
+                              ? "Current"
+                              : "Previous assignment"}
+                          </StatusBadge>
                         </TableCell>
                         <TableCell>{formatTimestamp(recent.action?.issuedAt).local}</TableCell>
                         <TableCell>
                           {formatTimestamp(recent.action?.startAuthorizedAt).local}
                         </TableCell>
-                        <TableCell>{recent.action?.closedReason || "—"}</TableCell>
+                        <TableCell>{recent.action?.closedReason || "Not closed"}</TableCell>
                         <TableCell>
                           {recent.action?.status ? (
                             <>
-                              <p>{enumLabel(ServiceExecutionState[recent.action.status.state])}</p>
+                              <ServiceExecutionStatus state={recent.action.status.state} />
                               <p>
                                 Failure:{" "}
                                 {enumLabel(ServiceExecutionFailure[recent.action.status.failure])}
@@ -374,6 +375,26 @@ export function DeviceResources({
   );
 }
 
+function ServiceExecutionStatus({ state }: { state: ServiceExecutionState | undefined }) {
+  return (
+    <StatusBadge
+      status={
+        state === ServiceExecutionState.FAILED || state === ServiceExecutionState.OUTCOME_UNKNOWN
+          ? "destructive"
+          : state === ServiceExecutionState.SUCCEEDED
+            ? "success"
+            : state === ServiceExecutionState.RUNNING
+              ? "info"
+              : "neutral"
+      }
+    >
+      {state === undefined
+        ? "Awaiting signed device history"
+        : enumLabel(ServiceExecutionState[state])}
+    </StatusBadge>
+  );
+}
+
 function ActionHistory({ action }: { action: ServiceActionSummary | undefined }) {
   if (!action) return <p>No action issued.</p>;
   const status = action.status;
@@ -381,7 +402,7 @@ function ActionHistory({ action }: { action: ServiceActionSummary | undefined })
     <div className="grid gap-1 whitespace-normal text-xs">
       <p>
         Sequence {action.resourceSequence.toString()} ·{" "}
-        {status ? enumLabel(ServiceExecutionState[status.state]) : "Awaiting signed device history"}
+        <ServiceExecutionStatus state={status?.state} />
       </p>
       <p className="break-all font-mono">{action.actionId}</p>
       <p>Failure: {status ? enumLabel(ServiceExecutionFailure[status.failure]) : "Not reported"}</p>
@@ -441,12 +462,20 @@ function Observation({
       {observation ? (
         <>
           <p>Observed: {formatTimestamp(observation.observedAt).local}</p>
-          <p>
-            Load: {observation.loadState || "Not reported"}; active:{" "}
-            {observation.activeState || "Not reported"}; substate:{" "}
-            {observation.subState || "Not reported"}; unit file:{" "}
-            {observation.unitFileState || "Not reported"}.
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Load:</span>
+            <StatusBadge status="neutral">{observation.loadState || "Not reported"}</StatusBadge>
+            <span>Active:</span>
+            <StatusBadge status={observation.activeState === "failed" ? "destructive" : "neutral"}>
+              {observation.activeState || "Not reported"}
+            </StatusBadge>
+            <span>Substate:</span>
+            <StatusBadge status="neutral">{observation.subState || "Not reported"}</StatusBadge>
+            <span>Unit file:</span>
+            <StatusBadge status="neutral">
+              {observation.unitFileState || "Not reported"}
+            </StatusBadge>
+          </div>
           <p>
             Pending job: {String(observation.jobPending)}; daemon reload needed:{" "}
             {String(observation.needDaemonReload)}; transient: {String(observation.transient)}.
@@ -463,7 +492,10 @@ function Observation({
 export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
-  const data = state.error ? undefined : state.data;
+  if (state.error) {
+    return <RpcError failure={toRpcFailure(state.error)} title="Service compliance unavailable" />;
+  }
+  const data = state.data;
   const resources = data?.resources ?? [];
   const pendingReleases = data?.releases.some((release) => !release.completedAt) ?? false;
   const attention = resources.some(
@@ -504,25 +536,25 @@ export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }
     <Tooltip>
       <TooltipTrigger
         render={
-          <Badge
-            variant={
+          <StatusBadge
+            dot
+            status={
               pendingReleases
                 ? "warning"
                 : attention
                   ? "destructive"
                   : unknown
-                    ? "outline"
+                    ? "neutral"
                     : stale
                       ? "warning"
                       : compliant
                         ? "success"
-                        : "outline"
+                        : "neutral"
             }
             tabIndex={0}
           />
         }
       >
-        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
         {pendingReleases ? "Resource release pending" : label}
       </TooltipTrigger>
       <TooltipContent>

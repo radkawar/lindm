@@ -107,7 +107,9 @@ IBM Plex Sans is an exact-pinned Fontsource package bundled by Vite, not a runti
 CDN fetch; its redistribution notice is `web/LICENSE.fonts`. No Next.js, pnpm,
 remote fonts, analytics, or runtime registry requests are introduced.
 
-The sidebar-07-derived shell has permission-aware collapsible groups, breadcrumbs,
+The sidebar-07-derived shell groups authorized pages under Fleet, Security and
+Administration, with explicit device/profile breadcrumbs and a closable mobile drawer.
+Groups covers both account and device groups. The shell has collapsible navigation,
 a role/break-glass account menu, keyboard skip link, and a locally persisted
 light/dark toggle. Control/Command-K opens the official command palette with
 navigation and search within the first 200 authorized devices; it does not claim
@@ -121,6 +123,63 @@ Forms compose the official shadcn Select rather than native dropdowns; controlle
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Long operational caveats live in accessible info tooltips or help disclosures,
 while destructive confirmation warnings remain visible.
+
+Console copy uses concise sentence case and names the operator's next action. Use
+commas, colons or periods rather than em or en dashes; ESLint checks string literals,
+template text and JSX text in handwritten `web/src` code. Distinguish unavailable,
+unknown, stale and empty results. A failed read must not look like an empty list or
+a successful refresh. Use `RpcError` for classified failures and expandable technical
+details, preserving ambiguity and request identity rather than retrying mutations.
+Compose page headings and empty results with `PageHeader` and `EmptyState`.
+Use `StatusBadge` for statuses, not ordinary category or role labels: success means
+the stated condition is confirmed, warning needs attention or has an uncertain
+outcome, destructive denotes failure or revoked authority, neutral denotes unknown
+or inactive state, and info denotes progress or an informational state. An active
+enrollment is not a claim of device health. Status text remains visible independently
+of color; optional dots are decorative. The five semantic tones have light/dark
+tokens, separate from the preset's blue action and neutral chart palette. Keep
+the preset's zero radius, bundled font and theme parity.
+
+RPC presentation uses the Connect code and `Lindm-Reason` together. Known missing
+capabilities or inventory are neutral; stale data, permission and re-authentication
+requirements are warnings with a next action. Internal, unknown and unrecognized
+failures remain errors, with the server's diagnostic details available on demand.
+Do not suppress backend failures or turn a failed read into an empty result.
+
+Advisories show each configured source's refresh state, last successful refresh and
+reported reason. A failed attempt does not erase the last successful timestamp.
+No configured sources is a setup state, not a refresh failure. Stale or missing
+coverage explicitly means exposure counts may be incomplete.
+
+Profiles distinguish saved revisions from assignments; Rollouts owns deployment.
+Enrollment separates one-time grants, unattended tokens and offline signed files.
+Device action forms use dialogs for short operations and dedicated pages for
+storage, encryption and recovery workflows. Keep one concise warning at confirmation;
+put policy explanations in Details. Preserve typed confirmation, independent approval,
+exact target identity and uncertain-request recovery. Accepted is not completed.
+Approval cards lead with the requested effect and target, human permission labels
+and requester names. Keep raw identifiers and payload hashes in Details without
+changing the exact approved payload. Names are display context, never authority.
+Storage actions select server-returned inventory targets and display their exact
+stable identity read-only. Never ask operators to transcribe LUKS UUIDs, WWNs,
+serials, sizes or native NVMe identity. Missing or stale observations require a
+fresh inventory action; they are not blank forms or permission to guess. Wipe
+confirmation uses the displayed hostname, falling back to the device ID only when
+no hostname was reported. Signed action targets remain exact observed identities.
+Recovery handoff forms and approval review show the server's readiness decision,
+observation time, EFI partition, signed artifact size, required/free space, Secure
+Boot and UKI capability. Missing, stale or insufficient observations block new
+approval/submission; exact ambiguous-request recovery remains available. Never
+treat locally configured artifact size as signed release metadata.
+
+Device Overview leads with the latest observed machine, hardware, network and
+encryption fields, compliance, ownership and last check-in. Keep collection states
+visible; do not infer a primary network interface or agent version from unrelated
+fields. Protocol sequence counters belong in collapsed Diagnostics, not the summary.
+Agent version is the current generation's accepted signed-session release and
+receipt time, not inferred from installed packages. Network summaries use the
+reported per-family default-route markers, and active session names preserve each
+collection/field state. Inventory retains the full interface and session tables.
 
 `/dashboard` is the signed-in landing page. Its narrow `GetFleetSummary` admin RPC
 uses SQL aggregates across the caller's authorized device scopes, never page
@@ -162,12 +221,14 @@ when every current resource has proof; no resources means unassigned, not compli
 The prefix participates in cursor filter binding. Sorting never changes server
 order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
 Revocation is a row action dialog retaining its existing approval/reason flow and
-ambiguous request identity after dismissal. Detail header actions focus existing
-permission-gated forms rather than sending mutations. Tabs separate Overview,
-Inventory, Services/Compliance, Encryption/Actions, Findings, and History.
+ambiguous request identity after dismissal. The device header has one permission-aware
+Actions menu. Short actions open dialogs; storage, encryption and recovery actions
+open dedicated pages with exact target review. Accepted actions link to their status
+page; no control claims that acceptance proves native completion. Tabs separate
+Overview, Inventory, Services, Encryption, Actions, Findings and History.
 Inventory mounts on first activation (or an explicit package-search deep link),
-so opening Overview does not silently start an inventory cursor. Encryption/actions
-unmount when inactive so recovery secrets cannot survive a tab change.
+so opening Overview does not silently start an inventory cursor. Encryption and
+recovery secrets are cleared on navigation, blur and their existing expiry timers.
 
 For isolated visual acceptance, build embedded assets and run a disposable console:
 
@@ -297,6 +358,149 @@ The integration lane also exercises real `cloud-localds` cancellation: staging s
 inside the owned private run directory and helper descendants stop before cleanup.
 It requires `cloud-image-utils`, but not KVM or a booted guest.
 
+#### Lab host configuration
+
+`lab vm` commands use the strict protobuf JSON `LabConfig` contract in
+`api/lindm/lab/v1/hosts.proto`. Resolution is `$LINDM_LAB_CONFIG`, then
+`~/.config/lindm/lab.json`, then a built-in local-only host. An explicitly selected
+missing file, unknown field, duplicate host name, invalid resource ceiling or
+unpinned container image fails closed. The built-in host uses the running
+machine's architecture and existing guest sizes; native KVM remains mandatory
+rather than silently falling back when `/dev/kvm` is inaccessible.
+Default admission reserves one quarter of CPU and RAM, budgets each slot at
+4 vCPU/4096 MiB, and takes the smaller CPU/memory capacity (at least one slot).
+The measured 24-core/62 GiB workstation therefore defaults to four guests, not
+one slot per two-vCPU QEMU. Ordinary clouds still use 2 vCPU/2048 MiB and encrypted
+guests 2 vCPU/4096 MiB. The operator config installed for this lab sets local
+capacity to two after observed swap pressure with five guests plus test suites;
+each Spark retains its baseline's four slots.
+
+Copy and adjust `lab/hosts.example.json` for local amd64 plus the two arm64 SSH
+hosts. Each entry declares its transport/SSH alias, native architectures, KVM,
+maximum simultaneous guests, per-guest vCPU/memory ceilings, owned work directory
+and native or digest-pinned container runtime. `~/` resolves on the execution
+host. Limits are admission ceilings, not implicit guest resizing. Change a host's
+name, work directory or capacity only while its slot namespace is idle, and use
+the same configuration across collaborating processes.
+
+```sh
+export LINDM_LAB_CONFIG="$PWD/lab/hosts.example.json"
+artifacts/bin/lab hosts
+artifacts/bin/lab hosts baseline -host dgx20 -record artifacts/dgx20-baseline.json
+artifacts/bin/lab hosts baseline -host dgx21 -record artifacts/dgx21-baseline.json
+```
+
+The maintained baseline supports local and SSH Ubuntu 24.04, installs exact direct
+package versions from `lab/baseline/ubuntu-24.04.packages`, records all before/after
+package and group changes, and verifies package-owned firmware, native tool versions
+and a fresh run-user `/dev/kvm` open. It emits a ready host entry as protobuf JSON.
+It is an explicit authorized host mutation, unlike ordinary VM runs; it never
+performs a broad upgrade or cleanup. Native tools are preferred on the Sparks:
+this avoids nested Docker/libguestfs device plumbing and preserves normal firmware
+package ownership checks. Package pins and baseline evidence make that choice
+auditable; the baseline does not claim all transitive apt dependencies are a
+hermetic snapshot.
+APT operations select only the existing validated
+`/etc/apt/sources.list.d/ubuntu.sources` official Noble sources and their Ubuntu
+archive keyring; unrelated third-party sources/keys are neither updated nor fixed.
+Signature and validity checks remain enforced. `NEEDRESTART_MODE=l` reports
+restart needs without restarting unrelated shared-host services.
+The example Spark work directory is `~/lindm-lab`, created mode 0700 by the
+baseline. Every ancestor must be owned by root/the run user and not replaceable
+by another unprivileged user (a sticky temporary parent is permitted). The Sparks'
+existing `~/work` is group-writable and shared with other projects, so it is not a
+safe parent for package-signing state. The baseline never chmods that shared
+directory; configure the private alternative instead. Evidence records the work
+directory and whether it was created.
+
+`-arch arm64` (also `aarch64`; `amd64`/`x86_64` are equivalent) must match the
+pinned image manifest. Selection prefers matching KVM hosts over TCG, then a free
+configured host; `-host dgx20` overrides selection. `-accelerator kvm` explicitly
+refuses foreign-architecture TCG. `lab hosts` shows reachability, configured native
+architectures, observed KVM access, active leases, observed QEMU processes and free
+managed capacity. Old QEMU processes started without this command are visible but
+cannot be retroactively leased.
+
+A host-local flock slot is held for the entire lane through VM/fixture teardown.
+Remote workers take the same locks over SSH on the target, not on the controller.
+Kernel locks release after process death, QEMU helpers have parent-death killing,
+and SSH stdin closure cancels the worker before its cleanup/lease release. Full
+hosts wait under the command deadline; agents do not coordinate by `pgrep`.
+
+Admission also samples native `MemAvailable` and `pswpout`: available memory must
+cover the configured per-guest RAM ceiling plus 8 GiB of headroom, with no
+swap-out counter increase over the 100 ms admission sample. The ceiling is
+conservative for lanes using less RAM. Each held slot records its admission
+timestamp, PID, available/guest/headroom bytes, swap counters and sample duration.
+Admissions are serialized and count still-held slots outside a reduced configured
+limit, so lowering capacity does not silently ignore existing guests.
+
+For example, from a pinned source checkout with built embedded web assets:
+
+```sh
+artifacts/bin/lab vm inspect -arch arm64 -accelerator kvm \
+  -manifest lab/images/ubuntu-noble-arm64.json \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -record artifacts/ubuntu-arm64-kvm.json
+```
+
+Replace `-arch arm64` with `-host dgx20` to target that host explicitly. Firmware
+paths/version refer to the execution host and must match its baseline record.
+Remote runs cross-build static Linux lab/server/agent binaries, rsync source and
+required package inputs into one private run directory, reauthenticate staged
+images before publishing them to the persistent digest cache, and reverify cached
+entries on every use. Build source may be selected with `-build-repo` on lanes
+supporting that flag; remote inspect uses `-repo` for its cross-build source.
+Never supply a mutable source tree for an evidence run.
+
+Remote dispatch uses real local password/WebAuthn authority instead of an external
+IdP. The server and dedicated pinned PostgreSQL container run beside the VM, with
+dynamic loopback listeners and a fresh owned database; no local `:18444` binding or
+shared development secrets are forwarded. This avoids WAN latency in the guest's
+control-plane path and keeps fixture ownership/cleanup together. Remote lifecycle
+requires `-control-plane-trust=true`; manual shared-console lifecycle variants stay
+local. Successful and partial lane records are copied to the requested new local
+`-record` file before exact run-directory cleanup. The record includes host/runtime,
+elapsed time, source revision and binary-diff SHA-256. Persistent image/golden caches
+and slot identities are retained. A lost transport or failed evidence copy reports
+the exact retained run path instead of deleting evidence or guessing at live state.
+
+Source-building VM commands `vm dispatch`, `vm device-actions` and `vm updates`
+accept `-build-repo DIR` independently of `-repo DIR`. The latter remains the
+initialized development-fixture/trust root; the former selects only package,
+agent and (where built by the lane) server compilation inputs. Omitting
+`-build-repo` preserves the existing `-repo` source default. For a stable native
+run, build the prebuilt lab/server from a pinned read-only checkpoint and pass
+that checkpoint to `-build-repo`, while retaining the shared fixture in `-repo`.
+Never copy, symlink or rebind fixture secrets into a source worktree. Record the
+checkpoint commit and any applied private-worktree diff SHA-256 with the resulting
+executable/package digests.
+
+`vm lifecycle` already consumes explicit `-first-build`, `-second-build`, `-lab`
+and `-lindmd` artifacts; it performs no repository-source compilation, so has no
+no-op source flag. Build its N→N+1 packages from the same pinned current tree.
+Standalone `vm encrypted` installs/reuses the authenticated vendor ISO/golden and
+observes native cold boots; it likewise compiles no repository source. Encrypted
+device-action package compilation is covered by `vm device-actions -build-repo`.
+
+Laboratory independent approvals share `OwnerSession.ApproveApproval`: each
+decision obtains fresh local password/WebAuthn or directory code/PKCE authority.
+Do not cache approval authority across idle expiry or account revoke/restore,
+extend server session lifetimes, or retry an approval mutation automatically.
+The deterministic regression uses a real prebuilt `lindmd`, real PostgreSQL in an
+owned disposable database, and Keycloak for the directory case. The production
+config rejects `search_path`, so this process fixture uses database isolation,
+not `testdb`'s in-process schema override. `go run ./cmd/dev test-integration`
+builds a release-stamped `lindmd` and sets `LINDM_NATIVE_SERVER_BINARY` and
+`LINDM_NATIVE_REPOSITORY` for every native-server regression (approvals, reveal
+authorization and release fixtures), so they run in the normal integration gate
+and fail rather than skip when those inputs are missing.
+It moves only owned session timestamps across the idle boundary, verifies the
+old-session 401, rejects login while the approver is disabled, restores the
+account through the real API, and verifies fresh two-human approvals.
+
 The encrypted installer lane is `lab vm encrypted -manifest
 lab/images/ubuntu-noble-encrypted-amd64.json` (or
 `lab/images/fedora-44-encrypted-x86_64.json`). Supply `-firmware-code`,
@@ -338,6 +542,17 @@ lab-only autologin; its display is a private Unix VNC socket, never a TCP listen
 Fedora desktop packages use the release repository with RPM signature checking.
 Desktop/session assertions remain separate from the encryption smoke assertions.
 
+The device-action lock lane additionally prepares a password-enabled
+`lindm-desktop-test` account in each disposable overlay and restarts GDM with
+test-only autologin. It retains the original logind session identities, then
+requires a real `Class=user`, Wayland/X11 `gdm-autologin` session, a user-owned
+`gnome-shell`, and agreement between logind `LockedHint` and GNOME ScreenSaver.
+The optional logind desktop label may be `ubuntu` or empty; it is not GNOME
+identity. The immutable golden is unchanged. Passwords and shadow rows never enter
+qualification records.
+Release removes only owned account restrictions; it must not remotely unlock the
+desktop, which still requires local authentication.
+
 `-tpm-boot` is a separate golden-cache dimension: it installs a systemd/dracut
 early-boot path, TPM libraries/tools and `tpm2-device=auto` while preserving the
 existing LUKS UUID/map name. It does **not** enroll a token. Ubuntu's default
@@ -365,6 +580,28 @@ chains. The guest-independent header oracle opens only regular qcow2 files
 read-only inside libguestfs; it never attaches host NBD or calls cryptsetup on a
 host block device. Successful empty-header observation is distinct from an
 appliance failure and alone is not a sanitization claim.
+
+`lab vm inspect-storage` is the read-only storage-identity capture lane for an
+already qualified Ubuntu 24.04 or Fedora 44 encrypted golden. It refuses a missing
+golden instead of starting an installer, installs the supplied version-stamped
+agent as a real native package in a disposable clone, and runs root inventory.
+Supply `-repo` and `-build-repo` pointing to the immutable capture source tree,
+`-agent` for the binary built from that tree, `-package-version`, the encrypted
+installer `-manifest`, `-cache`, `-golden-cache`, and the exact firmware flags above.
+Use `-storage-bus virtio-scsi` for the qualified serial/WWN tuple; Fedora's current
+desktop golden additionally requires `-desktop gnome -tpm-boot`.
+
+`-fixture-output NEW_DIR` creates a new private fixture directory beneath an
+existing mode-0700 parent; `-record NEW_JSON` retains the public run evidence.
+The lane captures native `lsblk -J -O`, the block subset of udev's exported
+database, and public projections of LUKS text/JSON metadata. Projections strip
+token payloads and cryptographic parameters before retention; no keys, volume
+keys, binary headers or golden credentials become testdata. Evidence binds source
+commit/diff and untracked-source digests, image/golden/package/agent digests and
+native tool versions. Stopped read-only host inspection independently checks LUKS
+UUID and partition size; serial/WWN are compared to the host-owned emulated
+controller configuration, not claimed to be stored in qcow2 bytes. Fixture files
+are published only after complete owned-guest cleanup and unchanged-header checks.
 
 Reusable `EncryptedVM` primitives provide chosen-key or unattended `ColdBoot`,
 observed unlock outcome/boot ID, guest-native `Run`, graceful `PowerOff`, hard
@@ -395,6 +632,68 @@ an already reaped successful process and then removes private state. Callers mus
 prove the intended recovery outcome separately and sample before cleanup; normal
 service-lane `close` still rejects unexpected process exits.
 
+Device-action failures also retain the protected executor's public action status
+and a bounded 200-entry executor/relay journal tail before owned guest cleanup.
+Collection uses a fresh pinned SSH connection and the read-only `action-status`
+RPC, never a raw protected journal copy, key file or LUKS header. Failed probes
+are recorded explicitly in private mode-0600 JSON referenced by the failure.
+Asynchronous signed-recovery staging failures log their nonsecret native or
+authority error so a resulting `OUTCOME_UNKNOWN` does not erase the diagnosis.
+Each status request owns a unique exclusive request filename, so a failed
+transport cannot block the diagnostic query by leaving its request behind.
+The action/encryption lane records host load average, available memory, swap
+capacity/free space and cumulative swap-in/out page counters at preflight and
+failure. Action diagnostics also sample them before guest cleanup. Compare the
+counters across timestamps to distinguish active swapping from historical swap
+occupancy; a contention-window timeout is not native product qualification.
+Live-root actions also retain bounded root status and journal samples over a
+separate pinned connection while waiting for the server attestation. The sampler
+is canceled/joined before returning; its latency cannot block the server oracle.
+Escrow material is removed from status, and the fixed poweroff-helper journal is
+included. The helper needs `CAP_WAKE_ALARM`: systemd's `ProtectClock=yes` removes
+that capability, so its unit instead denies `@clock` syscalls explicitly and
+keeps clock-setting authority out of its capability set. The 120-second alarm,
+independent PID 1 failsafe and no-device/no-swap restrictions remain unchanged.
+
+Recovery artifacts use deterministic compressed initramfs bytes and only the
+actual operation's native helper/ELF closure and signed storage/network/EFI/FAT
+module closure, including FAT's dynamically selected NLS modules. Kernel
+`CONFIG_RD_GZIP=y` is checked before building this gzip path. TPM modules are
+selected for TPM custody, not merely because the machine has a TPM. The signed
+UKI's measured byte size remains in every recovery record. Do not enlarge the
+vendor ESP to hide an oversized image: the lab retains its original capacity.
+The newc archive explicitly includes `"."` with UID0/GID0 and mode0755; all
+configuration ancestors must be protected even when the kernel's initial rootfs
+mode is replaceable. Do not bypass the no-follow root-ownership validator to boot
+a malformed image.
+ELF `PT_INTERP` dependencies must be executable ingredients as well as present
+in the approved closure. Other shared libraries need not be executable. The
+builder refuses a non-executable loader before signing; otherwise Linux reports
+`permission denied` for a correctly permissioned native helper.
+The recovery qualification lane resolves whole-disk device nodes again after the
+owned ordinary reboot, requiring the frozen WWN/serial/size and unique match.
+An NVMe node number is boot-local; it is never approval identity. Native scope
+observation then verifies the controller/namespace identity independently.
+For retained QEMU recovery diagnostics, the signed image selects the existing
+architecture's UART. `lindm-recovery-build -serial-console` accepts only
+`ttyS0,115200n8` or `ttyAMA0,115200`; omitting it preserves the default console.
+It cannot inject arbitrary kernel arguments. Recovery init binds standard streams
+to `/dev/console` after mounting devtmpfs; otherwise an archive without static
+device nodes can lose the precise init failure before forced poweroff. This adds
+no interactive shell or alternate boot path.
+
+Before recovery approval, publish the signed UKI through
+`lab release repository publish-artifact -repository DIR -keys OFFLINE_KEYS
+-target recovery/<lowercase-sha256>.efi=/path/signed.efi`. This requires the
+offline targets quorum, not merely online rollout signers. Configure the
+server's `releaseRepository.verificationStateDirectory` as a protected private
+directory outside the published repository for its TUF rollback checkpoint.
+The deployment's verified execution bootstrap supplies the release-root anchor;
+an absent catalog or readiness observation refuses approval rather than trusting
+a client-supplied image size. The maintained action fixture creates its own
+isolated signed repository and waits for fresh root-observed readiness before
+asking for either human's approval.
+
 Shared `VMHardwareOptions` selects x86_64/aarch64, KVM/TCG, UEFI or x86 legacy
 BIOS, TPM2 or TPM absence, virtio-blk/scsi, NVMe or SATA/AHCI, up to four extra
 1 GiB disks and a virtio GPU/private VNC display. Encrypted installer manifests
@@ -418,9 +717,12 @@ the existing five-minute boot deadline: SSH authentication alone precedes native
 PAM/session initialization and does not prove that a command channel is usable.
 Only transport startup failures and explicit temporary channel rejection may poll
 that side-effect-free readiness command; authentication, host-key, protocol and
-command failures remain terminal. Scheduled lifecycle reboots retain the old
-pinned SSH transport until remote shutdown, bounded by a two-minute deadline,
-then independently require a changed boot ID before cloud-init readiness.
+command failures remain terminal. Scheduled lifecycle reboots issue one reboot
+request, then poll only the boot ID over fresh pinned SSH transports until the
+old boot has actually changed, within the existing six-minute deadline. An old
+boot ID never counts as readiness; authentication or malformed IDs fail closed.
+Do not require the old host TCP connection to close: native QEMU/slirp evidence
+shows it can remain open without FIN after the guest has completed a new boot.
 For callers that disallow reboots, readiness requires QMP acknowledgement of
 shutdown-on-reboot before that command.
 BIOS guests retain startup shutdown-on-reboot, and explicit reboot-enabled or
@@ -463,17 +765,34 @@ additionally requires `rhc administrator`;
 the lane reads the authorized organization and creates one random
 `lindm-lab-<32 lowercase hex>` activation key, never a new organization.
 Organization/key material uses the existing `RedHatRegistrationCredentials`
-protobuf JSON contract over ephemeral pinned-SSH stdin only. The guest invokes
-its installed `subscription-manager register` entrypoint with in-memory parser
-arguments, not operating-system arguments or environment. Native output and RHSM
-logging are suppressed, including opt-in host failure diagnostics.
+protobuf JSON contract over ephemeral pinned-SSH stdin only. Each registration
+also generates an independent public `lindm-lab-<32 lowercase hex>` run name;
+it is never derived from the activation key. The validated contract rejects using
+the key itself as the public name. The guest invokes its installed
+`subscription-manager register --name` entrypoint with in-memory parser arguments,
+not operating-system arguments or environment, without changing the guest hostname.
+Native output and RHSM logging are suppressed, including opt-in host failure
+diagnostics. Successful registration emits only validated protobuf JSON containing
+the public run name and canonical consumer UUID from `/etc/pki/consumer/cert.pem`'s
+subject CN; other certificate subject fields are never emitted.
 
 Registration refuses a preexisting consumer or ownership marker. The lane checks
 native identity, requires enabled repositories, and performs a bounded
 `dnf --refresh makecache` with unavailable repositories treated as errors.
 This observes authorized metadata access without installing unnecessary packages.
-Evidence contains only registration, identity, metadata-refresh, unregister and
-activation-key-deletion booleans. An owned guest is unregistered before its key is
+Evidence contains the public run name, actual consumer UUID, private receipt path,
+and registration, identity, metadata-refresh, unregister and key-deletion booleans.
+Before registration, the host creates a private (0600, exclusive-create)
+`<run-name>.redhat-registration.jsonl` alongside the disposable VM directory in
+the selected work directory (the system temporary directory by default). The first
+record contains only the public run name, enabling exact hosted-name recovery if
+the registration reply is lost. As soon as registration returns, the host appends
+the validated name/UUID and fsyncs it before identity, repository, or lifecycle
+operations. The file and initial directory entry are durably synced; the receipt
+survives VM-directory removal and remains after normal cleanup. Retain the work
+directory for crash recovery; temporary-directory retention is host policy.
+Neither receipt record contains organization, activation-key, token or certificate
+material. An owned guest is unregistered before its key is
 deleted, using separate cancellation-independent deadlines while QEMU is still
 alive; a failed unregister does not skip key deletion and both errors propagate.
 No token is needed for the existing offline local-RPM path, whose systemd
@@ -485,12 +804,34 @@ assertions also require it. Dispatch retains its explicit Enforcing observation.
 
 The client refreshes expiring access credentials from the protected token file
 without retrying mutations. After an interrupted process, stop all lab lanes, then
-explicitly run `lab images redhat cleanup-keys -token-file FILE
--confirm-delete-lab-keys`. Cleanup deletes only that exact laboratory key namespace
-and prints counts, never key names or organization identifiers; it cannot
-unregister an unreachable guest. It neither changes unrelated keys nor accepts
-subscription terms. A failed lane or lease creation alone is not qualification
-evidence; the native checks and cleanup must complete.
+run `lab images redhat inventory -token-file FILE` for read-only consumer UUID,
+name, creation and last-checkin metadata. This allowlisted JSON excludes account,
+activation-key and certificate data. A default hostname or timestamp match alone
+does not establish ownership.
+
+Explicitly run `lab images redhat cleanup -token-file FILE
+-confirm-delete-lab-registrations` to delete systems whose public names match
+exactly `lindm-lab-<32 lowercase hex>` and activation keys in that exact namespace.
+System UUIDs must be canonical lowercase UUIDs; system names are re-read before
+deletion. An independently established legacy orphan can additionally be selected
+with `-legacy-consumer-uuid UUID`; this selects only that UUID, never all systems
+with the same hostname. Unrelated systems and keys remain untouched.
+
+The official authenticated [RHSM v1 Swagger schema](https://api.access.redhat.com/management/v1/swagger.json)
+defines `GET /management/v1/systems` (limit 100, offset pagination),
+`GET /management/v1/systems/{SystemUUID}` and `DELETE` of that exact resource
+(204 success). Details supply `createdDate`; these UUIDs identify RHSM consumers,
+not Insights inventory hosts. Key cleanup uses the separate
+[RHSM v2 activation-key API](https://console.redhat.com/api/rhsm/v2/openapi.json).
+Inventory is bounded to 1,000 systems and keys. Cleanup JSON records selected,
+deleted and subsequently absent consumer UUIDs plus key counts, never key names
+or organization identifiers. Each selected consumer requires a subsequent GET
+404 and key cleanup requires a fresh empty owned-key list; an acknowledged DELETE
+alone is not absence evidence. Partial failures retain evidence, attempt other
+selected cleanup without mutation retries, and return an error. Cleanup neither
+accepts subscription terms nor changes a disconnected guest's local credentials.
+A failed lane or lease creation alone is not qualification evidence; native checks
+and cleanup must complete.
 
 `go run ./cmd/lab auth check` exercises the running server's normal SSO/CSRF path
 against the fixed development fixture. The reusable development-session helper keeps
@@ -1185,6 +1526,51 @@ native package/signing tools are prerequisites. `-lab FILE` selects a prebuilt g
 probe; otherwise the current lab executable is uploaded. `-diagnostics DIR` opts
 into private failure diagnostics. `-record` refuses overwrite and contains public
 build/runtime identities and observations, never keys, sessions or grant secrets.
+
+SIGINT/SIGTERM cancel the lane through the CLI signal context. Owned guest,
+authority/database, package service, overlays and signing/source staging unwind
+through their existing bounded cleanup; cancellation skips the independent SSH
+failure-diagnostic probe. The final record explicitly reports `outcome: cancelled`
+with `cancellation_reason`, not a product failure or pass. Allow cleanup to finish:
+SIGKILL/tool-forced termination cannot execute defers or guarantee a final record.
+`TestVMUpdatesSignalsCleanOwnedStaging` exercises actual SIGINT and SIGTERM during
+native signing staging and requires removal of owned bytes/processes plus a
+cancelled record, without launching a guest.
+
+Read-only update-status and unpack probes discard a closed SSH transport and
+reconnect with the original host-key pin inside their existing deadlines. Native
+mutations are never replayed after an ambiguous transport failure. A completed
+status command may observe an unavailable executor during package replacement;
+invalid status JSON, authentication and host-key failures are terminal. Deadline
+errors retain the last successful update state. Reset recovery uses the common
+fresh-pinned-connection, changed-boot-ID oracle, not old-socket FIN. Private failure
+diagnostics independently reconnect and capture uptime/load, process/unit state,
+update-helper and kernel journals; they do not reuse the failed connection.
+
+The unpack witness loop also reads protected update status once per second: a
+terminal recovery failure, rejection or already-completed installation is not an
+interruption witness and fails immediately with the actual status. Failure
+diagnostics include package-manager versions and a fresh protected update status.
+An observation deadline is never interpreted as a native package transaction hang.
+
+Self-update failures carry `NativeUpdateDiagnostic`: a fixed native executable
+name, failed operation phase, exit code (`-1` when no exit status exists), at most
+eight final error lines of 512 bytes each, and an explicit truncation flag. Native
+output is sanitized before durable helper/journal storage; URLs, credentials,
+environment assignments and control/terminal escapes are withheld. Neither raw
+command arguments nor process environment are appended. The copied recovery helper
+and root update status retain the historical diagnostic through restart/checking.
+Only successful replacement clears the retained failure.
+
+Normal mTLS/session-fenced heartbeats read this state from the root executor.
+The server stores the current enrollment generation's latest status with a receipt
+time, rejects older observations, and journals meaningful diagnostic/terminal
+changes with an audit-event link. Identical heartbeat and checking timestamps do
+not duplicate events. Reports are untrusted diagnostic telemetry, never native
+success authority. Device Overview's collapsed Diagnostics section displays the
+historical status, manager/phase/exit code and escaped bounded error text; missing
+reports explicitly remain unknown, and page refresh uses the existing scoped
+device query.
 
 The lane observes signed pause and zero-percent holds, timestamp rollback, mixed
 targets, actual expiration of a previously valid unchanged timestamp, and package

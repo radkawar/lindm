@@ -13,15 +13,18 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
+	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/gen/lindm/device/v1/devicev1connect"
+	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/config"
 	"lindm/internal/agent/localrpc"
 )
@@ -140,4 +143,41 @@ func guestDeviceActionProbe(ctx context.Context, output io.Writer, denialExpecte
 		Reason     string    `json:"reason"`
 		ObservedAt time.Time `json:"observed_at"`
 	}{denial.Code().String(), denial.Meta().Get("Lindm-Reason"), time.Now().UTC()})
+}
+
+// guestNVMeIdentity is a read-only root lab probe. Approval receives the native
+// Identify Controller/Namespace identity, not controller facts from sysfs.
+func guestNVMeIdentity(ctx context.Context, path string, output io.Writer) (err error) {
+	if os.Geteuid() != 0 || filepath.Dir(path) != "/dev" || filepath.Clean(path) != path {
+		return errors.New("native NVMe identity requires root and an exact guest block path")
+	}
+	data, err := io.ReadAll(io.LimitReader(os.Stdin, 4097))
+	if err != nil || len(data) > 4096 {
+		return errors.New("bounded native NVMe target input required")
+	}
+	target := new(agentv1.StorageTarget)
+	if err := protojson.Unmarshal(data, target); err != nil {
+		return err
+	}
+	if err := protovalidate.Validate(target); err != nil {
+		return err
+	}
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return err
+	}
+	file := os.NewFile(uintptr(fd), path)
+	defer func() { err = errors.Join(err, file.Close()) }()
+	var stat unix.Stat_t
+	if err := unix.Fstat(fd, &stat); err != nil {
+		return err
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFBLK {
+		return errors.New("native NVMe identity requires a block descriptor")
+	}
+	scope, err := actionprovider.ReadNVMeSanitizeScope(ctx, file, target)
+	if err != nil {
+		return err
+	}
+	return writeGuestEvidence(output, scope)
 }

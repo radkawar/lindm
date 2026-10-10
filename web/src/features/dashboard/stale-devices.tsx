@@ -2,11 +2,12 @@ import { create, toJsonString } from "@bufbuild/protobuf";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRightIcon, Clock3Icon, InfoIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowUpRightIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
 import { DeviceState } from "../../../gen/lindm/admin/v1/admin_pb";
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -21,6 +22,14 @@ const lifecycleLabels: Record<DeviceState, string> = {
   [DeviceState.ACTIVE]: "Active",
   [DeviceState.REVOKED]: "Revoked",
   [DeviceState.RECOVERY_HOLD]: "Recovery hold",
+};
+
+const lifecycleTones: Record<DeviceState, StatusTone> = {
+  [DeviceState.UNSPECIFIED]: "neutral",
+  [DeviceState.PENDING]: "warning",
+  [DeviceState.ACTIVE]: "success",
+  [DeviceState.REVOKED]: "destructive",
+  [DeviceState.RECOVERY_HOLD]: "warning",
 };
 
 export function StaleDevices({
@@ -44,7 +53,7 @@ export function StaleDevices({
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle>
-            <h2>Stale devices</h2>
+            <h2>Devices with stale contact</h2>
           </CardTitle>
           <Tooltip>
             <TooltipTrigger
@@ -83,20 +92,11 @@ export function StaleDevices({
             }}
           >
             <RefreshCwIcon aria-hidden="true" />
-            Refresh rows
+            {list.isFetching ? "Refreshing…" : "Refresh rows"}
           </Button>
         </div>
-        {list.isPending ? <p role="status">Loading stale devices…</p> : null}
-        {failure ? (
-          <Alert variant="destructive">
-            <AlertTitle>
-              {failure.denied ? "Not authorized" : "Stale device list unavailable"}
-            </AlertTitle>
-            <AlertDescription>
-              {failure.codeName}: {failure.message}
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        {list.isPending ? <p role="status">Loading devices with stale contact…</p> : null}
+        {failure ? <RpcError failure={failure} title="Stale contact list unavailable" /> : null}
         {data?.devices.length ? (
           <>
             <ul className="divide-y">
@@ -118,9 +118,9 @@ export function StaleDevices({
                       Last contact {formatTimestamp(device.lastSeenAt).local}
                     </span>
                   </div>
-                  <Badge variant="outline" className="shrink-0 text-xs">
+                  <StatusBadge status={lifecycleTones[device.lifecycleState] ?? "neutral"} dot>
                     {lifecycleLabels[device.lifecycleState] ?? "Unknown"}
-                  </Badge>
+                  </StatusBadge>
                 </li>
               ))}
             </ul>
@@ -130,17 +130,10 @@ export function StaleDevices({
             </p>
           </>
         ) : data ? (
-          <div className="flex items-center gap-3 rounded-lg border border-dashed p-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <Clock3Icon className="size-4" aria-hidden="true" />
-            </span>
-            <div className="grid gap-1">
-              <p className="text-sm font-medium">No matching devices</p>
-              <p className="text-xs text-muted-foreground">
-                No stale contacts matched this separate read.
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            title="No matching devices"
+            description="No stale contacts matched this separate read."
+          />
         ) : null}
         <Link
           to="/devices"

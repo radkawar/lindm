@@ -15,16 +15,29 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	"lindm/internal/agent/actionprovider"
 )
 
 // Collect returns actual host and native-package evidence. Collection failures
 // are represented by typed statuses; a failed package attempt never has rows.
 // An error indicates that the resulting evidence could not be validated.
 func Collect(ctx context.Context) (*inventoryv1.NativeObservation, error) {
+	return collect(ctx, false)
+}
+
+// CollectForUpload leaves storage explicitly unavailable for replacement by
+// the executor's bounded read-only observation. It avoids repeating privileged
+// native probes from the network process.
+func CollectForUpload(ctx context.Context) (*inventoryv1.NativeObservation, error) {
+	return collect(ctx, true)
+}
+
+func collect(ctx context.Context, rootStorage bool) (*inventoryv1.NativeObservation, error) {
 	host, release := collectHost(ctx, readHostFile)
 	host.Details = collectDetails(ctx, detailSources{
 		readFile: readDetailFile, readDir: readDetailDir, stat: os.Stat,
-		run: runNative, sessions: collectSessions,
+		run: runNative, sessions: collectSessions, openBlock: openStorageBlock, nvmeScope: actionprovider.ReadNVMeSanitizeScope,
+		rootStorage: rootStorage,
 	})
 	host.FinishedAt = timestamppb.Now()
 	if err := boundHostDetails(host); err != nil {

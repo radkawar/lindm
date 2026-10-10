@@ -4,6 +4,7 @@ package vmlab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -25,6 +27,9 @@ import (
 
 type VMUpdateOptions struct {
 	Repository, CacheDir, WorkDir, LabBinary, DiagnosticsDir string
+	// BuildRepository selects package and server source; empty uses Repository.
+	// Repository remains the development fixture and trust root.
+	BuildRepository string
 }
 
 type VMUpdateStep struct {
@@ -55,6 +60,8 @@ type VMUpdateResult struct {
 	StartedAt            time.Time                `json:"started_at"`
 	FinishedAt           time.Time                `json:"finished_at"`
 	Passed               bool                     `json:"passed"`
+	Outcome              string                   `json:"outcome"`
+	CancellationReason   string                   `json:"cancellation_reason,omitempty"`
 	Failure              string                   `json:"failure,omitempty"`
 }
 
@@ -72,9 +79,16 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	defer cancel()
 	result = &VMUpdateResult{ImageID: manifest.GetId(), StartedAt: time.Now().UTC()}
 	defer func() {
-		result.FinishedAt, result.Passed = time.Now().UTC(), err == nil
-		if err != nil {
-			result.Failure = err.Error()
+		result.FinishedAt = time.Now().UTC()
+		switch {
+		case errors.Is(ctx.Err(), context.Canceled):
+			result.Outcome = "cancelled"
+			result.CancellationReason = errors.Join(ctx.Err(), err).Error()
+			err = errors.Join(ctx.Err(), err)
+		case err != nil:
+			result.Outcome, result.Failure = "failed", err.Error()
+		default:
+			result.Outcome, result.Passed = "passed", true
 		}
 	}()
 	work, err := os.MkdirTemp(options.WorkDir, "lindm-update-lab-")
@@ -82,7 +96,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(work)) }()
-	built, err := buildUpdatePackages(ctx, options.Repository, work, manifest.GetDistribution(), manifest.GetArchitecture())
+	built, err := buildUpdatePackages(ctx, VMBuildRepository(options.Repository, options.BuildRepository), work, manifest.GetDistribution(), manifest.GetArchitecture())
 	if err != nil {
 		return result, err
 	}
@@ -98,8 +112,8 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	defer func() { err = errors.Join(err, vm.close()) }()
 	vm.captureDiagnostics = options.DiagnosticsDir != ""
 	defer func() {
-		if err != nil && options.DiagnosticsDir != "" {
-			err = errors.Join(err, saveLifecycleFailure(ctx, vm, options.DiagnosticsDir))
+		if err != nil && !errors.Is(ctx.Err(), context.Canceled) && options.DiagnosticsDir != "" {
+			err = errors.Join(err, saveUpdateFailure(ctx, vm, options.DiagnosticsDir))
 		}
 	}()
 	result.ImageSHA256 = verified.SHA256
@@ -345,29 +359,26 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err := vm.qmpCommand(ctx, map[string]any{"execute": "cont", "id": "resume-after-update-reset"}); err != nil {
 		return result, err
 	}
-	if vm.client != nil {
-		_ = vm.client.Close()
-		vm.client = nil
+	previousBoot, err := uuid.Parse(result.InitialBootID)
+	if err != nil || previousBoot == uuid.Nil {
+		return result, errors.New("pre-update boot ID is invalid")
 	}
-	for {
-		if err := vm.connect(ctx); err != nil {
-			return result, err
-		}
-		boot, bootErr := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id", nil, 128, 5*time.Second)
-		if bootErr == nil {
-			id, parseErr := uuid.Parse(strings.TrimSpace(string(boot)))
-			if parseErr == nil && id != uuid.Nil && id.String() != result.InitialBootID {
-				result.FinalBootID = id.String()
-				break
-			}
-		}
+	reboot, stopReboot := context.WithTimeout(ctx, 6*time.Minute)
+	err = waitGuestBootChange(reboot, previousBoot, func(probe context.Context) (string, error) {
 		if vm.client != nil {
 			_ = vm.client.Close()
 			vm.client = nil
 		}
-		if err := lifecycleDelay(ctx, time.Second); err != nil {
-			return result, err
+		if err := vm.connect(probe); err != nil {
+			return "", err
 		}
+		boot, err := vm.run(probe, "cat /proc/sys/kernel/random/boot_id", nil, 128, 5*time.Second)
+		result.FinalBootID = strings.TrimSpace(string(boot))
+		return result.FinalBootID, err
+	})
+	stopReboot()
+	if err != nil {
+		return result, err
 	}
 	forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
 	if err != nil {
@@ -468,7 +479,7 @@ func readUpdateStatus(ctx context.Context, vm *guestVM) (*agentv1.AgentUpdateSta
 	if result.ExitCode != 0 {
 		// This fixed diagnostic command emits only protected update state or its
 		// operational error, never configuration, keys or enrollment credentials.
-		return nil, fmt.Errorf("update-status exited %d: %.2048s", result.ExitCode, strings.TrimSpace(string(result.Stderr)))
+		return nil, &updateStatusUnavailable{exit: result.ExitCode, detail: strings.TrimSpace(string(result.Stderr))}
 	}
 	response := new(agentv1.GetAgentUpdateResponse)
 	if err := protojson.Unmarshal(result.Stdout, response); err != nil {
@@ -480,6 +491,23 @@ func readUpdateStatus(ctx context.Context, vm *guestVM) (*agentv1.AgentUpdateSta
 	return response.GetStatus(), nil
 }
 
+// The executor can legitimately be unavailable while the native helper replaces
+// its service. Only a completed status command gets this retryable classification;
+// authentication, malformed replies and disabled updates remain terminal.
+type updateStatusUnavailable struct {
+	exit   int
+	detail string
+}
+
+func (e *updateStatusUnavailable) Error() string {
+	return fmt.Sprintf("update-status exited %d: %.2048s", e.exit, e.detail)
+}
+
+func updateObservationTransportLost(err error) bool {
+	var missing *ssh.ExitMissingError
+	return sshBootNotReady(err) || errors.As(err, &missing)
+}
+
 func waitUpdateObservation(ctx context.Context, vm *guestVM, before *agentv1.AgentUpdateStatus, outcome string) (*agentv1.AgentUpdateStatus, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -487,8 +515,34 @@ func waitUpdateObservation(ctx context.Context, vm *guestVM, before *agentv1.Age
 	defer ticker.Stop()
 	var last *agentv1.AgentUpdateStatus
 	var lastErr error
+	var firstTransportErr error
 	for {
-		last, lastErr = readUpdateStatus(ctx, vm)
+		var observed *agentv1.AgentUpdateStatus
+		if vm.client == nil {
+			lastErr = vm.connect(ctx)
+		}
+		if lastErr == nil {
+			observed, lastErr = readUpdateStatus(ctx, vm)
+		}
+		if lastErr != nil {
+			var unavailable *updateStatusUnavailable
+			if updateObservationTransportLost(lastErr) {
+				if firstTransportErr == nil {
+					firstTransportErr = fmt.Errorf("first update observation transport loss: %w", lastErr)
+				}
+				// runResult closes a timed-out transport. Reusing that client
+				// cannot observe recovery, even if the guest stayed healthy.
+				// Only this read-only observation may reconnect and retry.
+				if vm.client != nil {
+					_ = vm.client.Close()
+					vm.client = nil
+				}
+			} else if !errors.As(lastErr, &unavailable) && ctx.Err() == nil {
+				return nil, fmt.Errorf("observe update outcome %s: %w", outcome, lastErr)
+			}
+		} else {
+			last = observed
+		}
 		matched := last.GetLastOutcome() == outcome && last.GetPhase() != "checking"
 		if outcome == "installed" {
 			matched = last.GetPhase() == "installed" && last.GetVersion() == updateNextVersion && (last.GetLastOutcome() == "installed" || last.GetLastOutcome() == "no_update")
@@ -498,8 +552,9 @@ func waitUpdateObservation(ctx context.Context, vm *guestVM, before *agentv1.Age
 		}
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("wait for fresh update outcome %s (phase=%s outcome=%s): %w", outcome, last.GetPhase(), last.GetLastOutcome(), errors.Join(ctx.Err(), lastErr))
+			return nil, fmt.Errorf("wait for fresh update outcome %s (phase=%s outcome=%s): %w", outcome, last.GetPhase(), last.GetLastOutcome(), errors.Join(ctx.Err(), lastErr, firstTransportErr))
 		case <-ticker.C:
+			lastErr = nil
 		}
 	}
 }
@@ -520,6 +575,8 @@ func waitUpdateUnpack(ctx context.Context, vm *guestVM) (string, error) {
 	defer cancel()
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
+	nextStatus := time.Now().Add(time.Second)
+	var firstTransportErr error
 	const witness = `sudo -n sh -eu -c 'for file in ` + packaging.BinaryPath + `.dpkg-new ` + packaging.BinaryPath + `\;*; do
   if [ -f "$file" ] && [ "$(stat -c %s "$file")" -gt 0 ]; then
     for name in apt-get dpkg dnf dnf5; do
@@ -533,14 +590,105 @@ func waitUpdateUnpack(ctx context.Context, vm *guestVM) (string, error) {
 done
 exit 1'`
 	for {
-		data, err := vm.run(ctx, witness, nil, 4096, 10*time.Second)
-		if err == nil && len(data) > 0 {
+		var data []byte
+		var err error
+		if vm.client == nil {
+			err = vm.connect(ctx)
+		}
+		if err == nil {
+			var result guestCommandResult
+			result, err = vm.runResult(ctx, witness, nil, 4096, 10*time.Second)
+			if err == nil && result.ExitCode == 0 && len(result.Stderr) == 0 {
+				data = result.Stdout
+			} else if err == nil && (result.ExitCode != 1 || len(result.Stderr) != 0) {
+				return "", errors.New("native unpack witness command failed")
+			}
+		}
+		if err == nil && len(data) == 0 && !time.Now().Before(nextStatus) {
+			var status *agentv1.AgentUpdateStatus
+			status, err = readUpdateStatus(ctx, vm)
+			nextStatus = time.Now().Add(time.Second)
+			if err == nil {
+				if terminal := updateUnpackTerminal(status); terminal != nil {
+					return "", terminal
+				}
+			} else {
+				var unavailable *updateStatusUnavailable
+				if errors.As(err, &unavailable) {
+					// A completed read may race the native service replacement.
+					err = nil
+				}
+			}
+		}
+		if err != nil {
+			if !updateObservationTransportLost(err) {
+				return "", fmt.Errorf("observe native unpack: %w", err)
+			}
+			if firstTransportErr == nil {
+				firstTransportErr = fmt.Errorf("first unpack observation transport loss: %w", err)
+			}
+			if vm.client != nil {
+				_ = vm.client.Close()
+				vm.client = nil
+			}
+		} else if len(data) > 0 {
 			return strings.TrimSpace(string(data)), nil
 		}
 		select {
 		case <-ctx.Done():
-			return "", fmt.Errorf("observe actual native package unpack before reset: %w", errors.Join(ctx.Err(), err))
+			return "", fmt.Errorf("observe actual native package unpack before reset: %w", errors.Join(ctx.Err(), err, firstTransportErr))
 		case <-ticker.C:
 		}
 	}
+}
+
+func updateUnpackTerminal(status *agentv1.AgentUpdateStatus) error {
+	switch status.GetPhase() {
+	case "recovery_required", "rejected", "installed":
+		// A completed or failed transaction cannot become an interrupted unpack
+		// witness. Preserve the actual product state rather than later blaming
+		// the SSH operation that happened to overlap the observer deadline.
+		encoded, err := protojson.Marshal(status)
+		if err != nil {
+			return fmt.Errorf("encode terminal native update status: %w", err)
+		}
+		return fmt.Errorf("native update became terminal before unpack witness: %s", encoded)
+	default:
+		return nil
+	}
+}
+
+// Failure diagnostics must not reuse the transport whose loss caused the failure.
+// Collect only operational state over a new connection with the same host-key pin;
+// neither configuration nor enrollment/update authority bytes enter the record.
+func saveUpdateFailure(ctx context.Context, vm *guestVM, directory string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	probe := &guestVM{dir: vm.dir, cmd: vm.cmd, done: vm.done, waitErr: vm.waitErr, log: vm.log, address: vm.address, config: vm.config, tpm: vm.tpm}
+	err := probe.connect(ctx)
+	var result guestCommandResult
+	if err == nil {
+		defer func() { _ = probe.client.Close() }()
+		command := "sudo -n sh -c " + nativeQuote("cat /proc/sys/kernel/random/boot_id /proc/uptime /proc/loadavg; free -m; ps -eo pid,ppid,stat,comm; if command -v dpkg-query >/dev/null; then dpkg-query -W apt dpkg systemd; else rpm -q dnf dnf5 rpm systemd; fi; "+packaging.BinaryPath+" update-status; systemctl show ssh.service sshd.service lindm-executor.service lindm-agent.service lindm-agent-update-recovery.service -p Id -p ActiveState -p SubState -p MainPID -p NRestarts -p ExecMainStartTimestamp -p ExecMainStatus; journalctl -b --no-pager -o short-monotonic -n 240 -u ssh.service -u sshd.service -u lindm-executor.service -u lindm-agent.service -u 'lindm-agent-update-*'; journalctl -b -k --no-pager -n 80")
+		result, err = probe.runResult(ctx, command, nil, 512<<10, 30*time.Second)
+	}
+	failure := ""
+	if err != nil {
+		failure = err.Error()
+	}
+	data, err := json.Marshal(struct {
+		Source         string
+		LastOperation  *guestOperationDiagnostic
+		ExitCode       int
+		Stdout, Stderr string
+		Failure        string
+	}{"fresh-pinned-update-observer", vm.lastOperation, result.ExitCode, string(result.Stdout), string(result.Stderr), failure})
+	if err != nil {
+		return err
+	}
+	path, err := saveGuestDiagnostics(directory, data)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("private update diagnostics saved to %q", path)
 }

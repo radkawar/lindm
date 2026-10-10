@@ -81,18 +81,85 @@ message GetAgentUpdateResponse {
   AgentUpdateStatus status = 1;
 }
 
+// Bounded sanitized native failure output; telemetry, never success authority.
+message NativeUpdateDiagnostic {
+  string manager = 1 [(buf.validate.field).string = {
+    in: [
+      "apt-get",
+      "dpkg",
+      "dpkg-query",
+      "dpkg-deb",
+      "rpm",
+      "dnf",
+      "zypper",
+      "pacman",
+      "lindm-agent",
+      "systemctl",
+      "systemd-run"
+    ]
+  }];
+  string phase = 2 [(buf.validate.field).string = {
+    in: [
+      "validation",
+      "simulate",
+      "apply",
+      "configure",
+      "recovery",
+      "payload_verify"
+    ]
+  }];
+  int32 exit_code = 3 [(buf.validate.field).int32 = {
+    gte: -1
+    lte: 255
+  }];
+  // Eight 512-byte lines also cap the total at 4096 bytes.
+  repeated string error_lines = 4 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      string: {
+        min_len: 1
+        max_bytes: 512
+        pattern: "^[^\\x00-\\x1f\\x7f-\\x9f]*$"
+      }
+    }
+  }];
+  bool truncated = 5;
+}
+
 // Diagnostic facts are historical, not claims of current package health.
 message AgentUpdateStatus {
   bool enabled = 1;
-  string phase = 2;
-  string version = 3;
-  string transaction_id = 4;
-  string reason = 5;
+  string phase = 2 [(buf.validate.field).string = {
+    in: [
+      "disabled",
+      "idle",
+      "checking",
+      "staged",
+      "applying",
+      "installing",
+      "installed",
+      "rejected",
+      "recovery_required"
+    ]
+  }];
+  string version = 3 [(buf.validate.field).string.max_bytes = 64];
+  string transaction_id = 4 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  string reason = 5 [(buf.validate.field).string = {
+    max_bytes: 256
+    pattern: "^[a-z0-9_]*$"
+  }];
   google.protobuf.Timestamp observed_at = 6;
   google.protobuf.Timestamp attempt_started_at = 7;
   google.protobuf.Timestamp attempt_finished_at = 8;
-  string last_outcome = 9;
+  string last_outcome = 9 [(buf.validate.field).string = {
+    max_bytes: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
   google.protobuf.Timestamp last_metadata_at = 10;
+  NativeUpdateDiagnostic native_diagnostic = 11;
 }
 
 // Root-owned durable state, not an RPC request. The transaction is immutable once
@@ -166,6 +233,7 @@ message AgentUpdateJournal {
   google.protobuf.Timestamp attempt_finished_at = 8;
   string last_outcome = 9 [(buf.validate.field).string.max_len = 64];
   google.protobuf.Timestamp last_metadata_at = 10;
+  NativeUpdateDiagnostic native_diagnostic = 11;
 }
 
 // The detached helper's durable boundary, independently readable after reboot.
@@ -179,4 +247,5 @@ message AgentUpdateHelperState {
     ]
   }];
   google.protobuf.Timestamp observed_at = 2 [(buf.validate.field).required = true];
+  NativeUpdateDiagnostic native_diagnostic = 3;
 }

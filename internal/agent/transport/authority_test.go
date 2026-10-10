@@ -86,6 +86,10 @@ func (r *establishmentRaceRoot) GetConnection(context.Context, *connect.Request[
 	return connect.NewResponse(&agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewalPending: r.pending, RenewAfter: timestamppb.New(r.renewAfter)}), nil
 }
 
+func (*establishmentRaceRoot) GetAgentUpdate(context.Context, *connect.Request[agentv1.GetAgentUpdateRequest]) (*connect.Response[agentv1.GetAgentUpdateResponse], error) {
+	return connect.NewResponse(&agentv1.GetAgentUpdateResponse{}), nil
+}
+
 func (r *establishmentRaceRoot) PrepareSession(ctx context.Context, _ *connect.Request[agentv1.PrepareSessionRequest]) (*connect.Response[agentv1.PrepareSessionResponse], error) {
 	r.mu.Lock()
 	pause := !r.paused

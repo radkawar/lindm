@@ -5,22 +5,31 @@ package vmlab
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/redhatimages"
 )
 
-// VMRedHatEvidence contains outcomes only, never account or activation-key data.
+// VMRedHatEvidence contains public identity and outcomes, never account or key data.
 type VMRedHatEvidence struct {
-	Registered                  bool `json:"registered"`
-	IdentityObserved            bool `json:"identity_observed"`
-	RepositoryMetadataRefreshed bool `json:"repository_metadata_refreshed"`
-	Unregistered                bool `json:"unregistered"`
-	ActivationKeyDeleted        bool `json:"activation_key_deleted"`
+	RunName                     string `json:"run_name"`
+	ConsumerUUID                string `json:"consumer_uuid,omitempty"`
+	ReceiptPath                 string `json:"receipt_path"`
+	Registered                  bool   `json:"registered"`
+	IdentityObserved            bool   `json:"identity_observed"`
+	RepositoryMetadataRefreshed bool   `json:"repository_metadata_refreshed"`
+	Unregistered                bool   `json:"unregistered"`
+	ActivationKeyDeleted        bool   `json:"activation_key_deleted"`
 }
 
 type vmRedHatRegistration struct {
@@ -44,7 +53,7 @@ func registerVMRedHat(ctx context.Context, vm *guestVM, tokenFile string, eviden
 	if tokenFile == "" {
 		return nil, nil
 	}
-	if err := runVMRedHatProbe(ctx, vm, "redhat-ready", nil); err != nil {
+	if err := runVMRedHatProbe(ctx, vm, "redhat-ready", nil, nil); err != nil {
 		return nil, err
 	}
 	client, err := redhatimages.New(ctx, tokenFile)
@@ -57,34 +66,51 @@ func registerVMRedHat(ctx context.Context, vm *guestVM, tokenFile string, eviden
 			err = errors.Join(err, registration.Close())
 		}
 	}()
+	runName, err := newVMRedHatRunName()
+	if err != nil {
+		return nil, err
+	}
+	evidence.RunName = runName
+	receipt, err := createVMRedHatReceipt(filepath.Dir(vm.dir), runName)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, receipt.Close()) }()
+	evidence.ReceiptPath = receipt.Name()
 	registration.lease, err = client.CreateRegistration(ctx)
 	if err != nil {
 		return nil, err
 	}
 	organization, key := registration.lease.Credentials()
-	credentials := &labv1.RedHatRegistrationCredentials{OrganizationId: organization, ActivationKey: key}
+	credentials := &labv1.RedHatRegistrationCredentials{OrganizationId: organization, ActivationKey: key, RunName: runName}
 	payload, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(credentials)
 	credentials.OrganizationId, credentials.ActivationKey = "", ""
 	if err != nil {
 		return nil, errors.New("encode ephemeral Red Hat registration input")
 	}
 	defer clear(payload)
-	if err := runVMRedHatProbe(ctx, vm, "redhat-register", payload); err != nil {
+	identity := &labv1.RedHatRegistrationIdentity{RunName: runName}
+	if err := runVMRedHatProbe(ctx, vm, "redhat-register", payload, identity); err != nil {
 		return nil, err
 	}
 	evidence.Registered = true
-	if err := runVMRedHatProbe(ctx, vm, "redhat-identity", nil); err != nil {
+	evidence.ConsumerUUID = identity.GetConsumerUuid()
+	// Persist the exact native UUID before any subsequent guest operation.
+	if err := appendVMRedHatReceipt(receipt, identity); err != nil {
+		return nil, err
+	}
+	if err := runVMRedHatProbe(ctx, vm, "redhat-identity", nil, nil); err != nil {
 		return nil, err
 	}
 	evidence.IdentityObserved = true
-	if err := runVMRedHatProbe(ctx, vm, "redhat-repositories", nil); err != nil {
+	if err := runVMRedHatProbe(ctx, vm, "redhat-repositories", nil, nil); err != nil {
 		return nil, err
 	}
 	evidence.RepositoryMetadataRefreshed = true
 	return registration, nil
 }
 
-func runVMRedHatProbe(ctx context.Context, vm *guestVM, operation string, payload []byte) error {
+func runVMRedHatProbe(ctx context.Context, vm *guestVM, operation string, payload []byte, identity *labv1.RedHatRegistrationIdentity) error {
 	// Never retain even unexpected output in opt-in failure diagnostics. The
 	// guest additionally discards native stdout/stderr and disables RHSM logging.
 	capture := vm.captureDiagnostics
@@ -97,8 +123,83 @@ func runVMRedHatProbe(ctx context.Context, vm *guestVM, operation string, payloa
 	result, err := vm.runResult(ctx, "sudo -n "+guestLifecycleProbe+" guest "+operation, bytes.NewReader(payload), 1024, timeout)
 	defer clear(result.Stdout)
 	defer clear(result.Stderr)
-	if err != nil || result.ExitCode != 0 || len(result.Stdout) != 0 || len(result.Stderr) != 0 {
+	if err != nil || result.ExitCode != 0 || len(result.Stderr) != 0 {
 		return errors.New("redhat guest " + operation + " failed (credentials and native output suppressed)")
+	}
+	if identity != nil {
+		decoded, err := decodeVMRedHatIdentity(result.Stdout, identity.GetRunName())
+		if err != nil {
+			return err
+		}
+		identity.ConsumerUuid = decoded.GetConsumerUuid()
+	} else if len(result.Stdout) != 0 {
+		return errors.New("redhat guest " + operation + " failed (unexpected output suppressed)")
+	}
+	return nil
+}
+
+var vmRedHatRunNamePattern = regexp.MustCompile(`^lindm-lab-[0-9a-f]{32}$`)
+
+func newVMRedHatRunName() (string, error) {
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return "", errors.New("cannot generate public Red Hat run identity")
+	}
+	return "lindm-lab-" + hex.EncodeToString(random[:]), nil
+}
+
+func decodeVMRedHatIdentity(data []byte, runName string) (*labv1.RedHatRegistrationIdentity, error) {
+	identity := new(labv1.RedHatRegistrationIdentity)
+	if len(data) == 0 || len(data) > 1024 {
+		return nil, errors.New("invalid public Red Hat registration receipt")
+	}
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, identity); err != nil {
+		return nil, errors.New("invalid public Red Hat registration receipt")
+	}
+	if err := protovalidate.Validate(identity); err != nil || identity.GetRunName() != runName {
+		return nil, errors.New("invalid public Red Hat registration identity")
+	}
+	return identity, nil
+}
+
+func createVMRedHatReceipt(directory, runName string) (*os.File, error) {
+	// The receipt lives alongside, never inside, disposable VM state. Publish
+	// the independent name before mutation, covering a lost registration reply.
+	identity := &labv1.RedHatRegistrationIdentity{RunName: runName}
+	if !vmRedHatRunNamePattern.MatchString(runName) {
+		return nil, errors.New("invalid public Red Hat receipt name")
+	}
+	file, err := os.OpenFile(filepath.Join(directory, runName+".redhat-registration.jsonl"), os.O_WRONLY|os.O_CREATE|os.O_EXCL|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, errors.New("cannot create private Red Hat registration receipt")
+	}
+	if err := appendVMRedHatReceipt(file, identity); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	dir, err := os.Open(directory)
+	if err != nil {
+		_ = file.Close()
+		return nil, errors.New("cannot open Red Hat registration receipt directory")
+	}
+	if err := errors.Join(dir.Sync(), dir.Close()); err != nil {
+		_ = file.Close()
+		return nil, errors.New("cannot persist Red Hat registration receipt directory")
+	}
+	return file, nil
+}
+
+func appendVMRedHatReceipt(file *os.File, identity *labv1.RedHatRegistrationIdentity) error {
+	data, err := (protojson.MarshalOptions{UseProtoNames: true}).Marshal(identity)
+	if err != nil {
+		return errors.New("cannot encode public Red Hat registration receipt")
+	}
+	data = append(data, '\n')
+	if _, err := file.Write(data); err != nil {
+		return errors.New("cannot write private Red Hat registration receipt")
+	}
+	if err := file.Sync(); err != nil {
+		return errors.New("cannot persist private Red Hat registration receipt")
 	}
 	return nil
 }
@@ -120,7 +221,7 @@ func (r *vmRedHatRegistration) Close() error {
 		if err := r.vm.connect(ctx); err != nil {
 			return errors.New("redhat guest cleanup could not reconnect")
 		}
-		if err := runVMRedHatProbe(ctx, r.vm, "redhat-unregister", nil); err != nil {
+		if err := runVMRedHatProbe(ctx, r.vm, "redhat-unregister", nil, nil); err != nil {
 			return err
 		}
 		r.evidence.Unregistered = true

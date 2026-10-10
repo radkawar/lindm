@@ -113,6 +113,7 @@ message AuthorizationPolicy {
         "resources.assign",
         "execution_trust.manage",
         "remote_execution.run",
+        "inventory.manage",
         "recovery_keys.read",
         "encryption.manage",
         "actions.lock",

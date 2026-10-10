@@ -42,7 +42,7 @@ func readCLIFile(filename string, limit int64) (data []byte, err error) {
 // top-level dispatch. All keys and inputs are explicit; no ambient key fallback.
 func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("release repository command required: development-keys, init, publish, promote, rollout, rotate, mirror")
+		return errors.New("release repository command required: development-keys, init, publish, publish-artifact, promote, rollout, rotate, mirror")
 	}
 	flags := flag.NewFlagSet("release repository "+args[0], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -146,6 +146,14 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		return err
 	}
 	switch args[0] {
+	case "publish-artifact":
+		if len(files) != 1 {
+			return errors.New("publish-artifact requires exactly one -target logical-target=local-file")
+		}
+		for name, source := range files {
+			return publisher.PublishArtifact(ctx, name, source)
+		}
+		return errors.New("publish-artifact requires a target")
 	case "publish", "promote":
 		if *channelPath == "" {
 			return errors.New("publish requires -channel")

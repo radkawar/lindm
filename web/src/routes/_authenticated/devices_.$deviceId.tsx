@@ -5,7 +5,7 @@ import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
 import { parsePackageSearch } from "@/features/devices/package-search";
 import { DeviceResourceComplianceBadge, DeviceResources } from "@/features/services/view";
-import { RecoveryEnrollment } from "@/features/enrollment/recovery";
+import { RevokeApprovalRequest } from "@/features/approvals/revoke";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
@@ -53,12 +53,7 @@ function DeviceDetailRoute() {
       )}
       findings={<DeviceFindings deviceId={deviceId} />}
       history={<DeviceActionHistory deviceId={deviceId} />}
-      enrollmentRecovery={(device) => (
-        <RecoveryEnrollment
-          key={`${device.enrollmentGeneration}:${device.lifecycleState}`}
-          device={device}
-        />
-      )}
+      revoke={(device) => <RevokeApprovalRequest deviceId={device.id} />}
     />
   );
 }

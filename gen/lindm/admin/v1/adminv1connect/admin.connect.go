@@ -169,6 +169,9 @@ const (
 	// AdminServiceGetDeviceEncryptionProcedure is the fully-qualified name of the AdminService's
 	// GetDeviceEncryption RPC.
 	AdminServiceGetDeviceEncryptionProcedure = "/lindm.admin.v1.AdminService/GetDeviceEncryption"
+	// AdminServiceListDeviceStorageTargetsProcedure is the fully-qualified name of the AdminService's
+	// ListDeviceStorageTargets RPC.
+	AdminServiceListDeviceStorageTargetsProcedure = "/lindm.admin.v1.AdminService/ListDeviceStorageTargets"
 	// AdminServiceRevealRecoveryKeyProcedure is the fully-qualified name of the AdminService's
 	// RevealRecoveryKey RPC.
 	AdminServiceRevealRecoveryKeyProcedure = "/lindm.admin.v1.AdminService/RevealRecoveryKey"
@@ -243,6 +246,7 @@ type AdminServiceClient interface {
 	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
+	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
 	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
@@ -540,6 +544,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("GetDeviceEncryption")),
 			connect.WithClientOptions(opts...),
 		),
+		listDeviceStorageTargets: connect.NewClient[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse](
+			httpClient,
+			baseURL+AdminServiceListDeviceStorageTargetsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDeviceStorageTargets")),
+			connect.WithClientOptions(opts...),
+		),
 		revealRecoveryKey: connect.NewClient[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse](
 			httpClient,
 			baseURL+AdminServiceRevealRecoveryKeyProcedure,
@@ -639,6 +649,7 @@ type adminServiceClient struct {
 	getDeviceActions                     *connect.Client[v1.GetDeviceActionsRequest, v1.GetDeviceActionsResponse]
 	getDeviceAction                      *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
 	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
+	listDeviceStorageTargets             *connect.Client[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse]
 	revealRecoveryKey                    *connect.Client[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse]
 	listDeviceGroups                     *connect.Client[v1.ListDeviceGroupsRequest, v1.ListDeviceGroupsResponse]
 	setDeviceGroup                       *connect.Client[v1.SetDeviceGroupRequest, v1.SetDeviceGroupResponse]
@@ -881,6 +892,11 @@ func (c *adminServiceClient) GetDeviceEncryption(ctx context.Context, req *conne
 	return c.getDeviceEncryption.CallUnary(ctx, req)
 }
 
+// ListDeviceStorageTargets calls lindm.admin.v1.AdminService.ListDeviceStorageTargets.
+func (c *adminServiceClient) ListDeviceStorageTargets(ctx context.Context, req *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error) {
+	return c.listDeviceStorageTargets.CallUnary(ctx, req)
+}
+
 // RevealRecoveryKey calls lindm.admin.v1.AdminService.RevealRecoveryKey.
 func (c *adminServiceClient) RevealRecoveryKey(ctx context.Context, req *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error) {
 	return c.revealRecoveryKey.CallUnary(ctx, req)
@@ -969,6 +985,7 @@ type AdminServiceHandler interface {
 	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
+	ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error)
 	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
 	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
 	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
@@ -1262,6 +1279,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("GetDeviceEncryption")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceListDeviceStorageTargetsHandler := connect.NewUnaryHandler(
+		AdminServiceListDeviceStorageTargetsProcedure,
+		svc.ListDeviceStorageTargets,
+		connect.WithSchema(adminServiceMethods.ByName("ListDeviceStorageTargets")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceRevealRecoveryKeyHandler := connect.NewUnaryHandler(
 		AdminServiceRevealRecoveryKeyProcedure,
 		svc.RevealRecoveryKey,
@@ -1404,6 +1427,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceGetDeviceActionHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceEncryptionProcedure:
 			adminServiceGetDeviceEncryptionHandler.ServeHTTP(w, r)
+		case AdminServiceListDeviceStorageTargetsProcedure:
+			adminServiceListDeviceStorageTargetsHandler.ServeHTTP(w, r)
 		case AdminServiceRevealRecoveryKeyProcedure:
 			adminServiceRevealRecoveryKeyHandler.ServeHTTP(w, r)
 		case AdminServiceListDeviceGroupsProcedure:
@@ -1611,6 +1636,10 @@ func (UnimplementedAdminServiceHandler) GetDeviceAction(context.Context, *connec
 
 func (UnimplementedAdminServiceHandler) GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceEncryption is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDeviceStorageTargets(context.Context, *connect.Request[v1.ListDeviceStorageTargetsRequest]) (*connect.Response[v1.ListDeviceStorageTargetsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDeviceStorageTargets is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error) {

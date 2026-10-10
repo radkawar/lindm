@@ -25,7 +25,7 @@ func bindRecoveryApproval(request *adminv1.CreateRecoveryEnrollmentGrantRequest)
 	}
 	payload := proto.CloneOf(request)
 	payload.ApprovalId = ""
-	binding.action, binding.permission = "device.recover", PermissionRevokeDevice
+	binding.action, binding.permission = "device.recover", approvalPermission(request)
 	binding.target, binding.mutation = deviceID, request.GetRequestId()
 	binding.payload, err = (proto.MarshalOptions{Deterministic: true}).Marshal(payload)
 	if err != nil {

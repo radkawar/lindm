@@ -319,6 +319,9 @@ func TestDeviceActionCapabilityIsClosedAndActionSpecific(t *testing.T) {
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseQuarantine{ReleaseQuarantine: &agentv1.ReleaseQuarantineAction{}}}, "device.release-quarantine.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{}}}, "device.crypto-erase.v1"},
 		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{}}}, "device.sanitize.v1"},
+		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{}}}, "device.restart.v1"},
+		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Shutdown{Shutdown: &agentv1.ShutdownAction{}}}, "device.shutdown.v1"},
+		{&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}, "device.refresh-inventory.v1"},
 	} {
 		got, err := DeviceActionCapability(tc.spec)
 		if err != nil || got != tc.want {

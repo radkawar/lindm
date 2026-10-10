@@ -21,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
+	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
@@ -181,6 +182,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
 		&agentv1.UpdateExecutionTrustRequest{}, &agentv1.GetExecutionTrustRequest{}, &agentv1.StatusRequest{},
+		&agentv1.GetRecoveryReadinessRequest{}, &agentv1.GetRecoveryReadinessResponse{}, &inventoryv1.StorageDetails{},
 		&agentv1.PrepareServiceExecutionRequest{}, &agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
@@ -188,6 +190,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.PrepareDeviceActionRequest{}, &agentv1.StartDeviceActionRequest{},
 		&agentv1.GetDeviceActionRequest{}, &agentv1.AttestDeviceActionRequest{},
 		&agentv1.ConfirmDeviceActionEscrowRequest{}, &agentv1.SupplyDeviceActionCredentialRequest{},
+		&agentv1.ConfirmDeviceActionInventoryRequest{}, &agentv1.DeviceActionInventoryReceipt{},
 		&agentv1.DeviceActionRecord{}, &agentv1.DeviceActionIntent{}, &agentv1.DeviceActionChallenge{},
 		&agentv1.PrepareDeviceActionRecoveryRequest{}, &agentv1.CommitDeviceActionRecoveryRequest{},
 		&agentv1.DeviceActionRecoveryHandoff{}, &agentv1.DeviceActionRecoveryCredential{},

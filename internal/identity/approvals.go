@@ -36,6 +36,10 @@ type approvalBinding struct {
 
 func bindApproval(message proto.Message) (approvalBinding, error) {
 	var b approvalBinding
+	b.permission = approvalPermission(message)
+	if b.permission == "" {
+		return b, ErrApprovalInvalid
+	}
 	var payload proto.Message
 	switch request := message.(type) {
 	case *adminv1.CreateRecoveryEnrollmentGrantRequest:
@@ -46,7 +50,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.permission, b.mutation = "enrollment.approve", PermissionManageEnrollment, copy.GetRequestId()
+		b.action, b.mutation = "enrollment.approve", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -59,7 +63,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.permission, b.mutation = "device.revoke", PermissionRevokeDevice, copy.GetRequestId()
+		b.action, b.mutation = "device.revoke", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -72,7 +76,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.permission, b.mutation = "resources.assign", PermissionAssignResources, copy.GetRequestId()
+		b.action, b.mutation = "resources.assign", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -85,7 +89,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = nil
-		b.action, b.permission, b.mutation = "resources.activate_preview", PermissionAssignResources, copy.GetRequestId()
+		b.action, b.mutation = "resources.activate_preview", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -98,7 +102,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.permission = "execution_trust.manage", PermissionManageExecutionTrust
+		b.action = "execution_trust.manage"
 		payload = copy
 	case *adminv1.CreateDeviceActionRequest:
 		if request == nil || request.GetSpec() == nil {
@@ -107,20 +111,6 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
 		b.action, b.mutation = "device.action", copy.GetRequestId()
-		switch {
-		case copy.GetSpec().GetEscrowRotate() != nil, copy.GetSpec().GetTpm2Bind() != nil:
-			b.permission = PermissionManageEncryption
-		case copy.GetSpec().GetLockSessions() != nil:
-			b.permission = PermissionLockDevice
-		case copy.GetSpec().GetReleaseLock() != nil:
-			b.permission = PermissionReleaseLockDevice
-		case copy.GetSpec().GetQuarantine() != nil, copy.GetSpec().GetReleaseQuarantine() != nil:
-			b.permission = PermissionQuarantineDevice
-		case copy.GetSpec().GetCryptoErase() != nil, copy.GetSpec().GetSanitize() != nil:
-			b.permission = PermissionExecuteDestructive
-		default:
-			return b, ErrApprovalInvalid
-		}
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -133,7 +123,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.permission, b.mutation = "recovery_key.reveal", PermissionReadRecoveryKeys, copy.GetRequestId()
+		b.action, b.mutation = "recovery_key.reveal", copy.GetRequestId()
 		id, err := uuid.Parse(copy.GetDeviceId())
 		if err != nil || id == uuid.Nil {
 			return b, ErrApprovalInvalid
@@ -190,6 +180,23 @@ func (s *Service) approvalTransaction(ctx context.Context, fn func(pgx.Tx, *iden
 	return s.dbErr(tx.Commit(ctx))
 }
 
+// Inventory refresh requires independently scoped read and management authority.
+// Both checks use the same fresh, transaction-fenced principal.
+func scopeApproval(ctx context.Context, tx pgx.Tx, principal Principal, binding approvalBinding, scope ApprovalScope) error {
+	if err := scope(ctx, tx, principal, binding.permission, binding.target); err != nil {
+		return err
+	}
+	for _, permission := range approvalPermissionRequirements[binding.permission] {
+		if !Authorize(principal, permission) {
+			return ErrAuthorizationDenied
+		}
+		if err := scope(ctx, tx, principal, permission, binding.target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // CreateApproval derives authority from the typed action, never a caller supplied permission.
 func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *adminv1.CreateApprovalRequest, scope ApprovalScope) (*adminv1.Approval, error) {
 	if s == nil || scope == nil || request == nil {
@@ -209,12 +216,12 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 	if authorization.Principal().ServiceAccount {
 		return nil, ErrAuthorizationDenied
 	}
-	var row identitydb.ApprovalRequest
+	var projection approvalProjection
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
 		if err := s.LockAuthorization(ctx, tx, authorization, binding.permission); err != nil {
 			return err
 		}
-		if err := scope(ctx, tx, authorization.Principal(), binding.permission, binding.target); err != nil {
+		if err := scopeApproval(ctx, tx, authorization.Principal(), binding, scope); err != nil {
 			return err
 		}
 		previous, lookupErr := q.GetApprovalForMutation(ctx, identitydb.GetApprovalForMutationParams{RequesterID: actor, Action: binding.action, MutationID: binding.mutation})
@@ -225,8 +232,8 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 			if previous.RequesterVersion != int64(authorization.Version()) {
 				return ErrAuthorizationChanged
 			}
-			row = previous
-			return nil
+			projection, lookupErr = q.GetApprovalProjection(ctx, previous.ID)
+			return s.dbErr(lookupErr)
 		}
 		if !errors.Is(lookupErr, pgx.ErrNoRows) {
 			return s.dbErr(lookupErr)
@@ -235,17 +242,20 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 		if binding.target != uuid.Nil {
 			target = &binding.target
 		}
-		var err error
-		row, err = q.InsertApproval(ctx, identitydb.InsertApprovalParams{ID: uuid.New(), RequesterID: actor, RequesterVersion: int64(authorization.Version()), Action: binding.action, Permission: string(binding.permission), DeviceID: target, MutationID: binding.mutation, Payload: binding.payload, PayloadSha256: binding.digest[:], LifetimeSeconds: int32(request.GetLifetimeSeconds())})
+		row, err := q.InsertApproval(ctx, identitydb.InsertApprovalParams{ID: uuid.New(), RequesterID: actor, RequesterVersion: int64(authorization.Version()), Action: binding.action, Permission: string(binding.permission), DeviceID: target, MutationID: binding.mutation, Payload: binding.payload, PayloadSha256: binding.digest[:], LifetimeSeconds: int32(request.GetLifetimeSeconds())})
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action)
+		if err := s.insertAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
+			return err
+		}
+		projection, err = q.GetApprovalProjection(ctx, row.ID)
+		return s.dbErr(err)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return approvalMessage(row, s.clock())
+	return approvalMessage(&projection, s.clock())
 }
 
 // ApprovalConsumption is an opaque fresh pair bound to one durable approval and mutation.
@@ -348,10 +358,10 @@ func (s *Service) lockApprovalPair(ctx context.Context, tx pgx.Tx, pair *Approva
 	if pair.requester.Principal().ServiceAccount || pair.approver.Principal().ServiceAccount || !Authorize(pair.approver.Principal(), PermissionManageApprovals) {
 		return ErrAuthorizationDenied
 	}
-	if err := scope(ctx, tx, pair.requester.Principal(), pair.binding.permission, pair.binding.target); err != nil {
+	if err := scopeApproval(ctx, tx, pair.requester.Principal(), pair.binding, scope); err != nil {
 		return err
 	}
-	if err := scope(ctx, tx, pair.approver.Principal(), pair.binding.permission, pair.binding.target); err != nil {
+	if err := scopeApproval(ctx, tx, pair.approver.Principal(), pair.binding, scope); err != nil {
 		return err
 	}
 	return scope(ctx, tx, pair.approver.Principal(), PermissionManageApprovals, pair.binding.target)
@@ -420,6 +430,7 @@ func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, appro
 	if approve {
 		state, action = "approved", "approval.approved"
 	}
+	var projection approvalProjection
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
 		if err := s.lockApprovalPair(ctx, tx, pair, scope); err != nil {
 			return err
@@ -440,25 +451,34 @@ func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, appro
 		}
 		if current.State != "pending" {
 			if current.State == state && current.ApproverID != nil && *current.ApproverID == actor && current.ApproverVersion == int64(pair.approver.Version()) && current.DecisionReason == reason {
-				row = current
-				return nil
+				projection, err = q.GetApprovalProjection(ctx, current.ID)
+				return s.dbErr(err)
 			}
 			return ErrApprovalInvalid
 		}
-		row, err = q.DecideApproval(ctx, identitydb.DecideApprovalParams{ID: id, State: state, ApproverID: &actor, ApproverVersion: int64(pair.approver.Version()), DecisionReason: reason})
+		_, err = q.DecideApproval(ctx, identitydb.DecideApprovalParams{ID: id, State: state, ApproverID: &actor, ApproverVersion: int64(pair.approver.Version()), DecisionReason: reason})
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &actor, action, id.String(), reason)
+		if err := s.insertAudit(ctx, q, &actor, action, id.String(), reason); err != nil {
+			return err
+		}
+		projection, err = q.GetApprovalProjection(ctx, id)
+		return s.dbErr(err)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return approvalMessage(row, s.clock())
+	return approvalMessage(&projection, s.clock())
 }
 
-func approvalMessage(row identitydb.ApprovalRequest, now time.Time) (*adminv1.Approval, error) {
-	out := &adminv1.Approval{Id: row.ID.String(), RequesterId: row.RequesterID.String(), Action: row.Action, Permission: row.Permission, PayloadSha256: row.PayloadSha256, CreatedAt: timestamppb.New(row.CreatedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), DecisionReason: row.DecisionReason}
+// approvalProjection is read only after fresh authorization and target scope
+// checks. Names and hostname are joined live, never cached on approval requests.
+type approvalProjection = identitydb.GetApprovalProjectionRow
+
+func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Approval, error) {
+	row := &projection.ApprovalRequest
+	out := &adminv1.Approval{Id: row.ID.String(), RequesterId: row.RequesterID.String(), Action: row.Action, Permission: row.Permission, PayloadSha256: row.PayloadSha256, CreatedAt: timestamppb.New(row.CreatedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), DecisionReason: row.DecisionReason, RequesterDisplayName: projection.RequesterDisplayName, ApproverDisplayName: projection.ApproverDisplayName, DeviceHostname: projection.DeviceHostname}
 	if row.DeviceID != nil {
 		out.DeviceId = row.DeviceID.String()
 	}

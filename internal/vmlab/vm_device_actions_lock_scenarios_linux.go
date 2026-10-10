@@ -5,19 +5,55 @@ package vmlab
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
+
+	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 type actionAccountLockEvidence struct {
-	Scenario             string                  `json:"scenario"`
-	Lock                 *actionDispatchEvidence `json:"lock"`
-	Release              *actionDispatchEvidence `json:"release"`
-	PasswordLocked       bool                    `json:"password_locked"`
-	AccountExpired       bool                    `json:"account_expired"`
-	OriginalRestored     bool                    `json:"original_restored"`
-	AdminChangePreserved bool                    `json:"admin_change_preserved"`
+	Scenario                 string                  `json:"scenario"`
+	Lock                     *actionDispatchEvidence `json:"lock"`
+	Release                  *actionDispatchEvidence `json:"release"`
+	PasswordInitiallyEnabled bool                    `json:"password_initially_enabled"`
+	PasswordLocked           bool                    `json:"password_locked"`
+	AccountExpired           bool                    `json:"account_expired"`
+	OriginalRestored         bool                    `json:"original_restored"`
+	AdminChangePreserved     bool                    `json:"admin_change_preserved"`
+}
+
+func nativeLockScenarios(ctx context.Context, machine *actionMachine, control *vmControlPlane, result *VMDeviceActionsResult) (err error) {
+	result.DesktopInitialLogind, err = prepareActionDesktop(ctx, machine.vm)
+	if err != nil {
+		return err
+	}
+	result.DesktopBefore, err = waitActionDesktop(ctx, machine.vm, false)
+	if err != nil {
+		return err
+	}
+	request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}})
+	result.Lock, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
+	if err != nil {
+		return err
+	}
+	result.DesktopAfter, err = waitActionDesktop(ctx, machine.vm, true)
+	if err != nil {
+		return err
+	}
+	request = actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{LockActionId: result.Lock.ActionID}}})
+	result.LockRelease, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
+	if err != nil {
+		return err
+	}
+	// Release withdraws owned restrictions, never authenticates or remotely
+	// unlocks a desktop. The native screen shield must remain engaged.
+	result.DesktopAfterRelease, err = waitActionDesktop(ctx, machine.vm, true)
+	if err != nil {
+		return err
+	}
+	return nativeAccountLockScenarios(ctx, machine, control, result)
 }
 
 // Shadow records are compared in memory only. Neither password hashes nor full
@@ -27,7 +63,26 @@ func nativeAccountLockScenarios(ctx context.Context, machine *actionMachine, con
 	if _, err := machine.vm.Run(ctx, "sudo -n useradd --no-create-home --shell /bin/sh "+username, nil); err != nil {
 		return err
 	}
-	provider := &agentv1.DeviceActionProviderConfig{AllowSessionLock: true, AllowAccountLock: true, ProtectedAccounts: []string{"root", "lindm-lab"}, AllowQuarantine: true, ManagementEndpoints: []string{"127.0.0.1", "10.0.2.2"}, DnsServers: []string{"10.0.2.3"}, QuarantineSeconds: 60}
+	password := []byte(username + ":" + rand.Text() + "\n")
+	_, err := machine.vm.Run(ctx, "sudo -n chpasswd", bytes.NewReader(password))
+	clear(password)
+	if err != nil {
+		return err
+	}
+	data, err := machine.vm.Run(ctx, "sudo -n cat /etc/lindm/executor.json", nil)
+	if err != nil {
+		return err
+	}
+	config := new(agentv1.AgentConfig)
+	if err := protojson.Unmarshal(data, config); err != nil {
+		return err
+	}
+	provider := config.GetActionProvider()
+	if provider == nil {
+		return errors.New("native account fixture requires existing action qualification")
+	}
+	provider.AllowAccountLock = true
+	provider.ProtectedAccounts = []string{"root", "lindm-lab", actionDesktopUser}
 	if err := configureActionGuest(ctx, machine.vm.guest, provider, nil); err != nil {
 		return err
 	}
@@ -41,6 +96,12 @@ func nativeAccountLockScenarios(ctx context.Context, machine *actionMachine, con
 		}
 		entry := &actionAccountLockEvidence{Scenario: scenario}
 		result.AccountLocks = append(result.AccountLocks, entry)
+		originalFields := bytes.Split(bytes.TrimSpace(before), []byte{':'})
+		entry.PasswordInitiallyEnabled = len(originalFields) == 9 && len(originalFields[1]) > 0 && originalFields[1][0] != '!' && originalFields[1][0] != '*'
+		if !entry.PasswordInitiallyEnabled {
+			clear(before)
+			return errors.New("native account fixture must start password-enabled")
+		}
 		request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{Usernames: []string{username}}}})
 		entry.Lock, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
 		if err != nil {

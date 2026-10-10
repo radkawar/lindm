@@ -80,6 +80,11 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapErr(err)
 	}
+	if req.Msg.GetSpec().GetRefreshInventory() != nil {
+		if err := requireDeviceScope(ctx, q, authorization.Principal(), identity.PermissionReadFleet, deviceID); err != nil {
+			return nil, mapErr(err)
+		}
+	}
 	old, err := q.GetDeviceActionRequest(ctx, requestID)
 	if err == nil {
 		if old.ActorID != actor.ID || !bytes.Equal(old.RequestDigest, digest) {
@@ -121,6 +126,9 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	expires := req.Msg.GetExpiresAt().AsTime()
 	if !expires.After(now) || expires.After(now.Add(10*time.Minute)) || expires.After(snapshot.Delegation.GetExpiresAt().AsTime()) {
 		return nil, invalid("device_action_expiry")
+	}
+	if err := s.requireRecoveryReadiness(ctx, q, generationID, req.Msg.GetSpec(), now); err != nil {
+		return nil, mapErr(err)
 	}
 	if err := requireActionInventory(ctx, q, generationID, req.Msg.GetSpec(), now); err != nil {
 		return nil, mapErr(err)
@@ -180,6 +188,16 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapErr(err)
 	}
+	capability, err := trust.DeviceActionCapability(req.Msg.GetSpec())
+	if err != nil {
+		return nil, invalid("invalid_device_action")
+	}
+	if !deviceActionSignerDelegated(snapshot.Delegation, s.signing.PlanKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, capability) {
+		return nil, deviceActionCapabilityError(capability, "plan")
+	}
+	if !deviceActionSignerDelegated(snapshot.Delegation, s.signing.StartKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, capability) {
+		return nil, deviceActionCapabilityError(capability, "start")
+	}
 	id := uuid.New()
 	intent := &agentv1.DeviceActionIntent{DeploymentId: s.deploymentID.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generationID.String(), ActionId: id.String(), ActorId: actor.ID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: req.Msg.GetExpiresAt(), Spec: req.Msg.GetSpec(), SpecSha256: specDigest}
 	envelope, err := s.authority.Sign(ctx, intent, s.signing.PlanKey)
@@ -192,10 +210,6 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	intentBytes, err := proto.Marshal(intent)
 	if err != nil {
 		return nil, mapErr(err)
-	}
-	capability, err := trust.DeviceActionCapability(req.Msg.GetSpec())
-	if err != nil {
-		return nil, invalid("invalid_device_action")
 	}
 	luksUUIDs, err := actionLUKSUUIDs(req.Msg.GetSpec())
 	if err != nil {

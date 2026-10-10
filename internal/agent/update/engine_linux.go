@@ -123,7 +123,7 @@ func (e *Engine) Exchange(ctx context.Context, request *agentv1.ExchangeAgentUpd
 func (e *Engine) recordStatus(state *agentv1.AgentUpdateJournal) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.status = &agentv1.AgentUpdateStatus{Enabled: true, Phase: state.GetPhase(), Version: state.GetInstalledVersion(), Reason: state.GetReason(), ObservedAt: state.GetObservedAt(), AttemptStartedAt: state.GetAttemptStartedAt(), AttemptFinishedAt: state.GetAttemptFinishedAt(), LastOutcome: state.GetLastOutcome(), LastMetadataAt: state.GetLastMetadataAt()}
+	e.status = &agentv1.AgentUpdateStatus{Enabled: true, Phase: state.GetPhase(), Version: state.GetInstalledVersion(), Reason: state.GetReason(), ObservedAt: state.GetObservedAt(), AttemptStartedAt: state.GetAttemptStartedAt(), AttemptFinishedAt: state.GetAttemptFinishedAt(), LastOutcome: state.GetLastOutcome(), LastMetadataAt: state.GetLastMetadataAt(), NativeDiagnostic: proto.CloneOf(state.GetNativeDiagnostic())}
 	if tx := state.GetTransaction(); tx != nil {
 		e.status.TransactionId = tx.GetId()
 		e.status.Version = tx.GetVersion()
@@ -152,6 +152,9 @@ func (e *Engine) run() {
 	state = e.store.Load()
 	state.AttemptFinishedAt = timestamppb.Now()
 	if err != nil {
+		if diagnostic := diagnosticForError(err); diagnostic != nil {
+			state.NativeDiagnostic = diagnostic
+		}
 		state.LastOutcome, state.Reason = "rejected", "update_rejected_or_incomplete"
 		if state.GetPhase() == "applying" || state.GetPhase() == "recovery_required" {
 			state.LastOutcome = "incomplete"
@@ -182,7 +185,7 @@ func (e *Engine) cycle(ctx context.Context) error {
 	if !semver.IsValid("v"+current) || (state.GetInstalledVersion() != "" && semver.Compare("v"+current, "v"+state.GetInstalledVersion()) < 0) {
 		return errors.New("running agent is unstamped or downgraded")
 	}
-	installed, err := observeInstalled(ctx, e.cfg.GetManager())
+	installed, err := observeInstalled(ctx, e.cfg.GetManager(), "validation")
 	if err != nil {
 		return err
 	}
@@ -279,9 +282,9 @@ func (e *Engine) recover(ctx context.Context, state *agentv1.AgentUpdateJournal)
 			if err := e.validator.Validate(help); err != nil {
 				return err
 			}
-			e.mu.Lock()
-			e.status.Phase, e.status.ObservedAt = help.GetPhase(), help.GetObservedAt()
-			e.mu.Unlock()
+			if err := e.recordHelperState(state, help); err != nil {
+				return err
+			}
 		}
 		active, err := helperActive(ctx, tx)
 		if err != nil {
@@ -292,13 +295,14 @@ func (e *Engine) recover(ctx context.Context, state *agentv1.AgentUpdateJournal)
 				state.Phase, state.Reason, state.LastOutcome = "rejected", "verified_transaction_expired", "rejected"
 				return e.save(state)
 			}
-			installed, observedErr := observeInstalled(ctx, tx.GetManager())
+			installed, observedErr := observeInstalled(ctx, tx.GetManager(), "recovery")
 			if observedErr == nil && installed.matchesTransaction(tx) == nil && help.GetPhase() == "installed" {
 				if err := verifyInstalledPayload(ctx, tx); err != nil {
 					return err
 				}
 				state.InstalledVersion, state.Phase, state.Reason = tx.GetVersion(), "installed", ""
 				state.LastOutcome = "installed"
+				state.NativeDiagnostic = nil
 				return e.save(state)
 			}
 			// A durable staged transaction may precede any helper launch, or the
@@ -324,4 +328,25 @@ func (e *Engine) recover(ctx context.Context, state *agentv1.AgentUpdateJournal)
 		case <-timer.C:
 		}
 	}
+}
+
+func (e *Engine) recordHelperState(state *agentv1.AgentUpdateJournal, help *agentv1.AgentUpdateHelperState) error {
+	// The helper's installed marker is not sufficient proof of replacement.
+	// Preserve historical failure until recover verifies native state and payload.
+	diagnostic := state.GetNativeDiagnostic()
+	if help.GetNativeDiagnostic() != nil {
+		diagnostic = help.GetNativeDiagnostic()
+	}
+	phase := help.GetPhase()
+	if phase == "installing" {
+		phase = "applying"
+	}
+	if phase == "installed" {
+		phase = state.GetPhase()
+	}
+	if state.GetPhase() == phase && proto.Equal(state.GetNativeDiagnostic(), diagnostic) {
+		return nil
+	}
+	state.Phase, state.NativeDiagnostic = phase, proto.CloneOf(diagnostic)
+	return e.save(state)
 }

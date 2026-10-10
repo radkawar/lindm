@@ -50,3 +50,23 @@ func TestPackageSnapshotBatchesBindExactBytes(t *testing.T) {
 		t.Fatalf("snapshot lost partial final batch: count=%d batches=%d", count, len(data.batches))
 	}
 }
+
+func TestSyntheticNativeDetailsPreservesUnavailableHardware(t *testing.T) {
+	details := syntheticNativeDetails()
+	validator, err := protovalidate.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validator.Validate(details); err != nil {
+		t.Fatalf("synthetic host details cannot be published: %v", err)
+	}
+	for _, count := range []*inventoryv1.ObservedUint64{details.GetSessions().GetUsers(), details.GetSessions().GetSessions()} {
+		if count.GetStatus() != inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS || count.GetValue() != 0 {
+			t.Fatal("simulator must explicitly report zero synthetic users and sessions")
+		}
+	}
+	unavailable := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	if details.GetStorage().GetStatus() != unavailable || len(details.GetStorage().GetDevices()) != 0 || details.GetTpm().GetPresent().GetStatus() != unavailable || details.GetTpm().GetPresent().GetValue() {
+		t.Fatal("synthetic details invented storage or TPM capabilities")
+	}
+}

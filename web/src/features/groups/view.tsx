@@ -12,13 +12,16 @@ import {
 } from "../../../gen/lindm/admin/v1/authz_groups_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
@@ -46,13 +49,10 @@ export function GroupsView() {
   const list = useQuery(groupsQueryOptions(lifetime, pageToken));
   return (
     <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Authorization device groups</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Static group membership changes authorization scope, not inventory metadata. Only
-          unrestricted account managers can manage these groups.
-        </p>
-      </header>
+      <PageHeader
+        title="Authorization groups"
+        description="Static device membership controls access scopes. Only unrestricted account managers can edit these groups."
+      />
       <GroupEditor
         key={createGeneration}
         onCreated={() => setCreateGeneration((value) => value + 1)}
@@ -72,21 +72,15 @@ export function GroupsView() {
         </div>
       ) : null}
       {list.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Groups unavailable</AlertTitle>
-          <AlertDescription>{toRpcFailure(list.error).message}</AlertDescription>
-        </Alert>
+        <RpcError failure={toRpcFailure(list.error)}>
+          {list.data ? <p>The groups below are from the last successful refresh.</p> : null}
+        </RpcError>
       ) : null}
       {list.data?.groups.map((group) => (
         <GroupEditor key={`${group.id}:${group.name}:${group.deviceIds.join(",")}`} group={group} />
       ))}
-      {list.data?.groups.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No groups on this page.
-        </p>
+      {!list.error && list.data?.groups.length === 0 ? (
+        <EmptyState title="No authorization groups on this page" />
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button
@@ -117,6 +111,7 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [failure, setFailure] = useState<RpcFailure | null>(null);
   const [completed, setCompleted] = useState(false);
   const [attempt, setAttempt] = useState<SetDeviceGroupRequest | DeleteDeviceGroupRequest | null>(
     null,
@@ -154,6 +149,7 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
     setAttempt(exact);
     setBusy(true);
     setError("");
+    setFailure(null);
     try {
       const options = { signal: lifetime.signal, timeoutMs: 30_000 };
       if (exact.$typeName === "lindm.admin.v1.SetDeviceGroupRequest")
@@ -164,15 +160,13 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
       toast.success("Authorization group change completed");
       await client.invalidateQueries({ queryKey: ["device-groups", lifetime.generation] });
       if (!group) onCreated?.();
-    } catch (failure) {
+    } catch (cause) {
       if (!lifetime.signal.aborted) {
-        const normalized = toRpcFailure(failure);
-        setError(
-          `${normalized.message}${normalized.ambiguous ? " Outcome unknown; retry preserves the exact request ID and payload." : ""}`,
-        );
-        toast.error(normalized.ambiguous ? "Group change outcome unknown" : "Group change failed", {
-          description: "Review the inline result before continuing.",
-        });
+        const normalized = toRpcFailure(cause);
+        setFailure(normalized);
+        const feedback = classifyRpcFailure(normalized);
+        const notify = feedback.tone === "destructive" ? toast.error : toast;
+        notify(feedback.title, { description: feedback.action });
         if (!normalized.ambiguous) setAttempt(null);
       }
     } finally {
@@ -222,13 +216,14 @@ function GroupEditor({ group, onCreated }: { group?: DeviceGroup; onCreated?: ()
       </label>
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>Group change not confirmed</AlertTitle>
+          <AlertTitle>Check group details</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
       {busy ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Submitting exact group change…
+          Saving group…
         </p>
       ) : null}
       {completed ? (

@@ -330,7 +330,10 @@ func (o vmInventoryOracle) cpu() (*inventoryv1.CpuDetails, error) {
 	if logical == 0 {
 		return nil, errors.New("zero logical CPU truth")
 	}
-	data, err = o.command("lscpu --parse=SOCKET,CORE --all")
+	// Count kernel physical package/core IDs, not lscpu's synthesized logical
+	// topology. On ARM KVM, lscpu can map two distinct kernel core IDs onto one
+	// logical core; --physical preserves the independent native IDs.
+	data, err = o.command("lscpu --physical --parse=SOCKET,CORE --all")
 	if err != nil {
 		return nil, err
 	}
@@ -428,14 +431,21 @@ func parseTruthMemory(data []byte) (*inventoryv1.MemoryDetails, error) {
 
 // Pairs is already a flat, shell-safe presentation; lsblk rejects combining
 // --pairs with --list (or --raw/--tree).
-const storageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,PKNAME"
+const storageTruthCommand = "lsblk --bytes --pairs --output NAME,TYPE,SIZE,FSTYPE,MOUNTPOINT,PKNAME,KNAME,TRAN,MODEL,SERIAL,WWN,REV,UUID,FSVER,PARTUUID,PARTTYPE"
 
 func (o vmInventoryOracle) storage() (*inventoryv1.StorageDetails, error) {
 	data, status, err := o.optional("lsblk", storageTruthCommand)
 	if err != nil {
 		return nil, err
 	}
-	return parseTruthStorage(data, status)
+	result, err := parseTruthStorage(data, status)
+	if err != nil || result.Status != truthSuccess {
+		return result, err
+	}
+	if err := o.storageIdentities(result, data); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inventoryv1.StorageDetails, error) {
@@ -448,12 +458,13 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 		return nil, err
 	}
 	byName := make(map[string]*inventoryv1.BlockDevice)
+	byKernel := make(map[string]string)
 	for _, line := range lines {
 		fields, err := parseTruthPairs(line)
 		if err != nil {
 			return nil, err
 		}
-		if len(fields) != 6 || fields["NAME"] == "" || fields["TYPE"] == "" {
+		if (len(fields) != 6 && len(fields) != 16) || fields["NAME"] == "" || fields["TYPE"] == "" {
 			return nil, errors.New("incomplete lsblk truth")
 		}
 		size, err := parseTruthUint(fields["SIZE"])
@@ -461,11 +472,27 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 			return nil, err
 		}
 		device := &inventoryv1.BlockDevice{Name: fields["NAME"], Type: truthString(fields["TYPE"]), Parent: truthString(fields["PKNAME"]), SizeBytes: truthUint(size), Filesystem: truthString(fields["FSTYPE"]), Mountpoint: truthString(fields["MOUNTPOINT"]), Encryption: truthString("")}
+		if len(fields) == 16 {
+			device.Identity = storageTruthIdentity(fields)
+		}
 		if _, duplicate := byName[device.Name]; duplicate {
 			return nil, errors.New("duplicate block device truth")
 		}
 		byName[device.Name] = device
+		if kernel := fields["KNAME"]; kernel != "" {
+			if prior, duplicate := byKernel[kernel]; duplicate && prior != device.Name {
+				return nil, errors.New("duplicate block kernel identity truth")
+			}
+			byKernel[kernel] = device.Name
+		}
 		result.Devices = append(result.Devices, device)
+	}
+	for _, device := range result.Devices {
+		if byName[device.Parent.Value] == nil {
+			if alias := byKernel[device.Parent.Value]; alias != "" {
+				device.Parent = truthString(alias)
+			}
+		}
 	}
 	for _, device := range result.Devices {
 		switch {
@@ -475,12 +502,14 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 			device.Encryption = truthString("dm-crypt")
 		default:
 			parent := device.Parent.Value
+			complete := true
 			for steps := 0; parent != ""; steps++ {
 				if steps >= len(byName) {
 					return nil, errors.New("cyclic block ancestry truth")
 				}
 				ancestor := byName[parent]
 				if ancestor == nil {
+					complete = false
 					break
 				}
 				if ancestor.Type.Value == "crypt" {
@@ -489,7 +518,7 @@ func parseTruthStorage(data []byte, status inventoryv1.CollectionStatus) (*inven
 				}
 				parent = ancestor.Parent.Value
 			}
-			if device.Encryption.Status != truthSuccess && device.Filesystem.Status == truthSuccess {
+			if device.Encryption.Status != truthSuccess && complete {
 				device.Encryption = truthString("none")
 			}
 		}
@@ -818,7 +847,7 @@ func compareTruthMessage(before, after, actual protoreflect.Message, path string
 			continue
 		}
 		if field.Kind() == protoreflect.MessageKind {
-			if name == "details.platform" && !before.Has(field) && !after.Has(field) && !actual.Has(field) {
+			if !before.Has(field) && !after.Has(field) && !actual.Has(field) {
 				continue
 			}
 			if !before.Has(field) || !after.Has(field) || !actual.Has(field) {

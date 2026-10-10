@@ -60,7 +60,7 @@ func (s *Service) verifyDeviceActionRecord(ctx context.Context, loaded *bound, r
 			return historicalServiceError(ctx)
 		}
 	}
-	return nil
+	return s.verifyInventoryRefreshHistory(ctx, loaded, r)
 }
 
 func (s *Service) verifyDeviceActionChallenge(ctx context.Context, loaded *bound, r *agentv1.DeviceActionRecord) error {

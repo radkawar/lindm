@@ -34,6 +34,12 @@ func DeviceActionCapability(spec *agentv1.DeviceActionSpec) (string, error) {
 		return "device.crypto-erase.v1", nil
 	case *agentv1.DeviceActionSpec_Sanitize:
 		return "device.sanitize.v1", nil
+	case *agentv1.DeviceActionSpec_Restart:
+		return "device.restart.v1", nil
+	case *agentv1.DeviceActionSpec_Shutdown:
+		return "device.shutdown.v1", nil
+	case *agentv1.DeviceActionSpec_RefreshInventory:
+		return "device.refresh-inventory.v1", nil
 	default:
 		return "", errors.New("unsupported device action capability")
 	}

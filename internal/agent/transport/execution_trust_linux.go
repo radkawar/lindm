@@ -21,12 +21,13 @@ import (
 const managementInterval = 20 * time.Second
 
 // The management loop owns its cancellation, join and connection cache. It does
-// not share inventory scheduling, collection, spool state or transport status;
-// even a two-minute native collection cannot delay trust admission or dispatch.
+// not share inventory scheduling, spool state or transport status. A signed
+// refresh hands a bounded request to the sole inventory owner.
 type managementLoop struct {
-	executor agentv1connect.ExecutorServiceClient
-	cache    connectionCache
-	gate     authorityGate
+	executor         agentv1connect.ExecutorServiceClient
+	cache            connectionCache
+	gate             authorityGate
+	refreshInventory func(context.Context, *agentv1.DeviceActionStatus) error
 }
 
 func (m *managementLoop) start(parent context.Context) func() {

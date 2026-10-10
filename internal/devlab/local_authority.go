@@ -273,8 +273,9 @@ func (f *AuthorityFixture) OpenApproverSession(ctx context.Context) (*OwnerSessi
 	return f.openLocalSession(ctx, f.local.approver)
 }
 
-// StepUp revokes this session and obtains fresh password + WebAuthn assurance.
-// Like Close, it must not race other uses of this OwnerSession.
+// StepUp retires any remaining session authority, then obtains fresh password +
+// WebAuthn assurance even if the old session expired or was revoked. Like Close,
+// it must not race other uses of this OwnerSession.
 func (s *OwnerSession) StepUp(ctx context.Context) error {
 	if s.local == nil {
 		return errors.New("step-up requires local fixture authentication")
@@ -283,7 +284,6 @@ func (s *OwnerSession) StepUp(ctx context.Context) error {
 		if err := s.Close(ctx); err != nil {
 			return err
 		}
-		s.csrf = ""
 	}
 	return s.localCeremony(ctx, "")
 }

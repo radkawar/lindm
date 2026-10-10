@@ -316,7 +316,7 @@ func (q *Queries) NextServiceAction(ctx context.Context, actionID string) (Servi
 }
 
 const nextUnfinishedDeviceAction = `-- name: NextUnfinishedDeviceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id > ? AND state IN (1, 2, 3, 8, 9) ORDER BY action_id LIMIT 1
+SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id > ? AND state IN (1, 2, 3, 6, 8, 9) ORDER BY action_id LIMIT 1
 `
 
 func (q *Queries) NextUnfinishedDeviceAction(ctx context.Context, actionID string) (DeviceAction, error) {

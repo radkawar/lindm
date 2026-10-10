@@ -1,0 +1,91 @@
+//go:build linux
+
+package executor
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"buf.build/go/protovalidate"
+
+	"lindm/internal/agent/recoveryboot"
+)
+
+func TestRecoveryReadinessUnavailableIsExplicit(t *testing.T) {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	const boot = "25eec0a2-bb9f-42bc-b6cc-0508320c960e"
+	for _, tc := range []struct {
+		name   string
+		config *RecoveryBootConfig
+		facts  recoveryboot.Readiness
+		err    error
+		reason string
+	}{
+		{name: "unconfigured", reason: "recovery_readiness_not_configured"},
+		{name: "unreadable", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("recovery_readiness_esp_unreadable"), reason: "recovery_readiness_esp_unreadable"},
+		{name: "unsupported", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, facts: recoveryboot.Readiness{ESPUUID: "1234-5678", AllocationUnitBytes: 4096}, reason: "recovery_readiness_unsupported"},
+		{name: "native_failure_redacted", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("private-config-path: credential contents"), reason: "recovery_readiness_observation_failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Service{clock: func() time.Time { return now }, bootID: func() (string, error) { return boot, nil }, recoveryConfig: tc.config}
+			calls := 0
+			got := s.observeRecoveryReadiness(t.Context(), func(_ context.Context, path string) (recoveryboot.Readiness, error) {
+				calls++
+				if tc.config == nil || path != tc.config.ESPPath {
+					t.Fatal("observer did not use protected ESP configuration")
+				}
+				return tc.facts, tc.err
+			})
+			if got.GetAvailable() || got.GetReason() != tc.reason || got.GetBootId() != boot || !got.GetObservedAt().AsTime().Equal(now) {
+				t.Fatalf("failure became readiness or lost provenance: %v", got)
+			}
+			if tc.config == nil && calls != 0 {
+				t.Fatal("unconfigured startup probed a guessed ESP")
+			}
+			if err := protovalidate.Validate(got); err != nil {
+				t.Fatalf("failure cannot be published: %v", err)
+			}
+		})
+	}
+}
+
+func TestRecoveryReadinessIsFreshAndDetachedFromConfiguration(t *testing.T) {
+	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	cfg := &RecoveryBootConfig{ESPPath: "/boot/efi", ImageSHA256: make([]byte, 32), ImageSize: 8193}
+	s := &Service{clock: func() time.Time { return now }, bootID: func() (string, error) { return "25eec0a2-bb9f-42bc-b6cc-0508320c960e", nil }, recoveryConfig: cfg}
+	free := uint64(16384)
+	observe := func(context.Context, string) (recoveryboot.Readiness, error) {
+		return recoveryboot.Readiness{ESPUUID: "1234-5678", FreeBytes: free, AllocationUnitBytes: 4096, SecureBoot: true, UKICapable: true}, nil
+	}
+	first := s.observeRecoveryReadiness(t.Context(), observe)
+	cfg.ImageSHA256[0] = 1
+	free = 0
+	now = now.Add(time.Second)
+	second := s.observeRecoveryReadiness(t.Context(), observe)
+	if !first.GetAvailable() || first.GetFreeBytes() != 16384 || first.GetConfiguredImageSha256()[0] != 0 || second.GetFreeBytes() != 0 || !second.GetObservedAt().AsTime().After(first.GetObservedAt().AsTime()) {
+		t.Fatal("readiness reused native facts or aliased protected configuration")
+	}
+	// Zero free bytes is still a successful observation, never artifact readiness.
+	if !second.GetAvailable() || second.GetConfiguredImageSize() != 8193 {
+		t.Fatal("observer incorrectly derived artifact admission")
+	}
+	if err := protovalidate.Validate(first); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRecoveryReadinessBootFailureDoesNotProbeNativeState(t *testing.T) {
+	s := &Service{clock: time.Now, bootID: func() (string, error) { return "", errors.New("unreadable") }}
+	got := s.observeRecoveryReadiness(t.Context(), func(context.Context, string) (recoveryboot.Readiness, error) {
+		t.Fatal("missing boot identity probed native state")
+		return recoveryboot.Readiness{}, nil
+	})
+	if got.GetAvailable() || got.GetReason() != "recovery_readiness_boot_id_unavailable" {
+		t.Fatalf("boot failure implied readiness: %v", got)
+	}
+	if err := protovalidate.Validate(got); err != nil {
+		t.Fatal(err)
+	}
+}

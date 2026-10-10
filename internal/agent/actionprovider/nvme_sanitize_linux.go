@@ -32,14 +32,6 @@ func (p *Provider) sanitizeNVMe(ctx context.Context, plan *agentv1.DeviceActionP
 	if !proto.Equal(fresh, plan.GetBefore().GetNvmeSanitize()) {
 		return nil, ErrConflict
 	}
-	namespaceData, err := p.nvmeAdmin(ctx, target.file, 6, fresh.GetScope().GetNamespaceId(), 0, nvmeIdentifyBytes)
-	if err != nil {
-		return nil, err
-	}
-	namespace, err := parseNVMeNamespace(namespaceData)
-	if err != nil || !bytes.Equal(namespace.digest[:], fresh.GetIdentifyNamespaceSha256()) {
-		return nil, errors.Join(ErrConflict, err)
-	}
 	if err := invalidateNVMeSamples(target.file); err != nil {
 		return nil, err
 	}
@@ -54,12 +46,21 @@ func (p *Provider) sanitizeNVMe(ctx context.Context, plan *agentv1.DeviceActionP
 	if err != nil || !proto.Equal(fresh, plan.GetBefore().GetNvmeSanitize()) {
 		return nil, errors.Join(ErrConflict, err)
 	}
+	// The durable gate may itself take time. Re-observe native identity and
+	// inventory after it returns, immediately before the sole effect command.
+	revalidate := func(ctx context.Context) error {
+		current, err := p.observeNVMe(ctx, plan.GetSpec(), target)
+		if err != nil || !proto.Equal(current, fresh) {
+			return errors.Join(ErrConflict, err)
+		}
+		return nil
+	}
 	result := &agentv1.DeviceActionVerification{
 		After:        proto.CloneOf(plan.GetBefore()),
 		NvmeSanitize: &agentv1.NVMeSanitizeVerification{ObservedScope: fresh},
 		Evidence:     "Native command has no verified completion; a consumed/interrupted operation must not be restarted.",
 	}
-	if err := p.startNVMeCommand(ctx, target.file, action.GetMethod(), fresh.GetScope().GetNamespaceId(), namespace.lbaf, gate, result.NvmeSanitize); err != nil {
+	if err := p.startNVMeCommand(ctx, target.file, action.GetMethod(), fresh.GetScope().GetNamespaceId(), byte(fresh.GetScope().GetIdentity().GetLbaFormat()), gate, revalidate, result.NvmeSanitize); err != nil {
 		if errors.Is(err, ErrOutcomeUnknown) {
 			return result, err
 		}
@@ -91,14 +92,19 @@ func (p *Provider) sanitizeNVMe(ctx context.Context, plan *agentv1.DeviceActionP
 // command submission. Any loss after consumption remains unknown in that journal
 // and its startup path never re-enters Apply. The retained sanitize status is
 // polled read-only; we never issue sanitize-exit, retry, reset or resume commands.
-func (p *Provider) startNVMeCommand(ctx context.Context, file *os.File, method agentv1.SanitizeMethod, nsid uint32, lbaf byte, gate func(context.Context) error, result *agentv1.NVMeSanitizeVerification) error {
-	if !nativeSanitizeMethod(method) || nsid == 0 || nsid == ^uint32(0) || lbaf > 15 || gate == nil || result == nil {
+func (p *Provider) startNVMeCommand(ctx context.Context, file *os.File, method agentv1.SanitizeMethod, nsid uint32, lbaf byte, gate, revalidate func(context.Context) error, result *agentv1.NVMeSanitizeVerification) error {
+	if !nativeSanitizeMethod(method) || nsid == 0 || nsid == ^uint32(0) || lbaf > 15 || gate == nil || revalidate == nil || result == nil {
 		return ErrUnsupported
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if err := gate(ctx); err != nil {
+		return err
+	}
+	if err := revalidate(ctx); err != nil {
+		// Authority was consumed, but no effect was submitted. Refuse the
+		// changed binding; never retry with another basis or erase method.
 		return err
 	}
 	command := nvmeSanitizeCommand(method)

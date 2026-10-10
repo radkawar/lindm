@@ -46,6 +46,7 @@ type VMLifecycleOptions struct {
 	// Uses a private real server/database and automatic network trust relay.
 	ControlPlaneTrust bool
 	LindmdBinary      string
+	LocalAuthority    bool
 	// Optional bounded observation time after the first two publications lets
 	// a human inspect the actual console without changing product timers.
 	ObserveFor time.Duration
@@ -95,8 +96,8 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err != nil {
 		return nil, err
 	}
-	if manifest.GetArchitecture() != "amd64" && manifest.GetArchitecture() != "x86_64" {
-		return nil, errors.New("native lifecycle requires amd64/x86_64")
+	if _, _, err := inspectArchitecture(manifest.GetArchitecture()); err != nil {
+		return nil, err
 	}
 	if err := validateVMRedHatToken(manifest.GetDistribution(), options.RedHatTokenFile); err != nil {
 		return nil, err
@@ -184,7 +185,11 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	var isolated *devlab.AuthorityFixture
 	destinations := [2]string{"127.0.0.1:18444", "127.0.0.1:18445"}
 	if options.ControlPlaneTrust {
-		isolated, err = devlab.OpenAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+		if options.LocalAuthority {
+			isolated, err = devlab.OpenLocalAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+		} else {
+			isolated, err = devlab.OpenAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
+		}
 		if err != nil {
 			return nil, err
 		}

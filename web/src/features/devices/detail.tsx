@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, LockKeyhole, Plus, RefreshCw, Shield, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, Shield } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import { CollectionStatus, SnapshotState } from "../../../gen/lindm/inventory/v1/observation_pb";
@@ -13,19 +13,24 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { DeviceLifecycleBadge } from "./lifecycle-badge";
 import { DevicePackages } from "./packages";
 import type { PackageSearch } from "./package-search";
 import { deviceQueryOptions } from "./queries";
-import { collectionLabels, Fact, ObservedTime, ObservedValue } from "./observations";
+import { CollectionStatusBadge, Fact, ObservedTime, ObservedValue } from "./observations";
 import { DeviceMetadataCard } from "./metadata";
-import { DeviceNativeDetails } from "./native-details";
+import { DeviceNativeDetails, NumberValue } from "./native-details";
 import { DeviceEncryptionPanel } from "./encryption";
 import { DeviceActionsPanel, DeviceLockRestriction } from "./actions";
+import { DeviceActionMenu } from "./action-menu";
+import { DeviceAgentUpdate } from "./agent-update";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PageHeader } from "@/components/ui/page-header";
 
 const snapshotLabels: Record<SnapshotState, string> = {
   [SnapshotState.UNSPECIFIED]: "Not reported",
-  [SnapshotState.STAGING]: "Upload in progress — not published",
+  [SnapshotState.STAGING]: "Upload in progress, not published",
   [SnapshotState.COMMITTED]: "Published",
   [SnapshotState.SUPERSEDED]: "Superseded",
   [SnapshotState.EXPIRED]: "Expired",
@@ -34,8 +39,9 @@ const snapshotLabels: Record<SnapshotState, string> = {
 const detailTabs = [
   { id: "overview", label: "Overview" },
   { id: "inventory", label: "Inventory" },
-  { id: "resources", label: "Resources / Compliance" },
-  { id: "actions", label: "Encryption / Actions" },
+  { id: "resources", label: "Services" },
+  { id: "encryption", label: "Encryption" },
+  { id: "actions", label: "Actions" },
   { id: "findings", label: "Findings" },
   { id: "history", label: "History" },
 ] as const;
@@ -49,7 +55,7 @@ export function DeviceDetailView({
   findings,
   history,
   compliance,
-  enrollmentRecovery,
+  revoke,
 }: {
   deviceId: string;
   search: PackageSearch;
@@ -58,7 +64,7 @@ export function DeviceDetailView({
   findings: ReactNode;
   history: ReactNode;
   compliance: ReactNode;
-  enrollmentRecovery?: (device: Device) => ReactNode;
+  revoke?: (device: Device) => ReactNode;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -68,11 +74,10 @@ export function DeviceDetailView({
     search.pageToken || search.manager || search.namePrefix ? "inventory" : "overview",
   );
   const [inventoryVisited, setInventoryVisited] = useState(activeTab === "inventory");
-  const [focusTarget, setFocusTarget] = useState<"resources" | "actions" | null>(null);
+  const [focusTarget, setFocusTarget] = useState<"resources" | null>(null);
   useEffect(() => {
     if (!focusTarget) return;
-    const target =
-      focusTarget === "resources" ? "resource-profile" : `action-actions-${deviceId}-kind`;
+    const target = "resource-profile";
     const frame = requestAnimationFrame(() => {
       const control = document.getElementById(target);
       const panel = document.getElementById(`${tabId}-${focusTarget}-panel`);
@@ -87,7 +92,7 @@ export function DeviceDetailView({
     setActiveTab(tab);
     if (tab === "inventory") setInventoryVisited(true);
   }
-  function openForm(tab: "resources" | "actions") {
+  function openForm(tab: "resources") {
     activateTab(tab);
     setFocusTarget(tab);
   }
@@ -99,6 +104,22 @@ export function DeviceDetailView({
   const attempt = data?.packageAttempt;
   const snapshot = data?.currentSnapshot;
   const storage = host?.details?.storage;
+  const hardware = host?.details;
+  const activeSessions = hardware?.sessions?.activeSessions;
+  const defaultInterfaces =
+    hardware?.network?.interfaces.filter(
+      (network) =>
+        (network.defaultRouteIpv4?.status === CollectionStatus.SUCCESS &&
+          network.defaultRouteIpv4.value) ||
+        (network.defaultRouteIpv6?.status === CollectionStatus.SUCCESS &&
+          network.defaultRouteIpv6.value),
+    ) ?? [];
+  const summaryInterfaces = defaultInterfaces.length
+    ? defaultInterfaces
+    : (hardware?.network?.interfaces ?? []);
+  const disks = storage?.devices.filter(
+    (block) => block.type?.status === CollectionStatus.SUCCESS && block.type.value === "disk",
+  );
   const root =
     storage?.status === CollectionStatus.SUCCESS
       ? storage.devices.find(
@@ -120,9 +141,7 @@ export function DeviceDetailView({
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold tracking-tight">
-            {device?.hostname.trim() || "Device inventory"}
-          </h1>
+          <PageHeader title={device?.hostname.trim() || "Device inventory"} />
           <p className="break-all font-mono text-xs text-muted-foreground">{deviceId}</p>
           {device ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -136,27 +155,22 @@ export function DeviceDetailView({
               </Badge>
               {compliance}
               <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Badge
-                      variant={
-                        encrypted ? "success" : encryption === "none" ? "warning" : "outline"
-                      }
-                      tabIndex={0}
-                    />
-                  }
-                >
-                  <Shield aria-hidden="true" />
-                  {encrypted
-                    ? "Root encrypted"
-                    : encryption === "none"
-                      ? "Root not encrypted"
-                      : "Encryption unknown"}
+                <TooltipTrigger render={<span tabIndex={0} className="inline-flex" />}>
+                  <StatusBadge
+                    status={encrypted ? "success" : encryption === "none" ? "warning" : "neutral"}
+                  >
+                    <Shield aria-hidden="true" />
+                    {encrypted
+                      ? "Root encrypted"
+                      : encryption === "none"
+                        ? "Root not encrypted"
+                        : "Encryption unknown"}
+                  </StatusBadge>
                 </TooltipTrigger>
                 <TooltipContent>
                   Latest device-reported root filesystem storage observation, not full-disk
-                  coverage, escrow readiness, or live state. Inspect Inventory and Encryption /
-                  Actions for exact evidence.
+                  coverage, escrow readiness, or live state. Inspect Inventory and Encryption for
+                  exact evidence.
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -168,23 +182,9 @@ export function DeviceDetailView({
             disabled={detail.isFetching}
             onClick={() => void detail.refetch()}
           >
-            <RefreshCw aria-hidden="true" /> Refresh
+            <RefreshCw aria-hidden="true" /> Refresh page
           </Button>
-          {device && canPermission(principal, "actions.lock") ? (
-            <Button variant="outline" onClick={() => openForm("actions")}>
-              <LockKeyhole aria-hidden="true" /> Lock…
-            </Button>
-          ) : null}
-          {device && canPermission(principal, "actions.release-lock") ? (
-            <Button variant="outline" onClick={() => openForm("actions")}>
-              Release lock…
-            </Button>
-          ) : null}
-          {device && canPermission(principal, "destructive.execute") ? (
-            <Button variant="outline" onClick={() => openForm("actions")}>
-              <Trash2 aria-hidden="true" /> Wipe…
-            </Button>
-          ) : null}
+          {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
           {device && canPermission(principal, "resources.assign") ? (
             <Button onClick={() => openForm("resources")}>
               <Plus aria-hidden="true" /> Assign profile
@@ -192,14 +192,7 @@ export function DeviceDetailView({
           ) : null}
         </div>
       </div>
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Device detail unavailable"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
       {detail.isPending ? <p role="status">Loading device inventory…</p> : null}
       {device ? (
         <>
@@ -246,34 +239,197 @@ export function DeviceDetailView({
           >
             <Card>
               <CardHeader>
-                <CardTitle>Identity and contact</CardTitle>
-                <CardDescription>Device identity and its latest accepted contact.</CardDescription>
+                <CardTitle>Machine summary</CardTitle>
+                <CardDescription>
+                  Latest inventory received <ObservedTime value={data?.host?.receivedAt} server />.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <details className="mb-4 text-xs text-muted-foreground">
-                  <summary className="w-fit cursor-pointer">
-                    How to interpret these observations
-                  </summary>
-                  <p className="mt-2">
-                    Contact is not inventory freshness, online presence, or compliance.
-                  </p>
-                </details>
                 <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <Fact label="Lifecycle">
-                    <DeviceLifecycleBadge state={device.lifecycleState} />
+                  <Fact label="Hostname">
+                    <ObservedValue field={host?.hostname} />
                   </Fact>
-                  <Fact label="Last contact (server)">
+                  <Fact label="Operating system">
+                    <ObservedValue field={host?.osId} />
+                  </Fact>
+                  <Fact label="OS version">
+                    <ObservedValue field={host?.osVersion} />
+                  </Fact>
+                  <Fact label="Kernel">
+                    <ObservedValue field={host?.kernelRelease} />
+                  </Fact>
+                  <Fact label="Hardware vendor">
+                    <ObservedValue field={host?.hardwareVendor} />
+                  </Fact>
+                  <Fact label="Model">
+                    <ObservedValue field={host?.hardwareModel} />
+                  </Fact>
+                  <Fact label="Serial number">
+                    <ObservedValue field={host?.hardwareSerial} />
+                  </Fact>
+                  <Fact label="CPU">
+                    <ObservedValue field={hardware?.cpu?.model} />
+                  </Fact>
+                  <Fact label="Logical cores">
+                    <NumberValue field={hardware?.cpu?.logicalCores} />
+                  </Fact>
+                  <Fact label="RAM">
+                    <NumberValue field={hardware?.memory?.totalBytes} unit="bytes" />
+                  </Fact>
+                  <Fact label="Disks">
+                    {storage?.status === CollectionStatus.SUCCESS ? (
+                      disks?.length ? (
+                        <ul className="space-y-1">
+                          {disks.map((disk) => (
+                            <li key={disk.name}>
+                              {disk.name}: <NumberValue field={disk.sizeBytes} unit="bytes" />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span>No whole disks reported</span>
+                      )
+                    ) : (
+                      <CollectionStatusBadge status={storage?.status} />
+                    )}
+                  </Fact>
+                  <Fact label="Root encryption">
+                    <ObservedValue field={root?.encryption} />
+                  </Fact>
+                  <Fact label="Logged-in users">
+                    <NumberValue field={hardware?.sessions?.users} />
+                    {activeSessions?.status === CollectionStatus.SUCCESS ? (
+                      activeSessions.sessions.length ? (
+                        <ul className="mt-2 space-y-1">
+                          {activeSessions.sessions.map((session, index) => (
+                            <li key={index}>
+                              <ObservedValue field={session.userName} />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2">No active sessions observed</p>
+                      )
+                    ) : (
+                      <p className="mt-2">
+                        Active session names:{" "}
+                        <CollectionStatusBadge status={activeSessions?.status} />
+                      </p>
+                    )}
+                  </Fact>
+                  <Fact label="Agent version">
+                    {device.agentVersionAcceptedAt && device.agentRelease ? (
+                      <div className="grid gap-1">
+                        <span>{device.agentRelease}</span>
+                        <span className="text-xs text-muted-foreground">
+                          Accepted <ObservedTime value={device.agentVersionAcceptedAt} server />
+                        </span>
+                      </div>
+                    ) : (
+                      <StatusBadge status="neutral">Not reported</StatusBadge>
+                    )}
+                  </Fact>
+                  <Fact label="Compliance">{compliance}</Fact>
+                  <Fact label="Last check-in">
                     <ObservedTime value={device.lastSeenAt} server />
                   </Fact>
-                  <Fact label="Host sequence">{device.hostSequence.toString()}</Fact>
-                  <Fact label="Package attempt sequence">{device.packageSequence.toString()}</Fact>
-                  <Fact label="Published snapshot sequence">
-                    {device.publishedSnapshotSequence.toString()}
+                  <Fact
+                    label={
+                      defaultInterfaces.length
+                        ? "Default-route IP and MAC"
+                        : "Observed network interfaces"
+                    }
+                  >
+                    {hardware?.network?.status === CollectionStatus.SUCCESS ? (
+                      hardware.network.interfaces.length ? (
+                        <ul className="space-y-3">
+                          {summaryInterfaces.slice(0, 4).map((network) => (
+                            <li key={network.name} className="grid gap-1">
+                              <span className="font-medium">{network.name}</span>
+                              <span className="text-xs">
+                                IPv4 default route:{" "}
+                                {network.defaultRouteIpv4?.status === CollectionStatus.SUCCESS ? (
+                                  network.defaultRouteIpv4.value ? (
+                                    "Yes"
+                                  ) : (
+                                    "No"
+                                  )
+                                ) : (
+                                  <CollectionStatusBadge
+                                    status={network.defaultRouteIpv4?.status}
+                                  />
+                                )}
+                              </span>
+                              <span className="text-xs">
+                                IPv6 default route:{" "}
+                                {network.defaultRouteIpv6?.status === CollectionStatus.SUCCESS ? (
+                                  network.defaultRouteIpv6.value ? (
+                                    "Yes"
+                                  ) : (
+                                    "No"
+                                  )
+                                ) : (
+                                  <CollectionStatusBadge
+                                    status={network.defaultRouteIpv6?.status}
+                                  />
+                                )}
+                              </span>
+                              <span>
+                                IP:{" "}
+                                {network.addresses?.status === CollectionStatus.SUCCESS ? (
+                                  network.addresses.values.join(", ") || "None observed"
+                                ) : (
+                                  <CollectionStatusBadge status={network.addresses?.status} />
+                                )}
+                              </span>
+                              <span>
+                                MAC: <ObservedValue field={network.mac} />
+                              </span>
+                            </li>
+                          ))}
+                          {summaryInterfaces.length > 4 || defaultInterfaces.length > 0 ? (
+                            <li>
+                              <Button variant="link" onClick={() => activateTab("inventory")}>
+                                View all {hardware.network.interfaces.length} interfaces in
+                                Inventory
+                              </Button>
+                            </li>
+                          ) : null}
+                        </ul>
+                      ) : (
+                        <span>No interfaces observed</span>
+                      )
+                    ) : (
+                      <CollectionStatusBadge status={hardware?.network?.status} />
+                    )}
                   </Fact>
                 </dl>
               </CardContent>
             </Card>
             <DeviceMetadataCard deviceId={deviceId} metadata={device.metadata} />
+            <details className="border p-4">
+              <summary className="w-fit cursor-pointer font-medium">Diagnostics</summary>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Fact label="Host sequence">{device.hostSequence.toString()}</Fact>
+                <Fact label="Package attempt sequence">{device.packageSequence.toString()}</Fact>
+                <Fact label="Published snapshot sequence">
+                  {device.publishedSnapshotSequence.toString()}
+                </Fact>
+                <Fact label="Enrollment generation">{device.enrollmentGeneration}</Fact>
+                <Fact label="Agent protocol version">
+                  {device.agentVersionAcceptedAt && device.agentProtocolVersion > 0
+                    ? device.agentProtocolVersion
+                    : "Not reported"}
+                </Fact>
+                <Fact label="Boot ID">
+                  <ObservedValue field={host?.bootId} />
+                </Fact>
+              </dl>
+              <DeviceAgentUpdate
+                status={data?.agentUpdate}
+                receivedAt={data?.agentUpdateReceivedAt}
+              />
+            </details>
           </section>
           <section
             role="tabpanel"
@@ -364,15 +520,7 @@ export function DeviceDetailView({
                       {attempt ? (
                         <dl className="grid gap-4 sm:grid-cols-2">
                           <Fact label="Result">
-                            <Badge
-                              variant={
-                                attempt.status === CollectionStatus.SUCCESS
-                                  ? "outline"
-                                  : "destructive"
-                              }
-                            >
-                              {collectionLabels[attempt.status] ?? "Unknown collection status"}
-                            </Badge>
+                            <CollectionStatusBadge status={attempt.status} />
                           </Fact>
                           <Fact label="Sequence">{attempt.sequence.toString()}</Fact>
                           <Fact label="Backend">{attempt.backend || "Not reported"}</Fact>
@@ -409,7 +557,17 @@ export function DeviceDetailView({
                       {snapshot ? (
                         <dl className="grid gap-4 sm:grid-cols-2">
                           <Fact label="State">
-                            {snapshotLabels[snapshot.state] ?? "Unknown snapshot state"}
+                            <StatusBadge
+                              status={
+                                snapshot.state === SnapshotState.COMMITTED
+                                  ? "success"
+                                  : snapshot.state === SnapshotState.STAGING
+                                    ? "info"
+                                    : "neutral"
+                              }
+                            >
+                              {snapshotLabels[snapshot.state] ?? "Unknown snapshot state"}
+                            </StatusBadge>
                           </Fact>
                           <Fact label="Packages">{snapshot.packageCount.toLocaleString()}</Fact>
                           <Fact label="Snapshot ID">
@@ -470,6 +628,18 @@ export function DeviceDetailView({
           </section>
           <section
             role="tabpanel"
+            id={`${tabId}-encryption-panel`}
+            aria-labelledby={`${tabId}-encryption-tab`}
+            tabIndex={0}
+            hidden={activeTab !== "encryption"}
+            className="space-y-4"
+          >
+            {activeTab === "encryption" ? (
+              <DeviceEncryptionPanel key={`encryption:${deviceId}`} deviceId={deviceId} />
+            ) : null}
+          </section>
+          <section
+            role="tabpanel"
             id={`${tabId}-actions-panel`}
             aria-labelledby={`${tabId}-actions-tab`}
             tabIndex={0}
@@ -477,15 +647,7 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {activeTab === "actions" ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Select a lock or wipe action in the preparation form; opening this tab executes
-                  nothing.
-                </p>
-                <DeviceEncryptionPanel key={`encryption:${deviceId}`} deviceId={deviceId} />
-                <DeviceActionsPanel key={`actions:${deviceId}`} deviceId={deviceId} />
-                {enrollmentRecovery?.(device)}
-              </>
+              <DeviceActionsPanel key={`actions:${deviceId}`} deviceId={deviceId} />
             ) : null}
           </section>
           <section

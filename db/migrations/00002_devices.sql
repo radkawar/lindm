@@ -94,6 +94,26 @@ ALTER TABLE devices
     ADD CONSTRAINT devices_current_generation_fk
     FOREIGN KEY (current_generation_id) REFERENCES enrollment_generations (id) ON DELETE RESTRICT;
 
+-- Update reports are untrusted session-fenced telemetry, not installed proofs.
+CREATE TABLE device_agent_update_reports (
+    generation_id uuid PRIMARY KEY REFERENCES enrollment_generations (id) ON DELETE RESTRICT,
+    session_epoch bigint NOT NULL CHECK (session_epoch BETWEEN 1 AND 65536),
+    status bytea NOT NULL CHECK (octet_length(status) <= 8192),
+    event_digest bytea NOT NULL CHECK (octet_length(event_digest) IN (0, 32)),
+    received_at timestamptz NOT NULL
+);
+
+-- Full bounded diagnostics accompany the existing operator audit summary.
+CREATE TABLE device_agent_update_events (
+    id uuid PRIMARY KEY REFERENCES audit_events (id) ON DELETE RESTRICT,
+    generation_id uuid NOT NULL REFERENCES enrollment_generations (id) ON DELETE RESTRICT,
+    session_epoch bigint NOT NULL CHECK (session_epoch BETWEEN 1 AND 65536),
+    status bytea NOT NULL CHECK (octet_length(status) <= 8192),
+    received_at timestamptz NOT NULL
+);
+CREATE INDEX device_agent_update_events_generation_idx
+    ON device_agent_update_events (generation_id, received_at DESC, id DESC);
+
 CREATE TABLE device_certificates (
     id uuid PRIMARY KEY,
     device_id uuid NOT NULL REFERENCES devices (id) ON DELETE RESTRICT,
@@ -548,6 +568,7 @@ $$;
 -- +goose Down
 
 DROP FUNCTION IF EXISTS device_scope_matches(uuid, boolean, jsonb);
+DROP TABLE IF EXISTS device_agent_update_events, device_agent_update_reports;
 DROP TABLE IF EXISTS offline_enrollment_authorizations, provisioning_enrollments, provisioning_tokens,
     enrollment_recovery_grants, enrollment_installations;
 DROP TABLE IF EXISTS device_group_memberships, device_groups;

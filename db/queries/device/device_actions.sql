@@ -42,6 +42,21 @@ SELECT * FROM device_action_escrow WHERE action_id = $1;
 -- name: SetDeviceActionEscrowReceipt :exec
 UPDATE device_actions SET escrow_receipt_envelope = sqlc.arg('escrow_receipt_envelope') WHERE id = sqlc.arg('id');
 
+-- name: SetDeviceActionInventoryReceipt :exec
+UPDATE device_actions SET inventory_receipt_envelope = sqlc.arg('inventory_receipt_envelope'), inventory_receipt_document = sqlc.arg('inventory_receipt_document') WHERE id = sqlc.arg('id');
+
+-- Admission slots bind the first fresh collection, even when the routine limiter
+-- would admit it. The caller holds the device/action locks in the ingestion tx.
+-- name: ClaimDeviceActionHostAdmission :execrows
+UPDATE device_actions SET inventory_host_sequence = sqlc.arg('sequence'), inventory_host_received_at = sqlc.arg('received_at')
+WHERE id = sqlc.arg('id') AND inventory_host_sequence = 0 AND closed_at IS NULL
+AND capability = 'device.refresh-inventory.v1' AND start_authorized_at IS NOT NULL;
+
+-- name: ClaimDeviceActionPackageAdmission :execrows
+UPDATE device_actions SET inventory_package_sequence = sqlc.arg('sequence')
+WHERE id = sqlc.arg('id') AND inventory_package_sequence = 0 AND closed_at IS NULL
+AND capability = 'device.refresh-inventory.v1' AND start_authorized_at IS NOT NULL;
+
 -- name: SetDeviceActionRestriction :exec
 INSERT INTO device_action_restrictions (device_id, sessions_locked, lock_action_id, quarantined, action_id, updated_at, quarantine_until)
 VALUES (sqlc.arg('device_id'), sqlc.arg('sessions_locked'), CASE WHEN sqlc.arg('set_sessions')::boolean THEN sqlc.arg('action_id')::uuid ELSE NULL END, sqlc.arg('quarantined'), sqlc.arg('action_id'), sqlc.arg('updated_at'), CASE WHEN sqlc.arg('quarantined')::boolean THEN sqlc.arg('updated_at')::timestamptz + interval '330 seconds' ELSE NULL END)
@@ -88,3 +103,18 @@ SELECT DISTINCT unnest(a.luks_uuids)::uuid AS luks_uuid FROM device_actions a
 JOIN device_action_escrow e ON e.action_id = a.id
 WHERE a.device_id = $1
 ORDER BY luks_uuid LIMIT 65;
+
+-- Admission claims prove postchallenge collection. The host receipt is retained
+-- on the action because the latest host observation can be overwritten later.
+-- name: GetDeviceActionInventoryPublication :one
+SELECT s.id AS snapshot_id, s.sequence AS package_sequence,
+       a.inventory_host_sequence AS host_sequence,
+       greatest(s.committed_at, a.inventory_host_received_at)::timestamptz AS published_at
+FROM device_actions a
+JOIN package_snapshots s ON s.generation_id = a.generation_id
+    AND s.device_id = a.device_id AND s.sequence = a.inventory_package_sequence
+WHERE a.id = sqlc.arg('action_id')
+  AND a.inventory_host_sequence > 0
+  AND a.inventory_host_received_at >= a.start_authorized_at
+  AND s.state IN ('committed', 'superseded')
+  AND s.committed_at >= a.start_authorized_at;

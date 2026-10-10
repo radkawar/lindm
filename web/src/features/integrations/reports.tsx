@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { adminClient, clearCsrfToken } from "@/lib/rpc";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import {
   ReportFormat,
@@ -66,12 +68,7 @@ export function Reports() {
         </p>
       </details>
       <ScheduleEditor />
-      {list.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Report schedules unavailable</AlertTitle>
-          <AlertDescription>{toRpcFailure(list.error).message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading report schedules…</span>
@@ -79,12 +76,10 @@ export function Reports() {
         </div>
       ) : null}
       {list.data?.schedules.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No report schedules on this page.
-        </p>
+        <EmptyState
+          title="No report schedules on this page"
+          description="Add a schedule to generate recurring reports."
+        />
       ) : null}
       {list.data?.schedules.map((schedule) => (
         <ScheduleEditor key={`${schedule.id}:${schedule.revision}`} existing={schedule} />
@@ -323,11 +318,11 @@ function Artifacts() {
   const [page, setPage] = useState("");
   const list = useQuery(reportArtifactsQueryOptions(lifetime, page));
   const [downloading, setDownloading] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<RpcFailure | null>(null);
   async function download(artifact: ReportArtifact) {
     if (downloading || lifetime.signal.aborted) return;
     setDownloading(artifact.id);
-    setError("");
+    setError(null);
     try {
       const parts: ArrayBuffer[] = [];
       let total = 0;
@@ -368,7 +363,7 @@ function Artifacts() {
           await navigate({ to: "/" });
           return;
         }
-        setError(next.message);
+        setError(next);
       }
     } finally {
       if (!lifetime.signal.aborted) setDownloading("");
@@ -386,18 +381,8 @@ function Artifacts() {
           Refresh artifacts
         </Button>
       </div>
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Download failed</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {list.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Artifacts unavailable</AlertTitle>
-          <AlertDescription>{toRpcFailure(list.error).message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {error ? <RpcError failure={error} /> : null}
+      {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading artifacts…</span>
@@ -405,12 +390,10 @@ function Artifacts() {
         </div>
       ) : null}
       {list.data?.artifacts.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No artifacts on this page.
-        </p>
+        <EmptyState
+          title="No report artifacts on this page"
+          description="Generated reports appear here after a scheduled run or audit export."
+        />
       ) : null}
       {list.data?.artifacts.map((artifact) => (
         <article key={artifact.id} className="grid min-w-0 gap-3 border bg-card p-4">
@@ -418,7 +401,22 @@ function Artifacts() {
             <h4 className="font-semibold">
               {KINDS[artifact.kind]} · {FORMATS[artifact.format]}
             </h4>
-            <Badge variant="outline">{artifact.state}</Badge>
+            <StatusBadge
+              status={
+                artifact.state === "failed" || artifact.failureReason
+                  ? "destructive"
+                  : artifact.state === "published"
+                    ? "success"
+                    : artifact.state === "building"
+                      ? "info"
+                      : "neutral"
+              }
+            >
+              {artifact.state
+                ? artifact.state.charAt(0).toUpperCase() +
+                  artifact.state.slice(1).replaceAll("_", " ")
+                : "Unknown"}
+            </StatusBadge>
           </div>
           <p className="break-all font-mono text-xs">{artifact.id}</p>
           <p className="text-sm">

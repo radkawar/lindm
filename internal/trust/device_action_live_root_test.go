@@ -93,7 +93,19 @@ func TestNativeSanitizeGrantRequiresExactObservedNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scope := &agentv1.NVMeSanitizeScope{NamespaceId: 1}
+	scope := &agentv1.NVMeSanitizeScope{
+		NamespaceId: 1,
+		Identity: &agentv1.NVMeSanitizeIdentity{
+			Basis:              agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID,
+			VendorId:           0x1b36,
+			SubsystemVendorId:  0x1234,
+			ControllerSerial:   "native-nvme",
+			ControllerModel:    "qualified-model",
+			ControllerFirmware: "1.0",
+			NamespaceSizeBytes: 1 << 30,
+			LbaDataSizeShift:   9,
+		},
+	}
 	f.intent.Spec.Action = &agentv1.DeviceActionSpec_Sanitize{Sanitize: &agentv1.SanitizeAction{Target: &agentv1.StorageTarget{Serial: "native-nvme", SizeBytes: 1 << 30}, Method: agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, NvmeScope: scope}}
 	specDigest, err := DeviceActionDigest(f.intent.Spec)
 	if err != nil {
@@ -102,19 +114,44 @@ func TestNativeSanitizeGrantRequiresExactObservedNamespace(t *testing.T) {
 	f.intent.SpecSha256 = specDigest[:]
 	f.challenge.SpecSha256 = bytes.Clone(specDigest[:])
 	f.challenge.NativePlan.Spec = proto.CloneOf(f.intent.Spec)
-	f.challenge.NativePlan.Before.NvmeSanitize = &agentv1.NVMeSanitizePlan{Scope: proto.CloneOf(scope), ControllerSerial: "native-nvme", ControllerModel: "qualified-model", ControllerFirmware: "qualified-version", AllocatedNamespaceIds: []uint32{1}, IdentifyControllerSha256: bytes.Repeat([]byte{1}, 32), IdentifyNamespaceSha256: bytes.Repeat([]byte{2}, 32), NamespaceInventorySha256: bytes.Repeat([]byte{3}, 32)}
+	f.challenge.NativePlan.Before.NvmeSanitize = &agentv1.NVMeSanitizePlan{Scope: proto.CloneOf(scope), ControllerSerial: "native-nvme", ControllerModel: "qualified-model", ControllerFirmware: "1.0", AllocatedNamespaceIds: []uint32{1}, IdentifyControllerSha256: bytes.Repeat([]byte{1}, 32), IdentifyNamespaceSha256: bytes.Repeat([]byte{2}, 32), NamespaceInventorySha256: bytes.Repeat([]byte{3}, 32)}
 	for _, approval := range f.grant.Approvals {
 		approval.Binding.SpecSha256 = bytes.Clone(specDigest[:])
 	}
 	for _, tc := range []struct {
-		name   string
-		change func(*agentv1.DeviceActionChallenge)
-		valid  bool
+		name         string
+		change       func(*agentv1.DeviceActionChallenge)
+		valid        bool
+		signerReject bool
 	}{
 		{name: "matching scope", valid: true},
 		{name: "missing native proof", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize = nil }},
 		{name: "different namespace", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.NamespaceId = 2 }},
 		{name: "widened controller scope", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.ControllerWide = true }},
+		{name: "missing identity", signerReject: true, change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.Identity = nil }},
+		{name: "different identity basis", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.Basis = agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_NAMESPACE_NID
+		}},
+		{name: "different controller vendor", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.Identity.VendorId++ }},
+		{name: "different subsystem vendor", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.SubsystemVendorId++
+		}},
+		{name: "different controller serial", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.ControllerSerial = "other"
+		}},
+		{name: "different controller model", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.ControllerModel = "other"
+		}},
+		{name: "different controller firmware", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.ControllerFirmware = "2.0"
+		}},
+		{name: "different namespace size", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.NamespaceSizeBytes++
+		}},
+		{name: "different LBA format", change: func(c *agentv1.DeviceActionChallenge) { c.NativePlan.Before.NvmeSanitize.Scope.Identity.LbaFormat++ }},
+		{name: "different LBA data size", change: func(c *agentv1.DeviceActionChallenge) {
+			c.NativePlan.Before.NvmeSanitize.Scope.Identity.LbaDataSizeShift++
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			challenge := proto.CloneOf(f.challenge)
@@ -128,7 +165,17 @@ func TestNativeSanitizeGrantRequiresExactObservedNamespace(t *testing.T) {
 			challenge.NativePlanSha256 = digest[:]
 			grant := proto.CloneOf(f.grant)
 			grant.Challenge = proto.CloneOf(challenge)
-			_, err = f.verifier.VerifyDeviceActionStart(t.Context(), f.root, f.delegation, executionSign(t, f.authority, grant, f.startKey), f.intent, challenge, f.now)
+			envelope, err := f.authority.Sign(t.Context(), grant, f.startKey)
+			if tc.signerReject {
+				if err == nil {
+					t.Fatal("signer accepted structurally invalid native scope")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = f.verifier.VerifyDeviceActionStart(t.Context(), f.root, f.delegation, envelope, f.intent, challenge, f.now)
 			if tc.valid && err != nil {
 				t.Fatal(err)
 			}

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
 
@@ -24,13 +25,16 @@ const maxDetailFile = 4 << 20
 
 // detailSources is a function seam, not a second provider: production uses the
 // same bounded native runner as package inventory. Reads never access shadow,
-// home directories, process environments, or session identities.
+// home directories, process environments, or login history.
 type detailSources struct {
-	readFile func(string) ([]byte, error)
-	readDir  func(string) ([]fs.DirEntry, error)
-	stat     func(string) (fs.FileInfo, error)
-	run      nativeRunner
-	sessions func(context.Context) *inventoryv1.SessionCounts
+	readFile    func(string) ([]byte, error)
+	readDir     func(string) ([]fs.DirEntry, error)
+	stat        func(string) (fs.FileInfo, error)
+	run         nativeRunner
+	openBlock   func(string) (*os.File, error)
+	nvmeScope   func(context.Context, *os.File, *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error)
+	sessions    func(context.Context) *inventoryv1.SessionCounts
+	rootStorage bool
 }
 
 func readDetailFile(path string) (_ []byte, err error) {
@@ -136,9 +140,13 @@ func collectDetails(ctx context.Context, s detailSources) *inventoryv1.NativeDet
 	modules, modulesErr := s.file(ctx, "/proc/modules")
 	uptime, uptimeErr := s.file(ctx, "/proc/uptime")
 	stat, statErr := s.file(ctx, "/proc/stat")
+	storage := &inventoryv1.StorageDetails{Status: unavailable}
+	if !s.rootStorage {
+		storage = collectStorage(ctx, s)
+	}
 	result := &inventoryv1.NativeDetails{
 		Cpu: collectCPU(ctx, s, cpu, cpuErr), Memory: parseMemory(memory, memoryErr),
-		Storage: collectStorage(ctx, s.run), Network: collectNetwork(ctx, s.run),
+		Storage: storage, Network: collectNetwork(ctx, s.run),
 		Firmware: collectFirmware(ctx, s), Tpm: collectTPM(ctx, s), Power: collectPower(ctx, s),
 		Sessions: s.sessions(ctx), LocalUsers: parseLocalUsers(users, usersErr),
 		KernelModuleCount: parseModuleCount(modules, modulesErr),
@@ -146,27 +154,30 @@ func collectDetails(ctx context.Context, s detailSources) *inventoryv1.NativeDet
 		Backends: collectBackends(ctx, s), Flatpak: collectApplications(ctx, s.run, "flatpak"), Snap: collectApplications(ctx, s.run, "snap"),
 		Platform: collectPlatform(ctx, s),
 	}
+	markDefaultRoutes(ctx, s, result.Network)
 	boundDetails(result)
 	return result
+}
+
+func detailCategoryStatus(message proto.Message) inventoryv1.CollectionStatus {
+	const maxCategory = 64 << 10
+	if proto.Size(message) > maxCategory {
+		return capacity
+	}
+	data, err := (protojson.MarshalOptions{Multiline: true}).Marshal(message)
+	if err != nil {
+		return invalid
+	}
+	if len(data) > maxCategory {
+		return capacity
+	}
+	return success
 }
 
 // Reserve at most 64 KiB per repeated category. This keeps the complete host
 // evidence below the control-plane envelope without publishing truncated lists.
 func boundDetails(result *inventoryv1.NativeDetails) {
-	check := func(message proto.Message) inventoryv1.CollectionStatus {
-		const maxCategory = 64 << 10
-		if proto.Size(message) > maxCategory {
-			return capacity
-		}
-		data, err := (protojson.MarshalOptions{Multiline: true}).Marshal(message)
-		if err != nil {
-			return invalid
-		}
-		if len(data) > maxCategory {
-			return capacity
-		}
-		return success
-	}
+	check := detailCategoryStatus
 	if status := check(result.Storage); status != success {
 		result.Storage = &inventoryv1.StorageDetails{Status: status}
 	}
@@ -178,6 +189,11 @@ func boundDetails(result *inventoryv1.NativeDetails) {
 	}
 	if status := check(result.LocalUsers); status != success {
 		result.LocalUsers = &inventoryv1.LocalUsers{Status: status}
+	}
+	if active := result.Sessions.GetActiveSessions(); active != nil {
+		if status := check(active); status != success {
+			result.Sessions.ActiveSessions = &inventoryv1.ActiveSessions{Status: status}
+		}
 	}
 	if status := check(result.Flatpak); status != success {
 		result.Flatpak = &inventoryv1.ApplicationDetails{Status: status}

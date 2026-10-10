@@ -18,7 +18,7 @@ import type { RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
-import { EnrollmentFailure } from "./provisioning";
+import { RpcError } from "@/components/ui/rpc-error";
 import { enrollmentFailure, validateEnrollment } from "./validation";
 
 export function RecoveryEnrollment({ device }: { device: Device }) {
@@ -81,28 +81,23 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          {held
-            ? "Resolve clone / identity recovery hold"
-            : "Explicit reinstall / identity recovery"}
-        </CardTitle>
+        <CardTitle>{held ? "Recover device identity" : "Reinstall this device"}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         <Alert variant={held ? "destructive" : "default"}>
           <AlertTitle>
             {held
-              ? "Ambiguous identity is held — do not merge clones"
+              ? "Identity on hold. Do not merge clones."
               : "Replace this specific device generation"}
           </AlertTitle>
           <AlertDescription>
-            Independently identify the intended physical installation. Hostname, serial, MAC and TPM
-            hints are evidence, not authority. This operation never releases the ambiguous old
-            identity. A separately approved one-use grant explicitly links a new key and generation
-            to this device. Successful consumption retires ALL old-generation credentials; other
-            clones must enroll separately with new credentials. Do not erase a journal to retry an
-            interrupted enrollment. Approval binds the current generation and revocation state. If
-            either changes, refresh the device and request a new independent approval; an earlier
-            approval cannot override a later revocation.
+            Verify the physical installation independently. Hostname, serial, MAC and TPM hints
+            alone do not authorize recovery. The approved one-use grant links a new key and
+            generation to this device without releasing the old identity. All old-generation
+            credentials are retired when the grant is used. Other clones must enroll separately.
+            Never erase a journal to retry an interrupted enrollment. If the generation or
+            revocation state changes, refresh and request a new approval. An earlier approval cannot
+            override a later revocation.
           </AlertDescription>
         </Alert>
         <p className="break-all text-sm">
@@ -138,14 +133,14 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
                 and reapprove after a state change.
               </p>
             ) : null}
-            {failure ? <EnrollmentFailure failure={failure} /> : null}
+            {failure ? <RpcError failure={failure} /> : null}
             {approvalId ? (
               <p role="status" className="break-all text-sm">
                 Approval {approvalId} requested.{" "}
                 <Link to="/approvals" className="underline underline-offset-4">
-                  A different human reviews it in the inbox; return there as requester to issue the
-                  one-time recovery grant.
+                  Open approvals
                 </Link>
+                . A different person must approve. Then return as requester to issue the grant.
               </p>
             ) : (
               <Button type="submit" className="w-fit" variant="destructive" disabled={busy}>
@@ -159,8 +154,7 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
           </form>
         ) : (
           <p className="text-sm text-muted-foreground">
-            A human with device revocation permission in the current scope must request recovery.
-            The server remains authoritative.
+            Recovery requires a human account with device revocation permission for this device.
           </p>
         )}
       </CardContent>

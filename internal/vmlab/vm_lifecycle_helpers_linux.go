@@ -32,9 +32,13 @@ func uploadLifecycleProbe(ctx context.Context, vm *guestVM, path string) error {
 		return err
 	}
 	defer func() { _ = file.Close() }()
+	_, machine, err := inspectArchitecture(vm.hardware.Architecture)
+	if err != nil {
+		return err
+	}
 	binary, err := elf.NewFile(file)
-	if err != nil || binary.Machine != elf.EM_X86_64 || binary.Class != elf.ELFCLASS64 {
-		return errors.New("laboratory probe must be an amd64 ELF executable")
+	if err != nil || binary.Machine != machine || binary.Class != elf.ELFCLASS64 || (binary.Type != elf.ET_EXEC && binary.Type != elf.ET_DYN) {
+		return errors.New("laboratory probe must be an executable ELF matching the guest architecture")
 	}
 	hash := sha256.New()
 	if _, err := copyVMBytes(ctx, hash, file, 256<<20); err != nil {

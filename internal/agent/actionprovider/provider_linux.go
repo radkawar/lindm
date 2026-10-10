@@ -57,6 +57,8 @@ type Provider struct {
 	recoveryCustody func(context.Context, *agentv1.DeviceActionSpec) error
 	run             nativeRunner
 	sessionNative   func(context.Context, string) ([]graphicalSession, error)
+	openPower       func(context.Context) (powerBus, func() error, error)
+	bootID          func() (string, error)
 	accounts        *accountLocker
 	resolve         func(context.Context, *agentv1.DeviceActionSpec, bool) (*targetHandle, error)
 	flushHeader     func(*os.File) error
@@ -114,6 +116,8 @@ func New(options Options) (*Provider, error) {
 	}
 	p := &Provider{config: proto.CloneOf(config), validate: validator, seal: options.SealRecovery, recoveryCustody: options.TrustedRecoveryCustody, run: runNative, gate: make(chan struct{}, 1), clock: time.Now}
 	p.sessionNative = logindSessions
+	p.openPower = openLogindPower
+	p.bootID = powerBootID
 	p.accounts, err = newAccountLocker(options.AccountJournal, config)
 	if err != nil {
 		return nil, err
@@ -191,10 +195,16 @@ func (p *Provider) observe(ctx context.Context, spec *agentv1.DeviceActionSpec) 
 	if err := p.validate.Validate(spec); err != nil {
 		return nil, err
 	}
+	if _, ok := powerAction(spec); ok {
+		return p.observePower(ctx, spec)
+	}
 	if LiveRootHeaderErase(spec) {
 		return p.observeLiveRoot(ctx, spec)
 	}
 	observation := &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(p.clock()), Supported: true}
+	if spec.GetRefreshInventory() != nil {
+		return observation, nil
+	}
 	unsupported := func(reason string) (*agentv1.DeviceActionObservation, error) {
 		observation.Supported = false
 		observation.Reason = reason
@@ -395,6 +405,13 @@ func (p *Provider) Apply(ctx context.Context, plan *agentv1.DeviceActionPlan, cr
 	if gate == nil {
 		return nil, ErrConflict
 	}
+	if _, ok := powerAction(plan.GetSpec()); ok {
+		return p.applyPower(ctx, plan, gate)
+	}
+	if plan.GetSpec().GetRefreshInventory() != nil {
+		// Collection and durable transport publication belong to the executor.
+		return nil, ErrUnsupported
+	}
 	if LiveRootHeaderErase(plan.GetSpec()) {
 		return p.applyLiveRoot(ctx, plan, gate)
 	}
@@ -476,6 +493,13 @@ func (p *Provider) Verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, result *agentv1.DeviceActionVerification) (_ *agentv1.DeviceActionVerification, err error) {
 	if result == nil {
 		return nil, ErrNotVerified
+	}
+	if _, ok := powerAction(plan.GetSpec()); ok {
+		// Only the executor's later boot observation can confirm a restart.
+		return nil, ErrNotVerified
+	}
+	if plan.GetSpec().GetRefreshInventory() != nil {
+		return nil, ErrUnsupported
 	}
 	if LiveRootHeaderErase(plan.GetSpec()) {
 		// All raw verification was performed against pinned descriptors before

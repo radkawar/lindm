@@ -25,6 +25,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&hardware.StorageBus, "storage-bus", "virtio-scsi", "virtio-scsi, sata, nvme or virtio-blk; actual complete WWN/serial identity required")
 	flags.BoolVar(&hardware.TPM, "tpm", true, "swtpm2 present; false requires an observed real-server TPM-absent denial instead of a positive bind")
 	flags.StringVar(&options.Repository, "repo", ".", "repository with initialized dev PostgreSQL and trust fixture")
+	flags.StringVar(&options.BuildRepository, "build-repo", "", "package source repository; defaults to -repo")
 	flags.StringVar(&options.LabBinary, "lab", "", "prebuilt Linux amd64 lab executable for installed guest probes")
 	flags.StringVar(&options.LindmdBinary, "lindmd", "", "prebuilt current server executable")
 	flags.StringVar(&options.Encrypted.CacheDir, "cache", ".cache/lab/images", "verified official image cache")

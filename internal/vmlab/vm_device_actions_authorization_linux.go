@@ -58,10 +58,7 @@ func nativeApprovalNegatives(ctx context.Context, fixture *devlab.AuthorityFixtu
 			evidence = append(evidence, observation)
 			continue
 		}
-		if err := (*approver).StepUp(ctx); err != nil {
-			return evidence, err
-		}
-		approved, err := (*approver).Admin.ApproveApproval(ctx, connect.NewRequest(decision))
+		approved, err := (*approver).ApproveApproval(ctx, connect.NewRequest(decision))
 		if err != nil {
 			return evidence, err
 		}

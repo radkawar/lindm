@@ -684,11 +684,3 @@ func enrollDevice(t *testing.T, ctx context.Context, svc *Service, ownerCtx cont
 	}
 	return created.Msg.GetSecret(), txID, csr, enrolled
 }
-
-func rpcReason(err error) string {
-	var connectErr *connect.Error
-	if errors.As(err, &connectErr) {
-		return connectErr.Message()
-	}
-	return ""
-}

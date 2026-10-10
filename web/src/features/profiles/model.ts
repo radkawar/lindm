@@ -8,7 +8,7 @@ import {
 } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
-import { Code, ConnectError } from "@connectrpc/connect";
+import { ConnectError } from "@connectrpc/connect";
 import {
   PublishProfileRevisionRequestSchema,
   type PublishProfileRevisionRequest,
@@ -43,7 +43,7 @@ function editorBound(field: DescField): number {
 }
 
 export const CATALOG_SEMANTICS =
-  "Publishing records an immutable catalog revision and can move the catalog head. It does not assign the profile, deploy it, or prove native compliance.";
+  "Publishing saves a revision. To deploy it, assign it in Rollouts. Publication alone does not confirm device compliance.";
 
 // The row identity is independent of the editable protobuf resource ID.
 export type DraftResource = { resourceId: string; document: string };
@@ -142,18 +142,6 @@ export function classifyPublishError(error: unknown): { failure: RpcFailure; con
     failure.message === "profile_revision_conflict" ||
     connectError.rawMessage === "profile_revision_conflict";
   return { conflict, failure: conflict ? { ...failure, ambiguous: false } : failure };
-}
-
-export function publishFailureTitle(failure: RpcFailure, conflict: boolean): string {
-  if (conflict) return "Catalog head conflict";
-  if (failure.denied) return "Not authorized";
-  if (failure.unauthenticated) return "Sign-in required";
-  if (failure.message === "profile_revision_not_found") return "Profile revision not found";
-  if (failure.message === "profile_recovery_hold") return "Profile catalog recovery hold";
-  if (failure.message === "profile_revision_capacity") return "Profile revision capacity exhausted";
-  if (failure.message === "invalid_profile_request") return "Profile request rejected";
-  if (failure.code === Code.Aborted || failure.ambiguous) return "Publish result unknown";
-  return "Publish failed";
 }
 
 export function formatSha256(bytes: Uint8Array): string {

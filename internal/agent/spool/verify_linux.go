@@ -193,7 +193,7 @@ func (s *Store) verifyPackage(ctx context.Context, allocated int64, owned map[st
 		if pending.Sequence < 1 || pending.Sequence > allocated {
 			return ErrNeedsSync
 		}
-		if err := s.verifyPackageRow(ctx, pending, true); err != nil {
+		if _, err := s.verifyPackageRow(ctx, pending, true); err != nil {
 			return err
 		}
 	}
@@ -207,7 +207,7 @@ func (s *Store) verifyPackage(ctx context.Context, allocated int64, owned map[st
 	if queued.Sequence != 0 {
 		return ErrNeedsSync
 	}
-	if err := s.verifyPackageRow(ctx, queued, false); err != nil {
+	if _, err := s.verifyPackageRow(ctx, queued, false); err != nil {
 		if dropErr := s.dropQueuedPackage(ctx); dropErr != nil {
 			return dropErr
 		}
@@ -234,58 +234,58 @@ func (s *Store) unreferenced(ctx context.Context, owned map[string]spooldb.Owned
 	return nil
 }
 
-func (s *Store) verifyPackageRow(ctx context.Context, row spooldb.ReadPackageSlotRow, pending bool) error {
+func (s *Store) verifyPackageRow(ctx context.Context, row spooldb.ReadPackageSlotRow, pending bool) (int64, error) {
 	if row.FinishedUnix < row.StartedUnix || row.Status < 1 || row.Status > 7 || len(row.AcceptedMask) != 64 {
-		return ErrNeedsSync
+		return 0, ErrNeedsSync
 	}
 	success := row.Success == 1
 	if success != (row.Status == int64(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)) {
-		return ErrNeedsSync
+		return 0, ErrNeedsSync
 	}
 	if !success {
 		if row.SnapshotID != "" || row.CollectionID != "" || len(row.Manifest) != 0 || row.BeginAccepted != 0 {
-			return ErrNeedsSync
+			return 0, ErrNeedsSync
 		}
-		return nil
+		return 0, nil
 	}
 	if !pending {
 		if row.SnapshotID != "" || len(row.Manifest) != 0 || row.BeginAccepted != 0 {
-			return ErrNeedsSync
+			return 0, ErrNeedsSync
 		}
 	}
 	if row.CollectionID == "" {
 		if !pending {
-			return nil
+			return 0, nil
 		}
-		return s.verifyManifest(row, nil)
+		return 0, s.verifyManifest(row, nil)
 	}
 	if !canonicalUUID(row.CollectionID) {
-		return ErrNeedsSync
+		return 0, ErrNeedsSync
 	}
 	batches, err := s.queries.ListBatches(ctx, row.CollectionID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if len(batches) == 0 || len(batches) > MaxBatches {
-		return ErrNeedsSync
+		return 0, ErrNeedsSync
 	}
 	var total int64
 	for i, batch := range batches {
 		if batch.BatchIndex != int64(i) || batch.RecordCount < 1 || batch.RecordCount > MaxBatchRecords || batch.EncodedSize < 1 || batch.EncodedSize > MaxBatchEncoded || len(batch.Sha256) != 32 {
-			return ErrNeedsSync
+			return 0, ErrNeedsSync
 		}
 		total += batch.EncodedSize
 	}
 	if total <= 0 || total > CollectionBudget {
-		return ErrNeedsSync
+		return 0, ErrNeedsSync
 	}
 	if err := s.hashCollection(row.CollectionID, batches); err != nil {
-		return err
+		return 0, err
 	}
 	if pending {
-		return s.verifyManifest(row, batches)
+		return total, s.verifyManifest(row, batches)
 	}
-	return nil
+	return total, nil
 }
 
 func (s *Store) hashCollection(id string, batches []spooldb.ListBatchesRow) error {

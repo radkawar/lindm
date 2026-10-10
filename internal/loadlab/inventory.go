@@ -59,6 +59,7 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		d.hostSequence++
 		d.packageSequence++
 		host := &inventoryv1.HostObservation{StartedAt: now, FinishedAt: now, BootId: observed(d.boot), Hostname: observed(label(index)), OsId: observed("ubuntu"), OsVersion: observed("24.04"), Architecture: observed("x86_64"), KernelRelease: observed("6.8.0-90-generic"), HardwareVendor: observed("Lindm capacity simulator"), HardwareModel: observed("Synthetic, not native inventory"), HardwareSerial: observed(label(index))}
+		host.Details = syntheticNativeDetails()
 		d.inventoryUpload = &pendingInventoryUpload{
 			host:     &devicev1.ReportHostObservationRequest{EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, Sequence: d.hostSequence, Observation: host},
 			manifest: &devicev1.PackageSnapshotManifest{SnapshotId: id.String(), CreatedAt: now, EnrollmentGeneration: d.generation, Sequence: d.packageSequence, StartedAt: now, FinishedAt: now, Backend: "dpkg-query", Batches: r.packages.descriptors},
@@ -98,4 +99,29 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 	}
 	d.inventoryUpload = nil
 	return nil
+}
+
+// The capacity simulator has no native sessions. Publish an explicit synthetic
+// zero so the console can exercise non-destructive action admission, while
+// leaving hardware, storage and encryption capabilities unavailable.
+func syntheticNativeDetails() *inventoryv1.NativeDetails {
+	unavailable := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	text := func() *inventoryv1.ObservedString { return &inventoryv1.ObservedString{Status: unavailable} }
+	number := func() *inventoryv1.ObservedUint64 { return &inventoryv1.ObservedUint64{Status: unavailable} }
+	boolean := func() *inventoryv1.ObservedBool { return &inventoryv1.ObservedBool{Status: unavailable} }
+	return &inventoryv1.NativeDetails{
+		Cpu:               &inventoryv1.CpuDetails{Model: text(), LogicalCores: number(), PhysicalCores: number(), X86_64Level: text()},
+		Memory:            &inventoryv1.MemoryDetails{TotalBytes: number(), AvailableBytes: number(), SwapTotalBytes: number()},
+		Storage:           &inventoryv1.StorageDetails{Status: unavailable},
+		Network:           &inventoryv1.NetworkDetails{Status: unavailable},
+		Firmware:          &inventoryv1.FirmwareDetails{Mode: text(), SecureBoot: text()},
+		Tpm:               &inventoryv1.TpmDetails{Present: boolean(), Version: text()},
+		Power:             &inventoryv1.PowerDetails{Chassis: text(), Batteries: &inventoryv1.BatteryDetails{Status: unavailable}},
+		Sessions:          &inventoryv1.SessionCounts{Users: &inventoryv1.ObservedUint64{Status: success}, Sessions: &inventoryv1.ObservedUint64{Status: success}},
+		LocalUsers:        &inventoryv1.LocalUsers{Status: unavailable},
+		KernelModuleCount: number(), UptimeSeconds: number(), BootTimeUnixSeconds: number(),
+		Backends: &inventoryv1.BackendDetails{Dpkg: boolean(), Rpm: boolean(), Pacman: boolean(), Zypper: boolean(), RpmOstree: boolean(), Nix: boolean(), Flatpak: boolean(), Snap: boolean()},
+		Flatpak:  &inventoryv1.ApplicationDetails{Status: unavailable}, Snap: &inventoryv1.ApplicationDetails{Status: unavailable},
+	}
 }

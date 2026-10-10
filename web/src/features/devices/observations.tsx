@@ -6,6 +6,7 @@ import {
 } from "../../../gen/lindm/inventory/v1/observation_pb";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export const collectionLabels: Record<CollectionStatus, string> = {
   [CollectionStatus.UNSPECIFIED]: "Not reported",
@@ -18,6 +19,27 @@ export const collectionLabels: Record<CollectionStatus, string> = {
   [CollectionStatus.NATIVE_COMMAND_FAILURE]: "Native command failed",
 };
 
+export function CollectionStatusBadge({ status }: { status: CollectionStatus | undefined }) {
+  return (
+    <StatusBadge
+      status={
+        status === CollectionStatus.SUCCESS
+          ? "success"
+          : status === undefined ||
+              status === CollectionStatus.UNSPECIFIED ||
+              status === CollectionStatus.UNAVAILABLE
+            ? "neutral"
+            : status === CollectionStatus.PERMISSION_DENIED ||
+                status === CollectionStatus.CAPACITY_EXCEEDED
+              ? "warning"
+              : "destructive"
+      }
+    >
+      {collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status"}
+    </StatusBadge>
+  );
+}
+
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
@@ -28,13 +50,11 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
 }
 
 export function ObservedValue({ field }: { field: ObservedString | undefined }) {
-  if (!field) return <span className="text-muted-foreground">Not reported</span>;
+  if (!field) return <CollectionStatusBadge status={undefined} />;
   return field.status === CollectionStatus.SUCCESS ? (
     <span>{field.value}</span>
   ) : (
-    <span className="text-muted-foreground">
-      {collectionLabels[field.status] ?? "Unknown collection status"}
-    </span>
+    <CollectionStatusBadge status={field.status} />
   );
 }
 

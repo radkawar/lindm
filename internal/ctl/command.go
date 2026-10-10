@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -21,7 +22,7 @@ import (
 	policyv1 "lindm/gen/lindm/policy/v1"
 )
 
-const usage = "usage: lindmctl {login|logout|whoami|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list} [flags]"
+const usage = "usage: lindmctl {login|logout|whoami|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list|execution delegation sign} [flags]"
 
 // Run executes one command. Secret-issuing operations write their response only
 // once to stdout and are never retried. Browser invocation is injected by main.
@@ -31,6 +32,9 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 	}
 	if len(args) == 0 {
 		return errors.New(usage)
+	}
+	if args[0] == "execution" {
+		return runOwnerDelegation(ctx, args[1:], stdout, time.Now)
 	}
 	command, args := args[0], args[1:]
 	switch command {

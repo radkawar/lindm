@@ -102,6 +102,214 @@ func (s *Store) Queued(ctx context.Context) (bool, bool, error) {
 	return hostErr == nil, pkgErr == nil, nil
 }
 
+// QueuedForRefresh reports which queued slots contain complete observations
+// collected at or after startedAt. A missing, older or unsuccessful collection
+// reports false; invalid fresh payloads return an error. Like PendingHost and
+// PendingPackage, inspection is permitted during a healthy reopen's sync fence.
+// It never promotes, replaces or acknowledges an observation.
+func (s *Store) QueuedForRefresh(ctx context.Context, startedAt time.Time) (bool, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.inspectable(ctx); err != nil {
+		return false, false, err
+	}
+	if startedAt.IsZero() || !unixTime(startedAt.UnixNano()).Equal(startedAt) {
+		return false, false, ErrInvalid
+	}
+	hostFresh := false
+	hostRow, err := s.queries.ReadHostSlot(ctx, slotQueued)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, false, dbErr(ctx, err)
+	}
+	if err == nil {
+		host, err := decodeHost(hostRow.Observation)
+		if err != nil || hostRow.Sequence != 0 || s.validator.Validate(host) != nil {
+			return false, false, ErrInvalid
+		}
+		hostFresh = !host.GetStartedAt().AsTime().Before(startedAt)
+	}
+	packageRow, err := s.queries.ReadPackageSlot(ctx, slotQueued)
+	if errors.Is(err, sql.ErrNoRows) {
+		return hostFresh, false, nil
+	}
+	if err != nil {
+		return false, false, dbErr(ctx, err)
+	}
+	if packageRow.Success != 1 || unixTime(packageRow.StartedUnix).Before(startedAt) {
+		return hostFresh, false, nil
+	}
+	if packageRow.Sequence != 0 {
+		return false, false, ErrInvalid
+	}
+	queuedBytes, err := s.verifyPackageRow(ctx, packageRow, false)
+	if err != nil {
+		return false, false, dbErr(ctx, err)
+	}
+	if err := s.verifyRefreshOwnership(ctx, "", packageRow.CollectionID, queuedBytes); err != nil {
+		return false, false, dbErr(ctx, err)
+	}
+	return hostFresh, true, nil
+}
+
+// SupersedeForRefresh discards a prechallenge pending observation only when its
+// own domain has a complete fresh queued replacement. The caller must durably
+// Queue a full successful collection before the first refresh upload. On retry,
+// the other domain may already be pending or acknowledged; fresh pending uploads
+// are always preserved. This method neither acknowledges publication nor changes
+// allocated sequences or server high-water marks. Replacements must be promoted
+// to new sequences before upload.
+//
+// ErrPending means an older pending observation lacks a fresh queued replacement
+// (including an unsuccessful queued package). ErrInvalid means startedAt or queued
+// host metadata is invalid. Invalid payload/ownership metadata fails closed with
+// ErrNeedsSync or ErrConflict. All required replacements are verified before any
+// pending slot is detached. Cancellation or cleanup failure after the transaction
+// may leave an owned orphan for normal reopen/queue cleanup, but never removes the
+// fresh queued payload or rewinds the spent sequences.
+func (s *Store) SupersedeForRefresh(ctx context.Context, startedAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ready(ctx); err != nil {
+		return err
+	}
+	if startedAt.IsZero() || !unixTime(startedAt.UnixNano()).Equal(startedAt) {
+		return ErrInvalid
+	}
+	pendingHost, hostErr := s.queries.ReadHostSlot(ctx, slotPending)
+	if hostErr != nil && !errors.Is(hostErr, sql.ErrNoRows) {
+		return dbErr(ctx, hostErr)
+	}
+	discardHost := false
+	if hostErr == nil {
+		host, err := decodeHost(pendingHost.Observation)
+		if err != nil || s.validator.Validate(host) != nil {
+			return ErrNeedsSync
+		}
+		discardHost = host.GetStartedAt().AsTime().Before(startedAt)
+	}
+	pendingPackage, packageErr := s.queries.ReadPackageSlot(ctx, slotPending)
+	if packageErr != nil && !errors.Is(packageErr, sql.ErrNoRows) {
+		return dbErr(ctx, packageErr)
+	}
+	discardPackage := packageErr == nil && unixTime(pendingPackage.StartedUnix).Before(startedAt)
+	if !discardHost && !discardPackage {
+		return nil
+	}
+	if discardHost {
+		queuedHost, err := s.queries.ReadHostSlot(ctx, slotQueued)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrPending
+		}
+		if err != nil {
+			return dbErr(ctx, err)
+		}
+		host, err := decodeHost(queuedHost.Observation)
+		if err != nil || queuedHost.Sequence != 0 || s.validator.Validate(host) != nil {
+			return ErrInvalid
+		}
+		if host.GetStartedAt().AsTime().Before(startedAt) {
+			return ErrPending
+		}
+	}
+	obsoleteID := ""
+	if discardPackage {
+		queuedPackage, err := s.queries.ReadPackageSlot(ctx, slotQueued)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrPending
+		}
+		if err != nil {
+			return dbErr(ctx, err)
+		}
+		if queuedPackage.Success != 1 || unixTime(queuedPackage.StartedUnix).Before(startedAt) {
+			return ErrPending
+		}
+		if queuedPackage.Sequence != 0 {
+			return ErrInvalid
+		}
+		queuedBytes, err := s.verifyPackageRow(ctx, queuedPackage, false)
+		if err != nil {
+			return dbErr(ctx, err)
+		}
+		obsoleteID = pendingPackage.CollectionID
+		if err := s.verifyRefreshOwnership(ctx, obsoleteID, queuedPackage.CollectionID, queuedBytes); err != nil {
+			return dbErr(ctx, err)
+		}
+	}
+	// The store lock and sole-writer flock hold the verified slots stable until
+	// this transaction has detached only the older pending observations.
+	err := s.tx(ctx, func(q *spooldb.Queries) error {
+		if discardHost {
+			if err := q.DeleteHostSlot(ctx, slotPending); err != nil {
+				return err
+			}
+		}
+		if discardPackage {
+			if err := q.DeletePackageSlot(ctx, slotPending); err != nil {
+				return err
+			}
+		}
+		if obsoleteID == "" {
+			return nil
+		}
+		if err := q.DeleteBatches(ctx, obsoleteID); err != nil {
+			return err
+		}
+		changed, err := q.MarkOwned(ctx, spooldb.MarkOwnedParams{Referenced: 0, ByteSize: 0, CollectionID: obsoleteID})
+		if err != nil {
+			return err
+		}
+		if changed != 1 {
+			return ErrConflict
+		}
+		return nil
+	})
+	if err != nil {
+		return dbErr(ctx, err)
+	}
+	if err := s.checkpoint(ctx); err != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if obsoleteID == "" {
+		return nil
+	}
+	if err := s.deleteCollection(obsoleteID); err != nil {
+		return err
+	}
+	return dbErr(ctx, s.queries.DeleteOwned(ctx, obsoleteID))
+}
+
+func (s *Store) verifyRefreshOwnership(ctx context.Context, pendingID, queuedID string, queuedBytes int64) error {
+	if pendingID != "" && pendingID == queuedID {
+		return ErrConflict
+	}
+	if pendingID == "" && queuedID == "" {
+		return ctx.Err()
+	}
+	owned, err := s.queries.ListOwned(ctx)
+	if err != nil {
+		return err
+	}
+	for _, id := range [2]string{pendingID, queuedID} {
+		if id == "" {
+			continue
+		}
+		found := false
+		for _, row := range owned {
+			if row.CollectionID == id {
+				found = canonicalUUID(id) && row.Referenced == 1 && row.ByteSize > 0
+				if id == queuedID && row.ByteSize != queuedBytes {
+					return ErrNeedsSync
+				}
+				break
+			}
+		}
+		if !found {
+			return ErrNeedsSync
+		}
+	}
+	return nil
+}
+
 // PendingHost returns the immutable in-flight host upload, if any.
 func (s *Store) PendingHost(ctx context.Context) (HostUpload, bool, error) {
 	s.mu.Lock()
@@ -589,7 +797,6 @@ func (s *Store) dropPendingPackage(ctx context.Context, row spooldb.ReadPackageS
 	}
 	return s.queries.DeleteOwned(ctx, id)
 }
-
 func (s *Store) alreadyTerminal(ctx context.Context, host bool, seq, serverHigh uint64) error {
 	scope, err := s.queries.ReadScope(ctx)
 	if err != nil {

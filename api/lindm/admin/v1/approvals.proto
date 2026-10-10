@@ -64,6 +64,10 @@ message Approval {
     CreateRecoveryEnrollmentGrantRequest recover_device = 18;
     ActivateTargetPreviewRequest activate_target_preview = 19;
   }
+  // Current labels projected only for authorized approval responses.
+  string requester_display_name = 20;
+  string approver_display_name = 21;
+  string device_hostname = 22;
 }
 
 message CreateApprovalRequest {

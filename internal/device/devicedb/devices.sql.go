@@ -120,9 +120,13 @@ SELECT
     d.host_received_at,
     d.package_attempt_received_at,
     d.snapshot_received_at,
-    g.current_snapshot_id
+    g.current_snapshot_id,
+    coalesce(r.agent_release, '')::text AS agent_release,
+    coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
+    r.reported_at AS agent_version_accepted_at
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
 WHERE d.id = $1
 `
 
@@ -144,6 +148,9 @@ type GetDeviceDetailRow struct {
 	PackageAttemptReceivedAt pgtype.Timestamptz
 	SnapshotReceivedAt       pgtype.Timestamptz
 	CurrentSnapshotID        *uuid.UUID
+	AgentRelease             string
+	AgentProtocolVersion     int32
+	AgentVersionAcceptedAt   pgtype.Timestamptz
 }
 
 func (q *Queries) GetDeviceDetail(ctx context.Context, id uuid.UUID) (GetDeviceDetailRow, error) {
@@ -167,6 +174,9 @@ func (q *Queries) GetDeviceDetail(ctx context.Context, id uuid.UUID) (GetDeviceD
 		&i.PackageAttemptReceivedAt,
 		&i.SnapshotReceivedAt,
 		&i.CurrentSnapshotID,
+		&i.AgentRelease,
+		&i.AgentProtocolVersion,
+		&i.AgentVersionAcceptedAt,
 	)
 	return i, err
 }

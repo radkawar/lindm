@@ -4,8 +4,10 @@ package vmlab
 
 import (
 	"context"
+	"debug/elf"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,7 +23,20 @@ import (
 // not similarly named host binaries. Build independently closes/pins every ELF
 // dependency before signing the actual UKI with the fixture's enrolled db signer.
 func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte) (*recoveryboot.Artifact, error) {
-	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(signer.dir, "recovery-build"), SigningKey: signer.key, Certificate: recoveryboot.Ingredient{Source: signer.certificate, SHA256: signer.certificateSHA256}, StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix()}
+	_, serialConsole, err := encryptedInstallerArchitecture(vm.hardware.Architecture)
+	if err != nil {
+		return nil, err
+	}
+	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(signer.dir, "recovery-build"), SigningKey: signer.key, Certificate: recoveryboot.Ingredient{Source: signer.certificate, SHA256: signer.certificateSHA256}, StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), SerialConsole: serialConsole}
+	// The initramfs is compressed before UKI signing. Its decompressor and FAT
+	// charset modules must come from the same installed kernel as the image.
+	kernelConfig, err := vm.run(ctx, "cat "+nativeQuote("/boot/config-"+boot.KernelRelease), nil, 1<<20, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("read recovery kernel configuration: %w", err)
+	}
+	if !strings.Contains("\n"+string(kernelConfig)+"\n", "\nCONFIG_RD_GZIP=y\n") {
+		return nil, errors.New("qualified recovery kernel requires built-in gzip initramfs decompression")
+	}
 	// provisionActionOwnedBoot rebooted into the signed ordinary UKI; /run's
 	// earlier staging directory cannot survive that boot boundary.
 	if err := lifecycleCommand(ctx, vm, "create recovery module staging after owned boot", "mkdir -m 0700 /run/lindm-native-owned-boot"); err != nil {
@@ -97,13 +112,32 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	if err := addPublic("nsswitch.conf", "etc/nsswitch.conf", []byte("hosts: files dns\n")); err != nil {
 		return nil, err
 	}
-	for _, helper := range []string{"/usr/bin/sbverify", "/usr/bin/lsblk", "/usr/sbin/cryptsetup", "/usr/sbin/dmsetup", "/usr/sbin/nvme"} {
+	for _, destination := range recoveryboot.RequiredNativeHelpers(runtime) {
+		helper := "/" + destination
 		in, err := collect(helper, strings.TrimPrefix(helper, "/"), true)
 		if err != nil {
 			return nil, err
 		}
 		request.Files = append(request.Files, in)
 		collected[helper] = true
+		image, err := elf.Open(in.Source)
+		if err != nil {
+			return nil, err
+		}
+		var interpreterPath string
+		for _, segment := range image.Progs {
+			if segment.Type != elf.PT_INTERP {
+				continue
+			}
+			interpreter, readErr := io.ReadAll(io.LimitReader(segment.Open(), 4097))
+			if readErr != nil {
+				return nil, errors.Join(readErr, image.Close())
+			}
+			interpreterPath = strings.TrimSuffix(string(interpreter), "\x00")
+		}
+		if err := image.Close(); err != nil {
+			return nil, err
+		}
 		libraries, err := vm.run(ctx, "LC_ALL=C ldd "+nativeQuote(helper), nil, 64<<10, 15*time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("resolve recovery libraries for %s: %w", helper, err)
@@ -118,7 +152,7 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 			if filepath.Clean(field) != field {
 				return nil, errors.New("noncanonical native library path")
 			}
-			library, err := collect(field, strings.TrimPrefix(field, "/"), false)
+			library, err := collect(field, strings.TrimPrefix(field, "/"), field == interpreterPath)
 			if err != nil {
 				return nil, err
 			}
@@ -129,7 +163,20 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	// Keep only the distro-signed modules needed by this exact emulated tuple.
 	// modprobe's ordered insmod closure is decompressed without altering module
 	// bytes/signatures; BusyBox does not need host zstd/depmod in the initramfs.
-	modules := []string{"virtio_pci", "virtio_net", "ext4", "vfat", "efivarfs"}
+	modules := []string{"virtio_pci", "virtio_net", "vfat", "efivarfs"}
+	if runtime.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET {
+		modules = append(modules, "ext4")
+	}
+	// FAT requests these NLS modules dynamically, outside modprobe's static
+	// dependency graph. Preserve the distro kernel's actual mount defaults.
+	for _, line := range strings.Split(string(kernelConfig), "\n") {
+		if value, ok := strings.CutPrefix(line, "CONFIG_FAT_DEFAULT_CODEPAGE="); ok {
+			modules = append(modules, "nls_cp"+value)
+		}
+		if value, ok := strings.CutPrefix(line, "CONFIG_FAT_DEFAULT_IOCHARSET="); ok {
+			modules = append(modules, "nls_"+strings.Trim(value, `"`))
+		}
+	}
 	switch vm.hardware.StorageBus {
 	case "nvme":
 		modules = append(modules, "nvme")
@@ -138,7 +185,10 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	default:
 		return nil, errors.New("original recovery controller fixture requires NVMe or SATA")
 	}
-	if vm.hardware.TPM {
+	if runtime.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_TPM {
+		if !vm.hardware.TPM {
+			return nil, errors.New("qualified recovery TPM custody requires a TPM")
+		}
 		modules = append(modules, "tpm_tis")
 	}
 	var load, dependencies strings.Builder

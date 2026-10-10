@@ -31,7 +31,7 @@ export function ProvisioningTokenResult({
         </p>
         {unavailable ? (
           <Alert variant="destructive">
-            <AlertTitle>Secret delivery unknown — not recoverable</AlertTitle>
+            <AlertTitle>Secret delivery unknown</AlertTitle>
             <AlertDescription>
               A retry cannot retrieve the secret. Revoke this token below, then issue a replacement
               with a new request ID. Do not assume the original request failed.

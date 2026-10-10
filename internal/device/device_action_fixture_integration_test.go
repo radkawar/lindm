@@ -38,6 +38,11 @@ type deviceActionFixture struct {
 // Native effects are never invoked by this server contract fixture.
 func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 	t.Helper()
+	return newDeviceActionFixtureCapabilities(t, []string{"systemd.service.v1", "device.escrow-rotate.v1", "device.tpm2-bind.v1", "device.lock-sessions.v1", "device.release-lock.v1", "device.quarantine.v1", "device.release-quarantine.v1", "device.crypto-erase.v1", "device.sanitize.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1"})
+}
+
+func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *deviceActionFixture {
+	t.Helper()
 	f := &deviceActionFixture{enrolledFixture: newEnrolled(t, 0)}
 	s := f.svc
 	now := time.Now().UTC()
@@ -70,7 +75,6 @@ func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 		t.Fatal(err)
 	}
 	plan, start := ed25519Key(t), ed25519Key(t)
-	capabilities := []string{"systemd.service.v1", "device.escrow-rotate.v1", "device.tpm2-bind.v1", "device.lock-sessions.v1", "device.release-lock.v1", "device.quarantine.v1", "device.release-quarantine.v1", "device.crypto-erase.v1", "device.sanitize.v1"}
 	delegation := &agentv1.ExecutionDelegation{DeploymentId: s.deploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: capabilities}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: capabilities}}}
 	actor, _ := identity.PrincipalFromContext(f.ownerCtx)
 	tx, err := s.pool.Begin(t.Context())
@@ -108,9 +112,8 @@ func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 	details := nativeDetailsFixture()
 	report.Observation.Details = details
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
-	unknown := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
 	details.Sessions.Sessions = &inventoryv1.ObservedUint64{Status: success, Value: 1}
-	details.Storage = &inventoryv1.StorageDetails{Status: success, Devices: []*inventoryv1.BlockDevice{{Name: "fixture-disk", Type: observed(success, "disk"), Parent: observed(unknown, ""), SizeBytes: &inventoryv1.ObservedUint64{Status: success, Value: 1 << 30}, Filesystem: observed(success, "crypto_LUKS"), Mountpoint: observed(unknown, ""), Encryption: observed(success, "luks")}}}
+	details.Storage = &inventoryv1.StorageDetails{Status: success, Devices: []*inventoryv1.BlockDevice{fixtureStorageDevice("fixture-disk", fixtureStorageTarget(uuid.NewString()))}}
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); err != nil {
 		t.Fatal(err)
 	}

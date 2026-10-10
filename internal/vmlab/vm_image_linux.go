@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"runtime"
 
 	labv1 "lindm/gen/lindm/lab/v1"
 )
@@ -21,22 +22,9 @@ func newVerifiedGuestWithHardware(ctx context.Context, manifest *labv1.ImageMani
 }
 
 func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions, seed *unattendedSeed) (vm *guestVM, verified *VerifiedImage, err error) {
-	h, err := defaultVMHardware(hardware)
+	h, err := hardwareForManifest(manifest, hardware, runtime.GOARCH)
 	if err != nil {
 		return nil, nil, err
-	}
-	if manifest == nil {
-		return nil, nil, errors.New("VM image manifest is required")
-	}
-	architecture := manifest.Architecture
-	switch architecture {
-	case "amd64":
-		architecture = "x86_64"
-	case "arm64":
-		architecture = "aarch64"
-	}
-	if architecture != h.Architecture {
-		return nil, nil, errors.New("VM image and selected hardware architectures differ")
 	}
 	// Fail on missing selected acceleration before fetching a large image.
 	if err := checkVMAcceleration(h); err != nil {
@@ -84,4 +72,31 @@ func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, 
 	// QEMU inherited its own descriptor before Start returned. A later rename
 	// of the cache pathname cannot switch the machine to different image bytes.
 	return vm, verified, nil
+}
+
+// The authenticated manifest, not the execution host or an x86 default,
+// determines the guest architecture for every packaged/cloud-image lane.
+func hardwareForManifest(manifest *labv1.ImageManifest, options *VMHardwareOptions, hostArchitecture string) (VMHardwareOptions, error) {
+	if manifest == nil {
+		return VMHardwareOptions{}, errors.New("VM image manifest is required")
+	}
+	architecture, _, err := inspectArchitecture(manifest.Architecture)
+	if err != nil {
+		return VMHardwareOptions{}, err
+	}
+	var selected VMHardwareOptions
+	if options != nil {
+		selected = *options
+	}
+	if selected.Architecture == "" {
+		selected.Architecture = architecture
+	}
+	hardware, err := resolveVMHardware(&selected, hostArchitecture)
+	if err != nil {
+		return hardware, err
+	}
+	if hardware.Architecture != architecture {
+		return hardware, errors.New("VM image and selected hardware architectures differ")
+	}
+	return hardware, nil
 }

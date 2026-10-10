@@ -7,12 +7,20 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+)
+
+// Recovery proof diagnostics are disclosed only after signature verification.
+var (
+	ErrRecoveryRequestPayloadMismatch = errors.New("recovery_request_payload_mismatch")
+	ErrRecoveryRequestClockAhead      = errors.New("recovery_request_clock_ahead")
+	ErrRecoveryRequestExpired         = errors.New("recovery_request_expired")
 )
 
 // RecoveryPlanDigest removes only observation time and execution placement from
@@ -203,8 +211,11 @@ func (v *ExecutionVerifier) VerifyRecoveryCheckpointReceipt(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if receipt.GetCredentialId() != checkpoint.GetCredentialId() || receipt.GetActionId() != checkpoint.GetActionId() || receipt.GetSequence() != checkpoint.GetSequence() || !bytes.Equal(receipt.GetCheckpointSha256(), digest[:]) || receipt.GetRootVersion() != root.GetVersion() || receipt.GetDelegationVersion() != delegation.GetVersion() || receipt.GetStoredAt().AsTime().After(now) {
+	if receipt.GetCredentialId() != checkpoint.GetCredentialId() || receipt.GetActionId() != checkpoint.GetActionId() || receipt.GetSequence() != checkpoint.GetSequence() || !bytes.Equal(receipt.GetCheckpointSha256(), digest[:]) || receipt.GetRootVersion() != root.GetVersion() || receipt.GetDelegationVersion() != delegation.GetVersion() {
 		return nil, errors.New("recovery checkpoint receipt binding rejected")
+	}
+	if stored := receipt.GetStoredAt().AsTime(); stored.After(now) {
+		return nil, fmt.Errorf("recovery_checkpoint_clock_behind: signed_stored_at=%s observed_at=%s", stored.UTC().Format(time.RFC3339Nano), now.UTC().Format(time.RFC3339Nano))
 	}
 	return receipt, nil
 }
@@ -230,8 +241,17 @@ func (a *Authority) VerifyRecoveryRequestProof(ctx context.Context, envelope, cr
 	if err != nil {
 		return nil, err
 	}
-	if proof.GetCredentialId() != credential.GetCredentialId() || !bytes.Equal(proof.GetCredentialSha256(), credentialDigest[:]) || proof.GetOperation() != operation || !bytes.Equal(proof.GetPayloadSha256(), payloadDigest[:]) || proof.GetBootId() == credential.GetHandoff().GetOriginalBootId() || proof.GetExecutorIncarnation() == credential.GetHandoff().GetChallenge().GetExecutorIncarnation() || now.Before(proof.GetIssuedAt().AsTime()) || !now.Before(proof.GetExpiresAt().AsTime()) {
-		return nil, errors.New("recovery request binding or validity rejected")
+	if proof.GetCredentialId() != credential.GetCredentialId() || !bytes.Equal(proof.GetCredentialSha256(), credentialDigest[:]) || proof.GetOperation() != operation || proof.GetBootId() == credential.GetHandoff().GetOriginalBootId() || proof.GetExecutorIncarnation() == credential.GetHandoff().GetChallenge().GetExecutorIncarnation() {
+		return nil, errors.New("recovery request binding rejected")
+	}
+	if !bytes.Equal(proof.GetPayloadSha256(), payloadDigest[:]) {
+		return nil, ErrRecoveryRequestPayloadMismatch
+	}
+	if now.Before(proof.GetIssuedAt().AsTime()) {
+		return nil, ErrRecoveryRequestClockAhead
+	}
+	if !now.Before(proof.GetExpiresAt().AsTime()) {
+		return nil, ErrRecoveryRequestExpired
 	}
 	return proof, nil
 }

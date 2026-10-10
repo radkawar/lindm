@@ -14,9 +14,22 @@ import (
 
 func nvmeActionFixture(method agentv1.SanitizeMethod, controllerWide bool) *agentv1.SanitizeAction {
 	return &agentv1.SanitizeAction{
-		Target:    &agentv1.StorageTarget{Serial: "test-controller", Wwn: "eui.1200000000000034", SizeBytes: 4 << 20},
-		Method:    method,
-		NvmeScope: &agentv1.NVMeSanitizeScope{NamespaceId: 1, ControllerWide: controllerWide},
+		Target: &agentv1.StorageTarget{Serial: "test-controller", Wwn: "eui.1200000000000034", SizeBytes: 4 << 20},
+		Method: method,
+		NvmeScope: &agentv1.NVMeSanitizeScope{
+			NamespaceId:    1,
+			ControllerWide: controllerWide,
+			Identity: &agentv1.NVMeSanitizeIdentity{
+				Basis:              agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_NAMESPACE_NID,
+				VendorId:           0x1b36,
+				SubsystemVendorId:  0x1234,
+				ControllerSerial:   "test-controller",
+				ControllerModel:    "disposable NVMe fixture",
+				ControllerFirmware: "1.0",
+				NamespaceSizeBytes: 4 << 20,
+				LbaDataSizeShift:   9,
+			},
+		},
 	}
 }
 
@@ -28,10 +41,9 @@ func TestNVMePlanBindsExactControllerNamespaceAndInventory(t *testing.T) {
 		t.Fatalf("native plan: %v %v", before, err)
 	}
 	for _, mutate := range []func([]byte, []byte){
-		func(c, _ []byte) { c[64] = '2' }, // Firmware change.
-		func(c, _ []byte) { c[78]++ },     // Controller change.
-		func(c, _ []byte) { c[328] = 0 },  // Sanitize capability change.
-		func(_, n []byte) { n[33] = 1 },   // Deallocation behavior change.
+		func(c, _ []byte) { c[78]++ },    // Controller change.
+		func(c, _ []byte) { c[328] = 0 }, // Sanitize capability change.
+		func(_, n []byte) { n[33] = 1 },  // Deallocation behavior change.
 	} {
 		c, n := nvmeControllerFixture(), nvmeNamespaceFixture()
 		mutate(c, n)
@@ -45,6 +57,19 @@ func TestNVMePlanBindsExactControllerNamespaceAndInventory(t *testing.T) {
 		func(a *agentv1.SanitizeAction) { a.Target.Serial = "other-controller" },
 		func(a *agentv1.SanitizeAction) { a.Target.Wwn = "eui.0000000000000001" },
 		func(a *agentv1.SanitizeAction) { a.Target.SizeBytes++ },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity = nil },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.Basis = 0 },
+		func(a *agentv1.SanitizeAction) {
+			a.NvmeScope.Identity.Basis = agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID
+		},
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.VendorId++ },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.SubsystemVendorId++ },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.ControllerSerial = "other-controller" },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.ControllerModel = "other-model" },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.ControllerFirmware = "2.0" },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.NamespaceSizeBytes++ },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.LbaFormat++ },
+		func(a *agentv1.SanitizeAction) { a.NvmeScope.Identity.LbaDataSizeShift++ },
 	} {
 		wrong := proto.CloneOf(action)
 		mutate(wrong)
@@ -65,7 +90,7 @@ func TestNVMeMethodScopeRequiresAdvertisedSupportAndExactApproval(t *testing.T) 
 		agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE,
 		agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE,
 	} {
-		scope := &agentv1.NVMeSanitizeScope{NamespaceId: 1, ControllerWide: nvmeSanitizeCommand(method) != 0}
+		scope := nvmeActionFixture(method, nvmeSanitizeCommand(method) != 0).GetNvmeScope()
 		if err := nvmeMethodScope(method, scope, controller, []uint32{1}); err != nil {
 			t.Fatalf("advertised method %s: %v", method, err)
 		}
@@ -101,7 +126,7 @@ func TestNVMeControllerWideNeverTouchesUnapprovedNamespaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	controller.namespaces = 2
-	scope := &agentv1.NVMeSanitizeScope{NamespaceId: 1}
+	scope := nvmeActionFixture(agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, false).GetNvmeScope()
 	// A genuinely namespace-local format can coexist with another namespace.
 	if err := nvmeMethodScope(agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, scope, controller, []uint32{1, 2}); err != nil {
 		t.Fatal(err)
@@ -143,5 +168,79 @@ func TestNVMePlanRejectsInactiveAndIncompleteNamespaceScope(t *testing.T) {
 	binary.LittleEndian.PutUint16(controller[256:258], 2)
 	if _, err := nvmePlan(action, 1, controller, nvmeNamespaceFixture(), active, active); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("unprovable inactive namespace inventory accepted: %v", err)
+	}
+}
+
+func TestNVMePlanRejectsNativeIdentityMutation(t *testing.T) {
+	action := nvmeActionFixture(agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, false)
+	inventory := nvmeNamespaceListFixture(1)
+	for _, mutate := range []func([]byte, []byte){
+		func(c, _ []byte) { c[0]++ },
+		func(c, _ []byte) { c[2]++ },
+		func(c, _ []byte) { c[4] = 'X' },
+		func(c, _ []byte) { c[24] = 'X' },
+		func(c, _ []byte) { c[64] = '2' },
+		func(_, n []byte) { binary.LittleEndian.PutUint64(n[:8], 16384) },
+		func(_, n []byte) { n[25], n[26], n[134] = 1, 1, 9 },
+		func(_, n []byte) {
+			binary.LittleEndian.PutUint64(n[:8], 4096)
+			binary.LittleEndian.PutUint64(n[8:16], 4096)
+			n[130] = 10
+		},
+	} {
+		controller, namespace := nvmeControllerFixture(), nvmeNamespaceFixture()
+		mutate(controller, namespace)
+		if _, err := nvmePlan(action, 1, controller, namespace, inventory, inventory); !errors.Is(err, ErrConflict) {
+			t.Fatalf("mutated native identity accepted: %v", err)
+		}
+	}
+}
+
+func TestNVMeIdentityBasisRequiresExactNativeEvidence(t *testing.T) {
+	controllerData := nvmeControllerFixture()
+	copy(controllerData[4:24], "lindm-lab-0          ")
+	copy(controllerData[24:64], "QEMU NVMe Ctrl                          ")
+	controller, err := parseNVMeController(controllerData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const fallback = "nvme.1b36-6c696e646d2d6c61622d30-51454d55204e564d65204374726c-00000001"
+	for _, tc := range []struct {
+		name   string
+		absent bool
+		wwn    string
+		serial string
+		nsid   uint32
+		basis  agentv1.NvmeIdentityBasis
+	}{
+		{"namespace NID", false, "eui.1200000000000034", "lindm-lab-0", 1, agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_NAMESPACE_NID},
+		{"kernel discarded bogus NID", false, fallback, "lindm-lab-0", 1, agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID},
+		{"absent NIDs", true, fallback, "lindm-lab-0", 1, agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID},
+		{"absent NIDs and WWN", true, "", "lindm-lab-0", 1, agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID},
+		{"raw NID without kernel evidence", false, "", "lindm-lab-0", 1, 0},
+		{"serial mismatch", false, fallback, "different", 1, 0},
+		{"NSID mismatch", false, fallback, "lindm-lab-0", 2, 0},
+		{"wrong NID", false, "eui.1200000000000035", "lindm-lab-0", 1, 0},
+		{"noncanonical fallback", false, "nvme.1B36-6c696e646d2d6c61622d30-51454d55204e564d65204374726c-00000001", "lindm-lab-0", 1, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			namespaceData := nvmeNamespaceFixture()
+			if tc.absent {
+				clear(namespaceData[104:128])
+			}
+			namespace, err := parseNVMeNamespace(namespaceData)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := &agentv1.StorageTarget{Serial: tc.serial, Wwn: tc.wwn, SizeBytes: 4 << 20}
+			basis, err := nvmeIdentityBasis(target, tc.nsid, controller, namespace)
+			if tc.basis == 0 {
+				if !errors.Is(err, ErrConflict) {
+					t.Fatalf("unbound native identity accepted: %v", err)
+				}
+			} else if err != nil || basis != tc.basis {
+				t.Fatalf("identity basis: %v %v, want %v", basis, err, tc.basis)
+			}
+		})
 	}
 }

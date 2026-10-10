@@ -128,7 +128,7 @@ func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 func (f *deviceActionFixture) actionDelegation(t *testing.T, version uint64) {
 	t.Helper()
 	plan, start := delegate(t, f.planKey), delegate(t, f.startKey)
-	plan.Capabilities = []string{"device.lock-sessions.v1", "device.release-lock.v1", "device.escrow-rotate.v1", "device.crypto-erase.v1"}
+	plan.Capabilities = []string{"device.lock-sessions.v1", "device.release-lock.v1", "device.escrow-rotate.v1", "device.crypto-erase.v1", "device.restart.v1", "device.shutdown.v1", "device.refresh-inventory.v1"}
 	start.Capabilities = append([]string(nil), plan.Capabilities...)
 	start.Role = agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START
 	callTrust(t, f.svc, &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: mustSign(t, f.svc.authority, delegationDocument(f.fix.deploy.String(), 1, version, 0, f.now, plan, start), f.fix.rootKey)})

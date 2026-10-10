@@ -179,11 +179,50 @@ func (s *Service) admitBegin(ctx context.Context, q *devicedb.Queries, authority
 	if manifest.createdAt.After(authority.now.Add(snapshotFutureSkew)) {
 		return nil, invalid("manifest_time")
 	}
-	if !rateAllowed(authority.generation.LastPackageAdmissionAt, authority.now) {
+	refresh, err := claimRefreshInventoryAdmission(ctx, q, authority.device.ID, authority.generation.ID, manifest.sequence, manifest.startedAt, authority.now, true)
+	if err != nil {
+		return nil, err
+	}
+	if refresh.challengeIssuedAt.IsZero() && !rateAllowed(authority.generation.LastPackageAdmissionAt, authority.now) {
 		return nil, errRateLimited
 	}
 	if authority.device.OpenSnapshotID != nil {
-		return nil, errOpenUpload
+		if refresh.challengeIssuedAt.IsZero() {
+			return nil, errOpenUpload
+		}
+		old, err := q.GetPackageSnapshot(ctx, *authority.device.OpenSnapshotID)
+		if err != nil {
+			return nil, err
+		}
+		if old.DeviceID != authority.device.ID || old.GenerationID != authority.generation.ID || old.State != "staging" || old.Sequence >= manifest.sequence || !old.StartedAt.Valid || !old.AcceptedAt.Valid {
+			return nil, errOpenUpload
+		}
+		// Pregrant admission is authoritative even when the collector clock
+		// overlaps the challenge window. Stale postgrant routine data is also
+		// replaceable; an already claimed same-action slot never reaches here.
+		if old.AcceptedAt.Time.After(refresh.startAuthorizedAt) && !old.StartedAt.Time.Before(refresh.challengeIssuedAt) {
+			return nil, errOpenUpload
+		}
+		// Staging rows were never published or paged. Retain their immutable
+		// manifest/batch receipts, but release bulk before reserving fresh data.
+		release := old.ReservedBytes - old.MetadataBytes
+		if release < 0 || release > authority.device.ReservedInventoryBytes {
+			return nil, errInternalState
+		}
+		if err := s.supersedeSnapshot(ctx, q, authority.device, old.ID, authority.now); err != nil {
+			return nil, err
+		}
+		if err := q.DeleteSnapshotPackages(ctx, old.ID); err != nil {
+			return nil, err
+		}
+		if err := q.ReleaseSnapshotBulk(ctx, devicedb.ReleaseSnapshotBulkParams{ID: old.ID, ReservedBytes: old.MetadataBytes}); err != nil {
+			return nil, err
+		}
+		if err := s.releaseInventory(ctx, q, authority.device.ID, release); err != nil {
+			return nil, err
+		}
+		authority.device.ReservedInventoryBytes -= release
+		authority.device.OpenSnapshotID = nil
 	}
 	if err := s.reserveInventory(ctx, q, authority.device.ID, authority.device.ReservedInventoryBytes, manifest.reservedBytes); err != nil {
 		return nil, err

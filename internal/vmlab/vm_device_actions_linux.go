@@ -21,6 +21,7 @@ import (
 // action authority. Only signed official image manifests and disposable VMs run.
 type VMDeviceActionsOptions struct {
 	Repository       string
+	BuildRepository  string
 	Scenario         string
 	WipePhase        string
 	EncryptionPhase  string
@@ -32,6 +33,9 @@ type VMDeviceActionsOptions struct {
 
 type VMDeviceActionsResult struct {
 	Scenario                string                         `json:"scenario"`
+	HostStart               *HostResourceEvidence          `json:"host_start,omitempty"`
+	HostFailure             *HostResourceEvidence          `json:"host_failure,omitempty"`
+	HostObservationError    string                         `json:"host_observation_error,omitempty"`
 	WipePhase               string                         `json:"wipe_phase,omitempty"`
 	EncryptionPhase         string                         `json:"encryption_phase,omitempty"`
 	ImageID                 string                         `json:"image_id"`
@@ -58,8 +62,10 @@ type VMDeviceActionsResult struct {
 	Lock                    *actionDispatchEvidence        `json:"lock"`
 	LockRelease             *actionDispatchEvidence        `json:"lock_release"`
 	AccountLocks            []*actionAccountLockEvidence   `json:"account_locks"`
+	DesktopInitialLogind    string                         `json:"desktop_initial_logind,omitempty"`
 	DesktopBefore           *actionDesktopEvidence         `json:"desktop_before"`
 	DesktopAfter            *actionDesktopEvidence         `json:"desktop_after"`
+	DesktopAfterRelease     *actionDesktopEvidence         `json:"desktop_after_release"`
 	Quarantine              []*actionDispatchEvidence      `json:"quarantine"`
 	QuarantineEffective     bool                           `json:"quarantine_effective"`
 	QuarantineDNSPreserved  bool                           `json:"quarantine_dns_preserved"`
@@ -118,6 +124,19 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	}
 	if !machine.boot.PromptSeen {
 		return nil, errors.New("initial unbound encrypted clone did not request owner credential")
+	}
+	// Fedora's initramfs keeps cryptsetup authentication errors in the journal,
+	// and does not necessarily repeat its serial prompt on rejection. Route only
+	// this service's normal diagnostics to the lab console so a wrong-key test
+	// observes an explicit authentication failure, never infers one from timeout.
+	// Modify the disposable clone, not the immutable golden or product package.
+	if manifest.GetDistribution() == "fedora" {
+		const consoleSetup = `mkdir -p /etc/systemd/system/systemd-cryptsetup@.service.d
+printf '[Service]\nStandardOutput=journal+console\nStandardError=journal+console\nEnvironment=SYSTEMD_LOG_TARGET=console\n' > /etc/systemd/system/systemd-cryptsetup@.service.d/lab-console.conf
+dracut --force --include /etc/systemd/system/systemd-cryptsetup@.service.d /etc/systemd/system/systemd-cryptsetup@.service.d`
+		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(consoleSetup), nil); err != nil {
+			return nil, fmt.Errorf("enable Fedora cryptsetup rejection oracle: %w", err)
+		}
 	}
 	if _, err := observeEncryptedGuest(ctx, vm, options.Encrypted.Firmware.SecureBoot); err != nil {
 		return nil, err
@@ -235,9 +254,18 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		result.FinishedAt = time.Now().UTC()
 		result.Passed = err == nil
 		if err != nil {
+			var hostErr error
+			result.HostFailure, hostErr = captureHostResources()
+			if hostErr != nil {
+				result.HostObservationError = hostErr.Error()
+			}
 			result.Failure = err.Error()
 		}
 	}()
+	result.HostStart, err = captureHostResources()
+	if err != nil {
+		return result, err
+	}
 	result.Scenario, result.WipePhase = options.Scenario, options.WipePhase
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Hour)
 	defer cancel()
@@ -249,7 +277,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err != nil {
 		return result, err
 	}
-	packages, err := buildActionNativePackage(ctx, manifest, options.Repository, options.Encrypted.WorkDir)
+	packages, err := buildActionNativePackage(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.Encrypted.WorkDir)
 	if err != nil {
 		return result, err
 	}
@@ -270,16 +298,16 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	result.Database = fixture.DatabaseName
 	delegation, err := fixture.ConfigureDeviceActions(ctx)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("configure isolated device-action authority: %w", err)
 	}
 	control, err := openVMControlPlane(ctx, options.Repository, fixture)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("open isolated device-action control plane: %w", err)
 	}
 	defer func() { err = errors.Join(err, control.Close(context.WithoutCancel(ctx))) }()
 	approver, err := fixture.OpenApproverSession(ctx)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("open isolated device-action approver: %w", err)
 	}
 	defer func() {
 		if approver != nil {
@@ -287,7 +315,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		}
 	}()
 	if err := control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
-		return result, err
+		return result, fmt.Errorf("admit isolated device-action authority: %w", err)
 	}
 	if options.EncryptionPhase == "tpm" {
 		result.EncryptionPhase = options.EncryptionPhase
@@ -299,7 +327,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	}
 	machine, err := openActionMachine(ctx, manifest, options, packages, fixture, control, delegation)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("prepare native device-action machine: %w", err)
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
 	result.Firmware, result.DeviceID, result.Target = machine.vm.firmware, machine.deviceID, machine.target
@@ -402,17 +430,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		return result, err
 	}
 	if options.Scenario != "encryption" {
-		result.DesktopBefore, err = waitActionDesktop(ctx, machine.vm, false)
-		if err != nil {
-			return result, err
-		}
-		request = actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}})
-		result.Lock, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, nil, false)
-		if err != nil {
-			return result, err
-		}
-		result.DesktopAfter, err = waitActionDesktop(ctx, machine.vm, true)
-		if err != nil {
+		if err := nativeLockScenarios(ctx, machine, control, result); err != nil {
 			return result, err
 		}
 		if err := nativeQuarantineScenarios(ctx, machine, control, result); err != nil {

@@ -625,6 +625,12 @@ artifacts/bin/lab vm inspect -manifest lab/images/ubuntu-noble-amd64.json -agent
 artifacts/bin/lab vm inspect -manifest lab/images/fedora-44-x86_64.json -agent artifacts/bin/lindm-agent
 ```
 
+For local/remote scheduling, set `LINDM_LAB_CONFIG` to `lab/hosts.example.json`,
+run `lab hosts`, then target a lane with `-arch arm64` or `-host dgx20`.
+The maintained `lab hosts baseline` command prepares explicitly authorized native
+hosts; see [lab host configuration](docs/engineering.md#lab-host-configuration)
+for pinned prerequisites, per-host slot leases and the complete ARM KVM command.
+
 This lane requires `qemu-system-x86_64`, `qemu-img`, `cloud-localds` and accessible
 `/dev/kvm`; it does not change host permissions or use host sudo. Guest networking is
 restricted, SSH uses ephemeral credentials and a pinned host key, and cleanup kills

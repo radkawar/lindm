@@ -1,0 +1,52 @@
+# Ubuntu 24.04 (noble), amd64 and arm64; observed 2026-10-10.
+# apt-cache policy: local amd64 and SSH dgx20/dgx21 arm64.
+# Firmware is Architecture: all; .10 observed installed on amd64, superseding
+# stale .9 candidates in the remote apt indexes. Refresh indexes before install.
+# Exact direct dependencies only. APT resolves their dependencies; evidence
+# includes the entire dpkg state before/after, including those dependencies.
+# Update these reviewed pins when repositories retire a version; never float.
+qemu-system-arm=1:8.2.2+ds-0ubuntu1.18
+qemu-system-x86=1:8.2.2+ds-0ubuntu1.18
+qemu-system-common=1:8.2.2+ds-0ubuntu1.18
+qemu-system-data=1:8.2.2+ds-0ubuntu1.18
+qemu-utils=1:8.2.2+ds-0ubuntu1.18
+qemu-efi-aarch64=2024.02-2ubuntu0.10
+ovmf=2024.02-2ubuntu0.10
+swtpm=0.7.3-0ubuntu5.24.04.1
+swtpm-tools=0.7.3-0ubuntu5.24.04.1
+cloud-image-utils=0.33-1
+genisoimage=9:1.1.11-3.5
+gnupg=2.4.4-2ubuntu17.6
+gpg=2.4.4-2ubuntu17.6
+gpgv=2.4.4-2ubuntu17.6
+gpgconf=2.4.4-2ubuntu17.6
+gpg-agent=2.4.4-2ubuntu17.6
+dirmngr=2.4.4-2ubuntu17.6
+rsync=3.2.7-1ubuntu1.5
+xorriso=1:1.5.6-1.1ubuntu3
+libguestfs-tools=1:1.52.0-5ubuntu3
+guestfs-tools=1.52.0-2ubuntu5
+supermin=5.2.2-4ubuntu4
+mtools=4.0.43-1build1
+python3-virt-firmware=24.1.1-2
+openssh-client=1:9.6p1-3ubuntu13.19
+rpm=4.18.2+dfsg-2.1build2
+dpkg-dev=1.22.6ubuntu6.6
+apt-utils=2.8.3
+debsigs=0.1.26
+createrepo-c=0.17.3-2ubuntu3
+cpio=2.15+dfsg-1ubuntu2.1
+dosfstools=4.2-1.1build1
+e2fsprogs=1.47.0-2.4~exp1ubuntu4.1
+cryptsetup-bin=2:2.7.0-1ubuntu4.2
+squashfs-tools=1:4.6.1-1build1
+zstd=1.5.5+dfsg2-2build1.1
+jq=1.7.1-3ubuntu0.24.04.2
+python3=3.12.3-0ubuntu2.1
+golang-go=2:1.22~2build1
+gcc=4:13.2.0-7ubuntu1
+libc6-dev=2.39-0ubuntu8.9
+make=4.3-4.1build2
+pkg-config=1.8.1-2build1
+efitools=1.9.2-3ubuntu3
+sbsigntool=0.9.4-3.1ubuntu7

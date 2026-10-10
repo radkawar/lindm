@@ -12,6 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"google.golang.org/protobuf/encoding/protojson"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/packaging"
 )
 
 // observeActionGuest retains only the post-unlock console window and unit
@@ -85,4 +90,148 @@ func diagnoseActionFailure(ctx context.Context, vm *guestVM, cause error) error 
 		return cause
 	}
 	return errors.Join(cause, saveLifecycleFailure(ctx, vm, os.TempDir()))
+}
+
+// diagnoseNativeAction reads the protected executor view before guest cleanup.
+// It never copies the journal database, credentials, keys or native headers.
+func diagnoseNativeAction(ctx context.Context, vm *guestVM, actionID string, cause error) error {
+	if cause == nil || vm == nil || !vmValidID(actionID) {
+		return cause
+	}
+	diagnostic, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	probe := &guestVM{dir: vm.dir, cmd: vm.cmd, done: vm.done, waitErr: vm.waitErr, log: vm.log, address: vm.address, config: vm.config, tpm: vm.tpm}
+	type actionDiagnostic struct {
+		ActionID       string                `json:"action_id"`
+		ObservedAt     time.Time             `json:"observed_at"`
+		Status         json.RawMessage       `json:"executor_status,omitempty"`
+		StatusFailure  string                `json:"executor_status_failure,omitempty"`
+		Journal        string                `json:"journal_tail"`
+		JournalFailure string                `json:"journal_failure,omitempty"`
+		Host           *HostResourceEvidence `json:"host_before_cleanup,omitempty"`
+		HostFailure    string                `json:"host_observation_error,omitempty"`
+	}
+	result := actionDiagnostic{ActionID: actionID, ObservedAt: time.Now().UTC()}
+	host, hostErr := captureHostResources()
+	result.Host = host
+	if hostErr != nil {
+		result.HostFailure = hostErr.Error()
+	}
+	if err := probe.connect(diagnostic); err != nil {
+		result.StatusFailure, result.JournalFailure = err.Error(), err.Error()
+	} else {
+		defer func() { _ = probe.client.Close() }()
+		path, err := prepareActionStatusFile(diagnostic, probe, actionID)
+		if err == nil {
+			defer func() { _, _ = probe.run(diagnostic, "sudo -n rm -f -- "+nativeQuote(path), nil, 4096, 5*time.Second) }()
+			status, readErr := probe.runResult(diagnostic, "sudo -n "+packaging.BinaryPath+" action-status -file "+nativeQuote(path), nil, 128<<10, 10*time.Second)
+			if readErr != nil {
+				err = readErr
+			} else if status.ExitCode != 0 {
+				err = fmt.Errorf("action-status exit %d: %s", status.ExitCode, status.Stderr)
+			} else {
+				result.Status, err = actionStatusDiagnostic(status.Stdout)
+			}
+		}
+		if err != nil {
+			result.StatusFailure = err.Error()
+		}
+		journal, err := probe.runResult(diagnostic, "sudo -n journalctl -b --no-pager -o short-iso-precise -n 200 -u lindm-executor.service -u lindm-agent.service -u lindm-live-root-poweroff.service", nil, 128<<10, 15*time.Second)
+		result.Journal = string(journal.Stdout)
+		if err != nil {
+			result.JournalFailure = err.Error()
+		} else if journal.ExitCode != 0 {
+			result.JournalFailure = fmt.Sprintf("journalctl exit %d: %s", journal.ExitCode, journal.Stderr)
+		}
+	}
+	data, err := json.Marshal(result)
+	if err != nil {
+		return errors.Join(cause, err)
+	}
+	path, err := saveGuestDiagnostics(os.TempDir(), data)
+	if err != nil {
+		return errors.Join(cause, err)
+	}
+	return errors.Join(cause, fmt.Errorf("private executor action diagnostics saved to %q", path))
+}
+
+func actionStatusDiagnostic(data []byte) (json.RawMessage, error) {
+	decoded := new(agentv1.GetDeviceActionResponse)
+	if err := protojson.Unmarshal(data, decoded); err != nil {
+		return nil, err
+	}
+	// Even encrypted escrow material has no diagnostic purpose. Preserve
+	// native outcome and timing, but never retain ciphertext or key digests.
+	if verification := decoded.GetStatus().GetVerification(); verification != nil {
+		verification.Escrow = nil
+	}
+	return protojson.Marshal(decoded)
+}
+
+type liveRootDiagnostic struct {
+	ObservedAt time.Time                   `json:"observed_at"`
+	Status     *agentv1.DeviceActionStatus `json:"executor_status,omitempty"`
+	Journal    string                      `json:"journal_tail,omitempty"`
+	Failure    string                      `json:"observation_failure,omitempty"`
+}
+
+// Live-root evidence is volatile and disappears at forced poweroff. Observe it
+// on a separate pinned SSH transport while the server attestation oracle runs;
+// diagnostic latency or cancellation must not block that oracle or its socket.
+func monitorLiveRoot(ctx context.Context, vm *guestVM, actionID string) func() *liveRootDiagnostic {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	result := &liveRootDiagnostic{}
+	go func() {
+		defer close(done)
+		probe := &guestVM{dir: vm.dir, cmd: vm.cmd, done: vm.done, waitErr: vm.waitErr, log: vm.log, address: vm.address, config: vm.config, tpm: vm.tpm}
+		if err := probe.connect(ctx); err != nil {
+			result.Failure = err.Error()
+			return
+		}
+		defer func() { _ = probe.client.Close() }()
+		path, err := prepareActionStatusFile(ctx, probe, actionID)
+		if err != nil {
+			result.Failure = err.Error()
+			return
+		}
+		defer func() {
+			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			defer stop()
+			_, _ = probe.run(cleanup, "sudo -n rm -f -- "+nativeQuote(path), nil, 4096, 2*time.Second)
+		}()
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			status, statusErr := nativeActionStatus(ctx, probe, path)
+			if statusErr != nil {
+				if ctx.Err() == nil {
+					result.Failure = statusErr.Error()
+				}
+				return
+			}
+			if status != nil {
+				if verification := status.GetVerification(); verification != nil {
+					verification.Escrow = nil
+				}
+				result.Status, result.ObservedAt = status, time.Now().UTC()
+			}
+			journal, journalErr := probe.runResult(ctx, "sudo -n journalctl -b --no-pager -o short-iso-precise -n 200 -u lindm-executor.service -u lindm-agent.service -u lindm-live-root-poweroff.service", nil, 128<<10, 10*time.Second)
+			if journalErr == nil && journal.ExitCode == 0 {
+				result.Journal = string(journal.Stdout)
+			} else if ctx.Err() == nil {
+				result.Failure = fmt.Sprintf("live journal observation: %v; exit %d", journalErr, journal.ExitCode)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	return func() *liveRootDiagnostic {
+		cancel()
+		<-done
+		return result
+	}
 }

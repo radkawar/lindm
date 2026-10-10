@@ -13,6 +13,8 @@ import (
 // block device is opened by these tests; native qualification lives in vmlab.
 func nvmeControllerFixture() []byte {
 	data := make([]byte, nvmeIdentifyBytes)
+	binary.LittleEndian.PutUint16(data[0:2], 0x1b36)
+	binary.LittleEndian.PutUint16(data[2:4], 0x1234)
 	copy(data[4:24], []byte("test-controller     "))
 	copy(data[24:64], bytes.Repeat([]byte{' '}, 40))
 	copy(data[24:64], []byte("disposable NVMe fixture"))
@@ -53,12 +55,13 @@ func nvmeSanitizeLogFixture(progress, status uint16, command uint32) []byte {
 
 func TestNVMeControllerParsing(t *testing.T) {
 	controller, err := parseNVMeController(nvmeControllerFixture())
-	if err != nil || controller.serial != "test-controller" || controller.id != 7 || controller.oacs != 2 || controller.sanicap != 3 || controller.fna != 4 {
+	if err != nil || controller.vid != 0x1b36 || controller.ssvid != 0x1234 || controller.serial != "test-controller" || controller.id != 7 || controller.oacs != 2 || controller.sanicap != 3 || controller.fna != 4 {
 		t.Fatalf("identify controller: %+v %v", controller, err)
 	}
 	for _, mutate := range []func([]byte) []byte{
 		func(b []byte) []byte { return b[:4095] },
 		func(b []byte) []byte { return append(b, 0) },
+		func(b []byte) []byte { clear(b[0:2]); return b },
 		func(b []byte) []byte { b[4] = 0; return b },
 		func(b []byte) []byte { clear(b[4:24]); return b },
 		func(b []byte) []byte { b[76] = 1; return b },
@@ -75,7 +78,7 @@ func TestNVMeControllerParsing(t *testing.T) {
 func TestNVMeNamespaceParsingAndStableDigest(t *testing.T) {
 	data := nvmeNamespaceFixture()
 	namespace, err := parseNVMeNamespace(data)
-	if err != nil || namespace.size != 4<<20 || !namespace.matchesWWN("eui.1200000000000034") || namespace.matchesWWN("eui.1200000000000035") {
+	if err != nil || namespace.size != 4<<20 || namespace.lbaf != 0 || namespace.shift != 9 || !namespace.matchesWWN("eui.1200000000000034") || namespace.matchesWWN("eui.1200000000000035") {
 		t.Fatalf("identify namespace: %+v %v", namespace, err)
 	}
 	data[16] = 99   // NUSE is not identity.
@@ -99,12 +102,21 @@ func TestNVMeNamespaceParsingAndStableDigest(t *testing.T) {
 		func(b []byte) []byte { b[128] = 1; return b },
 		func(b []byte) []byte { b[130] = 13; return b },
 		func(b []byte) []byte { clear(b[:8]); return b },
-		func(b []byte) []byte { clear(b[104:128]); return b },
 		func(b []byte) []byte { binary.LittleEndian.PutUint64(b[:8], ^uint64(0)); return b },
 	} {
 		if _, err := parseNVMeNamespace(mutate(nvmeNamespaceFixture())); !errors.Is(err, ErrUnsupported) {
 			t.Fatalf("unsafe namespace accepted: %v", err)
 		}
+	}
+}
+
+func TestNVMeNamespaceWithoutNIDsRetainsLayout(t *testing.T) {
+	data := nvmeNamespaceFixture()
+	clear(data[104:128])
+	data[25], data[26], data[134] = 1, 1, 9
+	namespace, err := parseNVMeNamespace(data)
+	if err != nil || namespace.size != 4<<20 || namespace.lbaf != 1 || namespace.shift != 9 || namespace.matchesWWN("eui.0000000000000000") {
+		t.Fatalf("absent NID layout: %+v %v", namespace, err)
 	}
 }
 

@@ -7,7 +7,9 @@ import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/agent/v1/inventory_refresh.proto";
 import "lindm/agent/v1/offline_enrollment.proto";
+import "lindm/agent/v1/recovery_readiness.proto";
 import "lindm/agent/v1/service_execution.proto";
 import "lindm/agent/v1/update.proto";
 
@@ -65,6 +67,8 @@ service ExecutorService {
   rpc UpdateExecutionTrust(UpdateExecutionTrustRequest) returns (UpdateExecutionTrustResponse);
   // Reads protected public trust facts, not fresh resource observations.
   rpc GetExecutionTrust(GetExecutionTrustRequest) returns (GetExecutionTrustResponse);
+  // Reads native recovery capability and ESP capacity without changing boot state.
+  rpc GetRecoveryReadiness(GetRecoveryReadinessRequest) returns (GetRecoveryReadinessResponse);
   // Verifies signed desired intent and records native preflight/challenge before
   // replying. No native effect; callers cannot supply a plan or challenge.
   rpc PrepareServiceExecution(PrepareServiceExecutionRequest) returns (PrepareServiceExecutionResponse);
@@ -81,6 +85,7 @@ service ExecutorService {
   rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);
   rpc AttestDeviceAction(AttestDeviceActionRequest) returns (AttestDeviceActionResponse);
   rpc ConfirmDeviceActionEscrow(ConfirmDeviceActionEscrowRequest) returns (ConfirmDeviceActionEscrowResponse);
+  rpc ConfirmDeviceActionInventory(ConfirmDeviceActionInventoryRequest) returns (ConfirmDeviceActionInventoryResponse);
   rpc PrepareDeviceActionRecovery(PrepareDeviceActionRecoveryRequest) returns (PrepareDeviceActionRecoveryResponse);
   rpc CommitDeviceActionRecovery(CommitDeviceActionRecoveryRequest) returns (CommitDeviceActionRecoveryResponse);
   // Root-only one-use owner credential; never persisted or returned.

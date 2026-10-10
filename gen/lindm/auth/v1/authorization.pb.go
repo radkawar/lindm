@@ -341,11 +341,11 @@ const file_lindm_auth_v1_authorization_proto_rawDesc = "" +
 	"\x05group\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x05group\x122\n" +
 	"\x04role\x18\x02 \x01(\tB\x1e\xbaH\x1br\x19\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$R\x04role\x12<\n" +
-	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes\"\x94\x06\n" +
+	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes\"\xa6\x06\n" +
 	"\x13AuthorizationPolicy\x12=\n" +
 	"\x05roles\x18\x01 \x03(\v2\x1d.lindm.auth.v1.RoleDefinitionB\b\xbaH\x05\x92\x01\x02\x10dR\x05roles\x12M\n" +
-	"\x0egroup_bindings\x18\x02 \x03(\v2\x1b.lindm.auth.v1.GroupBindingB\t\xbaH\x06\x92\x01\x03\x10\xe8\aR\rgroupBindings\x12\xf4\x01\n" +
-	"\x1dapproval_required_permissions\x18\x03 \x03(\tB\xaf\x01\xbaH\xab\x01\x92\x01\xa7\x01\x18\x01\"\xa2\x01r\x9f\x01R\x10resources.assignR\x16execution_trust.manageR\x14remote_execution.runR\x12recovery_keys.readR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x1bapprovalRequiredPermissions:\xf7\x02\xbaH\xf3\x02\x1a\x8d\x01\n" +
+	"\x0egroup_bindings\x18\x02 \x03(\v2\x1b.lindm.auth.v1.GroupBindingB\t\xbaH\x06\x92\x01\x03\x10\xe8\aR\rgroupBindings\x12\x86\x02\n" +
+	"\x1dapproval_required_permissions\x18\x03 \x03(\tB\xc1\x01\xbaH\xbd\x01\x92\x01\xb9\x01\x18\x01\"\xb4\x01r\xb1\x01R\x10resources.assignR\x16execution_trust.manageR\x14remote_execution.runR\x10inventory.manageR\x12recovery_keys.readR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x1bapprovalRequiredPermissions:\xf7\x02\xbaH\xf3\x02\x1a\x8d\x01\n" +
 	"\x1aauthorization.unique_roles\x12 custom role names must be unique\x1aMthis.roles.all(r, this.roles.filter(other, other.name == r.name).size() == 1)\x1a\xe0\x01\n" +
 	"\x19authorization.known_roles\x12;group bindings must reference a built-in or configured role\x1a\x85\x01this.group_bindings.all(b, b.role in ['owner', 'admin', 'operator', 'helpdesk', 'auditor'] || this.roles.exists(r, r.name == b.role))B Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
 

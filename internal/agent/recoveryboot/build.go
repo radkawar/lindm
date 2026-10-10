@@ -3,6 +3,7 @@
 package recoveryboot
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"debug/elf"
@@ -46,6 +47,9 @@ type BuildRequest struct {
 	// discovered at boot; approved images never embed a future action ID.
 	ESPUUID         string
 	SourceDateEpoch int64
+	// SerialConsole selects an optional signed diagnostic UART, not arbitrary
+	// kernel arguments. The normal framebuffer console remains enabled.
+	SerialConsole string
 }
 
 type Artifact struct {
@@ -102,6 +106,10 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	if request.SourceDateEpoch < 0 || !fatUUID(request.ESPUUID) || (request.StateUUID != "" && !uuidText(request.StateUUID)) {
 		return nil, errors.New("recoveryboot: invalid_build_identity")
 	}
+	commandLine, err := recoveryCommandLine(request.SerialConsole)
+	if err != nil {
+		return nil, err
+	}
 	inputs := []Ingredient{request.Kernel, request.Stub, request.Busybox, request.Agent, request.Config, request.Certificate}
 	inputs = append(inputs, request.Files...)
 	for _, in := range inputs {
@@ -109,7 +117,7 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 			return nil, err
 		}
 	}
-	if err := validateClosure(request.Files); err != nil {
+	if err := validateBuildClosure(request.Config, request.Files); err != nil {
 		return nil, err
 	}
 	for _, in := range []Ingredient{request.Busybox, request.Agent} {
@@ -170,7 +178,7 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	}
 	unsigned := filepath.Join(dir, "unsigned.efi")
 	image := filepath.Join(dir, "lindm-recovery.efi")
-	if err := native(ctx, []string{"SOURCE_DATE_EPOCH=" + strconv.FormatInt(request.SourceDateEpoch, 10)}, "ukify", "build", "--linux="+request.Kernel.Source, "--initrd="+initrd, "--stub="+request.Stub.Source, "--cmdline=rdinit=/init panic=10 quiet", "--os-release=@"+osRelease, "--output="+unsigned); err != nil {
+	if err := native(ctx, []string{"SOURCE_DATE_EPOCH=" + strconv.FormatInt(request.SourceDateEpoch, 10)}, "ukify", "build", "--linux="+request.Kernel.Source, "--initrd="+initrd, "--stub="+request.Stub.Source, "--cmdline="+commandLine, "--os-release=@"+osRelease, "--output="+unsigned); err != nil {
 		return nil, err
 	}
 	if err := native(ctx, nil, "sbsign", "--key", request.SigningKey, "--cert", request.Certificate.Source, "--output", image, unsigned); err != nil {
@@ -190,40 +198,83 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	return &Artifact{Path: image, SHA256: digest, Size: size, CertificateSHA256: request.Certificate.SHA256, ClosurePath: closurePath, PCR11SHA256: pcr11}, nil
 }
 
-func copyApproved(in Ingredient, target string, mode os.FileMode) (err error) {
+func recoveryCommandLine(serialConsole string) (string, error) {
+	const base = "rdinit=/init panic=10 quiet"
+	switch serialConsole {
+	case "":
+		return base, nil
+	case "ttyS0,115200n8", "ttyAMA0,115200":
+		return base + " console=tty0 console=" + serialConsole, nil
+	default:
+		return "", errors.New("recoveryboot: unsupported_serial_console")
+	}
+}
+
+func copyApproved(in Ingredient, target string, mode os.FileMode) error {
 	if err := approved(in); err != nil {
 		return err
 	}
-	source, err := os.Open(in.Source)
+	return withExclusiveFile(target, mode, func(out *os.File) (err error) {
+		source, err := os.Open(in.Source)
+		if err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, source.Close()) }()
+		hash := sha256.New()
+		if _, err := io.Copy(io.MultiWriter(out, hash), source); err != nil {
+			return err
+		}
+		if !equalDigest(hash.Sum(nil), in.SHA256) {
+			return errors.New("recoveryboot: ingredient_changed")
+		}
+		return nil
+	})
+}
+
+func writeExclusive(name string, data []byte, mode os.FileMode) error {
+	return withExclusiveFile(name, mode, func(out *os.File) error {
+		_, err := out.Write(data)
+		return err
+	})
+}
+
+func withExclusiveFile(name string, mode os.FileMode, write func(*os.File) error) (err error) {
+	out, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, source.Close()) }()
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
-	if err != nil {
-		return err
+	owned, statErr := out.Stat()
+	defer func() { err = closeExclusive(out, owned, err) }()
+	if statErr != nil {
+		return statErr
 	}
-	defer func() { err = errors.Join(err, out.Close()) }()
-	hash := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(out, hash), source); err != nil {
+	if err := write(out); err != nil {
 		return err
-	}
-	if !equalDigest(hash.Sum(nil), in.SHA256) {
-		return errors.New("recoveryboot: ingredient_changed")
 	}
 	return out.Sync()
 }
 
-func writeExclusive(name string, data []byte, mode os.FileMode) (err error) {
-	f, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
-	if err != nil {
+// closeExclusive removes a failed newly owned file, including sync/close failures,
+// and durably records the removal. A failed O_EXCL open never reaches this helper.
+func closeExclusive(out *os.File, owned os.FileInfo, err error) error {
+	err = errors.Join(err, out.Close())
+	if err == nil || owned == nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, f.Close()) }()
-	if _, err := f.Write(data); err != nil {
-		return err
+	current, statErr := os.Lstat(out.Name())
+	if errors.Is(statErr, os.ErrNotExist) {
+		return errors.Join(err, syncDirectory(filepath.Dir(out.Name())))
 	}
-	return f.Sync()
+	if statErr != nil {
+		return errors.Join(err, statErr)
+	}
+	if !os.SameFile(owned, current) {
+		return errors.Join(err, errors.New("recoveryboot: exclusive_file_ownership_changed"))
+	}
+	if removeErr := os.Remove(out.Name()); removeErr != nil {
+		return errors.Join(err, removeErr)
+	}
+	return errors.Join(err, syncDirectory(filepath.Dir(out.Name())))
 }
 
 // Output is bounded and deliberately excludes private-key contents and native
@@ -271,7 +322,10 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	files[2].Destination, files[2].Executable = "etc/lindm/recovery.json", false
 	files[3].Destination, files[3].Executable = "etc/lindm/image-signing.pem", false
 	files = append(files, request.Files...)
-	dirs := map[string]bool{"dev": true, "proc": true, "sys": true, "run": true, "tmp": true}
+	// The initramfs root may start with tmpfs's replaceable default mode.
+	// Archive "." explicitly so every protected configuration ancestor is
+	// root-owned mode 0755, including the root itself.
+	dirs := map[string]bool{".": true, "dev": true, "proc": true, "sys": true, "run": true, "tmp": true}
 	seen := map[string]bool{"init": true, "etc/lindm/udhcpc": true}
 	for _, in := range files {
 		if path.Clean(in.Destination) != in.Destination || strings.HasPrefix(in.Destination, "/") || in.Destination == "." || strings.HasPrefix(in.Destination, "../") || seen[in.Destination] {
@@ -291,7 +345,23 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() { err = errors.Join(err, f.Close()) }()
+	owned, statErr := f.Stat()
+	defer func() { err = closeExclusive(f, owned, err) }()
+	if statErr != nil {
+		return "", statErr
+	}
+	compressed, err := gzip.NewWriterLevel(f, gzip.BestCompression)
+	if err != nil {
+		return "", err
+	}
+	// The gzip header has no timestamp or filename; the archive epoch below
+	// comes only from the approved build request, never the host wall clock.
+	defer func() {
+		err = errors.Join(err, compressed.Close())
+		if err == nil {
+			err = f.Sync()
+		}
+	}()
 	names := make([]string, 0, len(dirs))
 	for dir := range dirs {
 		names = append(names, dir)
@@ -300,7 +370,7 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	var inode uint32
 	for _, dir := range names {
 		inode++
-		if err := cpioEntry(f, inode, dir, 0040755, 0, request.SourceDateEpoch, strings.NewReader("")); err != nil {
+		if err := cpioEntry(compressed, inode, dir, 0040755, 0, request.SourceDateEpoch, strings.NewReader("")); err != nil {
 			return "", err
 		}
 	}
@@ -311,11 +381,11 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	init := strings.NewReplacer("@CUSTODY_SETUP@", setup, "@BOOT_IMAGE_SETUP@", bootImageSetup).Replace(initScript)
 	init = strings.NewReplacer("@STATE_UUID@", request.StateUUID, "@ESP_UUID@", request.ESPUUID).Replace(init)
 	inode++
-	if err := cpioEntry(f, inode, "init", 0100700, int64(len(init)), request.SourceDateEpoch, strings.NewReader(init)); err != nil {
+	if err := cpioEntry(compressed, inode, "init", 0100700, int64(len(init)), request.SourceDateEpoch, strings.NewReader(init)); err != nil {
 		return "", err
 	}
 	inode++
-	if err := cpioEntry(f, inode, "etc/lindm/udhcpc", 0100700, int64(len(dhcpScript)), request.SourceDateEpoch, strings.NewReader(dhcpScript)); err != nil {
+	if err := cpioEntry(compressed, inode, "etc/lindm/udhcpc", 0100700, int64(len(dhcpScript)), request.SourceDateEpoch, strings.NewReader(dhcpScript)); err != nil {
 		return "", err
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Destination < files[j].Destination })
@@ -340,17 +410,17 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 			mode = 0100700
 		}
 		inode++
-		err = cpioEntry(f, inode, in.Destination, mode, info.Size(), request.SourceDateEpoch, input)
+		err = cpioEntry(compressed, inode, in.Destination, mode, info.Size(), request.SourceDateEpoch, input)
 		if err = errors.Join(err, input.Close()); err != nil {
 			return "", err
 		}
 		fmt.Fprintf(&closure, "%s %d %s\n", hex.EncodeToString(in.SHA256), info.Size(), in.Destination)
 	}
 	inode++
-	if err := cpioEntry(f, inode, "TRAILER!!!", 0, 0, 0, strings.NewReader("")); err != nil {
+	if err := cpioEntry(compressed, inode, "TRAILER!!!", 0, 0, 0, strings.NewReader("")); err != nil {
 		return "", err
 	}
-	return closure.String(), f.Sync()
+	return closure.String(), nil
 }
 
 func cpioEntry(out io.Writer, inode uint32, name string, mode uint32, size, epoch int64, data io.Reader) error {

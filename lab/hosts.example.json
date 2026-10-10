@@ -1,0 +1,39 @@
+{
+  "hosts": [
+    {
+      "name": "local",
+      "transport": "local",
+      "architectures": ["amd64"],
+      "kvm": true,
+      "maxGuests": 4,
+      "maxVcpus": 4,
+      "maxMemoryMib": 4096,
+      "workDirectory": "~/lindm-lab",
+      "runtime": "native"
+    },
+    {
+      "name": "dgx20",
+      "transport": "ssh",
+      "sshAlias": "dgx20",
+      "architectures": ["arm64"],
+      "kvm": true,
+      "maxGuests": 4,
+      "maxVcpus": 4,
+      "maxMemoryMib": 8192,
+      "workDirectory": "~/lindm-lab",
+      "runtime": "native"
+    },
+    {
+      "name": "dgx21",
+      "transport": "ssh",
+      "sshAlias": "dgx21",
+      "architectures": ["arm64"],
+      "kvm": true,
+      "maxGuests": 4,
+      "maxVcpus": 4,
+      "maxMemoryMib": 8192,
+      "workDirectory": "~/lindm-lab",
+      "runtime": "native"
+    }
+  ]
+}

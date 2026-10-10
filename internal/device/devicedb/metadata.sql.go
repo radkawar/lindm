@@ -231,20 +231,28 @@ WITH page AS MATERIALIZED (
       AND ($7::text = '' OR d.os_id = $7)
       AND ($8::text = '' OR d.os_version = $8)
       AND starts_with(d.hostname, $9::text)
-      AND ($10::timestamptz IS NULL OR d.last_seen_at >= $10::timestamptz)
-      AND ($11::timestamptz IS NULL OR d.last_seen_at <= $11::timestamptz)
-      AND d.metadata @> $12::jsonb
+      AND ($10::text = '' OR EXISTS (
+          SELECT 1 FROM device_release_reports r
+          WHERE r.generation_id = d.current_generation_id AND r.agent_release = $10::text
+      ))
+      AND ($11::timestamptz IS NULL OR d.last_seen_at >= $11::timestamptz)
+      AND ($12::timestamptz IS NULL OR d.last_seen_at <= $12::timestamptz)
+      AND d.metadata @> $13::jsonb
     ORDER BY d.enrolled_at DESC, d.id DESC
-    LIMIT $13::int
+    LIMIT $14::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
     d.state, d.enrolled_at, d.last_seen_at, d.published_sequence,
     coalesce(g.host_sequence, 0)::bigint AS host_sequence,
     coalesce(g.package_sequence, 0)::bigint AS package_sequence,
     d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.metadata,
-    compliance.compliance_rank, compliance.last_verified_at
+    compliance.compliance_rank, compliance.last_verified_at,
+    coalesce(r.agent_release, '')::text AS agent_release,
+    coalesce(r.protocol_version, 0)::int AS agent_protocol_version,
+    r.reported_at AS agent_version_accepted_at
 FROM page d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
+LEFT JOIN device_release_reports r ON r.generation_id = d.current_generation_id
 CROSS JOIN LATERAL (
     -- Explicit worst rank, independent of protobuf enum numbering:
     -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.
@@ -273,6 +281,7 @@ type SearchDevicesParams struct {
 	OsID              string
 	OsVersion         string
 	NamePrefix        string
+	AgentRelease      string
 	SeenFrom          pgtype.Timestamptz
 	SeenUntil         pgtype.Timestamptz
 	MetadataFilter    []byte
@@ -298,6 +307,9 @@ type SearchDevicesRow struct {
 	Metadata                 []byte
 	ComplianceRank           int32
 	LastVerifiedAt           pgtype.Timestamptz
+	AgentRelease             string
+	AgentProtocolVersion     int32
+	AgentVersionAcceptedAt   pgtype.Timestamptz
 }
 
 // Restrict scope, filters and keyset before projecting bounded page resources.
@@ -312,6 +324,7 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 		arg.OsID,
 		arg.OsVersion,
 		arg.NamePrefix,
+		arg.AgentRelease,
 		arg.SeenFrom,
 		arg.SeenUntil,
 		arg.MetadataFilter,
@@ -343,6 +356,9 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 			&i.Metadata,
 			&i.ComplianceRank,
 			&i.LastVerifiedAt,
+			&i.AgentRelease,
+			&i.AgentProtocolVersion,
+			&i.AgentVersionAcceptedAt,
 		); err != nil {
 			return nil, err
 		}

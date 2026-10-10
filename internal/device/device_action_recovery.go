@@ -18,6 +18,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/gen/lindm/recovery/v1/recoveryv1connect"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/trust"
 )
 
 var _ recoveryv1connect.RecoveryServiceHandler = (*Service)(nil)
@@ -71,6 +72,9 @@ func (s *Service) authenticateRecovery(ctx context.Context, envelope, proof []by
 	}
 	verified, err := s.authority.VerifyRecoveryRequestProof(ctx, proof, envelope, credential, operation, payload, now)
 	if err != nil {
+		if errors.Is(err, trust.ErrRecoveryRequestPayloadMismatch) || errors.Is(err, trust.ErrRecoveryRequestClockAhead) || errors.Is(err, trust.ErrRecoveryRequestExpired) {
+			return nil, rpcError(connect.CodePermissionDenied, err.Error())
+		}
 		return nil, rpcError(connect.CodePermissionDenied, "recovery_request_rejected")
 	}
 	action, err := devicedb.New(s.pool).GetDeviceAction(ctx, row.ActionID)

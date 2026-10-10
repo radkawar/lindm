@@ -16,8 +16,8 @@ export function ScopeEditor({
     <fieldset className="grid min-w-0 gap-4 border p-4" disabled={disabled}>
       <legend className="px-1 text-sm font-semibold">Device authorization scopes</legend>
       <p className="max-w-3xl text-sm text-muted-foreground">
-        No scopes means unrestricted. Scopes are ORed. Within one scope, all labels must match and
-        the label, device-ID and group-ID dimensions are ANDed. Enter one exact label or UUID per
+        No scopes means unrestricted access. A device can match any scope. Within a scope, it must
+        match every label and each device or group filter you provide. Enter one label or UUID per
         line.
       </p>
       {scopes.map((scope, index) => (

@@ -19,6 +19,7 @@ import (
 	"golang.org/x/net/html"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/gen/lindm/admin/v1/adminv1connect"
 	authv1 "lindm/gen/lindm/auth/v1"
 )
@@ -37,6 +38,7 @@ type OwnerSession struct {
 	csrf      string
 	origin    string
 	local     *localAccount
+	login     func(context.Context) (*OwnerSession, error)
 }
 
 // OpenOwnerSession follows the server's authorization-code/S256-PKCE flow and
@@ -195,8 +197,35 @@ func ownerDialContext(adminAddress string) func(context.Context, string, string)
 	}
 }
 
+// ApproveApproval authenticates again before deciding an approval. Native local
+// lanes use password + WebAuthn; directory approval fixtures repeat code/PKCE.
+// Only authentication is renewed: a failed approval mutation is never retried.
+func (s *OwnerSession) ApproveApproval(ctx context.Context, request *connect.Request[adminv1.ApproveApprovalRequest]) (_ *connect.Response[adminv1.ApproveApprovalResponse], resultErr error) {
+	if s.local != nil {
+		if err := s.StepUp(ctx); err != nil {
+			return nil, err
+		}
+		return s.Admin.ApproveApproval(ctx, request)
+	}
+	if s.login == nil {
+		return nil, errors.New("approval requires renewable laboratory authentication")
+	}
+	fresh, err := s.login(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resultErr = errors.Join(resultErr, fresh.Close(context.WithoutCancel(ctx))) }()
+	if fresh.AccountID != s.AccountID {
+		return nil, errors.New("fresh approval login changed laboratory principal")
+	}
+	return fresh.Admin.ApproveApproval(ctx, request)
+}
+
 func (s *OwnerSession) Close(ctx context.Context) error {
 	defer s.transport.CloseIdleConnections()
+	if s.csrf == "" {
+		return nil
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.origin+"/auth/logout", nil)
 	if err != nil {
 		return err
@@ -212,9 +241,12 @@ func (s *OwnerSession) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if response.StatusCode != http.StatusNoContent {
+	// An expired or revoked session has no remaining logout authority. This
+	// does not authenticate it: callers must complete a new real login.
+	if response.StatusCode != http.StatusNoContent && response.StatusCode != http.StatusUnauthorized {
 		return fmt.Errorf("revoke laboratory console session: HTTP %d", response.StatusCode)
 	}
+	s.csrf = ""
 	return nil
 }
 

@@ -14,6 +14,8 @@ import (
 	"strconv"
 
 	"golang.org/x/sys/unix"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 // NVME_IOCTL_ID is _IO('N', 0x40) from linux/nvme_ioctl.h. It returns the
@@ -26,6 +28,81 @@ func nvmeNamespaceID(file *os.File) (uint32, error) {
 		return 0, fmt.Errorf("%w: nvme_namespace_descriptor: %v", ErrUnsupported, errno)
 	}
 	return uint32(id), nil
+}
+
+// ReadNVMeSanitizeScope discovers approval identity using native read-only
+// namespace/controller ioctls. The caller owns the pinned read-only block
+// descriptor and supplies the independently observed storage target. This does
+// not authorize erasure, qualify a method, or select controller-wide scope.
+func ReadNVMeSanitizeScope(ctx context.Context, file *os.File, target *agentv1.StorageTarget) (*agentv1.NVMeSanitizeScope, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if file == nil || target == nil {
+		return nil, ErrUnsupported
+	}
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+		return nil, err
+	}
+	flags, err := unix.FcntlInt(file.Fd(), unix.F_GETFL, 0)
+	if err != nil {
+		return nil, err
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFBLK || flags&unix.O_ACCMODE != unix.O_RDONLY {
+		return nil, fmt.Errorf("%w: nvme_read_only_namespace_required", ErrUnsupported)
+	}
+	nsid, err := nvmeNamespaceID(file)
+	if err != nil {
+		return nil, err
+	}
+	p := &Provider{run: runNative}
+	return p.readNVMeSanitizeScope(ctx, file, target, nsid)
+}
+
+func (p *Provider) readNVMeIdentify(ctx context.Context, file *os.File, nsid uint32) ([]byte, []byte, error) {
+	controller, err := p.nvmeAdmin(ctx, file, 6, 0, 1, nvmeIdentifyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	namespace, err := p.nvmeAdmin(ctx, file, 6, nsid, 0, nvmeIdentifyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return controller, namespace, nil
+}
+
+func (p *Provider) readNVMeSanitizeScope(ctx context.Context, file *os.File, target *agentv1.StorageTarget, nsid uint32) (*agentv1.NVMeSanitizeScope, error) {
+	controllerData, namespaceData, err := p.readNVMeIdentify(ctx, file, nsid)
+	if err != nil {
+		return nil, err
+	}
+	controller, err := parseNVMeController(controllerData)
+	if err != nil {
+		return nil, err
+	}
+	namespace, err := parseNVMeNamespace(namespaceData)
+	if err != nil {
+		return nil, err
+	}
+	basis, err := nvmeIdentityBasis(target, nsid, controller, namespace)
+	if err != nil {
+		return nil, err
+	}
+	return &agentv1.NVMeSanitizeScope{
+		NamespaceId: nsid,
+		Identity: &agentv1.NVMeSanitizeIdentity{
+			Basis:              basis,
+			VendorId:           uint32(controller.vid),
+			SubsystemVendorId:  uint32(controller.ssvid),
+			ControllerSerial:   controller.serial,
+			ControllerModel:    controller.model,
+			ControllerFirmware: controller.firmware,
+			NamespaceSizeBytes: namespace.size,
+			LbaFormat:          uint32(namespace.lbaf),
+			LbaDataSizeShift:   uint32(namespace.shift),
+		},
+	}, nil
 }
 
 // nvmeAdmin submits precisely one Linux NVME_IOCTL_ADMIN_CMD through nvme-cli's

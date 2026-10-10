@@ -2,13 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
-import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { reasonError } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
@@ -34,13 +36,13 @@ export function EnrollmentView() {
 
   return (
     <section className="flex min-w-0 max-w-4xl flex-col gap-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Enrollment</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          A grant is one-use and short-lived. It is not a reusable fleet password and must not be
-          baked into a golden image. The server stores only a hash.
-        </p>
-      </div>
+      <PageHeader
+        title="Device enrollment"
+        description="Use a one-time grant for a device, provisioning tokens for unattended installs, or signed files for offline sites."
+      />
+      <p className="text-sm text-muted-foreground">
+        Grants are short-lived and single-use. Never store a grant in a golden image.
+      </p>
       <IssueGrant
         onIssued={(grant) => {
           if (!lifetime.signal.aborted) setIssued(grant);
@@ -107,20 +109,24 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
       setRequestId(newRequestId());
       setFailure(null);
       if (!authLifetime.signal.aborted) {
-        toast.success("Enrollment grant issued", {
-          description: result.deliveryUnknown
-            ? "The secret was not delivered. Review the grant before continuing."
-            : "Secure the one-time secret shown on this page.",
-        });
+        if (result.deliveryUnknown) {
+          toast.error("Grant secret was not delivered", {
+            description: "Revoke the grant and issue a replacement.",
+          });
+        } else {
+          toast.success("Enrollment grant issued", {
+            description: "Secure the one-time secret shown on this page.",
+          });
+        }
       }
     },
     onError: (error) => {
       const next = toRpcFailure(error);
       setFailure(next);
       if (!authLifetime.signal.aborted) {
-        toast.error(next.ambiguous ? "Grant request outcome unknown" : "Grant request failed", {
-          description: "Review the inline result before continuing.",
-        });
+        const feedback = classifyRpcFailure(next);
+        const notify = feedback.tone === "destructive" ? toast.error : toast;
+        notify(feedback.title, { description: feedback.action });
       }
     },
     onSettled: () => {
@@ -131,7 +137,7 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Issue a grant</CardTitle>
+        <CardTitle>Issue a one-time grant</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -195,15 +201,11 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
             </p>
           ) : null}
           {failure ? (
-            <Alert variant="destructive">
-              <AlertTitle>{failure.denied ? "Not authorized" : "Grant request failed"}</AlertTitle>
-              <AlertDescription>
-                {failure.ambiguous
-                  ? "No result came back. Retry this same request ID. A retry does not recover a withheld secret. "
-                  : ""}
-                {failure.codeName}: {failure.message}
-              </AlertDescription>
-            </Alert>
+            <RpcError failure={failure}>
+              {failure.ambiguous ? (
+                <p>Retry the same request ID. A retry cannot recover a withheld secret.</p>
+              ) : null}
+            </RpcError>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
@@ -258,7 +260,7 @@ function GrantResult({ grant, onHide }: { grant: IssuedGrant; onHide: () => void
         {grant.hidden ? (
           <p role="status">The secret has been hidden and cannot be displayed again.</p>
         ) : grant.deliveryUnknown || secret === null ? (
-          <Alert>
+          <Alert variant="destructive">
             <AlertTitle>Secret was not delivered</AlertTitle>
             <AlertDescription>
               The server did not return the secret. It cannot be recovered. Revoke this grant and
@@ -357,9 +359,9 @@ function RevokeGrant({
       const next = toRpcFailure(error);
       setFailure(next);
       if (!lifetime.signal.aborted) {
-        toast.error(next.ambiguous ? "Revocation outcome unknown" : "Grant revocation failed", {
-          description: "Review the inline result before continuing.",
-        });
+        const feedback = classifyRpcFailure(next);
+        const notify = feedback.tone === "destructive" ? toast.error : toast;
+        notify(feedback.title, { description: feedback.action });
       }
     },
     onSettled: () => {
@@ -446,14 +448,7 @@ function RevokeGrant({
               <AlertDescription>{accepted}</AlertDescription>
             </Alert>
           ) : null}
-          {failure ? (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {failure.ambiguous ? "No result came back. Retry the same request ID. " : ""}
-                {failure.codeName}: {failure.message}
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          {failure ? <RpcError failure={failure} /> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="destructive" disabled={revoke.isPending}>
               {revoke.isPending

@@ -49,10 +49,27 @@ message VendorImageReceipt {
 // RedHatRegistrationCredentials is ephemeral stdin delivery to the owned guest.
 // Never persist, log, or include an instance in laboratory evidence.
 message RedHatRegistrationCredentials {
+  option (buf.validate.message).cel = {
+    id: "redhat_registration.public_name"
+    message: "public run name must not disclose the activation key"
+    expression: "this.run_name != this.activation_key"
+  };
   string organization_id = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 32
     pattern: "^[0-9]+$"
   }];
   string activation_key = 2 [(buf.validate.field).string.pattern = "^lindm-lab-[0-9a-f]{32}$"];
+  // Public random identity, generated independently from the secret activation key.
+  string run_name = 3 [(buf.validate.field).string.pattern = "^lindm-lab-[0-9a-f]{32}$"];
+}
+
+// RedHatRegistrationIdentity is the only permitted guest registration output.
+// The UUID comes from the native consumer certificate, not the activation key.
+message RedHatRegistrationIdentity {
+  string run_name = 1 [(buf.validate.field).string.pattern = "^lindm-lab-[0-9a-f]{32}$"];
+  string consumer_uuid = 2 [(buf.validate.field).string = {
+    pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    not_in: ["00000000-0000-0000-0000-000000000000"]
+  }];
 }

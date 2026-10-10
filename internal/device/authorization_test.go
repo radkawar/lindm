@@ -75,6 +75,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"GetDeviceActions":                     {identity.PermissionReadFleet, readers, false},
 		"GetDeviceAction":                      {identity.PermissionReadFleet, readers, false},
 		"GetDeviceEncryption":                  {identity.PermissionReadFleet, readers, false},
+		"ListDeviceStorageTargets":             {identity.PermissionReadFleet, readers, false},
 		"RevealRecoveryKey":                    {identity.PermissionReadRecoveryKeys, admins, false},
 		"ListDeviceGroups":                     {identity.PermissionManageAccounts, accounts, true},
 		"SetDeviceGroup":                       {identity.PermissionManageAccounts, accounts, true},

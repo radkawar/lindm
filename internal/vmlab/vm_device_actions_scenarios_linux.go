@@ -3,7 +3,9 @@
 package vmlab
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,15 +22,12 @@ func revealNativeRecovery(ctx context.Context, owner, approver *devlab.OwnerSess
 	if err := owner.StepUp(ctx); err != nil {
 		return nil, err
 	}
-	if err := approver.StepUp(ctx); err != nil {
-		return nil, err
-	}
 	request := &adminv1.RevealRecoveryKeyRequest{RequestId: uuid.NewString(), DeviceId: deviceID, ActionId: actionID, Reason: "verify literal recovery credential on disposable cold boot"}
 	created, err := owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 300, Payload: &adminv1.CreateApprovalRequest_RevealRecoveryKey{RevealRecoveryKey: request}}))
 	if err != nil {
 		return nil, err
 	}
-	approved, err := approver.Admin.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent approval for native recovery qualification"}))
+	approved, err := approver.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent approval for native recovery qualification"}))
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +101,42 @@ func waitActionNetworkExpiry(ctx context.Context, vm *EncryptedVM, deadline time
 type actionDesktopEvidence struct {
 	SessionID         string `json:"session_id"`
 	Type              string `json:"type"`
+	Class             string `json:"class"`
+	User              string `json:"user"`
+	Service           string `json:"service"`
 	Desktop           string `json:"desktop"`
 	LockedHint        bool   `json:"locked_hint"`
 	ScreenSaverActive bool   `json:"screen_saver_active"`
+}
+
+const actionDesktopUser = "lindm-desktop-test"
+
+// prepareActionDesktop changes only the disposable overlay. A password-enabled
+// user is required: a locked/passwordless installer SSH account is not a useful
+// GNOME lock-screen fixture. GDM performs the real PAM/logind login.
+func prepareActionDesktop(ctx context.Context, vm *EncryptedVM) (string, error) {
+	initial, err := vm.Run(ctx, `sudo -n sh -eu -c 'loginctl list-sessions --no-legend --no-pager | while read -r id rest; do loginctl show-session "$id" -p Id -p Name -p Class -p Type -p Desktop -p Service -p LockedHint; done'`, nil)
+	if err != nil {
+		return "", err
+	}
+	script := `set -eu
+useradd --create-home --shell /bin/bash ` + actionDesktopUser + `
+chpasswd
+install -d -o ` + actionDesktopUser + ` -g ` + actionDesktopUser + ` -m 0700 /home/` + actionDesktopUser + `/.config
+printf 'yes\n' > /home/` + actionDesktopUser + `/.config/gnome-initial-setup-done
+chown ` + actionDesktopUser + `:` + actionDesktopUser + ` /home/` + actionDesktopUser + `/.config/gnome-initial-setup-done
+config=/etc/gdm/custom.conf
+session=gnome
+if test -d /etc/gdm3; then config=/etc/gdm3/custom.conf; session=ubuntu; fi
+printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=` + actionDesktopUser + `\nInitialSetupEnable=False\n' > "$config"
+install -d -m 0755 /var/lib/AccountsService/users
+printf '[User]\nSystemAccount=false\nSession=%s\nXSession=%s\n' "$session" "$session" > /var/lib/AccountsService/users/` + actionDesktopUser + `
+if command -v restorecon >/dev/null; then restorecon -RF "$config" /var/lib/AccountsService /home/` + actionDesktopUser + `; fi
+systemctl restart display-manager.service`
+	password := []byte(actionDesktopUser + ":" + rand.Text() + "\n")
+	defer clear(password)
+	_, err = vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), bytes.NewReader(password))
+	return string(initial), err
 }
 
 func observeActionDesktop(ctx context.Context, vm *EncryptedVM, locked bool) (*actionDesktopEvidence, error) {
@@ -115,31 +147,37 @@ loginctl list-sessions --no-legend --no-pager | while read -r id rest; do
  class=$(loginctl show-session "$id" -p Class --value)
  [ "$class" = user ] || continue
  user=$(loginctl show-session "$id" -p Name --value)
- [ "$user" = lindm-lab ] || continue
+ [ "$user" = `+actionDesktopUser+` ] || continue
  printf "%s\n%s\n" "$id" "$type"
  loginctl show-session "$id" -p Desktop --value
  loginctl show-session "$id" -p LockedHint --value
- uid=$(id -u lindm-lab)
+ printf "%s\n%s\n" "$class" "$user"
+ loginctl show-session "$id" -p Service --value
+ uid=$(id -u `+actionDesktopUser+`)
  pgrep -u "$uid" -x gnome-shell >/dev/null
- sudo -n -u lindm-lab env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus gdbus call --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver.GetActive
+ sudo -n -u `+actionDesktopUser+` env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus gdbus call --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver.GetActive
  exit 0
 done'`, nil)
 	if err != nil {
 		return nil, err
 	}
+	return parseActionDesktop(data, locked)
+}
+
+func parseActionDesktop(data []byte, locked bool) (*actionDesktopEvidence, error) {
 	fields := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// Ubuntu names its GNOME session "ubuntu". The user-owned gnome-shell
-	// process and working ScreenSaver D-Bus API prove the desktop, not its label.
-	if len(fields) != 5 || (fields[1] != "x11" && fields[1] != "wayland") || fields[2] == "" {
+	// logind's Desktop label can be empty, even with a real GNOME session.
+	// The user-owned gnome-shell and ScreenSaver API establish the desktop.
+	if len(fields) != 8 || (fields[1] != "x11" && fields[1] != "wayland") || fields[4] != "user" || fields[5] != actionDesktopUser || fields[6] != "gdm-autologin" {
 		return nil, fmt.Errorf("actual GNOME user session was not observed: %q", fields)
 	}
 	if fields[3] != "yes" && fields[3] != "no" {
 		return nil, errors.New("invalid logind lock observation")
 	}
-	if fields[4] != "(true,)" && fields[4] != "(false,)" {
+	if fields[7] != "(true,)" && fields[7] != "(false,)" {
 		return nil, errors.New("invalid GNOME screen shield observation")
 	}
-	observed := &actionDesktopEvidence{SessionID: fields[0], Type: fields[1], Desktop: fields[2], LockedHint: fields[3] == "yes", ScreenSaverActive: fields[4] == "(true,)"}
+	observed := &actionDesktopEvidence{SessionID: fields[0], Type: fields[1], Desktop: fields[2], Class: fields[4], User: fields[5], Service: fields[6], LockedHint: fields[3] == "yes", ScreenSaverActive: fields[7] == "(true,)"}
 	if observed.LockedHint != locked || observed.ScreenSaverActive != locked {
 		return nil, errors.New("native logind and GNOME lock state did not both reach expectation")
 	}

@@ -5,23 +5,86 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"strings"
+
+	"google.golang.org/protobuf/encoding/protojson"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
+
+// RequiredNativeHelpers returns initramfs-relative paths for the configured
+// recovery operations. This selects dependencies, not execution authority.
+// Direct overwrite/discard use Go I/O/ioctl; native NVMe methods use nvme-cli.
+func RequiredNativeHelpers(config *agentv1.RecoveryRuntimeConfig) []string {
+	required := []string{"usr/bin/sbverify", "usr/bin/lsblk"}
+	provider := config.GetProvider()
+	var luks, nvme bool
+	for _, target := range provider.GetTargets() {
+		luks = luks || target.GetTarget().GetLuksUuid() != "" || target.GetAllowCryptoErase()
+		nvme = nvme || len(target.GetNativeSanitizeMethods()) != 0
+	}
+	if luks {
+		required = append(required, "usr/sbin/cryptsetup")
+	}
+	if provider.GetAllowLiveRootCryptoErase() {
+		required = append(required, "usr/sbin/dmsetup")
+	}
+	if nvme {
+		required = append(required, "usr/sbin/nvme")
+	}
+	return required
+}
+
+func validateBuildClosure(config Ingredient, files []Ingredient) error {
+	input, err := os.Open(config.Source)
+	if err != nil {
+		return err
+	}
+	data, err := io.ReadAll(io.LimitReader(input, (1<<20)+1))
+	if err = errors.Join(err, input.Close()); err != nil {
+		return err
+	}
+	if len(data) > 1<<20 {
+		return errors.New("recoveryboot: runtime_config_too_large")
+	}
+	runtime := new(agentv1.RecoveryRuntimeConfig)
+	if err := protojson.Unmarshal(data, runtime); err != nil {
+		return fmt.Errorf("recoveryboot: decode_runtime_config: %w", err)
+	}
+	if err := requireNativeHelpers(files, RequiredNativeHelpers(runtime)); err != nil {
+		return err
+	}
+	return validateClosure(files)
+}
+
+func requireNativeHelpers(files []Ingredient, required []string) error {
+	for _, name := range required {
+		found := false
+		for _, file := range files {
+			if file.Destination == name && file.Executable {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("recoveryboot: required_native_helper_missing: %s", name)
+		}
+	}
+	return nil
+}
 
 // validateClosure does not run ldd or any ingredient binary. ELF interpreters and
 // DT_NEEDED libraries must resolve inside the explicitly approved file closure.
 // dlopen modules remain explicit release ingredients, not discovered host files.
 func validateClosure(files []Ingredient) error {
+	if err := requireNativeHelpers(files, RequiredNativeHelpers(nil)); err != nil {
+		return err
+	}
 	byPath := make(map[string]Ingredient, len(files))
 	for _, file := range files {
 		byPath[file.Destination] = file
-	}
-	for _, required := range []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/cryptsetup", "usr/sbin/dmsetup", "usr/sbin/nvme"} {
-		file, ok := byPath[required]
-		if !ok || !file.Executable {
-			return fmt.Errorf("recoveryboot: required_native_helper_missing: %s", required)
-		}
 	}
 	for _, file := range files {
 		binary, err := elf.Open(file.Source)
@@ -47,8 +110,12 @@ func validateClosure(files []Ingredient) error {
 			if len(interpreter) > 4096 || !strings.HasPrefix(name, "/") {
 				return errors.Join(errors.New("recoveryboot: invalid_elf_interpreter"), binary.Close())
 			}
-			if _, ok := byPath[strings.TrimPrefix(name, "/")]; !ok {
+			loader, ok := byPath[strings.TrimPrefix(name, "/")]
+			if !ok {
 				return errors.Join(fmt.Errorf("recoveryboot: missing_elf_interpreter: %s", name), binary.Close())
+			}
+			if !loader.Executable {
+				return errors.Join(fmt.Errorf("recoveryboot: non_executable_elf_interpreter: %s", name), binary.Close())
 			}
 		}
 		for _, library := range libraries {

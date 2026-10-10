@@ -41,6 +41,23 @@ func nvmeSanitizeCommand(method agentv1.SanitizeMethod) uint32 {
 	}
 }
 
+// A namespace NID and Linux's controller-derived WWN are distinct identities,
+// not interchangeable aliases. A raw NID may be present but discarded by Linux;
+// only the exact native controller-derived WWN establishes that latter basis.
+func nvmeIdentityBasis(target *agentv1.StorageTarget, nsid uint32, controller nvmeController, namespace nvmeNamespace) (agentv1.NvmeIdentityBasis, error) {
+	if nsid == 0 || nsid == ^uint32(0) || controller.serial != target.GetSerial() || namespace.size != target.GetSizeBytes() {
+		return 0, fmt.Errorf("%w: nvme_exact_identity_changed", ErrConflict)
+	}
+	if namespace.matchesWWN(target.GetWwn()) {
+		return agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_NAMESPACE_NID, nil
+	}
+	if namespace.nguid == [16]byte{} && namespace.eui64 == [8]byte{} && target.GetWwn() == "" ||
+		target.GetWwn() == controller.fallbackWWN(nsid) {
+		return agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID, nil
+	}
+	return 0, fmt.Errorf("%w: nvme_namespace_identity_changed", ErrConflict)
+}
+
 func nvmeMethodScope(method agentv1.SanitizeMethod, scope *agentv1.NVMeSanitizeScope, controller nvmeController, allocated []uint32) error {
 	if scope == nil || scope.GetNamespaceId() == 0 || scope.GetNamespaceId() == ^uint32(0) || !slices.Contains(allocated, scope.GetNamespaceId()) {
 		return fmt.Errorf("%w: nvme_namespace_scope", ErrUnsupported)
@@ -106,8 +123,17 @@ func nvmePlan(action *agentv1.SanitizeAction, nsid uint32, controllerData, names
 	if controller.oacs&8 == 0 && uint32(len(allocated)) != controller.namespaces {
 		return nil, fmt.Errorf("%w: nvme_namespace_inventory_incomplete", ErrUnsupported)
 	}
-	if action.GetNvmeScope().GetNamespaceId() != nsid || controller.serial != action.GetTarget().GetSerial() || namespace.size != action.GetTarget().GetSizeBytes() || !namespace.matchesWWN(action.GetTarget().GetWwn()) {
-		return nil, fmt.Errorf("%w: nvme_exact_identity_changed", ErrConflict)
+	basis, err := nvmeIdentityBasis(action.GetTarget(), nsid, controller, namespace)
+	if err != nil {
+		return nil, err
+	}
+	identity := action.GetNvmeScope().GetIdentity()
+	if action.GetNvmeScope().GetNamespaceId() != nsid || identity == nil ||
+		identity.GetBasis() != basis ||
+		identity.GetVendorId() != uint32(controller.vid) || identity.GetSubsystemVendorId() != uint32(controller.ssvid) ||
+		identity.GetControllerSerial() != controller.serial || identity.GetControllerModel() != controller.model || identity.GetControllerFirmware() != controller.firmware ||
+		identity.GetNamespaceSizeBytes() != namespace.size || identity.GetLbaFormat() != uint32(namespace.lbaf) || identity.GetLbaDataSizeShift() != uint32(namespace.shift) {
+		return nil, fmt.Errorf("%w: nvme_approved_identity_changed", ErrConflict)
 	}
 	if err := nvmeMethodScope(action.GetMethod(), action.GetNvmeScope(), controller, allocated); err != nil {
 		return nil, err
@@ -143,17 +169,13 @@ func (p *Provider) observeNVMe(ctx context.Context, spec *agentv1.DeviceActionSp
 	if err != nil {
 		return nil, err
 	}
-	controllerData, err := p.nvmeAdmin(ctx, target.file, 6, 0, 1, nvmeIdentifyBytes)
+	controllerData, namespaceData, err := p.readNVMeIdentify(ctx, target.file, nsid)
 	if err != nil {
 		return nil, errors.Join(ErrUnsupported, err)
 	}
 	controller, err := parseNVMeController(controllerData)
 	if err != nil {
 		return nil, err
-	}
-	namespaceData, err := p.nvmeAdmin(ctx, target.file, 6, nsid, 0, nvmeIdentifyBytes)
-	if err != nil {
-		return nil, errors.Join(ErrUnsupported, err)
 	}
 	activeData, err := p.nvmeAdmin(ctx, target.file, 6, 0, 2, nvmeIdentifyBytes)
 	if err != nil {

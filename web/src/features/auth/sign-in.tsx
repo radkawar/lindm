@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
+import { toRpcFailure } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,12 +41,11 @@ export function SignIn({ notice }: { notice: string }) {
             </div>
           ) : null}
           {options.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Sign-in options unavailable</AlertTitle>
-              <AlertDescription>
-                Unable to load sign-in options. Reload to try again.
-              </AlertDescription>
-            </Alert>
+            <RpcError failure={toRpcFailure(options.error)}>
+              <Button variant="outline" onClick={() => void options.refetch()}>
+                Retry
+              </Button>
+            </RpcError>
           ) : null}
           {options.data?.externalLogin ? (
             <Button render={<a href={loginHref} />}>Sign in with organization</Button>

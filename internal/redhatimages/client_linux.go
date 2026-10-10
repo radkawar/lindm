@@ -1,6 +1,6 @@
-// Package redhatimages acquires official RHEL KVM images through Red Hat's
-// authenticated download API. It does not register systems, accept subscriptions,
-// build cloud images, or claim that authenticated checksums are vendor signatures.
+// Package redhatimages acquires official RHEL KVM images and manages disposable
+// laboratory registration resources through Red Hat's authenticated APIs. It never
+// accepts subscription terms or treats authenticated checksums as vendor signatures.
 package redhatimages
 
 import (

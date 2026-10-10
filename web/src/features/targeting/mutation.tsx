@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ProtobufFields } from "@/components/ui/protobuf-fields";
@@ -124,11 +124,10 @@ export function TargetMutation<S extends DescMessage>({
         }
       }}
     >
-      <Label htmlFor={id}>{title} — typed request (protobuf JSON)</Label>
+      <Label htmlFor={id}>{title} (protobuf JSON)</Label>
       <p className="text-sm text-muted-foreground">
-        Specify an audit reason and exact expected revision where required. Unknown fields are
-        rejected. Sending captures the complete request, including its request ID. Requests are
-        never retried automatically.
+        Include an audit reason and expected revision where required. Sending locks this request and
+        its ID. Retries use the same request.
       </p>
       <Textarea
         id={id}
@@ -146,17 +145,13 @@ export function TargetMutation<S extends DescMessage>({
         </p>
       ) : null}
       {attempt?.failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>
-            {attempt.status === "ambiguous" ? "Outcome unknown" : "Request rejected"}
-          </AlertTitle>
-          <AlertDescription>
-            {attempt.failure.codeName}: {attempt.failure.message}
+        <RpcError failure={attempt.failure}>
+          <p>
             {attempt.status === "ambiguous"
-              ? " Retry only the exact captured request. Starting another request does not cancel this one."
-              : " Refresh server state before preparing a new request; no automatic rebase occurs."}
-          </AlertDescription>
-        </Alert>
+              ? "Retry this captured request. A new request does not cancel it."
+              : "Refresh server state before preparing a new request."}
+          </p>
+        </RpcError>
       ) : null}
       {attempt?.status === "accepted" ? (
         <p role="status" className="text-sm">

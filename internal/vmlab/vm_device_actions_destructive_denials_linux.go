@@ -30,9 +30,6 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 		if err := owner.StepUp(ctx); err != nil {
 			return evidence, err
 		}
-		if err := (*approver).StepUp(ctx); err != nil {
-			return evidence, err
-		}
 		request := actionRequestFor(deviceID, generation, spec)
 		lifetime := 40 * time.Second
 		if scenario == "destructive_expired_approval" {
@@ -53,7 +50,7 @@ func nativeDestructiveSpecNegatives(ctx context.Context, vm *guestVM, fixture *d
 			evidence = append(evidence, denial)
 			continue
 		}
-		approved, err := (*approver).Admin.ApproveApproval(ctx, connect.NewRequest(decision))
+		approved, err := (*approver).ApproveApproval(ctx, connect.NewRequest(decision))
 		if err != nil {
 			return evidence, err
 		}

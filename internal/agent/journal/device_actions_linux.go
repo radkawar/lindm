@@ -277,6 +277,13 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 	if (len(record.GetEscrowReceiptEnvelope()) != 0) != (record.GetReceiptRoot() != nil && len(record.GetReceiptDelegationEnvelope()) != 0) {
 		return ErrDeviceActionRejected
 	}
+	hasInventoryReceipt := len(record.GetInventoryReceiptEnvelope()) != 0
+	if hasInventoryReceipt != (record.GetInventoryReceiptRoot() != nil) || hasInventoryReceipt != (len(record.GetInventoryReceiptDelegationEnvelope()) != 0) {
+		return ErrDeviceActionRejected
+	}
+	if hasInventoryReceipt && (i.GetSpec().GetRefreshInventory() == nil || record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED || record.GetVerification().GetInventorySequence() == 0) {
+		return ErrDeviceActionRejected
+	}
 	switch record.GetState() {
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED:
 		if started || record.GetVerification() != nil {
@@ -295,6 +302,18 @@ func (s *Store) validateDeviceAction(record *agentv1.DeviceActionRecord) error {
 			return ErrDeviceActionRejected
 		}
 	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED:
+		if i.GetSpec().GetRefreshInventory() != nil && !hasInventoryReceipt {
+			return ErrDeviceActionRejected
+		}
+		if i.GetSpec().GetShutdown() != nil {
+			return ErrDeviceActionRejected
+		}
+		if i.GetSpec().GetRestart() != nil {
+			v := record.GetVerification()
+			if v.GetBootId() == "" || v.GetBootId() == c.GetBootId() || v.GetAfter().GetBootId() != v.GetBootId() {
+				return ErrDeviceActionRejected
+			}
+		}
 		if !started || !record.GetVerification().GetVerified() || i.GetSpec().GetEscrowRotate() != nil && len(record.GetEscrowReceiptEnvelope()) == 0 {
 			return ErrDeviceActionRejected
 		}
@@ -350,6 +369,9 @@ func rejectDeviceActionTransition(current, next *agentv1.DeviceActionRecord) err
 	base.ReceiptRoot, base.ReceiptDelegationEnvelope = current.GetReceiptRoot(), current.GetReceiptDelegationEnvelope()
 	base.RecoveryCredentialEnvelope = current.GetRecoveryCredentialEnvelope()
 	base.RecoveryBootGrantEnvelope, base.RecoveryBootGrantSha256 = current.GetRecoveryBootGrantEnvelope(), current.GetRecoveryBootGrantSha256()
+	base.InventoryReceiptEnvelope = current.GetInventoryReceiptEnvelope()
+	base.InventoryReceiptRoot = current.GetInventoryReceiptRoot()
+	base.InventoryReceiptDelegationEnvelope = current.GetInventoryReceiptDelegationEnvelope()
 	if !proto.Equal(base, current) {
 		return ErrDeviceActionRejected
 	}
@@ -376,6 +398,11 @@ func rejectDeviceActionTransition(current, next *agentv1.DeviceActionRecord) err
 		if !proto.Equal(current.GetVerification().GetEscrow(), next.GetVerification().GetEscrow()) {
 			return ErrDeviceActionRejected
 		}
+	case agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN:
+		// Publication evidence or a changed boot resolves consumption, not replay.
+		if (current.GetIntent().GetSpec().GetRestart() == nil && current.GetIntent().GetSpec().GetRefreshInventory() == nil) || next.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+			return ErrDeviceActionRejected
+		}
 	default:
 		return ErrDeviceActionRejected
 	}
@@ -386,6 +413,9 @@ func rejectDeviceActionTransition(current, next *agentv1.DeviceActionRecord) err
 		return ErrDeviceActionRejected
 	}
 	if !retiring && (!bytes.Equal(current.GetEscrowReceiptEnvelope(), next.GetEscrowReceiptEnvelope()) || !proto.Equal(current.GetEscrowConfirmedAt(), next.GetEscrowConfirmedAt()) || !proto.Equal(current.GetReceiptRoot(), next.GetReceiptRoot()) || !bytes.Equal(current.GetReceiptDelegationEnvelope(), next.GetReceiptDelegationEnvelope())) {
+		return ErrDeviceActionRejected
+	}
+	if len(current.GetInventoryReceiptEnvelope()) != 0 && (!bytes.Equal(current.GetInventoryReceiptEnvelope(), next.GetInventoryReceiptEnvelope()) || !proto.Equal(current.GetInventoryReceiptRoot(), next.GetInventoryReceiptRoot()) || !bytes.Equal(current.GetInventoryReceiptDelegationEnvelope(), next.GetInventoryReceiptDelegationEnvelope())) {
 		return ErrDeviceActionRejected
 	}
 	return nil

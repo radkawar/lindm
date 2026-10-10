@@ -14,6 +14,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { attributeDefinitionsQueryOptions } from "./queries";
 
 export function readAttributeInputs(data: FormData, attributes: Record<string, AttributeValue>) {
@@ -204,11 +205,7 @@ export function AttributeFields({
       ) : definitions.isPending ? (
         <p role="status">Loading attribute definitions…</p>
       ) : null}
-      {failure ? (
-        <p role="alert" className="text-sm text-destructive">
-          {failure.codeName}: {failure.message}
-        </p>
-      ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
     </fieldset>
   );
 }

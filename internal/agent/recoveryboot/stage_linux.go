@@ -63,9 +63,60 @@ func Reboot(ctx context.Context) error {
 	return native(ctx, nil, "systemctl", "reboot", "--no-block")
 }
 
-// Preflight authenticates the artifact and qualifies off-target custody without
-// creating a key, writing files, or changing boot state.
+// CheckESPCapacity is a read-only check for the exact signed image size. Needed
+// is rounded to filesystem allocation units; available excludes reserved blocks.
+// It neither reserves space nor replaces Preflight's artifact and custody checks.
+func CheckESPCapacity(espPath string, imageSize int64) (needed, available uint64, err error) {
+	if err := protectedPath(espPath, false); err != nil {
+		return 0, 0, err
+	}
+	var esp unix.Statfs_t
+	if err := unix.Statfs(espPath, &esp); err != nil {
+		return 0, 0, fmt.Errorf("recoveryboot: stat ESP capacity: %w", err)
+	}
+	return espCapacity(imageSize, esp)
+}
+
+func espCapacity(imageSize int64, esp unix.Statfs_t) (needed, available uint64, err error) {
+	if imageSize <= 0 {
+		return 0, 0, errors.New("recoveryboot: invalid_image_size")
+	}
+	if esp.Type != unix.MSDOS_SUPER_MAGIC {
+		return 0, 0, errors.New("recoveryboot: qualified_esp_required")
+	}
+	unit := esp.Frsize
+	if unit == 0 {
+		unit = esp.Bsize
+	}
+	if unit <= 0 {
+		return 0, 0, errors.New("recoveryboot: invalid_esp_allocation_unit")
+	}
+	allocation := uint64(unit)
+	blocks := uint64(imageSize) / allocation
+	if uint64(imageSize)%allocation != 0 {
+		blocks++
+	}
+	if blocks > ^uint64(0)/allocation || esp.Bavail > ^uint64(0)/allocation {
+		return 0, 0, fmt.Errorf("recoveryboot: ESP capacity overflow: %w", unix.EOVERFLOW)
+	}
+	needed, available = blocks*allocation, esp.Bavail*allocation
+	if needed > available {
+		return needed, available, espInsufficient(needed, available, unix.ENOSPC)
+	}
+	return needed, available, nil
+}
+
+func espInsufficient(needed, available uint64, cause error) error {
+	return fmt.Errorf("recoveryboot: device_action_esp_insufficient needed=%d available=%d: %w", needed, available, cause)
+}
+
+// Preflight authenticates the artifact, checks ESP capacity and qualifies
+// off-target custody without creating a key, writing files, or changing boot state.
 func Preflight(ctx context.Context, request StageRequest) error {
+	return preflight(ctx, request, CheckESPCapacity)
+}
+
+func preflight(ctx context.Context, request StageRequest, capacity func(string, int64) (uint64, uint64, error)) error {
 	if os.Geteuid() != 0 || !uuidText(request.ActionID) || !uuidText(request.SourceBootID) || request.ImageSize <= 0 {
 		return errors.New("recoveryboot: invalid_stage_identity")
 	}
@@ -76,6 +127,9 @@ func Preflight(ctx context.Context, request StageRequest) error {
 	if strings.TrimSpace(string(boot)) != request.SourceBootID {
 		return errors.New("recoveryboot: source_boot_changed")
 	}
+	if _, _, err := capacity(request.ESPPath, request.ImageSize); err != nil {
+		return err
+	}
 	if request.TrustedTPMCustody != nil {
 		if err := protectedPath(request.StateDirectory, true); err != nil {
 			return err
@@ -85,16 +139,6 @@ func Preflight(ctx context.Context, request StageRequest) error {
 		}
 	} else if err := offTargetState(request.StateDirectory, request.TargetDevices); err != nil {
 		return err
-	}
-	if err := protectedPath(request.ESPPath, false); err != nil {
-		return err
-	}
-	var esp unix.Statfs_t
-	if err := unix.Statfs(request.ESPPath, &esp); err != nil {
-		return err
-	}
-	if esp.Type != unix.MSDOS_SUPER_MAGIC {
-		return errors.New("recoveryboot: qualified_esp_required")
 	}
 	if err := approved(Ingredient{Source: request.CertificatePath, SHA256: request.CertificateSHA256}); err != nil {
 		return err
@@ -166,7 +210,7 @@ func Stage(ctx context.Context, request StageRequest) (*Staged, error) {
 	}
 	entry := "lindm-recovery-" + request.ActionID + ".efi"
 	image := filepath.Join(directory, entry)
-	if err := copyApproved(Ingredient{Source: request.ImagePath, SHA256: request.ImageSHA256}, image, 0600); err != nil {
+	if err := copyESPImage(request, image, CheckESPCapacity); err != nil {
 		return nil, err
 	}
 	if request.TrustedTPMCustody != nil {
@@ -192,6 +236,28 @@ func Stage(ctx context.Context, request StageRequest) (*Staged, error) {
 		return nil, err
 	}
 	return &Staged{request: request, entry: entry, image: image, snapshot: snapshot}, nil
+}
+
+func copyESPImage(request StageRequest, image string, capacity func(string, int64) (uint64, uint64, error)) error {
+	needed, available, err := capacity(request.ESPPath, request.ImageSize)
+	if err != nil {
+		return err
+	}
+	if err := copyApproved(Ingredient{Source: request.ImagePath, SHA256: request.ImageSHA256}, image, 0600); err != nil {
+		if errors.Is(err, unix.ENOSPC) {
+			// A competing writer or directory growth can exhaust space after
+			// preflight. Re-observe after copyApproved removes its partial file.
+			_, current, capacityErr := capacity(request.ESPPath, request.ImageSize)
+			if capacityErr == nil || errors.Is(capacityErr, unix.ENOSPC) {
+				available = current
+			} else {
+				err = errors.Join(err, capacityErr)
+			}
+			return espInsufficient(needed, available, err)
+		}
+		return err
+	}
+	return nil
 }
 
 // Arm requires already durable BOOT consumption. beforeArm is a repeatable,

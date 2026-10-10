@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,12 +75,7 @@ export function Deliveries() {
         onChange={(e) => setReason(e.target.value)}
       />
       {action.feedback}
-      {list.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Deliveries unavailable</AlertTitle>
-          <AlertDescription>{toRpcFailure(list.error).message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading deliveries…</span>
@@ -87,12 +83,7 @@ export function Deliveries() {
         </div>
       ) : null}
       {list.data?.deliveries.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No deliveries on this page.
-        </p>
+        <EmptyState title="No deliveries on this page" />
       ) : null}
       <Table>
         <TableHeader>
@@ -120,24 +111,28 @@ export function Deliveries() {
                 {delivery.resourceId}
               </TableCell>
               <TableCell>
-                <Badge
-                  variant={
+                <StatusBadge
+                  status={
                     delivery.status === DeliveryStatus.DEAD_LETTER
                       ? "destructive"
                       : delivery.status === DeliveryStatus.DELIVERED
-                        ? "secondary"
-                        : "outline"
+                        ? "success"
+                        : delivery.status === DeliveryStatus.LEASED
+                          ? "info"
+                          : delivery.lastError
+                            ? "warning"
+                            : "neutral"
                   }
                 >
                   {STATUS[delivery.status]}
-                </Badge>
+                </StatusBadge>
               </TableCell>
               <TableCell>
                 {delivery.attempts} / {delivery.replayCount}
               </TableCell>
               <TableCell>{formatTimestamp(delivery.nextAttemptAt).local}</TableCell>
               <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                {delivery.lastError || "—"}
+                {delivery.lastError || "None recorded"}
               </TableCell>
               <TableCell>
                 {delivery.status === DeliveryStatus.DEAD_LETTER ? (

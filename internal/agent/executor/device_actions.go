@@ -331,7 +331,7 @@ func (s *Service) expireDeviceAction(ctx context.Context, loaded *bound, record 
 }
 
 func deviceActionStatus(r *agentv1.DeviceActionRecord) *agentv1.DeviceActionStatus {
-	return &agentv1.DeviceActionStatus{ActionId: r.GetIntent().GetActionId(), IntentSha256: bytes.Clone(r.GetIntentSha256()), State: r.GetState(), Failure: r.GetFailure(), AcceptedAt: proto.CloneOf(r.GetAcceptedAt()), StartedAt: proto.CloneOf(r.GetStartedAt()), CompletedAt: proto.CloneOf(r.GetCompletedAt()), Before: proto.CloneOf(r.GetNativePlan().GetBefore()), Verification: proto.CloneOf(r.GetVerification())}
+	return &agentv1.DeviceActionStatus{ActionId: r.GetIntent().GetActionId(), IntentSha256: bytes.Clone(r.GetIntentSha256()), State: r.GetState(), Failure: r.GetFailure(), AcceptedAt: proto.CloneOf(r.GetAcceptedAt()), StartedAt: proto.CloneOf(r.GetStartedAt()), CompletedAt: proto.CloneOf(r.GetCompletedAt()), Before: proto.CloneOf(r.GetNativePlan().GetBefore()), Verification: proto.CloneOf(r.GetVerification()), RefreshInventory: r.GetIntent().GetSpec().GetRefreshInventory() != nil}
 }
 
 func deviceActionPreparation(r *agentv1.DeviceActionRecord) *agentv1.PrepareDeviceActionResponse {

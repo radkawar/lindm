@@ -21,11 +21,13 @@ import {
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
 import { toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
 import { formatTimestamp } from "@/lib/time";
 import type { PackageSearch } from "./package-search";
 import { devicePackagesQueryOptions } from "./queries";
-import { collectionLabels, Fact } from "./observations";
+import { CollectionStatusBadge, Fact } from "./observations";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function DevicePackages({
   deviceId,
@@ -136,15 +138,12 @@ export function DevicePackages({
           />
         </div>
         {failure ? (
-          <Alert variant="destructive">
-            <AlertTitle>
-              {failure.denied ? "Not authorized" : "Package view unavailable"}
-            </AlertTitle>
-            <AlertDescription>
-              {failure.codeName}: {failure.message}. Expired or unavailable snapshots are not
-              replaced silently. Choose Latest snapshot to start a new view.
-            </AlertDescription>
-          </Alert>
+          <RpcError failure={failure} title="Package inventory unavailable">
+            <p>
+              Choose Latest snapshot to start a new view. Existing snapshots are never replaced
+              silently.
+            </p>
+          </RpcError>
         ) : null}
         {packages.isPending ? <p role="status">Loading package records…</p> : null}
         {data ? (
@@ -176,10 +175,10 @@ export function DevicePackages({
               </Alert>
             ) : null}
             {data.packages.length === 0 ? (
-              <p>
-                No package rows match this view. This does not change the snapshot's recorded
-                package count.
-              </p>
+              <EmptyState
+                title="No packages match this view"
+                description="Adjust the package filters to see more results. The snapshot's recorded package count is unchanged."
+              />
             ) : (
               <Table>
                 <TableHeader>
@@ -238,13 +237,8 @@ export function DevicePackages({
 }
 
 function PackageModuleEvidence({ module }: { module: ModuleObservation | undefined }) {
-  if (!module) return <span className="text-muted-foreground">Unknown — not reported</span>;
-  if (module.status !== CollectionStatus.SUCCESS) {
-    return (
-      <span className="text-muted-foreground">
-        {collectionLabels[module.status] ?? "Unknown collection status"}
-      </span>
-    );
+  if (!module || module.status !== CollectionStatus.SUCCESS) {
+    return <CollectionStatusBadge status={module?.status} />;
   }
   if (!module.modular) return <span>Not modular (native observation)</span>;
   return (

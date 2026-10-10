@@ -114,6 +114,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		params := devicedb.SearchDevicesParams{
 			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter,
 			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
+			AgentRelease:     filter.GetAgentRelease(),
 			CursorEnrolledAt: timestamptz(now), CursorID: uuid.Nil,
 		}
 		if filter.GetLastSeenFrom() != nil {
@@ -287,6 +288,8 @@ func searchDevice(row devicedb.SearchDevicesRow) (*adminv1.Device, error) {
 		HostReceivedAt: protoTime(row.HostReceivedAt), PackageAttemptReceivedAt: protoTime(row.PackageAttemptReceivedAt),
 		SnapshotReceivedAt: protoTime(row.SnapshotReceivedAt), PublishedSnapshotSequence: uint64(row.PublishedSequence), Metadata: metadata,
 		Compliance: compliance, LastVerifiedAt: protoTime(row.LastVerifiedAt),
+		AgentRelease: row.AgentRelease, AgentProtocolVersion: uint32(row.AgentProtocolVersion),
+		AgentVersionAcceptedAt: protoTime(row.AgentVersionAcceptedAt),
 	}, nil
 }
 

@@ -128,6 +128,9 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 		consumed := false
 		gate := func(gateCtx context.Context) error {
 			if consumed {
+				if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
+					return s.recheckPowerActionStart(gateCtx, record, envelope)
+				}
 				return errServiceRejected
 			}
 			status, err := s.consumeDeviceAction(gateCtx, record, envelope, confirm)
@@ -145,6 +148,8 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 		var operationErr error
 		if confirm {
 			result, operationErr = s.actionProvider.ConfirmEscrow(work, record.GetNativePlan(), record.GetVerification(), credential, gate)
+		} else if record.GetIntent().GetSpec().GetRefreshInventory() != nil {
+			result, operationErr = s.beginInventoryRefresh(work, record, gate)
 		} else {
 			result, operationErr = s.actionProvider.Apply(work, record.GetNativePlan(), credential, gate)
 		}
@@ -269,6 +274,9 @@ func (s *Service) authorizeDeviceActionReceipt(ctx context.Context, loaded *boun
 // Completion is independent of current authorization, RPC cancellation and the
 // grant deadline. Any ambiguity after consumption remains OUTCOME_UNKNOWN.
 func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActionVerification, operationErr error, confirm bool) {
+	if errors.Is(operationErr, errInventoryPublicationPending) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 	defer cancel()
 	s.mu.Lock()
@@ -320,6 +328,19 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 		if errors.Is(operationErr, errServiceExpired) || errors.Is(operationErr, context.Canceled) || errors.Is(operationErr, context.DeadlineExceeded) {
 			next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED
 		}
+	} else if record.GetIntent().GetSpec().GetRestart() != nil || record.GetIntent().GetSpec().GetShutdown() != nil {
+		// Native acceptance cannot establish a changed boot or powered-off host.
+		// Only startup recovery may confirm restart against the signed boot ID.
+		next.State, next.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_OBSERVATION
+		if next.Verification != nil {
+			next.Verification.Verified = false
+		}
+		if record.GetIntent().GetSpec().GetShutdown() != nil {
+			if next.Verification == nil {
+				next.Verification = &agentv1.DeviceActionVerification{After: proto.CloneOf(record.GetNativePlan().GetBefore())}
+			}
+			next.Verification.Evidence = "outcome_unknown_until_contact"
+		}
 	} else if operationErr == nil && !confirm && record.GetIntent().GetSpec().GetEscrowRotate() != nil && result.GetEscrow() != nil {
 		// Verification covers the newly staged key, not completion of rotation.
 		// The encrypted stage is durable before any server can attest/store it.
@@ -337,8 +358,8 @@ func (s *Service) finishDeviceAction(actionID string, result *agentv1.DeviceActi
 	}
 }
 
-// Startup never observes-and-retries imperative effects. Every consumed phase
-// becomes permanently unknown; unconsumed challenges expire with incarnation.
+// Startup observes restart boot evidence but never retries imperative effects.
+// Other consumed phases remain unknown; unconsumed challenges expire.
 func (s *Service) recoverDeviceActions(ctx context.Context) error {
 	if s.store == nil || s.hold {
 		return nil
@@ -361,14 +382,67 @@ func (s *Service) recoverDeviceActions(ctx context.Context) error {
 			return err
 		}
 		cursor = record.GetIntent().GetActionId()
+		wasUnknown := record.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
+		if record.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN && record.GetIntent().GetSpec().GetRestart() == nil {
+			continue
+		}
 		if record.GetStartedAt() == nil {
 			record.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED
 		} else {
 			record.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
 		}
 		record.Failure, record.CompletedAt = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED, protoTimestamp(s.now())
+		if record.GetStartedAt() != nil && record.GetIntent().GetSpec().GetShutdown() != nil && record.GetVerification() == nil {
+			record.Verification = &agentv1.DeviceActionVerification{After: proto.CloneOf(record.GetNativePlan().GetBefore()), Evidence: "outcome_unknown_until_contact"}
+		}
+		if record.GetStartedAt() != nil && record.GetIntent().GetSpec().GetRestart() != nil {
+			boot, err := s.bootID()
+			if err != nil {
+				return err
+			}
+			if _, err := canonicalUUID(boot); err != nil {
+				return err
+			}
+			if boot != record.GetChallenge().GetBootId() {
+				record.State, record.Failure = agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED, agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE
+				record.Verification = &agentv1.DeviceActionVerification{
+					Verified:             true,
+					BootId:               boot,
+					After:                &agentv1.DeviceActionObservation{ObservedAt: protoTimestamp(s.now()), Supported: true, BootId: boot},
+					Evidence:             "restart_confirmed_boot_id_changed",
+					PowerRequestAccepted: record.GetVerification().GetPowerRequestAccepted(),
+				}
+			} else if wasUnknown {
+				continue
+			}
+		}
 		if err := s.updateDeviceAction(ctx, loaded, revision, record); err != nil {
 			return err
 		}
 	}
+}
+
+// Wall delivery may block after grant consumption. Power providers recheck the
+// same authority immediately afterward rather than extending the start deadline.
+func (s *Service) recheckPowerActionStart(ctx context.Context, expected *agentv1.DeviceActionRecord, envelope []byte) error {
+	if err := s.lock(ctx); err != nil {
+		return err
+	}
+	defer s.mu.Unlock()
+	if s.agentUpdateBusy() {
+		return errServiceRejected
+	}
+	loaded, err := s.enrolled(ctx)
+	if err != nil {
+		return err
+	}
+	record, _, err := s.loadDeviceAction(ctx, loaded, expected.GetIntent().GetActionId())
+	if err != nil {
+		return err
+	}
+	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || !bytes.Equal(record.GetStartGrantEnvelope(), envelope) || !proto.Equal(record.GetNativePlan(), expected.GetNativePlan()) {
+		return errServiceRejected
+	}
+	_, err = s.authorizeDeviceActionStart(ctx, loaded, record, envelope)
+	return err
 }

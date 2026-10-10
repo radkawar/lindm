@@ -1,0 +1,99 @@
+{
+  "distribution": "fedora",
+  "version": "44",
+  "captured_at": "2026-10-10T02:39:45.945361953Z",
+  "image_id": "fedora-server-encrypted-44-1.7-x86-64",
+  "image_sha256": "85837793bfa36db6bc709b4cecd2ec116951b87d9c53c3d95eb2fac8dcf7cf1f",
+  "golden_disk_sha256": "9a0e3e29159613c9375dd88ab29926e978a703e97c793c919305f3eeceaf91b7",
+  "harness_source": {
+    "base_commit": "9138d17f8ff6c3673f82cea1590c36c33fca2d22",
+    "diff_sha256": "15349ec86fd85d55a39fefc882adf48eab81246bf06ff1b49ecb8e15ef0bdf0b",
+    "untracked_sha256": {
+      "cmd/lab/vm_inspect_storage_linux.go": "b21561d95162e3685f53f3c0cc830c5e5ef98559beb6f34b1d1dc912200bc484",
+      "internal/agent/executor/recovery_readiness_linux_test.go": "7ca567e96130196be9ebde947ff2cbe86ad240b15cea00b49e754962303f12b4",
+      "internal/agent/inventory/storage_linux_test.go": "8445c4af81877e0f564c69cd5507b63c5443e9ad5706538d082920e33f443886",
+      "internal/agent/inventory/storage_metadata_linux.go": "f9c4437f3cf703f262a0f3685d75b0bcf77901485b1cc77e1d6bbaf28db7d0d2",
+      "internal/agent/inventory/storage_metadata_linux_test.go": "a4c662ff191c6e763885e7383119a3df3668fc3e091fa1e514db38404f3ffb07",
+      "internal/agent/inventory/storage_schema_linux_test.go": "0dfa12a7e352ec42619fe13a057cbc2822ec74f0ceadae856b437436ee6bc9f8",
+      "internal/agent/recoveryboot/readiness_linux_test.go": "b68eb6792ef1fce776279c9b5a0929a7949bf9430e541a437003bae65f15d029",
+      "internal/agent/transport/recovery_readiness_linux.go": "2c93bfb846217425b3fd92dc7f904fa1116e940ded32ad0404be0e220330dc42",
+      "internal/agent/transport/recovery_readiness_linux_test.go": "7e3cc8f97f3c19ceb160333c00862949d9f2a88bf2d675587708575939adc046",
+      "internal/device/storage_targets_integration_test.go": "d3d47c5db4c0e56ed7a9f381e814c100ed6c3dcef7aaaba0514f9fe768133e8e",
+      "internal/device/storage_targets_test.go": "e76df1bb33bc5b14dd49ad47adfba372d19c268ce72c113666519642ee06c550",
+      "internal/vmlab/encrypted_storage_inspect_linux.go": "50391665555eada0c5768ec833fbbeb91d34e551875c76352b5af9d3d5070a0c",
+      "internal/vmlab/encrypted_storage_inspect_linux_test.go": "37e3f0a1248bae117d033b38334376733e44731de534a31f29c316f276e541d4",
+      "internal/vmlab/encrypted_storage_projection_linux.go": "4fe61b2f57251116444c2ac0e054939bbd2ebacf77dc21cdc92d49e48cad167b",
+      "internal/vmlab/vm_storage_identity_oracle_linux.go": "9583480de2a7a1afa91f673f3e8bebc1285f1d3d7f71e98eb47668baeb123ca8",
+      "internal/vmlab/vm_storage_identity_oracle_linux_test.go": "a649ebc14c6022c11ecfb6a2c00045ec90f511eb63a30fb1323c9561d930c4a6"
+    }
+  },
+  "agent_source": {
+    "base_commit": "9138d17f8ff6c3673f82cea1590c36c33fca2d22",
+    "diff_sha256": "15349ec86fd85d55a39fefc882adf48eab81246bf06ff1b49ecb8e15ef0bdf0b",
+    "untracked_sha256": {
+      "cmd/lab/vm_inspect_storage_linux.go": "b21561d95162e3685f53f3c0cc830c5e5ef98559beb6f34b1d1dc912200bc484",
+      "internal/agent/executor/recovery_readiness_linux_test.go": "7ca567e96130196be9ebde947ff2cbe86ad240b15cea00b49e754962303f12b4",
+      "internal/agent/inventory/storage_linux_test.go": "8445c4af81877e0f564c69cd5507b63c5443e9ad5706538d082920e33f443886",
+      "internal/agent/inventory/storage_metadata_linux.go": "f9c4437f3cf703f262a0f3685d75b0bcf77901485b1cc77e1d6bbaf28db7d0d2",
+      "internal/agent/inventory/storage_metadata_linux_test.go": "a4c662ff191c6e763885e7383119a3df3668fc3e091fa1e514db38404f3ffb07",
+      "internal/agent/inventory/storage_schema_linux_test.go": "0dfa12a7e352ec42619fe13a057cbc2822ec74f0ceadae856b437436ee6bc9f8",
+      "internal/agent/recoveryboot/readiness_linux_test.go": "b68eb6792ef1fce776279c9b5a0929a7949bf9430e541a437003bae65f15d029",
+      "internal/agent/transport/recovery_readiness_linux.go": "2c93bfb846217425b3fd92dc7f904fa1116e940ded32ad0404be0e220330dc42",
+      "internal/agent/transport/recovery_readiness_linux_test.go": "7e3cc8f97f3c19ceb160333c00862949d9f2a88bf2d675587708575939adc046",
+      "internal/device/storage_targets_integration_test.go": "d3d47c5db4c0e56ed7a9f381e814c100ed6c3dcef7aaaba0514f9fe768133e8e",
+      "internal/device/storage_targets_test.go": "e76df1bb33bc5b14dd49ad47adfba372d19c268ce72c113666519642ee06c550",
+      "internal/vmlab/encrypted_storage_inspect_linux.go": "50391665555eada0c5768ec833fbbeb91d34e551875c76352b5af9d3d5070a0c",
+      "internal/vmlab/encrypted_storage_inspect_linux_test.go": "37e3f0a1248bae117d033b38334376733e44731de534a31f29c316f276e541d4",
+      "internal/vmlab/encrypted_storage_projection_linux.go": "4fe61b2f57251116444c2ac0e054939bbd2ebacf77dc21cdc92d49e48cad167b",
+      "internal/vmlab/vm_storage_identity_oracle_linux.go": "9583480de2a7a1afa91f673f3e8bebc1285f1d3d7f71e98eb47668baeb123ca8",
+      "internal/vmlab/vm_storage_identity_oracle_linux_test.go": "a649ebc14c6022c11ecfb6a2c00045ec90f511eb63a30fb1323c9561d930c4a6"
+    }
+  },
+  "agent_sha256": "2b098f9c4b2a61c519bf2a209b98f310d29b8eb71d31a019c524a72aeadd34cb",
+  "package_sha256": "ce1def0ad1287e0f1ac694f9678f2779fbb2a9b27be6d6d6723fbd44975ec713",
+  "package_version": "0.1.0",
+  "package_format": "rpm",
+  "firmware": {
+    "package_manager": "dpkg",
+    "package": "ovmf",
+    "version": "2024.02-2ubuntu0.10",
+    "code_sha256": "1286f2a3217d09b374d05951355d7a561c8bacecd74845c8a1fbb71a48c0de8d",
+    "vars_sha256": "a9b2b13aba3d4629593913471af7545bd8eef1d414f33cab4c86fff7d5bc09b9",
+    "code_path": "/home/r/dev/minor/lindm/.cache/lab/encrypted/.firmware-2768427578/firmware-code.fd",
+    "vars_path": "/home/r/dev/minor/lindm/.cache/lab/encrypted/.firmware-2768427578/nvram.fd",
+    "secure_boot": true,
+    "enrolled_keys": true,
+    "source_vars_sha256": "a9b2b13aba3d4629593913471af7545bd8eef1d414f33cab4c86fff7d5bc09b9"
+  },
+  "native_versions": {
+    "agent": "0.1.0",
+    "cryptsetup": "cryptsetup 2.8.4 flags: UDEV BLKID KEYRING FIPS KERNEL_CAPI PWQUALITY HW_OPAL",
+    "host-guestfish": "guestfish 1.52.0",
+    "host-qemu-img": "qemu-img version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)\nCopyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers",
+    "kernel": "6.19.10-300.fc44.x86_64",
+    "lsblk": "lsblk from util-linux 2.41.3",
+    "udevadm": "259"
+  },
+  "luks_uuid": "76cd66e8-7d6f-4779-b224-fbd3ac2455ce",
+  "stopped_partition_size_bytes": 22991077376,
+  "controller_serial": "lindm-lab-0",
+  "controller_wwn": "0x5000000000000001",
+  "storage_bus": "virtio-scsi",
+  "independent_oracle_match": true,
+  "stopped_headers_unchanged": true,
+  "guest_cleaned": true,
+  "files_sha256": {
+    "agent-storage.json": "dc3effd890723f548b023fe94c90ae543802a28d5c384b22cf42026b701d8d6f",
+    "lsblk.json": "b15c8edd26e44e2197ad43e7e8dc1edcf467cf2571e8858f2b9848b58531b0b7",
+    "luks.json": "266a89a088cfedc3733c3a2c1f9eaeb2e7c08e2faf046ed5bfde524744a16903",
+    "luks.txt": "e8884fad209a9472ac0ffd773923ded6c2122e96bcbfc1d08eba8103cb1e93b7",
+    "udev.txt": "697bd59cf95412d8349b85445a1a96b6365036bb2f9147987eccd7964a66ac6a"
+  },
+  "projection": {
+    "agent-storage.json": "installed packaged lindm-agent inspect as root; StorageDetails protobuf JSON only",
+    "lsblk.json": "raw native lsblk --bytes --json --output-all stdout",
+    "luks.json": "cryptsetup luksDump --dump-json-metadata; keyslots type and tokens type/keyslots only; all payloads, digests, salts and areas removed",
+    "luks.txt": "cryptsetup luksDump; Version/UUID and Keyslots/Tokens section plus direct numeric type lines only",
+    "udev.txt": "udevadm info --export-db; block records only; P/N and allowlisted public E identity properties, native order retained"
+  }
+}

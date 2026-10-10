@@ -1,0 +1,170 @@
+package labhost
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const memoryHeadroomBytes uint64 = 8 << 30
+
+type memoryAdmission struct {
+	ObservedAt         time.Time `json:"observed_at"`
+	AvailableBytes     uint64    `json:"mem_available_bytes"`
+	GuestMemoryBytes   uint64    `json:"guest_memory_ceiling_bytes"`
+	HeadroomBytes      uint64    `json:"headroom_bytes"`
+	SwapOutPagesBefore uint64    `json:"swap_out_pages_before"`
+	SwapOutPagesAfter  uint64    `json:"swap_out_pages_after"`
+	SampleMilliseconds int64     `json:"sample_milliseconds"`
+	PID                int       `json:"pid"`
+}
+
+func procCounter(data []byte, field string, unit string) (uint64, error) {
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || fields[0] != field {
+			continue
+		}
+		expected := 2
+		if unit != "" {
+			expected = 3
+		}
+		if len(fields) != expected || unit != "" && fields[2] != unit {
+			return 0, fmt.Errorf("invalid native %s counter", field)
+		}
+		value, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid native %s counter: %w", field, err)
+		}
+		return value, nil
+	}
+	return 0, fmt.Errorf("missing native %s counter", field)
+}
+
+func readSwapOut() (uint64, error) {
+	data, err := os.ReadFile("/proc/vmstat")
+	if err != nil {
+		return 0, err
+	}
+	return procCounter(data, "pswpout", "")
+}
+
+func observeMemory(ctx context.Context) (memoryAdmission, error) {
+	var result memoryAdmission
+	before, err := readSwapOut()
+	if err != nil {
+		return result, err
+	}
+	started := time.Now()
+	timer := time.NewTimer(100 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return result, ctx.Err()
+	case <-timer.C:
+	}
+	after, err := readSwapOut()
+	if err != nil {
+		return result, err
+	}
+	if after < before {
+		return result, errors.New("native swap-out counter decreased during admission")
+	}
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return result, err
+	}
+	available, err := procCounter(data, "MemAvailable:", "kB")
+	if err != nil {
+		return result, err
+	}
+	if available > ^uint64(0)/1024 {
+		return result, errors.New("native available memory counter overflow")
+	}
+	result = memoryAdmission{ObservedAt: time.Now().UTC(), AvailableBytes: available * 1024, SwapOutPagesBefore: before, SwapOutPagesAfter: after, SampleMilliseconds: time.Since(started).Milliseconds(), PID: os.Getpid()}
+	return result, nil
+}
+
+func (m memoryAdmission) allows(guestBytes uint64) bool {
+	return m.SwapOutPagesAfter == m.SwapOutPagesBefore && m.AvailableBytes >= guestBytes+memoryHeadroomBytes
+}
+
+// Serialize admission so lowering a configured limit also counts older slots
+// outside the new range. Never unlink those identities while holders may exist.
+func (s *Slots) tryAcquire(ctx context.Context) (_ *Lease, resultErr error) {
+	guard, err := s.openName(".admission.lock")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resultErr = errors.Join(resultErr, guard.Close()) }()
+	locked, err := lockSlot(guard)
+	if err != nil || !locked {
+		return nil, err
+	}
+	active, err := s.Count()
+	if err != nil || active >= s.capacity {
+		return nil, err
+	}
+	observation, err := s.memoryProbe(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lab hosts: memory admission: %w", err)
+	}
+	guestBytes := uint64(s.memoryMib) << 20
+	if !observation.allows(guestBytes) {
+		return nil, nil
+	}
+	observation.GuestMemoryBytes, observation.HeadroomBytes = guestBytes, memoryHeadroomBytes
+	for index := range s.capacity {
+		file, err := s.open(index)
+		if err != nil {
+			return nil, err
+		}
+		locked, lockErr := lockSlot(file)
+		if lockErr != nil || !locked {
+			if err := errors.Join(lockErr, file.Close()); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		data, err := json.Marshal(observation)
+		if err == nil {
+			_, err = file.WriteAt(append(data, '\n'), 0)
+		}
+		if err == nil {
+			err = file.Truncate(int64(len(data) + 1))
+		}
+		if err == nil {
+			err = file.Sync()
+		}
+		if err != nil {
+			return nil, errors.Join(err, file.Close())
+		}
+		return &Lease{file: file}, nil
+	}
+	return nil, nil
+}
+
+func (s *Slots) indices() ([]uint32, error) {
+	entries, err := os.ReadDir(s.directory)
+	if err != nil {
+		return nil, err
+	}
+	indices := make([]uint32, 0, len(entries))
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "slot-") || !strings.HasSuffix(name, ".lock") {
+			continue
+		}
+		value, err := strconv.ParseUint(strings.TrimSuffix(strings.TrimPrefix(name, "slot-"), ".lock"), 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid lease identity %q", name)
+		}
+		indices = append(indices, uint32(value))
+	}
+	return indices, nil
+}

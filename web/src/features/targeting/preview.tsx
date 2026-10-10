@@ -16,7 +16,8 @@ import {
 } from "../../../gen/lindm/policy/v1/targeting_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -155,11 +156,11 @@ export function TargetPreviewView() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Preview and activate an exact target snapshot</CardTitle>
+        <CardTitle>Preview device resources</CardTitle>
         <CardDescription>
-          Preview is a server-side resource resolution, not an executor native plan. Activation
-          rechecks identity, scope, generation and input freshness; it never silently rebases the
-          snapshot.
+          Review the resources assigned to one device, then activate the captured snapshot.
+          Activation rechecks access, device generation and freshness. It does not apply changes
+          itself.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
@@ -204,13 +205,9 @@ export function TargetPreviewView() {
           </p>
         ) : null}
         {current.previewFailure ? (
-          <Alert variant="destructive">
-            <AlertTitle>Preview unavailable</AlertTitle>
-            <AlertDescription>
-              {current.previewFailure.codeName}: {current.previewFailure.message}. Any snapshot
-              below remains the previous capture.
-            </AlertDescription>
-          </Alert>
+          <RpcError failure={current.previewFailure}>
+            {preview ? <p>The snapshot below is from the previous capture.</p> : null}
+          </RpcError>
         ) : null}
         {preview ? (
           <>
@@ -266,13 +263,13 @@ export function TargetPreviewView() {
                     key={candidate.assignment?.assignmentId ?? index}
                     className="flex flex-wrap gap-2 border p-3 text-sm"
                   >
-                    <Badge variant="outline">
+                    <StatusBadge status="neutral">
                       {candidate.match === TargetMatch.INCLUDED
                         ? "Included"
                         : candidate.match === TargetMatch.EXCLUDED
                           ? "Excluded"
                           : "Unknown"}
-                    </Badge>
+                    </StatusBadge>
                     <span className="break-all">
                       Assignment {candidate.assignment?.assignmentId ?? "Not recorded"} · revision{" "}
                       {candidate.revision.toString()} · profile revision{" "}
@@ -300,7 +297,7 @@ export function TargetPreviewView() {
                 native backend, requested features or ownership. Native planning can still refuse.
               </p>
               {!preview.resolution ? (
-                <Alert variant="destructive">
+                <Alert>
                   <AlertTitle>Resolution unavailable</AlertTitle>
                   <AlertDescription>
                     No typed resolution was returned. Do not infer readiness from assignment
@@ -322,11 +319,15 @@ export function TargetPreviewView() {
                       {resolved.ref?.canonicalKey ?? "Unknown key"}
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      <Badge
-                        variant={
+                      <StatusBadge
+                        status={
                           resolved.disposition === ResourceResolutionDisposition.READY
-                            ? "secondary"
-                            : "destructive"
+                            ? "success"
+                            : resolved.disposition === ResourceResolutionDisposition.CONFLICT
+                              ? "destructive"
+                              : resolved.disposition === ResourceResolutionDisposition.BLOCKED
+                                ? "warning"
+                                : "neutral"
                         }
                       >
                         {resolved.disposition === ResourceResolutionDisposition.READY
@@ -336,12 +337,10 @@ export function TargetPreviewView() {
                             : resolved.disposition === ResourceResolutionDisposition.BLOCKED
                               ? "Blocked"
                               : "Unknown"}
-                      </Badge>
-                      <Badge variant={resolved.dispatchSupported ? "outline" : "destructive"}>
-                        {resolved.dispatchSupported
-                          ? "Dispatch supported; native support unverified"
-                          : "Unsupported for dispatch"}
-                      </Badge>
+                      </StatusBadge>
+                      <StatusBadge status={resolved.dispatchSupported ? "info" : "warning"}>
+                        {resolved.dispatchSupported ? "Dispatch supported" : "Dispatch unsupported"}
+                      </StatusBadge>
                     </div>
                     <p className="break-all">
                       Required capability: {resolved.capabilityId || "Unavailable"}
@@ -401,9 +400,8 @@ export function TargetPreviewView() {
                 required
               />
               <p className="text-sm text-muted-foreground">
-                Activate only the exact preview ID and digest displayed above. A changed or expired
-                snapshot is rejected. Unsupported resources and conflicts are not proof of
-                convergence.
+                Activation uses this exact preview and digest. Refresh changed or expired previews,
+                and resolve unsupported resources or conflicts before deployment.
               </p>
               {current.request ? (
                 <p className="break-all font-mono text-xs">
@@ -411,19 +409,13 @@ export function TargetPreviewView() {
                 </p>
               ) : null}
               {current.activationFailure ? (
-                <Alert variant="destructive">
-                  <AlertTitle>
+                <RpcError failure={current.activationFailure}>
+                  <p>
                     {current.status === "ambiguous"
-                      ? "Activation outcome unknown"
-                      : "Activation rejected"}
-                  </AlertTitle>
-                  <AlertDescription>
-                    {current.activationFailure.codeName}: {current.activationFailure.message}
-                    {current.status === "ambiguous"
-                      ? " Retry the exact captured request; do not replace the snapshot while its outcome is unknown."
-                      : " Capture a fresh preview before preparing another activation."}
-                  </AlertDescription>
-                </Alert>
+                      ? "Retry this captured request. Keep this snapshot until the outcome is known."
+                      : "Capture a fresh preview before preparing another activation."}
+                  </p>
+                </RpcError>
               ) : null}
               {current.activationFailure?.message === "approval_required" ? (
                 <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
@@ -457,17 +449,12 @@ export function TargetPreviewView() {
                           : "Request approval for this snapshot"}
                     </Button>
                   )}
-                  {current.approvalFailure ? (
-                    <p role="alert" className="text-destructive">
-                      {current.approvalFailure.codeName}: {current.approvalFailure.message}
-                    </p>
-                  ) : null}
+                  {current.approvalFailure ? <RpcError failure={current.approvalFailure} /> : null}
                 </div>
               ) : null}
               {current.status === "accepted" ? (
                 <p role="status" className="text-sm">
-                  Snapshot activation accepted. Dispatch and native compliance are separate
-                  evidence.
+                  Snapshot activation accepted. Device execution has not been confirmed.
                 </p>
               ) : null}
               <Button

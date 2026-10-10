@@ -33,7 +33,9 @@ func quarantineTable(actionID string) (string, error) {
 // and https://wiki.nftables.org/wiki-nftables/index.php/Element_timeouts.
 func quarantineRules(table string, endpoints, dns []string, seconds uint32) ([]byte, error) {
 	var rules strings.Builder
-	fmt.Fprintf(&rules, "add table inet %s\nadd set inet %s active { type integer; flags timeout; timeout %ds; elements = { 0 timeout %ds }; }\n", table, table, seconds, seconds)
+	// integer alone has no fixed width and nft rejects it as a set key. Derive
+	// the exact key type from the same numgen expression used by every lookup.
+	fmt.Fprintf(&rules, "add table inet %s\nadd set inet %s active { typeof numgen inc mod 1; flags timeout; timeout %ds; elements = { 0 timeout %ds }; }\n", table, table, seconds, seconds)
 	for _, direction := range []string{"input", "output"} {
 		fmt.Fprintf(&rules, "add chain inet %s %s { type filter hook %s priority -10; policy accept; }\n", table, direction, direction)
 		address := "daddr"

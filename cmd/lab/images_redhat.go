@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,11 +21,11 @@ import (
 )
 
 func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Writer) (err error) {
-	if len(args) > 0 && args[0] == "cleanup-keys" {
-		return runRedHatKeyCleanup(ctx, args[1:], stdout, stderr)
+	if len(args) > 0 && (args[0] == "inventory" || args[0] == "cleanup") {
+		return runRedHatRegistrationCommand(ctx, args[0], args[1:], stdout, stderr)
 	}
 	if len(args) == 0 || (args[0] != "discover" && args[0] != "fetch") {
-		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat cleanup-keys -token-file FILE -confirm-delete-lab-keys; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
+		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat inventory -token-file FILE; lab images redhat cleanup -token-file FILE -confirm-delete-lab-registrations [-legacy-consumer-uuid UUID]; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
 	}
 	flags := flag.NewFlagSet("images redhat "+args[0], flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -125,16 +126,21 @@ func writeRedHatManifest(path string, manifest *labv1.ImageManifest) (err error)
 	return errors.Join(parent.Sync(), parent.Close())
 }
 
-func runRedHatKeyCleanup(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("images redhat cleanup-keys", flag.ContinueOnError)
+func runRedHatRegistrationCommand(ctx context.Context, command string, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("images redhat "+command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	token := flags.String("token-file", "", "current-user-owned mode-0600 Red Hat offline-token file")
-	confirmed := flags.Bool("confirm-delete-lab-keys", false, "confirm all laboratory VM lanes are stopped and delete only exact lindm-lab-<32 lowercase hex> activation keys")
+	var confirmed bool
+	var legacyUUID string
+	if command == "cleanup" {
+		flags.BoolVar(&confirmed, "confirm-delete-lab-registrations", false, "confirm all lab lanes are stopped and delete only exact laboratory systems and activation keys")
+		flags.StringVar(&legacyUUID, "legacy-consumer-uuid", "", "optional canonical consumer UUID independently established as a legacy lab orphan; never infer ownership from default hostname")
+	}
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *token == "" || !*confirmed {
-		return errors.New("cleanup-keys requires -token-file FILE and -confirm-delete-lab-keys after all lab lanes stop")
+	if flags.NArg() != 0 || *token == "" || (command == "cleanup" && !confirmed) {
+		return errors.New("registration inventory requires -token-file FILE; cleanup additionally requires -confirm-delete-lab-registrations after all lab lanes stop")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
@@ -143,7 +149,13 @@ func runRedHatKeyCleanup(ctx context.Context, args []string, stdout, stderr io.W
 		return err
 	}
 	defer client.Close()
-	count, cleanupErr := client.CleanupRegistrations(ctx, *confirmed)
-	_, writeErr := fmt.Fprintf(stdout, "deleted laboratory activation keys %d\n", count)
-	return errors.Join(cleanupErr, writeErr)
+	if command == "inventory" {
+		systems, err := client.InventorySystems(ctx)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(stdout).Encode(systems)
+	}
+	result, cleanupErr := client.CleanupRegistrations(ctx, confirmed, legacyUUID)
+	return errors.Join(cleanupErr, json.NewEncoder(stdout).Encode(result))
 }

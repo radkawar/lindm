@@ -1,22 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdvisoryFindingState } from "../../../gen/lindm/admin/v1/advisories_pb";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
+import { toRpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/time";
 import { AcceptanceForm } from "./acceptance-form";
-import {
-  AdvisoryPaging,
-  findingStateLabel,
-  ReadFailure,
-  unexpired,
-  useFreshnessClock,
-} from "./display";
+import { AdvisoryPaging, findingStateLabel, unexpired, useFreshnessClock } from "./display";
 import { deviceFindingsQueryOptions } from "./queries";
 
 export function DeviceFindings({ deviceId }: { deviceId: string }) {
@@ -31,7 +28,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
     freshness !== undefined &&
     unexpired(freshness.inventoryExpiresAt, now) &&
     unexpired(freshness.feedExpiresAt, now);
-  const state = current ? findingStateLabel(freshness.state) : "UNKNOWN";
+  const state = current ? findingStateLabel(freshness.state) : "Unknown";
   return (
     <Card className="min-w-0" aria-busy={findings.isFetching}>
       <CardHeader>
@@ -39,9 +36,8 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           <h2>Distro advisory findings</h2>
         </CardTitle>
         <CardDescription>
-          Package exposure from distro advisories and the last inventory snapshot. Missing findings
-          never establish that a device is clean. Acceptance is temporary risk acknowledgement, not
-          remediation.
+          Package findings from the latest inventory and distro sources. Accepting a finding records
+          the risk; it does not fix the package.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -55,12 +51,18 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
         </Button>
         <p role="status" className="flex flex-wrap items-center gap-2 text-sm">
           Exposure:{" "}
-          <Badge variant={state === "AFFECTED" ? "destructive" : "outline"}>{state}</Badge>
-          {freshness?.reason ? ` — ${freshness.reason}` : ""}
+          <StatusBadge
+            status={
+              state === "Affected" ? "destructive" : state === "Accepted" ? "warning" : "neutral"
+            }
+          >
+            {state}
+          </StatusBadge>
+          {freshness?.reason ? ` (${freshness.reason})` : ""}
         </p>
         {!current ? (
           <p className="border bg-muted/30 p-3 text-sm">
-            UNKNOWN: inventory or feed freshness cannot establish current exposure.
+            Current exposure is unknown. Refresh the inventory or advisory sources.
           </p>
         ) : null}
         {findings.isPending ? (
@@ -69,7 +71,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             <Skeleton className="h-32 w-full" />
           </div>
         ) : null}
-        {findings.error ? <ReadFailure error={findings.error} /> : null}
+        {findings.error ? <RpcError failure={toRpcFailure(findings.error)} /> : null}
         {freshness ? (
           <dl className="grid gap-3 border-y py-4 text-sm sm:grid-cols-2">
             <div>
@@ -101,13 +103,10 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           </dl>
         ) : null}
         {findings.data?.findings.length === 0 ? (
-          <p
-            role="status"
-            className="border border-dashed px-4 py-8 text-center text-sm text-muted-foreground"
-          >
-            No findings on this page. This is not proof of absence of vulnerabilities; consult
-            exposure status and coverage above.
-          </p>
+          <EmptyState
+            title="No findings on this page"
+            description="Check inventory and source coverage before treating this device as unaffected."
+          />
         ) : null}
         {findings.data?.findings.map((finding) => {
           const accepted =
@@ -115,17 +114,25 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             unexpired(finding.exception?.expiresAt, now);
           const label =
             !current || freshness?.state === AdvisoryFindingState.UNKNOWN
-              ? "UNKNOWN"
+              ? "Unknown"
               : finding.state === AdvisoryFindingState.ACCEPTED && !accepted
-                ? "AFFECTED — acceptance expired"
+                ? "Affected (acceptance expired)"
                 : findingStateLabel(finding.state);
           return (
             <article key={finding.id} className="grid min-w-0 gap-4 border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="break-words font-semibold">{finding.advisoryId}</h3>
-                <Badge variant={label.startsWith("AFFECTED") ? "destructive" : "outline"}>
+                <StatusBadge
+                  status={
+                    label.startsWith("Affected")
+                      ? "destructive"
+                      : label === "Accepted"
+                        ? "warning"
+                        : "neutral"
+                  }
+                >
                   {label}
-                </Badge>
+                </StatusBadge>
               </div>
               <dl className="grid gap-3 break-words text-sm sm:grid-cols-2">
                 <div>
@@ -157,7 +164,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                 <div className="break-all">
                   <dt className="inline font-medium">Source: </dt>
                   <dd className="inline">
-                    {finding.feedId} — {finding.sourceUrl || "Unavailable"}
+                    {finding.feedId}: {finding.sourceUrl || "Unavailable"}
                   </dd>
                 </div>
               </dl>
@@ -173,8 +180,8 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                   </p>
                   <p>
                     {accepted
-                      ? "Acceptance remains subject to server authorization and expiry."
-                      : "This acceptance does not establish current accepted status."}
+                      ? "Risk accepted until the displayed expiry, subject to current authorization."
+                      : "This acceptance is no longer current."}
                   </p>
                 </div>
               ) : null}

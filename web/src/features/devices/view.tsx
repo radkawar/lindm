@@ -11,10 +11,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DeviceCompliance, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Dialog,
   DialogContent,
@@ -118,9 +120,10 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
         <Tooltip>
           <TooltipTrigger
             render={
-              <Badge
+              <StatusBadge
+                dot
                 tabIndex={0}
-                variant={
+                status={
                   device.compliance === DeviceCompliance.ATTENTION
                     ? "destructive"
                     : device.compliance === DeviceCompliance.STALE
@@ -128,12 +131,11 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
                       : device.compliance === DeviceCompliance.COMPLIANT ||
                           device.compliance === DeviceCompliance.DRIFT_REMEDIATED
                         ? "success"
-                        : "outline"
+                        : "neutral"
                 }
               />
             }
           >
-            <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
             {complianceLabels[device.compliance] ?? "Unknown"}
           </TooltipTrigger>
           <TooltipContent className="block space-y-2">
@@ -250,30 +252,17 @@ export function DevicesView({
   if (!canRead) return <p role="alert">Fleet read permission is required to view inventory.</p>;
   return (
     <section className="flex min-w-0 flex-col gap-5" aria-busy={list.isFetching}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Fleet inventory
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">Devices</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage enrolled devices and their reported inventory.
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
-          <RefreshCw aria-hidden="true" /> Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Devices"
+        description="Manage enrolled devices and their reported inventory."
+        actions={
+          <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
+            <RefreshCw aria-hidden="true" /> Refresh
+          </Button>
+        }
+      />
       <DeviceFilters search={search} onSearch={onSearch} />
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>{failure.denied ? "Not authorized" : "Device list failed"}</AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}. Start a new search if this cursor has expired or
-            is invalid.
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {failure ? <RpcError failure={failure} title="Device list unavailable" /> : null}
       <div className="min-w-0 border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="text-sm">
@@ -333,12 +322,15 @@ export function DevicesView({
           </p>
         ) : null}
         {data?.devices.length === 0 ? (
-          <div role="status" className="space-y-2 px-6 py-12 text-center">
-            <p className="font-medium">No devices match this search page</p>
-            <p className="text-sm text-muted-foreground">
-              Adjust your inventory filters or start a new search for the latest enrollments.
-            </p>
-          </div>
+          <EmptyState
+            title="No devices match this page"
+            description="Adjust your inventory filters or start a new search for the latest enrollments."
+            action={
+              <Button variant="outline" onClick={() => onSearch({ ...search, pageToken: "" })}>
+                Start new search
+              </Button>
+            }
+          />
         ) : null}
         {rows.length > 0 ? (
           <Table className={compact ? "[&_td]:h-12 [&_td]:py-2" : "[&_td]:py-4"}>

@@ -17,24 +17,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { collectionLabels, Fact, ObservedValue } from "./observations";
+import { CollectionStatusBadge, Fact, ObservedValue } from "./observations";
 
-function Status({ status }: { status: CollectionStatus | undefined }) {
-  return (
-    <span className="text-muted-foreground">
-      {collectionLabels[status ?? CollectionStatus.UNSPECIFIED] ?? "Unknown collection status"}
-    </span>
-  );
-}
-
-function NumberValue({ field, unit = "" }: { field: ObservedUint64 | undefined; unit?: string }) {
+export function NumberValue({
+  field,
+  unit = "",
+}: {
+  field: ObservedUint64 | undefined;
+  unit?: string;
+}) {
   return field?.status === CollectionStatus.SUCCESS ? (
     <span>
       {field.value.toLocaleString()}
       {unit ? ` ${unit}` : ""}
     </span>
   ) : (
-    <Status status={field?.status} />
+    <CollectionStatusBadge status={field?.status} />
   );
 }
 
@@ -42,7 +40,7 @@ function BoolValue({ field }: { field: ObservedBool | undefined }) {
   return field?.status === CollectionStatus.SUCCESS ? (
     <span>{field.value ? "Yes" : "No"}</span>
   ) : (
-    <Status status={field?.status} />
+    <CollectionStatusBadge status={field?.status} />
   );
 }
 
@@ -50,7 +48,7 @@ function StringsValue({ field }: { field: ObservedStrings | undefined }) {
   return field?.status === CollectionStatus.SUCCESS ? (
     <span>{field.values.length ? field.values.join(", ") : "None observed"}</span>
   ) : (
-    <Status status={field?.status} />
+    <CollectionStatusBadge status={field?.status} />
   );
 }
 
@@ -73,7 +71,7 @@ function NativeRows<T>({
     <section className="grid min-w-0 gap-3">
       <h3 className="font-semibold">{title}</h3>
       {status !== CollectionStatus.SUCCESS ? (
-        <Status status={status} />
+        <CollectionStatusBadge status={status} />
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
@@ -223,7 +221,7 @@ export function DeviceNativeDetails({ details }: { details: NativeDetails | unde
                 coverage or a package module stream.
               </p>
               {!details.platform ? (
-                <p className="text-sm">Unknown — platform evidence was not reported.</p>
+                <p className="text-sm">Unknown. Platform evidence was not reported.</p>
               ) : (
                 <>
                   <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -274,12 +272,34 @@ export function DeviceNativeDetails({ details }: { details: NativeDetails | unde
               title="Network interfaces"
               status={details.network?.status}
               rows={details.network?.interfaces ?? []}
-              headers={["Name", "MAC", "Link", "Addresses"]}
+              headers={[
+                "Name",
+                "MAC",
+                "Link",
+                "Addresses",
+                "IPv4 default route",
+                "IPv6 default route",
+              ]}
               render={(row) => [
                 row.name,
                 <ObservedValue field={row.mac} />,
                 <ObservedValue field={row.link} />,
                 <StringsValue field={row.addresses} />,
+                <BoolValue field={row.defaultRouteIpv4} />,
+                <BoolValue field={row.defaultRouteIpv6} />,
+              ]}
+            />
+            <NativeRows
+              title="Active sessions"
+              status={details.sessions?.activeSessions?.status}
+              rows={details.sessions?.activeSessions?.sessions ?? []}
+              headers={["User", "Class", "Type", "Seat", "Remote"]}
+              render={(row) => [
+                <ObservedValue field={row.userName} />,
+                <ObservedValue field={row.sessionClass} />,
+                <ObservedValue field={row.sessionType} />,
+                <ObservedValue field={row.seat} />,
+                <BoolValue field={row.remote} />,
               ]}
             />
             <NativeRows

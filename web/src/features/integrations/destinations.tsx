@@ -1,7 +1,8 @@
 import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,12 +49,7 @@ export function Destinations() {
         </p>
       </details>
       <DestinationEditor />
-      {list.error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Destinations unavailable</AlertTitle>
-          <AlertDescription>{toRpcFailure(list.error).message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading destinations…</span>
@@ -61,12 +57,10 @@ export function Destinations() {
         </div>
       ) : null}
       {list.data?.destinations.length === 0 ? (
-        <p
-          role="status"
-          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
-        >
-          No destinations on this page.
-        </p>
+        <EmptyState
+          title="No destinations on this page"
+          description="Add a destination to export audit events."
+        />
       ) : null}
       {list.data?.destinations.map((destination) => (
         <DestinationEditor
@@ -241,7 +235,7 @@ function DestinationEditor({ destination }: { destination?: Destination }) {
               onChange={(e) => setSecret(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Use a cryptographically random 32–64 byte UTF-8 secret shared with your receiver.
+              Use a cryptographically random 32 to 64 byte UTF-8 secret shared with your receiver.
             </p>
             <details className="text-xs text-muted-foreground">
               <summary className="w-fit cursor-pointer py-1">Secret handling</summary>

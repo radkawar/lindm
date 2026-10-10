@@ -112,7 +112,7 @@ func rejectActionRecoveryBoot(ctx context.Context, vm *EncryptedVM, key []byte, 
 		return nil, ctx.Err()
 	}
 	if rejected == nil || rejected.Error() != "encrypted boot rejected unlock secret" || boot.Accepted || !boot.PromptSeen {
-		return nil, errors.New("cold boot did not explicitly reject retired recovery key")
+		return nil, errors.Join(errors.New("cold boot did not explicitly reject retired recovery key"), rejected)
 	}
 	return &actionBootEvidence{Credential: kind, Boot: boot, ObservedAt: time.Now().UTC()}, nil
 }

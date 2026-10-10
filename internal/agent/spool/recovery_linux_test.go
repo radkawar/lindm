@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
@@ -617,5 +618,252 @@ func TestSpoolPostCommitFsyncFailureKeepsReferencedPayload(t *testing.T) {
 	batch, err := store.Batch(ctx, 0)
 	if err != nil || !bytes.Equal(batch, expected) {
 		t.Fatalf("post-fsync-failure promotion published a missing payload: %v", err)
+	}
+}
+
+func TestSpoolRefreshCancellationPreservesDurableQueue(t *testing.T) {
+	for _, afterCommit := range []bool{false, true} {
+		name := "before commit"
+		if afterCommit {
+			name = "after commit"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			directory := spoolDirectory(t)
+			id := testIdentity()
+			store := openSynced(t, directory, id, 4, 9)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			oldHost, oldPackage := pendingRefreshObservation(t, store, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old")))
+			oldRow, err := store.queries.ReadPackageSlot(ctx, slotPending)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldBatch, err := store.Batch(ctx, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Queue(ctx, refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))); err != nil {
+				t.Fatal(err)
+			}
+			queued, err := store.queries.ReadPackageSlot(ctx, slotQueued)
+			if err != nil {
+				t.Fatal(err)
+			}
+			freshFile := filepath.Join(directory, collectionsName, queued.CollectionID, "b000")
+			freshBatch, err := os.ReadFile(freshFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			interrupted, cancel := context.WithCancel(ctx)
+			defer cancel()
+			if afterCommit {
+				interrupted = cancelAfterCommit(t, store)
+			} else {
+				cancel()
+			}
+			if err := store.SupersedeForRefresh(interrupted, start); !errors.Is(err, context.Canceled) || errors.Is(err, ErrNeedsSync) {
+				t.Fatalf("canceled supersession: %v", err)
+			}
+			after, err := store.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("cancellation changed recovery or counters: before=%+v after=%+v err=%v", before, after, err)
+			}
+			if _, found, err := store.PendingHost(ctx); err != nil || found == afterCommit {
+				t.Fatalf("host deletion crossed transaction boundary: found=%v err=%v", found, err)
+			}
+			if _, found, err := store.PendingPackage(ctx); err != nil || found == afterCommit {
+				t.Fatalf("package deletion crossed transaction boundary: found=%v err=%v", found, err)
+			}
+			owned, err := store.queries.ListOwned(ctx)
+			if err != nil || len(owned) != 2 {
+				t.Fatalf("cancellation lost ownership: %+v %v", owned, err)
+			}
+			for _, row := range owned {
+				wantReferenced := int64(1)
+				if afterCommit && row.CollectionID == oldRow.CollectionID {
+					wantReferenced = 0
+				}
+				if row.Referenced != wantReferenced {
+					t.Fatalf("ownership did not commit with pending slots: %+v", row)
+				}
+			}
+			if got, err := os.ReadFile(freshFile); err != nil || !bytes.Equal(got, freshBatch) {
+				t.Fatalf("cancellation changed fresh bytes: %v", err)
+			}
+			if err := store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			reopened, err := Open(ctx, directory, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = reopened.Close() }()
+			if err := reopened.Synchronize(ctx, 4, 9); err != nil {
+				t.Fatal(err)
+			}
+			if afterCommit {
+				if _, err := os.Stat(filepath.Join(directory, collectionsName, oldRow.CollectionID)); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("committed orphan survived reopen: %v", err)
+				}
+				batches, err := reopened.queries.ListBatches(ctx, oldRow.CollectionID)
+				if err != nil || len(batches) != 0 {
+					t.Fatalf("orphan descriptors survived reopen: %+v %v", batches, err)
+				}
+			} else {
+				requireRefreshPending(t, reopened, oldHost, oldPackage, oldBatch)
+			}
+			if host, packages, err := reopened.QueuedForRefresh(ctx, start); err != nil || !host || !packages {
+				t.Fatalf("fresh queue lost after cancellation: host=%v packages=%v err=%v", host, packages, err)
+			}
+			if err := reopened.SupersedeForRefresh(ctx, start); err != nil {
+				t.Fatal(err)
+			}
+			host, err := reopened.PromoteHost(ctx)
+			if err != nil || host.Sequence != oldHost.Sequence+1 {
+				t.Fatalf("host sequence was reused: %+v %v", host, err)
+			}
+			packages, err := reopened.PromotePackage(ctx)
+			if err != nil || packages.Sequence != oldPackage.Sequence+1 {
+				t.Fatalf("package sequence was reused: %+v %v", packages, err)
+			}
+			if batch, err := reopened.Batch(ctx, 0); err != nil || !bytes.Equal(batch, freshBatch) {
+				t.Fatalf("promoted bytes changed after cancellation: %v", err)
+			}
+		})
+	}
+}
+
+func TestSpoolRefreshMetadataRollbackKeepsPendingAndOwnership(t *testing.T) {
+	ctx := t.Context()
+	directory := spoolDirectory(t)
+	store := openSynced(t, directory, testIdentity(), 4, 9)
+	start := time.Unix(1_700_000_060, 0).UTC()
+	host, packages := pendingRefreshObservation(t, store, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old")))
+	batch, err := store.Batch(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Queue(ctx, refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.Recovery(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Fail the actual ownership update after both pending slots and the old
+	// descriptors have been deleted inside the same SQLite transaction.
+	if _, err := store.db.ExecContext(ctx, `CREATE TRIGGER reject_refresh_detach
+		BEFORE UPDATE OF referenced ON owned_dir WHEN NEW.referenced = 0
+		BEGIN SELECT RAISE(ABORT, 'refresh ownership failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SupersedeForRefresh(ctx, start); err == nil {
+		t.Fatal("ownership failure did not abort supersession")
+	}
+	requireRefreshPending(t, store, host, packages, batch)
+	owned, err := store.queries.ListOwned(ctx)
+	if err != nil || len(owned) != 2 {
+		t.Fatalf("rollback lost ownership: %+v %v", owned, err)
+	}
+	for _, row := range owned {
+		batches, err := store.queries.ListBatches(ctx, row.CollectionID)
+		if err != nil || row.Referenced != 1 || len(batches) != 1 {
+			t.Fatalf("rollback lost descriptors or referenced mark: %+v batches=%+v err=%v", row, batches, err)
+		}
+	}
+	after, err := store.Recovery(ctx)
+	if err != nil || before != after {
+		t.Fatalf("rollback changed counters: before=%+v after=%+v err=%v", before, after, err)
+	}
+	if _, err := store.db.ExecContext(ctx, "DROP TRIGGER reject_refresh_detach"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SupersedeForRefresh(ctx, start); err != nil {
+		t.Fatalf("retry after rollback: %v", err)
+	}
+}
+
+func TestSpoolRefreshCleanupRefusesUnsafeOwnedPayload(t *testing.T) {
+	ctx := t.Context()
+	directory := spoolDirectory(t)
+	id := testIdentity()
+	store := openSynced(t, directory, id, 4, 9)
+	start := time.Unix(1_700_000_060, 0).UTC()
+	pendingRefreshObservation(t, store, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old")))
+	old, err := store.queries.ReadPackageSlot(ctx, slotPending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Queue(ctx, refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))); err != nil {
+		t.Fatal(err)
+	}
+	queued, err := store.queries.ReadPackageSlot(ctx, slotQueued)
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshFile := filepath.Join(directory, collectionsName, queued.CollectionID, "b000")
+	freshBytes, err := os.ReadFile(freshFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	sentinel := []byte("not owned by the spool")
+	if err := os.WriteFile(outside, sentinel, 0600); err != nil {
+		t.Fatal(err)
+	}
+	oldFile := filepath.Join(directory, collectionsName, old.CollectionID, "b000")
+	if err := os.Remove(oldFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, oldFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SupersedeForRefresh(ctx, start); !errors.Is(err, ErrUnrecognized) {
+		t.Fatalf("unsafe cleanup was not refused: %v", err)
+	}
+	if got, err := os.ReadFile(outside); err != nil || !bytes.Equal(got, sentinel) {
+		t.Fatalf("cleanup touched unowned bytes: %v", err)
+	}
+	if got, err := os.ReadFile(freshFile); err != nil || !bytes.Equal(got, freshBytes) {
+		t.Fatalf("cleanup touched fresh bytes: %v", err)
+	}
+	if _, found, err := store.PendingHost(ctx); err != nil || found {
+		t.Fatalf("metadata was not atomically detached: found=%v err=%v", found, err)
+	}
+	if _, found, err := store.PendingPackage(ctx); err != nil || found {
+		t.Fatalf("metadata was not atomically detached: found=%v err=%v", found, err)
+	}
+	owned, err := store.queries.ListOwned(ctx)
+	if err != nil || len(owned) != 2 {
+		t.Fatalf("cleanup failure lost retry ownership: %+v %v", owned, err)
+	}
+	for _, row := range owned {
+		if row.CollectionID == old.CollectionID && row.Referenced != 0 {
+			t.Fatalf("obsolete payload is still referenced: %+v", row)
+		}
+		if row.CollectionID == queued.CollectionID && row.Referenced != 1 {
+			t.Fatalf("fresh payload was detached: %+v", row)
+		}
+	}
+	if err := os.Remove(oldFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(ctx, directory, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reopened.Close() }()
+	if host, packages, err := reopened.QueuedForRefresh(ctx, start); err != nil || !host || !packages {
+		t.Fatalf("cleanup retry lost fresh queue: host=%v packages=%v err=%v", host, packages, err)
+	}
+	if names := collectionNames(t, directory); len(names) != 1 || names[0] != queued.CollectionID {
+		t.Fatalf("cleanup retry removed the wrong collection: %v", names)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -328,6 +329,9 @@ func (s *Service) commitDeviceActionRecovery(ctx context.Context, request *agent
 			defer func() { _ = pending.Close() }()
 		}
 		if err := s.runRecoveryBoot(work, next, handoff, pending); err != nil {
+			// Recovery failures occur after the commit RPC returns. Preserve the
+			// nonsecret native/gate error instead of reducing it to UNKNOWN alone.
+			slog.Error("device action recovery handoff failed", "action_id", next.GetIntent().GetActionId(), "error", err)
 			s.finishRecoveryBoot(next.GetIntent().GetActionId())
 		}
 	}()

@@ -31,6 +31,9 @@ type EncryptedVMOptions struct {
 	Hardware  *VMHardwareOptions
 	Desktop   string
 	TPMBoot   bool
+	// RequireCachedGolden forbids installer provisioning when the pinned golden
+	// is absent. Read-only observation lanes must set this option.
+	RequireCachedGolden bool
 }
 
 // UnlockOutcome distinguishes observed boot success from merely submitting a key.
@@ -427,6 +430,12 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (b
 			pending += string(buf[:n])
 			if len(pending) > 8192 {
 				pending = pending[len(pending)-8192:]
+			}
+			// Some initramfs password agents report cryptsetup's rejection without
+			// repeating the original prompt on the serial console.
+			if sent && (strings.Contains(pending, "No key available with this passphrase.") ||
+				strings.Contains(pending, "Failed to activate with specified passphrase. (Passphrase incorrect?)")) {
+				return true, errors.New("encrypted boot rejected unlock secret")
 			}
 			if encryptedUnlockPrompt(pending) {
 				if secret == "" {

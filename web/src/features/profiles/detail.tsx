@@ -6,8 +6,9 @@ import {
   ProfileResourceSchema,
   type ProfileResource,
 } from "../../../gen/lindm/policy/v1/profile_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -109,37 +110,31 @@ export function ProfileDetailView({
       >
         Back to profiles
       </Link>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <h1 className="break-words text-2xl font-semibold tracking-tight">
-            {record?.spec?.name.trim() || "Resource profile"}
-          </h1>
-          <p className="break-all font-mono text-xs text-muted-foreground">{profileId}</p>
-        </div>
-        <Button
-          variant="outline"
-          disabled={displayed.isFetching}
-          onClick={() => {
-            void displayed.refetch();
-            if (revision !== "") void headQuery.refetch();
-          }}
-        >
-          Refresh revision
-        </Button>
-      </div>
+      <PageHeader
+        title={record?.spec?.name.trim() || "Profile"}
+        description={profileId}
+        actions={
+          <Button
+            variant="outline"
+            disabled={displayed.isFetching}
+            onClick={() => {
+              void displayed.refetch();
+              if (revision !== "") void headQuery.refetch();
+            }}
+          >
+            Refresh revision
+          </Button>
+        }
+      />
       <p className="max-w-3xl text-sm text-muted-foreground">
-        {revision === ""
-          ? "This read selected the catalog head. "
-          : "This read selected an exact retained revision. "}
-        Reading it does not show whether any device is assigned to it or has applied it.{" "}
+        {revision === "" ? "Latest published revision. " : "Saved revision. "}
         {CATALOG_SEMANTICS}
       </p>
       <Card>
         <CardHeader>
-          <CardTitle>Read an exact revision</CardTitle>
+          <CardTitle>Find a revision</CardTitle>
           <CardDescription>
-            Leave this empty only by opening the catalog head. A revision ID reads that retained
-            specification, even if it is no longer the head.
+            Enter a revision ID to view a saved version, or return to the latest published revision.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -166,14 +161,14 @@ export function ProfileDetailView({
                 onChange={(event) => setLookup(event.target.value)}
               />
             </div>
-            <Button type="submit">Read exact revision</Button>
+            <Button type="submit">Open revision</Button>
             <Button
               type="button"
               variant="outline"
               disabled={revision === ""}
               onClick={() => onSearch({ revision: "" })}
             >
-              Catalog head
+              Latest revision
             </Button>
           </form>
           {lookupError !== "" ? (
@@ -183,16 +178,7 @@ export function ProfileDetailView({
           ) : null}
         </CardContent>
       </Card>
-      {failure ? (
-        <Alert variant="destructive">
-          <AlertTitle>
-            {failure.denied ? "Not authorized" : "Profile revision unavailable"}
-          </AlertTitle>
-          <AlertDescription>
-            {failure.codeName}: {failure.message}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {failure ? <RpcError failure={failure} /> : null}
       {displayed.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading profile revision…</span>
@@ -208,9 +194,9 @@ export function ProfileDetailView({
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-wrap gap-2">
-                <Badge variant={isHead ? "default" : "outline"}>
-                  {isHead ? "Catalog head" : "Exact revision"}
-                </Badge>
+                <StatusBadge status={isHead ? "info" : "neutral"}>
+                  {isHead ? "Latest revision" : "Saved revision"}
+                </StatusBadge>
                 {!isHead && head ? (
                   <Link
                     to="/profiles/$profileId"
@@ -218,7 +204,7 @@ export function ProfileDetailView({
                     search={{ revision: "" }}
                     className="text-sm underline underline-offset-4"
                   >
-                    Open catalog head {head.revisionId}
+                    Open latest revision {head.revisionId}
                   </Link>
                 ) : null}
               </div>
@@ -258,18 +244,16 @@ export function ProfileDetailView({
         </>
       ) : null}
       {headFailure ? (
-        <Alert variant="destructive">
-          <AlertTitle>Catalog head unavailable</AlertTitle>
-          <AlertDescription>
-            A new unsent draft cannot target the catalog head until it loads.
-            {attempt ? " The open request can still be retried exactly." : ""}{" "}
-            {headFailure.codeName}: {headFailure.message}
-          </AlertDescription>
-        </Alert>
+        <RpcError failure={headFailure}>
+          <p>
+            Load the latest revision before starting a new draft.
+            {attempt ? " You can still retry the captured request." : ""}
+          </p>
+        </RpcError>
       ) : null}
       {revision !== "" && headQuery.isPending ? (
         <p role="status" className="text-sm text-muted-foreground">
-          Loading catalog head for compare-and-swap…
+          Loading latest revision…
         </p>
       ) : null}
       {editorSource && canPermission(principal, "profiles.manage") ? (

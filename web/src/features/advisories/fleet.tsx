@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RpcError } from "@/components/ui/rpc-error";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -17,64 +17,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
-import { canonicalUuid } from "@/lib/ids";
-import { AdvisoryPaging, ReadFailure, unexpired, useFreshnessClock } from "./display";
+import { AdvisoryPaging, unexpired, useFreshnessClock } from "./display";
 import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./queries";
 
 export function AdvisoryFleet() {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const now = useFreshnessClock();
-  const [deviceId, setDeviceId] = useState("");
-  const canonicalDeviceId = canonicalUuid(deviceId.trim());
   const summary = useQuery(advisorySummaryQueryOptions(lifetime, pageToken));
   const feeds = useQuery(advisoryFeedsQueryOptions(lifetime));
   const feedUnknown =
     !feeds.data?.feeds.length ||
     !!feeds.error ||
-    feeds.data.feeds.some((feed) => !feed.fresh || !unexpired(feed.expiresAt, now));
+    feeds.data.feeds.some((feed) => !!feed.error || !feed.fresh || !unexpired(feed.expiresAt, now));
   return (
     <div className="grid min-w-0 gap-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Distro advisories</h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Distro package findings, not a complete vulnerability assessment. No findings does not
-          mean clean. Stale inventory, unsupported coverage and stale feeds are UNKNOWN.
-        </p>
-        <Link to="/devices" className="inline-block text-sm underline underline-offset-4">
-          Open devices to inspect per-device advisory findings
-        </Link>
-      </div>
+      <PageHeader
+        title="Advisories"
+        description="Review package findings and advisory source coverage across your devices."
+        actions={
+          <Link to="/devices" className="text-sm underline underline-offset-4">
+            Inspect device findings
+          </Link>
+        }
+      />
       <Card>
-        <div className="mx-6 mt-3 grid max-w-lg gap-2">
-          <Label htmlFor="advisory-device-id">Open findings by device ID</Label>
-          <Input
-            id="advisory-device-id"
-            value={deviceId}
-            onChange={(event) => setDeviceId(event.target.value)}
-            placeholder="Device UUID"
-          />
-          {canonicalDeviceId && canonicalDeviceId !== "00000000-0000-0000-0000-000000000000" ? (
-            <Link
-              to="/devices/$deviceId"
-              params={{ deviceId: canonicalDeviceId }}
-              search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
-              className="underline"
-            >
-              Open device detail and findings
-            </Link>
-          ) : deviceId ? (
-            <p role="status">Enter a valid nonzero device UUID.</p>
-          ) : null}
-        </div>
         <CardHeader>
           <CardTitle>
             <h2>Fleet summary</h2>
           </CardTitle>
-          <CardDescription>
-            Counts are server-evaluated. Accepted findings remain exposure, not fixes.
-          </CardDescription>
+          <CardDescription>Accepting a finding does not fix affected devices.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <Button
@@ -91,15 +65,12 @@ export function AdvisoryFleet() {
               <Skeleton className="h-32 w-full" />
             </div>
           ) : null}
-          {summary.error ? <ReadFailure error={summary.error} /> : null}
+          {summary.error ? <RpcError failure={toRpcFailure(summary.error)} /> : null}
           {feedUnknown ? (
-            <Alert>
-              <AlertTitle>UNKNOWN — feed coverage is not current</AlertTitle>
-              <AlertDescription>
-                One or more feed sources are stale or unavailable. Previously evaluated counts below
-                cannot establish current fleet exposure.
-              </AlertDescription>
-            </Alert>
+            <p className="text-sm text-muted-foreground">
+              Counts may be incomplete. Review each feed source below before assessing current fleet
+              exposure.
+            </p>
           ) : null}
           {summary.data ? (
             <>
@@ -111,7 +82,7 @@ export function AdvisoryFleet() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">UNKNOWN devices</dt>
+                  <dt className="text-xs text-muted-foreground">Unknown devices</dt>
                   <dd className="mt-1 text-2xl font-semibold tabular-nums">
                     {summary.data.unknownDevices.toString()}
                   </dd>
@@ -124,7 +95,7 @@ export function AdvisoryFleet() {
                     <TableHead>Severity</TableHead>
                     <TableHead>Affected devices</TableHead>
                     <TableHead>Accepted devices</TableHead>
-                    <TableHead>UNKNOWN devices</TableHead>
+                    <TableHead>Unknown devices</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -137,7 +108,7 @@ export function AdvisoryFleet() {
                         </p>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{advisory.severity || "Unknown"}</Badge>
+                        <StatusBadge status="neutral">{advisory.severity || "Unknown"}</StatusBadge>
                       </TableCell>
                       <TableCell>{advisory.affectedDevices.toString()}</TableCell>
                       <TableCell>{advisory.acceptedDevices.toString()}</TableCell>
@@ -147,13 +118,10 @@ export function AdvisoryFleet() {
                 </TableBody>
               </Table>
               {!summary.data.advisories.length ? (
-                <p
-                  role="status"
-                  className="border border-dashed px-4 py-8 text-center text-sm text-muted-foreground"
-                >
-                  No advisory summaries on this page. This does not establish that the fleet is
-                  clean.
-                </p>
+                <EmptyState
+                  title="No advisory summaries on this page"
+                  description="No findings are listed. Check source coverage before treating a device as unaffected."
+                />
               ) : null}
             </>
           ) : null}
@@ -171,7 +139,7 @@ export function AdvisoryFleet() {
             <h2>Feed freshness and status</h2>
           </CardTitle>
           <CardDescription>
-            Feed freshness alone does not establish device inventory freshness or coverage.
+            Each source needs a current refresh. Devices also need current inventory.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -189,41 +157,79 @@ export function AdvisoryFleet() {
               <Skeleton className="h-32 w-full" />
             </div>
           ) : null}
-          {feeds.error ? <ReadFailure error={feeds.error} /> : null}
-          {feeds.data?.feeds.length === 0 ? (
-            <p
-              role="status"
-              className="border border-dashed px-4 py-8 text-center text-sm text-muted-foreground"
-            >
-              UNKNOWN — no advisory feeds configured.
-            </p>
+          {feeds.error ? <RpcError failure={toRpcFailure(feeds.error)} /> : null}
+          {feeds.isSuccess && feeds.data.feeds.length === 0 ? (
+            <EmptyState
+              title="No advisory feeds configured"
+              description="Add distro sources to advisories.feeds in the control-plane configuration. Enable scheduled refreshes or import a verified offline feed, then refresh this status view."
+            />
           ) : null}
           {feeds.data?.feeds.map((feed) => (
             <article key={feed.id} className="grid min-w-0 gap-2 border bg-muted/20 p-4 text-sm">
-              <h3 className="break-words font-semibold">
-                {feed.id} —{" "}
-                {!feeds.error && feed.fresh && unexpired(feed.expiresAt, now)
-                  ? "Fresh"
-                  : "UNKNOWN — stale or unavailable"}
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="break-words font-semibold">{feed.id}</h3>
+                <StatusBadge
+                  status={
+                    feeds.error
+                      ? "neutral"
+                      : feed.error
+                        ? "destructive"
+                        : feed.fresh && unexpired(feed.expiresAt, now)
+                          ? "success"
+                          : feed.checkedAt
+                            ? "warning"
+                            : "neutral"
+                  }
+                >
+                  {feeds.error
+                    ? "Status unavailable"
+                    : feed.error
+                      ? "Refresh failed"
+                      : feed.fresh && unexpired(feed.expiresAt, now)
+                        ? "Current"
+                        : !feed.checkedAt
+                          ? "Awaiting refresh"
+                          : unexpired(feed.expiresAt, now)
+                            ? "Incomplete coverage"
+                            : "Stale"}
+                </StatusBadge>
+              </div>
+              <p className="break-all">Source: {feed.sourceUrl}</p>
               <p>
                 {feed.distro} {feed.release}
                 {feed.platformStream ? ` (${feed.platformStream})` : ""} ·{" "}
                 {feed.advisoryCount.toString()} advisory records
               </p>
-              <p>Last successful check: {formatTimestamp(feed.checkedAt).local}</p>
+              <p>
+                Last successful refresh:{" "}
+                {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Not recorded"}
+              </p>
               <p>
                 Signed snapshot:{" "}
                 {feed.snapshotAt ? formatTimestamp(feed.snapshotAt).local : "Not recorded"}
               </p>
               <p>Expires: {formatTimestamp(feed.expiresAt).local}</p>
               <p>Last attempt: {formatTimestamp(feed.attemptedAt).local}</p>
+              <p className={feed.error ? "text-destructive" : "text-muted-foreground"}>
+                Reason:{" "}
+                {feeds.error
+                  ? "The latest status request failed. Showing the last retrieved source details."
+                  : feed.error === "refresh_failed"
+                    ? "The source refresh failed. Check control-plane logs for details."
+                    : feed.error ||
+                      (feed.fresh && unexpired(feed.expiresAt, now)
+                        ? "The source snapshot is complete and within its freshness window."
+                        : !feed.checkedAt
+                          ? "No successful refresh is recorded for this source configuration."
+                          : !unexpired(feed.expiresAt, now)
+                            ? "The last successful refresh is outside its freshness window."
+                            : "The source snapshot has incomplete coverage.")}
+              </p>
               {feed.error ? (
-                <p role="alert" className="text-destructive">
-                  Feed error: {feed.error}
+                <p className="break-all text-xs text-muted-foreground">
+                  Reported reason: {feed.error}
                 </p>
               ) : null}
-              <p className="break-all">Source: {feed.sourceUrl}</p>
               <p className="break-all font-mono">
                 Snapshot SHA-256: {feed.sourceSha256 || "Unavailable"}
               </p>

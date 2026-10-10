@@ -36,6 +36,9 @@ func decodeCPIO(t *testing.T, archive []byte) map[string][]byte {
 		if name == "TRAILER!!!" {
 			return entries
 		}
+		if name == "." && (field(14) != 0040755 || field(22) != 0 || field(30) != 0) {
+			t.Fatal("initramfs root must establish protected mode0755 uid0 gid0 ancestry")
+		}
 		if _, exists := entries[name]; exists {
 			t.Fatal("duplicate newc path")
 		}

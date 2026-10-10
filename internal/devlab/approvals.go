@@ -26,6 +26,7 @@ type ApprovalSession struct {
 	session   *OwnerSession
 	directory *freshDirectoryFixture
 	transport *http.Transport
+	account   *fixtureLoginAccount
 	closed    bool
 }
 
@@ -88,9 +89,12 @@ func OpenApprovalSession(ctx context.Context, repository string, isolated *Autho
 	}
 	account := &fixtureLoginAccount{username: owned.name, password: password, subject: owned.userID, role: "admin"}
 	approval.session, err = openFixtureSession(ctx, repository, address, account)
-	account.password = ""
+	approval.account = account
 	if err != nil {
 		return nil, err
+	}
+	approval.session.login = func(ctx context.Context) (*OwnerSession, error) {
+		return openFixtureSession(ctx, repository, address, account)
 	}
 	return approval, nil
 }
@@ -106,7 +110,7 @@ func (a *ApprovalSession) Approve(ctx context.Context, requester *OwnerSession, 
 	if err != nil {
 		return nil, err
 	}
-	approved, err := a.session.Admin.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent approval for owned laboratory resource cleanup"}))
+	approved, err := a.session.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent approval for owned laboratory resource cleanup"}))
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +131,9 @@ func (a *ApprovalSession) Close(ctx context.Context) error {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		result = a.session.Close(cleanup)
 		cancel()
+	}
+	if a.account != nil {
+		a.account.password = ""
 	}
 	if a.directory != nil {
 		result = errors.Join(result, a.directory.close(ctx, io.Discard))

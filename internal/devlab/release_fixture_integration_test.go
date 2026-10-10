@@ -20,11 +20,7 @@ import (
 // This runs a real private PostgreSQL/server fixture and validates the signed
 // provisioning bytes. It is not a mock of the vmlab constructor's routing.
 func TestReleaseFixtureReturnsResignedBootstrap(t *testing.T) {
-	binary := os.Getenv("LINDM_NATIVE_SERVER_BINARY")
-	repository := os.Getenv("LINDM_NATIVE_REPOSITORY")
-	if binary == "" || repository == "" {
-		t.Skip("requires LINDM_NATIVE_SERVER_BINARY (stamped lindmd) and LINDM_NATIVE_REPOSITORY (initialized development trust/database)")
-	}
+	binary, repository := nativeServer(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 	sharedBefore, err := ReadPublicAgentFixture(ctx, repository)

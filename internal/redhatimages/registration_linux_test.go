@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -26,6 +28,14 @@ type registrationFixture struct {
 	malformedCreate bool
 	conflict        bool
 	deleteFailure   bool
+	systems         map[string]System
+	systemDeletes   []string
+	systemReads     int
+	systemFailure   string
+	keepSystem      bool
+	renameSystem    string
+	repeatPage      bool
+	keepKey         bool
 }
 
 func registrationClient(t *testing.T, f *registrationFixture) *Client {
@@ -41,8 +51,52 @@ func registrationClient(t *testing.T, f *registrationFixture) *Client {
 			_, _ = io.WriteString(w, `{"access_token":"registration-bearer","token_type":"bearer","expires_in":900}`)
 			return
 		}
-		f.badBearer = f.badBearer || r.Host != "console.redhat.com" || r.Header.Get("Authorization") != "Bearer registration-bearer"
+		f.badBearer = f.badBearer || (r.Host != "console.redhat.com" && r.Host != "api.access.redhat.com") || r.Header.Get("Authorization") != "Bearer registration-bearer"
 		switch {
+		case r.URL.Path == "/management/v1/systems" && r.Method == http.MethodGet:
+			ids := make([]string, 0, len(f.systems))
+			for id := range f.systems {
+				ids = append(ids, id)
+			}
+			sort.Strings(ids)
+			offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+			if f.repeatPage {
+				offset = 0
+			}
+			rows := make([]System, 0)
+			for i := offset; i < len(ids) && i < offset+systemPageSize; i++ {
+				rows = append(rows, f.systems[ids[i]])
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"body": rows})
+		case strings.HasPrefix(r.URL.Path, "/management/v1/systems/"):
+			id := strings.TrimPrefix(r.URL.Path, "/management/v1/systems/")
+			system, exists := f.systems[id]
+			if r.Method == http.MethodDelete {
+				f.systemDeletes = append(f.systemDeletes, id)
+				if id == f.systemFailure {
+					w.WriteHeader(503)
+					_, _ = io.WriteString(w, "private-native-error")
+					return
+				}
+				if !exists {
+					w.WriteHeader(404)
+					return
+				}
+				if !f.keepSystem {
+					delete(f.systems, id)
+				}
+				w.WriteHeader(204)
+				return
+			}
+			f.systemReads++
+			if !exists {
+				w.WriteHeader(404)
+				return
+			}
+			if f.renameSystem != "" {
+				system.Name = f.renameSystem
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"body": system, "account": "private-account", "activationKey": "private-key"})
 		case r.URL.Path == "/api/rhsm/v2/organization":
 			_, _ = io.WriteString(w, `{"body":{"id":123456}}`)
 		case r.URL.Path == "/api/rhsm/v2/activation_keys" && r.Method == http.MethodPost:
@@ -91,7 +145,9 @@ func registrationClient(t *testing.T, f *registrationFixture) *Client {
 				w.WriteHeader(404)
 				return
 			}
-			delete(f.keys, name)
+			if !f.keepKey {
+				delete(f.keys, name)
+			}
 			f.deleted++
 			w.WriteHeader(204)
 		default:
@@ -180,14 +236,14 @@ func TestRegistrationCleanupRequiresConfirmationAndExactNamespace(t *testing.T) 
 	owned := registrationPrefix + strings.Repeat("a", 32)
 	f := &registrationFixture{keys: map[string]bool{owned: true, "customer-key": true, registrationPrefix + "customer": true, registrationPrefix + strings.Repeat("A", 32): true}}
 	client := registrationClient(t, f)
-	if _, err := client.CleanupRegistrations(context.Background(), false); err == nil {
+	if _, err := client.CleanupRegistrations(context.Background(), false, ""); err == nil {
 		t.Fatal("unconfirmed cleanup accepted")
 	}
-	count, err := client.CleanupRegistrations(context.Background(), true)
+	result, err := client.CleanupRegistrations(context.Background(), true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
+	if result.KeysDeleted != 1 || !result.KeysAbsenceVerified {
 		t.Fatal("incorrect cleanup count")
 	}
 	f.mu.Lock()

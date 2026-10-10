@@ -15,17 +15,17 @@ export function ProtobufFields({ schema }: { schema: DescMessage }) {
           {schema.fields.map((field) => (
             <li key={field.number} className="min-w-0 break-words">
               <code>{field.jsonName}</code>
-              {field.oneof ? ` — choose one ${field.oneof.name} field` : ""}
-              {field.fieldKind === "list" ? " — array" : ""}
+              {field.oneof ? `: choose one ${field.oneof.name} field` : ""}
+              {field.fieldKind === "list" ? ": array" : ""}
               {field.fieldKind === "enum"
-                ? ` — ${field.enum.values.map((value) => value.name).join(" | ")}`
+                ? `: ${field.enum.values.map((value) => value.name).join(" | ")}`
                 : ""}
               {field.fieldKind === "message" ? <ProtobufFields schema={field.message} /> : null}
               {field.fieldKind === "list" && field.listKind === "message" ? (
                 <ProtobufFields schema={field.message} />
               ) : null}
               {field.fieldKind === "list" && field.listKind === "enum"
-                ? ` — ${field.enum.values.map((value) => value.name).join(" | ")}`
+                ? `: ${field.enum.values.map((value) => value.name).join(" | ")}`
                 : ""}
             </li>
           ))}

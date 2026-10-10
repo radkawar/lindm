@@ -736,3 +736,575 @@ func TestSpoolAllowsTransportStatusAndRemovesItsTemp(t *testing.T) {
 		t.Fatalf("arbitrary file accepted: %+v %v", recovery, err)
 	}
 }
+
+func refreshObservation(start time.Time, hostname string, status inventoryv1.CollectionStatus, packages ...*inventoryv1.Package) *inventoryv1.NativeObservation {
+	obs := observation(hostname, status, packages...)
+	obs.Host.StartedAt = timestamppb.New(start)
+	obs.Host.FinishedAt = timestamppb.New(start.Add(time.Second))
+	obs.Packages.StartedAt = timestamppb.New(start)
+	obs.Packages.FinishedAt = timestamppb.New(start.Add(time.Second))
+	return obs
+}
+
+func pendingRefreshObservation(t *testing.T, store *Store, obs *inventoryv1.NativeObservation) (HostUpload, PackageUpload) {
+	t.Helper()
+	if err := store.Queue(t.Context(), obs); err != nil {
+		t.Fatal(err)
+	}
+	host, err := store.PromoteHost(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages, err := store.PromotePackage(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return host, packages
+}
+
+func requireRefreshPending(t *testing.T, store *Store, host HostUpload, packages PackageUpload, batch []byte) {
+	t.Helper()
+	gotHost, ok, err := store.PendingHost(t.Context())
+	if err != nil || !ok || gotHost.Sequence != host.Sequence || !proto.Equal(gotHost.Observation, host.Observation) {
+		t.Fatalf("pending host changed: %+v found=%v err=%v", gotHost, ok, err)
+	}
+	gotPackage, ok, err := store.PendingPackage(t.Context())
+	if err != nil || !ok || gotPackage.Sequence != packages.Sequence || !bytes.Equal(gotPackage.CanonicalManifest, packages.CanonicalManifest) || gotPackage.BeginAccepted != packages.BeginAccepted || len(gotPackage.AcceptedBatches) != len(packages.AcceptedBatches) {
+		t.Fatalf("pending package changed: %+v found=%v err=%v", gotPackage, ok, err)
+	}
+	for i, index := range packages.AcceptedBatches {
+		if gotPackage.AcceptedBatches[i] != index {
+			t.Fatal("pending accepted batch hints changed")
+		}
+	}
+	if batch != nil {
+		gotBatch, err := store.Batch(t.Context(), 0)
+		if err != nil || !bytes.Equal(gotBatch, batch) {
+			t.Fatalf("pending payload changed: %v", err)
+		}
+	}
+}
+
+func TestSpoolRefreshSupersedesPartialBacklogAcrossReopen(t *testing.T) {
+	ctx := t.Context()
+	directory := spoolDirectory(t)
+	id := testIdentity()
+	store := openSynced(t, directory, id, 4, 9)
+	start := time.Unix(1_700_000_060, 0).UTC()
+	records := make([]*inventoryv1.Package, MaxBatchRecords+1)
+	for i := range records {
+		records[i] = pkg("bash", "old")
+	}
+	oldHost, oldPackage := pendingRefreshObservation(t, store, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, records...))
+	if oldPackage.BatchCount != 2 {
+		t.Fatalf("partial upload fixture has %d batches", oldPackage.BatchCount)
+	}
+	if err := store.MarkBegin(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkBatchAccepted(ctx, 0); err != nil {
+		t.Fatal(err)
+	}
+	oldRow, err := store.queries.ReadPackageSlot(ctx, slotPending)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh := refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))
+	if err := store.Queue(ctx, fresh); err != nil {
+		t.Fatal(err)
+	}
+	queued, err := store.queries.ReadPackageSlot(ctx, slotQueued)
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshBytes, err := os.ReadFile(filepath.Join(directory, collectionsName, queued.CollectionID, "b000"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, directory, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+	if host, packages, err := store.QueuedForRefresh(ctx, start); err != nil || !host || !packages {
+		t.Fatalf("fresh queue inspection during fence: host=%v packages=%v err=%v", host, packages, err)
+	}
+	if err := store.SupersedeForRefresh(ctx, start); !errors.Is(err, ErrNeedsSync) {
+		t.Fatalf("supersede before sync: %v", err)
+	}
+	if err := store.Synchronize(ctx, 4, 9); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.Recovery(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := store.SupersedeForRefresh(ctx, start); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after, err := store.Recovery(ctx)
+	if err != nil || before != after {
+		t.Fatalf("supersession changed counters or claimed admission: before=%+v after=%+v err=%v", before, after, err)
+	}
+	if _, ok, err := store.PendingHost(ctx); err != nil || ok {
+		t.Fatalf("old host survived: found=%v err=%v", ok, err)
+	}
+	if _, ok, err := store.PendingPackage(ctx); err != nil || ok {
+		t.Fatalf("old package survived: found=%v err=%v", ok, err)
+	}
+	if _, err := os.Stat(filepath.Join(directory, collectionsName, oldRow.CollectionID)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("old payload survived: %v", err)
+	}
+	owned, err := store.queries.ListOwned(ctx)
+	if err != nil || len(owned) != 1 || owned[0].CollectionID != queued.CollectionID || owned[0].Referenced != 1 {
+		t.Fatalf("fresh ownership changed: %+v %v", owned, err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, directory, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Synchronize(ctx, 4, 9); err != nil {
+		t.Fatal(err)
+	}
+	host, err := store.PromoteHost(ctx)
+	if err != nil || host.Sequence != oldHost.Sequence+1 || !proto.Equal(host.Observation, fresh.Host) {
+		t.Fatalf("fresh host reused allocation or changed bytes: %+v %v", host, err)
+	}
+	packages, err := store.PromotePackage(ctx)
+	if err != nil || packages.Sequence != oldPackage.Sequence+1 || packages.Manifest.GetSnapshotId() == oldPackage.Manifest.GetSnapshotId() || packages.BeginAccepted || len(packages.AcceptedBatches) != 0 {
+		t.Fatalf("fresh package reused allocation or upload hints: %+v %v", packages, err)
+	}
+	batch, err := store.Batch(ctx, 0)
+	if err != nil || !bytes.Equal(batch, freshBytes) {
+		t.Fatalf("fresh durable payload changed: %v", err)
+	}
+}
+
+func TestSpoolRefreshRejectsIncompleteOrUnsafeQueue(t *testing.T) {
+	for _, name := range []string{
+		"missing both", "missing host", "missing package", "failed package",
+		"old host", "old package", "zero start", "overflow start",
+		"invalid host", "missing payload", "damaged payload", "missing descriptors",
+		"truncated collection", "unowned queued", "unowned pending", "shared payload",
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			directory := spoolDirectory(t)
+			store := openSynced(t, directory, testIdentity(), 4, 9)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			host, packages := pendingRefreshObservation(t, store, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old")))
+			batch, err := store.Batch(ctx, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fresh := refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))
+			want := ErrPending
+			if name == "failed package" {
+				fresh.Packages.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_TIMEOUT
+				fresh.Packages.Packages = nil
+			}
+			if name == "old host" {
+				fresh.Host.StartedAt = timestamppb.New(start.Add(-time.Nanosecond))
+			}
+			if name == "old package" {
+				fresh.Packages.StartedAt = timestamppb.New(start.Add(-time.Nanosecond))
+			}
+			if name == "truncated collection" {
+				fresh.Packages.Packages = make([]*inventoryv1.Package, MaxBatchRecords+1)
+				for i := range fresh.Packages.Packages {
+					fresh.Packages.Packages[i] = pkg("bash", "new")
+				}
+			}
+			if name != "missing both" {
+				if err := store.Queue(ctx, fresh); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch name {
+			case "missing host":
+				if err := store.queries.DeleteHostSlot(ctx, slotQueued); err != nil {
+					t.Fatal(err)
+				}
+			case "missing package":
+				if err := store.dropQueuedPackage(ctx); err != nil {
+					t.Fatal(err)
+				}
+			case "zero start":
+				want = ErrInvalid
+				start = time.Time{}
+			case "overflow start":
+				want = ErrInvalid
+				start = time.Date(2500, time.January, 1, 0, 0, 0, 0, time.UTC)
+			case "invalid host":
+				want = ErrInvalid
+				if _, err := store.queries.UpdateHostSlot(ctx, spooldb.UpdateHostSlotParams{Kind: slotQueued, Observation: []byte{0xff}}); err != nil {
+					t.Fatal(err)
+				}
+			case "missing payload", "damaged payload", "missing descriptors", "truncated collection", "unowned queued", "unowned pending", "shared payload":
+				want = ErrNeedsSync
+				queued, err := store.queries.ReadPackageSlot(ctx, slotQueued)
+				if err != nil {
+					t.Fatal(err)
+				}
+				filename := filepath.Join(directory, collectionsName, queued.CollectionID, "b000")
+				switch name {
+				case "missing payload":
+					err = os.Remove(filename)
+				case "damaged payload":
+					err = os.WriteFile(filename, []byte("damaged"), 0600)
+				case "missing descriptors":
+					err = store.queries.DeleteBatches(ctx, queued.CollectionID)
+				case "truncated collection":
+					if _, err := store.db.ExecContext(ctx, "DELETE FROM batch_descriptor WHERE collection_id = ? AND batch_index = 1", queued.CollectionID); err != nil {
+						t.Fatal(err)
+					}
+					err = os.Remove(filepath.Join(directory, collectionsName, queued.CollectionID, "b001"))
+				case "unowned queued":
+					_, err = store.queries.MarkOwned(ctx, spooldb.MarkOwnedParams{CollectionID: queued.CollectionID, Referenced: 0})
+				case "unowned pending":
+					pending, readErr := store.queries.ReadPackageSlot(ctx, slotPending)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					_, err = store.queries.MarkOwned(ctx, spooldb.MarkOwnedParams{CollectionID: pending.CollectionID, Referenced: 0})
+				case "shared payload":
+					want = ErrConflict
+					_, err = store.db.ExecContext(ctx, "UPDATE package_slot SET collection_id = (SELECT collection_id FROM package_slot WHERE kind = 1) WHERE kind = 2")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.SupersedeForRefresh(ctx, start); !errors.Is(err, want) {
+				t.Fatalf("supersede invalid queue: got=%v want=%v", err, want)
+			}
+			switch name {
+			case "invalid host", "missing payload", "damaged payload", "missing descriptors", "truncated collection", "unowned queued", "zero start", "overflow start":
+				if _, _, err := store.QueuedForRefresh(ctx, start); !errors.Is(err, want) {
+					t.Fatalf("inspection accepted invalid fresh queue: got=%v want=%v", err, want)
+				}
+			}
+			requireRefreshPending(t, store, host, packages, batch)
+			after, err := store.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("rejected supersession changed recovery: before=%+v after=%+v err=%v", before, after, err)
+			}
+		})
+	}
+}
+
+func TestSpoolRefreshRetainsSameActionWhileSupersedingMixedPending(t *testing.T) {
+	for _, name := range []string{"both", "host", "package", "later", "without queue"} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			directory := spoolDirectory(t)
+			store := openSynced(t, directory, testIdentity(), 4, 9)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			obs := refreshObservation(start, "same-action", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "same-action"))
+			if name == "host" {
+				obs.Packages.StartedAt = timestamppb.New(start.Add(-time.Minute))
+			}
+			if name == "package" {
+				obs.Host.StartedAt = timestamppb.New(start.Add(-time.Minute))
+			}
+			if name == "later" {
+				obs = refreshObservation(start.Add(time.Second), "later", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "later"))
+			}
+			host, _ := pendingRefreshObservation(t, store, obs)
+			if err := store.MarkBegin(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.MarkBatchAccepted(ctx, 0); err != nil {
+				t.Fatal(err)
+			}
+			packages, ok, err := store.PendingPackage(ctx)
+			if err != nil || !ok {
+				t.Fatal(err)
+			}
+			batch, err := store.Batch(ctx, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name != "without queue" {
+				if err := store.Queue(ctx, refreshObservation(start.Add(2*time.Second), "newer", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "newer"))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.SupersedeForRefresh(ctx, start); err != nil {
+				t.Fatalf("same-action supersession: %v", err)
+			}
+			gotHost, hostFound, err := store.PendingHost(ctx)
+			if err != nil || hostFound != (name != "package") {
+				t.Fatalf("wrong pending host retained: found=%v err=%v", hostFound, err)
+			}
+			if hostFound && (gotHost.Sequence != host.Sequence || !proto.Equal(gotHost.Observation, host.Observation)) {
+				t.Fatal("same-action host changed")
+			}
+			gotPackage, packageFound, err := store.PendingPackage(ctx)
+			if err != nil || packageFound != (name != "host") {
+				t.Fatalf("wrong pending package retained: found=%v err=%v", packageFound, err)
+			}
+			if packageFound {
+				if gotPackage.Sequence != packages.Sequence || !bytes.Equal(gotPackage.CanonicalManifest, packages.CanonicalManifest) || !gotPackage.BeginAccepted || len(gotPackage.AcceptedBatches) != 1 || gotPackage.AcceptedBatches[0] != 0 {
+					t.Fatal("same-action package or upload hints changed")
+				}
+				if got, err := store.Batch(ctx, 0); err != nil || !bytes.Equal(got, batch) {
+					t.Fatalf("same-action bytes changed: %v", err)
+				}
+			}
+			after, err := store.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("same-action counters changed: before=%+v after=%+v err=%v", before, after, err)
+			}
+			hostQueued, packageQueued, err := store.QueuedForRefresh(ctx, start)
+			wantQueued := name != "without queue"
+			if err != nil || hostQueued != wantQueued || packageQueued != wantQueued {
+				t.Fatalf("same-action queue changed: host=%v package=%v err=%v", hostQueued, packageQueued, err)
+			}
+		})
+	}
+}
+
+func TestSpoolRefreshSupersedesIndependentSlotsAndZeroPackages(t *testing.T) {
+	for _, name := range []string{"host only", "package only", "failed package"} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			directory := spoolDirectory(t)
+			store := openSynced(t, directory, testIdentity(), 4, 9)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			old := refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old"))
+			if name == "failed package" {
+				old.Packages.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_TIMEOUT
+				old.Packages.Packages = nil
+			}
+			if err := store.Queue(ctx, old); err != nil {
+				t.Fatal(err)
+			}
+			if name != "package only" {
+				if _, err := store.PromoteHost(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if name != "host only" {
+				if _, err := store.PromotePackage(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.Queue(ctx, refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)); err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.SupersedeForRefresh(ctx, start); err != nil {
+				t.Fatal(err)
+			}
+			after, err := store.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("supersession changed counters: before=%+v after=%+v err=%v", before, after, err)
+			}
+			host, err := store.PromoteHost(ctx)
+			if err != nil || host.Sequence != before.HostAllocated+1 {
+				t.Fatalf("host allocation: %+v %v", host, err)
+			}
+			packages, err := store.PromotePackage(ctx)
+			if err != nil || packages.Sequence != before.PackageAllocated+1 || !packages.Success || packages.BatchCount != 0 {
+				t.Fatalf("zero-package allocation: %+v %v", packages, err)
+			}
+			if names := collectionNames(t, directory); len(names) != 0 {
+				t.Fatalf("obsolete files remain: %v", names)
+			}
+		})
+	}
+}
+
+func TestSpoolQueuedForRefreshTracksPartialPromotion(t *testing.T) {
+	for _, name := range []string{"both", "host only", "package only", "stale", "failed"} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			store := openSynced(t, spoolDirectory(t), testIdentity(), 0, 0)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			obs := refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))
+			wantHost, wantPackage := true, true
+			switch name {
+			case "stale":
+				obs = refreshObservation(start.Add(-time.Second), "stale", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old"))
+				wantHost, wantPackage = false, false
+			case "failed":
+				obs.Packages.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_TIMEOUT
+				obs.Packages.Packages = nil
+				wantPackage = false
+			}
+			if err := store.Queue(ctx, obs); err != nil {
+				t.Fatal(err)
+			}
+			switch name {
+			case "host only":
+				if _, err := store.PromotePackage(ctx); err != nil {
+					t.Fatal(err)
+				}
+				wantPackage = false
+			case "package only":
+				if _, err := store.PromoteHost(ctx); err != nil {
+					t.Fatal(err)
+				}
+				wantHost = false
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			host, packages, err := store.QueuedForRefresh(ctx, start)
+			if err != nil || host != wantHost || packages != wantPackage {
+				t.Fatalf("queued freshness: host=%v packages=%v err=%v", host, packages, err)
+			}
+			after, err := store.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("inspection allocated sequences: before=%+v after=%+v err=%v", before, after, err)
+			}
+		})
+	}
+}
+
+func TestSpoolRefreshResumesMixedCrashWindows(t *testing.T) {
+	for _, name := range []string{
+		"package accepted", "host accepted", "package pending", "host pending",
+		"missing host replacement", "missing package replacement",
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			directory := spoolDirectory(t)
+			id := testIdentity()
+			store := openSynced(t, directory, id, 4, 9)
+			start := time.Unix(1_700_000_060, 0).UTC()
+			staleHost := name == "package accepted" || name == "package pending" || name == "missing host replacement"
+			accepted := name == "package accepted" || name == "host accepted"
+			missing := name == "missing host replacement" || name == "missing package replacement"
+			if err := store.Queue(ctx, refreshObservation(start.Add(-time.Minute), "old", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "old"))); err != nil {
+				t.Fatal(err)
+			}
+			var host HostUpload
+			var packages PackageUpload
+			var err error
+			if staleHost {
+				host, err = store.PromoteHost(ctx)
+			} else {
+				packages, err = store.PromotePackage(ctx)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			fresh := refreshObservation(start, "fresh", inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, pkg("bash", "new"))
+			if err := store.Queue(ctx, fresh); err != nil {
+				t.Fatal(err)
+			}
+			// Ordinary flushing can advance one fresh domain while the other
+			// remains blocked on an older pending upload. The full Queue was
+			// durable before either fresh domain was promoted.
+			if staleHost {
+				packages, err = store.PromotePackage(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := store.MarkBegin(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err := store.MarkBatchAccepted(ctx, 0); err != nil {
+					t.Fatal(err)
+				}
+				if accepted {
+					if err := store.FinishPackage(ctx, packages.Sequence, packages.Sequence, TerminalAdmitted); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if missing {
+					if err := store.queries.DeleteHostSlot(ctx, slotQueued); err != nil {
+						t.Fatal(err)
+					}
+				}
+			} else {
+				host, err = store.PromoteHost(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if accepted {
+					if err := store.AcknowledgeHost(ctx, host.Sequence, host.Sequence); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if missing {
+					if err := store.dropQueuedPackage(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			before, err := store.Recovery(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			reopened, err := Open(ctx, directory, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = reopened.Close() }()
+			if err := reopened.Synchronize(ctx, before.HostHighwater, before.PackageHighwater); err != nil {
+				t.Fatal(err)
+			}
+			err = reopened.SupersedeForRefresh(ctx, start)
+			if missing && !errors.Is(err, ErrPending) || !missing && err != nil {
+				t.Fatalf("mixed refresh resume: %v", err)
+			}
+			after, err := reopened.Recovery(ctx)
+			if err != nil || before != after {
+				t.Fatalf("mixed resume changed counters or receipts: before=%+v after=%+v err=%v", before, after, err)
+			}
+			gotHost, hostFound, err := reopened.PendingHost(ctx)
+			wantHost := staleHost && missing || !staleHost && !accepted
+			if err != nil || hostFound != wantHost || hostFound && (gotHost.Sequence != host.Sequence || !proto.Equal(gotHost.Observation, host.Observation)) {
+				t.Fatalf("mixed host state changed: %+v found=%v err=%v", gotHost, hostFound, err)
+			}
+			gotPackage, packageFound, err := reopened.PendingPackage(ctx)
+			wantPackage := !staleHost && missing || staleHost && !accepted
+			if err != nil || packageFound != wantPackage || packageFound && (gotPackage.Sequence != packages.Sequence || !bytes.Equal(gotPackage.CanonicalManifest, packages.CanonicalManifest)) {
+				t.Fatalf("mixed package state changed: %+v found=%v err=%v", gotPackage, packageFound, err)
+			}
+			if staleHost && packageFound && (!gotPackage.BeginAccepted || len(gotPackage.AcceptedBatches) != 1 || gotPackage.AcceptedBatches[0] != 0) {
+				t.Fatal("mixed resume discarded fresh package upload hints")
+			}
+			if missing {
+				return
+			}
+			if staleHost {
+				next, err := reopened.PromoteHost(ctx)
+				if err != nil || next.Sequence != host.Sequence+1 || !proto.Equal(next.Observation, fresh.Host) {
+					t.Fatalf("replacement host did not resume: %+v %v", next, err)
+				}
+			} else {
+				next, err := reopened.PromotePackage(ctx)
+				if err != nil || next.Sequence != packages.Sequence+1 || !next.StartedAt.Equal(start) {
+					t.Fatalf("replacement package did not resume: %+v %v", next, err)
+				}
+			}
+		})
+	}
+}

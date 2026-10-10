@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
+import { RpcError } from "@/components/ui/rpc-error";
 import { adminClient } from "@/lib/rpc";
 import { AttributeFields, readAttributeInputs } from "./attributes";
 import { deviceFilter, type DeviceSearch } from "./search";
@@ -352,9 +353,10 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
           Downloaded {pages} page(s). {pageToken ? "More pages are available." : "Export complete."}
         </p>
       ) : null}
-      {failure || inputError ? (
+      {failure ? <RpcError failure={failure} /> : null}
+      {inputError ? (
         <p role="alert" className="text-sm text-destructive">
-          {failure ? `${failure.codeName}: ${failure.message}` : inputError}
+          {inputError}
         </p>
       ) : null}
     </section>

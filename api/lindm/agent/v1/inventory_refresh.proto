@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_actions.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Publication evidence, not authority to start another collection. The start-role
+// signature binds an exact consumed action to a committed full inventory snapshot.
+message DeviceActionInventoryReceipt {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string action_id = 4 [(buf.validate.field).string.uuid = true];
+  bytes intent_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bytes start_grant_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  uint64 package_sequence = 7 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 host_sequence = 8 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string snapshot_id = 9 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp published_at = 10 [(buf.validate.field).required = true];
+  uint64 root_version = 11 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 12 [(buf.validate.field).uint64.gt = 0];
+}
+
+message ConfirmDeviceActionInventoryRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes receipt_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ConfirmDeviceActionInventoryResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+}

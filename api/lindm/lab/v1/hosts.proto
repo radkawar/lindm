@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// LabConfig describes operator-managed capacity, not a built-in host inventory.
+message LabConfig {
+  option (buf.validate.message).cel = {
+    id: "lab.host_names_unique"
+    message: "host names must be unique"
+    expression: "this.hosts.all(h, this.hosts.filter(other, other.name == h.name).size() == 1)"
+  };
+
+  repeated LabHost hosts = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+}
+
+// LabHost capacities are per-guest ceilings and a concurrent guest-slot count.
+// Operators must budget max_guests times the per-guest ceilings on each host.
+message LabHost {
+  option (buf.validate.message).cel = {
+    id: "lab.host_transport"
+    message: "SSH transport requires an SSH alias; local transport forbids one"
+    expression: "this.transport == 'ssh' ? this.ssh_alias != '' : this.ssh_alias == ''"
+  };
+  option (buf.validate.message).cel = {
+    id: "lab.host_runtime"
+    message: "container runtime requires a digest-pinned runner image; native runtime forbids one"
+    expression: "this.runtime == 'container' ? this.runner_image != '' : this.runner_image == ''"
+  };
+  option (buf.validate.message).cel = {
+    id: "lab.host_work_directory"
+    message: "work directories must not contain dot or parent-directory segments"
+    expression: "!this.work_directory.matches('(^|/)[.][.]?(/|$)')"
+  };
+
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z0-9][a-z0-9-]*$"
+  }];
+  string transport = 2 [(buf.validate.field).string = {
+    in: [
+      "local",
+      "ssh"
+    ]
+  }];
+  string ssh_alias = 3 [(buf.validate.field).string = {
+    max_len: 253
+    pattern: "^([a-zA-Z0-9][a-zA-Z0-9._-]*)?$"
+  }];
+  // Native architectures. Other supported guest architectures may use TCG.
+  repeated string architectures = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 2
+    unique: true
+    items: {
+      string: {
+        in: [
+          "amd64",
+          "arm64"
+        ]
+      }
+    }
+  }];
+  bool kvm = 5;
+  uint32 max_guests = 6 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 1024
+  }];
+  uint32 max_vcpus = 7 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 4096
+  }];
+  uint32 max_memory_mib = 8 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 16777216
+  }];
+  // Absolute path or ~/ path resolved on the executing host, never by a shell.
+  string work_directory = 9 [(buf.validate.field).string = {
+    min_len: 2
+    max_len: 4096
+    pattern: "^(/|~/)[a-zA-Z0-9._/-]+$"
+  }];
+  string runtime = 10 [(buf.validate.field).string = {
+    in: [
+      "native",
+      "container"
+    ]
+  }];
+  string runner_image = 11 [(buf.validate.field).string = {
+    max_len: 1024
+    pattern: "^([a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[0-9a-f]{64})?$"
+  }];
+}

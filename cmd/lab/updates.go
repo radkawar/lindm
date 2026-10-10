@@ -14,7 +14,8 @@ func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags := flag.NewFlagSet("vm updates", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	manifestPath := flags.String("manifest", "", "verified Ubuntu24 amd64 or Fedora44 x86_64 manifest")
-	repository := flags.String("repo", ".", "source checkout with built embedded console")
+	repository := flags.String("repo", ".", "checkout containing the existing development fixture")
+	buildRepository := flags.String("build-repo", "", "source checkout with built embedded console; default is -repo")
 	cache := flags.String("cache", ".cache/lab/images", "verified image cache")
 	work := flags.String("work-dir", "", "existing private working parent")
 	diagnostics := flags.String("diagnostics", "", "private owned failure diagnostics parent")
@@ -37,7 +38,7 @@ func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
-	result, runErr := vmlab.UpdateVM(ctx, manifest, vmlab.VMUpdateOptions{Repository: *repository, CacheDir: *cache, WorkDir: *work, LabBinary: *probe, DiagnosticsDir: *diagnostics})
+	result, runErr := vmlab.UpdateVM(ctx, manifest, vmlab.VMUpdateOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, LabBinary: *probe, DiagnosticsDir: *diagnostics})
 	if result == nil {
 		return runErr
 	}

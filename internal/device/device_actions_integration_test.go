@@ -27,7 +27,7 @@ func lockActionSpec() *agentv1.DeviceActionSpec {
 	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{}}}
 }
 func wipeActionSpec() *agentv1.DeviceActionSpec {
-	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}}}}
+	return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: fixtureStorageTarget(uuid.NewString())}}}
 }
 
 func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
@@ -98,6 +98,7 @@ func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
 func TestDeviceActionDestructiveApprovalConsumedAtStart(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	request := f.request(wipeActionSpec())
+	f.observeStorageTargets(t, request.GetSpec().GetCryptoErase().GetTarget())
 	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("destructive create without approval: %v", err)
 	}
@@ -133,6 +134,7 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 			if variant == "digest" {
 				request.Spec.GetCryptoErase().Target.LuksUuid = uuid.NewString()
 			}
+			f.observeStorageTargets(t, request.GetSpec().GetCryptoErase().GetTarget())
 			f.create(t, request)
 			start, _ := f.startRequest(t, f.work(t))
 			if variant == "revoked" {
@@ -162,7 +164,8 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 
 func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 	f := newDeviceActionFixture(t)
-	rotate := &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{LuksUuid: uuid.NewString(), SizeBytes: 1 << 30}, EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
+	rotate := &agentv1.EscrowRotateAction{Target: fixtureStorageTarget(uuid.NewString()), EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
+	f.observeStorageTargets(t, rotate.GetTarget())
 	action := f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: rotate}}))
 	work := f.work(t)
 	start, challenge := f.startRequest(t, work)
@@ -406,8 +409,10 @@ func TestDeviceActionEncryptionExactVolumeSelection(t *testing.T) {
 	f := newDeviceActionFixture(t)
 	volumes := []string{uuid.NewString(), uuid.NewString()}
 	actions := make([]string, len(volumes))
+	targets := []*agentv1.StorageTarget{fixtureStorageTarget(volumes[0]), fixtureStorageTarget(volumes[1])}
+	f.observeStorageTargets(t, targets...)
 	for i, volume := range volumes {
-		rotate := &agentv1.EscrowRotateAction{Target: &agentv1.StorageTarget{LuksUuid: volume, SizeBytes: 1 << 30}, EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
+		rotate := &agentv1.EscrowRotateAction{Target: targets[i], EscrowKeyId: f.svc.escrow.KeyID(), EscrowPublicKey: f.svc.escrow.PublicKey()}
 		action := f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: rotate}}))
 		actions[i] = action.GetActionId()
 		work := f.work(t)
@@ -455,7 +460,7 @@ func TestDeviceActionEncryptionExactVolumeSelection(t *testing.T) {
 	if err != nil || missing.Msg.GetObservation() != nil || missing.Msg.GetEscrow() != nil {
 		t.Fatalf("missing volume fell back to another recovery key: %v", err)
 	}
-	incomplete := f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: []*agentv1.StorageTarget{{LuksUuid: volumes[0], SizeBytes: 1 << 30}}}}})
+	incomplete := f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER, Targets: targets[:1]}}})
 	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(incomplete)); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("live root omitted retained escrow volume: %v", err)
 	}

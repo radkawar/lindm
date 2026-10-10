@@ -49,3 +49,31 @@ export function deviceActionsQueryOptions(
     },
   });
 }
+
+export function deviceActionQueryOptions(
+  lifetime: AuthLifetime,
+  deviceId: string,
+  actionId: string,
+) {
+  return queryOptions({
+    queryKey: ["device-action", lifetime.generation, deviceId, actionId] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    refetchInterval: 10_000,
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.getDeviceAction(
+        { actionId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      if (
+        !result.action ||
+        result.action.actionId !== actionId ||
+        result.action.deviceId !== deviceId
+      ) {
+        throw new Error("The action response does not match this device and action ID.");
+      }
+      return result.action;
+    },
+  });
+}

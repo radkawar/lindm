@@ -129,24 +129,24 @@ func (p installedPackage) matchesTransaction(tx *agentv1.AgentUpdateTransaction)
 	return nil
 }
 
-func observeInstalled(ctx context.Context, manager agentv1.NativeUpdateManager) (installedPackage, error) {
-	var p installedPackage
+func observeInstalled(ctx context.Context, manager agentv1.NativeUpdateManager, phase string) (p installedPackage, resultErr error) {
+	defer func() { resultErr = withNativeDiagnostic(resultErr, managerExecutable(manager), phase) }()
 	var output []byte
 	var err error
 	switch packageFormat(manager) {
 	case "deb":
-		output, err = nativeCommand(ctx, "/usr/bin/dpkg-query", "--show", "--showformat=${Package}\t${Version}\t${Architecture}\t${Status}\n", "lindm-agent")
+		output, err = nativeCommand(ctx, phase, "/usr/bin/dpkg-query", "--show", "--showformat=${Package}\t${Version}\t${Architecture}\t${Status}\n", "lindm-agent")
 	case "rpm":
-		output, err = nativeCommand(ctx, "/usr/bin/rpm", "-q", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\tinstalled\n", "lindm-agent")
+		output, err = nativeCommand(ctx, phase, "/usr/bin/rpm", "-q", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\tinstalled\n", "lindm-agent")
 	case "arch":
-		output, err = nativeCommand(ctx, "/usr/bin/pacman", "-Q", "lindm-agent")
+		output, err = nativeCommand(ctx, phase, "/usr/bin/pacman", "-Q", "lindm-agent")
 		if err == nil {
 			fields := strings.Fields(string(output))
 			if len(fields) != 2 || fields[0] != "lindm-agent" {
 				return p, errors.New("ambiguous pacman package observation")
 			}
 			// Architecture comes from the local database metadata, not uname.
-			info, infoErr := nativeCommand(ctx, "/usr/bin/pacman", "-Qi", "lindm-agent")
+			info, infoErr := nativeCommand(ctx, phase, "/usr/bin/pacman", "-Qi", "lindm-agent")
 			if infoErr != nil {
 				return p, infoErr
 			}
@@ -159,7 +159,7 @@ func observeInstalled(ctx context.Context, manager agentv1.NativeUpdateManager) 
 	if err != nil {
 		var failure *nativeFailure
 		var exit *exec.ExitError
-		if errors.As(err, &failure) && errors.As(err, &exit) && missingNativePackage(packageFormat(manager), output, failure.stderr, exit.ExitCode()) {
+		if errors.As(err, &failure) && !failure.outputOverflow && errors.As(err, &exit) && missingNativePackage(packageFormat(manager), output, failure.stderr, exit.ExitCode()) {
 			return installedPackage{name: "lindm-agent", state: "absent"}, nil
 		}
 		return p, err
@@ -201,7 +201,8 @@ func colonFields(data []byte) map[string]string {
 	return result
 }
 
-func validatePackage(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction) error {
+func validatePackage(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction) (resultErr error) {
+	defer func() { resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), "validation") }()
 	path := packagePath(directory, tx.GetManager())
 	if err := verifyFile(path, tx); err != nil {
 		return err
@@ -209,14 +210,14 @@ func validatePackage(ctx context.Context, directory string, tx *agentv1.AgentUpd
 	var name, version, arch string
 	switch packageFormat(tx.GetManager()) {
 	case "deb":
-		out, err := nativeCommand(ctx, "/usr/bin/dpkg-deb", "--field", path, "Package", "Version", "Architecture")
+		out, err := nativeCommand(ctx, "validation", "/usr/bin/dpkg-deb", "--field", path, "Package", "Version", "Architecture")
 		if err != nil {
 			return err
 		}
 		fields := colonFields(out)
 		name, version, arch = fields["Package"], fields["Version"], fields["Architecture"]
 	case "rpm":
-		out, err := nativeCommand(ctx, "/usr/bin/rpm", "-qp", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n", path)
+		out, err := nativeCommand(ctx, "validation", "/usr/bin/rpm", "-qp", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n", path)
 		if err != nil {
 			return err
 		}
@@ -229,7 +230,7 @@ func validatePackage(ctx context.Context, directory string, tx *agentv1.AgentUpd
 		if err := protectedSignature(path + ".sig"); err != nil {
 			return err
 		}
-		out, err := nativeCommand(ctx, "/usr/bin/pacman", "-Qip", path)
+		out, err := nativeCommand(ctx, "validation", "/usr/bin/pacman", "-Qip", path)
 		if err != nil {
 			return err
 		}
@@ -291,24 +292,27 @@ func verifyFile(path string, tx *agentv1.AgentUpdateTransaction) (resultErr erro
 	return nil
 }
 
-func verifyInstalledPayload(ctx context.Context, tx *agentv1.AgentUpdateTransaction) error {
+func verifyInstalledPayload(ctx context.Context, tx *agentv1.AgentUpdateTransaction) (resultErr error) {
+	defer func() {
+		resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), "payload_verify")
+	}()
 	var err error
 	switch packageFormat(tx.GetManager()) {
 	case "deb":
 		var out []byte
-		out, err = nativeCommand(ctx, "/usr/bin/dpkg", "--verify", "lindm-agent")
+		out, err = nativeCommand(ctx, "payload_verify", "/usr/bin/dpkg", "--verify", "lindm-agent")
 		err = verificationResult(out, err, true)
 	case "rpm":
 		var out []byte
-		out, err = nativeCommand(ctx, "/usr/bin/rpm", "-V", "--noconfig", "lindm-agent")
+		out, err = nativeCommand(ctx, "payload_verify", "/usr/bin/rpm", "-V", "--noconfig", "lindm-agent")
 		err = verificationResult(out, err, false)
 	case "arch":
-		_, err = nativeCommand(ctx, "/usr/bin/pacman", "-Qk", "lindm-agent")
+		_, err = nativeCommand(ctx, "payload_verify", "/usr/bin/pacman", "-Qk", "lindm-agent")
 	}
 	if err != nil {
 		return err
 	}
-	out, err := nativeCommand(ctx, installedBinary, "version")
+	out, err := nativeCommand(ctx, "payload_verify", installedBinary, "version")
 	if err != nil {
 		return err
 	}
@@ -359,7 +363,7 @@ func verificationDifference(data []byte) (changed, conffiles bool, resultErr err
 func verificationResult(data []byte, commandErr error, allowConffiles bool) error {
 	changed, conffiles, err := verificationDifference(data)
 	if err != nil {
-		return err
+		return errors.Join(commandErr, err)
 	}
 	if commandErr == nil {
 		if changed {
@@ -376,7 +380,7 @@ func verificationResult(data []byte, commandErr error, allowConffiles bool) erro
 		return commandErr
 	}
 	if changed {
-		return errNativePayloadMismatch
+		return errors.Join(commandErr, errNativePayloadMismatch)
 	}
 	if allowConffiles && conffiles {
 		return nil
@@ -384,7 +388,12 @@ func verificationResult(data []byte, commandErr error, allowConffiles bool) erro
 	return commandErr
 }
 
-func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction, prior installedPackage, interrupted bool, authorize func() error) error {
+func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction, prior installedPackage, interrupted bool, authorize func() error) (resultErr error) {
+	phase := "apply"
+	if interrupted {
+		phase = "recovery"
+	}
+	defer func() { resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), phase) }()
 	path := packagePath(directory, tx.GetManager())
 	var err error
 	switch tx.GetManager() {
@@ -393,7 +402,7 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 			if err := authorize(); err != nil {
 				return err
 			}
-			_, err = nativeCommand(ctx, "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--configure", "lindm-agent")
+			_, err = nativeCommand(ctx, "configure", "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--configure", "lindm-agent")
 			return err
 		}
 		if interrupted {
@@ -402,10 +411,10 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 			if err := authorize(); err != nil {
 				return err
 			}
-			if _, err := nativeCommand(ctx, "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--unpack", path); err != nil {
+			if _, err := nativeCommand(ctx, "recovery", "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--unpack", path); err != nil {
 				return err
 			}
-			_, err = nativeCommand(ctx, "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--configure", "lindm-agent")
+			_, err = nativeCommand(ctx, "configure", "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--configure", "lindm-agent")
 			return err
 		}
 		// Empty private cache and no configured sources prevent dependency or
@@ -415,17 +424,17 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 			return err
 		}
 		args := []string{"--assume-yes", "--no-download", "--no-remove", "--no-install-recommends", "-o", "Dir::Cache::archives=" + cache, "-o", "Dir::Etc::sourcelist=/dev/null", "-o", "Dir::Etc::sourceparts=-", "-o", "Dpkg::Options::=--force-confold", "install", path}
-		preview, err := nativeCommand(ctx, "/usr/bin/apt-get", append([]string{"--simulate"}, args...)...)
+		preview, err := nativeCommand(ctx, "simulate", "/usr/bin/apt-get", append([]string{"--simulate"}, args...)...)
 		if err != nil {
 			return err
 		}
 		if err := ownedAPTPreview(preview); err != nil {
-			return err
+			return withNativeDiagnostic(err, "apt-get", "simulate")
 		}
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = nativeCommand(ctx, "/usr/bin/apt-get", args...)
+		_, err = nativeCommand(ctx, "apply", "/usr/bin/apt-get", args...)
 		return err
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_DNF:
 		action := "install"
@@ -435,7 +444,7 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = nativeCommand(ctx, "/usr/bin/dnf", "--assumeyes", "--disablerepo=*", "--setopt=install_weak_deps=False", "--setopt=obsoletes=False", "--setopt=plugins=0", action, path)
+		_, err = nativeCommand(ctx, phase, "/usr/bin/dnf", "--assumeyes", "--disablerepo=*", "--setopt=install_weak_deps=False", "--setopt=obsoletes=False", "--setopt=plugins=0", action, path)
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_ZYPPER:
 		args := []string{"--non-interactive", "--no-refresh", "--disable-repositories", "install", "--no-recommends", "--no-allow-vendor-change"}
 		if interrupted && prior.version == tx.GetNativeVersion() {
@@ -444,19 +453,19 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = nativeCommand(ctx, "/usr/bin/zypper", append(args, path)...)
+		_, err = nativeCommand(ctx, phase, "/usr/bin/zypper", append(args, path)...)
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN:
-		preview, err := nativeCommand(ctx, "/usr/bin/pacman", "-U", "--print", "--print-format", "%n", path)
+		preview, err := nativeCommand(ctx, "simulate", "/usr/bin/pacman", "-U", "--print", "--print-format", "%n", path)
 		if err != nil {
 			return err
 		}
 		if strings.TrimSpace(string(preview)) != "lindm-agent" {
-			return errors.New("pacman transaction selects unrelated packages")
+			return withNativeDiagnostic(errors.New("pacman transaction selects unrelated packages"), "pacman", "simulate")
 		}
 		if err := authorize(); err != nil {
 			return err
 		}
-		_, err = nativeCommand(ctx, "/usr/bin/pacman", "-U", "--noconfirm", "--noprogressbar", path)
+		_, err = nativeCommand(ctx, phase, "/usr/bin/pacman", "-U", "--noconfirm", "--noprogressbar", path)
 		return err
 	default:
 		return errors.New("native package manager unsupported")
@@ -478,17 +487,21 @@ func ownedAPTPreview(data []byte) error {
 }
 
 type commandOutput struct {
-	bytes.Buffer
+	// A named buffer prevents io.Copy from bypassing Write via a promoted
+	// bytes.Buffer.ReadFrom method, including when os/exec drains child pipes.
+	buffer   bytes.Buffer
 	overflow bool
+	tail     nativeOutputTail
 }
 
 func (b *commandOutput) Write(p []byte) (int, error) {
 	n := len(p)
-	if b.Len()+n > 65536 {
+	b.tail.write(p)
+	if b.buffer.Len()+n > nativeOutputLimit {
 		b.overflow = true
-		p = p[:max(0, 65536-b.Len())]
+		p = p[:max(0, nativeOutputLimit-b.buffer.Len())]
 	}
-	_, err := b.Buffer.Write(p)
+	_, err := b.buffer.Write(p)
 	return n, err
 }
 
@@ -497,14 +510,18 @@ func (b *commandOutput) Write(p []byte) (int, error) {
 type nativeFailure struct {
 	program, stderr string
 	cause           error
+	diagnostic      *agentv1.NativeUpdateDiagnostic
+	outputOverflow  bool
 }
 
 func (e *nativeFailure) Error() string {
-	return fmt.Sprintf("native %s failed: %v", e.program, e.cause)
+	// Even exec's start error can contain a pathname. Never append a raw cause,
+	// output, argv or environment to a public-facing error string.
+	return fmt.Sprintf("native %s %s failed (exit %d)", e.program, e.diagnostic.GetPhase(), e.diagnostic.GetExitCode())
 }
 func (e *nativeFailure) Unwrap() error { return e.cause }
 
-func nativeCommand(ctx context.Context, executable string, args ...string) ([]byte, error) {
+func nativeCommand(ctx context.Context, phase, executable string, args ...string) ([]byte, error) {
 	call, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(call, executable, args...)
@@ -514,11 +531,18 @@ func nativeCommand(ctx context.Context, executable string, args ...string) ([]by
 	var stdout, stderr commandOutput
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
-	if stdout.overflow || stderr.overflow {
-		return nil, errors.New("native command output exceeds bound")
+	if err != nil || stdout.overflow || stderr.overflow {
+		if err == nil {
+			err = errors.New("native command output exceeds bound")
+		}
+		program := filepath.Base(executable)
+		failure := &nativeFailure{program: program, stderr: stderr.buffer.String(), cause: err, diagnostic: commandDiagnostic(program, phase, err, &stdout, &stderr), outputOverflow: stdout.overflow || stderr.overflow}
+		if stdout.overflow || stderr.overflow {
+			// Keep the existing fail-closed parser bound; a partial native reply
+			// is never valid package observation or transaction authorization.
+			return nil, failure
+		}
+		return stdout.buffer.Bytes(), failure
 	}
-	if err != nil {
-		return stdout.Bytes(), &nativeFailure{program: filepath.Base(executable), stderr: stderr.String(), cause: err}
-	}
-	return stdout.Bytes(), nil
+	return stdout.buffer.Bytes(), nil
 }

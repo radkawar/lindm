@@ -6,13 +6,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AcceptAdvisoryFindingRequestSchema } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { toRpcFailure } from "@/lib/errors";
+import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
@@ -59,9 +59,11 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         failure,
       });
       if (!lifetime.signal.aborted) {
-        toast.error(failure.ambiguous ? "Acceptance outcome unknown" : "Acceptance not recorded", {
-          description: "Review the inline result before continuing.",
-        });
+        const { tone, title } = classifyRpcFailure(failure);
+        toast[tone === "destructive" ? "error" : tone === "warning" ? "warning" : "message"](
+          title,
+          { description: "Acceptance not confirmed. Review the inline result before continuing." },
+        );
       }
     },
   });
@@ -116,14 +118,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
                 ? "Recording acceptance…"
                 : "Acceptance not confirmed."}
           </p>
-          {attempt.failure ? (
-            <Alert variant="destructive">
-              <AlertTitle>Acceptance not confirmed</AlertTitle>
-              <AlertDescription>
-                {attempt.failure.codeName}: {attempt.failure.message}
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          {attempt.failure ? <RpcError failure={attempt.failure} /> : null}
           {attempt.status === "ambiguous" ? (
             <>
               <p>
