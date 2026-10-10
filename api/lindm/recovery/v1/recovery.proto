@@ -3,19 +3,45 @@ syntax = "proto3";
 package lindm.recovery.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
 
 option go_package = "lindm/gen/lindm/recovery/v1;recoveryv1";
 
-// Separate purpose-restricted endpoint. One-action signed proofs authenticate
-// these four methods only; credentials are never ordinary device/admin identity.
+// Separate purpose-restricted endpoint. Public time grants no device or action
+// authority. One-action signed proofs authenticate the remaining four methods;
+// credentials are never ordinary device/admin identity.
 service RecoveryService {
+  rpc GetRecoveryTime(GetRecoveryTimeRequest) returns (GetRecoveryTimeResponse);
   rpc AcquireRecoveryWork(AcquireRecoveryWorkRequest) returns (AcquireRecoveryWorkResponse);
   rpc AuthorizeRecoveryStart(AuthorizeRecoveryStartRequest) returns (AuthorizeRecoveryStartResponse);
   rpc CheckpointRecoveryAction(CheckpointRecoveryActionRequest) returns (CheckpointRecoveryActionResponse);
   rpc ReportRecoveryResult(ReportRecoveryResultRequest) returns (ReportRecoveryResultResponse);
+}
+// Fresh process-local nonce and protected trust selection, never action credentials.
+message GetRecoveryTimeRequest {
+  bytes nonce = 1 [(buf.validate.field).bytes.len = 32];
+  string boot_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 root_version = 3 [(buf.validate.field).uint64.gt = 0];
+  bytes root_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  uint64 delegation_version = 5 [(buf.validate.field).uint64.gt = 0];
+  bytes delegation_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  uint64 minimum_recovery_epoch = 7 [(buf.validate.field).uint64.lte = 9223372036854775807];
+}
+message GetRecoveryTimeResponse {
+  // Untrusted verification candidate until the signed statement matches exactly.
+  google.protobuf.Timestamp server_time = 1 [(buf.validate.field).required = true];
+  bytes time_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  // Explicit even when the delegation has not changed.
+  lindm.agent.v1.UpdateExecutionTrustRequest trust_update = 3 [(buf.validate.field).required = true];
 }
 // For every request, payload_sha256 covers deterministic protobuf of the whole
 // typed request with credential_envelope and request_proof cleared. The proof

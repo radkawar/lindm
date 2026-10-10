@@ -5,6 +5,8 @@
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { RecoveryCheckpoint, RecoveryJournal } from "../../agent/v1/device_action_recovery_pb.js";
 import { file_lindm_agent_v1_device_action_recovery } from "../../agent/v1/device_action_recovery_pb.js";
 import type { DeviceActionChallenge, DeviceActionStatus } from "../../agent/v1/device_actions_pb.js";
@@ -17,7 +19,87 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/recovery/v1/recovery.proto.
  */
 export const file_lindm_recovery_v1_recovery: GenFile = /*@__PURE__*/
-  fileDesc("CiBsaW5kbS9yZWNvdmVyeS92MS9yZWNvdmVyeS5wcm90bxIRbGluZG0ucmVjb3ZlcnkudjEiagoaQWNxdWlyZVJlY292ZXJ5V29ya1JlcXVlc3QSKAoTY3JlZGVudGlhbF9lbnZlbG9wZRgBIAEoDEILukgIegYQARiAgAQSIgoNcmVxdWVzdF9wcm9vZhgCIAEoDEILukgIegYQARiAgAEiyAIKG0FjcXVpcmVSZWNvdmVyeVdvcmtSZXNwb25zZRIkCg9pbnRlbnRfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIACEh0KDHJlc3VsdF9ub25jZRgCIAEoDEIHukgEegJoIBInChRzdGFydF9ncmFudF9lbnZlbG9wZRgDIAEoDEIJukgGegQYgIAEEjYKCmNoZWNrcG9pbnQYBCABKAsyIi5saW5kbS5hZ2VudC52MS5SZWNvdmVyeUNoZWNrcG9pbnQSQQoMdHJ1c3RfdXBkYXRlGAUgASgLMisubGluZG0uYWdlbnQudjEuVXBkYXRlRXhlY3V0aW9uVHJ1c3RSZXF1ZXN0Eg4KBmNsb3NlZBgGIAEoCBIwCgdqb3VybmFsGAcgASgLMh8ubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlKb3VybmFsItcBCh1BdXRob3JpemVSZWNvdmVyeVN0YXJ0UmVxdWVzdBIoChNjcmVkZW50aWFsX2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABBIiCg1yZXF1ZXN0X3Byb29mGAIgASgMQgu6SAh6BhABGICAARJACgljaGFsbGVuZ2UYAyABKAsyJS5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25DaGFsbGVuZ2VCBrpIA8gBARImChVyZWNvdmVyeV9pbWFnZV9zaGEyNTYYBCABKAxCB7pIBHoCaCAiSwoeQXV0aG9yaXplUmVjb3ZlcnlTdGFydFJlc3BvbnNlEikKFHN0YXJ0X2dyYW50X2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABCLpAQofQ2hlY2twb2ludFJlY292ZXJ5QWN0aW9uUmVxdWVzdBIoChNjcmVkZW50aWFsX2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABBIiCg1yZXF1ZXN0X3Byb29mGAIgASgMQgu6SAh6BhABGICAARI+CgpjaGVja3BvaW50GAMgASgLMiIubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlDaGVja3BvaW50Qga6SAPIAQESOAoHam91cm5hbBgEIAEoCzIfLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Sm91cm5hbEIGukgDyAEBIogBCiBDaGVja3BvaW50UmVjb3ZlcnlBY3Rpb25SZXNwb25zZRIiChFjaGVja3BvaW50X3NoYTI1NhgBIAEoDEIHukgEegJoIBIZCghzZXF1ZW5jZRgCIAEoBEIHukgEMgIgABIlChByZWNlaXB0X2VudmVsb3BlGAMgASgMQgu6SAh6BhABGICAASLGAQobUmVwb3J0UmVjb3ZlcnlSZXN1bHRSZXF1ZXN0EigKE2NyZWRlbnRpYWxfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIAEEiIKDXJlcXVlc3RfcHJvb2YYAiABKAxCC7pICHoGEAEYgIABEjoKBnN0YXR1cxgDIAEoCzIiLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvblN0YXR1c0IGukgDyAEBEh0KDHJlc3VsdF9ub25jZRgEIAEoDEIHukgEegJoICIuChxSZXBvcnRSZWNvdmVyeVJlc3VsdFJlc3BvbnNlEg4KBmNsb3NlZBgBIAEoCDKFBAoPUmVjb3ZlcnlTZXJ2aWNlEnQKE0FjcXVpcmVSZWNvdmVyeVdvcmsSLS5saW5kbS5yZWNvdmVyeS52MS5BY3F1aXJlUmVjb3ZlcnlXb3JrUmVxdWVzdBouLmxpbmRtLnJlY292ZXJ5LnYxLkFjcXVpcmVSZWNvdmVyeVdvcmtSZXNwb25zZRJ9ChZBdXRob3JpemVSZWNvdmVyeVN0YXJ0EjAubGluZG0ucmVjb3ZlcnkudjEuQXV0aG9yaXplUmVjb3ZlcnlTdGFydFJlcXVlc3QaMS5saW5kbS5yZWNvdmVyeS52MS5BdXRob3JpemVSZWNvdmVyeVN0YXJ0UmVzcG9uc2USgwEKGENoZWNrcG9pbnRSZWNvdmVyeUFjdGlvbhIyLmxpbmRtLnJlY292ZXJ5LnYxLkNoZWNrcG9pbnRSZWNvdmVyeUFjdGlvblJlcXVlc3QaMy5saW5kbS5yZWNvdmVyeS52MS5DaGVja3BvaW50UmVjb3ZlcnlBY3Rpb25SZXNwb25zZRJ3ChRSZXBvcnRSZWNvdmVyeVJlc3VsdBIuLmxpbmRtLnJlY292ZXJ5LnYxLlJlcG9ydFJlY292ZXJ5UmVzdWx0UmVxdWVzdBovLmxpbmRtLnJlY292ZXJ5LnYxLlJlcG9ydFJlY292ZXJ5UmVzdWx0UmVzcG9uc2VCKFombGluZG0vZ2VuL2xpbmRtL3JlY292ZXJ5L3YxO3JlY292ZXJ5djFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_device_action_recovery, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_execution_trust]);
+  fileDesc("CiBsaW5kbS9yZWNvdmVyeS92MS9yZWNvdmVyeS5wcm90bxIRbGluZG0ucmVjb3ZlcnkudjEiqAIKFkdldFJlY292ZXJ5VGltZVJlcXVlc3QSFgoFbm9uY2UYASABKAxCB7pIBHoCaCASPwoHYm9vdF9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIdCgxyb290X3ZlcnNpb24YAyABKARCB7pIBDICIAASHAoLcm9vdF9zaGEyNTYYBCABKAxCB7pIBHoCaCASIwoSZGVsZWdhdGlvbl92ZXJzaW9uGAUgASgEQge6SAQyAiAAEiIKEWRlbGVnYXRpb25fc2hhMjU2GAYgASgMQge6SAR6AmggEi8KFm1pbmltdW1fcmVjb3ZlcnlfZXBvY2gYByABKARCD7pIDDIKGP//////////fyLBAQoXR2V0UmVjb3ZlcnlUaW1lUmVzcG9uc2USNwoLc2VydmVyX3RpbWUYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESIgoNdGltZV9lbnZlbG9wZRgCIAEoDEILukgIegYQARiAgAESSQoMdHJ1c3RfdXBkYXRlGAMgASgLMisubGluZG0uYWdlbnQudjEuVXBkYXRlRXhlY3V0aW9uVHJ1c3RSZXF1ZXN0Qga6SAPIAQEiagoaQWNxdWlyZVJlY292ZXJ5V29ya1JlcXVlc3QSKAoTY3JlZGVudGlhbF9lbnZlbG9wZRgBIAEoDEILukgIegYQARiAgAQSIgoNcmVxdWVzdF9wcm9vZhgCIAEoDEILukgIegYQARiAgAEiyAIKG0FjcXVpcmVSZWNvdmVyeVdvcmtSZXNwb25zZRIkCg9pbnRlbnRfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIACEh0KDHJlc3VsdF9ub25jZRgCIAEoDEIHukgEegJoIBInChRzdGFydF9ncmFudF9lbnZlbG9wZRgDIAEoDEIJukgGegQYgIAEEjYKCmNoZWNrcG9pbnQYBCABKAsyIi5saW5kbS5hZ2VudC52MS5SZWNvdmVyeUNoZWNrcG9pbnQSQQoMdHJ1c3RfdXBkYXRlGAUgASgLMisubGluZG0uYWdlbnQudjEuVXBkYXRlRXhlY3V0aW9uVHJ1c3RSZXF1ZXN0Eg4KBmNsb3NlZBgGIAEoCBIwCgdqb3VybmFsGAcgASgLMh8ubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlKb3VybmFsItcBCh1BdXRob3JpemVSZWNvdmVyeVN0YXJ0UmVxdWVzdBIoChNjcmVkZW50aWFsX2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABBIiCg1yZXF1ZXN0X3Byb29mGAIgASgMQgu6SAh6BhABGICAARJACgljaGFsbGVuZ2UYAyABKAsyJS5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25DaGFsbGVuZ2VCBrpIA8gBARImChVyZWNvdmVyeV9pbWFnZV9zaGEyNTYYBCABKAxCB7pIBHoCaCAiSwoeQXV0aG9yaXplUmVjb3ZlcnlTdGFydFJlc3BvbnNlEikKFHN0YXJ0X2dyYW50X2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABCLpAQofQ2hlY2twb2ludFJlY292ZXJ5QWN0aW9uUmVxdWVzdBIoChNjcmVkZW50aWFsX2VudmVsb3BlGAEgASgMQgu6SAh6BhABGICABBIiCg1yZXF1ZXN0X3Byb29mGAIgASgMQgu6SAh6BhABGICAARI+CgpjaGVja3BvaW50GAMgASgLMiIubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlDaGVja3BvaW50Qga6SAPIAQESOAoHam91cm5hbBgEIAEoCzIfLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Sm91cm5hbEIGukgDyAEBIogBCiBDaGVja3BvaW50UmVjb3ZlcnlBY3Rpb25SZXNwb25zZRIiChFjaGVja3BvaW50X3NoYTI1NhgBIAEoDEIHukgEegJoIBIZCghzZXF1ZW5jZRgCIAEoBEIHukgEMgIgABIlChByZWNlaXB0X2VudmVsb3BlGAMgASgMQgu6SAh6BhABGICAASLGAQobUmVwb3J0UmVjb3ZlcnlSZXN1bHRSZXF1ZXN0EigKE2NyZWRlbnRpYWxfZW52ZWxvcGUYASABKAxCC7pICHoGEAEYgIAEEiIKDXJlcXVlc3RfcHJvb2YYAiABKAxCC7pICHoGEAEYgIABEjoKBnN0YXR1cxgDIAEoCzIiLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvblN0YXR1c0IGukgDyAEBEh0KDHJlc3VsdF9ub25jZRgEIAEoDEIHukgEegJoICIuChxSZXBvcnRSZWNvdmVyeVJlc3VsdFJlc3BvbnNlEg4KBmNsb3NlZBgBIAEoCDLvBAoPUmVjb3ZlcnlTZXJ2aWNlEmgKD0dldFJlY292ZXJ5VGltZRIpLmxpbmRtLnJlY292ZXJ5LnYxLkdldFJlY292ZXJ5VGltZVJlcXVlc3QaKi5saW5kbS5yZWNvdmVyeS52MS5HZXRSZWNvdmVyeVRpbWVSZXNwb25zZRJ0ChNBY3F1aXJlUmVjb3ZlcnlXb3JrEi0ubGluZG0ucmVjb3ZlcnkudjEuQWNxdWlyZVJlY292ZXJ5V29ya1JlcXVlc3QaLi5saW5kbS5yZWNvdmVyeS52MS5BY3F1aXJlUmVjb3ZlcnlXb3JrUmVzcG9uc2USfQoWQXV0aG9yaXplUmVjb3ZlcnlTdGFydBIwLmxpbmRtLnJlY292ZXJ5LnYxLkF1dGhvcml6ZVJlY292ZXJ5U3RhcnRSZXF1ZXN0GjEubGluZG0ucmVjb3ZlcnkudjEuQXV0aG9yaXplUmVjb3ZlcnlTdGFydFJlc3BvbnNlEoMBChhDaGVja3BvaW50UmVjb3ZlcnlBY3Rpb24SMi5saW5kbS5yZWNvdmVyeS52MS5DaGVja3BvaW50UmVjb3ZlcnlBY3Rpb25SZXF1ZXN0GjMubGluZG0ucmVjb3ZlcnkudjEuQ2hlY2twb2ludFJlY292ZXJ5QWN0aW9uUmVzcG9uc2USdwoUUmVwb3J0UmVjb3ZlcnlSZXN1bHQSLi5saW5kbS5yZWNvdmVyeS52MS5SZXBvcnRSZWNvdmVyeVJlc3VsdFJlcXVlc3QaLy5saW5kbS5yZWNvdmVyeS52MS5SZXBvcnRSZWNvdmVyeVJlc3VsdFJlc3BvbnNlQihaJmxpbmRtL2dlbi9saW5kbS9yZWNvdmVyeS92MTtyZWNvdmVyeXYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_device_action_recovery, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_execution_trust]);
+
+/**
+ * Fresh process-local nonce and protected trust selection, never action credentials.
+ *
+ * @generated from message lindm.recovery.v1.GetRecoveryTimeRequest
+ */
+export type GetRecoveryTimeRequest = Message<"lindm.recovery.v1.GetRecoveryTimeRequest"> & {
+  /**
+   * @generated from field: bytes nonce = 1;
+   */
+  nonce: Uint8Array;
+
+  /**
+   * @generated from field: string boot_id = 2;
+   */
+  bootId: string;
+
+  /**
+   * @generated from field: uint64 root_version = 3;
+   */
+  rootVersion: bigint;
+
+  /**
+   * @generated from field: bytes root_sha256 = 4;
+   */
+  rootSha256: Uint8Array;
+
+  /**
+   * @generated from field: uint64 delegation_version = 5;
+   */
+  delegationVersion: bigint;
+
+  /**
+   * @generated from field: bytes delegation_sha256 = 6;
+   */
+  delegationSha256: Uint8Array;
+
+  /**
+   * @generated from field: uint64 minimum_recovery_epoch = 7;
+   */
+  minimumRecoveryEpoch: bigint;
+};
+
+/**
+ * Describes the message lindm.recovery.v1.GetRecoveryTimeRequest.
+ * Use `create(GetRecoveryTimeRequestSchema)` to create a new message.
+ */
+export const GetRecoveryTimeRequestSchema: GenMessage<GetRecoveryTimeRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_recovery_v1_recovery, 0);
+
+/**
+ * @generated from message lindm.recovery.v1.GetRecoveryTimeResponse
+ */
+export type GetRecoveryTimeResponse = Message<"lindm.recovery.v1.GetRecoveryTimeResponse"> & {
+  /**
+   * Untrusted verification candidate until the signed statement matches exactly.
+   *
+   * @generated from field: google.protobuf.Timestamp server_time = 1;
+   */
+  serverTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: bytes time_envelope = 2;
+   */
+  timeEnvelope: Uint8Array;
+
+  /**
+   * Explicit even when the delegation has not changed.
+   *
+   * @generated from field: lindm.agent.v1.UpdateExecutionTrustRequest trust_update = 3;
+   */
+  trustUpdate?: UpdateExecutionTrustRequest | undefined;
+};
+
+/**
+ * Describes the message lindm.recovery.v1.GetRecoveryTimeResponse.
+ * Use `create(GetRecoveryTimeResponseSchema)` to create a new message.
+ */
+export const GetRecoveryTimeResponseSchema: GenMessage<GetRecoveryTimeResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_recovery_v1_recovery, 1);
 
 /**
  * For every request, payload_sha256 covers deterministic protobuf of the whole
@@ -43,7 +125,7 @@ export type AcquireRecoveryWorkRequest = Message<"lindm.recovery.v1.AcquireRecov
  * Use `create(AcquireRecoveryWorkRequestSchema)` to create a new message.
  */
 export const AcquireRecoveryWorkRequestSchema: GenMessage<AcquireRecoveryWorkRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 0);
+  messageDesc(file_lindm_recovery_v1_recovery, 2);
 
 /**
  * @generated from message lindm.recovery.v1.AcquireRecoveryWorkResponse
@@ -93,7 +175,7 @@ export type AcquireRecoveryWorkResponse = Message<"lindm.recovery.v1.AcquireReco
  * Use `create(AcquireRecoveryWorkResponseSchema)` to create a new message.
  */
 export const AcquireRecoveryWorkResponseSchema: GenMessage<AcquireRecoveryWorkResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 1);
+  messageDesc(file_lindm_recovery_v1_recovery, 3);
 
 /**
  * @generated from message lindm.recovery.v1.AuthorizeRecoveryStartRequest
@@ -125,7 +207,7 @@ export type AuthorizeRecoveryStartRequest = Message<"lindm.recovery.v1.Authorize
  * Use `create(AuthorizeRecoveryStartRequestSchema)` to create a new message.
  */
 export const AuthorizeRecoveryStartRequestSchema: GenMessage<AuthorizeRecoveryStartRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 2);
+  messageDesc(file_lindm_recovery_v1_recovery, 4);
 
 /**
  * @generated from message lindm.recovery.v1.AuthorizeRecoveryStartResponse
@@ -142,7 +224,7 @@ export type AuthorizeRecoveryStartResponse = Message<"lindm.recovery.v1.Authoriz
  * Use `create(AuthorizeRecoveryStartResponseSchema)` to create a new message.
  */
 export const AuthorizeRecoveryStartResponseSchema: GenMessage<AuthorizeRecoveryStartResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 3);
+  messageDesc(file_lindm_recovery_v1_recovery, 5);
 
 /**
  * @generated from message lindm.recovery.v1.CheckpointRecoveryActionRequest
@@ -177,7 +259,7 @@ export type CheckpointRecoveryActionRequest = Message<"lindm.recovery.v1.Checkpo
  * Use `create(CheckpointRecoveryActionRequestSchema)` to create a new message.
  */
 export const CheckpointRecoveryActionRequestSchema: GenMessage<CheckpointRecoveryActionRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 4);
+  messageDesc(file_lindm_recovery_v1_recovery, 6);
 
 /**
  * @generated from message lindm.recovery.v1.CheckpointRecoveryActionResponse
@@ -204,7 +286,7 @@ export type CheckpointRecoveryActionResponse = Message<"lindm.recovery.v1.Checkp
  * Use `create(CheckpointRecoveryActionResponseSchema)` to create a new message.
  */
 export const CheckpointRecoveryActionResponseSchema: GenMessage<CheckpointRecoveryActionResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 5);
+  messageDesc(file_lindm_recovery_v1_recovery, 7);
 
 /**
  * @generated from message lindm.recovery.v1.ReportRecoveryResultRequest
@@ -236,7 +318,7 @@ export type ReportRecoveryResultRequest = Message<"lindm.recovery.v1.ReportRecov
  * Use `create(ReportRecoveryResultRequestSchema)` to create a new message.
  */
 export const ReportRecoveryResultRequestSchema: GenMessage<ReportRecoveryResultRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 6);
+  messageDesc(file_lindm_recovery_v1_recovery, 8);
 
 /**
  * @generated from message lindm.recovery.v1.ReportRecoveryResultResponse
@@ -253,15 +335,24 @@ export type ReportRecoveryResultResponse = Message<"lindm.recovery.v1.ReportReco
  * Use `create(ReportRecoveryResultResponseSchema)` to create a new message.
  */
 export const ReportRecoveryResultResponseSchema: GenMessage<ReportRecoveryResultResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_recovery_v1_recovery, 7);
+  messageDesc(file_lindm_recovery_v1_recovery, 9);
 
 /**
- * Separate purpose-restricted endpoint. One-action signed proofs authenticate
- * these four methods only; credentials are never ordinary device/admin identity.
+ * Separate purpose-restricted endpoint. Public time grants no device or action
+ * authority. One-action signed proofs authenticate the remaining four methods;
+ * credentials are never ordinary device/admin identity.
  *
  * @generated from service lindm.recovery.v1.RecoveryService
  */
 export const RecoveryService: GenService<{
+  /**
+   * @generated from rpc lindm.recovery.v1.RecoveryService.GetRecoveryTime
+   */
+  getRecoveryTime: {
+    methodKind: "unary";
+    input: typeof GetRecoveryTimeRequestSchema;
+    output: typeof GetRecoveryTimeResponseSchema;
+  },
   /**
    * @generated from rpc lindm.recovery.v1.RecoveryService.AcquireRecoveryWork
    */

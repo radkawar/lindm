@@ -27,7 +27,7 @@ type effectGate struct {
 	journal    StateStore
 	started    time.Duration
 	expires    time.Time
-	clock      func() time.Time
+	clock      func() (time.Time, time.Time, error)
 	boottime   func() (time.Duration, error)
 	verify     func(context.Context) error
 	checkpoint func(context.Context) error
@@ -35,6 +35,18 @@ type effectGate struct {
 }
 
 func (g *effectGate) fresh(ctx context.Context) error {
+	if err := g.deadline(ctx); err != nil {
+		return err
+	}
+	// Signature verification can span a suspend or consume the remaining grant
+	// lifetime. Sample both deadlines after it, at the native effect boundary.
+	if err := g.verify(ctx); err != nil {
+		return err
+	}
+	return g.deadline(ctx)
+}
+
+func (g *effectGate) deadline(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -42,10 +54,14 @@ func (g *effectGate) fresh(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if elapsed < g.started || elapsed-g.started >= 30*time.Second || !g.clock().Before(g.expires) {
+	_, latest, err := g.clock()
+	if err != nil {
+		return err
+	}
+	if elapsed < g.started || elapsed-g.started >= 30*time.Second || !latest.Before(g.expires) {
 		return ErrAuthorityExpired
 	}
-	return g.verify(ctx)
+	return nil
 }
 
 func (g *effectGate) consume(ctx context.Context) error {
@@ -65,6 +81,6 @@ func (g *effectGate) consume(ctx context.Context) error {
 		return err
 	}
 	// A durable server round trip may itself use the remaining grant lifetime.
-	// Recheck wall and suspend-aware monotonic deadlines after its response.
+	// Recheck authenticated and suspend-aware monotonic deadlines after its response.
 	return g.fresh(ctx)
 }

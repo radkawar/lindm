@@ -8,6 +8,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"errors"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -27,6 +28,8 @@ type SnapshotOptions struct {
 	BootID         string
 	Initial        *agentv1.RecoveryJournal
 	ExpectedSHA256 []byte
+	Clock          *Clock
+	ProvisionedAt  time.Time
 }
 
 // FetchSnapshot performs exactly one purpose-restricted read. It authenticates
@@ -39,7 +42,7 @@ func FetchSnapshot(ctx context.Context, options SnapshotOptions) ([]byte, error)
 		return nil, errors.New("recovery_snapshot_custody_required")
 	}
 	at := options.Initial.GetTrustAcceptedAt().AsTime()
-	r, err := authenticateRunner(ctx, Options{Key: options.Key, Bootstrap: options.Bootstrap, Client: options.Client, BootID: options.BootID, ImageSHA256: options.Initial.GetHandoff().GetRecoveryImageSha256()}, options.Initial, &at)
+	r, err := authenticateRunner(ctx, Options{Key: options.Key, Bootstrap: options.Bootstrap, Client: options.Client, BootID: options.BootID, ImageSHA256: options.Initial.GetHandoff().GetRecoveryImageSha256(), Clock: options.Clock, ProvisionedAt: options.ProvisionedAt}, options.Initial, &at)
 	if err != nil {
 		return nil, err
 	}

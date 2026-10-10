@@ -30,6 +30,9 @@ type blockNode struct {
 	Filesystem  string      `json:"fstype"`
 	Device      string      `json:"maj:min"`
 	Children    []blockNode `json:"children"`
+
+	nativeWWN    bool
+	nativeSerial bool
 }
 
 type targetHandle struct {
@@ -82,39 +85,11 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 	if err := json.Unmarshal(output, &topology); err != nil {
 		return nil, fmt.Errorf("decode block identity: %w", err)
 	}
-	var matches []*blockNode
-	roots := make(map[*blockNode]*blockNode)
-	var visit func([]blockNode, *blockNode)
-	visit = func(nodes []blockNode, disk *blockNode) {
-		for i := range nodes {
-			n := &nodes[i]
-			if n.Type == "disk" {
-				disk = n
-			}
-			if disk != nil {
-				if n.WWN == "" {
-					n.WWN = disk.WWN
-				}
-				if n.Serial == "" {
-					n.Serial = disk.Serial
-				}
-			}
-			// Distinguish equal-sized encrypted partitions on the same medium.
-			// An absent UUID remains eligible for offline post-erase readback;
-			// pre-effect callers independently verify native luksUUID.
-			uuidMatches := target.GetLuksUuid() == "" || n.UUID == "" || n.UUID == target.GetLuksUuid()
-			if uuidMatches && n.WWN == target.GetWwn() && n.Serial == target.GetSerial() && n.Size == target.GetSizeBytes() {
-				matches = append(matches, n)
-				roots[n] = disk
-			}
-			visit(n.Children, disk)
-		}
+	selected, disk, diagnostic := resolveTargetIdentity(topology.Devices, target, spec.GetSanitize() != nil, nativeBlockIdentity)
+	if diagnostic.MatchCount != 1 {
+		return nil, fmt.Errorf("%w: target_identity_ambiguous %s", ErrConflict, diagnostic.encode())
 	}
-	visit(topology.Devices, nil)
-	if len(matches) != 1 {
-		return nil, fmt.Errorf("%w: target_identity_ambiguous", ErrConflict)
-	}
-	node := *matches[0]
+	node := *selected
 	if target.GetWwn() == "" || target.GetSerial() == "" || filepath.Dir(node.Path) != "/dev" || filepath.Clean(node.Path) != node.Path {
 		return nil, fmt.Errorf("%w: incomplete_target_identity", ErrUnsupported)
 	}
@@ -141,7 +116,6 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 		return nil, fmt.Errorf("%w: target_device_changed", ErrConflict)
 	}
 	if destructive(spec) {
-		disk := roots[matches[0]]
 		if disk == nil || (spec.GetSanitize() != nil && node.Type != "disk") {
 			return nil, ErrUnsupported
 		}
@@ -167,7 +141,136 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 			}
 		}
 	}
+	size, err := blockSize(file)
+	if err != nil || size != target.GetSizeBytes() {
+		return nil, errors.Join(fmt.Errorf("%w: target_size_changed", ErrConflict), err)
+	}
+	if node.Type == "disk" {
+		// Re-observe kernel identity after pinning the selected descriptor (and
+		// after its exclusive reopen). Boot-local names never establish identity.
+		if !sameNativeBlockIdentity(node, nativeBlockIdentity(actual)) {
+			return nil, fmt.Errorf("%w: target_native_identity_changed", ErrConflict)
+		}
+	}
 	return &targetHandle{file: file, node: node, qualification: qualification}, nil
+}
+
+func resolveTargetIdentity(nodes []blockNode, target *agentv1.StorageTarget, wholeDisk bool, native func(string) sysfsBlockIdentity) (selected, root *blockNode, diagnostic targetIdentityDiagnostic) {
+	diagnostic.Approved = identityDiagnosticTarget(target)
+	var visit func([]blockNode, *blockNode, string)
+	visit = func(nodes []blockNode, parent *blockNode, parentError string) {
+		for i := range nodes {
+			n := &nodes[i]
+			candidate := identityDiagnosticNode(*n)
+			// The parent belongs to this branch only. A preceding disk at the
+			// same tree level is not the backing disk of an orphan partition.
+			disk, identityError := parent, parentError
+			if n.Type == "disk" {
+				disk = n
+				evidence := native(n.Device)
+				candidate.Sysfs = evidence.diagnostic()
+				identityError = resolveBlockIdentity(n, evidence)
+			} else if disk != nil {
+				if n.Type == "part" && (n.WWN != "" && n.WWN != disk.WWN || n.Serial != "" && n.Serial != disk.Serial) {
+					identityError = "partition_identity_conflict"
+				}
+				if n.WWN == "" {
+					n.WWN = disk.WWN
+				}
+				if n.Serial == "" {
+					n.Serial = disk.Serial
+				}
+			}
+			// An absent UUID remains eligible for offline post-erase readback;
+			// pre-effect LUKS callers independently verify native luksUUID.
+			uuidMatches := target.GetLuksUuid() == "" || n.UUID == "" || n.UUID == target.GetLuksUuid()
+			typeMatches := !wholeDisk || n.Type == "disk"
+			candidate.Matched = identityError == "" && disk != nil && typeMatches && uuidMatches &&
+				target.GetWwn() != "" && target.GetSerial() != "" && target.GetSizeBytes() != 0 &&
+				n.WWN == target.GetWwn() && n.Serial == target.GetSerial() && n.Size == target.GetSizeBytes()
+			if candidate.Matched {
+				diagnostic.MatchCount++
+				selected, root = n, disk
+			}
+			candidate.EffectiveWWN = diagnosticIdentityText(n.WWN)
+			candidate.EffectiveSerial = diagnosticIdentityText(n.Serial)
+			candidate.IdentityError = identityError
+			diagnostic.CandidateCount++
+			if len(diagnostic.Candidates) < 16 {
+				diagnostic.Candidates = append(diagnostic.Candidates, candidate)
+			}
+			visit(n.Children, disk, identityError)
+		}
+	}
+	visit(nodes, nil, "")
+	if diagnostic.MatchCount != 1 {
+		return nil, nil, diagnostic
+	}
+	return selected, root, diagnostic
+}
+
+// Identity diagnostics contain only bounded hardware identifiers, never mounts,
+// filesystem labels, command output, credentials or signed recovery material.
+type targetIdentityDiagnostic struct {
+	Approved          targetIdentityFields      `json:"approved"`
+	CandidateCount    int                       `json:"candidate_count"`
+	MatchCount        int                       `json:"match_count"`
+	Candidates        []targetIdentityCandidate `json:"candidates"`
+	CandidatesOmitted int                       `json:"candidates_omitted"`
+}
+
+type targetIdentityFields struct {
+	WWN    string `json:"wwn"`
+	Serial string `json:"serial"`
+	UUID   string `json:"uuid"`
+	Size   uint64 `json:"size"`
+}
+
+type targetIdentityCandidate struct {
+	targetIdentityFields
+	Path            string              `json:"path"`
+	Type            string              `json:"type"`
+	Device          string              `json:"device"`
+	EffectiveWWN    string              `json:"effective_wwn"`
+	EffectiveSerial string              `json:"effective_serial"`
+	Matched         bool                `json:"matched"`
+	Sysfs           *sysfsBlockIdentity `json:"sysfs,omitempty"`
+	IdentityError   string              `json:"identity_error,omitempty"`
+}
+
+func (diagnostic targetIdentityDiagnostic) encode() []byte {
+	// Even adversarial escaped identifiers must fit the retained 16 KiB console
+	// tail. Keep the approved tuple and total/match counts if rows do not fit.
+	const maximumBytes = 12 << 10
+	for {
+		diagnostic.CandidatesOmitted = diagnostic.CandidateCount - len(diagnostic.Candidates)
+		encoded, _ := json.Marshal(diagnostic)
+		if len(encoded) <= maximumBytes || len(diagnostic.Candidates) == 0 {
+			return encoded
+		}
+		diagnostic.Candidates = diagnostic.Candidates[:len(diagnostic.Candidates)-1]
+	}
+}
+
+func diagnosticIdentityText(value string) string {
+	const maximumBytes = 256
+	if len(value) > maximumBytes {
+		return value[:maximumBytes] + "[truncated]"
+	}
+	return value
+}
+
+func identityDiagnosticTarget(target *agentv1.StorageTarget) targetIdentityFields {
+	return targetIdentityFields{WWN: diagnosticIdentityText(target.GetWwn()), Serial: diagnosticIdentityText(target.GetSerial()), UUID: diagnosticIdentityText(target.GetLuksUuid()), Size: target.GetSizeBytes()}
+}
+
+func identityDiagnosticNode(node blockNode) targetIdentityCandidate {
+	return targetIdentityCandidate{
+		targetIdentityFields: targetIdentityFields{WWN: diagnosticIdentityText(node.WWN), Serial: diagnosticIdentityText(node.Serial), UUID: diagnosticIdentityText(node.UUID), Size: node.Size},
+		Path:                 diagnosticIdentityText(node.Path),
+		Type:                 diagnosticIdentityText(node.Type),
+		Device:               diagnosticIdentityText(node.Device),
+	}
 }
 
 func (p *Provider) offlineTarget(ctx context.Context, spec *agentv1.DeviceActionSpec, node blockNode, qualification *agentv1.QualifiedActionTarget) error {

@@ -20,6 +20,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
+	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	"lindm/internal/protodata"
 )
 
@@ -45,6 +46,7 @@ const (
 	DeviceActionRecoveryBootType       = "application/vnd.lindm.device-action-recovery-boot.v1+protobuf"
 	RecoveryRequestProofType           = "application/vnd.lindm.recovery-request-proof.v1+protobuf"
 	RecoveryCheckpointReceiptType      = "application/vnd.lindm.recovery-checkpoint-receipt.v1+protobuf"
+	RecoveryTimeType                   = "application/vnd.lindm.recovery-time.v1+protobuf"
 	ProvisioningRetrievalType          = "application/vnd.lindm.provisioning-retrieval.v1+protobuf"
 	OfflineAuthorizationType           = "application/vnd.lindm.offline-enrollment-authorization.v1+protobuf"
 	OfflineRequestType                 = "application/vnd.lindm.offline-enrollment-request.v1+protobuf"
@@ -69,6 +71,7 @@ func New() (*Authority, error) {
 		&agentv1.DeviceActionInventoryReceipt{},
 		&agentv1.DeviceActionRecoveryHandoff{}, &agentv1.DeviceActionRecoveryCredential{}, &agentv1.DeviceActionRecoveryBootGrant{},
 		&agentv1.RecoveryRequestProof{}, &agentv1.RecoveryCheckpointReceipt{}, &agentv1.RecoveryCheckpoint{},
+		&agentv1.RecoveryTimeStatement{}, &recoveryv1.GetRecoveryTimeRequest{}, &recoveryv1.GetRecoveryTimeResponse{},
 		&enrollmentv1.ProvisioningRetrieval{},
 		&agentv1.OfflineEnrollmentAuthorization{}, &agentv1.OfflineEnrollmentRequestProof{}, &agentv1.OfflineEnrollmentResponse{},
 	), protovalidate.WithDisableLazy())
@@ -138,6 +141,8 @@ func payloadType(message proto.Message) (string, error) {
 		return RecoveryRequestProofType, nil
 	case *agentv1.RecoveryCheckpointReceipt:
 		return RecoveryCheckpointReceiptType, nil
+	case *agentv1.RecoveryTimeStatement:
+		return RecoveryTimeType, nil
 	case *enrollmentv1.ProvisioningRetrieval:
 		return ProvisioningRetrievalType, nil
 	case *agentv1.OfflineEnrollmentAuthorization:

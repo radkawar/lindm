@@ -65,7 +65,11 @@ func checkedResponse[T any](response *connect.Response[T], err error, validator 
 }
 
 func (r *runner) proof(ctx context.Context, operation agentv1.RecoveryOperation, payload proto.Message) ([]byte, error) {
-	return requestProof(ctx, r.authority, r.key, r.credential, r.record.GetCredentialEnvelope(), r.bootID, r.incarnation, operation, payload, r.clock())
+	now, _, err := r.now()
+	if err != nil {
+		return nil, err
+	}
+	return requestProof(ctx, r.authority, r.key, r.credential, r.record.GetCredentialEnvelope(), r.bootID, r.incarnation, operation, payload, now)
 }
 
 func (r *runner) acquire(ctx context.Context) (*recoveryv1.AcquireRecoveryWorkResponse, error) {
@@ -99,10 +103,14 @@ func (r *runner) authorize(ctx context.Context, challenge *agentv1.DeviceActionC
 }
 
 func (r *runner) checkpoint(ctx context.Context, phase agentv1.RecoveryPhase) error {
+	now, _, err := r.now()
+	if err != nil {
+		return err
+	}
 	previous := r.record.GetCheckpoint()
 	checkpoint := &agentv1.RecoveryCheckpoint{
 		CredentialId: r.credential.GetCredentialId(), ActionId: r.record.GetHandoff().GetIntent().GetActionId(),
-		BootId: r.bootID, ExecutorIncarnation: r.incarnation, Sequence: 1, Phase: phase, At: timestamppb.New(r.clock()),
+		BootId: r.bootID, ExecutorIncarnation: r.incarnation, Sequence: 1, Phase: phase, At: timestamppb.New(now),
 	}
 	if previous != nil {
 		digest, err := trust.DeviceActionDigest(previous)
@@ -140,7 +148,11 @@ func (r *runner) checkpoint(ctx context.Context, phase agentv1.RecoveryPhase) er
 	if checked.GetSequence() != checkpoint.GetSequence() || !bytes.Equal(checked.GetCheckpointSha256(), digest[:]) {
 		return errors.New("recovery_checkpoint_ack_mismatch")
 	}
-	if _, err := r.verifier.VerifyRecoveryCheckpointReceipt(ctx, r.record.GetAcceptedRoot(), r.delegation, checked.GetReceiptEnvelope(), checkpoint, r.clock()); err != nil {
+	_, latest, err := r.now()
+	if err != nil {
+		return err
+	}
+	if _, err := r.verifier.VerifyRecoveryCheckpointReceipt(ctx, r.record.GetAcceptedRoot(), r.delegation, checked.GetReceiptEnvelope(), checkpoint, latest); err != nil {
 		return err
 	}
 	r.record.CheckpointReceiptEnvelope = checked.GetReceiptEnvelope()

@@ -778,6 +778,27 @@ loss; an erased disk cannot be the only durable record of consumed authority.
 The external-operator recovery environment is an additional mode, not evidence
 that remote wipe of a lost or stolen original device works.
 
+Recovery does not trust its RTC for authority. Before any action-scoped request,
+it sends a fresh random nonce and boot identity to the public, purpose-separated
+`GetRecoveryTime` endpoint on the pinned recovery origin. The server signs the
+exact request digest and database time in a dedicated DSSE domain with its
+currently delegated recovery START key. The recovery verifier authenticates the
+root/delegation chain, protected version/epoch fences and provisioning-time floor;
+the time endpoint grants no device identity, checkpoint or execution authority.
+The bootstrap is single-use and must complete within its signed, at-most-30-second
+lifetime. No unauthenticated NTP or persisted cross-boot clock estimate is used.
+
+The initial TLS connection verifies the pinned CA chain, hostname, signatures and
+constraints without consulting the RTC and permits only this public time request.
+Before sending action credentials, transport verifies certificate validity over
+the authenticated time interval, including reused connections. Recovery retains
+the signed time plus suspend-aware monotonic elapsed time as a conservative
+interval covering the complete bootstrap round trip: its lower bound governs
+issued-at/not-before checks, while its upper bound governs expiry and future
+receipt checks. This narrows rather than extends existing credential, delegation
+and grant lifetimes. Missing time, failed signatures, nonce substitutions,
+monotonic rollback and expired authority fail closed before destructive effects.
+
 ### Implemented connected service dispatch (G3)
 
 The first dispatch path is pull-based and limited to `systemd.service.v1`. Postgres

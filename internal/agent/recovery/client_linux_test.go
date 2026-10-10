@@ -20,6 +20,11 @@ import (
 
 func recoveryProofFixture(t *testing.T) (*trust.Authority, ed25519.PrivateKey, *agentv1.DeviceActionRecoveryCredential, time.Time) {
 	t.Helper()
+	return recoveryProofFixtureAt(t, time.Now())
+}
+
+func recoveryProofFixtureAt(t *testing.T, now time.Time) (*trust.Authority, ed25519.PrivateKey, *agentv1.DeviceActionRecoveryCredential, time.Time) {
+	t.Helper()
 	authority, err := trust.New()
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +33,6 @@ func recoveryProofFixture(t *testing.T) (*trust.Authority, ed25519.PrivateKey, *
 	if err != nil {
 		t.Fatal(err)
 	}
-	now := time.Now()
 	image := bytes.Repeat([]byte{3}, 32)
 	target := &agentv1.StorageTarget{Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 4096}
 	mediaDigest, err := trust.DeviceActionDigest(target)

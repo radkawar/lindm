@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -51,7 +50,7 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	}
 	cfg := document.Proto
 	verifiedAt := cfg.GetBootstrapVerifiedAt()
-	if !verifiedAt.IsValid() || verifiedAt.AsTime().After(time.Now().Add(time.Minute)) {
+	if !verifiedAt.IsValid() {
 		return errors.New("invalid authenticated recovery bootstrap admission time")
 	}
 	authority, err := trust.New()
@@ -60,7 +59,7 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	}
 	// This is restoration of authenticated image provisioning, exactly as the
 	// ordinary executor restores its protected BootstrapVerifiedAt. The runtime
-	// still verifies current delegation, approvals and fresh grants at real time.
+	// verifies current authority against nonce-authenticated server time, not RTC.
 	bootstrap, err := authority.VerifyBootstrap(ctx, document.ExecutionRoot, document.Bootstrap, verifiedAt.AsTime())
 	if err != nil {
 		return err
@@ -68,7 +67,8 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	if cfg.GetServerUrl() != bootstrap.Bundle.GetEnrollmentOrigin() || !bytes.Equal(document.ServerCA, bootstrap.Bundle.GetTransportCaPem()) {
 		return errors.New("recovery endpoint does not match authenticated bootstrap transport")
 	}
-	client, closeClient, err := transport.NewRecoveryClient(cfg.GetServerUrl(), document.ServerCA)
+	clock := recovery.NewClock()
+	client, closeClient, err := transport.NewRecoveryClient(cfg.GetServerUrl(), document.ServerCA, clock.Bounds)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 		store = journal
 	case agentv1.RecoveryCustody_RECOVERY_CUSTODY_TPM:
 		tpm, openErr := recoverycustody.OpenWithSnapshot(ctx, document.Capsule, func(ctx context.Context, signer ed25519.PrivateKey, initial *agentv1.RecoveryJournal, expected []byte) ([]byte, error) {
-			return recovery.FetchSnapshot(ctx, recovery.SnapshotOptions{Key: signer, Bootstrap: bootstrap, Client: client, BootID: bootID, Initial: initial, ExpectedSHA256: expected})
+			return recovery.FetchSnapshot(ctx, recovery.SnapshotOptions{Key: signer, Bootstrap: bootstrap, Client: client, BootID: bootID, Initial: initial, ExpectedSHA256: expected, Clock: clock, ProvisionedAt: verifiedAt.AsTime()})
 		})
 		if openErr != nil {
 			return openErr
@@ -130,5 +130,5 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	return recovery.Run(ctx, recovery.Options{Journal: store, Key: key, Bootstrap: bootstrap, Client: client, Provider: provider, BootID: verifiedBoot, ImageSHA256: handoff.GetRecoveryImageSha256()})
+	return recovery.Run(ctx, recovery.Options{Journal: store, Key: key, Bootstrap: bootstrap, Client: client, Provider: provider, BootID: verifiedBoot, ImageSHA256: handoff.GetRecoveryImageSha256(), Clock: clock, ProvisionedAt: verifiedAt.AsTime()})
 }

@@ -21,6 +21,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/devlab"
 	"lindm/internal/trust"
 )
@@ -33,6 +34,7 @@ type actionSignedHandoffEvidence struct {
 	Boot                 *actionOwnedBootEvidence          `json:"owned_ordinary_boot"`
 	RecoveryImageSHA256  string                            `json:"recovery_image_sha256"`
 	RecoveryImageSize    int64                             `json:"recovery_image_size"`
+	RecoverySizeEvidence *recoveryboot.SizeEvidence        `json:"recovery_size_evidence,omitempty"`
 	ClosureSHA256        string                            `json:"signed_closure_sha256"`
 	PredictedPCR11SHA256 string                            `json:"predicted_pcr11_sha256"`
 	ActionID             string                            `json:"action_id"`
@@ -159,6 +161,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		return evidence, err
 	}
 	evidence.RecoveryImageSHA256, evidence.RecoveryImageSize = hex.EncodeToString(artifact.SHA256), artifact.Size
+	evidence.RecoverySizeEvidence = artifact.SizeEvidence
 	if err := fixture.PublishRecoveryArtifact(ctx, artifact.Path, artifact.SHA256); err != nil {
 		return evidence, fmt.Errorf("publish exact signed recovery release: %w", err)
 	}

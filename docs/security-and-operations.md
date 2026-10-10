@@ -330,6 +330,20 @@ and the separately attributable external-operator method is required. Physical g
 exercise compromised/replayed handoff, wrong media, power loss, expired authority,
 recovery-image changes and return to a clean installed state.
 
+If original-device recovery reports **unsupported: ESP capacity**, retain the
+signed-image digest and the displayed allocation-rounded needed/available bytes;
+do not submit a wipe approval or change the ordinary boot image to make it fit.
+The external-recovery-media alternative requires an on-site operator and a
+separately qualified, trust-verified recovery image booted from external media.
+Provide protected off-target identity and journal storage, observe the exact
+approved whole-disk/controller identity again in that environment, and obtain a
+new image-and-target-bound two-person approval and fresh execution grant before
+any destructive command. An approval for the rejected original-device image is
+not transferable to a different image or media scope. Retain independent
+post-action verification and the server's scoped result; absent a qualified
+external path, report unsupported rather than improvising an erase. This path
+cannot satisfy remote wipe for a lost or stolen device.
+
 Deleting escrow now does not remove historical key copies from immutable backups.
 A crypto-erase claim requires a demonstrated key hierarchy and retention design that
 renders every recovery path unusable; otherwise choose qualified media sanitization

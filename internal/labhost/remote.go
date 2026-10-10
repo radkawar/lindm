@@ -551,16 +551,21 @@ func (s *remoteStage) input(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	target := s.remote + "/inputs/" + strconv.Itoa(len(s.copied)) + "-" + filepath.Base(absolute)
-	s.copied[absolute] = target
-	if info.IsDir() {
-		absolute += "/"
-		target += "/"
-	}
-	if err := s.sync(absolute, target); err != nil {
+	// Native repositories bind package basenames as well as signed bytes. Keep
+	// the name intact and isolate equal names in separate staging directories.
+	target := filepath.Join(s.remote, "inputs", strconv.Itoa(len(s.copied)), filepath.Base(absolute))
+	if err := s.mkdir(filepath.Dir(target)); err != nil {
 		return "", err
 	}
-	return strings.TrimSuffix(target, "/"), nil
+	source := absolute
+	if info.IsDir() {
+		source += "/"
+	}
+	if err := s.sync(source, target); err != nil {
+		return "", err
+	}
+	s.copied[absolute] = target
+	return target, nil
 }
 
 // Native package metadata embeds absolute paths. Relocate only its known file

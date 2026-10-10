@@ -215,6 +215,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&devicev1.ReportDeviceActionResultRequest{},
 			&devicev1.ConfirmRefreshInventoryPublicationRequest{},
 			&devicev1.RegisterDeviceActionRecoveryRequest{},
+			&recoveryv1.GetRecoveryTimeRequest{},
 			&recoveryv1.AcquireRecoveryWorkRequest{},
 			&recoveryv1.AuthorizeRecoveryStartRequest{},
 			&recoveryv1.CheckpointRecoveryActionRequest{},

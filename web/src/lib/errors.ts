@@ -81,7 +81,7 @@ const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
   device_action_recovery_artifact_unavailable:
     "The signed recovery image is unavailable. Ask an administrator to check the recovery release.",
   device_action_esp_insufficient:
-    "The EFI system partition needs more free space before recovery handoff.",
+    "Unsupported: ESP capacity. The signed recovery image does not fit the available EFI system partition space. Use separately qualified external recovery media with an on-site operator; do not remove ordinary boot files or resize the ESP to bypass this gate.",
 };
 
 export function recoveryReadinessMessage(reason: string) {
@@ -112,12 +112,18 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "device_action_recovery_readiness_unsupported":
       case "device_action_recovery_artifact_required":
       case "device_action_recovery_artifact_unavailable":
-      case "device_action_esp_insufficient":
         return {
           tone: recoveryReadinessTone(failure.reason),
           title: "Recovery is not ready",
           message: recoveryReadinessMessage(failure.reason),
           action: "Review recovery readiness before requesting approval.",
+        };
+      case "device_action_esp_insufficient":
+        return {
+          tone: recoveryReadinessTone(failure.reason),
+          title: "Unsupported: ESP capacity",
+          message: recoveryReadinessMessage(failure.reason),
+          action: "Arrange separately qualified external recovery media with an on-site operator.",
         };
       case "device_action_capability_not_delegated":
         return {

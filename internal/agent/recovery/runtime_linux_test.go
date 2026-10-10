@@ -34,6 +34,7 @@ type recoveryTestServer struct {
 	t                                *testing.T
 	r                                *runner
 	start                            ed25519.PrivateKey
+	root                             ed25519.PrivateKey
 	checkpoint                       *agentv1.RecoveryCheckpoint
 	grant                            []byte
 	authorizations, effects, reports int
@@ -46,7 +47,7 @@ type recoveryTestServer struct {
 }
 
 func (s *recoveryTestServer) check(ctx context.Context, message proto.Message, envelope, proof []byte, operation agentv1.RecoveryOperation) error {
-	_, err := s.r.authority.VerifyRecoveryRequestProof(ctx, proof, envelope, s.r.credential, operation, message, s.r.clock())
+	_, err := s.r.authority.VerifyRecoveryRequestProof(ctx, proof, envelope, s.r.credential, operation, message, s.now())
 	return err
 }
 func (s *recoveryTestServer) AcquireRecoveryWork(ctx context.Context, request *connect.Request[recoveryv1.AcquireRecoveryWorkRequest]) (*connect.Response[recoveryv1.AcquireRecoveryWorkResponse], error) {
@@ -70,7 +71,7 @@ func (s *recoveryTestServer) AuthorizeRecoveryStart(ctx context.Context, request
 	if s.replayOriginalBoot {
 		challenge.BootId = s.r.record.GetHandoff().GetOriginalBootId()
 	}
-	grant := &agentv1.DeviceActionStartGrant{Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: timestamppb.New(s.r.clock()), ExpiresAt: challenge.GetExpiresAt(), Approvals: []*agentv1.DeviceActionHumanApproval{{ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), Binding: binding}, {ActorId: uuid.NewString(), AuthorizationVersion: 2, Binding: proto.CloneOf(binding)}}}
+	grant := &agentv1.DeviceActionStartGrant{Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), RootVersion: 1, DelegationVersion: 1, NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt(), Approvals: []*agentv1.DeviceActionHumanApproval{{ActorId: intent.GetActorId(), AuthorizationVersion: intent.GetAuthorizationVersion(), Binding: binding}, {ActorId: uuid.NewString(), AuthorizationVersion: 2, Binding: proto.CloneOf(binding)}}}
 	encoded, err := s.r.authority.Sign(ctx, grant, s.start)
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func (s *recoveryTestServer) CheckpointRecoveryAction(ctx context.Context, reque
 	if err != nil {
 		return nil, err
 	}
-	receipt := &agentv1.RecoveryCheckpointReceipt{CredentialId: checkpoint.GetCredentialId(), ActionId: checkpoint.GetActionId(), Sequence: checkpoint.GetSequence(), CheckpointSha256: digest[:], StoredAt: timestamppb.New(s.r.clock()), RootVersion: 1, DelegationVersion: 1}
+	receipt := &agentv1.RecoveryCheckpointReceipt{CredentialId: checkpoint.GetCredentialId(), ActionId: checkpoint.GetActionId(), Sequence: checkpoint.GetSequence(), CheckpointSha256: digest[:], StoredAt: timestamppb.New(s.now()), RootVersion: 1, DelegationVersion: 1}
 	if s.brokenReceipt && checkpoint.GetPhase() == agentv1.RecoveryPhase_RECOVERY_PHASE_EFFECT_COMMITTED {
 		receipt.CheckpointSha256 = bytes.Repeat([]byte{99}, 32)
 	}
@@ -151,7 +152,12 @@ func (p *recoveryTestProvider) Verify(_ context.Context, _ *agentv1.DeviceAction
 
 func newRecoveryRunnerFixture(t *testing.T) (*runner, *recoveryTestServer, *recoveryTestProvider) {
 	t.Helper()
-	authority, key, credential, now := recoveryProofFixture(t)
+	return newRecoveryRunnerFixtureAt(t, time.Now())
+}
+
+func newRecoveryRunnerFixtureAt(t *testing.T, at time.Time) (*runner, *recoveryTestServer, *recoveryTestProvider) {
+	t.Helper()
+	authority, key, credential, now := recoveryProofFixtureAt(t, at)
 	makeKey := func() ed25519.PrivateKey {
 		_, k, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
@@ -218,7 +224,7 @@ func newRecoveryRunnerFixture(t *testing.T) (*runner, *recoveryTestServer, *reco
 	plan := proto.CloneOf(credential.GetHandoff().GetChallenge().GetNativePlan())
 	plan.Before.RecoveryEnvironment = true
 	plan.Before.OffTargetJournal = true
-	r := &runner{journal: journal, key: key, bootID: uuid.NewString(), incarnation: uuid.NewString(), clock: func() time.Time { return now }, boottime: func() (time.Duration, error) { return time.Second, nil }, authority: authority, verifier: verifier, validator: validator, credential: credential, delegation: delegation, record: &agentv1.RecoveryJournal{FormatVersion: 1, Handoff: credential.GetHandoff(), CredentialEnvelope: []byte("retained signed credential fixture"), IntentEnvelope: []byte("retained intent fixture"), AcceptedRoot: root, DelegationEnvelope: delegationEnvelope, CredentialRoot: root, CredentialDelegationEnvelope: delegationEnvelope, State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: timestamppb.New(now)}}
+	r := &runner{journal: journal, key: key, bootID: uuid.NewString(), incarnation: uuid.NewString(), clock: &Clock{ready: true, serverTime: now, monotonic: func() (time.Duration, error) { return 0, nil }}, boottime: func() (time.Duration, error) { return time.Second, nil }, authority: authority, verifier: verifier, validator: validator, credential: credential, delegation: delegation, record: &agentv1.RecoveryJournal{FormatVersion: 1, Handoff: credential.GetHandoff(), CredentialEnvelope: []byte("retained signed credential fixture"), IntentEnvelope: []byte("retained intent fixture"), AcceptedRoot: root, DelegationEnvelope: delegationEnvelope, CredentialRoot: root, CredentialDelegationEnvelope: delegationEnvelope, State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: timestamppb.New(now)}}
 	intentEnvelope, err := authority.Sign(t.Context(), credential.GetHandoff().GetIntent(), planKey)
 	if err != nil {
 		t.Fatal(err)
@@ -233,7 +239,12 @@ func newRecoveryRunnerFixture(t *testing.T) (*runner, *recoveryTestServer, *reco
 	r.record.IntentEnvelope = intentEnvelope
 	r.record.CredentialEnvelope = credentialEnvelope
 	r.record.TrustAcceptedAt = timestamppb.New(now)
-	server := &recoveryTestServer{t: t, r: r, start: startKey, bootstrap: bootstrap}
+	rootDigest, err := trust.ExecutionRootDigest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.clock.floor = recoveryTrustFloor{rootVersion: 1, delegationVersion: 1, rootSHA256: rootDigest, delegationSHA256: sha256.Sum256(delegationEnvelope)}
+	server := &recoveryTestServer{t: t, r: r, start: startKey, root: rootKey, bootstrap: bootstrap}
 	provider := &recoveryTestProvider{plan: plan, server: server}
 	r.client = server
 	r.provider = provider
@@ -313,4 +324,27 @@ func TestRecoveryRunRejectsChangedMediaBeforeStart(t *testing.T) {
 	if !proto.Equal(server.status.GetBefore(), r.record.GetHandoff().GetChallenge().GetNativePlan().GetBefore()) {
 		t.Fatal("rejected media replaced the approved handoff observation")
 	}
+}
+
+func (s *recoveryTestServer) now() time.Time {
+	s.t.Helper()
+	now, _, err := s.r.now()
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return now
+}
+
+func (s *recoveryTestServer) GetRecoveryTime(ctx context.Context, request *connect.Request[recoveryv1.GetRecoveryTimeRequest]) (*connect.Response[recoveryv1.GetRecoveryTimeResponse], error) {
+	digest, err := trust.DeviceActionDigest(request.Msg)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	statement := &agentv1.RecoveryTimeStatement{DeploymentId: s.r.record.GetAcceptedRoot().GetDeploymentId(), RequestSha256: digest[:], ServerTime: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), RootVersion: 1, DelegationVersion: 1}
+	envelope, err := s.r.authority.Sign(ctx, statement, s.start)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&recoveryv1.GetRecoveryTimeResponse{ServerTime: statement.GetServerTime(), TimeEnvelope: envelope, TrustUpdate: &agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: s.r.record.GetDelegationEnvelope()}}), nil
 }

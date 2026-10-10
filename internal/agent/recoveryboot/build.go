@@ -59,6 +59,8 @@ type Artifact struct {
 	CertificateSHA256 []byte
 	ClosurePath       string
 	PCR11SHA256       []byte
+	SizeEvidence      *SizeEvidence
+	SizeEvidencePath  string
 }
 
 func digestFile(name string) (_ []byte, size int64, err error) {
@@ -195,7 +197,16 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Artifact{Path: image, SHA256: digest, Size: size, CertificateSHA256: request.Certificate.SHA256, ClosurePath: closurePath, PCR11SHA256: pcr11}, nil
+	sizes, err := measureBuildSizes(request, initrd, image, size)
+	if err != nil {
+		return nil, err
+	}
+	sizes.SignedImageSHA256 = hex.EncodeToString(digest)
+	sizePath := filepath.Join(dir, "component-sizes.json")
+	if err := writeSizeEvidence(sizePath, sizes); err != nil {
+		return nil, err
+	}
+	return &Artifact{Path: image, SHA256: digest, Size: size, CertificateSHA256: request.Certificate.SHA256, ClosurePath: closurePath, PCR11SHA256: pcr11, SizeEvidence: sizes, SizeEvidencePath: sizePath}, nil
 }
 
 func recoveryCommandLine(serialConsole string) (string, error) {
@@ -315,6 +326,15 @@ func uuidText(value string) bool {
 	return true
 }
 
+func recoveryInitScript(request BuildRequest) string {
+	setup := offTargetSetup
+	if request.StateUUID == "" {
+		setup = tpmSetup
+	}
+	init := strings.NewReplacer("@CUSTODY_SETUP@", setup, "@BOOT_IMAGE_SETUP@", bootImageSetup).Replace(initScript)
+	return strings.NewReplacer("@STATE_UUID@", request.StateUUID, "@ESP_UUID@", request.ESPUUID).Replace(init)
+}
+
 func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	files := []Ingredient{request.Busybox, request.Agent, request.Config, request.Certificate}
 	files[0].Destination, files[0].Executable = "bin/busybox", true
@@ -374,12 +394,7 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 			return "", err
 		}
 	}
-	setup := offTargetSetup
-	if request.StateUUID == "" {
-		setup = tpmSetup
-	}
-	init := strings.NewReplacer("@CUSTODY_SETUP@", setup, "@BOOT_IMAGE_SETUP@", bootImageSetup).Replace(initScript)
-	init = strings.NewReplacer("@STATE_UUID@", request.StateUUID, "@ESP_UUID@", request.ESPUUID).Replace(init)
+	init := recoveryInitScript(request)
 	inode++
 	if err := cpioEntry(compressed, inode, "init", 0100700, int64(len(init)), request.SourceDateEpoch, strings.NewReader(init)); err != nil {
 		return "", err

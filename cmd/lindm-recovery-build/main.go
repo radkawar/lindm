@@ -89,7 +89,7 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(os.Stdout, "image %s\nsha256 %x\nsize %d\ncertificate_sha256 %x\npcr11_sha256 %x\nclosure %s\n", artifact.Path, artifact.SHA256, artifact.Size, artifact.CertificateSHA256, artifact.PCR11SHA256, artifact.ClosurePath)
+	_, err = fmt.Fprintf(os.Stdout, "image %s\nsha256 %x\nsize %d\ncertificate_sha256 %x\npcr11_sha256 %x\nclosure %s\ncomponent_sizes %s\n", artifact.Path, artifact.SHA256, artifact.Size, artifact.CertificateSHA256, artifact.PCR11SHA256, artifact.ClosurePath, artifact.SizeEvidencePath)
 	return err
 }
 

@@ -138,6 +138,28 @@ message RecoveryCheckpointReceipt {
   uint64 root_version = 6 [(buf.validate.field).uint64.gt = 0];
   uint64 delegation_version = 7 [(buf.validate.field).uint64.gt = 0];
 }
+// START device.sanitize.v1 signature in a dedicated time-only DSSE domain.
+// The request digest includes nonce, boot and protected trust counters/digests.
+// This statement grants neither device identity nor permission to execute.
+// Expiry bounds bootstrap acceptance only. The process-local monotonic clock may
+// continue for read-only result reconciliation; every effect independently checks
+// current credential, grant and delegation expiry.
+message RecoveryTimeStatement {
+  string deployment_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  bytes request_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp server_time = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+  uint64 root_version = 5 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 6 [(buf.validate.field).uint64.gt = 0];
+  option (buf.validate.message).cel = {
+    id: "recovery_time.validity"
+    message: "recovery time statement lasts at most thirty seconds"
+    expression: "this.expires_at > this.server_time && this.expires_at - this.server_time <= duration('30s')"
+  };
+}
 // Protected off-target journal. Private one-action keys are never serialized here.
 message RecoveryJournal {
   uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];

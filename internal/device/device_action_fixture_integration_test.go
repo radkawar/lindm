@@ -32,6 +32,7 @@ import (
 type deviceActionFixture struct {
 	*enrolledFixture
 	certificate []byte
+	rootKeys    []ed25519.PrivateKey
 }
 
 // All authorization and custody state belongs to a fresh real PostgreSQL schema.
@@ -62,6 +63,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 		return data
 	}
 	roots := []ed25519.PrivateKey{ed25519Key(t), ed25519Key(t)}
+	f.rootKeys = roots
 	root := &agentv1.ExecutionRoot{DeploymentId: s.deploymentID.String(), Version: 1, Threshold: 2, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour)), Keys: []*agentv1.ExecutionKey{public(roots[0]), public(roots[1])}}
 	rootJSON, err := protojson.Marshal(root)
 	if err != nil {

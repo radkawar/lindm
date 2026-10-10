@@ -33,6 +33,9 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// RecoveryServiceGetRecoveryTimeProcedure is the fully-qualified name of the RecoveryService's
+	// GetRecoveryTime RPC.
+	RecoveryServiceGetRecoveryTimeProcedure = "/lindm.recovery.v1.RecoveryService/GetRecoveryTime"
 	// RecoveryServiceAcquireRecoveryWorkProcedure is the fully-qualified name of the RecoveryService's
 	// AcquireRecoveryWork RPC.
 	RecoveryServiceAcquireRecoveryWorkProcedure = "/lindm.recovery.v1.RecoveryService/AcquireRecoveryWork"
@@ -49,6 +52,7 @@ const (
 
 // RecoveryServiceClient is a client for the lindm.recovery.v1.RecoveryService service.
 type RecoveryServiceClient interface {
+	GetRecoveryTime(context.Context, *connect.Request[v1.GetRecoveryTimeRequest]) (*connect.Response[v1.GetRecoveryTimeResponse], error)
 	AcquireRecoveryWork(context.Context, *connect.Request[v1.AcquireRecoveryWorkRequest]) (*connect.Response[v1.AcquireRecoveryWorkResponse], error)
 	AuthorizeRecoveryStart(context.Context, *connect.Request[v1.AuthorizeRecoveryStartRequest]) (*connect.Response[v1.AuthorizeRecoveryStartResponse], error)
 	CheckpointRecoveryAction(context.Context, *connect.Request[v1.CheckpointRecoveryActionRequest]) (*connect.Response[v1.CheckpointRecoveryActionResponse], error)
@@ -66,6 +70,12 @@ func NewRecoveryServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	recoveryServiceMethods := v1.File_lindm_recovery_v1_recovery_proto.Services().ByName("RecoveryService").Methods()
 	return &recoveryServiceClient{
+		getRecoveryTime: connect.NewClient[v1.GetRecoveryTimeRequest, v1.GetRecoveryTimeResponse](
+			httpClient,
+			baseURL+RecoveryServiceGetRecoveryTimeProcedure,
+			connect.WithSchema(recoveryServiceMethods.ByName("GetRecoveryTime")),
+			connect.WithClientOptions(opts...),
+		),
 		acquireRecoveryWork: connect.NewClient[v1.AcquireRecoveryWorkRequest, v1.AcquireRecoveryWorkResponse](
 			httpClient,
 			baseURL+RecoveryServiceAcquireRecoveryWorkProcedure,
@@ -95,10 +105,16 @@ func NewRecoveryServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // recoveryServiceClient implements RecoveryServiceClient.
 type recoveryServiceClient struct {
+	getRecoveryTime          *connect.Client[v1.GetRecoveryTimeRequest, v1.GetRecoveryTimeResponse]
 	acquireRecoveryWork      *connect.Client[v1.AcquireRecoveryWorkRequest, v1.AcquireRecoveryWorkResponse]
 	authorizeRecoveryStart   *connect.Client[v1.AuthorizeRecoveryStartRequest, v1.AuthorizeRecoveryStartResponse]
 	checkpointRecoveryAction *connect.Client[v1.CheckpointRecoveryActionRequest, v1.CheckpointRecoveryActionResponse]
 	reportRecoveryResult     *connect.Client[v1.ReportRecoveryResultRequest, v1.ReportRecoveryResultResponse]
+}
+
+// GetRecoveryTime calls lindm.recovery.v1.RecoveryService.GetRecoveryTime.
+func (c *recoveryServiceClient) GetRecoveryTime(ctx context.Context, req *connect.Request[v1.GetRecoveryTimeRequest]) (*connect.Response[v1.GetRecoveryTimeResponse], error) {
+	return c.getRecoveryTime.CallUnary(ctx, req)
 }
 
 // AcquireRecoveryWork calls lindm.recovery.v1.RecoveryService.AcquireRecoveryWork.
@@ -123,6 +139,7 @@ func (c *recoveryServiceClient) ReportRecoveryResult(ctx context.Context, req *c
 
 // RecoveryServiceHandler is an implementation of the lindm.recovery.v1.RecoveryService service.
 type RecoveryServiceHandler interface {
+	GetRecoveryTime(context.Context, *connect.Request[v1.GetRecoveryTimeRequest]) (*connect.Response[v1.GetRecoveryTimeResponse], error)
 	AcquireRecoveryWork(context.Context, *connect.Request[v1.AcquireRecoveryWorkRequest]) (*connect.Response[v1.AcquireRecoveryWorkResponse], error)
 	AuthorizeRecoveryStart(context.Context, *connect.Request[v1.AuthorizeRecoveryStartRequest]) (*connect.Response[v1.AuthorizeRecoveryStartResponse], error)
 	CheckpointRecoveryAction(context.Context, *connect.Request[v1.CheckpointRecoveryActionRequest]) (*connect.Response[v1.CheckpointRecoveryActionResponse], error)
@@ -136,6 +153,12 @@ type RecoveryServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewRecoveryServiceHandler(svc RecoveryServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	recoveryServiceMethods := v1.File_lindm_recovery_v1_recovery_proto.Services().ByName("RecoveryService").Methods()
+	recoveryServiceGetRecoveryTimeHandler := connect.NewUnaryHandler(
+		RecoveryServiceGetRecoveryTimeProcedure,
+		svc.GetRecoveryTime,
+		connect.WithSchema(recoveryServiceMethods.ByName("GetRecoveryTime")),
+		connect.WithHandlerOptions(opts...),
+	)
 	recoveryServiceAcquireRecoveryWorkHandler := connect.NewUnaryHandler(
 		RecoveryServiceAcquireRecoveryWorkProcedure,
 		svc.AcquireRecoveryWork,
@@ -162,6 +185,8 @@ func NewRecoveryServiceHandler(svc RecoveryServiceHandler, opts ...connect.Handl
 	)
 	return "/lindm.recovery.v1.RecoveryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case RecoveryServiceGetRecoveryTimeProcedure:
+			recoveryServiceGetRecoveryTimeHandler.ServeHTTP(w, r)
 		case RecoveryServiceAcquireRecoveryWorkProcedure:
 			recoveryServiceAcquireRecoveryWorkHandler.ServeHTTP(w, r)
 		case RecoveryServiceAuthorizeRecoveryStartProcedure:
@@ -178,6 +203,10 @@ func NewRecoveryServiceHandler(svc RecoveryServiceHandler, opts ...connect.Handl
 
 // UnimplementedRecoveryServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedRecoveryServiceHandler struct{}
+
+func (UnimplementedRecoveryServiceHandler) GetRecoveryTime(context.Context, *connect.Request[v1.GetRecoveryTimeRequest]) (*connect.Response[v1.GetRecoveryTimeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.recovery.v1.RecoveryService.GetRecoveryTime is not implemented"))
+}
 
 func (UnimplementedRecoveryServiceHandler) AcquireRecoveryWork(context.Context, *connect.Request[v1.AcquireRecoveryWorkRequest]) (*connect.Response[v1.AcquireRecoveryWorkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.recovery.v1.RecoveryService.AcquireRecoveryWork is not implemented"))

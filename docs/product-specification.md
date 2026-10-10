@@ -142,6 +142,30 @@ The test references are scenario families in [verification](verification.md).
 | P20 | Native package/image/generation delivery, unattended agent updates, compatibility, reproducible releases, SBOM/provenance/signatures and distro certification                                                                                                                                        | Full matrix install/update/recovery and two clean builds with matching unsigned payload digests; old-agent/new-server and rejection attacks (L08, L17)                                                    |
 | P21 | Horizontal control-plane/worker operation with durable jobs, isolation/backpressure, predictable capacity and no mandatory message broker                                                                                                                                                            | Sustained load and failover gates in operations; no duplicate destructive effects or lost accepted work (L18)                                                                                             |
 
+### Original-device sanitize capability
+
+Original-device SATA/NVMe sanitize requires the approved signed recovery image to
+fit the existing EFI system partition, including allocation-unit rounding. A
+fresh authenticated inventory observation reports the image, needed and available
+bytes before approval. Insufficient capacity is **unsupported: ESP capacity**, not
+an approval warning or a sanitization failure after erasure begins. The console
+shows those bytes and the external-recovery alternative. Execution rechecks space;
+inventory readiness is neither authority nor a reservation.
+
+Do not resize the ESP, remove or compact ordinary boot images, replace the
+distribution kernel with an unqualified kernel, or weaken image trust to turn a
+gated cell green. The pinned Fedora 44 stock fixture is such a gated cell: its
+unchanged ESP has 14,888,960 bytes available, while its vendor-signed kernel alone
+is 18,479,464 bytes before the recovery stub and initramfs. Component digests and
+native records are retained in [verification](verification.md).
+
+An on-site operator may instead use separately qualified external recovery media
+with the same exact target validation, fresh two-person authorization and
+protected off-target state described in
+[dangerous-action operations](security-and-operations.md#3-dangerous-actions).
+That mode is not remote wipe of a lost or stolen device and does not certify
+original-device sanitize for the capacity-gated configuration.
+
 ### Management, not a script runner
 
 Policies describe desired resources with schemas, applicability, dependencies,

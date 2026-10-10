@@ -219,6 +219,68 @@ New signed Arch 0.6.0/0.6.1 packages, repositories and rejection fixtures were b
 from the same checkpoint under this evidence directory; preparation is not a native
 lifecycle pass. No timeout, security or provenance gate was weakened.
 
+Native ARM continuation on the DGX Sparks uses independently pinned arm64/aarch64
+vendor images, not cross-architecture inference. Debian 13 inspection passed on
+`dgx20` KVM after correcting two missing laboratory observations: per-interface
+IPv4/IPv6 default routes and active-session properties. The agent already emitted
+these fields; the old independent oracle omitted them and correctly failed strict
+comparison. The replacement oracle uses iproute2 netlink JSON and `loginctl`
+properties, independently of the production proc-table and `busctl` parsers.
+Parser regressions were added; their unit/race execution is not claimed here.
+
+The corrected record in `~/.cache/lindm-mutabledistros3-20261010/` is
+`debian13-arm64-dgx20-inspect-complete-oracle.json`, SHA-256
+`a67af59b3846199900abff8744dd078c36ccc0e1de0b4ad579632c54ade98f23`.
+It matched 353 dpkg identities and all asserted native fields, using agent
+`494c6168c452abd0b45205d7f478f4d952097977346e2c191504af1300a9c49d`.
+Source `d303cecb69bc041328438538a2e3bbf084ac06fb` plus private binary-diff SHA-256
+`7bd66a46565181c187518e4b61dd5e1dae3a1d405ffb98ba60aed18e18f1e59c`
+binds the independently rebuilt remote runner. This is QEMU 8.2.2, native aarch64
+KVM, package-pinned AAVMF `2024.02-2ubuntu0.10`, Secure Boot disabled/SetupMode true,
+virtio-blk, no TPM/desktop, and explicit user egress. This inspection record is
+separate from the subsequent packaged lifecycle proof below.
+
+The Debian 13 ARM packaged 0.7.0→0.7.1 automatic-trust lifecycle subsequently
+**passed**, including actual independent final revocation after the approver fix.
+Record `debian13-arm64-dgx20-lifecycle-stagingfix.json` in the same directory has
+SHA-256 `be19db1bcf1197a534d6425d8944d3e68173e3cd9245dd0c9abac452abce8c05`.
+Device `14e3a441-0a41-47f6-9e73-5a21a6b55373`, generation
+`b9603ce7-fb9b-48df-991f-24ffb88ba1ce`, matched 354 native packages at all five
+enrollment/upgrade/reboot/reinstall/spool-recovery publications; denied collection
+preserved sequence 5 at attempt 6. Unsigned/tampered/wrong-signer rejection,
+lost issuance, retained identity, spool corruption, authority rotation/rollback
+denial/restart retention, final device revocation and missing-journal hold passed.
+Epoch advanced 1→3. Total command time was 1,886.95 seconds; recorded remote lane
+time excluding staging was 1,723.65 seconds. Native dispatch is a separate lane.
+
+Its first attempt exposed another lab defect before package installation:
+remote staging prefixed the artifact basename, but authenticated APT pool
+validation correctly required the original name. Staging now keeps original
+basenames in distinct numbered directories, with a real local-rsync relocation
+regression. The passing lane retains source `d303cec` plus private diff
+`8c30afa7e3e809009ec39cc777f8130efdf0d076101035ff8ac5f6d24eab3263`;
+controller runner SHA-256 is
+`80dd80799d2c5a9f95f4e39bb79a13687bae25b5cc84e273902ee4072d2c69aa`.
+Both signed package versions were built from unchanged `d303cec` product sources;
+the delta affects only lab oracles/staging and their tests.
+
+All eight ARM image inputs (Debian 12/13, Rocky 9.8/10.2, AlmaLinux 8.10/9.8/10.2
+and Leap 16.0) passed authenticated acquisition and offline cache reverification.
+`arm64-acquisition.json`, SHA-256
+`1c7b1bfe9711e92d513c768a72cfddc430bdc3dc3dac601e52c2885651d0d5fb`,
+records their individual signatures, image hashes and exact sizes. Acquisition
+does not qualify the remaining native lifecycle/dispatch cells.
+
+Arch cannot be substituted on these ARM hosts: [Arch's architecture policy](https://wiki.archlinux.org/title/Frequently_asked_questions#What_architectures_does_Arch_support?)
+supports x86_64 and identifies Arch Linux ARM as a separate derivative. The pinned
+official arch-boxes release publishes no aarch64 input. Tumbleweed's official
+[ARM64 installer directory](https://download.opensuse.org/ports/aarch64/tumbleweed/iso/)
+publishes signed Snapshot20261007 DVD/NET media, but its advertised ARM Cloud/KVM
+checksum links return 404 and no matching native QCOW2 was found. A maintained
+SUSE installer-to-golden path, with snapshot-pinned installation content, is a
+prerequisite; an ISO cannot be relabeled as a provisioned cloud disk. These precise
+ARM prerequisites do not change the pending x86_64 Arch/Tumbleweed requirements.
+
 The shared laboratory approval session defect is independently reproduced without
 a VM against a real isolated `lindmd` and PostgreSQL database. Race-enabled
 regressions cover idle expiry for local WebAuthn and Keycloak code/PKCE sessions,
@@ -1776,7 +1838,8 @@ NVMe17's console `lindm-cloud-init-2552937792.json` has SHA-256
 `9a90bf3660b49673eacb192914bc6df52b39dce2b9d29ed368020f6c9842f96c`;
 root probe `lindm-cloud-init-3599471030.json` has SHA-256
 `9be64d4e5e41d2d6cca26c7c347f055ddd053d78893979153b0dab158e821dda`.
-The minimal recovery image has RTC time but no authenticated clock bootstrap.
+Those historical runs used a minimal recovery image with RTC time but no
+authenticated clock bootstrap.
 Future-issued proofs are rejected even inside their30s lifetime; a signed
 checkpoint stored after the local clock is also rejected. No acceptance window
 was widened and no unauthenticated time source was introduced.
@@ -1785,10 +1848,9 @@ Console `lindm-cloud-init-2867842716.json` has SHA-256
 `f7ae0b99bedb7f5d3c45094d71342fbc5cfbfd1c447d222dfe3a8898a0c13130`;
 root probe `lindm-cloud-init-3515380366.json` has SHA-256
 `6970d94b80bb0fb76286b600d4144c1c069510c9e9c338857ef7489bf9f69585`.
-Both final recovery attempts have zero host swap-out delta and over50GiB available
-memory. Their retained authenticated refusals—not the later lab wait timeout—are
-the product diagnosis. Recovery needs an authenticated time bootstrap consistent
-with the signed proof/grant/receipt contract before sanitize can be qualified.
+Both historical recovery attempts have zero host swap-out delta and over50GiB
+available memory. Their retained authenticated refusals—not the later lab wait
+timeout—are the product diagnosis that motivated the authenticated-time work below.
 
 The unified private build is based on
 `01495afab18b08dcec438f973ce43728156c235c`, including the checked refresh-backlog
@@ -1815,6 +1877,209 @@ The NVMe boot-local path correction is patch10, SHA-256
 The signed receipt-clock diagnostic is patch11, SHA-256
 `773109ec0702261b2fbc16b4fcf88c69f21f9c874fbf6d9e7c3e046991153e23`.
 Adjacent JSON files bind binary and embedded-console digests and exercised checks.
+
+Authenticated recovery-time continuation uses committed checkpoint
+`d303cecb69bc041328438538a2e3bbf084ac06fb`, which includes the landed WipeQual3
+changes above, plus private
+`$HOME/.cache/lindm-recovery-time-20261010/recovery-time-source-d303cec-03.patch`
+(SHA-256 `f578eaa6dfd6a99eaf85c95158e4d572f96dced9f2ac54549db455417b5631b7`).
+Its adjacent JSON binds all changed sources and embedded-console inputs.
+Stamped `lab-recovery-time` has SHA-256
+`90a9efebc3fa8cb028f54de2e7576bf73ffed049e6d419eec8ab9af454a9be4d`;
+`lindmd-recovery-time` has SHA-256
+`b961ea969d43d73fcd3b0708b423e1e2142ab1248e019a9c921bf0c8f206bc92`.
+No fixture, signing key or credential was copied into the private worktree.
+
+The affected trust, recovery, transport, agent-command and device unit/race suites
+passed, as did the real-PostgreSQL `TestRecoveryTime` and `TestDeviceActionRecovery`
+integration/race selection, focused Buf lint, affected Go vet and stamped
+whole-tree builds. Regressions cover replay/wrong nonce/request/boot/key/domain,
+RTC skew decades in both directions without changing the host clock, full
+round-trip uncertainty, expiry equality, monotonic rollback, HTTP/1.1 and HTTP/2
+keepalive certificate revalidation, and unchanged/current trust delivery.
+Independent review found and corrected learned-authority rollback and expiry
+during final signature verification. Added regressions authenticate a newer
+delegation before rejecting stale acquired trust, retain the same floor across
+snapshot restoration, reject a higher-version root fork around the learned root,
+and refuse expiry/suspend during the final post-checkpoint verification.
+The corrected recovery race suite passed. These are protocol/runtime proofs,
+not native sanitize or physical-media certification.
+
+The first maintained WipeQual3 runner and handoff-command reruns covered
+SATA and NVMe on Ubuntu 24.04 and Fedora 44, retaining every record beneath
+`$HOME/.cache/lindm-recovery-time-20261010`. **None of these first four is a sanitize pass.**
+
+| Native record                    | SHA-256                                                            | Retained outcome                                                                                                                                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu-recovery-sata-01.json`   | `c1709f245ea60ce65aa7c0b1338f64aeda62758d493022242e65acdaf71156e3` | Fresh readiness accepts the 38,763,576-byte signed image, two humans approve, and original-device signed recovery boots. The server receives FAILED/PRECONDITION; the recovery console reports `device_action_precondition: target_identity_ambiguous` before a destructive start. |
+| `ubuntu-recovery-nvme-01.json`   | `08b5a4a4ce09377ce1c1a77fb536df7653573466afbc4e006fc45ed9cc3a40d1` | The 39,508,024-byte signed image fits; native controller-serial/NSID identity, two-human approval and original-device handoff are retained. The server receives FAILED/PRECONDITION and the console reports the same `target_identity_ambiguous` pre-effect refusal.               |
+| `fedora44-recovery-sata-01.json` | `cf62060f3e0012971dc521b1fde552325ced2476afbc8e8966be2dd823120999` | Signed refresh succeeds, then readiness refuses `device_action_esp_insufficient`: signed image 43,543,608 bytes, allocation-rounded requirement 43,544,576, vendor ESP available 14,888,960. No wipe approval/action is requested.                                                 |
+| `fedora44-recovery-nvme-01.json` | `ce875a08d39cde14f6fef056dd67b7aa1f737d800054ba7fab5910f2afdcf512` | Signed refresh succeeds, then readiness refuses `device_action_esp_insufficient`: signed image 46,145,592 bytes, allocation-rounded requirement 46,147,584, vendor ESP available 14,888,960. No wipe approval/action is requested.                                                 |
+
+For both Ubuntu runs, `actionprovider.openTarget` reaches its existing exact
+WWN/serial/size matching guard and rejects because the native `lsblk` tree does
+not provide exactly one matching node. The retained console does not distinguish
+zero matches from multiple matches, so no narrower topology cause is claimed.
+**[INFERENCE]** Reaching that native observation and authenticated failed result
+means the mandatory signed-time bootstrap, scoped work acquisition and signed
+BOOTED checkpoint completed; the prior `recovery_request_clock_ahead` is no longer
+the reached blocker. No identity predicate was weakened to proceed.
+
+Protected diagnostics were copied alongside the records, retaining mode 0600:
+
+| Diagnostic                                                | SHA-256                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------ |
+| Ubuntu SATA console `lindm-cloud-init-3413425091.json`    | `20397fae90e1f8252641af940b20650a7085e0368e2b39411ddd03b02bea1dd0` |
+| Ubuntu SATA root probe `lindm-cloud-init-3597847071.json` | `9daa582ee767042c6e25ba2ddfcf9611ca8fe47245ee49772da72644a53523e9` |
+| Ubuntu NVMe console `lindm-cloud-init-2616327059.json`    | `04492b06f65e3aef8b4778362cacffcb369d1dc4e84eed76e089120b7d921028` |
+| Ubuntu NVMe root probe `lindm-cloud-init-3812067693.json` | `f05cb50f641aae4279a967e7ee93ce11dc48488f21c227a60ec5f5d415732a91` |
+| Fedora SATA readiness `lindm-cloud-init-1152846659.json`  | `2586e76de60446b30d351b6b114823466a6ccb3730688b600e08669d85d14074` |
+| Fedora NVMe readiness `lindm-cloud-init-3600537708.json`  | `a55220005a5ba294f6eea68c7fdc61b13ea6b223820cafcafc88fe4e7bc80c26` |
+
+`retained-diagnoses.json` has SHA-256
+`f1d98eba5cb2b4ace6dfbdfa2a18651a6801dc5dbe4d754d68ab15b6530a584f`.
+All four runs used at most two local guests, recorded zero swap-out delta and at
+least 56,834,268 KiB available memory at their retained host samples. All guests
+exited; final `pgrep -c qemu-system` returned 0. The Fedora vendor ESP was not
+enlarged, no validity window was extended, and no unauthenticated time source or
+fallback sanitize method was introduced. The subsequent identity investigation
+and explicit capacity-gate decision are recorded below.
+
+The original resolver was then captured without changing its matching predicate.
+The immutable diagnostic delta
+`recovery-identity-diagnostic-delta.patch` has SHA-256
+`f8924b9626d5a06dab2d25a26b5bc32a8392e7b5ec6302e8b98ed0421b85c101`;
+`recovery-identity-diagnostic-source.json` binds it to source03 and the same runner
+and has SHA-256
+`20e9375ec942ee7b9fea607e4bc78da415fca90ce301dbe9ae2a747d0c3cd41b`.
+Both actual recovery consoles reported seven candidates and **zero matches**,
+not duplicate identities. The minimal initramfs has no populated udev database:
+`lsblk` reports no WWN; SATA also has no serial, while NVMe exposes its
+space-padded raw serial. Native sysfs still reports the exact approved identities.
+SATA `/dev/sda` (`8:0`) has `device/wwid=naa.5000000000000001` and VPD page80
+serial `lindm-lab-0`; the approval is `0x5000000000000001`,
+`lindm-lab-0`, 3,758,096,384 bytes. NVMe's original target renumbered to
+`/dev/nvme1n1` (`259:0`), with the exact approved namespace WWID
+`nvme.1b36-6c696e646d2d6c61622d30-51454d55204e564d65204374726c-00000001`
+and `device/serial=lindm-lab-0`, again 3,758,096,384 bytes.
+The off-target state disk has a different WWN, `lindm-lab-1` serial and
+1,073,741,824-byte size; the identity-less seed is only 374,784 bytes. Neither
+the seed nor an ESP partition matched the approved tuple.
+
+| Retained diagnostic record or complete approved/candidate list | SHA-256                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu-recovery-sata-diagnostic-02.json`                      | `def75968e75bac8b857321fa29fbeb287c6e367eccef554e1bd9af1aa7c7ba25` |
+| `ubuntu-sata-approved-and-candidates-02.json`                  | `8223d76b60bf0fa87c6d0a051c6e63d78bedb21aabfed78ad30b4933361e72ef` |
+| SATA console `lindm-cloud-init-3749473365.json`                | `f4b65b6cedd8e76547d6ca73aea28275483fbe1b5a730b703781b223b781d005` |
+| `ubuntu-recovery-nvme-diagnostic-02.json`                      | `b3fb401a750f020edeeb604508a93153ff4f08304365f6f9dbc45297af233d61` |
+| `ubuntu-nvme-approved-and-candidates-02.json`                  | `cb6d8e7a3cf753a83c354d3f70646ca6f361639d3b7dd63603fb5eaf1c301767` |
+| NVMe console `lindm-cloud-init-256824549.json`                 | `74d1d153a8edae3661f5b359bbfc01ab512a3d97ed9f4a770c2618f12d3d327e` |
+
+The corrected resolver reads native identity through validated kernel
+major:minor sysfs paths, translates only the SCSI NAA/EUI representation, and
+removes only native-backed trailing serial padding. It rejects conflicting
+sources and still requires exactly one complete approved WWN/serial/size tuple;
+sanitize cannot select a partition. It never chooses by path, serial alone or
+the approval's expected value. Descriptor size and observed native identity are
+rechecked after pinning/exclusive reopen. The independent frozen NVMe identity
+basis, controller, namespace and method-scope checks are unchanged.
+Regressions cover the captured missing-udev tuples, padding, duplicates,
+renumbering/reordered candidates, changed or conflicting identity/size, malformed
+VPD80/device numbers, whole-disk scope, branch-local inheritance and identity
+change after pinning.
+
+Source05, `recovery-time-source-d303cec-05.patch`, has SHA-256
+`a249b98227efdd74daf76f1fbe36c5edafbb691d708f44ac30a74abf813f66de`;
+its adjacent JSON binds all sources, checks and exact embedded-console archive.
+Stamped runner `lab-recovery-identity` has SHA-256
+`688bb13cf5ca0623126aa808855fe1910fcb41791636002dad880d0a1cc0e7d1`,
+and server `lindmd-recovery-identity` has SHA-256
+`a0b8a6f580c1147fa9c58f4bc32ecb1856061daa660d62a8d1f68ee77427795e`.
+Affected actionprovider/recoveryboot/vmlab race suites, Go vet, stamped
+whole-tree build, console build/TypeScript check, changed-console ESLint and
+changed-document Markdown lint passed. Console bundling retained third-party
+`use client` directive warnings; it did not fail or bypass the checks.
+
+**Ubuntu 24.04 original-device recovery SATA and NVMe now pass natively** with
+source05 and the authenticated-time bootstrap. Each retained record proves fresh
+readiness, distinct requester/approver identities, the exact signed recovery UKI
+booted on the original enrolled device, unchanged target identity and protected
+off-target journal, successful server-verified scoped result, closed-image
+poweroff and independent read-only samples of the stopped original disk.
+
+| Passing native record          | SHA-256                                                            | Native result                                                                                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu-recovery-sata-03.json` | `fa2b24daad9e76ca8069e4b80d79e464a07dc364115ad7e50f5cb9b3516a02ee` | Exact 3,758,096,384-byte rotational-emulation overwrite completed; 257 distributed zero-read samples verified. Signed image 38,780,984 bytes; unchanged ESP available 57,928,704.                                                                  |
+| `ubuntu-recovery-nvme-03.json` | `9f076e650acb606477bc0a1e9257604d90405d55ec64cc48a3b19918b9ddab94` | Native NVMe user-data format completed with unchanged basis2 controller-serial/NSID1 scope, 3,758,096,384 bytes and LBA shift9; 257 cache-invalidated samples verified, with every formerly nonzero sample changed. Signed image 39,524,920 bytes. |
+
+The exact signed recovery-image digests are
+`43f49be9a65a32c8f11c8a3e46db99c9941dc48ac6962610fe3b3a1661bc806a`
+(SATA) and
+`748160f9a4cf3d8b043a739c00989cd1ca7b4d617b3087ed045245ce2fb203fa`
+(NVMe). Both independent stopped-disk first/middle/last 4,096-byte samples hash
+to the zero-block SHA-256
+`ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7`.
+These are QEMU/KVM controller and software-TPM qualification results, not ATA
+secure erase, inaccessible/remapped-cell proof, organizational validation or
+physical-media certification. No fallback method was substituted.
+
+Fedora 44 stock is an explicit **unsupported: ESP capacity** capability cell,
+not a sanitize pass. Read-only libguestfs extraction of the pinned cloud image
+measured its unmodified vendor kernel
+`/boot/vmlinuz-6.19.10-300.fc44.x86_64` at **18,479,464 bytes**, SHA-256
+`4b37e4e542a62c580c751787848be6c99e6f908f6712c8c6da85516b8d541de2`.
+The kernel alone exceeds the unchanged ESP's 14,888,960 available bytes by
+3,590,504 bytes, before the stub and initramfs. Its retained configuration has
+SHA-256 `1c0d2e478cdc33747fb3bdd9e332677c517b5791c8cbed0454d22e6e430042d5`
+and already uses `CONFIG_KERNEL_ZSTD=y`; initramfs xz and zstd are supported but
+cannot reduce this separate signed-kernel lower bound.
+`fedora-vendor-kernel-capacity.json`, SHA-256
+`71b98e75098a7fed49322457d7b644455117122ef39d97ff2e5b1e174c598eed`,
+retains the source image digest and arithmetic.
+No ordinary UKI was compacted or replaced, no vendor boot file deleted,
+no ESP resized, and no unqualified alternate kernel introduced.
+The console shows needed/available bytes and the separately qualified on-site
+external-recovery-media alternative, with its boundary documented in the
+[product capability notes](product-specification.md#original-device-sanitize-capability)
+and [operations](security-and-operations.md#3-dangerous-actions).
+
+The source05 Fedora reruns retain exact per-component byte counts and SHA-256
+in `recovery_size_evidence`, including every helper/library/module and the actual
+signed PE section sizes. Both refuse before any sanitize approval or action;
+their `passed=false` records are retained as capability-gated cells, not relabeled
+as successful erasure.
+
+| Capacity-gated native record     | SHA-256                                                            | Signed image / rounded needed / available bytes |
+| -------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
+| `fedora44-recovery-sata-02.json` | `90d08fb2c7ac139e520bdfd0087e62081fcbb2b25031510a5eca4cf6f26ca008` | 43,558,456 / 43,558,912 / 14,888,960            |
+| `fedora44-recovery-nvme-02.json` | `39ee001297527b4d1e762b5a93160956e2b75f6c0ac203dc38f29663f16420cb` | 46,164,024 / 46,166,016 / 14,888,960            |
+
+| Measured component                                | Fedora SATA bytes | Fedora NVMe bytes |
+| ------------------------------------------------- | ----------------: | ----------------: |
+| Unmodified signed kernel                          |        18,479,464 |        18,479,464 |
+| EFI stub input (already included in UKI overhead) |           112,128 |           112,128 |
+| Actual gzip initramfs                             |        24,962,758 |        27,568,297 |
+| UKI overhead, alignment and signature             |           116,234 |           116,263 |
+| Agent ingredient, uncompressed                    |        39,203,057 |        39,203,057 |
+| Busybox ingredient, uncompressed                  |         1,440,888 |         1,440,888 |
+| Method-required helpers, uncompressed             |           189,232 |         1,837,952 |
+| Helper libraries/loader, uncompressed             |        11,847,992 |        15,049,608 |
+| Exact required modules, uncompressed              |         1,068,606 |         2,179,236 |
+| Firmware ingredients                              |                 0 |                 0 |
+
+Only kernel + actual compressed initramfs + UKI overhead sum to the signed-image
+size; uncompressed ingredient counts cannot be added as compressed contributions.
+The closure already excludes unrelated firmware and method-irrelevant helpers
+and modules, retaining signed module bytes unchanged. Kernel/stub/busybox/agent
+digests and configuration/script/module metadata are in each record.
+Retained Fedora SATA diagnostic `lindm-cloud-init-1539785054.json` has SHA-256
+`cd6854af00a58315a42f7d50a5d03b145d93950ccbc5ff412a434e0e85870c73`;
+NVMe diagnostic `lindm-cloud-init-1111728939.json` has SHA-256
+`eb5b7f982bca327d20847ca06d670a57f9f201249de1aa1653862bac3c4ea431`.
+Final summary `recovery-time-final-native-evidence.json` has SHA-256
+`35b6c07f1b11291a972e0d48dd3072d8fe94cd8f0869692f4d808a852e25a7c8`.
+The four final runs used at most two local guests, retained at least
+55,606,804 KiB available memory and zero swap-out delta, and left zero guests.
 
 For encryption-only qualification use `-scenario encryption` and a distinct
 `-record` path. This excludes desktop/network restrictions and destructive erase.

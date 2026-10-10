@@ -1,0 +1,19 @@
+{
+  "id": "almalinux-8.10-20260928-aarch64",
+  "distribution": "almalinux",
+  "version": "8.10",
+  "architecture": "aarch64",
+  "edition": "genericcloud",
+  "release": "8.10-20260928",
+  "imageFilename": "AlmaLinux-8-GenericCloud-8.10-20260928.aarch64.qcow2",
+  "imageUrl": "https://repo.almalinux.org/almalinux/8/cloud/aarch64/images/AlmaLinux-8-GenericCloud-8.10-20260928.aarch64.qcow2",
+  "checksumUrl": "https://repo.almalinux.org/almalinux/8/cloud/aarch64/images/CHECKSUM",
+  "signatureUrl": "https://repo.almalinux.org/almalinux/8/cloud/aarch64/images/CHECKSUM.asc",
+  "keyUrl": "https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux",
+  "sha256": "b5deb2b8c9d19a92b5d8f12cdbdc20d255ed48e397fb5321a7ccf23f854b5a54",
+  "signerFingerprint": "BC5EDDCADF502C077F1582882AE81E8ACED7258B",
+  "imageSizeBytes": "1495138304",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://wiki.almalinux.org/release-notes/8.10.html",
+  "releaseProvenanceUrl": "https://repo.almalinux.org/almalinux/8/cloud/aarch64/images/"
+}

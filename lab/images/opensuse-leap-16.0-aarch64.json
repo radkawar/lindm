@@ -1,0 +1,19 @@
+{
+  "id": "opensuse-leap-16.0-build18.75-aarch64",
+  "distribution": "opensuse-leap",
+  "version": "16.0",
+  "architecture": "aarch64",
+  "edition": "minimal-vm-cloud",
+  "release": "16.0-Build18.75",
+  "imageFilename": "Leap-16.0-Minimal-VM.aarch64-Cloud-Build18.75.qcow2",
+  "imageUrl": "https://fr2.rpmfind.net/linux/opensuse/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.aarch64-Cloud-Build18.75.qcow2",
+  "checksumUrl": "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.aarch64-Cloud-Build18.75.qcow2.sha256",
+  "signatureUrl": "https://download.opensuse.org/distribution/leap/16.0/appliances/Leap-16.0-Minimal-VM.aarch64-Cloud-Build18.75.qcow2.sha256.asc",
+  "keyUrl": "https://download.opensuse.org/distribution/leap/16.0/repo/oss/repodata/repomd.xml.key",
+  "sha256": "bca1bd30a41622eb78727ba9375bff4d99ffaec1aed49bde1efa0ffc96ee58a8",
+  "signerFingerprint": "AD485664E901B867051AB15F35A2F86E29B700A4",
+  "imageSizeBytes": "318963712",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://build.opensuse.org/projects/openSUSE:Leap:16.0/signing_keys",
+  "releaseProvenanceUrl": "https://download.opensuse.org/distribution/leap/16.0/appliances/"
+}

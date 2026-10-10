@@ -584,6 +584,18 @@ func (o vmInventoryOracle) network() (*inventoryv1.NetworkDetails, error) {
 			return nil, errors.New("address truth has no interface")
 		}
 	}
+	ipv4, ipv4Status, err := o.defaultRoutes(false)
+	if err != nil {
+		return nil, err
+	}
+	ipv6, ipv6Status, err := o.defaultRoutes(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, iface := range result.Interfaces {
+		iface.DefaultRouteIpv4 = &inventoryv1.ObservedBool{Status: ipv4Status, Value: ipv4[iface.Name]}
+		iface.DefaultRouteIpv6 = &inventoryv1.ObservedBool{Status: ipv6Status, Value: ipv6[iface.Name]}
+	}
 	return result, nil
 }
 
@@ -706,6 +718,12 @@ func (o vmInventoryOracle) sessions() (*inventoryv1.SessionCounts, error) {
 			return nil, err
 		}
 		*item.target = &inventoryv1.ObservedUint64{Status: status, Value: uint64(len(rows))}
+		if item.target == &result.Sessions {
+			result.ActiveSessions, err = o.activeSessions(rows, status)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	return result, nil
 }

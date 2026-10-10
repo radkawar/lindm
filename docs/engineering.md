@@ -333,8 +333,9 @@ signatures only for legacy OpenStack images, not current per-distribution images
 Unsigned current Debian checksum metadata cannot use this signed mode; no signature,
 trusted fingerprint, or vendor qualification is inferred from HTTPS downloads.
 Debian 12/13 native lanes instead use `lab/images/debian-12-amd64.json` and
-`lab/images/debian-13-amd64.json`, pinned official netinst ISOs authenticated by
-Debian's signed SHA512SUMS. Inspect, lifecycle and dispatch require explicit UEFI
+`lab/images/debian-13-amd64.json`, with separately pinned `debian-12-arm64.json`
+and `debian-13-arm64.json` for native ARM hosts. These are official netinst ISOs
+authenticated by Debian's signed SHA512SUMS. Inspect, lifecycle and dispatch require explicit UEFI
 firmware flags for these manifests. The first run installs an unencrypted ext4
 guest through Debian preseed with signed Debian repository packages, preserving
 vendor EFI/kernel payloads; it never substitutes a direct-kernel boot. Installation
@@ -351,6 +352,20 @@ and repository packages reflect the signed suite at installation time rather tha
 a reproducible snapshot. Each normal run uses a fresh overlay and SSH credentials.
 These maintained paths are not passing Debian lifecycle or physical-validation
 claims until their native commands complete and evidence is recorded.
+The additional `*-aarch64.json` Rocky 9.8/10.2, AlmaLinux 8.10/9.8/10.2 and
+openSUSE Leap 16.0 manifests independently pin official native cloud-image bytes,
+signed checksum metadata and vendor trust anchors. They are not architecture
+aliases for the x86_64 images. Run acquisition and offline verification before
+native ARM KVM qualification with the execution host's pinned AAVMF firmware.
+Neither manifest presence nor a passing x86_64 lane proves the ARM cell.
+
+Native inspection independently observes per-interface default-route membership
+through iproute2's netlink JSON (IPv4 main table, IPv6 all tables), rather than
+reusing the agent's proc-table parser. Active-session truth uses `loginctl`
+properties independently of the agent's `busctl` JSON decoder. Missing optional
+properties retain unavailable status; neither oracle chooses a preferred interface
+or infers session activity from session counts.
+
 The default native VM lane requires accessible KVM, QEMU, `qemu-img` and
 `cloud-localds`. Explicit foreign-architecture runs use QEMU TCG instead; neither
 path changes host security or substitutes container observations for a real guest.
@@ -451,8 +466,12 @@ paths/version refer to the execution host and must match its baseline record.
 Remote runs cross-build static Linux lab/server/agent binaries, rsync source and
 required package inputs into one private run directory, reauthenticate staged
 images before publishing them to the persistent digest cache, and reverify cached
-entries on every use. Build source may be selected with `-build-repo` on lanes
-supporting that flag; remote inspect uses `-repo` for its cross-build source.
+entries on every use. Staged package names remain unchanged inside individually
+numbered directories: native repository pool lookups bind the original basename,
+not just signed payload bytes. Identical names from different inputs cannot collide.
+The remote staging compiler selects its source from `-repo`; use an immutable
+source checkout there with the isolated remote authority, not the mutable shared
+fixture checkout. Local source-building lanes separately support `-build-repo`.
 Never supply a mutable source tree for an evidence run.
 
 Remote dispatch uses real local password/WebAuthn authority instead of an external
@@ -681,6 +700,27 @@ It cannot inject arbitrary kernel arguments. Recovery init binds standard stream
 to `/dev/console` after mounting devtmpfs; otherwise an archive without static
 device nodes can lose the precise init failure before forced poweroff. This adds
 no interactive shell or alternate boot path.
+
+Signed recovery bootstraps time through the pinned recovery origin before
+generating an action-scoped proof. `GetRecoveryTime` signs a fresh nonce/boot-bound
+request digest and PostgreSQL clock value under the current recovery START
+delegation; it is public time information, not enrollment or wipe authority.
+The root/delegation transition chain and protected provisioning-time floor remain
+mandatory. A provisional TLS connection may send only this time request; action
+requests require certificate validity across the subsequently authenticated UTC
+interval, including keepalive connections. Neither local RTC skew nor
+unauthenticated NTP can supply a replacement.
+
+Recovery retains only a process-local, suspend-aware monotonic clock interval.
+The full time-bootstrap round trip is uncertainty, never an allowance added to a
+credential/grant lifetime. Use its lower bound for issued-at and not-before, its
+upper bound for expiry and signed checkpoint receipt time. A missing/invalid
+statement, changed nonce/request/boot/key, delayed/expired bootstrap or monotonic
+rollback refuses execution. Statement expiry limits initial admission; long
+read-only result reconciliation uses monotonic elapsed time, while every new
+effect still requires unexpired delegation, credential and fresh start grant.
+Native qualification must retain the exact signed source/binary/image digests
+and separate original-device SATA and NVMe records on each named distribution.
 
 Before recovery approval, publish the signed UKI through
 `lab release repository publish-artifact -repository DIR -keys OFFLINE_KEYS

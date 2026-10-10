@@ -1,7 +1,9 @@
 package labhost
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,5 +39,74 @@ func TestReturnedEvidenceDoesNotOverwriteExistingRecord(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0600 {
 		t.Fatalf("evidence mode = %v", info.Mode())
+	}
+}
+
+func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
+	root := t.TempDir()
+	name := "lindm-agent_0.7.0_arm64.deb"
+	build := filepath.Join(root, "build", name)
+	repository := filepath.Join(root, "repository")
+	pool := filepath.Join(repository, "pool", "main", "l", "lindm-agent", name)
+	for _, path := range []string{build, pool} {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("unchanged artifact bytes"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stage := &remoteStage{ctx: t.Context(), local: t.TempDir(), remote: t.TempDir(), stderr: io.Discard, copied: make(map[string]string)}
+	stagedBuild, err := stage.input(build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(stagedBuild) != name {
+		t.Fatalf("package basename changed: %s", stagedBuild)
+	}
+	record := filepath.Join(root, "record.json")
+	input := map[string]any{"artifact": map[string]string{"path": build}, "apt": map[string]string{"root": repository}}
+	data, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(record, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	stagedRecord, err := stage.record(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(stagedRecord)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var relocated struct {
+		Artifact struct{ Path string }
+		APT      struct{ Root string }
+	}
+	if err := json.Unmarshal(data, &relocated); err != nil {
+		t.Fatal(err)
+	}
+	// The lifecycle validator derives this path from the artifact basename.
+	poolArtifact := filepath.Join(relocated.APT.Root, "pool", "main", "l", "lindm-agent", filepath.Base(relocated.Artifact.Path))
+	data, err = os.ReadFile(poolArtifact)
+	if err != nil || string(data) != "unchanged artifact bytes" {
+		t.Fatalf("relocated repository artifact unavailable or changed: %q, %v", data, err)
+	}
+	other := filepath.Join(root, "other", name)
+	if err := os.MkdirAll(filepath.Dir(other), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, []byte("distinct artifact"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stagedOther, err := stage.input(other)
+	if err != nil || stagedOther == stagedBuild || filepath.Base(stagedOther) != name {
+		t.Fatalf("same-named inputs collide or lose basename: %s, %v", stagedOther, err)
+	}
+	data, err = os.ReadFile(stagedBuild)
+	if err != nil || string(data) != "unchanged artifact bytes" {
+		t.Fatalf("earlier artifact overwritten: %q, %v", data, err)
 	}
 }

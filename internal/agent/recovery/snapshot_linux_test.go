@@ -21,7 +21,6 @@ import (
 func snapshotFixture(t *testing.T) (SnapshotOptions, *recoveryTestServer, *recoveryTestProvider) {
 	t.Helper()
 	r, server, provider := newRecoveryRunnerFixture(t)
-	r.clock = time.Now
 	r.credential.Handoff.Custody = agentv1.RecoveryCustody_RECOVERY_CUSTODY_TPM
 	envelope, err := r.authority.Sign(t.Context(), r.credential, server.start)
 	if err != nil {
@@ -42,7 +41,7 @@ func snapshotFixture(t *testing.T) (SnapshotOptions, *recoveryTestServer, *recov
 	if err != nil {
 		t.Fatal(err)
 	}
-	return SnapshotOptions{Key: r.key, Bootstrap: server.bootstrap, Client: server, BootID: r.bootID, Initial: initial}, server, provider
+	return SnapshotOptions{Key: r.key, Bootstrap: server.bootstrap, Client: server, BootID: r.bootID, Initial: initial, Clock: &Clock{monotonic: func() (time.Duration, error) { return 0, nil }}}, server, provider
 }
 
 func snapshotBytes(t *testing.T, journal *agentv1.RecoveryJournal) ([]byte, []byte) {

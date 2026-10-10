@@ -12,10 +12,21 @@ export function RecoveryReadinessView({ readiness }: { readiness: RecoveryReadin
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">Recovery readiness</h3>
         <StatusBadge status={readiness?.ready ? "success" : recoveryReadinessTone(reason)}>
-          {readiness?.ready ? "Ready" : "Not ready"}
+          {readiness?.ready
+            ? "Ready"
+            : reason === "device_action_esp_insufficient"
+              ? "Unsupported: ESP capacity"
+              : "Not ready"}
         </StatusBadge>
       </div>
       {!readiness?.ready ? <p className="text-sm">{recoveryReadinessMessage(reason)}</p> : null}
+      {reason === "device_action_esp_insufficient" ? (
+        <p className="text-sm text-muted-foreground">
+          External recovery requires physical access, protected off-target state, exact media
+          revalidation and fresh two-person authorization. It is not remote wipe of a lost or stolen
+          device.
+        </p>
+      ) : null}
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <Fact label="Observed">
           <ObservedTime value={observation?.observedAt} />

@@ -755,6 +755,96 @@ func (x *RecoveryCheckpointReceipt) GetDelegationVersion() uint64 {
 	return 0
 }
 
+// START device.sanitize.v1 signature in a dedicated time-only DSSE domain.
+// The request digest includes nonce, boot and protected trust counters/digests.
+// This statement grants neither device identity nor permission to execute.
+// Expiry bounds bootstrap acceptance only. The process-local monotonic clock may
+// continue for read-only result reconciliation; every effect independently checks
+// current credential, grant and delegation expiry.
+type RecoveryTimeStatement struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId      string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	RequestSha256     []byte                 `protobuf:"bytes,2,opt,name=request_sha256,json=requestSha256,proto3" json:"request_sha256,omitempty"`
+	ServerTime        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=server_time,json=serverTime,proto3" json:"server_time,omitempty"`
+	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	RootVersion       uint64                 `protobuf:"varint,5,opt,name=root_version,json=rootVersion,proto3" json:"root_version,omitempty"`
+	DelegationVersion uint64                 `protobuf:"varint,6,opt,name=delegation_version,json=delegationVersion,proto3" json:"delegation_version,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RecoveryTimeStatement) Reset() {
+	*x = RecoveryTimeStatement{}
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryTimeStatement) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryTimeStatement) ProtoMessage() {}
+
+func (x *RecoveryTimeStatement) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryTimeStatement.ProtoReflect.Descriptor instead.
+func (*RecoveryTimeStatement) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RecoveryTimeStatement) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *RecoveryTimeStatement) GetRequestSha256() []byte {
+	if x != nil {
+		return x.RequestSha256
+	}
+	return nil
+}
+
+func (x *RecoveryTimeStatement) GetServerTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ServerTime
+	}
+	return nil
+}
+
+func (x *RecoveryTimeStatement) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *RecoveryTimeStatement) GetRootVersion() uint64 {
+	if x != nil {
+		return x.RootVersion
+	}
+	return 0
+}
+
+func (x *RecoveryTimeStatement) GetDelegationVersion() uint64 {
+	if x != nil {
+		return x.DelegationVersion
+	}
+	return 0
+}
+
 // Protected off-target journal. Private one-action keys are never serialized here.
 type RecoveryJournal struct {
 	state                     protoimpl.MessageState       `protogen:"open.v1"`
@@ -785,7 +875,7 @@ type RecoveryJournal struct {
 
 func (x *RecoveryJournal) Reset() {
 	*x = RecoveryJournal{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -797,7 +887,7 @@ func (x *RecoveryJournal) String() string {
 func (*RecoveryJournal) ProtoMessage() {}
 
 func (x *RecoveryJournal) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -810,7 +900,7 @@ func (x *RecoveryJournal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryJournal.ProtoReflect.Descriptor instead.
 func (*RecoveryJournal) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RecoveryJournal) GetFormatVersion() uint32 {
@@ -955,7 +1045,7 @@ type PrepareDeviceActionRecoveryRequest struct {
 
 func (x *PrepareDeviceActionRecoveryRequest) Reset() {
 	*x = PrepareDeviceActionRecoveryRequest{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1057,7 @@ func (x *PrepareDeviceActionRecoveryRequest) String() string {
 func (*PrepareDeviceActionRecoveryRequest) ProtoMessage() {}
 
 func (x *PrepareDeviceActionRecoveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1070,7 @@ func (x *PrepareDeviceActionRecoveryRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use PrepareDeviceActionRecoveryRequest.ProtoReflect.Descriptor instead.
 func (*PrepareDeviceActionRecoveryRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PrepareDeviceActionRecoveryRequest) GetIntentEnvelope() []byte {
@@ -1001,7 +1091,7 @@ type PrepareDeviceActionRecoveryResponse struct {
 
 func (x *PrepareDeviceActionRecoveryResponse) Reset() {
 	*x = PrepareDeviceActionRecoveryResponse{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1013,7 +1103,7 @@ func (x *PrepareDeviceActionRecoveryResponse) String() string {
 func (*PrepareDeviceActionRecoveryResponse) ProtoMessage() {}
 
 func (x *PrepareDeviceActionRecoveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1026,7 +1116,7 @@ func (x *PrepareDeviceActionRecoveryResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use PrepareDeviceActionRecoveryResponse.ProtoReflect.Descriptor instead.
 func (*PrepareDeviceActionRecoveryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PrepareDeviceActionRecoveryResponse) GetHandoffProof() []byte {
@@ -1061,7 +1151,7 @@ type CommitDeviceActionRecoveryRequest struct {
 
 func (x *CommitDeviceActionRecoveryRequest) Reset() {
 	*x = CommitDeviceActionRecoveryRequest{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1163,7 @@ func (x *CommitDeviceActionRecoveryRequest) String() string {
 func (*CommitDeviceActionRecoveryRequest) ProtoMessage() {}
 
 func (x *CommitDeviceActionRecoveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1176,7 @@ func (x *CommitDeviceActionRecoveryRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CommitDeviceActionRecoveryRequest.ProtoReflect.Descriptor instead.
 func (*CommitDeviceActionRecoveryRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CommitDeviceActionRecoveryRequest) GetActionId() string {
@@ -1119,7 +1209,7 @@ type CommitDeviceActionRecoveryResponse struct {
 
 func (x *CommitDeviceActionRecoveryResponse) Reset() {
 	*x = CommitDeviceActionRecoveryResponse{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1131,7 +1221,7 @@ func (x *CommitDeviceActionRecoveryResponse) String() string {
 func (*CommitDeviceActionRecoveryResponse) ProtoMessage() {}
 
 func (x *CommitDeviceActionRecoveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1144,7 +1234,7 @@ func (x *CommitDeviceActionRecoveryResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CommitDeviceActionRecoveryResponse.ProtoReflect.Descriptor instead.
 func (*CommitDeviceActionRecoveryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{10}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CommitDeviceActionRecoveryResponse) GetStatus() *DeviceActionStatus {
@@ -1177,7 +1267,7 @@ type TPMRecoveryCheckpoint struct {
 
 func (x *TPMRecoveryCheckpoint) Reset() {
 	*x = TPMRecoveryCheckpoint{}
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1189,7 +1279,7 @@ func (x *TPMRecoveryCheckpoint) String() string {
 func (*TPMRecoveryCheckpoint) ProtoMessage() {}
 
 func (x *TPMRecoveryCheckpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_device_action_recovery_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1202,7 +1292,7 @@ func (x *TPMRecoveryCheckpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TPMRecoveryCheckpoint.ProtoReflect.Descriptor instead.
 func (*TPMRecoveryCheckpoint) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{11}
+	return file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TPMRecoveryCheckpoint) GetFormatVersion() uint32 {
@@ -1349,7 +1439,17 @@ const file_lindm_agent_v1_device_action_recovery_proto_rawDesc = "" +
 	"\x11checkpoint_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x10checkpointSha256\x12?\n" +
 	"\tstored_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bstoredAt\x12*\n" +
 	"\froot_version\x18\x06 \x01(\x04B\a\xbaH\x042\x02 \x00R\vrootVersion\x126\n" +
-	"\x12delegation_version\x18\a \x01(\x04B\a\xbaH\x042\x02 \x00R\x11delegationVersion\"\xaf\n" +
+	"\x12delegation_version\x18\a \x01(\x04B\a\xbaH\x042\x02 \x00R\x11delegationVersion\"\xbd\x04\n" +
+	"\x15RecoveryTimeStatement\x12S\n" +
+	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12.\n" +
+	"\x0erequest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\rrequestSha256\x12C\n" +
+	"\vserver_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"serverTime\x12A\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12*\n" +
+	"\froot_version\x18\x05 \x01(\x04B\a\xbaH\x042\x02 \x00R\vrootVersion\x126\n" +
+	"\x12delegation_version\x18\x06 \x01(\x04B\a\xbaH\x042\x02 \x00R\x11delegationVersion:\xb2\x01\xbaH\xae\x01\x1a\xab\x01\n" +
+	"\x16recovery_time.validity\x124recovery time statement lasts at most thirty seconds\x1a[this.expires_at > this.server_time && this.expires_at - this.server_time <= duration('30s')\"\xaf\n" +
 	"\n" +
 	"\x0fRecoveryJournal\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x12<\n" +
@@ -1434,7 +1534,7 @@ func file_lindm_agent_v1_device_action_recovery_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_device_action_recovery_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lindm_agent_v1_device_action_recovery_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_lindm_agent_v1_device_action_recovery_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_lindm_agent_v1_device_action_recovery_proto_goTypes = []any{
 	(RecoveryCustody)(0),                        // 0: lindm.agent.v1.RecoveryCustody
 	(RecoveryOperation)(0),                      // 1: lindm.agent.v1.RecoveryOperation
@@ -1445,57 +1545,60 @@ var file_lindm_agent_v1_device_action_recovery_proto_goTypes = []any{
 	(*RecoveryRequestProof)(nil),                // 6: lindm.agent.v1.RecoveryRequestProof
 	(*RecoveryCheckpoint)(nil),                  // 7: lindm.agent.v1.RecoveryCheckpoint
 	(*RecoveryCheckpointReceipt)(nil),           // 8: lindm.agent.v1.RecoveryCheckpointReceipt
-	(*RecoveryJournal)(nil),                     // 9: lindm.agent.v1.RecoveryJournal
-	(*PrepareDeviceActionRecoveryRequest)(nil),  // 10: lindm.agent.v1.PrepareDeviceActionRecoveryRequest
-	(*PrepareDeviceActionRecoveryResponse)(nil), // 11: lindm.agent.v1.PrepareDeviceActionRecoveryResponse
-	(*CommitDeviceActionRecoveryRequest)(nil),   // 12: lindm.agent.v1.CommitDeviceActionRecoveryRequest
-	(*CommitDeviceActionRecoveryResponse)(nil),  // 13: lindm.agent.v1.CommitDeviceActionRecoveryResponse
-	(*TPMRecoveryCheckpoint)(nil),               // 14: lindm.agent.v1.TPMRecoveryCheckpoint
-	(*DeviceActionIntent)(nil),                  // 15: lindm.agent.v1.DeviceActionIntent
-	(*timestamppb.Timestamp)(nil),               // 16: google.protobuf.Timestamp
-	(*DeviceActionChallenge)(nil),               // 17: lindm.agent.v1.DeviceActionChallenge
-	(*DeviceActionStartGrant)(nil),              // 18: lindm.agent.v1.DeviceActionStartGrant
-	(*ExecutionRoot)(nil),                       // 19: lindm.agent.v1.ExecutionRoot
-	(*DeviceActionVerification)(nil),            // 20: lindm.agent.v1.DeviceActionVerification
-	(DeviceActionState)(0),                      // 21: lindm.agent.v1.DeviceActionState
-	(DeviceActionFailure)(0),                    // 22: lindm.agent.v1.DeviceActionFailure
-	(*DeviceActionStatus)(nil),                  // 23: lindm.agent.v1.DeviceActionStatus
+	(*RecoveryTimeStatement)(nil),               // 9: lindm.agent.v1.RecoveryTimeStatement
+	(*RecoveryJournal)(nil),                     // 10: lindm.agent.v1.RecoveryJournal
+	(*PrepareDeviceActionRecoveryRequest)(nil),  // 11: lindm.agent.v1.PrepareDeviceActionRecoveryRequest
+	(*PrepareDeviceActionRecoveryResponse)(nil), // 12: lindm.agent.v1.PrepareDeviceActionRecoveryResponse
+	(*CommitDeviceActionRecoveryRequest)(nil),   // 13: lindm.agent.v1.CommitDeviceActionRecoveryRequest
+	(*CommitDeviceActionRecoveryResponse)(nil),  // 14: lindm.agent.v1.CommitDeviceActionRecoveryResponse
+	(*TPMRecoveryCheckpoint)(nil),               // 15: lindm.agent.v1.TPMRecoveryCheckpoint
+	(*DeviceActionIntent)(nil),                  // 16: lindm.agent.v1.DeviceActionIntent
+	(*timestamppb.Timestamp)(nil),               // 17: google.protobuf.Timestamp
+	(*DeviceActionChallenge)(nil),               // 18: lindm.agent.v1.DeviceActionChallenge
+	(*DeviceActionStartGrant)(nil),              // 19: lindm.agent.v1.DeviceActionStartGrant
+	(*ExecutionRoot)(nil),                       // 20: lindm.agent.v1.ExecutionRoot
+	(*DeviceActionVerification)(nil),            // 21: lindm.agent.v1.DeviceActionVerification
+	(DeviceActionState)(0),                      // 22: lindm.agent.v1.DeviceActionState
+	(DeviceActionFailure)(0),                    // 23: lindm.agent.v1.DeviceActionFailure
+	(*DeviceActionStatus)(nil),                  // 24: lindm.agent.v1.DeviceActionStatus
 }
 var file_lindm_agent_v1_device_action_recovery_proto_depIdxs = []int32{
-	15, // 0: lindm.agent.v1.DeviceActionRecoveryHandoff.intent:type_name -> lindm.agent.v1.DeviceActionIntent
-	16, // 1: lindm.agent.v1.DeviceActionRecoveryHandoff.expires_at:type_name -> google.protobuf.Timestamp
+	16, // 0: lindm.agent.v1.DeviceActionRecoveryHandoff.intent:type_name -> lindm.agent.v1.DeviceActionIntent
+	17, // 1: lindm.agent.v1.DeviceActionRecoveryHandoff.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: lindm.agent.v1.DeviceActionRecoveryHandoff.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	17, // 3: lindm.agent.v1.DeviceActionRecoveryHandoff.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	18, // 3: lindm.agent.v1.DeviceActionRecoveryHandoff.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
 	3,  // 4: lindm.agent.v1.DeviceActionRecoveryCredential.handoff:type_name -> lindm.agent.v1.DeviceActionRecoveryHandoff
-	16, // 5: lindm.agent.v1.DeviceActionRecoveryCredential.issued_at:type_name -> google.protobuf.Timestamp
-	16, // 6: lindm.agent.v1.DeviceActionRecoveryCredential.expires_at:type_name -> google.protobuf.Timestamp
-	18, // 7: lindm.agent.v1.DeviceActionRecoveryBootGrant.grant:type_name -> lindm.agent.v1.DeviceActionStartGrant
+	17, // 5: lindm.agent.v1.DeviceActionRecoveryCredential.issued_at:type_name -> google.protobuf.Timestamp
+	17, // 6: lindm.agent.v1.DeviceActionRecoveryCredential.expires_at:type_name -> google.protobuf.Timestamp
+	19, // 7: lindm.agent.v1.DeviceActionRecoveryBootGrant.grant:type_name -> lindm.agent.v1.DeviceActionStartGrant
 	1,  // 8: lindm.agent.v1.RecoveryRequestProof.operation:type_name -> lindm.agent.v1.RecoveryOperation
-	16, // 9: lindm.agent.v1.RecoveryRequestProof.issued_at:type_name -> google.protobuf.Timestamp
-	16, // 10: lindm.agent.v1.RecoveryRequestProof.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 9: lindm.agent.v1.RecoveryRequestProof.issued_at:type_name -> google.protobuf.Timestamp
+	17, // 10: lindm.agent.v1.RecoveryRequestProof.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 11: lindm.agent.v1.RecoveryCheckpoint.phase:type_name -> lindm.agent.v1.RecoveryPhase
-	16, // 12: lindm.agent.v1.RecoveryCheckpoint.at:type_name -> google.protobuf.Timestamp
-	16, // 13: lindm.agent.v1.RecoveryCheckpointReceipt.stored_at:type_name -> google.protobuf.Timestamp
-	19, // 14: lindm.agent.v1.RecoveryJournal.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
-	3,  // 15: lindm.agent.v1.RecoveryJournal.handoff:type_name -> lindm.agent.v1.DeviceActionRecoveryHandoff
-	7,  // 16: lindm.agent.v1.RecoveryJournal.checkpoint:type_name -> lindm.agent.v1.RecoveryCheckpoint
-	20, // 17: lindm.agent.v1.RecoveryJournal.verification:type_name -> lindm.agent.v1.DeviceActionVerification
-	21, // 18: lindm.agent.v1.RecoveryJournal.state:type_name -> lindm.agent.v1.DeviceActionState
-	17, // 19: lindm.agent.v1.RecoveryJournal.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
-	16, // 20: lindm.agent.v1.RecoveryJournal.started_at:type_name -> google.protobuf.Timestamp
-	16, // 21: lindm.agent.v1.RecoveryJournal.completed_at:type_name -> google.protobuf.Timestamp
-	22, // 22: lindm.agent.v1.RecoveryJournal.failure:type_name -> lindm.agent.v1.DeviceActionFailure
-	16, // 23: lindm.agent.v1.RecoveryJournal.accepted_at:type_name -> google.protobuf.Timestamp
-	19, // 24: lindm.agent.v1.RecoveryJournal.credential_root:type_name -> lindm.agent.v1.ExecutionRoot
-	16, // 25: lindm.agent.v1.RecoveryJournal.trust_accepted_at:type_name -> google.protobuf.Timestamp
-	23, // 26: lindm.agent.v1.PrepareDeviceActionRecoveryResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	23, // 27: lindm.agent.v1.CommitDeviceActionRecoveryResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	2,  // 28: lindm.agent.v1.TPMRecoveryCheckpoint.phase:type_name -> lindm.agent.v1.RecoveryPhase
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	17, // 12: lindm.agent.v1.RecoveryCheckpoint.at:type_name -> google.protobuf.Timestamp
+	17, // 13: lindm.agent.v1.RecoveryCheckpointReceipt.stored_at:type_name -> google.protobuf.Timestamp
+	17, // 14: lindm.agent.v1.RecoveryTimeStatement.server_time:type_name -> google.protobuf.Timestamp
+	17, // 15: lindm.agent.v1.RecoveryTimeStatement.expires_at:type_name -> google.protobuf.Timestamp
+	20, // 16: lindm.agent.v1.RecoveryJournal.accepted_root:type_name -> lindm.agent.v1.ExecutionRoot
+	3,  // 17: lindm.agent.v1.RecoveryJournal.handoff:type_name -> lindm.agent.v1.DeviceActionRecoveryHandoff
+	7,  // 18: lindm.agent.v1.RecoveryJournal.checkpoint:type_name -> lindm.agent.v1.RecoveryCheckpoint
+	21, // 19: lindm.agent.v1.RecoveryJournal.verification:type_name -> lindm.agent.v1.DeviceActionVerification
+	22, // 20: lindm.agent.v1.RecoveryJournal.state:type_name -> lindm.agent.v1.DeviceActionState
+	18, // 21: lindm.agent.v1.RecoveryJournal.challenge:type_name -> lindm.agent.v1.DeviceActionChallenge
+	17, // 22: lindm.agent.v1.RecoveryJournal.started_at:type_name -> google.protobuf.Timestamp
+	17, // 23: lindm.agent.v1.RecoveryJournal.completed_at:type_name -> google.protobuf.Timestamp
+	23, // 24: lindm.agent.v1.RecoveryJournal.failure:type_name -> lindm.agent.v1.DeviceActionFailure
+	17, // 25: lindm.agent.v1.RecoveryJournal.accepted_at:type_name -> google.protobuf.Timestamp
+	20, // 26: lindm.agent.v1.RecoveryJournal.credential_root:type_name -> lindm.agent.v1.ExecutionRoot
+	17, // 27: lindm.agent.v1.RecoveryJournal.trust_accepted_at:type_name -> google.protobuf.Timestamp
+	24, // 28: lindm.agent.v1.PrepareDeviceActionRecoveryResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	24, // 29: lindm.agent.v1.CommitDeviceActionRecoveryResponse.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	2,  // 30: lindm.agent.v1.TPMRecoveryCheckpoint.phase:type_name -> lindm.agent.v1.RecoveryPhase
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_device_action_recovery_proto_init() }
@@ -1511,7 +1614,7 @@ func file_lindm_agent_v1_device_action_recovery_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_device_action_recovery_proto_rawDesc), len(file_lindm_agent_v1_device_action_recovery_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
