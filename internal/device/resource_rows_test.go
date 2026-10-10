@@ -90,7 +90,7 @@ func TestQualifiedKindsAdmitOnlyExercisedOwnership(t *testing.T) {
 				item := qualifiedServiceResource()
 				item.Desired.Ref.Kind = kind
 				item.Ownership = &resourcev1.OwnershipPolicy{Mode: mode, Release: release}
-				exercised := slices.Contains(qualification.releases, release) && (mode == resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY || qualification.adoption)
+				exercised := slices.Contains(qualification.releases, release) && slices.Contains(qualification.modes, mode)
 				if got := resourceDispatchUnsupported(item); (got == "") != exercised || (!exercised && got != resourceOwnershipUnavailable) {
 					t.Errorf("kind %s mode %s release %s: %q", kind, mode, release, got)
 				}

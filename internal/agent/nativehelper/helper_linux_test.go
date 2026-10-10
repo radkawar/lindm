@@ -94,7 +94,8 @@ func TestPackageUnitsDoNotWidenExecutorOrDownloadDuringApply(t *testing.T) {
 		for _, property := range properties {
 			values[property.Name] = property.Value.Value()
 		}
-		if values["Restart"] != "no" || values["ProtectSystem"] != "strict" || values["PrivateDevices"] != true || values["NoNewPrivileges"] != true {
+		// Package scriptlets need SELinux domain transitions during apply.
+		if values["Restart"] != "no" || values["ProtectSystem"] != "strict" || values["PrivateDevices"] != true || values["NoNewPrivileges"] != (phase == "prepare") {
 			t.Fatalf("unsafe package helper confinement for %s", phase)
 		}
 		command := unitValue[[]unitExec](t, values, "ExecStart")

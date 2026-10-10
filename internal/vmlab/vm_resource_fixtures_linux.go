@@ -35,7 +35,9 @@ cd /var/lib/lindm-resource-lab
 . /etc/os-release
 case "$ID:$VERSION_ID" in
  ubuntu:24.04) apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y dpkg-dev apt-utils gnupg openssl python3 attr curl ;;
- fedora:44) dnf5 install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 python3-libdnf5 attr curl ;;
+ fedora:44) dnf5 install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 python3-libdnf5 attr curl
+  # The provider requires the maintained DNF5 (>= 5.4.6.0) release update.
+  dnf5 upgrade -y dnf5 libdnf5 libdnf5-cli python3-libdnf5 ;;
  *) echo 'resource lane requires Ubuntu 24.04 or Fedora 44' >&2; exit 1 ;;
 esac
 case "$ID" in
@@ -47,6 +49,9 @@ export GNUPGHOME="$PWD/gnupg"
 gpg --batch --pinentry-mode loopback --passphrase '' --quick-generate-key 'Disposable resource repository <resource@invalid>' rsa3072 sign 1d
 gpg --batch --armor --export > repository.asc
 gpg --batch --export > repository.gpg
+# Root provisions the approved signer into system RPM trust; the provider
+# refuses RPM sources whose key is absent there.
+if [ "$ID" = fedora ]; then rpmkeys --import repository.asc; fi
 gpg --batch --with-colons --list-keys > keys.colons
 mkdir -m 0700 wrong-gnupg
 gpg --homedir "$PWD/wrong-gnupg" --batch --pinentry-mode loopback --passphrase '' --quick-generate-key 'Wrong disposable signer <wrong@invalid>' rsa3072 sign 1d

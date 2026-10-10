@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,7 +38,7 @@ func CreationMetadata(ctx context.Context, target *agentv1.ResourceOwnershipSnap
 	if err := noDefaultACL(c.parent()); err != nil {
 		return err
 	}
-	target.ManagedFileXattrs, err = CreationXattrs(ctx, o.GetPath(), o.GetFile().GetMode())
+	target.ManagedFileXattrs, err = CreationXattrs(ctx, o.GetPath())
 	if err != nil {
 		return err
 	}
@@ -49,8 +48,8 @@ func CreationMetadata(ctx context.Context, target *agentv1.ResourceOwnershipSnap
 
 // CreationXattrs is read-only native label derivation for providers that own
 // exact parent creation. It does not approve ancestry, ACLs, or any write.
-func CreationXattrs(ctx context.Context, path string, mode uint32) ([]*agentv1.NativeFileXattr, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" || strings.ContainsAny(path, "\x00\r\n") || mode&^uint32(0777) != 0 {
+func CreationXattrs(ctx context.Context, path string) ([]*agentv1.NativeFileXattr, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" || strings.ContainsAny(path, "\x00\r\n") {
 		return nil, ErrUnsafePath
 	}
 	_, err := os.Stat("/sys/fs/selinux/enforce")
@@ -76,7 +75,8 @@ func CreationXattrs(ctx context.Context, path string, mode uint32) ([]*agentv1.N
 	}
 	lookup, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	command := exec.CommandContext(lookup, program, "-n", "-m", strconv.FormatUint(uint64(unix.S_IFREG|mode), 8), "--", path)
+	// matchpathcon -m takes a file class name, not a numeric mode.
+	command := exec.CommandContext(lookup, program, "-n", "-m", "file", "--", path)
 	command.Env = []string{"LANG=C", "LC_ALL=C", "PATH=/usr/sbin:/usr/bin"}
 	command.Dir = "/"
 	command.WaitDelay = time.Second

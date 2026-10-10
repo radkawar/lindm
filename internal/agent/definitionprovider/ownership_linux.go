@@ -126,7 +126,7 @@ func targetImage(ctx context.Context, desired *resourcev1.ResourceDesiredState, 
 	if !before.GetDefinitionFile().GetState().GetExists() {
 		// Parent custody (or the exact absent-parent/grandparent evidence) was
 		// already captured. Resolve the final path's native label before gating.
-		f.Xattrs, err = nativefile.CreationXattrs(ctx, f.State.GetPath(), 0644)
+		f.Xattrs, err = nativefile.CreationXattrs(ctx, f.State.GetPath())
 		if err != nil {
 			return nil, err
 		}

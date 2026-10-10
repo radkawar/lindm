@@ -75,7 +75,9 @@ func openCustody(path string) (_ *custody, err error) {
 		if i == len(parts) || parts[i] == "" {
 			break
 		}
-		fd, err = unix.Openat2(fd, parts[i], &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC | unix.O_NOFOLLOW, Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS})
+		// systemd RestrictSUIDSGID= fails openat2 with ENOSYS. A single clean
+		// component opened with O_NOFOLLOW cannot escape or follow a link.
+		fd, err = unix.Openat(fd, parts[i], unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 		if err != nil {
 			return nil, fmt.Errorf("open protected ancestor: %w", err)
 		}
@@ -86,7 +88,7 @@ func openCustody(path string) (_ *custody, err error) {
 		_, _ = fmt.Fprintf(h, "%d:%d:%d:%d:%d;", st.Dev, st.Ino, st.Uid, st.Gid, st.Mode)
 	}
 	c.ancestry = h.Sum(nil)
-	fd, err = unix.Openat2(c.parent(), c.name, &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_NONBLOCK | unix.O_CLOEXEC | unix.O_NOFOLLOW, Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS | unix.RESOLVE_NO_XDEV})
+	fd, err = unix.Openat(c.parent(), c.name, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if errors.Is(err, unix.ENOENT) {
 		return c, nil
 	}
@@ -97,20 +99,25 @@ func openCustody(path string) (_ *custody, err error) {
 	if err = unix.Fstat(fd, &c.stat); err != nil {
 		return nil, err
 	}
-	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Nlink != 1 || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent {
+	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Nlink != 1 || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent || c.stat.Dev != c.stats[len(c.stats)-1].Dev {
 		return nil, ErrUnsafePath
 	}
 	// Replacing immutable, append-only, verity, encrypted or other special files
-	// would discard semantics. Extents are a filesystem allocation detail only.
+	// would discard semantics. Extents (ext4) and compression or copy-on-write
+	// state (btrfs) are filesystem allocation details only.
 	flags, err := unix.IoctlGetInt(fd, unix.FS_IOC_GETFLAGS)
 	if err != nil {
 		return nil, fmt.Errorf("read native file flags: %w", err)
 	}
-	if flags & ^0x80000 != 0 {
-		return nil, fmt.Errorf("%w: native file flags", ErrUnsupported)
+	if flags&^storageOnlyFlags != 0 {
+		return nil, fmt.Errorf("%w: native file flags %#x", ErrUnsupported, flags)
 	}
 	return c, nil
 }
+
+// storageOnlyFlags are FS_COMPR_FL, FS_NOCOMP_FL, FS_EXTENT_FL and FS_NOCOW_FL.
+const storageOnlyFlags = 0x4 | 0x400 | 0x80000 | 0x800000
+
 func (c *custody) parent() int { return c.dirs[len(c.dirs)-1] }
 func (c *custody) close() error {
 	var result error

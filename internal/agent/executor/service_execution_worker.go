@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -240,6 +241,11 @@ func (s *Service) finishResourceAction(actionID string, result *resourcev1.Resou
 		// A higher sequence or a concurrent read may already have expired or
 		// superseded this queued action. Never overwrite its terminal evidence.
 		return
+	}
+	if operationErr != nil {
+		// The signed status carries only the typed failure; the local journal
+		// keeps the provider error for the device administrator.
+		slog.Warn("resource execution failed", "action_id", actionID, "state", state.String(), "error", operationErr)
 	}
 	next := proto.CloneOf(record)
 	next.CompletedAt = protoTimestamp(s.now())

@@ -264,7 +264,7 @@ func nativeCommands(r *agentv1.NativeResourceTransactionRequest, db *localDB) ([
 		old, u := before.GetLocalUser(), target.GetLocalUser()
 		switch {
 		case !old.GetExists() && u.GetExists():
-			appendCommand("useradd", "--no-create-home", "--no-user-group", "--no-log-init", "-K", "CREATE_MAIL_SPOOL=no", "--uid", decimal(u.GetUid()), "--gid", decimal(u.GetGid()), "--home-dir", u.GetHome().GetPath(), "--shell", u.GetShell(), "--password", "!", "--inactive", "-1", "--expiredate", "", "--", name)
+			appendCommand("useradd", "--no-create-home", "--no-user-group", "--no-log-init", "--uid", decimal(u.GetUid()), "--gid", decimal(u.GetGid()), "--home-dir", u.GetHome().GetPath(), "--shell", u.GetShell(), "--password", "!", "--inactive", "-1", "--expiredate", "", "--", name)
 		case old.GetExists() && !u.GetExists():
 			if db.groups[name] != nil {
 				return nil, fmt.Errorf("%w: userdel could remove an unrelated private group", ErrUnsafe)

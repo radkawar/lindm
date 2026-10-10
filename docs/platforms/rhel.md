@@ -132,6 +132,9 @@ and under-investigation distinctions
 ([normalization](../../internal/advisory/feed/redhat_claims.go),
 [product policy](../../internal/advisory/feed/redhat.go)).
 An individual advisory or legacy VEX is not complete coverage.
+RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
+they neither match records nor make architecture coverage UNKNOWN
+([Fedora advisory feeds](fedora.md#advisory-feeds)).
 Product CPE applicability is established before applying advisory metadata policy,
 so historical off-scope informational notices cannot poison a selected host feed.
 Applicable final `csaf_informational_advisory` documents contribute no claims only

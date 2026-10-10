@@ -182,12 +182,15 @@ sanitize ([target construction](../../internal/device/storage_targets.go#L111),
 
 ## Resource providers
 
-The agent executes only generic signed resource intents. Systemd service is
-dispatched; the post-cutover 24.04 aarch64 connected dispatch lane passed (see
-[verification](../verification.md#generic-resource-executor-cutover-phase-2)).
-Every other kind has an agent provider but is dispatched only after the server's
-per-kind qualification table lists it with native Ubuntu 24.04 and Fedora 44
-records; until then its assignments show `resource_executor_not_available`.
+The agent executes only generic signed resource intents. The server dispatches
+a kind only when its per-kind qualification table lists it with native Ubuntu
+24.04 and Fedora 44 records (see
+[verification](../verification.md#generic-resource-executor-cutover-phase-2)):
+systemd services, native packages, managed files, local groups and users,
+sysctl, systemd timers and drop-ins, password policy, encryption compliance and firewall zones are
+dispatched; other kinds show
+`resource_executor_not_available`. The 24.04 records are aarch64 cloud-image
+guests.
 
 Native mechanisms on Ubuntu: packages use apt/dpkg in asynchronously staged
 transient units with an owned `/etc/apt/preferences.d/lindm-*` exact-version
@@ -196,6 +199,29 @@ pin; password policy uses owned `pam-auth-update` profiles and requires the
 owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
+
+Firewall zones are a dedicated `inet lindm_z_<zone>` nftables table written over
+netlink at priority 10 (the agent does not run the `nft` CLI). Native records for
+the two-guest lane exist (see
+[verification](../verification.md#generic-resource-executor-cutover-phase-2));
+dispatch still follows the server qualification table. Root provisioning is
+required on the device: `executor.json` `firewall_provider` (approved data
+interface by permanent MAC plus kernel name, and the probe peers' HTTPS control
+endpoints as management endpoints) and `connectivity_guard` (4–32 identical
+dual-stack allow/deny probe targets and the controller's execution start public
+key), `systemctl enable lindm-firewall-restore.service`,
+`systemctl enable --now lindm-connectivity-guard.service`, then an executor
+restart. The server's `connectivity_probes` must equal the device targets, and a
+dedicated unenrolled peer runs `lindm-connectivity-probe.service` with a TLS leaf
+from the enrollment transport CA. Probe targets are static root policy, so a
+zone released to absence still needs an independent deny for each DENY target;
+the lab uses its own priority-100 table that drops only those exact tuples. The
+24.04 cloud image has UFW installed but inactive; coexistence with an active UFW
+ruleset is not exercised. Native findings: `/proc/1/ns/net` is ptrace-gated for
+the capability-bounded helper, guard and restore units, so the host-namespace
+check compares per-namespace `/proc/<pid>/net/dev` entries; the 6.8 kernel reads
+back boolean bitwise expressions with an explicit `NFTA_BITWISE_OP=0`, which the
+expression digest normalizes.
 
 ## Device actions
 

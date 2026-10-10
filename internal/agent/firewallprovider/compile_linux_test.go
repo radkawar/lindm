@@ -212,6 +212,54 @@ func TestUnknownExpressionAndAttributeCannotDisappear(t *testing.T) {
 		t.Fatal("unmodelled expression attribute disappeared")
 	}
 }
+
+// Kernels reading back a boolean bitwise add NFTA_BITWISE_OP=0 and drop the
+// nested flags. The canonical digest must equal the compiled expression's;
+// otherwise every applied ruleset with a mask reads back as foreign (seen on
+// Ubuntu 24.04 6.8 and Fedora 44 6.19 guests: outcome unknown after apply).
+func TestKernelBitwiseReadbackMatchesCompiledDigest(t *testing.T) {
+	compiled, err := expr.Marshal(unix.NFPROTO_INET, &expr.Bitwise{SourceRegister: 1, DestRegister: 1, Len: 4, Mask: []byte{0xff, 0xff, 0xff, 0}, Xor: []byte{0, 0, 0, 0}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := func(element []byte) []byte {
+		t.Helper()
+		data, err := netlink.MarshalAttributes([]netlink.Attribute{{Type: unix.NLA_F_NESTED | unix.NFTA_LIST_ELEM, Data: element}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	want, err := expressionDigest(list(compiled))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nested := func(attrs []netlink.Attribute) []byte {
+		t.Helper()
+		data, err := netlink.MarshalAttributes(attrs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	u32 := func(v uint32) []byte { return binary.BigEndian.AppendUint32(nil, v) }
+	kernel := nested([]netlink.Attribute{
+		{Type: unix.NFTA_EXPR_NAME, Data: []byte("bitwise\x00")},
+		{Type: unix.NFTA_EXPR_DATA, Data: nested([]netlink.Attribute{
+			{Type: unix.NFTA_BITWISE_SREG, Data: u32(1)}, {Type: unix.NFTA_BITWISE_DREG, Data: u32(1)}, {Type: unix.NFTA_BITWISE_LEN, Data: u32(4)},
+			{Type: bitwiseOp, Data: u32(0)},
+			{Type: unix.NFTA_BITWISE_MASK, Data: nested([]netlink.Attribute{{Type: unix.NFTA_DATA_VALUE, Data: []byte{0xff, 0xff, 0xff, 0}}})},
+			{Type: unix.NFTA_BITWISE_XOR, Data: nested([]netlink.Attribute{{Type: unix.NFTA_DATA_VALUE, Data: []byte{0, 0, 0, 0}}})},
+		})},
+	})
+	got, err := expressionDigest(list(kernel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("kernel boolean bitwise read-back digests differently from the compiled expression")
+	}
+}
 func TestReplacementNeverFlushesUnmanagedObjects(t *testing.T) {
 	state, config := compilerFixture(t)
 	compiled, err := compile(state, config)

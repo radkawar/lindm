@@ -27,7 +27,7 @@ func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer
 	diagnostics := flags.String("diagnostics", "", "existing private failure diagnostics directory")
 	record := flags.String("record", "", "new private evidence file with per-kind outcomes and SHA256 native records")
 	localAuthority := flags.Bool("local-authority", false, "isolated local password/WebAuthn authority instead of Keycloak")
-	kinds := flags.String("kinds", "packages,files", "connected kind groups: packages,files,accounts,sysctl,definitions,password")
+	kinds := flags.String("kinds", "packages,files", "connected kind groups: packages,files,accounts,sysctl,definitions,password,firewall (firewall boots a second probe-peer guest)")
 	phase := flags.String("phase", "executor", "executor: signed native bootstrap without profile gate bypass; connected: real server assignment/release after qualification")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {

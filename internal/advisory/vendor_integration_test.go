@@ -75,7 +75,7 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 				if test.distro == "rhel" {
 					seedRHELPlatform(t, pool, id, test.release, test.stream)
 				}
-				out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+				out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -106,7 +106,7 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 				p.Module.Stream = "20"
 				id := seedInventory(t, pool, test.distro, test.release, p)
 				seedRHELPlatform(t, pool, id, test.release, test.stream)
-				out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+				out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 				if err != nil || len(out.GetFindings()) != 0 {
 					t.Fatalf("another module stream inherited an advisory: %v %v", out, err)
 				}
@@ -123,7 +123,7 @@ func TestAdvisoryDebianUndeterminedRemainsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := seedInventory(t, pool, "debian", "12", &inventoryv1.Package{Name: "libjs-angularjs", Version: "1.8.3-1+deb12u1", Architecture: "all", Manager: "dpkg", SourceName: "angular.js", SourceVersion: "1.8.3-1+deb12u1"})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,8 +150,8 @@ func TestAdvisorySignedSnapshotAgeAndManifestPersist(t *testing.T) {
 		t.Fatalf("signed source freshness/provenance lost: %v", status)
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
-	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_stale_or_changed" {
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_stale" {
 		t.Fatalf("recent fetch renewed an old signed snapshot: %v %v", out, err)
 	}
 }
@@ -217,7 +217,7 @@ func TestAdvisoryArchAbsentVersionIsNativeRollingEvidence(t *testing.T) {
 			if test.stale {
 				mustExec(t, t.Context(), pool, "UPDATE host_observations SET started_at=now()-interval '48 hours',finished_at=now()-interval '48 hours' WHERE generation_id=(SELECT current_generation_id FROM devices WHERE id=$1)", id)
 			}
-			out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+			out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 			if err != nil {
 				t.Fatal(err)
 			}

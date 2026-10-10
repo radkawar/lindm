@@ -58,7 +58,9 @@ func expressionDigest(raw []byte) ([]byte, error) {
 			} else if kind != unix.NFTA_EXPR_NAME {
 				return nil, ErrUnsupported
 			}
-			fields[i].Type = kind
+			// MarshalAttributes keeps a decoded nonzero Length: a dropped
+			// default attribute would otherwise leave a stale header length.
+			fields[i].Type, fields[i].Length = kind, 0
 		}
 		if len(fields) != 2 {
 			return nil, ErrConflict
@@ -87,6 +89,7 @@ func canonicalAttributes(raw []byte, kind string) ([]byte, error) {
 	seen := map[uint16]bool{}
 	for _, a := range attrs {
 		a.Type &= attributeTypeMask
+		a.Length = 0
 		if seen[a.Type] {
 			return nil, ErrConflict
 		}

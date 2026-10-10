@@ -79,18 +79,27 @@ func smallRead(path string, limit int) (data []byte, err error) {
 	}
 	return data, err
 }
+
+// namespaceIdentity proves the helper runs in PID 1's network namespace.
+// /proc/1/ns/net is ptrace-gated: a capability-bounded root helper cannot open
+// or stat it (EACCES) without CAP_SYS_PTRACE, which would expose the executor's
+// keys. Per-namespace /proc/<pid>/net entries are not ptrace-gated and are the
+// same kernel entry exactly when both tasks share a network namespace.
 func namespaceIdentity() ([]byte, error) {
-	var self, host unix.Stat_t
+	var self, selfEntry, hostEntry unix.Stat_t
 	if err := unix.Stat("/proc/self/ns/net", &self); err != nil {
 		return nil, err
 	}
-	if err := unix.Stat("/proc/1/ns/net", &host); err != nil {
+	if err := unix.Stat("/proc/self/net/dev", &selfEntry); err != nil {
 		return nil, err
 	}
-	if self.Dev != host.Dev || self.Ino != host.Ino {
+	if err := unix.Stat("/proc/1/net/dev", &hostEntry); err != nil {
+		return nil, err
+	}
+	if selfEntry.Dev != hostEntry.Dev || selfEntry.Ino != hostEntry.Ino {
 		return nil, fmt.Errorf("%w: helper is not in the host network namespace", ErrUnsupported)
 	}
-	digest := sha256.Sum256([]byte(fmt.Sprintf("lindm.firewall.netns.v1\x00%d\x00%d", host.Dev, host.Ino)))
+	digest := sha256.Sum256([]byte(fmt.Sprintf("lindm.firewall.netns.v1\x00%d\x00%d", self.Dev, self.Ino)))
 	return digest[:], nil
 }
 func checkInterfaces(config *agentv1.NativeFirewallProviderConfig) error {

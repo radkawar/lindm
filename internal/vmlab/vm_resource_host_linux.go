@@ -23,6 +23,8 @@ const (
 	resourceLabGroupID     = 24001
 	resourceLabUser        = "rlabuser"
 	resourceLabUserID      = 24002
+	resourceLabPrimary     = "rlabprimary"
+	resourceLabPrimaryID   = 24010
 	resourceLabHomeRoot    = resourceFixtureRoot + "/homes"
 	resourceLabHomeRootID  = "8f1d3a4e-6c2b-4a57-9e10-2d7b4c6a8e31"
 	resourceLabSysctlKey   = "vm.swappiness"
@@ -43,6 +45,7 @@ func provisionHostResourceRoots(config *agentv1.AgentConfig) {
 
 const resourceHostFixtureScript = `set -eu
 install -d -o root -g root -m 0755 ` + resourceLabHomeRoot + `
+groupadd -g 24010 ` + resourceLabPrimary + `
 cat > /etc/systemd/system/` + resourceLabTarget + ` <<'UNIT'
 [Unit]
 Description=Disposable lindm resource timer target
@@ -68,7 +71,7 @@ func resourceStep(ctx context.Context, r *resourceDispatch, evidence *VMResource
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	fail := func(err error) error {
 		s.Failure = err.Error()
-		s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
+		s.Native = append(s.Native, r.failureDiagnostics(ctx)...)
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	if err := r.assign(ctx, desired, policy); err != nil {
@@ -101,12 +104,13 @@ func resourceReleaseStep(ctx context.Context, r *resourceDispatch, evidence *VMR
 	s.Release, err = r.release(ctx, ref, false)
 	if err != nil {
 		s.Failure = err.Error()
-		s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
+		s.Native = append(s.Native, r.failureDiagnostics(ctx)...)
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	native, err := oracle(ctx)
 	if err != nil {
 		s.Failure = err.Error()
+		s.Native = append(s.Native, r.failureDiagnostics(ctx)...)
 		return fmt.Errorf("%s: %w", name, err)
 	}
 	s.Native = []VMResourceNativeRecord{native}
@@ -118,11 +122,27 @@ func resourceReleaseStep(ctx context.Context, r *resourceDispatch, evidence *VMR
 // executorDiagnostics retains the installed executor's recent journal for a
 // failed scenario. It is diagnostic context, never qualification evidence.
 func executorDiagnostics(ctx context.Context, vm *guestVM) VMResourceNativeRecord {
-	data, err := vm.run(ctx, "sudo -n journalctl --no-pager -o short-iso -n 120 -u lindm-executor.service 2>&1", nil, 256<<10, 30*time.Second)
+	data, err := vm.run(ctx, "sudo -n journalctl --no-pager -o short-iso -n 50000 2>&1 | grep -E 'lindm-(executor|agent|package|resource|observe)|useradd|groupadd|usermod|userdel|chage|authselect|pam-auth|scriptlet|lindm-resource-crash' | grep -v -e ' audit' -e ' sudo\\[' | tail -n 200", nil, 256<<10, 30*time.Second)
 	if err != nil {
 		data = []byte(err.Error())
 	}
 	return resourceNativeRecord("failure-diagnostic-executor-journal", data)
+}
+
+// failureDiagnostics adds a lane's own native diagnostic context, such as the
+// firewall guard journal and ruleset, to the executor journal.
+func (r *resourceDispatch) failureDiagnostics(ctx context.Context) []VMResourceNativeRecord {
+	records := []VMResourceNativeRecord{executorDiagnostics(ctx, r.vm)}
+	if r.diagnostics != nil {
+		records = append(records, r.diagnostics(ctx)...)
+	}
+	return records
+}
+
+// resourceAdoptionPolicy adopts pre-existing native state under an approved
+// assignment and restores the recorded baseline on release.
+func resourceAdoptionPolicy() *resourcev1.OwnershipPolicy {
+	return &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}
 }
 
 func (r *resourceDispatch) fresh() {
@@ -140,7 +160,7 @@ func resourceGroupDesired(present bool) *resourcev1.ResourceDesiredState {
 func resourceUserDesired(shell string) *resourcev1.ResourceDesiredState {
 	user := &resourcev1.LocalUserDesired{
 		Name: resourceLabUser, Presence: resourcev1.Presence_PRESENCE_PRESENT, Uid: proto.Uint32(resourceLabUserID),
-		PrimaryGroup: proto.String("users"), HomeDirectory: proto.String(resourceLabHomeRoot + "/" + resourceLabUser),
+		PrimaryGroup: proto.String(resourceLabPrimary), HomeDirectory: proto.String(resourceLabHomeRoot + "/" + resourceLabUser),
 		Shell:    &resourcev1.LoginShell{InstalledShell: shell},
 		Password: &resourcev1.PasswordState{State: &resourcev1.PasswordState_Locked{Locked: &resourcev1.LockedPassword{}}},
 		Home:     &resourcev1.HomePolicy{Creation: resourcev1.HomeCreation_HOME_CREATION_CREATE_IF_ABSENT, Mode: proto.Uint32(0o700), ApprovedRootId: resourceLabHomeRootID},
@@ -165,8 +185,8 @@ func userOracle(shell string, present bool) func(context.Context, *guestVM) (VMR
 		// the removed numeric identity.
 		command := "if getent passwd " + resourceLabUser + "; then exit 1; fi; if grep '^" + resourceLabUser + ":' /etc/passwd /etc/shadow; then exit 1; fi; test -d " + home + "; stat -c '%n %a %u %g' " + home + "; printf 'user-absent-home-preserved\\n'"
 		if present {
-			command = fmt.Sprintf("test \"$(getent passwd %s)\" = '%s:x:%d:100::%s:%s'; id %s; test \"$(stat -c '%%a %%u %%g' %s)\" = '700 %d 100'; stat -c '%%n %%a %%u %%g' %s; getent shadow %s | cut -d: -f1,2 | grep -E '^%s:!'; grep -Fx %s /etc/shells",
-				resourceLabUser, resourceLabUser, resourceLabUserID, home, shell, resourceLabUser, home, resourceLabUserID, home, resourceLabUser, resourceLabUser, nativeQuote(shell))
+			command = fmt.Sprintf("test \"$(getent passwd %s)\" = '%s:x:%d:%d::%s:%s'; id %s; test \"$(stat -c '%%a %%u %%g' %s)\" = '700 %d %d'; stat -c '%%n %%a %%u %%g' %s; getent shadow %s | cut -d: -f1,2 | grep -E '^%s:!'; grep -Fx %s /etc/shells",
+				resourceLabUser, resourceLabUser, resourceLabUserID, resourceLabPrimaryID, home, shell, resourceLabUser, home, resourceLabUserID, resourceLabPrimaryID, home, resourceLabUser, resourceLabUser, nativeQuote(shell))
 		}
 		return resourceOracle(ctx, vm, "native-user-database-home-shadow", command)
 	}
@@ -217,7 +237,7 @@ func sysctlOracle(value string) func(context.Context, *guestVM) (VMResourceNativ
 		// An empty value means the pre-management value and no owned file.
 		command := "prior=$(cat " + resourceLabSysctlPrior + "); test \"$(sysctl -n " + resourceLabSysctlKey + ")\" = \"$prior\"; if ls /etc/sysctl.d/60-lindm-*.conf 2>/dev/null; then exit 1; fi; printf 'restored %s\\n' \"$prior\""
 		if value != "" {
-			command = "test \"$(sysctl -n " + resourceLabSysctlKey + ")\" = " + nativeQuote(value) + "; sysctl " + resourceLabSysctlKey + "; grep -Fx " + nativeQuote(resourceLabSysctlKey+" = "+value) + " /etc/sysctl.d/60-lindm-*.conf; stat -c '%n %a %u %g' /etc/sysctl.d/60-lindm-*.conf; systemd-sysctl --cat-config | grep -F " + nativeQuote(resourceLabSysctlKey)
+			command = "test \"$(sysctl -n " + resourceLabSysctlKey + ")\" = " + nativeQuote(value) + "; sysctl " + resourceLabSysctlKey + "; grep -Fx " + nativeQuote(resourceLabSysctlKey+" = "+value) + " /etc/sysctl.d/60-lindm-*.conf; stat -c '%n %a %u %g' /etc/sysctl.d/60-lindm-*.conf; /usr/lib/systemd/systemd-sysctl --cat-config | grep -F " + nativeQuote(resourceLabSysctlKey)
 		}
 		return resourceOracle(ctx, vm, "native-sysctl-live-persistent", command)
 	}
@@ -225,13 +245,13 @@ func sysctlOracle(value string) func(context.Context, *guestVM) (VMResourceNativ
 
 func exerciseResourceSysctl(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence) error {
 	r.fresh()
-	if err := resourceStep(ctx, r, evidence, "set-persistent", resourceSysctlDesired("17"), resourceCreatePolicy(), false, withVM(r.vm, sysctlOracle("17"))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "set-persistent", resourceSysctlDesired("17"), resourceAdoptionPolicy(), false, withVM(r.vm, sysctlOracle("17"))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "reconcile", resourceSysctlDesired("23"), resourceCreatePolicy(), false, withVM(r.vm, sysctlOracle("23"))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "reconcile", resourceSysctlDesired("23"), resourceAdoptionPolicy(), false, withVM(r.vm, sysctlOracle("23"))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "repeat", resourceSysctlDesired("23"), resourceCreatePolicy(), true, withVM(r.vm, sysctlOracle("23"))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "repeat", resourceSysctlDesired("23"), resourceAdoptionPolicy(), true, withVM(r.vm, sysctlOracle("23"))); err != nil {
 		return err
 	}
 	if err := resourceReleaseStep(ctx, r, evidence, "release-restores-prior", resourceSysctlDesired("23").GetRef(), withVM(r.vm, sysctlOracle(""))); err != nil {
@@ -304,7 +324,7 @@ func ResourceKindSelection(value string) (map[string]bool, error) {
 	selected := make(map[string]bool)
 	for name := range strings.SplitSeq(value, ",") {
 		switch name {
-		case "packages", "files", "accounts", "sysctl", "definitions", "password":
+		case "packages", "files", "accounts", "sysctl", "definitions", "password", "firewall":
 			selected[name] = true
 		default:
 			return nil, fmt.Errorf("unknown resource lane kind %q", name)

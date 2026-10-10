@@ -51,7 +51,19 @@ func runNative(ctx context.Context, path string, args ...string) ([]byte, error)
 	cmd.Stderr = &diagnostic
 	err := cmd.Run()
 	if diagnostic.Len() != 0 {
-		return nil, errors.New("accountprovider: native diagnostic")
+		// Shadow tools never receive secrets on this path; keep a bounded,
+		// printable first line for the local administrator.
+		line, _, _ := strings.Cut(diagnostic.String(), "\n")
+		line = strings.Map(func(r rune) rune {
+			if r < 0x20 || r > 0x7e {
+				return '?'
+			}
+			return r
+		}, line)
+		if len(line) > 256 {
+			line = line[:256]
+		}
+		return nil, fmt.Errorf("accountprovider: native diagnostic from %s: %s", filepath.Base(path), line)
 	}
 	return out.Bytes(), err
 }

@@ -162,6 +162,13 @@ func TestUnsignedRPMDoesNotPassDigestOnlyOutput(t *testing.T) {
 	if err := checkRPMSignature([]byte("proof.rpm:\n    Header V4 RSA/SHA256 Signature, key ID 00000000: OK\n"), fingerprint); err == nil {
 		t.Fatal("foreign signer accepted")
 	}
+	// RPM 6 reports the full fingerprint of a known key.
+	if err := checkRPMSignature([]byte("proof.rpm:\n    Header OpenPGP V4 RSA/SHA256 signature, key fingerprint: 12345678901234567890123456789012abcdefab: OK\n"), fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkRPMSignature([]byte("proof.rpm:\n    Header OpenPGP V4 RSA/SHA256 signature, key fingerprint: 00000000901234567890123456789012ABCDEFAB: OK\n"), fingerprint); err == nil {
+		t.Fatal("foreign RPM 6 signer accepted")
+	}
 }
 func TestTransactionVerificationDetectsUnmanifestedEffects(t *testing.T) {
 	before, err := parseDatabase([]byte("ii \tbase\t1.0-1\tamd64\n"), resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)

@@ -83,7 +83,7 @@ func protectedOpen(path string) (*os.File, error) {
 			return nil, errors.Join(err, unix.Close(parent))
 		}
 		if st.Uid != 0 || st.Mode&0022 != 0 {
-			return nil, errors.Join(ErrUnsupported, unix.Close(parent))
+			return nil, errors.Join(fmt.Errorf("%w: replaceable ancestry of %s", ErrUnsupported, path), unix.Close(parent))
 		}
 		name, next, more := strings.Cut(rest, "/")
 		if !more {
@@ -113,8 +113,10 @@ func protectedOpen(path string) (*os.File, error) {
 	if err := unix.Fstat(fd, &st); err != nil {
 		return nil, errors.Join(err, f.Close())
 	}
-	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != 0 || st.Mode&0022 != 0 || st.Nlink != 1 {
-		return nil, errors.Join(ErrUnsupported, f.Close())
+	// Distribution builds hardlink identical vendor files (Fedora's authselect
+	// profiles); a root-owned, non-writable regular file is safe at any count.
+	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != 0 || st.Mode&0022 != 0 {
+		return nil, errors.Join(fmt.Errorf("%w: unprotected native file %s", ErrUnsupported, path), f.Close())
 	}
 	return f, nil
 }

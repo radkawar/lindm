@@ -17,50 +17,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
 
-type versionlockCondition struct {
-	Key        string `toml:"key"`
-	Comparator string `toml:"comparator"`
-	Value      string `toml:"value"`
-}
-type versionlockPackage struct {
-	Name       string                 `toml:"name"`
-	Comment    string                 `toml:"comment,omitempty"`
-	Conditions []versionlockCondition `toml:"conditions"`
-}
-type versionlockDocument struct {
-	Version  string               `toml:"version"`
-	Packages []versionlockPackage `toml:"packages,omitempty"`
-}
-
-func parseVersionlock(data []byte) (versionlockDocument, error) {
-	if len(data) == 0 {
-		return versionlockDocument{Version: "1.0"}, nil
-	}
-	var document versionlockDocument
-	decoder := toml.NewDecoder(bytes.NewReader(data)).DisallowUnknownFields()
-	if err := decoder.Decode(&document); err != nil {
-		return document, fmt.Errorf("packageprovider: invalid native versionlock: %w", err)
-	}
-	if document.Version != "1.0" {
-		return document, errors.New("packageprovider: unsupported native versionlock version")
-	}
-	for _, entry := range document.Packages {
-		if entry.Name == "" || len(entry.Conditions) == 0 {
-			return document, errors.New("packageprovider: incomplete native versionlock entry")
-		}
-		for _, condition := range entry.Conditions {
-			if condition.Key != "evr" && condition.Key != "epoch" && condition.Key != "arch" {
-				return document, errors.New("packageprovider: unknown native versionlock dimension")
-			}
-			if condition.Comparator != "=" && condition.Comparator != "!=" && condition.Comparator != "<" && condition.Comparator != "<=" && condition.Comparator != ">" && condition.Comparator != ">=" {
-				return document, errors.New("packageprovider: unknown native versionlock comparator")
-			}
-		}
-	}
-	return document, nil
-}
 func (p *Provider) pinPath(ref *resourcev1.ResourceRef) string {
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return "/etc/dnf/versionlock.toml"
@@ -86,15 +45,31 @@ func readPin(path string) (*resourcev1.FileIdentity, []byte, error) {
 	digest := sha256.Sum256(data)
 	return &resourcev1.FileIdentity{Path: path, Device: uint64(stat.Dev), Inode: stat.Ino, Uid: stat.Uid, Gid: stat.Gid, Mode: stat.Mode & 07777, Sha256: digest[:]}, data, nil
 }
+
+// pinClaimsPackage reports an existing native pin for this package. An APT pin
+// file is per package; DNF's versionlock is one shared file whose entries for
+// other packages are not this package's pin. An unreadable document fails closed.
+func pinClaimsPackage(ref *resourcev1.ResourceRef, o *resourcev1.NativePackageObservation) bool {
+	if o.GetPinFile() == nil {
+		return false
+	}
+	if o.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+		return true
+	}
+	return dnf.VersionlockClaims(o.GetPinContents(), ref.GetCanonicalKey(), o.GetPackage().GetNativeName())
+}
+
 func aptPin(d *resourcev1.NativePackageDesired) []byte {
 	if d.GetExact() == nil || d.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
 		return nil
 	}
 	return []byte("# Managed by lindm; exact native version, never implicit downgrade.\nPackage: " + d.GetPackage().GetNativeName() + ":" + d.GetPackage().GetArchitecture() + "\nPin: version " + d.GetExact().GetDeb() + "\nPin-Priority: 1000\n")
 }
-func pinMarker(ref *resourcev1.ResourceRef) string { return "lindm:" + ref.GetCanonicalKey() }
+func pinMarker(ref *resourcev1.ResourceRef) string {
+	return dnf.VersionlockMarker(ref.GetCanonicalKey())
+}
 func renderDNFPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) ([]byte, error) {
-	document, err := parseVersionlock(current)
+	document, err := dnf.ParseVersionlock(current)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +90,7 @@ func renderDNFPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesire
 	}
 	document.Packages = entries
 	if d.GetExact() != nil && d.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-		document.Packages = append(document.Packages, versionlockPackage{Name: d.GetPackage().GetNativeName(), Comment: marker, Conditions: []versionlockCondition{{Key: "evr", Comparator: "=", Value: nativeVersion(d.GetExact())}, {Key: "arch", Comparator: "=", Value: d.GetPackage().GetArchitecture()}}})
+		document.Packages = append(document.Packages, dnf.VersionlockPackage{Name: d.GetPackage().GetNativeName(), Comment: marker, Conditions: []dnf.VersionlockCondition{{Key: "evr", Comparator: "=", Value: nativeVersion(d.GetExact())}, {Key: "arch", Comparator: "=", Value: d.GetPackage().GetArchitecture()}}})
 	}
 	if len(document.Packages) == 0 && len(current) == 0 {
 		return nil, nil
@@ -139,7 +114,7 @@ func pinMatches(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired,
 	if d.GetPackage().GetEcosystem() == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		return bytes.Equal(aptPin(d), current)
 	}
-	document, err := parseVersionlock(current)
+	document, err := dnf.ParseVersionlock(current)
 	if err != nil {
 		return false
 	}

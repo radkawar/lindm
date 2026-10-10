@@ -1142,6 +1142,13 @@ The executor itself retains `PrivateDevices=yes`. Fresh helper namespaces expose
 current mapper/LVM topology and hotplugged devices without persistent device
 allowlists or widening the network agent. Output, runtime and cancellation cleanup
 are bounded; incomplete, malformed or wrong-boot helper results are not published.
+The executor submits the unit and its output pipes directly to PID 1 over the
+root-only private socket, never through a bus broker. It passes descriptors only
+after PID 1 has answered a descriptor-free call. On failure it joins the unit's
+stop job, over a new connection if the first one was lost. A failed root
+observation records only the readiness reason: it never keeps serial, firmware or
+SMBIOS CPU facts, and other categories keep their unprivileged collection status.
+The executor log names the failed stage.
 
 `ListDeviceStorageTargets` applies scoped `fleet.read` before returning exact
 `StorageTarget` and optional `NVMeSanitizeScope` messages for the selected action
@@ -1286,8 +1293,28 @@ observation still makes its findings UNKNOWN; no release string is fabricated.
 
 Evaluations bind snapshot, host observation and feed revision. A shared SQL view
 rechecks those bindings and expiry at read time, so a new snapshot or expired
-exception does not wait for a worker before changing the visible state. Matching
-uses bounded package-position batches and a 10,000-finding admission bound.
+exception does not wait for a worker before changing the visible state. Device
+reads and risk acceptance serve only the persisted evaluation and never match
+inline; an evaluation behind its device's current evidence reads as UNKNOWN
+`evaluation_pending`, and acceptance against it conflicts. The `lindmd` background
+job polls every five seconds for active devices whose evaluation no longer binds
+their current snapshot, host observation or bound feed generation (plus devices
+evaluated without an applicable feed once any process configures or re-enables a
+feed in the shared database, whatever the server's own feed list) and
+re-evaluates them in batches of 32, each device in its own bounded transaction,
+beside rather than behind a long feed refresh. Matching probes binary and source
+identities as separate index lookups on `(feed, generation, kind, name, id)`, never
+a scan of a multi-million-record generation. Candidates are read in 500-record
+keyset pages over `(package position, record id)`: one installed Ubuntu kernel
+binary alone matches about 10,000 OSV records. The per-device admission bound is
+100,000 findings; the stock Ubuntu 24.04 cloud image with one kernel already
+exceeds 10,000 because thousands of open kernel CVEs apply to each installed
+binary of the kernel source. Against the 2026-10-10 Ubuntu export (2,157,314
+records) that 665-package inventory evaluates in about 1.5 s. Deterministic record or capacity
+failures persist an UNKNOWN evaluation instead of retrying unchanged evidence.
+RPM imported signing keys (`gpg-pubkey` rows without an architecture) are keyring
+entries, not packages: they neither match records nor make architecture coverage
+UNKNOWN; any other architecture-less package still does.
 Matching records for the same advisory and installed package merge their CVEs
 (at most 1,000), preserve the highest severity and require all known fixes; an
 unknown fix is not replaced by another CVE's known fix. Device

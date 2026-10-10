@@ -33,8 +33,8 @@ func NeedsPersistenceWrite(request *agentv1.NativeResourceTransactionRequest) bo
 }
 
 // ExecuteNative is exclusively the fixed authenticated transient helper entry.
-// The parent supplies root-local policy, makes only ProcPath(key) writable, and
-// grants /etc/sysctl.d writable only if the target file image differs. CAP_LEASE
+// The parent supplies root-local policy, makes /proc/sys writable only for a
+// runtime change (this helper writes only the planned key), and grants /etc/sysctl.d writable only if the target file image differs. CAP_LEASE
 // is needed whenever persistent ownership is pinned, including unchanged files.
 // ProtectKernelTunables=false belongs to this helper, NEVER the executor unit.
 // CAP_NET_ADMIN applies to network keys; other approved keys may require

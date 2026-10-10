@@ -40,6 +40,43 @@ all disks. [`lindm-agent.service:11-50`](../../internal/packaging/assets/lindm-a
 runs as `lindm`, has no capabilities, owns network transport and cannot read root
 executor state. Service start limits remain part of the installed contract.
 
+The executor starts the root `inventory-observe` helper as a transient unit over
+PID 1's private socket `/run/systemd/private` and passes its output pipes directly
+to PID 1 ([`root_inventory_systemd_linux.go`](../../internal/agent/executor/root_inventory_systemd_linux.go)).
+It previously executed `systemd-run --pipe --wait`, which uses the system bus and
+passes its stdio descriptors through the broker. On Fedora 44 (systemd
+`259.5-1.fc44`, selinux-policy-targeted `43.3-1.fc44`, Enforcing) dbus-broker is
+denied writing the executor's pipe. The denial is `dontaudit`ed and appears only
+after `semodule -DB`:
+`avc: denied { write } for comm="dbus-broker" path="pipe:[17498]"
+scontext=system_u:system_r:system_dbusd_t:s0-s0:c0.c1023
+tcontext=system_u:system_r:unconfined_service_t:s0 tclass=fifo_file permissive=0`.
+The broker drops the connection and the executor journal records
+`stage=run ... exit_status=1 diagnostic="Failed to start transient service unit:
+Connection reset by peer"`. An unsandboxed `unconfined_service_t` unit failed the
+same way, so the executor sandbox was not the cause. Every published host
+observation then carried storage `UNAVAILABLE` with
+`recovery_readiness_executor_unavailable`. Do not relabel the executor, add a policy
+module or disable SELinux: the direct PID 1 connection needs no broker permission.
+Ubuntu 24.04 (AppArmor) was unaffected and passes with the same launcher. The
+executor logs every readiness failure as `recovery readiness observation failed`
+with its stage, unit, systemd job/unit result, exit status and bounded helper
+stderr. Evidence and record digests are in
+[verification](../verification.md#customer-journey-release-acceptance).
+
+The private socket has its own race. sd-bus reads authentication greedily, so a
+busy PID 1 can read BEGIN together with the client's first call. Package
+installation, `systemctl enable --now`, daemon-reload or a policy load all made
+PID 1 busy enough. A first call that carries descriptors is then rejected with
+the connection (`start transient unit: read unix @->/run/systemd/private: recvmsg:
+connection reset by peer`). A call without descriptors stays unparsed until more
+bytes arrive. Fedora 44 x86_64 release acceptance failed on the reset. The
+executor now sends descriptor-free `Peer.Ping` calls and repeats each unanswered
+one, which wakes PID 1, before it passes any descriptor. A stop after a lost
+connection uses a new connection. Readiness also ignores the `UnitRemoved`
+signals that daemon-reload sends for still-running units. No AVC accompanied
+either failure.
+
 ## Inventory and per-field quirks
 
 Installed packages come from `rpm --query --all`, including epoch, version,
@@ -167,20 +204,45 @@ as passed. Separately qualified external recovery is a different capability.
 
 ## Resource providers
 
-The agent executes only generic signed resource intents. Systemd service is
-dispatched; Fedora 44 post-cutover service dispatch is not yet re-recorded.
-Every other kind has an agent provider but is dispatched only after the server's
-per-kind qualification table lists it with native Ubuntu 24.04 and Fedora 44
-records; until then its assignments show `resource_executor_not_available`.
+The agent executes only generic signed resource intents. The server dispatches
+a kind only when its per-kind qualification table lists it with native Ubuntu
+24.04 and Fedora 44 records (see
+[verification](../verification.md#generic-resource-executor-cutover-phase-2)):
+systemd services, native packages, managed files, local groups and users,
+sysctl, systemd timers and drop-ins, password policy, encryption compliance and firewall zones are
+dispatched; other kinds show
+`resource_executor_not_available`. The Fedora 44 records are aarch64 cloud-image
+guests with SELinux enforcing; new files get their label from `matchpathcon`,
+and btrfs compression/copy-on-write file flags are storage details, not refused
+special files.
 
-Native mechanisms on Fedora: packages require DNF5 (detected by the shared
-[`dnf`](../../internal/agent/dnf/manager.go) helper; DNF4 is refused) in
+Native mechanisms on Fedora: packages require DNF5 5.4.6.0 or newer (detected
+by the shared [`dnf`](../../internal/agent/dnf/manager.go) helper; DNF4 and
+older DNF5 releases, including the 5.4.1.0 in the 44 release image, are refused
+because they cannot store a transaction from the read-only staging sandbox) in
 asynchronously staged transient units, with an owned
-`/etc/dnf/versionlock.toml` entry for exact versions; password policy uses
+`/etc/dnf/versionlock.toml` entry for exact versions. The approved repository's
+signing key must already be imported into system RPM trust (`rpmkeys --import`);
+RPM 6 signature output is matched by full key fingerprint. Package scriptlets
+run under RPM's SELinux transition, so the apply unit does not set
+`NoNewPrivileges=`. Password policy uses
 authselect feature transactions; sysctl persistence is an
 owned `/etc/sysctl.d/60-lindm-<sha256(key)>.conf`; local accounts use the shadow
 tools against the exact host `/etc` bound into a private account root.
 Firewall restoration and its rollback supervisor units ship disabled.
+
+Firewall zones use the same dedicated `inet lindm_z_<zone>` netlink table, root
+provisioning, packaged guard/restore units, dedicated probe peer and static
+probe targets as on [Ubuntu](ubuntu.md#resource-providers); dispatch follows the
+server qualification table. The Fedora Cloud 44 aarch64 image does not install
+firewalld (`rpm -q firewalld` reports it absent in the record), so nothing was
+stopped or disabled; the lane opens its oracle and probe ports with
+`firewall-cmd` only when firewalld is active, and coexistence with an active
+firewalld ruleset is not exercised. NetworkManager owns the data link (a
+MAC-matched keyfile). SELinux stayed enforcing; the packaged guard, restore and
+probe units needed no policy change. The 6.19 kernel needed the same two fixes
+as Ubuntu (ptrace-gated `/proc/1/ns/net`, explicit boolean bitwise operation on
+read-back).
 
 ## Device actions
 
@@ -201,6 +263,17 @@ Fedora uses repository **updateinfo**, not Red Hat CSAF/VEX. The adapter require
 ([`advisory/feed/rpm.go:51-79`](../../internal/advisory/feed/rpm.go#L51-L79)).
 Parser architecture acceptance is not machine qualification. Stale or absent feed
 coverage must not become a clean exposure report.
+
+Native `rpm --query --all` lists each imported signing key as a `gpg-pubkey`
+record with no ARCH tag; inventory preserves it with an empty architecture,
+matching the independent native oracle. Matching treats exactly that identity
+(`manager=rpm`, `name=gpg-pubkey`, empty architecture) as a keyring entry, not a
+package: it neither matches advisory records nor makes the device's
+architecture coverage UNKNOWN
+([`advisories.sql` `AdvisoryArchitectures`/`AdvisoryCandidates`](../../db/queries/advisory/advisories.sql)).
+Before this rule every Fedora device in the 2026-10-10 release acceptance run
+reported `package_architecture_uncovered`. Any other architecture-less package
+still makes coverage UNKNOWN. This applies to every RPM distribution.
 
 On 2026-10-10, complete current `updates/Everything` metadata for Fedora 43 and 44
 was fetched separately for x86_64 and aarch64. Compressed SHA256 values matched

@@ -156,11 +156,10 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 				record.ExposureReason = "feed_refresh_omitted_diagnostic_not_release_qualified"
 				return resultErr
 			}
-			findings, err := owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 1}))
+			freshness, err := awaitDeviceExposure(ctx, owner, deviceID)
 			if err != nil {
 				return errors.Join(resultErr, err)
 			}
-			freshness := findings.Msg.GetFreshness()
 			record.ExposureReason = freshness.GetReason()
 			record.ExposureKnown = freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR || freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED
 			if !record.ExposureKnown {
@@ -199,6 +198,33 @@ func configureAcceptanceDispatch(ctx context.Context, fixture *devlab.AuthorityF
 		return fmt.Errorf("admit acceptance execution authority: %w", err)
 	}
 	return nil
+}
+
+// awaitDeviceExposure reads the device's persisted advisory evaluation. The
+// server evaluates new snapshots and feed generations in its background job,
+// so a read may briefly report evaluation_pending; any other state is final
+// evidence. The poll is bounded and never hides a pending result as known.
+func awaitDeviceExposure(ctx context.Context, owner *devlab.OwnerSession, deviceID string) (*adminv1.AdvisoryFreshness, error) {
+	deadline := time.Now().Add(3 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		read, cancel := context.WithTimeout(ctx, 20*time.Second)
+		findings, err := owner.Admin.ListDeviceFindings(read, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 1}))
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		freshness := findings.Msg.GetFreshness()
+		if freshness.GetReason() != "evaluation_pending" || !time.Now().Before(deadline) {
+			return freshness, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 // Each guest publishes its own profile head; the image-qualified name keeps the

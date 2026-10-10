@@ -21,7 +21,7 @@ type procKey struct {
 	identity  []byte
 }
 
-func ProcPath(key string) string { return "/proc/sys/" + strings.ReplaceAll(key, ".", "/") }
+func procPath(key string) string { return "/proc/sys/" + strings.ReplaceAll(key, ".", "/") }
 
 // Root approval is necessary but cannot delegate power/destructive operations or
 // weaken executor/authentication authority through the sysctl capability.
@@ -44,11 +44,11 @@ func openProc(key string, writable bool) (*procKey, error) {
 	if writable {
 		flags = unix.O_RDWR
 	}
-	fd, err := openProtected(ProcPath(key), flags)
+	fd, err := openProtected(procPath(key), flags)
 	if err != nil {
 		return nil, err
 	}
-	p := &procKey{file: os.NewFile(uintptr(fd), ProcPath(key)), key: key}
+	p := &procKey{file: os.NewFile(uintptr(fd), procPath(key)), key: key}
 	fail := func(err error) (*procKey, error) { return nil, errors.Join(err, p.file.Close()) }
 	var fs unix.Statfs_t
 	if err := unix.Fstatfs(fd, &fs); err != nil {
@@ -72,7 +72,15 @@ func openProc(key string, writable bool) (*procKey, error) {
 	if err := unix.Stat("/proc/self/ns/net", &network); err != nil {
 		return fail(err)
 	}
-	identity := sha256.Sum256(fmt.Appendf(nil, "lindm.sysctl.native.v1:%s:%s:%d:%d:%d:%d", p.boot, key, p.stat.Dev, p.stat.Ino, network.Dev, network.Ino))
+	// The procfs device and inode differ per mount namespace (ProtectProc=
+	// gives each sandboxed unit its own instance), so only the boot, key and,
+	// for per-namespace net.* keys, the network namespace identify the setting.
+	// Other keys are observed from a private network namespace by the helper.
+	var namespace unix.Stat_t
+	if strings.HasPrefix(key, "net.") {
+		namespace = network
+	}
+	identity := sha256.Sum256(fmt.Appendf(nil, "lindm.sysctl.native.v2:%s:%s:%d:%d", p.boot, key, namespace.Dev, namespace.Ino))
 	p.identity = identity[:]
 	return p, nil
 }

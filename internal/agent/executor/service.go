@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -128,7 +129,8 @@ type Service struct {
 	pinLiveRoot           func() error
 	recoveryConfig        *RecoveryBootConfig
 	recoveryBoot          recoveryBootPlatform
-	rootInventoryCommand  func(context.Context, string, ...string) ([]byte, error)
+	rootInventorySystemd  func(context.Context, string) (rootInventoryUnits, error)
+	logger                *slog.Logger
 	recoveryPending       *recoveryPendingAction
 	recoveryTPM           func() (recoveryTPMPending, error)
 	updateConfig          *agentv1.AgentUpdateConfig
@@ -564,6 +566,10 @@ func mapError(err error) error {
 		code, reason = connect.CodePermissionDenied, "signing_rejected"
 	case errors.Is(err, errIdempotencyConflict):
 		code, reason = connect.CodeAlreadyExists, "idempotency_conflict"
+	}
+	if code == connect.CodeInternal {
+		// The wire carries only the generic reason; keep the cause locally.
+		slog.Warn("executor request failed internally", "error", err)
 	}
 	out := connect.NewError(code, errors.New(reason))
 	out.Meta().Set("Lindm-Reason", reason)

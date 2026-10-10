@@ -12,6 +12,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 	"lindm/internal/agent/journal/journaldb"
 	"lindm/internal/resource"
 )
@@ -186,7 +187,7 @@ func (s *Store) mutateResourceOwnership(ctx context.Context, actionID string, ex
 			}
 			for _, dimension := range dimensions {
 				if !slices.Contains(ledger.OwnedDimensions, dimension) {
-					if !baselineOwnershipDimensionMatches(ledger, snapshot, dimension) {
+					if !newOwnershipDimensionMatches(ledger, snapshot, dimension) {
 						return nil, ErrResourceOwnershipDrift
 					}
 					ledger.OwnedDimensions = append(ledger.OwnedDimensions, dimension)
@@ -383,7 +384,7 @@ func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapsh
 	}
 	switch {
 	case observation.GetNativePackage() != nil:
-		return !observation.GetNativePackage().GetInstalled() && observation.GetNativePackage().GetPinFile() == nil
+		return !observation.GetNativePackage().GetInstalled() && !nativePinClaimed(observation)
 	case observation.GetManagedFile() != nil:
 		return !observation.GetManagedFile().GetExists()
 	case observation.GetLocalGroup() != nil:
@@ -395,6 +396,20 @@ func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapsh
 		// signed adoption; absence cannot be inferred from incomplete evidence.
 		return false
 	}
+}
+
+// nativePinClaimed reports an existing pin for this package. An APT pin file is
+// per package; DNF's versionlock is one shared file whose entries for other
+// packages do not make this package's creation an adoption.
+func nativePinClaimed(observation *resourcev1.ResourceObservation) bool {
+	pkg := observation.GetNativePackage()
+	if pkg.GetPinFile() == nil {
+		return false
+	}
+	if pkg.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
+		return true
+	}
+	return dnf.VersionlockClaims(pkg.GetPinContents(), observation.GetRef().GetCanonicalKey(), pkg.GetPackage().GetNativeName())
 }
 
 // A new enrollment cannot adopt away an unreleased native owner from an older

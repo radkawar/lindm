@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -25,7 +26,15 @@ import (
 const tumbleweedInstallerEdition = "dvd"
 
 // Bump when the AutoYaST profile or machine layout changes.
-const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v1"
+const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v2"
+
+// tumbleweedSSHDOrdering closes a vendor boot race. Tumbleweed starts sshd and
+// systemd-user-sessions in parallel once cloud-init's network stage finishes;
+// until user sessions are permitted, pam_nologin (requisite in the sshd account
+// stack) refuses every non-root login, which a client sees as an authentication
+// failure. The lab deliberately treats that as terminal, so a reboot probe that
+// lands in the window failed a lifecycle lane. Order sshd after the unit.
+const tumbleweedSSHDOrdering = "/etc/systemd/system/sshd.service.d/10-lindm-lab-user-sessions.conf"
 
 // tumbleweedRepositoryAlias names the online OSS repository in the profile and
 // in the installed system.
@@ -64,6 +73,9 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 			{"root_filesystem", "test \"$(findmnt -n -o FSTYPE /)\" = btrfs"},
 			{"package_tool", "command -v zypper >/dev/null && command -v rpm >/dev/null"},
 			{"privilege_tool", "command -v sudo >/dev/null"},
+			{"sshd_after_user_sessions", "systemctl show sshd.service -p After --value | tr ' ' '\\n' | grep -qx systemd-user-sessions.service"},
+			// The vendor TW cloud configuration, not MicroOS's alternative.
+			{"cloud_config", "rpm -q cloud-init-config-suse >/dev/null"},
 			// Fresh firmware variables boot only the removable-media path.
 			{"removable_boot", "test -s /boot/efi/EFI/BOOT/" + tumbleweedRemovableLoader(architecture)},
 		},
@@ -187,6 +199,7 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
 	// SUSE's cloud-init.service has no [Install]; its generator enables
 	// cloud-init.target, which wants these stage units.
 	provision += "systemctl enable sshd.service cloud-init-local.service cloud-config.service cloud-final.service\n"
+	provision += "install -d -m 0755 " + path.Dir(tumbleweedSSHDOrdering) + "\nprintf '%s\\n' '[Unit]' 'After=systemd-user-sessions.service' > " + tumbleweedSSHDOrdering + "\n"
 	provision += "cloud-init clean --logs\nrm -f /etc/machine-id\ntouch /etc/machine-id\n"
 	// Base64 keeps credential bytes outside XML and shell token syntax.
 	script := "printf '%s' '" + base64.StdEncoding.EncodeToString([]byte(provision)) + "' | base64 -d > /tmp/lindm-provision && /bin/sh -eu /tmp/lindm-provision && rm -f /tmp/lindm-provision\n"
@@ -197,8 +210,7 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
     <mode>
       <confirm config:type="boolean">false</confirm>
       <second_stage config:type="boolean">false</second_stage>
-      <final_reboot config:type="boolean">false</final_reboot>
-      <final_halt config:type="boolean">true</final_halt>
+      <halt config:type="boolean">true</halt>
     </mode>
   </general>
   <report>
@@ -234,11 +246,11 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
       <append>net.ifnames=0 console=tty0 console=%[2]s</append>
       <terminal>console</terminal>
       <timeout config:type="integer">1</timeout>
-      <update_nvram config:type="boolean">false</update_nvram>
+      <update_nvram>false</update_nvram>
     </global>
   </bootloader>
   <software>
-    <install_recommends config:type="boolean">true</install_recommends>
+    <install_recommended config:type="boolean">true</install_recommended>
     <patterns config:type="list">
       <pattern>base</pattern>
       <pattern>enhanced_base</pattern>
@@ -247,6 +259,7 @@ func tumbleweedInstallerRecipe(disk, architecture, sourceDigest, login, hostPriv
       <package>openssh-server</package>
       <package>sudo</package>
       <package>cloud-init</package>
+      <package>cloud-init-config-suse</package>
     </packages>
   </software>
   <services-manager>

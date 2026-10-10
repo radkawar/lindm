@@ -14,8 +14,10 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
+// getent initgroups asks getgrouplist with no base group, so it reports only
+// groups that list the user as a member; the primary group is checked by NSS.
 func (p *Provider) verifyGroups(ctx context.Context, db *localDB, u *resourcev1.LocalUserObservation) ([]byte, error) {
-	expected := []uint32{u.GetGid()}
+	var expected []uint32
 	var evidence []byte
 	primaryFound := false
 	for name, row := range db.groups {
@@ -34,7 +36,7 @@ func (p *Provider) verifyGroups(ctx context.Context, db *localDB, u *resourcev1.
 			return nil, err
 		}
 		evidence = append(evidence, result...)
-		if !slices.Contains(expected, gid) {
+		if slices.Contains(u.GetGroups(), name) && !slices.Contains(expected, gid) {
 			expected = append(expected, gid)
 		}
 	}
@@ -46,7 +48,7 @@ func (p *Provider) verifyGroups(ctx context.Context, db *localDB, u *resourcev1.
 		return nil, err
 	}
 	fields := strings.Fields(string(out))
-	if len(fields) < 2 || fields[0] != u.GetName() {
+	if len(fields) < 1 || fields[0] != u.GetName() {
 		return nil, ErrUnsafe
 	}
 	actual := make([]uint32, 0, len(fields)-1)

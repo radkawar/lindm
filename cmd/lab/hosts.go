@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -187,11 +188,11 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		clean = labhost.SetFlag(clean, workFlag, work)
 	}
-	lease, err := slots.Acquire(ctx)
+	leases, err := acquireLaneLeases(ctx, slots, vmGuestCount(clean[1], clean))
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, lease.Close()) }()
+	defer func() { err = errors.Join(err, closeLaneLeases(leases)) }()
 	return runUnscheduled(ctx, clean, stdout, stderr)
 }
 
@@ -203,6 +204,38 @@ func vmHasHardwareFlags(command string) bool {
 		// These lanes retain their existing fixed native-KVM hardware contract.
 		return false
 	}
+}
+
+// vmGuestCount is the number of concurrent guests a lane boots. The firewall
+// resource lane adds an independent probe-peer guest beside the device; every
+// guest holds its own capacity slot for the lane's whole lifetime.
+func vmGuestCount(lane string, args []string) int {
+	if lane == "resources" && slices.Contains(strings.Split(labhost.FlagValue(args, "kinds"), ","), "firewall") {
+		return 2
+	}
+	return 1
+}
+
+// acquireLaneLeases holds one capacity slot per concurrent lane guest until
+// every guest has exited. A partial reservation is released on failure.
+func acquireLaneLeases(ctx context.Context, slots *labhost.Slots, guests int) ([]*labhost.Lease, error) {
+	leases := make([]*labhost.Lease, 0, guests)
+	for range guests {
+		lease, err := slots.Acquire(ctx)
+		if err != nil {
+			return nil, errors.Join(err, closeLaneLeases(leases))
+		}
+		leases = append(leases, lease)
+	}
+	return leases, nil
+}
+
+func closeLaneLeases(leases []*labhost.Lease) error {
+	var err error
+	for _, lease := range leases {
+		err = errors.Join(err, lease.Close())
+	}
+	return err
 }
 
 // runHostExec is the staged binary's internal entrypoint. It takes the remote
@@ -234,11 +267,11 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	if err != nil {
 		return err
 	}
-	lease, err := slots.Acquire(ctx)
+	leases, err := acquireLaneLeases(ctx, slots, vmGuestCount(args[2], args))
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, lease.Close()) }()
+	defer func() { err = errors.Join(err, closeLaneLeases(leases)) }()
 	lane := args[2]
 	work, err := labhost.ResolveWorkDirectory(cfg.Hosts[0])
 	if err != nil {

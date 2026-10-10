@@ -41,9 +41,12 @@ func (q *Queries) AcceptAdvisoryException(ctx context.Context, arg AcceptAdvisor
 }
 
 const advisoryArchitectures = `-- name: AdvisoryArchitectures :many
-SELECT DISTINCT architecture FROM snapshot_packages WHERE snapshot_id=$1 LIMIT 65
+SELECT DISTINCT architecture FROM snapshot_packages WHERE snapshot_id=$1
+ AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='') LIMIT 65
 `
 
+// RPM imported signing keys (gpg-pubkey with no ARCH tag) are not packages and
+// do not make a device's architecture coverage unknown.
 func (q *Queries) AdvisoryArchitectures(ctx context.Context, snapshotID uuid.UUID) ([]string, error) {
 	rows, err := q.db.Query(ctx, advisoryArchitectures, snapshotID)
 	if err != nil {
@@ -65,21 +68,32 @@ func (q *Queries) AdvisoryArchitectures(ctx context.Context, snapshotID uuid.UUI
 }
 
 const advisoryCandidates = `-- name: AdvisoryCandidates :many
-SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
- p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.record_bytes
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+ p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
-JOIN advisory_records r ON r.feed_id=$1
- AND ((NOT r.source_package AND r.package_name=p.name)
-      OR (r.source_package AND r.package_name=p.source_name))
+JOIN advisory_record_generations r ON r.feed_id=$1 AND r.generation=$2
+ AND NOT r.source_package AND r.package_name=p.name
  AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
-WHERE p.snapshot_id=$2 AND p.position>=$3
- AND p.position<$4
-ORDER BY p.position,r.id
+WHERE p.snapshot_id=$3 AND p.position>=$4
+ AND p.position<$5
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+UNION ALL
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+ p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
+FROM snapshot_packages p
+JOIN advisory_record_generations r ON r.feed_id=$1 AND r.generation=$2
+ AND r.source_package AND r.package_name=p.source_name
+ AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
+WHERE p.snapshot_id=$3 AND p.position>=$4
+ AND p.position<$5 AND p.source_name<>''
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+ORDER BY position,record_id
 LIMIT 10001
 `
 
 type AdvisoryCandidatesParams struct {
 	FeedID        string
+	Generation    uuid.UUID
 	SnapshotID    uuid.UUID
 	FirstPosition int32
 	EndPosition   int32
@@ -98,12 +112,20 @@ type AdvisoryCandidatesRow struct {
 	ModuleStream  string
 	ModuleVersion string
 	ModuleContext string
+	RecordID      uuid.UUID
 	RecordBytes   []byte
 }
 
+// Binary and source identities are disjoint UNION ALL branches so each probes
+// advisory_record_generations_identity_idx by exact key; an OR join scans the
+// whole generation. The caller passes the feed revision read in the same
+// repeatable-read transaction, which is exactly the advisory_records view's
+// generation filter. RPM imported signing keys (gpg-pubkey without an
+// architecture) are keyring entries, not installable packages, and never match.
 func (q *Queries) AdvisoryCandidates(ctx context.Context, arg AdvisoryCandidatesParams) ([]AdvisoryCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, advisoryCandidates,
 		arg.FeedID,
+		arg.Generation,
 		arg.SnapshotID,
 		arg.FirstPosition,
 		arg.EndPosition,
@@ -128,6 +150,7 @@ func (q *Queries) AdvisoryCandidates(ctx context.Context, arg AdvisoryCandidates
 			&i.ModuleStream,
 			&i.ModuleVersion,
 			&i.ModuleContext,
+			&i.RecordID,
 			&i.RecordBytes,
 		); err != nil {
 			return nil, err
@@ -193,7 +216,9 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  complete_snapshot=advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.complete_snapshot,
  advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
- expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END
+ expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
+ configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
+  THEN advisory_feeds.configured_at ELSE clock_timestamp() END
 `
 
 type ConfigureAdvisoryFeedParams struct {
@@ -441,7 +466,7 @@ func (q *Queries) GetAdvisoryExceptionRequest(ctx context.Context, arg GetAdviso
 }
 
 const getAdvisoryFeed = `-- name: GetAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot FROM advisory_feeds WHERE id=$1
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE id=$1
 `
 
 func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -465,6 +490,7 @@ func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed,
 		&i.AdvisoryCount,
 		&i.Enabled,
 		&i.CompleteSnapshot,
+		&i.ConfiguredAt,
 	)
 	return i, err
 }
@@ -594,12 +620,29 @@ type InsertAdvisoryPublicationBatchParams struct {
 	RecordBytes   []byte
 }
 
-const listAdvisoryDeviceIDs = `-- name: ListAdvisoryDeviceIDs :many
-SELECT id FROM devices WHERE id>$1 AND state='active' ORDER BY id LIMIT 100
+const listAdvisoryEvaluationsPending = `-- name: ListAdvisoryEvaluationsPending :many
+SELECT d.id FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id
+LEFT JOIN advisory_evaluations e ON e.device_id=d.id
+LEFT JOIN advisory_feeds af ON af.id=e.feed_id
+WHERE d.state='active' AND (e.device_id IS NULL
+ OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
+ OR e.host_received_at IS DISTINCT FROM h.received_at
+ OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
+ OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
+ORDER BY e.evaluated_at NULLS FIRST,d.id
+LIMIT $1
 `
 
-func (q *Queries) ListAdvisoryDeviceIDs(ctx context.Context, id uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listAdvisoryDeviceIDs, id)
+// Evaluations are recomputed only when their bound evidence changes: a new
+// published snapshot or host observation, a new feed generation, or a disabled
+// bound feed. Feed selection depends only on enabled feed configuration, so a
+// device evaluated without any applicable feed is rechecked once any process
+// configures or re-enables a feed after that evaluation. Time-based expiry needs
+// no worker: the read path and advisory_finding_status recheck it.
+func (q *Queries) ListAdvisoryEvaluationsPending(ctx context.Context, rowLimit int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryEvaluationsPending, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +662,7 @@ func (q *Queries) ListAdvisoryDeviceIDs(ctx context.Context, id uuid.UUID) ([]uu
 }
 
 const listAdvisoryFeeds = `-- name: ListAdvisoryFeeds :many
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
 `
 
 func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error) {
@@ -649,6 +692,7 @@ func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error)
 			&i.AdvisoryCount,
 			&i.Enabled,
 			&i.CompleteSnapshot,
+			&i.ConfiguredAt,
 		); err != nil {
 			return nil, err
 		}
@@ -830,7 +874,7 @@ func (q *Queries) LockAdvisoryDevice(ctx context.Context, id uuid.UUID) error {
 }
 
 const lockAdvisoryFeed = `-- name: LockAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot FROM advisory_feeds WHERE id=$1 FOR UPDATE
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -854,6 +898,7 @@ func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed
 		&i.AdvisoryCount,
 		&i.Enabled,
 		&i.CompleteSnapshot,
+		&i.ConfiguredAt,
 	)
 	return i, err
 }
@@ -1034,5 +1079,22 @@ func (q *Queries) StoreAdvisoryEvaluation(ctx context.Context, arg StoreAdvisory
 		arg.FindingDigest,
 		arg.HostReceivedAt,
 	)
+	return err
+}
+
+const touchAdvisoryEvaluation = `-- name: TouchAdvisoryEvaluation :exec
+UPDATE advisory_evaluations SET evaluated_at=$2 WHERE device_id=$1 AND id=$3
+`
+
+type TouchAdvisoryEvaluationParams struct {
+	DeviceID    uuid.UUID
+	EvaluatedAt pgtype.Timestamptz
+	ID          uuid.UUID
+}
+
+// Records that unchanged feed-less evidence was rechecked against the current
+// feed configuration, without replacing the evaluation identity bound by cursors.
+func (q *Queries) TouchAdvisoryEvaluation(ctx context.Context, arg TouchAdvisoryEvaluationParams) error {
+	_, err := q.db.Exec(ctx, touchAdvisoryEvaluation, arg.DeviceID, arg.EvaluatedAt, arg.ID)
 	return err
 }

@@ -222,3 +222,23 @@ func TestNativeNetlinkAtomicOwnershipLifecycle(t *testing.T) {
 		}
 	}
 }
+
+// Packaged helpers are root with a bounded capability set, so the kernel's
+// ptrace check denies them /proc/1/ns/net exactly as it denies an ordinary
+// user against a root init. The host-namespace proof must not depend on that
+// access. (Inside a container whose init this user owns, access is granted
+// and the test cannot reproduce the denial.)
+func TestNamespaceIdentityWithoutPtraceAccessToInit(t *testing.T) {
+	var init unix.Stat_t
+	if err := unix.Stat("/proc/1/ns/net", &init); !errors.Is(err, unix.EACCES) {
+		t.Logf("ptrace access to PID 1 is not denied here (%v); only the positive path is exercised", err)
+	}
+	first, err := namespaceIdentity()
+	if err != nil {
+		t.Fatalf("host network namespace rejected: %v", err)
+	}
+	second, err := namespaceIdentity()
+	if err != nil || !bytes.Equal(first, second) || len(first) != 32 {
+		t.Fatal("unstable host network namespace identity")
+	}
+}

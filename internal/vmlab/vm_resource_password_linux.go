@@ -147,13 +147,13 @@ func exerciseResourcePassword(ctx context.Context, packages *nativeGuestPackages
 		return err
 	}
 	r.fresh()
-	if err := resourceStep(ctx, r, evidence, "quality-baseline-rejects-short", resourcePasswordDesired(14), resourceCreatePolicy(), false, withVM(r.vm, passwordOracle(14))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "quality-baseline-rejects-short", resourcePasswordDesired(14), resourceAdoptionPolicy(), false, withVM(r.vm, passwordOracle(14))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "quality-reconcile-length", resourcePasswordDesired(16), resourceCreatePolicy(), false, withVM(r.vm, passwordOracle(16))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "quality-reconcile-length", resourcePasswordDesired(16), resourceAdoptionPolicy(), false, withVM(r.vm, passwordOracle(16))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "repeat", resourcePasswordDesired(16), resourceCreatePolicy(), true, withVM(r.vm, passwordOracle(16))); err != nil {
+	if err := resourceStep(ctx, r, evidence, "repeat", resourcePasswordDesired(16), resourceAdoptionPolicy(), true, withVM(r.vm, passwordOracle(16))); err != nil {
 		return err
 	}
 	if err := resourceReleaseStep(ctx, r, evidence, "release-restores-defaults", resourcePasswordDesired(16).GetRef(), withVM(r.vm, passwordOracle(0))); err != nil {

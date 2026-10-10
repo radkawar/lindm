@@ -39,7 +39,9 @@ func observationDirectory(ctx context.Context, bus *nativeBus, stateDirectory, i
 	if err != nil {
 		return "", err
 	}
-	handle := os.NewFile(uintptr(fd), "native-observation-custody")
+	// DirEntry.Info resolves entries against this name: it must be the real
+	// directory, not a label, or every retained observer becomes an ENOENT.
+	handle := os.NewFile(uintptr(fd), parent)
 	defer func() { resultErr = errors.Join(resultErr, handle.Close()) }()
 	if err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		return "", err

@@ -233,7 +233,8 @@ func (p *Provider) database(ctx context.Context) (*database, error) {
 		}
 	} else {
 		executable = "/usr/bin/rpm"
-		args = []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{INSTALLTIME}\t%{INSTALLTID}\t%{HDRID}\n"}
+		// RPM 6 removed the SHA-1 HDRID alias; SHA256HEADER exists since 4.14.
+		args = []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{INSTALLTIME}\t%{INSTALLTID}\t%{SHA256HEADER}\n"}
 		var found bool
 		for _, path := range []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite"} {
 			info, err := os.Stat(path)
@@ -258,9 +259,18 @@ func (p *Provider) database(ctx context.Context) (*database, error) {
 		return nil, err
 	}
 	if len(result.stderr) != 0 {
-		return nil, errors.New("packageprovider: native database probe warned; snapshot is not complete")
+		return nil, fmt.Errorf("packageprovider: native database probe warned; snapshot is not complete: %s", firstLine(result.stderr))
 	}
 	return parseDatabase(result.stdout, p.ecosystem)
+}
+
+// firstLine bounds native diagnostics carried in local errors.
+func firstLine(data []byte) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(string(data)), "\n")
+	if len(line) > 256 {
+		line = line[:256]
+	}
+	return line
 }
 
 func protectedFile(path string, maximum int64) (data []byte, err error) {

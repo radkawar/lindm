@@ -164,14 +164,33 @@ func (s *Service) Import(ctx context.Context, id string, input io.Reader) error 
 	return ErrNotFound
 }
 
-// Run owns no detached goroutines. The caller cancels and joins it before closing
-// the pool. Inventory matching continues with egress disabled, preserving unknown
-// freshness instead of pretending an air-gapped feed is current.
+const (
+	// evaluationBatch bounds one pending-device query; each device is matched
+	// in its own bounded transaction.
+	evaluationBatch = 32
+	// evaluationPoll is the latency between a published snapshot/feed
+	// generation and its persisted evaluation; reads never match inline.
+	evaluationPoll = 5 * time.Second
+	// evaluationBudget bounds one evaluation pass before the loop yields to
+	// its ticker again.
+	evaluationBudget = 45 * time.Second
+)
+
+// Run owns no detached goroutines: it joins its evaluation loop before
+// returning, and the caller cancels and joins Run before closing the pool.
+// Inventory matching continues with egress disabled, preserving unknown
+// freshness instead of pretending an air-gapped feed is current. Evaluation
+// runs beside, not behind, a long feed refresh.
 func (s *Service) Run(ctx context.Context) {
+	evaluationDone := make(chan struct{})
+	go func() {
+		defer close(evaluationDone)
+		s.runEvaluations(ctx)
+	}()
+	defer func() { <-evaluationDone }()
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	var nextRefresh time.Time
-	var after uuid.UUID
 	for {
 		cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
 		if err := s.drainAdvisoryGenerationCleanup(cleanupCtx); err != nil && ctx.Err() == nil {
@@ -192,31 +211,32 @@ func (s *Service) Run(ctx context.Context) {
 		if err := q.PruneAdvisoryExceptions(bounded); err != nil && ctx.Err() == nil {
 			slog.Warn("advisory exception retention failed", "error", err)
 		}
-		if len(s.config.GetFeeds()) == 0 {
-			cancel()
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				continue
-			}
+		cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
-		ids, err := advisorydb.New(s.pool).ListAdvisoryDeviceIDs(bounded, after)
-		if err == nil {
-			for _, id := range ids {
-				if _, err := s.Evaluate(bounded, id); err != nil && bounded.Err() == nil {
-					slog.Warn("advisory evaluation failed", "device_id", id, "error", err)
-				}
-				after = id
-				if bounded.Err() != nil {
-					break
-				}
+	}
+}
+
+// runEvaluations does not gate on this process's configured feeds: feeds are
+// configured and published in the shared database, possibly by another
+// process, and reads depend on this job alone for evaluation.
+func (s *Service) runEvaluations(ctx context.Context) {
+	ticker := time.NewTicker(evaluationPoll)
+	defer ticker.Stop()
+	for {
+		pass, cancel := context.WithTimeout(ctx, evaluationBudget)
+		for pass.Err() == nil {
+			attempted, err := s.EvaluatePending(pass, evaluationBatch)
+			if err != nil && ctx.Err() == nil {
+				slog.Warn("advisory evaluation failed", "error", err)
 			}
-			if len(ids) < 100 {
-				after = uuid.Nil
+			// A failing batch is retried on the next tick, not spun on.
+			if err != nil || attempted < evaluationBatch {
+				break
 			}
-		} else if ctx.Err() == nil {
-			slog.Warn("advisory scan failed", "error", err)
 		}
 		cancel()
 		select {
@@ -225,6 +245,30 @@ func (s *Service) Run(ctx context.Context) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// EvaluatePending persists fresh evaluations for at most limit active devices
+// whose stored evaluation no longer binds their current snapshot, host
+// observation or feed generation. It returns the number of devices attempted.
+// Device reads serve only these persisted evaluations.
+func (s *Service) EvaluatePending(ctx context.Context, limit int32) (int, error) {
+	ids, err := advisorydb.New(s.pool).ListAdvisoryEvaluationsPending(ctx, limit)
+	if err != nil {
+		return 0, fmt.Errorf("list pending advisory evaluations: %w", err)
+	}
+	var failed error
+	for i, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return i, err
+		}
+		if _, err := s.Evaluate(ctx, id); err != nil {
+			if ctx.Err() != nil {
+				return i, ctx.Err()
+			}
+			failed = errors.Join(failed, fmt.Errorf("evaluate device %s: %w", id, err))
+		}
+	}
+	return len(ids), failed
 }
 
 func timestamp(t time.Time) pgtype.Timestamptz {

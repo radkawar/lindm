@@ -387,7 +387,47 @@ and repository packages reflect the signed suite at installation time rather tha
 a reproducible snapshot. Each normal run uses a fresh overlay and SSH credentials.
 These maintained paths are not passing Debian lifecycle or physical-validation
 claims until their native commands complete and evidence is recorded.
-The additional `*-aarch64.json` Rocky 9.8/10.2, AlmaLinux 8.10/9.8/10.2 and
+
+openSUSE Tumbleweed has no official ARM cloud/KVM image, so
+`lab/images/opensuse-tumbleweed-20261007-aarch64.json` pins the signed
+Snapshot20261007 **DVD** (manifest edition `dvd`; the openSUSE key signs the
+`.sha256`) and the same installer-to-golden machinery
+(`internal/vmlab/installed_image_linux.go`) builds `<image-cache>/tumbleweed-installed`
+through an AutoYaST profile (`tumbleweed_installer_linux.go`). The base system comes
+only from the authenticated DVD repository, so it is pinned by the ISO digest. The
+DVD lacks cloud-init, which the lab needs for fresh NoCloud credentials, so the
+profile adds the official online OSS tree at a lower priority (120 versus the DVD's
+99), which supplies only cloud-init's closure. The lab requires that tree's
+`repomd.xml`, signed by the manifest's pinned key, to name the manifest snapshot
+(`cpe:/o:opensuse:opensuse:20261007`) both before and after installation. Published
+snapshots only advance, so this bounds the metadata libzypp resolved; once the
+tree moves on, building a new golden fails closed. Maintaining the cell means bumping
+the manifest to the current snapshot DVD, while an existing golden keeps being
+reused from its integrity-pinned cache.
+The vendor ARM DVD catalogs its EFI FAT image with El Torito platform 0 and points a
+hybrid USB MBR partition at that file, which `xorriso -boot_image any replay`
+rejects. The remaster therefore re-declares the unchanged vendor FAT image as the
+single UEFI El Torito entry, without the MBR, patches `EFI/BOOT/grub.cfg` both inside
+that image and on the ISO, and adds `autoyast=cd:/lindm-seed/autoinst.xml textmode=1
+self_update=0`. The profile must validate against the media's yast2-schema
+(e.g. `update_nvram` is an untyped string, `install_recommended` is the element
+name, and `halt` rather than `final_halt` powers off after a single stage), or
+YaST stops on an invalid-profile dialog. YaST installs GRUB to the removable path on
+aarch64. The profile names `cloud-init-config-suse` explicitly; otherwise the solver
+satisfies cloud-init with MicroOS's configuration. Provisioning adds an
+`sshd.service` drop-in ordering it after `systemd-user-sessions.service`: Tumbleweed
+starts both in parallel, and while `/run/nologin` exists `pam_nologin` (requisite in
+the sshd account stack) rejects the lab key ("Access denied … by PAM account
+configuration"). A reboot probe landing in that window failed a lifecycle lane, and
+the lab correctly treats authentication failure as terminal rather than retrying it.
+Validation proves VERSION_ID equals the snapshot, the source marker, the Btrfs root,
+zypper/rpm, sudo, the sshd ordering, `cloud-init-config-suse` and
+`EFI/BOOT/bootaa64.efi` on a fresh-NVRAM first boot. Dispatch records the kernel's
+SELinux state from `/sys/fs/selinux/enforce` for non-DNF guests, because Leap 16
+and Tumbleweed enforce SELinux and Tumbleweed ships no `getenforce`. Only the DNF
+family additionally requires `Enforcing`.
+
+The additional `*-aarch64.json` Rocky 8.10/9.8/10.2, AlmaLinux 8.10/9.8/10.2 and
 openSUSE Leap 16.0 manifests independently pin official native cloud-image bytes,
 signed checksum metadata and vendor trust anchors. They are not architecture
 aliases for the x86_64 images. Run acquisition and offline verification before
@@ -1997,7 +2037,10 @@ filesystem effects are not one atomic transaction.
 
 The ordinary executor sandbox is unchanged. Its fixed firewall helper has
 CAP_NET_ADMIN/CAP_NET_RAW and AF_UNIX/AF_INET/AF_INET6/AF_NETLINK in the host network
-namespace, checked against `/proc/1/ns/net`. PrivateNetwork is forbidden for host
+namespace. The check compares the per-namespace `/proc/self/net/dev` and
+`/proc/1/net/dev` kernel entries: `/proc/1/ns/net` is ptrace-gated, so a
+capability-bounded root helper, guard or restore unit gets `EACCES` without
+CAP_SYS_PTRACE, which none of them is granted. PrivateNetwork is forbidden for host
 firewall effects and target-specific packet verification. The provider retains the
 existing bounded plan, private snapshot, transaction and ownership admission caps;
 an oversized native expansion fails before the final authority gate.

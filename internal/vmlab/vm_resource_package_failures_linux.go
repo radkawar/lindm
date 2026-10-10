@@ -202,30 +202,37 @@ func exercisePackageInterruption(ctx context.Context, r *resourceDispatch, rpm r
 	waitCtx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
 	var action *adminv1.ServiceActionSummary
+	notReached := func(err error) error {
+		s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
+		if state, err := r.vm.runResult(ctx, "sudo -n sh -c 'ls -lZ "+resourceFixtureRoot+"; cat "+resourceFixtureRoot+"/maintainer.log; systemctl --no-pager list-units --all \"lindm-*\"' 2>&1", nil, 64<<10, 30*time.Second); err == nil {
+			s.Native = append(s.Native, resourceNativeRecord("failure-diagnostic-interrupt-state", state.Stdout))
+		}
+		return fmt.Errorf("native maintainer interruption point not reached (action %q): %w", action.GetActionId(), err)
+	}
 	for {
 		state, err := r.control.dispatchState(waitCtx, r.device)
 		if err != nil {
-			return err
+			return notReached(err)
 		}
 		if len(state.GetResources()) == 1 {
 			action = state.GetResources()[0].GetLatestAction()
 		}
 		marker, err := r.vm.runResult(waitCtx, "sudo -n test -s "+resourceFixtureRoot+"/interrupt.log", nil, 1024, 10*time.Second)
 		if err != nil {
-			return err
+			return notReached(err)
 		}
 		if marker.ExitCode == 0 && action.GetStartAuthorizedAt() != nil {
 			break
 		}
 		if err := lifecycleDelay(waitCtx, 100*time.Millisecond); err != nil {
-			return fmt.Errorf("native maintainer interruption point not reached: %w", err)
+			return notReached(err)
 		}
 	}
 	id, err := uuid.Parse(action.GetActionId())
 	if err != nil {
 		return err
 	}
-	if err := lifecycleCommand(ctx, r.vm, "interrupt real running package effect", "systemctl stop lindm-agent.service; systemctl kill --kill-whom=all --signal=KILL lindm-package-"+id.String()+"-apply.service; systemctl kill --kill-whom=main --signal=KILL lindm-executor.service; systemctl start lindm-executor.service; systemctl start lindm-agent.service"); err != nil {
+	if err := lifecycleCommand(ctx, r.vm, "interrupt real running package effect", "systemctl stop lindm-agent.service; for k in /sys/fs/cgroup/system.slice/lindm-package-*-apply.service/cgroup.kill; do echo 1 > \"$k\"; done; systemctl kill --kill-whom=main --signal=KILL lindm-executor.service; systemctl start lindm-executor.service; systemctl start lindm-agent.service"); err != nil {
 		return err
 	}
 	s.Action, err = r.action(ctx, true)

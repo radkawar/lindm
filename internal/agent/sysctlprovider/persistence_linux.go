@@ -279,7 +279,9 @@ func openProtected(path string, flags int) (int, error) {
 		if i == len(parts)-1 {
 			mode = flags
 		}
-		next, openErr := unix.Openat2(fd, part, &unix.OpenHow{Flags: uint64(mode | unix.O_CLOEXEC | unix.O_NOFOLLOW | unix.O_NONBLOCK), Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS})
+		// systemd RestrictSUIDSGID= fails openat2 with ENOSYS. A single clean
+		// component opened with O_NOFOLLOW cannot escape or follow a link.
+		next, openErr := unix.Openat(fd, part, mode|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		closeErr := unix.Close(fd)
 		if openErr != nil {
 			return -1, errors.Join(openErr, closeErr)

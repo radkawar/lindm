@@ -286,7 +286,7 @@ func (f *streamPublicationFixture) feed(t *testing.T) advisorydb.AdvisoryFeed {
 
 func (f *streamPublicationFixture) listFindings(t *testing.T) *adminv1.ListDeviceFindingsResponse {
 	t.Helper()
-	response, err := f.service.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: f.deviceID.String()}, true, []byte("[]"))
+	response, err := listEvaluated(t, f.service, &adminv1.ListDeviceFindingsRequest{DeviceId: f.deviceID.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}

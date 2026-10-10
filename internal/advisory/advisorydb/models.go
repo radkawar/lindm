@@ -42,6 +42,7 @@ type AdvisoryFeed struct {
 	AdvisoryCount    int64
 	Enabled          bool
 	CompleteSnapshot bool
+	ConfiguredAt     pgtype.Timestamptz
 }
 
 type AdvisoryFinding struct {

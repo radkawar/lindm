@@ -124,9 +124,6 @@ func (s *Service) AcceptAdvisoryFinding(ctx context.Context, req *connect.Reques
 		return nil, mapErr(err)
 	}
 	defer s.release()
-	if _, err := s.advisories.Evaluate(ctx, id); err != nil {
-		return nil, advisoryError(err)
-	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionManageAdvisoryExceptions)
 	if err != nil {
 		return nil, executionError(err)

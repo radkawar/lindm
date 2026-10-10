@@ -21,13 +21,19 @@ import (
 	"lindm/internal/advisory/advisorydb"
 )
 
+// evaluationPending marks a stored evaluation that no longer binds the
+// device's current evidence, or a device not yet evaluated. The background
+// job replaces it; it is UNKNOWN, never stale certainty.
+const evaluationPending = "evaluation_pending"
+
+// ListDevice serves the persisted evaluation only. Matching runs in the
+// background job (EvaluatePending) when a snapshot, host observation or feed
+// generation changes; until then the stored evaluation is reported UNKNOWN with
+// reason evaluation_pending, never re-matched inside the request.
 func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFindingsRequest, unrestricted bool, scopes []byte) (*adminv1.ListDeviceFindingsResponse, error) {
 	deviceID, err := uuid.Parse(req.GetDeviceId())
 	if err != nil {
 		return nil, ErrInvalid
-	}
-	if _, err := s.Evaluate(ctx, deviceID); err != nil {
-		return nil, err
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
@@ -43,6 +49,15 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 		return nil, ErrNotFound
 	}
 	e, err := q.GetAdvisoryEvaluation(ctx, deviceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if req.GetPageToken() != "" {
+			return nil, ErrConflict
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return &adminv1.ListDeviceFindingsResponse{Freshness: &adminv1.AdvisoryFreshness{State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN, Reason: evaluationPending}}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +179,14 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	if !e.ExpiresAt.Valid || !now.Time.Before(e.ExpiresAt.Time) {
 		unknown("inventory_stale")
 	}
-	if d.State != "active" || !sameID(e.SnapshotID, d.CurrentSnapshotID) || e.HostReceivedAt != d.HostReceivedAt || d.PackageStatus.Int16 != 1 {
-		unknown("inventory_changed")
+	if d.PackageStatus.Int16 != 1 {
+		unknown("package_collection_failed")
+	}
+	if !sameID(e.SnapshotID, d.CurrentSnapshotID) || e.HostReceivedAt != d.HostReceivedAt {
+		unknown(evaluationPending)
+	}
+	if d.State != "active" {
+		unknown("device_not_active")
 	}
 	if e.FeedID == "" {
 		if f.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || f.Reason == "" {
@@ -180,8 +201,11 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	f.FeedCheckedAt = protoTime(row.CheckedAt)
 	f.FeedExpiresAt = protoTime(row.ExpiresAt)
 	f.SourceSha256 = hex.EncodeToString(row.SourceSha256)
-	if !row.Enabled || e.FeedRevision == nil || row.Revision != *e.FeedRevision || !row.ExpiresAt.Valid || !now.Time.Before(row.ExpiresAt.Time) {
-		unknown("feed_stale_or_changed")
+	if !row.ExpiresAt.Valid || !now.Time.Before(row.ExpiresAt.Time) {
+		unknown("feed_stale")
+	}
+	if !row.Enabled || e.FeedRevision == nil || row.Revision != *e.FeedRevision {
+		unknown(evaluationPending)
 	}
 	return f, nil
 }
@@ -302,8 +326,20 @@ func (s *Service) Accept(ctx context.Context, tx pgx.Tx, actor uuid.UUID, req *a
 	if err != nil {
 		return nil, err
 	}
-	if !sameID(e.SnapshotID, d.CurrentSnapshotID) {
+	// Acceptance binds the persisted evaluation; it never re-matches inline.
+	// Evidence newer than that evaluation conflicts until the background job
+	// has evaluated it.
+	if !sameID(e.SnapshotID, d.CurrentSnapshotID) || e.HostReceivedAt != d.HostReceivedAt {
 		return nil, ErrConflict
+	}
+	if e.FeedID != "" {
+		source, err := q.GetAdvisoryFeed(ctx, e.FeedID)
+		if err != nil {
+			return nil, err
+		}
+		if !source.Enabled || e.FeedRevision == nil || source.Revision != *e.FeedRevision {
+			return nil, ErrConflict
+		}
 	}
 	now, err := q.AdvisoryDatabaseTime(ctx)
 	if err != nil {

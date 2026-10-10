@@ -13,7 +13,9 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  complete_snapshot=advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.complete_snapshot,
  advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
- expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END;
+ expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
+ configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
+  THEN advisory_feeds.configured_at ELSE clock_timestamp() END;
 
 -- name: GetAdvisoryFeed :one
 SELECT * FROM advisory_feeds WHERE id=$1;
@@ -92,16 +94,32 @@ LEFT JOIN package_attempts pa ON pa.generation_id=g.id
 WHERE d.id=$1;
 
 -- name: AdvisoryCandidates :many
-SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
- p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.record_bytes
+-- Binary and source identities are disjoint UNION ALL branches so each probes
+-- advisory_record_generations_identity_idx by exact key; an OR join scans the
+-- whole generation. The caller passes the feed revision read in the same
+-- repeatable-read transaction, which is exactly the advisory_records view's
+-- generation filter. RPM imported signing keys (gpg-pubkey without an
+-- architecture) are keyring entries, not installable packages, and never match.
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+ p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
-JOIN advisory_records r ON r.feed_id=sqlc.arg('feed_id')
- AND ((NOT r.source_package AND r.package_name=p.name)
-      OR (r.source_package AND r.package_name=p.source_name))
+JOIN advisory_record_generations r ON r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
+ AND NOT r.source_package AND r.package_name=p.name
  AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
 WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>=sqlc.arg('first_position')
  AND p.position<sqlc.arg('end_position')
-ORDER BY p.position,r.id
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+UNION ALL
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+ p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
+FROM snapshot_packages p
+JOIN advisory_record_generations r ON r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
+ AND r.source_package AND r.package_name=p.source_name
+ AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
+WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>=sqlc.arg('first_position')
+ AND p.position<sqlc.arg('end_position') AND p.source_name<>''
+ AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture=''))
+ORDER BY position,record_id
 LIMIT 10001;
 
 -- name: AdvisorySourceMappingMissing :one
@@ -121,6 +139,11 @@ ON CONFLICT(device_id) DO UPDATE SET id=EXCLUDED.id,snapshot_id=EXCLUDED.snapsho
  feed_id=EXCLUDED.feed_id,feed_revision=EXCLUDED.feed_revision,evaluated_at=EXCLUDED.evaluated_at,
  inventory_at=EXCLUDED.inventory_at,host_received_at=EXCLUDED.host_received_at,expires_at=EXCLUDED.expires_at,state=EXCLUDED.state,
  reason=EXCLUDED.reason,finding_digest=EXCLUDED.finding_digest;
+
+-- name: TouchAdvisoryEvaluation :exec
+-- Records that unchanged feed-less evidence was rechecked against the current
+-- feed configuration, without replacing the evaluation identity bound by cursors.
+UPDATE advisory_evaluations SET evaluated_at=$2 WHERE device_id=$1 AND id=$3;
 
 -- name: DeleteAdvisoryFindings :exec
 DELETE FROM advisory_findings WHERE device_id=$1;
@@ -172,8 +195,25 @@ LEFT JOIN advisory_evaluations e ON e.device_id=d.id
 LEFT JOIN advisory_feeds af ON af.id=e.feed_id
 WHERE d.state='active' AND device_scope_matches(d.id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb);
 
--- name: ListAdvisoryDeviceIDs :many
-SELECT id FROM devices WHERE id>$1 AND state='active' ORDER BY id LIMIT 100;
+-- name: ListAdvisoryEvaluationsPending :many
+-- Evaluations are recomputed only when their bound evidence changes: a new
+-- published snapshot or host observation, a new feed generation, or a disabled
+-- bound feed. Feed selection depends only on enabled feed configuration, so a
+-- device evaluated without any applicable feed is rechecked once any process
+-- configures or re-enables a feed after that evaluation. Time-based expiry needs
+-- no worker: the read path and advisory_finding_status recheck it.
+SELECT d.id FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id
+LEFT JOIN advisory_evaluations e ON e.device_id=d.id
+LEFT JOIN advisory_feeds af ON af.id=e.feed_id
+WHERE d.state='active' AND (e.device_id IS NULL
+ OR e.snapshot_id IS DISTINCT FROM g.current_snapshot_id
+ OR e.host_received_at IS DISTINCT FROM h.received_at
+ OR (e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision))
+ OR (e.feed_id='' AND EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.enabled AND f.configured_at>e.evaluated_at)))
+ORDER BY e.evaluated_at NULLS FIRST,d.id
+LIMIT sqlc.arg('row_limit');
 
 -- name: AcceptAdvisoryException :exec
 INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
@@ -199,7 +239,10 @@ SELECT EXISTS(SELECT 1 FROM devices d WHERE d.id=sqlc.arg('device_id')::uuid
  AND device_scope_matches(d.id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb))::boolean;
 
 -- name: AdvisoryArchitectures :many
-SELECT DISTINCT architecture FROM snapshot_packages WHERE snapshot_id=$1 LIMIT 65;
+-- RPM imported signing keys (gpg-pubkey with no ARCH tag) are not packages and
+-- do not make a device's architecture coverage unknown.
+SELECT DISTINCT architecture FROM snapshot_packages WHERE snapshot_id=$1
+ AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='') LIMIT 65;
 
 -- name: PruneAdvisoryExceptionRequests :exec
 DELETE FROM advisory_exception_requests WHERE (actor_id,request_id) IN

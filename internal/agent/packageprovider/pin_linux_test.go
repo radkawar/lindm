@@ -8,12 +8,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
 
 func desiredFixture(ecosystem resourcev1.PackageEcosystem) *resourcev1.ResourceDesiredState {
@@ -52,7 +54,7 @@ func TestDNFNativePinPreservesUnrelatedOwnershipAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := parseVersionlock(pin)
+	parsed, err := dnf.ParseVersionlock(pin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +80,29 @@ func TestDNFNativePinPreservesUnrelatedOwnershipAndIsIdempotent(t *testing.T) {
 		if _, err := renderDNFPin(d.GetRef(), d.GetNativePackage(), overlap); err == nil {
 			t.Fatalf("acquired overlapping native pin %s", name)
 		}
+	}
+}
+func TestSharedDNFVersionlockOnlyClaimsMatchingPackage(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM)
+	file := &resourcev1.FileIdentity{Path: "/etc/dnf/versionlock.toml"}
+	observe := func(contents string) *resourcev1.NativePackageObservation {
+		return &resourcev1.NativePackageObservation{Package: d.GetNativePackage().GetPackage(), PinFile: file, PinContents: []byte(contents)}
+	}
+	other := "version = '1.0'\n[[packages]]\nname = 'bash'\ncomment = 'lindm:rpm/bash/x86_64'\n[[packages.conditions]]\nkey = 'evr'\ncomparator = '='\nvalue = '0:5.3-1.fc44'\n"
+	if pinClaimsPackage(d.GetRef(), observe(other)) {
+		t.Fatal("another package's versionlock entry required adoption")
+	}
+	for _, name := range []string{"proof", "pro*"} {
+		if !pinClaimsPackage(d.GetRef(), observe(strings.Replace(other, "'bash'", "'"+name+"'", 1))) {
+			t.Fatalf("existing %s versionlock entry acquired without adoption", name)
+		}
+	}
+	if !pinClaimsPackage(d.GetRef(), observe("not toml")) {
+		t.Fatal("unreadable versionlock acquired without adoption")
+	}
+	deb := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	if !pinClaimsPackage(deb.GetRef(), &resourcev1.NativePackageObservation{Package: deb.GetNativePackage().GetPackage(), PinFile: file}) {
+		t.Fatal("per-package APT pin acquired without adoption")
 	}
 }
 func TestPinObservationRefusesSymlinksAndAtomicReplacementPreservesBaseline(t *testing.T) {

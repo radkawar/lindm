@@ -26,7 +26,7 @@ func resourceComplianceDesired() *resourcev1.ResourceDesiredState {
 // header keyslots; it never relies on the agent's encryption observation.
 func complianceOracle(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
 	command := "root=$(findmnt -n -o SOURCE /); lsblk -s -n -o NAME,TYPE,FSTYPE \"$root\"; lsblk -s -n -o TYPE \"$root\" | grep -qx crypt; " +
-		"luks=$(lsblk -s -n -p -o NAME,FSTYPE \"$root\" | awk '$2==\"crypto_LUKS\"{print $1; exit}'); test -n \"$luks\"; cryptsetup isLuks --type luks2 \"$luks\"; cryptsetup luksDump \"$luks\" | sed -n '/^Keyslots:/,/^Tokens:/p' | grep -E '^ +[0-9]+: '"
+		"luks=$(lsblk -s -r -n -p -o NAME,FSTYPE \"$root\" | awk '$2==\"crypto_LUKS\"{print $1; exit}'); test -n \"$luks\"; cryptsetup isLuks --type luks2 \"$luks\"; cryptsetup luksDump \"$luks\" | sed -n '/^Keyslots:/,/^Tokens:/p' | grep -E '^ +[0-9]+: '"
 	return resourceOracle(ctx, vm, "native-luks-root-keyslots", command)
 }
 
@@ -81,6 +81,18 @@ func nativeComplianceScenario(ctx context.Context, machine *actionMachine, contr
 	request := actionRequestFor(machine.deviceID, machine.generation, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_EscrowRotate{EscrowRotate: rotate}})
 	result.Escrow, _, err = dispatchNativeAction(ctx, machine.vm.guest, control.session, request, ownerCredential, false)
 	if err != nil {
+		diagnostic := VMResourceScenario{Name: "escrow-rotate-dispatch", StartedAt: time.Now().UTC(), Failure: err.Error()}
+		diagnostic.Native = append(diagnostic.Native, executorDiagnostics(ctx, machine.vm.guest))
+		if inventory, runErr := machine.vm.guest.runResult(ctx, "sudo -n /usr/libexec/lindm/lindm-agent inventory-observe 2>&1 | head -c 200000", nil, 256<<10, 2*time.Minute); runErr == nil {
+			diagnostic.Native = append(diagnostic.Native, resourceNativeRecord("failure-diagnostic-root-inventory", inventory.Stdout))
+		}
+		// Disposable guest only: bisect which executor sandbox property breaks a
+		// nested systemd-run on this distribution.
+		bisect := `for p in "" "-p NoNewPrivileges=yes" "-p ProtectProc=invisible" "-p PrivateDevices=yes" "-p SystemCallFilter=@system-service -p SystemCallErrorNumber=EPERM" "-p RestrictAddressFamilies=AF_UNIX" "-p RestrictSUIDSGID=yes" "-p MemoryDenyWriteExecute=yes" "-p RestrictNamespaces=yes" "-p ProtectSystem=strict" "-p ProtectHome=yes" "-p PrivateTmp=yes" "-p ProtectKernelTunables=yes -p ProtectControlGroups=yes" "-p CapabilityBoundingSet=CAP_CHOWN" "-p LockPersonality=yes -p ProtectHostname=yes -p ProtectClock=yes"; do printf "%s => " "$p"; systemd-run --quiet --wait --pipe $p /usr/bin/systemd-run --quiet --wait --pipe /usr/bin/true 2>&1 | head -c 300; echo " rc=$?"; done`
+		if system, runErr := machine.vm.guest.runResult(ctx, "sudo -n sh -c "+nativeQuote(bisect), nil, 256<<10, 5*time.Minute); runErr == nil {
+			diagnostic.Native = append(diagnostic.Native, resourceNativeRecord("failure-diagnostic-system", system.Stdout))
+		}
+		evidence.Scenarios = append(evidence.Scenarios, diagnostic)
 		return err
 	}
 	if err := complianceFinding(ctx, r, evidence, "escrowed-luks-root-converged", resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_CONVERGED); err != nil {

@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -33,29 +35,49 @@ func (s *Service) GetRecoveryReadiness(ctx context.Context, req *connect.Request
 	defer s.mu.Unlock()
 	observation := s.observeRecoveryReadiness(ctx, recoveryboot.ObserveReadiness)
 	if observation.GetBootId() == "" {
+		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "readiness_boot_id", err: errors.Join(errInternal, errors.New(observation.GetReason()))})
 		return nil, mapError(errInternal)
 	}
 	root, err := s.observeRootInventory(ctx)
 	if err != nil {
+		s.logRecoveryReadinessFailure(err)
 		return nil, mapError(errInternal)
 	}
 	boot, err := s.bootID()
 	if err != nil || boot != root.GetBootId() || boot != observation.GetBootId() || ctx.Err() != nil ||
 		root.GetStartedAt().AsTime().Before(observation.GetObservedAt().AsTime()) {
+		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "readiness_boot_fence", err: errors.Join(errInternal, err, ctx.Err())})
 		return nil, mapError(errInternal)
 	}
 	if err := s.admit(root); err != nil {
+		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "admit", err: err, violations: s.violationPaths(root)})
 		return nil, mapError(errInternal)
 	}
 	encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(root)
 	if err != nil {
+		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "encode", err: err})
 		return nil, mapError(errInternal)
 	}
 	response := &agentv1.GetRecoveryReadinessResponse{Observation: observation, RootObservation: encoded}
 	if err := s.admit(response); err != nil {
+		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "admit_response", err: err, violations: s.violationPaths(response)})
 		return nil, mapError(errInternal)
 	}
 	return noStore(response), nil
+}
+
+// logRecoveryReadinessFailure records the internal cause that the RPC reduces
+// to errInternal, so native failures are diagnosable from the executor journal.
+func (s *Service) logRecoveryReadinessFailure(err error) {
+	logger := s.logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	var stage *rootInventoryError
+	if !errors.As(err, &stage) {
+		stage = &rootInventoryError{stage: "unclassified", err: err}
+	}
+	logger.Warn("recovery readiness observation failed", stage.logAttrs()...)
 }
 
 func (s *Service) observeRecoveryReadiness(ctx context.Context, observe func(context.Context, string) (recoveryboot.Readiness, error)) *agentv1.RecoveryReadinessObservation {

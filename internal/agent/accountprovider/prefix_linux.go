@@ -31,7 +31,10 @@ func validateAccountRoot(root string) (err error) {
 	if err != nil {
 		return err
 	}
-	if len(entries) != 1 || entries[0].Name() != "etc" || !entries[0].IsDir() {
+	// Only the exact /etc bind and the private mail-spool scratch tree exist.
+	// A distribution default that creates a mailbox writes it there, never on
+	// the host; it is discarded with the transaction directory.
+	if len(entries) != 2 || entries[0].Name() != "etc" || !entries[0].IsDir() || entries[1].Name() != "var" || !entries[1].IsDir() {
 		return ErrUnsafe
 	}
 	var host, bound unix.Stat_t

@@ -60,14 +60,14 @@ func TestVendorBackportsPersistWithoutUpstreamFalsePositives(t *testing.T) {
 				fixed.SourceVersion = tc.fixed
 			}
 			fixedID := seedInventory(t, pool, tc.distro, tc.release, fixed)
-			response, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: oldID.String()}, true, []byte("[]"))
+			response, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: oldID.String()}, true, []byte("[]"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(response.GetFindings()) != 1 || response.Findings[0].GetFixedVersion() != tc.fixed {
 				t.Fatalf("old package: %v", response)
 			}
-			response, err = s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: fixedID.String()}, true, []byte("[]"))
+			response, err = listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: fixedID.String()}, true, []byte("[]"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +92,7 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "sudo-devel", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}
-	first, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+	first, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,14 +102,14 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	if first.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
 		t.Fatalf("finding not affected: %v", first)
 	}
-	second, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken}, true, []byte("[]"))
+	second, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(second.Findings) != 1 || second.Findings[0].Id == first.Findings[0].Id {
 		t.Fatal("page repeated or lost a finding")
 	}
-	if _, err := s.ListDevice(t.Context(), request, false, []byte("[]")); !errors.Is(err, ErrNotFound) {
+	if _, err := listEvaluated(t, s, request, false, []byte("[]")); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("out-of-scope findings exposed: %v", err)
 	}
 	summary, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, false, []byte("[]"))
@@ -140,7 +140,7 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	if err := tx.Rollback(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	out, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+	out, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	if _, err := pool.Exec(t.Context(), "UPDATE advisory_exceptions SET accepted_at=now()-interval '2 hours',expires_at=now()-interval '1 hour' WHERE finding_id=$1", uuid.MustParse(accept.FindingId)); err != nil {
 		t.Fatal(err)
 	}
-	out, err = s.ListDevice(t.Context(), request, true, []byte("[]"))
+	out, err = listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,28 +167,37 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	if summary.UnknownDevices != 1 || summary.EvaluatedDevices != 0 || len(summary.Advisories) != 1 || summary.Advisories[0].UnknownDevices != 1 {
 		t.Fatalf("fleet freshness waited for background reevaluation: %v", summary)
 	}
-	out, err = s.ListDevice(t.Context(), request, true, []byte("[]"))
+	out, err = listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
 		t.Fatal("stale feed shown healthy/affected with current certainty")
 	}
-	if _, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageToken: first.NextPageToken}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
-		t.Fatalf("obsolete evaluation cursor silently rebound: %v", err)
-	}
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(t.Context(), "UPDATE package_snapshots SET started_at=now()-interval '3 days',finished_at=now()-interval '2 days' WHERE device_id=$1", id); err != nil {
-		t.Fatal(err)
+	// Identical content keeps the feed generation, so the persisted evaluation
+	// and its cursor stay valid instead of being rebuilt per read.
+	if second, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken}, true, []byte("[]")); err != nil || len(second.Findings) != 1 || second.Findings[0].Id == first.Findings[0].Id {
+		t.Fatalf("unchanged evaluation cursor: %v %v", second, err)
 	}
+	// A new host observation replaces the evaluation once the background job
+	// runs; the old cursor must not silently rebind to it.
+	mustExec(t, t.Context(), pool, "UPDATE host_observations SET received_at=clock_timestamp() WHERE generation_id=(SELECT current_generation_id FROM devices WHERE id=$1)", id)
+	mustExec(t, t.Context(), pool, "UPDATE devices d SET host_received_at=h.received_at FROM host_observations h WHERE h.generation_id=d.current_generation_id AND d.id=$1", id)
+	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageToken: first.NextPageToken}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
+		t.Fatalf("obsolete evaluation cursor silently rebound: %v", err)
+	}
+	// Published snapshots are immutable; age arrives by time passing past the
+	// expiry the evaluation bound. Reads recheck it without a worker run.
+	mustExec(t, t.Context(), pool, "UPDATE advisory_evaluations SET expires_at=now()-interval '1 second' WHERE device_id=$1", id)
 	out, err = s.ListDevice(t.Context(), request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
-		t.Fatal("stale inventory shown healthy")
+	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Freshness.Reason != "inventory_stale" {
+		t.Fatalf("stale inventory shown healthy: %v", out.Freshness)
 	}
 }
 
@@ -222,7 +231,7 @@ func TestAdvisoryOfflineImportCannotEstablishCurrentCoverage(t *testing.T) {
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}
-	before, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+	before, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +255,7 @@ func TestAdvisoryOfflineImportCannotEstablishCurrentCoverage(t *testing.T) {
 	if summary.UnknownDevices != 1 || summary.EvaluatedDevices != 0 {
 		t.Fatalf("offline replay retained apparently current fleet coverage: %v", summary)
 	}
-	after, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+	after, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +287,7 @@ func TestFeedConfigurationChangeReparsesUnchangedSourceBytes(t *testing.T) {
 		Name: "openssh-server", Version: "1:8.9p1-3ubuntu0.9", Architecture: "amd64", Manager: "dpkg",
 		SourceName: "openssh", SourceVersion: "1:8.9p1-3ubuntu0.9",
 	})
-	out, err := reconfigured.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, reconfigured, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,12 +303,76 @@ func TestUncoveredMultilibArchitectureIsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "i686", Manager: "rpm"})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(out.Findings) != 0 || out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Freshness.Reason != "package_architecture_uncovered" {
 		t.Fatalf("x86_64 repository cleared an uncovered multilib package: %v", out)
+	}
+}
+
+// The server's evaluator serves feeds configured and published by another
+// process (the refresh CLI or a fixture) in the shared database. A device
+// evaluated before any applicable feed existed is rechecked once one is
+// configured, without the server's own configuration listing that feed.
+func TestEvaluatorRechecksFeedlessDevicesAfterExternalConfiguration(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	server, err := New(t.Context(), pool, nil, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	before, err := listEvaluated(t, server, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || before.Freshness.Reason != "feed_unavailable" {
+		t.Fatalf("device without a feed: %v", before.Freshness)
+	}
+	if attempted, err := server.EvaluatePending(t.Context(), evaluationBatch); err != nil || attempted != 0 {
+		t.Fatalf("unchanged feed-less device evaluated again: %d %v", attempted, err)
+	}
+	external, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := external.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	after, err := listEvaluated(t, server, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED || len(after.Findings) != 1 {
+		t.Fatalf("externally configured feed not evaluated: %v", after)
+	}
+}
+
+// Native rpm reports imported signing keys as gpg-pubkey rows without an ARCH
+// tag. They are keyring entries, not packages, and must not make every RPM
+// device's architecture coverage UNKNOWN. Any other architecture-less row still
+// does.
+func TestRPMSigningKeyRowsDoNotMakeCoverageUnknown(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	sudo := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	key := &inventoryv1.Package{Name: "gpg-pubkey", Version: "0:7db87c81-4ab02935", Manager: "rpm"}
+	keyed := seedInventory(t, pool, "fedora", "44", sudo, key)
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: keyed.String()}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED || len(out.Findings) != 1 || out.Findings[0].PackageName != "sudo" {
+		t.Fatalf("signing key row changed device exposure: %v", out)
+	}
+	unarchitected := seedInventory(t, pool, "fedora", "44", sudo, &inventoryv1.Package{Name: "gpg-pubkey-helper", Version: "0:1.0-1.fc44", Manager: "rpm"})
+	out, err = listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: unarchitected.String()}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.Freshness.Reason != "package_architecture_uncovered" {
+		t.Fatalf("architecture-less package other than a signing key was covered: %v", out.Freshness)
 	}
 }
 
@@ -352,7 +425,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}
 	found := make(map[string]*adminv1.AdvisoryFinding)
 	for {
-		out, err := s.ListDevice(t.Context(), request, true, []byte("[]"))
+		out, err := listEvaluated(t, s, request, true, []byte("[]"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -382,13 +455,13 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 	if len(found) != 3 {
 		t.Fatalf("lost implicated source or binary package: %v", found)
 	}
-	if _, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, false, []byte("[]")); !errors.Is(err, ErrNotFound) {
+	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, false, []byte("[]")); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("rejected findings escaped device scope: %v", err)
 	}
 	actor := uuid.New()
 	mustExec(t, t.Context(), pool, "INSERT INTO principals(id,issuer,subject) VALUES($1,'https://advisory.test',$2)", actor, uuid.NewString())
 	acceptFinding(t, s, actor, &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: id.String(), FindingId: found["openssl"].Id, Reason: "Documented temporary source uncertainty", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +471,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 		}
 	}
 	unrelated := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
-	unaffected, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: unrelated.String()}, true, []byte("[]"))
+	unaffected, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: unrelated.String()}, true, []byte("[]"))
 	if err != nil || unaffected.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR || len(unaffected.GetFindings()) != 0 {
 		t.Fatalf("scoped rejection contaminated unrelated device: %v %v", unaffected, err)
 	}
@@ -426,7 +499,7 @@ func TestAdvisoryUnscopedRejectionAndManifestCapacity(t *testing.T) {
 		t.Fatalf("unscoped rejection asserted complete coverage: %v %v", status, err)
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_partial_coverage" || len(out.GetFindings()) != 0 {
 		t.Fatalf("unscoped rejection cleared a device: %v %v", out, err)
 	}
@@ -457,7 +530,7 @@ func TestAdvisoryRejectedRecordLegacyAssessmentRemainsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "openssl", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm"})
-	out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
+	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "vendor_assessment_unknown" || len(out.GetFindings()) != 1 || out.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
 		t.Fatalf("legacy assessment fields failed closed compatibility: %v %v", out, err)
 	}
@@ -532,6 +605,26 @@ VALUES($1,$2,$3,1,'committed',$4,$5,now(),now(),now(),now(),now()+interval '24 h
 VALUES($1,1,now(),now(),(SELECT host_received_at FROM devices WHERE id=$2),$3,1,'fixture-boot',1,'advisory-fixture',1,$4,1,$5,1,'x86_64',1,'fixture-kernel',2,'',2,'',2,'')`, generation, deviceID, digest[:], distro, release)
 	mustExec(t, ctx, pool, "INSERT INTO package_attempts(generation_id,sequence,started_at,finished_at,received_at,status,backend,snapshot_id,digest) VALUES($1,1,now(),now(),now(),1,$2,$3,$4)", generation, packages[0].Manager, snapshot, digest[:])
 	return deviceID
+}
+
+// listEvaluated runs the background evaluation job to completion, then reads
+// the persisted evaluation exactly as the admin API does.
+func listEvaluated(t *testing.T, s *Service, req *adminv1.ListDeviceFindingsRequest, unrestricted bool, scopes []byte) (*adminv1.ListDeviceFindingsResponse, error) {
+	t.Helper()
+	if err := drainEvaluations(t.Context(), s); err != nil {
+		return nil, err
+	}
+	return s.ListDevice(t.Context(), req, unrestricted, scopes)
+}
+
+func drainEvaluations(ctx context.Context, s *Service) error {
+	for range 1000 {
+		attempted, err := s.EvaluatePending(ctx, evaluationBatch)
+		if err != nil || attempted < evaluationBatch {
+			return err
+		}
+	}
+	return errors.New("pending advisory evaluations did not drain")
 }
 
 func mustExec(t *testing.T, ctx context.Context, pool *pgxpool.Pool, query string, args ...any) {

@@ -41,6 +41,38 @@ type VMHardwareOptions struct {
 	recoveryTarget bool
 	// Acceptance preserves vendor timers rather than quiescing inventory fixtures.
 	stockAcceptance bool
+	// dataLink adds nic1 on a lane-owned host-local L2 link to one peer guest.
+	dataLink *vmDataLink
+}
+
+// vmDataLink is a guest's second NIC on a host-local Unix datagram Ethernet
+// link shared with exactly one other guest of the same lane. QEMU binds Local
+// and sends frames to Remote; both lie in one lane-owned private directory, so
+// concurrent lanes on a host never share a segment. It never creates a host
+// bridge, tap device, route or firewall rule, and it works unchanged on remote
+// lab hosts because both guests run on the same executing host.
+type vmDataLink struct {
+	MAC           string
+	Local, Remote string
+}
+
+// sun_path holds 108 bytes including the terminator.
+const maxUnixSocketPath = 107
+
+func (l vmDataLink) validate() error {
+	mac, err := net.ParseMAC(l.MAC)
+	if err != nil || len(mac) != 6 || mac.String() != l.MAC || mac[0]&1 != 0 || mac[0]&2 == 0 {
+		return errors.New("VM data link requires a lowercase locally administered unicast MAC")
+	}
+	for _, path := range []string{l.Local, l.Remote} {
+		if !filepath.IsAbs(path) || filepath.Clean(path) != path || strings.ContainsAny(path, ",\x00") || len(path) > maxUnixSocketPath {
+			return errors.New("VM data link endpoints must be short clean absolute socket paths")
+		}
+	}
+	if l.Local == l.Remote || filepath.Dir(l.Local) != filepath.Dir(l.Remote) {
+		return errors.New("VM data link endpoints must be distinct sockets in one private link directory")
+	}
+	return nil
 }
 
 func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareOptions, error) {
@@ -87,6 +119,13 @@ func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareO
 	}
 	if h.Firmware != nil && (h.Firmware.Code == "" || h.Firmware.Vars == "" || h.Firmware.Package == "" || h.Firmware.Version == "") {
 		return h, errors.New("VM EFI firmware requires code, variables, package and exact version")
+	}
+	if options != nil && options.dataLink != nil {
+		link := *options.dataLink
+		if err := link.validate(); err != nil {
+			return h, err
+		}
+		h.dataLink = &link
 	}
 	return h, nil
 }
@@ -214,6 +253,14 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 		network += ",restrict=on"
 	}
 	args = append(args, "-device", "virtio-blk-pci,drive=seed", "-device", "virtio-rng-pci", "-netdev", network, "-device", "virtio-net-pci,netdev=net0,id=nic0")
+	if h.dataLink != nil {
+		// JSON keeps socket paths out of QEMU's comma-delimited option syntax.
+		netdev, err := json.Marshal(map[string]any{"type": "dgram", "id": "net1", "local": map[string]string{"type": "unix", "path": h.dataLink.Local}, "remote": map[string]string{"type": "unix", "path": h.dataLink.Remote}})
+		if err != nil {
+			return nil, fmt.Errorf("encode QEMU data link: %w", err)
+		}
+		args = append(args, "-netdev", string(netdev), "-device", "virtio-net-pci,netdev=net1,id=nic1,mac="+h.dataLink.MAC)
+	}
 	if h.TPM {
 		device := "tpm-tis"
 		if h.Architecture == "aarch64" {
@@ -289,6 +336,7 @@ type vmRuntimeEvidence struct {
 	Desktop           bool                       `json:"desktop"`
 	Display           string                     `json:"display"`
 	NetworkAccess     string                     `json:"network_access"`
+	DataLink          string                     `json:"data_link,omitempty"`
 	Emulated          bool                       `json:"emulated"`
 	Physical          bool                       `json:"physical"`
 }
@@ -310,6 +358,9 @@ func (v *guestVM) runtimeEvidence(ctx context.Context) (*vmRuntimeEvidence, erro
 	e.NetworkAccess = "restricted-user"
 	if h.AllowNetwork {
 		e.NetworkAccess = "user-egress"
+	}
+	if h.dataLink != nil {
+		e.DataLink = "nic1 " + h.dataLink.MAC + " host-local unix-dgram L2 peer link"
 	}
 	switch h.StorageBus {
 	case "virtio-blk":

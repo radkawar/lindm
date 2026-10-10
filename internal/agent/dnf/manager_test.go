@@ -29,6 +29,23 @@ func TestParseVersion(t *testing.T) {
 	}
 }
 
+func TestAtLeastComparesNumericComponents(t *testing.T) {
+	for _, test := range []struct {
+		manager Manager
+		want    bool
+	}{
+		{Manager{DNF5, "5.4.6.0"}, true},
+		{Manager{DNF5, "5.4.10.0"}, true},
+		{Manager{DNF5, "5.10.0.0"}, true},
+		{Manager{DNF5, "5.4.1.0"}, false},
+		{Manager{DNF4, "5.4.6"}, false},
+	} {
+		if got := test.manager.AtLeast(DNF5, "5.4.6.0"); got != test.want {
+			t.Fatalf("%+v AtLeast 5.4.6.0 = %v", test.manager, got)
+		}
+	}
+}
+
 func TestExecutableSelectsNativeManagerNotDistribution(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "native-manager")
 	if err := os.WriteFile(path, nil, 0700); err != nil {

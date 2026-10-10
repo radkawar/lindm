@@ -9,13 +9,13 @@ and 16, and SLED 15 SP7, are separate enterprise product rows, not results inher
 from openSUSE. [Verification](../verification.md#1-launch-platform-qualification)
 is authoritative; no complete release cell is certified (`docs/verification.md:155-175,770-815`).
 
-| Input                                         | Recorded boundary                                                                                                                                                                    |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Leap 16.0 Minimal-VM Cloud Build18.75, x86_64 | Authenticated acquisition; inspection exited 1 for the ndb rpmdb cause diagnosed below. Fixed, but no x86_64 rerun, lifecycle or dispatch pass yet.                                  |
-| Tumbleweed Cloud Snapshot20261007, x86_64     | Authenticated acquisition and offline cache verification only; no native inspection/lifecycle pass.                                                                                  |
-| Leap 16.0 Build18.75, aarch64                 | Native inspection (376 RPMs), full signed lifecycle and connected dispatch passed on dgx21 KVM after the ndb and disk fixes below; not an expansion of the x86_64 launch allocation. |
-| Tumbleweed aarch64                            | No maintained cloud-image/installer-to-golden input; signed DVD/NET availability is not an installed guest.                                                                          |
-| SLES/SLED                                     | Required independent vendor installation, entitlement and native lifecycle evidence; openSUSE results do not qualify them.                                                           |
+| Input                                         | Recorded boundary                                                                                                                                                                               |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Leap 16.0 Minimal-VM Cloud Build18.75, x86_64 | After the ndb fix: native inspection (378 RPMs), full signed lifecycle (five 380-package publications) and nine-scenario connected dispatch passed locally under UEFI (records below).          |
+| Tumbleweed Cloud Snapshot20261007, x86_64     | Authenticated acquisition and offline cache verification only; no native inspection/lifecycle pass.                                                                                             |
+| Leap 16.0 Build18.75, aarch64                 | Native inspection (376 RPMs), full signed lifecycle and connected dispatch passed on dgx21 KVM after the ndb and disk fixes below; not an expansion of the x86_64 launch allocation.            |
+| Tumbleweed Snapshot20261007 DVD, aarch64      | Installer-to-golden (signed DVD + AutoYaST, snapshot-bound cloud-init closure): native inspection (830 RPMs), full signed lifecycle and connected dispatch passed on dgx21 KVM (records below). |
+| SLES/SLED                                     | Required independent vendor installation, entitlement and native lifecycle evidence; openSUSE results do not qualify them.                                                                      |
 
 These boundaries are recorded in `docs/verification.md:177-220,267-304`.
 
@@ -153,6 +153,9 @@ signature with pinned keys. SUSE coverage remains partial: no finding is not a
 clean bill of health, and offline byte-pinned imports do not become fresh complete
 coverage (`docs/architecture.md:1160-1196`). Do not interpret Tumbleweed GA notices
 as rolling-snapshot vulnerability boundaries.
+RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
+they neither match records nor make architecture coverage UNKNOWN
+([Fedora advisory feeds](fedora.md#advisory-feeds)).
 
 ## Lab inputs and recorded evidence
 
@@ -164,6 +167,10 @@ Image/version pins, sizes and signer fingerprints are in:
   Snapshot20261007, image SHA-256 `ba2c573a5894fbd27e6d19916abae222e04daaadad7aa10e8ebface2ebaf0884`.
 - [`opensuse-leap-16.0-aarch64.json`](../../lab/images/opensuse-leap-16.0-aarch64.json):2-18:
   Build18.75, image SHA-256 `bca1bd30a41622eb78727ba9375bff4d99ffaec1aed49bde1efa0ffc96ee58a8`.
+- [`opensuse-tumbleweed-20261007-aarch64.json`](../../lab/images/opensuse-tumbleweed-20261007-aarch64.json):2-18:
+  signed Snapshot20261007 **DVD** (edition `dvd`), ISO SHA-256
+  `bc84067c9a14aee474d151559b67fc8718295d2508d66669cb75edec587cb261`, 4,270,606,336
+  bytes, `.sha256` signed by the openSUSE key `AD485664…29B700A4`.
 
 Recorded acquisition evidence, not new checks performed for this page:
 
@@ -210,15 +217,90 @@ The first post-fix inspection, before the disk floor, also passed
 (`leap16-arm64-dgx21-inspect-ndbfix.json`,
 `720a662f58912499b01d499cd7022874a13ebc8f9b0b183c7364348d83690c89`).
 
+### Leap 16.0 x86_64 native records (2026-10-10)
+
+The x86_64 cell, which had failed at inspection with the ndb cause, passed locally
+(KVM, OVMF `2024.02-2ubuntu0.10` with Secure Boot disabled, virtio-blk, no
+TPM/desktop, user egress, isolated local password/WebAuthn authority). Source is
+`4d74dcf` plus the MutableDistros5 lab delta (installer goldens only; no agent
+change). The signed 0.7.0/0.7.1 x86_64 RPMs are `ebafbefb…`/`f2c8da50…`. Records are
+under `~/.cache/lindm-mutabledistros5-20261010/`:
+
+| Lane      | Observed result                                                                                                                                                                                                   | Record / SHA-256                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Inspect   | 378 native RPM identities and independent detail comparison, UEFI                                                                                                                                                 | `leap16-x86_64-local-inspect.json` / `dadb6bc9d37fd93dcaa6eecefc31913c37467738c1c68523904e2f567b2ea2cc`   |
+| Lifecycle | Signed zypper 0.7.0→0.7.1 automatic trust: five 380-package publications, denied attempt 6 kept snapshot 5, epoch 1→3, revocation and hold                                                                        | `leap16-x86_64-local-lifecycle.json` / `06c36ca389fc455a92f09f8fd87f2010252e508303061d1c0dd7570d2ef8e752` |
+| Dispatch  | Nine native scenarios with real periodic intervals and revoked denial; supersession integration-only. Ran before dispatch observed SELinux, so its `not applicable` is the old lab assumption, not an observation | `leap16-x86_64-local-dispatch.json` / `4c0b3341432f59e0e4ab110579f0a37c0873c7ca635395948b1bdb91a320599b`  |
+
+A Leap 16.0 aarch64 dispatch rerun with the kernel SELinux observation recorded
+**SELinux Enforcing** and passed the same nine scenarios on `dgx20`
+(`leap16-arm64-dgx20-dispatch-v3.json`,
+`17289eba4f96fdb1605c590578c572ad3cd037cbceaa3b925e7867fa2be9ba43`, same directory).
+
+### Tumbleweed Snapshot20261007 aarch64 installer-to-golden records (2026-10-10)
+
+No official Tumbleweed ARM cloud/KVM image exists, so the lab installs one from the
+signed Snapshot20261007 DVD with AutoYaST
+([`tumbleweed_installer_linux.go`](../../internal/vmlab/tumbleweed_installer_linux.go);
+workflow in `docs/engineering.md`). The base system (830 packages, Btrfs root with
+snapper, SELinux enforcing, GRUB on the removable path) comes only from the
+authenticated DVD. The DVD lacks cloud-init, so the lab takes `cloud-init` and
+`cloud-init-config-suse` with their closure from the official ports OSS repository at
+a lower priority. That repository's signed `repomd.xml` had to name snapshot
+`20261007` both before and after installation. The golden disk's integrity pin is
+`06442620b7e94fd5555a9b8cd54d7fd762e9a6d31ac13612a5e0de28165685a5` (`dgx21`
+`tumbleweed-installed` cache, recipe `opensuse-tumbleweed-dvd-autoyast-v2`). It is
+a local derived disk, not a vendor-signed image.
+
+Defects found and fixed with regressions while building it:
+
+- The vendor ARM DVD's hybrid MBR/platform-0 El Torito layout makes `xorriso
+-boot_image any replay` fail (exit 32). The remaster re-declares the vendor FAT
+  image as the UEFI El Torito entry (`TestTumbleweedRemasterPatchesEFIImageGRUB`).
+- The first profile failed yast2-schema validation (`update_nvram` typed boolean,
+  `install_recommends`), and with `final_halt` the installer rebooted into the DVD
+  instead of powering off (`TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials`;
+  the profile now validates against the DVD's yast2-schema 5.0.3 RNG).
+- The solver chose `cloud-init-config-MicroOS`; the profile now names
+  `cloud-init-config-suse`.
+- A first lifecycle failed after the reboot with `unable to authenticate`. Tumbleweed
+  starts sshd in parallel with `systemd-user-sessions`, and pam_nologin rejects
+  logins until `/run/nologin` is removed. A guest whose user-sessions start was
+  delayed reproduced "Access denied … by PAM account configuration" for the same key.
+  The golden orders sshd after that unit and validation checks it. A second
+  pre-fix lifecycle (`tw-arm64-dgx21-lifecycle-diag1.json`,
+  `eab13584b53e3460b55e5bd512bbe275b7cc7063d856965c58466eaafafc4a15`) passed.
+- Dispatch recorded SELinux `not applicable` for zypper guests. It now reads
+  `/sys/fs/selinux/enforce` (`TestSELinuxModeFromKernelEnforceState`).
+
+Runtime: `dgx21`, native aarch64 KVM/QEMU 8.2.2, AAVMF `2024.02-2ubuntu0.10`
+(Secure Boot disabled, SetupMode), virtio-blk, no TPM/desktop, user egress,
+isolated local password/WebAuthn authority. Source is `4d74dcf` plus the
+MutableDistros5 lab delta (`md5-source-tw2.patch`
+`3a9bca0585cb3aaba93e79b6f91d0e79767c5dbceb74ba847e70c3f4c3e4a987`; the dispatch
+rerun adds the SELinux observation, `md5-source-v3.patch`
+`7b6b0d5a2096370f28f5280ba84b6f841d4a1d6a2c60bb03679df74c39bb17b4`). The signed
+0.7.0/0.7.1 aarch64 RPMs are `396996dc…`/`8cedbe48…`.
+
+| Lane      | Observed result                                                                                                                                            | Record / SHA-256                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Inspect   | 830 native RPM identities and independent detail comparison                                                                                                | `tw-arm64-dgx21-inspect-v2.json` / `76e793fdd477764a4b8c96afab993daa106ec99218e4ab880fde16d7921c2866`   |
+| Lifecycle | Signed zypper 0.7.0→0.7.1 automatic trust: five 832-package publications, denied attempt 6 kept snapshot 5, epoch 1→3, revocation and missing-journal hold | `tw-arm64-dgx21-lifecycle-v2.json` / `d29350054997675adcb50bcd72deafa176456ec79b55877f595858eb04d7f37b` |
+| Dispatch  | Nine native scenarios with real periodic intervals and revoked denial; SELinux Enforcing; supersession integration-only                                    | `tw-arm64-dgx21-dispatch-v3.json` / `ba180b62dde4cdf26a5117f8fcc29f55157f7c6a970b93c60cea09e7aa166308`  |
+
+The v2 dispatch (`tw-arm64-dgx21-dispatch-v2.json`,
+`9cc8db6ed3ed41254d9dea088b0d4a539ba70917d71af81b9c39a9d89f07f16e`) also passed,
+but it carries the old `not applicable` SELinux label.
+
 ## Known gaps
 
-Leap x86_64 needs its own rerun of inspection, lifecycle and dispatch; the ARM
-records above do not qualify it. Leap LSM enforcement is not established by these
-records. Tumbleweed needs inspection, lifecycle, distribution-upgrade snapshot and
-rollback evidence. Tumbleweed aarch64 has no official ARM Cloud/KVM image (the
-advertised checksum links return 404), so its prerequisite is a maintained,
-snapshot-pinned SUSE installer-to-golden workflow (signed Snapshot DVD/NET media
-exist); an ISO cannot be relabeled as a provisioned cloud disk.
+Leap and Tumbleweed policy-level SELinux behavior (denials, custom modules) is not
+established by these records; they only record the kernel enforcing state. Tumbleweed x86_64
+still needs inspection, lifecycle and dispatch from its cloud image. Tumbleweed also
+needs distribution-upgrade snapshot and rollback evidence: these lanes upgrade only
+the agent package. The aarch64 golden is bound to the 20261007 snapshot. Once the
+ports tree advances, building a new golden fails closed until the manifest is bumped
+to that snapshot's DVD; an existing cached golden is still reused.
 Desktop sessions, enterprise vendor installations, air-gap operation, encryption,
 actions and physical hardware remain distinct gates. None is waived by signed
 image availability or shared RPM code. See the authoritative

@@ -265,6 +265,10 @@ func (p *Provider) makePlan(desired *resourcev1.ResourceDesiredState, operation 
 			native.OwnedProfileObjects = append(native.OwnedProfileObjects, proto.CloneOf(file.GetState().GetFile()))
 		}
 	}
+	if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE && targetMatches(before, target) {
+		// Converged native policy needs no effect or start grant.
+		native.Fields = nil
+	}
 	if operation == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		native.Fields = dimensionFields(ledger.GetOwnedDimensions())
 		last, err := digestMessage(ledger.GetLastApplied())

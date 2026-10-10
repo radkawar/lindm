@@ -89,7 +89,7 @@ func (g *Guard) Arm(ctx context.Context, request *agentv1.NativeResourceTransact
 	if request.GetPlan().GetRef().GetKind() != 8 || g.config.RetainConfirmation == nil {
 		return ErrConflict
 	}
-	lock, err := g.store.lock("record.lock")
+	lock, err := g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (g *Guard) Applied(ctx context.Context, request *agentv1.NativeResourceTran
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	lock, err := g.store.lock("record.lock")
+	lock, err := g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (g *Guard) Applied(ctx context.Context, request *agentv1.NativeResourceTran
 }
 func (g *Guard) Confirm(ctx context.Context, request *agentv1.NativeResourceTransactionRequest, applied *agentv1.ResourceOwnershipSnapshot) error {
 	// Network work holds no root record lock, and runs only on the native worker.
-	lock, err := g.store.lock("record.lock")
+	lock, err := g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (g *Guard) Confirm(ctx context.Context, request *agentv1.NativeResourceTran
 	if err != nil {
 		return err
 	}
-	lock, err = g.store.lock("record.lock")
+	lock, err = g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func (g *Guard) Committed(ctx context.Context, request *agentv1.NativeResourceTr
 	if g.config.RetainConfirmation == nil {
 		return ErrConflict
 	}
-	lock, err := g.store.lock("record.lock")
+	lock, err := g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func (g *Guard) Committed(ctx context.Context, request *agentv1.NativeResourceTr
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	lock, err = g.store.lock("record.lock")
+	lock, err = g.store.lockWorker(ctx, "record.lock")
 	if err != nil {
 		return err
 	}

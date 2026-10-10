@@ -5,6 +5,7 @@
 package connectivityguard
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -93,6 +94,27 @@ func (s *store) lock(name string) (*os.File, error) {
 		return nil, errors.Join(err, f.Close())
 	}
 	return f, nil
+}
+
+// lockWorker is the native worker's record lock. The supervisor polls the same
+// lock non-blockingly every 100ms and holds it only for a check or an exact
+// inverse, so contention is transient: the worker waits, bounded by its own
+// deadline, instead of failing an applied transaction as outcome-unknown.
+// The supervisor itself never waits; its ticker retries.
+func (s *store) lockWorker(ctx context.Context, name string) (*os.File, error) {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		f, err := s.lock(name)
+		if !errors.Is(err, unix.EWOULDBLOCK) {
+			return f, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, errors.Join(ctx.Err(), err)
+		case <-ticker.C:
+		}
+	}
 }
 func (s *store) load() (*agentv1.ConnectivityGuardRecord, error) {
 	f, err := s.open(recordName, false)

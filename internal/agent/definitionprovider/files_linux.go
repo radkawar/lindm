@@ -47,7 +47,9 @@ func directory(path string) (int, []byte, error) {
 		if i == len(parts) || parts[i] == "" {
 			break
 		}
-		next, err := unix.Openat2(fd, parts[i], &unix.OpenHow{Flags: unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC | unix.O_NOFOLLOW, Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS})
+		// systemd RestrictSUIDSGID= fails openat2 with ENOSYS. A single clean
+		// component opened with O_NOFOLLOW cannot escape or follow a link.
+		next, err := unix.Openat(fd, parts[i], unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 		_ = unix.Close(fd)
 		if err != nil {
 			return -1, nil, err
@@ -316,7 +318,10 @@ func (p *Provider) snapshot(ctx context.Context, desired *resourcev1.ResourceDes
 			}
 			o.TimerEnabled = proto.Bool(v.fileState == "enabled")
 			o.TimerActive = proto.Bool(v.active == "active")
-			o.TimerInvocationId = bytes.Clone(v.invocation)
+			// An inactive timer reports an empty InvocationID, which is absence.
+			if len(v.invocation) != 0 {
+				o.TimerInvocationId = bytes.Clone(v.invocation)
+			}
 			o.TimerJobPending = v.pending
 			o.TimerUnitFileState = v.fileState
 			o.TimerScheduleSha256 = schedule

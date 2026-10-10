@@ -63,6 +63,18 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 	if _, err := f.commit(t, manifest, 1); err != nil {
 		t.Fatal(err)
 	}
+	// Reads serve persisted evaluations only: publication alone is pending
+	// until the background job evaluates the new snapshot.
+	pending, err := f.svc.ListDeviceFindings(f.ownerCtx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: f.deviceID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending.Msg.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || pending.Msg.GetFreshness().GetReason() != "evaluation_pending" || len(pending.Msg.GetFindings()) != 0 {
+		t.Fatalf("read matched inline instead of serving the persisted evaluation: %v", pending.Msg)
+	}
+	if _, err := store.EvaluatePending(f.ctx, 32); err != nil {
+		t.Fatal(err)
+	}
 	findings, err := f.svc.ListDeviceFindings(f.ownerCtx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: f.deviceID}))
 	if err != nil {
 		t.Fatal(err)
@@ -227,6 +239,9 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 				t.Fatal(err)
 			}
 			if _, err := f.commit(t, manifest, 1); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := store.EvaluatePending(f.ctx, 32); err != nil {
 				t.Fatal(err)
 			}
 			response, err := f.svc.ListDeviceFindings(f.ownerCtx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: f.deviceID}))

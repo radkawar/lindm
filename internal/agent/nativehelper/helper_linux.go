@@ -61,15 +61,13 @@ func Run(ctx context.Context, document *config.Document, transactionID, phase st
 		return err
 	}
 	if phase == "apply" {
-		ownNetwork, err := os.Stat("/proc/self/ns/net")
+		// The confined apply unit cannot read PID 1's namespace links without
+		// ptrace authority. A systemd PrivateNetwork namespace has only loopback.
+		interfaces, err := net.Interfaces()
 		if err != nil {
 			return err
 		}
-		hostNetwork, err := os.Stat("/proc/1/ns/net")
-		if err != nil {
-			return err
-		}
-		if os.SameFile(ownNetwork, hostNetwork) {
+		if len(interfaces) != 1 || interfaces[0].Name != "lo" {
 			return errors.New("package_helper_private_network_required")
 		}
 	}

@@ -196,6 +196,75 @@ func TestVMHardwareRejectsUnsupportedAndUnboundedRequests(t *testing.T) {
 	}
 }
 
+// The peer link must stay a private two-endpoint segment: a path that escapes
+// the lane's directory, a broadcast/global MAC, or a comma-carrying option
+// would join or address another lane's guests.
+func TestVMHardwareDataLink(t *testing.T) {
+	link := &vmDataLink{MAC: "52:54:00:77:00:10", Local: "/private/link,dir/device.sock", Remote: "/private/link,dir/peer.sock"}
+	if _, err := resolveVMHardware(&VMHardwareOptions{dataLink: link}, "amd64"); err == nil {
+		t.Fatal("accepted comma-carrying data link paths")
+	}
+	for _, bad := range []vmDataLink{
+		{MAC: "52:54:00:77:00:1G", Local: "/l/a.sock", Remote: "/l/b.sock"},
+		{MAC: "52:54:00:77:00:1A", Local: "/l/a.sock", Remote: "/l/b.sock"},
+		{MAC: "53:54:00:77:00:10", Local: "/l/a.sock", Remote: "/l/b.sock"},
+		{MAC: "00:16:3e:77:00:10", Local: "/l/a.sock", Remote: "/l/b.sock"},
+		{MAC: "52:54:00:77:00:10", Local: "l/a.sock", Remote: "/l/b.sock"},
+		{MAC: "52:54:00:77:00:10", Local: "/l/a.sock", Remote: "/other/b.sock"},
+		{MAC: "52:54:00:77:00:10", Local: "/l/a.sock", Remote: "/l/a.sock"},
+		{MAC: "52:54:00:77:00:10", Local: "/l/../a.sock", Remote: "/l/b.sock"},
+		{MAC: "52:54:00:77:00:10", Local: "/" + strings.Repeat("l", 100) + "/a.sock", Remote: "/" + strings.Repeat("l", 100) + "/b.sock"},
+	} {
+		if _, err := resolveVMHardware(&VMHardwareOptions{dataLink: &bad}, "amd64"); err == nil {
+			t.Fatalf("accepted unsafe data link %#v", bad)
+		}
+	}
+	link = &vmDataLink{MAC: "52:54:00:77:00:10", Local: "/private/link/device.sock", Remote: "/private/link/peer.sock"}
+	h, err := resolveVMHardware(&VMHardwareOptions{dataLink: link}, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	link.Remote = "/private/link/other.sock"
+	args, err := configuredVMArguments(h, "/private/run", "12345", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var netdevs []map[string]any
+	devices := 0
+	for i, arg := range args {
+		if i+1 == len(args) {
+			break
+		}
+		if arg == "-netdev" && strings.HasPrefix(args[i+1], "{") {
+			var netdev map[string]any
+			if err := json.Unmarshal([]byte(args[i+1]), &netdev); err != nil {
+				t.Fatal(err)
+			}
+			netdevs = append(netdevs, netdev)
+		}
+		if arg == "-device" && args[i+1] == "virtio-net-pci,netdev=net1,id=nic1,mac=52:54:00:77:00:10" {
+			devices++
+		}
+	}
+	want := map[string]any{"type": "dgram", "id": "net1", "local": map[string]any{"type": "unix", "path": "/private/link/device.sock"}, "remote": map[string]any{"type": "unix", "path": "/private/link/peer.sock"}}
+	if len(netdevs) != 1 || devices != 1 || !jsonEqual(netdevs[0], want) {
+		t.Fatalf("unexpected data link arguments: %q", args)
+	}
+	plain, err := configuredVMArguments(VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", StorageBus: "virtio-blk"}, "/private/run", "12345", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(plain, func(arg string) bool { return strings.Contains(arg, "net1") }) {
+		t.Fatal("ordinary guest gained a data link")
+	}
+}
+
+func jsonEqual(a, b any) bool {
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && bytes.Equal(left, right)
+}
+
 // Encryption fixtures select the disposable disk by serial, not a guessed
 // /dev name. A collision with root or the seed could destroy the wrong disk.
 func TestVMHardwareFixtureDiskIdentity(t *testing.T) {

@@ -21,6 +21,8 @@ import (
 // passes to the immutable spool. Direct inventory.Collect retains caller
 // privileges and never claims recovery readiness. Both publication paths use
 // this boundary; invalid root projections are discarded in their entirety.
+// A failed root observation is recorded only as the readiness reason: other
+// categories keep their independent unprivileged collection status.
 func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	collect := r.collectInventory
 	if collect == nil {
@@ -43,7 +45,6 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 		host.Details.RecoveryReadiness = &agentv1.RecoveryReadinessObservation{
 			ObservedAt: timestamppb.Now(), BootId: boot, Reason: reason,
 		}
-		host.Details.Storage = &inventoryv1.StorageDetails{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
 		if cpu := host.Details.Cpu; cpu.GetModelSource().GetValue() == "smbios_type4" {
 			// Never retain a previous privileged model after a failed current
 			// observation. Public procfs/sysfs facts and historical evidence
@@ -51,6 +52,9 @@ func (r *runner) collectNativeObservation(ctx context.Context) (*inventoryv1.Nat
 			cpu.Model = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
 			cpu.ModelSource = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
 		}
+		// Serial and firmware are privileged-only facts: never keep them
+		// without a current root projection. Storage is not privileged-only;
+		// its unprivileged collection status stands on its own.
 		host.HardwareSerial = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
 		host.Details.Firmware = &inventoryv1.FirmwareDetails{
 			Mode:       &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE},

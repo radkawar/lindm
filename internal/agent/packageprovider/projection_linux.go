@@ -11,6 +11,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
 
 // ValidateStagingProjection checks the actual host pin before the parent starts
@@ -40,6 +41,6 @@ func ValidateStagingProjection(request *agentv1.NativePackageTransactionRequest)
 	if !bytes.Equal(digest[:], request.GetCandidatePinSha256()) {
 		return ErrConflict
 	}
-	_, err = parseVersionlock(request.GetCandidatePinContents())
+	_, err = dnf.ParseVersionlock(request.GetCandidatePinContents())
 	return err
 }

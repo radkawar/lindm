@@ -29,7 +29,7 @@ def resolve(directory, operation, specification):
     config.clean_requirements_on_remove = False
     config.skip_unavailable = False
     config.best = True
-    config.gpgcheck = True
+    config.pkg_gpgcheck = True
     config.repo_gpgcheck = True
     base.setup()
     repos = base.get_repo_sack()

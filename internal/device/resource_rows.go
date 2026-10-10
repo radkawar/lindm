@@ -110,14 +110,24 @@ func resourceDesiresPresence(desired *resourcev1.ResourceDesiredState) bool {
 // Ubuntu 24.04 and Fedora 44 lanes exercised exactly these ownership operations.
 // docs/verification.md lists the records. Absent kinds are never dispatched.
 type resourceQualification struct {
-	adoption bool
+	modes    []resourcev1.OwnershipMode
 	releases []resourcev1.ReleaseBehavior
 }
 
 var qualifiedResourceKinds = map[resourcev1.ResourceKind]resourceQualification{
 	// Services have no ownership baseline: release is retained, or refused by
 	// the agent as baseline_unknown without any native effect.
-	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE: {releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}},
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE: {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}},
+	resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE:  {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE:    {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP:     {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER:      {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	// Every kernel setting and authentication stack already exists natively.
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:                {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION:    {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:       {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE:         {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 }
 
 // The generic wire is not native qualification. Keep unqualified kinds and
@@ -144,7 +154,7 @@ func resourceDispatchUnsupported(item *policyv1.ProfileResource) string {
 const resourceOwnershipUnavailable = "resource_ownership_operation_unavailable"
 
 func resourceOwnershipUnsupported(qualification resourceQualification, ownership *resourcev1.OwnershipPolicy) string {
-	if ownership.GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION && !qualification.adoption {
+	if !slices.Contains(qualification.modes, ownership.GetMode()) {
 		return resourceOwnershipUnavailable
 	}
 	if !slices.Contains(qualification.releases, ownership.GetRelease()) {

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
@@ -131,6 +132,7 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 		return resourcePreparation(current), nil
 	}
 	if operationErr != nil {
+		slog.Warn("resource preparation failed", "action_id", current.GetIntent().GetActionId(), "error", operationErr)
 		failure := agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
 		if errors.Is(operationErr, serviceprovider.ErrUnsupported) {
 			failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
@@ -141,6 +143,7 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 		return resourcePreparation(current), nil
 	}
 	if plan.GetBefore().GetMetadata().GetBootId() != loaded.state.GetSessionBootId() || plan.GetBefore().GetMetadata().GetExecutorIncarnation() != s.incarnation {
+		slog.Warn("resource preparation crossed a boot or executor restart", "action_id", current.GetIntent().GetActionId())
 		if err := s.endResourcePreparation(ctx, loaded, current, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION); err != nil {
 			return nil, err
 		}

@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -27,6 +28,8 @@ type resourceDispatch struct {
 	vm                                        *guestVM
 	control                                   *vmControlPlane
 	device, head, profile, resource, revision string
+	// diagnostics optionally adds lane-specific failure context.
+	diagnostics func(context.Context) []VMResourceNativeRecord
 }
 
 func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.ResourceDesiredState, ownership *resourcev1.OwnershipPolicy) error {
@@ -185,9 +188,19 @@ func resourceFileDesired(name, content string) *resourcev1.ResourceDesiredState 
 func resourceOracle(ctx context.Context, vm *guestVM, name, command string) (VMResourceNativeRecord, error) {
 	// Native tools (gpgv, dpkg, systemctl) report on stderr; it is part of the
 	// recorded evidence, while the exit status remains the oracle verdict.
-	data, err := vm.run(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(command)+" 2>&1", nil, 256<<10, time.Minute)
+	result, err := vm.runResult(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(command)+" 2>&1", nil, 256<<10, time.Minute)
 	if err != nil {
 		return VMResourceNativeRecord{}, fmt.Errorf("independent %s oracle: %w", name, err)
+	}
+	data := result.Stdout
+	if result.ExitCode != 0 {
+		// The oracle observes disposable lab state only; its tail names the
+		// failed native check.
+		tail := strings.TrimSpace(string(data))
+		if len(tail) > 1024 {
+			tail = tail[len(tail)-1024:]
+		}
+		return VMResourceNativeRecord{}, fmt.Errorf("independent %s oracle: guest exit %d: %q", name, result.ExitCode, tail)
 	}
 	if len(data) == 0 {
 		return VMResourceNativeRecord{}, errors.New("native resource oracle returned no evidence")
@@ -232,7 +245,7 @@ func fileOracle(ctx context.Context, vm *guestVM, name, content string, exists b
 	return resourceOracle(ctx, vm, "native-file-content-mode-uid-gid-xattrs-selinux", command)
 }
 
-func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool) error {
+func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane) error {
 	vm := packages.vm
 	if result.Resources == nil {
 		result.Resources = newVMResourceEvidence()
@@ -272,6 +285,12 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 			return err
 		}
 	}
+	if selected["firewall"] {
+		r.fresh()
+		if err := exerciseResourceFirewall(ctx, r, firewall, &result.Resources.Fixture, &kinds[6]); err != nil {
+			return err
+		}
+	}
 	// An interrupted effect leaves its device fence held, so it runs last.
 	if selected["packages"] {
 		if err := exercisePackageInterruption(ctx, r, rpm, &kinds[0]); err != nil {
@@ -308,6 +327,7 @@ func exerciseResourcePackages(ctx context.Context, r *resourceDispatch, rpm reso
 		s.Action = action
 		if err != nil {
 			s.Failure = err.Error()
+			s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
 			return err
 		}
 		if index == 2 && action.GetStartAuthorizedAt() != nil {
@@ -364,6 +384,7 @@ func exerciseResourceFiles(ctx context.Context, r *resourceDispatch, evidence *V
 		s.Action = action
 		if err != nil {
 			s.Failure = err.Error()
+			s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
 			return err
 		}
 		if index == 2 && action.GetStartAuthorizedAt() != nil {

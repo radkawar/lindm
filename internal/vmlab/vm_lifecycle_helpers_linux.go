@@ -98,7 +98,11 @@ func lifecycleCommand(ctx context.Context, vm *guestVM, phase, command string) e
 		return fmt.Errorf("%s: %w", phase, err)
 	}
 	if result.ExitCode != 0 {
-		return fmt.Errorf("%s: guest exit %d (stdout bytes %d, stderr bytes %d)", phase, result.ExitCode, len(result.Stdout), len(result.Stderr))
+		stderr := strings.TrimSpace(string(result.Stderr))
+		if len(stderr) > 512 {
+			stderr = stderr[:512]
+		}
+		return fmt.Errorf("%s: guest exit %d (stdout bytes %d, stderr bytes %d): %q", phase, result.ExitCode, len(result.Stdout), len(result.Stderr), stderr)
 	}
 	return nil
 }

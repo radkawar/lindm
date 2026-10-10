@@ -6,14 +6,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
-	"os/exec"
-	"syscall"
+	"strings"
 	"time"
+	"unicode"
 
+	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
@@ -22,29 +23,39 @@ const (
 	rootInventoryOutputLimit     = 80 << 10
 	rootInventoryDiagnosticLimit = 8 << 10
 	rootInventoryCleanupTimeout  = time.Second
-	rootInventoryWaitDelay       = 100 * time.Millisecond
+	rootInventoryHelper          = "/usr/libexec/lindm/lindm-agent"
 )
+
+// rootInventoryUnits runs one fixed transient unit on a connection owned by a
+// single observation. run returns the unit's bounded stdout only after its main
+// process exited successfully; stop joins the unit's stop job.
+type rootInventoryUnits interface {
+	run(ctx context.Context, properties []systemdProperty) ([]byte, error)
+	stop(ctx context.Context) error
+	close() error
+}
 
 // observeRootInventory starts a new host-device observation for every request.
 // The executor itself keeps PrivateDevices: only this short-lived, read-only
 // unit sees host block devices. Neither configuration nor caller arguments cross
-// the boundary; systemd-run is the native D-Bus frontend, not a shell.
-func (s *Service) observeRootInventory(ctx context.Context) (*inventoryv1.RootObservation, error) {
+// the boundary. PID 1 receives the unit and its output pipes directly on its
+// private socket: no shell, systemd-run frontend or bus broker is involved.
+func (s *Service) observeRootInventory(ctx context.Context) (_ *inventoryv1.RootObservation, resultErr error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, &rootInventoryError{stage: "canceled", err: err}
 	}
 	boot, err := s.bootID()
 	if _, parseErr := uuid.Parse(boot); err != nil || parseErr != nil {
-		return nil, errInternal
+		return nil, &rootInventoryError{stage: "boot_id", err: errors.Join(errInternal, err, parseErr)}
 	}
 	id, err := newID()
 	if err != nil {
-		return nil, err
+		return nil, &rootInventoryError{stage: "unit_id", err: err}
 	}
 	unit := "lindm-inventory-" + id + ".service"
-	run := s.rootInventoryCommand
-	if run == nil {
-		run = runRootInventoryCommand
+	open := s.rootInventorySystemd
+	if open == nil {
+		open = openSystemdPrivateUnit
 	}
 	// Reserve cleanup and pipe-join time within the RPC's 15-second budget.
 	// Early caller cancellation still joins bounded cleanup independently.
@@ -53,59 +64,82 @@ func (s *Service) observeRootInventory(ctx context.Context) (*inventoryv1.RootOb
 		deadline = outer.Add(-2 * time.Second)
 	}
 	if !deadline.After(time.Now()) {
-		return nil, context.DeadlineExceeded
+		return nil, &rootInventoryError{stage: "deadline", err: context.DeadlineExceeded}
 	}
 	call, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
+	units, err := open(call, unit)
+	if err != nil {
+		// Nothing was submitted to PID 1 without an authenticated connection.
+		return nil, &rootInventoryError{stage: "connect", unit: unit, err: errors.Join(errInternal, err)}
+	}
+	defer func() {
+		if err := units.close(); err != nil && resultErr == nil {
+			resultErr = &rootInventoryError{stage: "close", unit: unit, err: errors.Join(errInternal, err)}
+		}
+	}()
 	started := s.now()
-	payload, runErr := run(call, "/usr/bin/systemd-run", rootInventoryArguments(unit)...)
+	payload, runErr := units.run(call, rootInventoryProperties())
 	if runErr != nil || call.Err() != nil {
-		// Even a failed/timed-out start may already have reached PID 1. StopUnit
-		// waits for the cgroup to stop; RuntimeMaxSec is an independent backstop
-		// if PID 1 cannot be reached. Never return before the stop command joins.
+		// Even a failed/timed-out start may already have reached PID 1. Joining
+		// the stop job waits for the cgroup to stop; RuntimeMaxSec is an
+		// independent backstop if PID 1 cannot be reached. Never return first.
 		cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), rootInventoryCleanupTimeout)
-		_, stopErr := run(cleanup, "/usr/bin/systemctl", "--no-ask-password", "stop", unit)
+		stopErr := units.stop(cleanup)
 		stop()
-		return nil, errors.Join(errInternal, runErr, call.Err(), stopErr)
+		return nil, &rootInventoryError{stage: "run", unit: unit, err: errors.Join(errInternal, runErr, call.Err()), cleanup: stopErr}
 	}
 	if len(payload) == 0 || len(payload) > rootInventoryOutputLimit {
-		return nil, errInternal
+		return nil, &rootInventoryError{stage: "output_bound", unit: unit, err: errInternal, payloadBytes: len(payload)}
 	}
 	root := new(inventoryv1.RootObservation)
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(payload, root); err != nil {
-		return nil, errInternal
+		// Decoder messages may quote payload tokens; record only the size.
+		return nil, &rootInventoryError{stage: "decode", unit: unit, err: errInternal, payloadBytes: len(payload)}
 	}
 	if err := s.admit(root); err != nil {
-		return nil, errInternal
+		return nil, &rootInventoryError{stage: "admit", unit: unit, err: err, violations: s.violationPaths(root)}
 	}
 	currentBoot, err := s.bootID()
 	if err != nil || currentBoot != boot || root.GetBootId() != boot || ctx.Err() != nil ||
 		root.GetStartedAt().AsTime().Before(started) || root.GetFinishedAt().AsTime().After(s.now()) {
-		return nil, errInternal
+		return nil, &rootInventoryError{stage: "boot_fence", unit: unit, err: errors.Join(errInternal, err, ctx.Err())}
 	}
 	return root, nil
 }
 
-func rootInventoryArguments(unit string) []string {
-	return []string{
-		"--quiet", "--no-ask-password", "--pipe", "--wait", "--collect", "--unit=" + unit,
-		"--property=Type=exec", "--property=User=root", "--property=Group=root",
-		"--property=PrivateDevices=no", "--property=DevicePolicy=closed", "--property=DeviceAllow=block-* r",
-		"--property=CapabilityBoundingSet=", "--property=AmbientCapabilities=", "--property=NoNewPrivileges=yes",
-		"--property=ProtectSystem=strict", "--property=ProtectHome=yes", "--property=PrivateTmp=yes",
-		"--property=PrivateNetwork=yes", "--property=RestrictAddressFamilies=AF_UNIX",
-		"--property=ProtectKernelTunables=yes", "--property=ProtectKernelModules=yes", "--property=ProtectKernelLogs=yes",
-		"--property=ProtectClock=yes", "--property=ProtectHostname=yes", "--property=ProtectProc=invisible",
-		"--property=ProtectControlGroups=yes", "--property=RestrictNamespaces=yes", "--property=RestrictRealtime=yes",
-		"--property=RestrictSUIDSGID=yes", "--property=LockPersonality=yes", "--property=MemoryDenyWriteExecute=yes",
-		"--property=SystemCallArchitectures=native", "--property=SystemCallFilter=@system-service",
-		"--property=InaccessiblePaths=-/etc/lindm -/var/lib/lindm -/run/lindm",
-		"--property=UMask=0077", "--property=WorkingDirectory=/",
-		"--property=RuntimeMaxSec=10s", "--property=TimeoutStartSec=10s", "--property=TimeoutStopSec=500ms",
-		"--property=KillMode=control-group", "--property=SendSIGKILL=yes", "--property=TasksMax=64",
-		"--property=MemoryMax=256M", "--property=LimitCORE=0", "--property=LimitNOFILE=256",
-		"--setenv=PATH=/usr/sbin:/usr/bin:/sbin:/bin", "--setenv=LC_ALL=C", "--setenv=LANG=C",
-		"--", "/usr/libexec/lindm/lindm-agent", "inventory-observe",
+// rootInventoryProperties is the complete fixed sandbox of the helper unit.
+// Output descriptors are appended by the launcher that owns the pipes.
+func rootInventoryProperties() []systemdProperty {
+	property := newSystemdProperty
+	return []systemdProperty{
+		property("Description", "Lindm root inventory observation"),
+		property("Type", "exec"), property("User", "root"), property("Group", "root"),
+		property("ExecStart", []systemdExec{{Path: rootInventoryHelper, Arguments: []string{rootInventoryHelper, "inventory-observe"}}}),
+		property("PrivateDevices", false), property("DevicePolicy", "closed"),
+		property("DeviceAllow", []struct{ Path, Access string }{{"block-*", "r"}}),
+		property("CapabilityBoundingSet", uint64(0)), property("AmbientCapabilities", uint64(0)),
+		property("NoNewPrivileges", true), property("ProtectSystem", "strict"), property("ProtectHome", "yes"),
+		property("PrivateTmp", true), property("PrivateNetwork", true),
+		property("RestrictAddressFamilies", systemdList{AllowList: true, Values: []string{"AF_UNIX"}}),
+		property("ProtectKernelTunables", true), property("ProtectKernelModules", true), property("ProtectKernelLogs", true),
+		property("ProtectClock", true), property("ProtectHostname", true), property("ProtectProc", "invisible"),
+		property("ProtectControlGroups", true), property("RestrictNamespaces", uint64(0)), property("RestrictRealtime", true),
+		property("RestrictSUIDSGID", true), property("LockPersonality", true), property("MemoryDenyWriteExecute", true),
+		property("SystemCallArchitectures", []string{"native"}),
+		property("SystemCallFilter", systemdList{AllowList: true, Values: []string{"@system-service"}}),
+		property("InaccessiblePaths", []string{"-/etc/lindm", "-/var/lib/lindm", "-/run/lindm"}),
+		property("UMask", uint32(0o077)), property("WorkingDirectory", "/"),
+		property("RuntimeMaxUSec", uint64(10*time.Second/time.Microsecond)),
+		property("TimeoutStartUSec", uint64(10*time.Second/time.Microsecond)),
+		property("TimeoutStopUSec", uint64(500*time.Millisecond/time.Microsecond)),
+		property("KillMode", "control-group"), property("SendSIGKILL", true),
+		property("TasksMax", uint64(64)), property("MemoryMax", uint64(256<<20)),
+		property("LimitCORE", uint64(0)), property("LimitCORESoft", uint64(0)),
+		property("LimitNOFILE", uint64(256)), property("LimitNOFILESoft", uint64(256)),
+		property("Environment", []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C", "LANG=C"}),
+		property("Restart", "no"), property("CollectMode", "inactive-or-failed"),
+		property("StandardInput", "null"),
 	}
 }
 
@@ -129,34 +163,104 @@ func (b *rootInventoryOutput) Write(p []byte) (int, error) {
 // output, which may contain device identities or the helper's JSON payload.
 type rootInventoryFailure struct {
 	cause      error
+	jobResult  string
+	unitResult string
+	exitCode   int32
+	exitStatus int32
 	diagnostic string
 }
 
-func (e *rootInventoryFailure) Error() string { return "root inventory native command failed" }
+// Error names the systemd/D-Bus cause; the helper's stderr stays in diagnostic.
+func (e *rootInventoryFailure) Error() string {
+	if e.cause == nil {
+		return "root inventory native unit failed"
+	}
+	return "root inventory native unit failed: " + e.cause.Error()
+}
 func (e *rootInventoryFailure) Unwrap() error { return e.cause }
 
-func runRootInventoryCommand(ctx context.Context, executable string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, executable, args...)
-	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C", "LANG=C"}
-	cmd.Dir = "/"
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		err := unix.Kill(-cmd.Process.Pid, unix.SIGKILL)
-		if errors.Is(err, unix.ESRCH) {
-			return os.ErrProcessDone
+// rootInventoryError names the failed stage of one root observation for the
+// executor log. The RPC boundary still maps every instance to errInternal.
+type rootInventoryError struct {
+	stage        string
+	unit         string
+	err          error
+	cleanup      error
+	payloadBytes int
+	violations   []string
+}
+
+func (e *rootInventoryError) Error() string { return "root inventory " + e.stage + " failed" }
+func (e *rootInventoryError) Unwrap() []error {
+	if e.cleanup == nil {
+		return []error{e.err}
+	}
+	return []error{e.err, e.cleanup}
+}
+
+// logAttrs never includes the helper payload: only its size, schema field paths
+// and rule IDs, systemd job/unit results, exit status and the bounded native
+// stderr diagnostic.
+func (e *rootInventoryError) logAttrs() []any {
+	attrs := []any{"stage", e.stage, "error", e.err}
+	if e.unit != "" {
+		attrs = append(attrs, "unit", e.unit)
+	}
+	if e.cleanup != nil {
+		attrs = append(attrs, "cleanup_error", e.cleanup)
+	}
+	if e.payloadBytes != 0 {
+		attrs = append(attrs, "payload_bytes", e.payloadBytes)
+	}
+	if len(e.violations) != 0 {
+		attrs = append(attrs, "violations", e.violations)
+	}
+	var failure *rootInventoryFailure
+	if !errors.As(e.err, &failure) {
+		return attrs
+	}
+	if failure.jobResult != "" {
+		attrs = append(attrs, "job_result", failure.jobResult)
+	}
+	if failure.unitResult != "" {
+		attrs = append(attrs, "unit_result", failure.unitResult)
+	}
+	switch failure.exitCode {
+	case cldExited:
+		attrs = append(attrs, "exit_status", failure.exitStatus)
+	case cldKilled, cldDumped:
+		attrs = append(attrs, "signal", unix.Signal(failure.exitStatus).String())
+	}
+	if failure.diagnostic != "" {
+		attrs = append(attrs, "diagnostic", failure.diagnostic)
+	}
+	return attrs
+}
+
+// violationPaths reports at most eight field paths and rule IDs, never values.
+func (s *Service) violationPaths(msg proto.Message) []string {
+	var invalid *protovalidate.ValidationError
+	if !errors.As(s.validator.Validate(msg), &invalid) {
+		return nil
+	}
+	paths := make([]string, 0, min(len(invalid.Violations), 8))
+	for _, violation := range invalid.Violations[:min(len(invalid.Violations), 8)] {
+		paths = append(paths, protovalidate.FieldPathString(violation.Proto.GetField())+":"+violation.Proto.GetRuleId())
+	}
+	return paths
+}
+
+// rootInventoryDiagnostic keeps the native stderr diagnostic printable and
+// bounded for one journal entry.
+func rootInventoryDiagnostic(data []byte) string {
+	const limit = 2 << 10
+	if len(data) > limit {
+		data = data[:limit]
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return '?'
 		}
-		return err
-	}
-	cmd.WaitDelay = rootInventoryWaitDelay
-	stdout := rootInventoryOutput{limit: rootInventoryOutputLimit}
-	stderr := rootInventoryOutput{limit: rootInventoryDiagnosticLimit}
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	if stdout.overflow || stderr.overflow {
-		err = errors.Join(err, errors.New("root inventory command output exceeds bound"))
-	}
-	if err != nil || ctx.Err() != nil {
-		return nil, &rootInventoryFailure{cause: errors.Join(err, ctx.Err()), diagnostic: stderr.buffer.String()}
-	}
-	return stdout.buffer.Bytes(), nil
+		return r
+	}, strings.ToValidUTF8(strings.TrimSpace(string(data)), "?"))
 }

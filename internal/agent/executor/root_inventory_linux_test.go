@@ -5,15 +5,17 @@ package executor
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"slices"
+	"log/slog"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/godbus/dbus/v5"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -59,58 +61,108 @@ func rootInventoryTestService(t *testing.T, now time.Time) *Service {
 	return openExecutor(t, now, WithBootID(func() (string, error) { return rootInventoryTestBoot, nil }))
 }
 
-func TestRootInventoryTransientCommandContractAndFreshness(t *testing.T) {
+// fakeUnits replaces only PID 1: observeRootInventory's admission, deadlines,
+// cleanup and logging run unchanged around it.
+type fakeUnits struct {
+	t       *testing.T
+	unit    string
+	runUnit func(context.Context, []systemdProperty) ([]byte, error)
+	stopped func(context.Context) error
+	stops   int
+	closed  bool
+}
+
+func (f *fakeUnits) run(ctx context.Context, properties []systemdProperty) ([]byte, error) {
+	return f.runUnit(ctx, properties)
+}
+
+func (f *fakeUnits) stop(ctx context.Context) error {
+	f.stops++
+	if f.stopped == nil {
+		f.t.Fatal("successful observation stopped its unit")
+	}
+	return f.stopped(ctx)
+}
+
+func (f *fakeUnits) close() error {
+	f.closed = true
+	return nil
+}
+
+func fakeRootInventory(t *testing.T, run func(context.Context, []systemdProperty) ([]byte, error), stop func(context.Context) error) func(context.Context, string) (rootInventoryUnits, error) {
+	return func(_ context.Context, unit string) (rootInventoryUnits, error) {
+		return &fakeUnits{t: t, unit: unit, runUnit: run, stopped: stop}, nil
+	}
+}
+
+func rootInventoryProperty(t *testing.T, properties []systemdProperty, name string) any {
+	t.Helper()
+	found := -1
+	for i, property := range properties {
+		if property.Name == name {
+			if found >= 0 {
+				t.Fatalf("duplicate unit property %s", name)
+			}
+			found = i
+		}
+	}
+	if found < 0 {
+		t.Fatalf("missing fixed unit property %s", name)
+	}
+	return properties[found].Value.Value()
+}
+
+func TestRootInventoryTransientUnitContractAndFreshness(t *testing.T) {
 	now := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 	s := rootInventoryTestService(t, now)
 	units := make(map[string]bool)
 	calls := 0
-	s.rootInventoryCommand = func(ctx context.Context, executable string, args ...string) ([]byte, error) {
-		calls++
-		if executable != "/usr/bin/systemd-run" {
-			t.Fatalf("unexpected command: %s", executable)
-		}
-		deadline, ok := ctx.Deadline()
-		if !ok || time.Until(deadline) > 12*time.Second || time.Until(deadline) <= 0 {
-			t.Fatal("helper start has no bounded runtime")
-		}
-		for _, required := range []string{
-			"--quiet", "--no-ask-password", "--pipe", "--wait", "--collect",
-			"--property=Type=exec", "--property=User=root", "--property=Group=root",
-			"--property=PrivateDevices=no", "--property=DevicePolicy=closed", "--property=DeviceAllow=block-* r",
-			"--property=CapabilityBoundingSet=", "--property=AmbientCapabilities=", "--property=NoNewPrivileges=yes",
-			"--property=ProtectSystem=strict", "--property=ProtectHome=yes", "--property=PrivateTmp=yes",
-			"--property=PrivateNetwork=yes", "--property=RestrictAddressFamilies=AF_UNIX",
-			"--property=ProtectKernelTunables=yes", "--property=ProtectKernelModules=yes", "--property=ProtectKernelLogs=yes",
-			"--property=ProtectClock=yes", "--property=ProtectHostname=yes", "--property=ProtectProc=invisible",
-			"--property=ProtectControlGroups=yes", "--property=RestrictNamespaces=yes", "--property=RestrictRealtime=yes",
-			"--property=RestrictSUIDSGID=yes", "--property=LockPersonality=yes", "--property=MemoryDenyWriteExecute=yes",
-			"--property=SystemCallArchitectures=native", "--property=SystemCallFilter=@system-service",
-			"--property=InaccessiblePaths=-/etc/lindm -/var/lib/lindm -/run/lindm",
-			"--property=UMask=0077", "--property=WorkingDirectory=/",
-			"--property=RuntimeMaxSec=10s", "--property=TimeoutStartSec=10s", "--property=TimeoutStopSec=500ms",
-			"--property=KillMode=control-group", "--property=SendSIGKILL=yes", "--property=TasksMax=64",
-			"--property=MemoryMax=256M", "--property=LimitCORE=0", "--property=LimitNOFILE=256",
-			"--setenv=PATH=/usr/sbin:/usr/bin:/sbin:/bin", "--setenv=LC_ALL=C", "--setenv=LANG=C",
-		} {
-			if !slices.Contains(args, required) {
-				t.Fatalf("missing fixed helper argument %q", required)
-			}
-		}
-		separator := slices.Index(args, "--")
-		if separator < 0 || !slices.Equal(args[separator:], []string{"--", "/usr/libexec/lindm/lindm-agent", "inventory-observe"}) {
-			t.Fatalf("helper accepted paths, configuration or caller arguments: %v", args)
-		}
-		unit := strings.TrimPrefix(args[5], "--unit=")
+	var opened []*fakeUnits
+	s.rootInventorySystemd = func(ctx context.Context, unit string) (rootInventoryUnits, error) {
 		id := strings.TrimSuffix(strings.TrimPrefix(unit, "lindm-inventory-"), ".service")
-		if _, err := uuid.Parse(id); err != nil || units[unit] {
+		if _, err := uuid.Parse(id); err != nil || units[unit] || unit != "lindm-inventory-"+id+".service" {
 			t.Fatalf("helper reused or failed to isolate unit %q", unit)
 		}
 		units[unit] = true
-		root := rootInventoryTestObservation(now)
-		root.HardwareSerial = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: fmt.Sprintf("serial-%d", calls)}
-		root.Cpu.Model = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: fmt.Sprintf("root-cpu-%d", calls)}
-		root.Cpu.ModelSource = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: "smbios_type4"}
-		return rootInventoryTestJSON(t, root), nil
+		fake := &fakeUnits{t: t, unit: unit, runUnit: func(ctx context.Context, properties []systemdProperty) ([]byte, error) {
+			calls++
+			deadline, ok := ctx.Deadline()
+			if !ok || time.Until(deadline) > 12*time.Second || time.Until(deadline) <= 0 {
+				t.Fatal("helper start has no bounded runtime")
+			}
+			for name, want := range map[string]any{
+				"Type": "exec", "User": "root", "Group": "root",
+				"ExecStart":      []systemdExec{{Path: "/usr/libexec/lindm/lindm-agent", Arguments: []string{"/usr/libexec/lindm/lindm-agent", "inventory-observe"}}},
+				"PrivateDevices": false, "DevicePolicy": "closed", "DeviceAllow": []struct{ Path, Access string }{{"block-*", "r"}},
+				"CapabilityBoundingSet": uint64(0), "AmbientCapabilities": uint64(0), "NoNewPrivileges": true,
+				"ProtectSystem": "strict", "ProtectHome": "yes", "PrivateTmp": true, "PrivateNetwork": true,
+				"RestrictAddressFamilies": systemdList{AllowList: true, Values: []string{"AF_UNIX"}},
+				"ProtectKernelTunables":   true, "ProtectKernelModules": true, "ProtectKernelLogs": true,
+				"ProtectClock": true, "ProtectHostname": true, "ProtectProc": "invisible",
+				"ProtectControlGroups": true, "RestrictNamespaces": uint64(0), "RestrictRealtime": true,
+				"RestrictSUIDSGID": true, "LockPersonality": true, "MemoryDenyWriteExecute": true,
+				"SystemCallArchitectures": []string{"native"},
+				"SystemCallFilter":        systemdList{AllowList: true, Values: []string{"@system-service"}},
+				"InaccessiblePaths":       []string{"-/etc/lindm", "-/var/lib/lindm", "-/run/lindm"},
+				"UMask":                   uint32(0o077), "WorkingDirectory": "/",
+				"RuntimeMaxUSec": uint64(10_000_000), "TimeoutStartUSec": uint64(10_000_000), "TimeoutStopUSec": uint64(500_000),
+				"KillMode": "control-group", "SendSIGKILL": true, "TasksMax": uint64(64), "MemoryMax": uint64(256 << 20),
+				"LimitCORE": uint64(0), "LimitCORESoft": uint64(0), "LimitNOFILE": uint64(256), "LimitNOFILESoft": uint64(256),
+				"Environment": []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C", "LANG=C"},
+				"Restart":     "no", "CollectMode": "inactive-or-failed", "StandardInput": "null",
+			} {
+				if got := rootInventoryProperty(t, properties, name); !reflect.DeepEqual(got, want) {
+					t.Fatalf("unit property %s = %#v, want %#v", name, got, want)
+				}
+			}
+			root := rootInventoryTestObservation(now)
+			root.HardwareSerial = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: fmt.Sprintf("serial-%d", calls)}
+			root.Cpu.Model = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: fmt.Sprintf("root-cpu-%d", calls)}
+			root.Cpu.ModelSource = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS, Value: "smbios_type4"}
+			return rootInventoryTestJSON(t, root), nil
+		}}
+		opened = append(opened, fake)
+		return fake, nil
 	}
 	for i := 1; i <= 2; i++ {
 		response, err := s.GetRecoveryReadiness(t.Context(), connect.NewRequest(&agentv1.GetRecoveryReadinessRequest{}))
@@ -128,8 +180,8 @@ func TestRootInventoryTransientCommandContractAndFreshness(t *testing.T) {
 			t.Fatal("RPC cached or omitted root CPU provenance")
 		}
 	}
-	if calls != 2 {
-		t.Fatal("RPC did not perform a fresh native helper observation")
+	if calls != 2 || len(opened) != 2 || !opened[0].closed || !opened[1].closed {
+		t.Fatal("RPC did not perform a fresh native helper observation on its own closed connection")
 	}
 }
 
@@ -147,7 +199,7 @@ func TestRootInventoryRejectsInvalidHelperPayload(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := rootInventoryTestService(t, now)
-			s.rootInventoryCommand = func(context.Context, string, ...string) ([]byte, error) { return payload, nil }
+			s.rootInventorySystemd = fakeRootInventory(t, func(context.Context, []systemdProperty) ([]byte, error) { return payload, nil }, nil)
 			if root, err := s.observeRootInventory(t.Context()); err == nil || root != nil {
 				t.Fatal("invalid helper payload became evidence")
 			}
@@ -171,7 +223,7 @@ func TestRootInventoryRejectsInvalidHelperPayload(t *testing.T) {
 			s := rootInventoryTestService(t, now)
 			root := rootInventoryTestObservation(now)
 			mutate(root)
-			s.rootInventoryCommand = func(context.Context, string, ...string) ([]byte, error) { return rootInventoryTestJSON(t, root), nil }
+			s.rootInventorySystemd = fakeRootInventory(t, func(context.Context, []systemdProperty) ([]byte, error) { return rootInventoryTestJSON(t, root), nil }, nil)
 			if result, err := s.observeRootInventory(t.Context()); err == nil || result != nil {
 				t.Fatal("invalid native projection became evidence")
 			}
@@ -186,35 +238,46 @@ func TestRootInventoryFailureAndCancellationStopAndJoinUnit(t *testing.T) {
 			s := rootInventoryTestService(t, now)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			calls, joined := 0, false
-			var unit string
-			s.rootInventoryCommand = func(call context.Context, executable string, args ...string) ([]byte, error) {
-				calls++
-				if calls == 1 {
-					unit = strings.TrimPrefix(args[5], "--unit=")
+			var fake *fakeUnits
+			s.rootInventorySystemd = func(_ context.Context, unit string) (rootInventoryUnits, error) {
+				fake = &fakeUnits{t: t, unit: unit, runUnit: func(context.Context, []systemdProperty) ([]byte, error) {
 					if mode == "canceled_with_payload" {
 						cancel()
 						return rootInventoryTestJSON(t, rootInventoryTestObservation(now)), nil
 					}
 					return rootInventoryTestJSON(t, rootInventoryTestObservation(now)), errors.New("native start or exit failed")
-				}
-				if calls != 2 || executable != "/usr/bin/systemctl" || !slices.Equal(args, []string{"--no-ask-password", "stop", unit}) {
-					t.Fatal("uncertain start did not stop exactly its unique unit")
-				}
-				deadline, ok := call.Deadline()
-				if call.Err() != nil || !ok || time.Until(deadline) > rootInventoryCleanupTimeout {
-					t.Fatal("cleanup inherited canceled context or lacked a deadline")
-				}
-				joined = true
-				if mode == "cleanup_failure" {
-					return nil, errors.New("PID 1 unavailable")
-				}
-				return nil, nil
+				}, stopped: func(call context.Context) error {
+					deadline, ok := call.Deadline()
+					if call.Err() != nil || !ok || time.Until(deadline) > rootInventoryCleanupTimeout {
+						t.Fatal("cleanup inherited canceled context or lacked a deadline")
+					}
+					if mode == "cleanup_failure" {
+						return errors.New("PID 1 unavailable")
+					}
+					return nil
+				}}
+				return fake, nil
 			}
-			if root, err := s.observeRootInventory(ctx); err == nil || root != nil || !joined || calls != 2 {
+			root, err := s.observeRootInventory(ctx)
+			if err == nil || root != nil || fake == nil || fake.stops != 1 || !fake.closed {
 				t.Fatal("native failure accepted or cleanup escaped the call lifecycle")
 			}
+			var stage *rootInventoryError
+			if !errors.As(err, &stage) || stage.stage != "run" || stage.unit != fake.unit || (mode == "cleanup_failure") != (stage.cleanup != nil) {
+				t.Fatalf("failure lost its stage, unit or cleanup outcome: %v", err)
+			}
 		})
+	}
+}
+
+func TestRootInventoryConnectFailureSubmitsNothing(t *testing.T) {
+	s := rootInventoryTestService(t, time.Now())
+	s.rootInventorySystemd = func(context.Context, string) (rootInventoryUnits, error) {
+		return nil, errors.New("private socket refused")
+	}
+	var stage *rootInventoryError
+	if root, err := s.observeRootInventory(t.Context()); root != nil || !errors.As(err, &stage) || stage.stage != "connect" {
+		t.Fatalf("connection failure was not classified: %v", err)
 	}
 }
 
@@ -237,10 +300,10 @@ func TestRootInventoryRejectsBootChangeAndUnavailableBoot(t *testing.T) {
 					return rootInventoryTestBoot, nil
 				}
 			}
-			s.rootInventoryCommand = func(context.Context, string, ...string) ([]byte, error) {
+			s.rootInventorySystemd = fakeRootInventory(t, func(context.Context, []systemdProperty) ([]byte, error) {
 				commands++
 				return rootInventoryTestJSON(t, rootInventoryTestObservation(now)), nil
-			}
+			}, nil)
 			if response, err := s.GetRecoveryReadiness(t.Context(), connect.NewRequest(&agentv1.GetRecoveryReadinessRequest{})); err == nil || response != nil {
 				t.Fatal("boot change became published evidence")
 			}
@@ -253,8 +316,8 @@ func TestRootInventoryRejectsBootChangeAndUnavailableBoot(t *testing.T) {
 
 func TestRootInventoryNoLaunchAfterCancellationOrExhaustedBudget(t *testing.T) {
 	s := rootInventoryTestService(t, time.Now())
-	s.rootInventoryCommand = func(context.Context, string, ...string) ([]byte, error) {
-		t.Fatal("canceled or exhausted request spawned a command")
+	s.rootInventorySystemd = func(context.Context, string) (rootInventoryUnits, error) {
+		t.Fatal("canceled or exhausted request connected to PID 1")
 		return nil, nil
 	}
 	canceled, cancel := context.WithCancel(t.Context())
@@ -280,103 +343,159 @@ func TestRootInventoryBoundedOutput(t *testing.T) {
 	}
 }
 
-// These subprocess fixtures exercise os/exec output draining and cancellation,
-// never systemd or the host's PID 1. The runner deliberately clears parent env.
-func TestRootInventoryCommandProcess(t *testing.T) {
-	index := slices.Index(os.Args, "--root-inventory-command-fixture")
-	if index < 0 {
-		return
-	}
-	write := func(file *os.File, data []byte) {
-		t.Helper()
-		if _, err := file.Write(data); err != nil {
-			t.Fatal(err)
-		}
-	}
-	switch os.Args[index+1] {
-	case "success":
-		write(os.Stdout, []byte("payload"))
-	case "failure":
-		write(os.Stdout, []byte("payload"))
-		write(os.Stderr, []byte("private diagnostic"))
-		os.Exit(7)
-	case "stdout_overflow":
-		write(os.Stdout, bytes.Repeat([]byte("x"), rootInventoryOutputLimit+1))
-	case "stderr_overflow":
-		write(os.Stderr, bytes.Repeat([]byte("x"), rootInventoryDiagnosticLimit+1))
-	case "cancel":
-		time.Sleep(time.Hour)
-	default:
-		os.Exit(8)
-	}
-	os.Exit(0)
-}
-
-func TestRootInventoryNativeRunnerBoundsAndExit(t *testing.T) {
-	executable, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, mode := range []string{"success", "failure", "stdout_overflow", "stderr_overflow", "cancel"} {
-		t.Run(mode, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-			if mode == "cancel" {
-				var stop context.CancelFunc
-				ctx, stop = context.WithTimeout(ctx, 100*time.Millisecond)
-				defer stop()
-			}
-			started := time.Now()
-			output, err := runRootInventoryCommand(ctx, executable, "-test.run=^TestRootInventoryCommandProcess$", "--", "--root-inventory-command-fixture", mode)
-			if mode == "success" {
-				if err != nil || string(output) != "payload" {
-					t.Fatalf("successful native output lost: %q, %v", output, err)
-				}
-				return
-			}
-			if err == nil || output != nil {
-				t.Fatal("failed or overflowing native command produced evidence")
-			}
-			var failure *rootInventoryFailure
-			if !errors.As(err, &failure) || len(failure.diagnostic) > rootInventoryDiagnosticLimit || strings.Contains(err.Error(), "private diagnostic") {
-				t.Fatal("native diagnostics unbounded or publicly exposed")
-			}
-			if mode == "cancel" && (!errors.Is(err, context.DeadlineExceeded) || time.Since(started) > 2*time.Second) {
-				t.Fatal("canceled native process was not bounded and joined")
-			}
-		})
-	}
-}
-
 func TestRootInventoryReservesRPCCleanupBudget(t *testing.T) {
 	now := time.Now()
 	s := rootInventoryTestService(t, now)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second+50*time.Millisecond)
 	defer cancel()
 	outer, _ := ctx.Deadline()
-	calls := 0
-	s.rootInventoryCommand = func(call context.Context, executable string, args ...string) ([]byte, error) {
-		calls++
+	stopped := false
+	s.rootInventorySystemd = fakeRootInventory(t, func(call context.Context, _ []systemdProperty) ([]byte, error) {
 		deadline, ok := call.Deadline()
-		if !ok {
-			t.Fatal("native command lacks deadline")
+		if !ok || !deadline.Equal(outer.Add(-2*time.Second)) {
+			t.Fatal("helper consumed the cleanup reserve")
 		}
-		if calls == 1 {
-			if !deadline.Equal(outer.Add(-2 * time.Second)) {
-				t.Fatal("helper consumed the cleanup reserve")
-			}
-			<-call.Done()
-			return nil, call.Err()
-		}
-		if executable != "/usr/bin/systemctl" || !deadline.Before(outer) || call.Err() != nil {
+		<-call.Done()
+		return nil, call.Err()
+	}, func(call context.Context) error {
+		deadline, ok := call.Deadline()
+		if !ok || !deadline.Before(outer) || call.Err() != nil {
 			t.Fatal("cleanup did not fit inside the original RPC deadline")
 		}
-		return nil, nil
-	}
-	if root, err := s.observeRootInventory(ctx); root != nil || !errors.Is(err, context.DeadlineExceeded) || calls != 2 {
+		stopped = true
+		return nil
+	})
+	if root, err := s.observeRootInventory(ctx); root != nil || !errors.Is(err, context.DeadlineExceeded) || !stopped {
 		t.Fatal("helper deadline did not trigger joined cleanup")
 	}
 	if ctx.Err() != nil {
 		t.Fatal("cleanup exceeded the enclosing RPC deadline")
+	}
+}
+
+// The executor journal is the only place a native readiness failure is
+// diagnosable; the RPC itself carries only "internal".
+func TestRecoveryReadinessLogsNativeFailureWithoutPayload(t *testing.T) {
+	now := time.Now()
+	s := rootInventoryTestService(t, now)
+	var logs bytes.Buffer
+	s.logger = slog.New(slog.NewJSONHandler(&logs, nil))
+	s.rootInventorySystemd = fakeRootInventory(t, func(context.Context, []systemdProperty) ([]byte, error) {
+		return nil, &rootInventoryFailure{
+			cause: errors.New("start transient unit: Connection reset by peer"), jobResult: "done", unitResult: "exit-code",
+			exitCode: cldExited, exitStatus: 7, diagnostic: rootInventoryDiagnostic([]byte("helper failed\x1b[31m\n")),
+		}
+	}, func(context.Context) error { return nil })
+	_, err := s.GetRecoveryReadiness(t.Context(), connect.NewRequest(&agentv1.GetRecoveryReadinessRequest{}))
+	if connect.CodeOf(err) != connect.CodeInternal {
+		t.Fatalf("native failure changed the RPC contract: %v", err)
+	}
+	var entry map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
+		t.Fatalf("expected one structured log entry: %v: %s", err, logs.Bytes())
+	}
+	for key, want := range map[string]any{
+		"msg": "recovery readiness observation failed", "stage": "run", "unit_result": "exit-code",
+		"job_result": "done", "exit_status": float64(7), "diagnostic": "helper failed?[31m",
+	} {
+		if entry[key] != want {
+			t.Fatalf("log %s = %#v, want %#v", key, entry[key], want)
+		}
+	}
+	unit, _ := entry["unit"].(string)
+	cause, _ := entry["error"].(string)
+	if !strings.HasPrefix(unit, "lindm-inventory-") || !strings.Contains(cause, "Connection reset by peer") {
+		t.Fatalf("log omitted the unit or native cause: %v", entry)
+	}
+
+	// A decodable-but-invalid payload is logged by size only, never by content.
+	logs.Reset()
+	s.rootInventorySystemd = fakeRootInventory(t, func(context.Context, []systemdProperty) ([]byte, error) {
+		return []byte(`{"hardware_serial":"SECRET-SERIAL"`), nil
+	}, nil)
+	if _, err := s.GetRecoveryReadiness(t.Context(), connect.NewRequest(&agentv1.GetRecoveryReadinessRequest{})); err == nil {
+		t.Fatal("malformed payload accepted")
+	}
+	if strings.Contains(logs.String(), "SECRET-SERIAL") || !strings.Contains(logs.String(), `"stage":"decode"`) || !strings.Contains(logs.String(), `"payload_bytes":34`) {
+		t.Fatalf("decode failure log leaked or omitted payload metadata: %s", logs.String())
+	}
+}
+
+func TestSystemdUnitPathEscapesLikeSdBus(t *testing.T) {
+	got := systemdUnitPath("lindm-inventory-1e6cec1c-c5ae-4957-804d-a157cf15ed43.service")
+	want := dbus.ObjectPath("/org/freedesktop/systemd1/unit/lindm_2dinventory_2d1e6cec1c_2dc5ae_2d4957_2d804d_2da157cf15ed43_2eservice")
+	if got != want {
+		t.Fatalf("unit path %s, want %s", got, want)
+	}
+}
+
+func TestSystemdUnitSignalsFilterAndFailClosed(t *testing.T) {
+	const unit = "lindm-inventory-1e6cec1c-c5ae-4957-804d-a157cf15ed43.service"
+	h := &systemdUnitSignals{unit: unit, path: systemdUnitPath(unit), queue: make(chan *dbus.Signal, 1)}
+	h.DeliverSignal("", "", &dbus.Signal{Path: systemdUnitPath("other.service"), Name: systemdProperties, Body: []any{systemdUnitInterface, map[string]dbus.Variant{}, []string{}}})
+	h.DeliverSignal("", "", &dbus.Signal{Path: systemdManagerPath, Name: systemdManager + ".JobRemoved", Body: []any{uint32(1), dbus.ObjectPath("/org/freedesktop/systemd1/job/1"), "other.service", "done"}})
+	if len(h.queue) != 0 || h.overflow.Load() {
+		t.Fatal("another unit's signals reached this observation")
+	}
+	removed := &dbus.Signal{Path: systemdManagerPath, Name: systemdManager + ".JobRemoved", Body: []any{uint32(2), dbus.ObjectPath("/org/freedesktop/systemd1/job/2"), unit, "done"}}
+	h.DeliverSignal("", "", removed)
+	h.DeliverSignal("", "", removed)
+	if len(h.queue) != 1 || !h.overflow.Load() {
+		t.Fatal("full signal queue blocked or silently dropped evidence")
+	}
+	if _, err := awaitSystemdUnit(t.Context(), t.Context(), h, "/org/freedesktop/systemd1/job/2"); err == nil {
+		t.Fatal("overflowed signal stream produced a unit result")
+	}
+}
+
+func TestAwaitSystemdUnitReportsTerminalMainProcess(t *testing.T) {
+	const unit = "lindm-inventory-1e6cec1c-c5ae-4957-804d-a157cf15ed43.service"
+	const job = dbus.ObjectPath("/org/freedesktop/systemd1/job/42")
+	state := func(value string) *dbus.Signal {
+		return &dbus.Signal{Path: systemdUnitPath(unit), Name: systemdProperties, Body: []any{systemdUnitInterface, map[string]dbus.Variant{"ActiveState": dbus.MakeVariant(value)}, []string{}}}
+	}
+	service := func(result string, code, status int32) *dbus.Signal {
+		return &dbus.Signal{Path: systemdUnitPath(unit), Name: systemdProperties, Body: []any{systemdServiceInterface, map[string]dbus.Variant{
+			"Result": dbus.MakeVariant(result), "ExecMainCode": dbus.MakeVariant(code), "ExecMainStatus": dbus.MakeVariant(status),
+		}, []string{}}}
+	}
+	jobRemoved := func(path dbus.ObjectPath, result string) *dbus.Signal {
+		return &dbus.Signal{Path: systemdManagerPath, Name: systemdManager + ".JobRemoved", Body: []any{uint32(42), path, unit, result}}
+	}
+	for name, tc := range map[string]struct {
+		signals []*dbus.Signal
+		want    systemdUnitExit
+	}{
+		// The inactive state reported while the job is queued is not an exit.
+		"success": {[]*dbus.Signal{state("inactive"), jobRemoved("/org/freedesktop/systemd1/job/7", "done"), jobRemoved(job, "done"), state("active"), service("success", cldExited, 0), state("inactive")},
+			systemdUnitExit{jobResult: "done", unitResult: "success", code: cldExited, status: 0}},
+		"exec_failure": {[]*dbus.Signal{jobRemoved(job, "failed"), service("exit-code", cldExited, 203), state("failed")},
+			systemdUnitExit{jobResult: "failed", unitResult: "exit-code", code: cldExited, status: 203}},
+		"killed": {[]*dbus.Signal{jobRemoved(job, "done"), service("signal", cldKilled, 9), state("failed")},
+			systemdUnitExit{jobResult: "done", unitResult: "signal", code: cldKilled, status: 9}},
+		// daemon-reload emits UnitRemoved for a live unit and suppresses
+		// JobRemoved; neither may end or fail the wait.
+		"reload_during_run": {[]*dbus.Signal{{Path: systemdManagerPath, Name: systemdManager + ".UnitRemoved", Body: []any{unit, systemdUnitPath(unit)}}, state("active"), service("success", cldExited, 0), state("inactive")},
+			systemdUnitExit{unitResult: "success", code: cldExited, status: 0}},
+		"start_failed_without_exit": {[]*dbus.Signal{jobRemoved(job, "resources")},
+			systemdUnitExit{jobResult: "resources"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := &systemdUnitSignals{unit: unit, path: systemdUnitPath(unit), queue: make(chan *dbus.Signal, len(tc.signals))}
+			for _, signal := range tc.signals {
+				h.DeliverSignal("", "", signal)
+			}
+			got, err := awaitSystemdUnit(t.Context(), t.Context(), h, job)
+			if err != nil || got != tc.want {
+				t.Fatalf("exit = %+v, %v; want %+v", got, err, tc.want)
+			}
+		})
+	}
+	h := &systemdUnitSignals{unit: unit, path: systemdUnitPath(unit), queue: make(chan *dbus.Signal, 1)}
+	h.DeliverSignal("", "", state("active"))
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := awaitSystemdUnit(ctx, t.Context(), h, job); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("unfinished unit was not bounded by the call deadline: %v", err)
 	}
 }

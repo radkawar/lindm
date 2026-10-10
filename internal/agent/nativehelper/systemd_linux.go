@@ -136,7 +136,9 @@ func transientProperties(directory, transactionID, phase string) []unitProperty 
 		property("ProtectHome", "yes"), property("PrivateDevices", true), property("PrivateTmp", true),
 		property("ProtectKernelTunables", true), property("ProtectKernelModules", true),
 		property("ProtectKernelLogs", true), property("ProtectControlGroups", true),
-		property("NoNewPrivileges", true), property("RestrictSUIDSGID", !apply),
+		// RPM's SELinux plugin runs scriptlets in rpm_script_t; under
+		// NoNewPrivileges that exec is refused and every scriptlet exits 127.
+		property("NoNewPrivileges", !apply), property("RestrictSUIDSGID", !apply),
 		property("CapabilityBoundingSet", capabilities), property("ReadWritePaths", paths),
 		property("PrivateNetwork", apply), property("RestrictAddressFamilies", struct {
 			AllowList bool

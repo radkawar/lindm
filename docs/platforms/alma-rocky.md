@@ -119,6 +119,9 @@ repository/stream evidence
 Therefore neither feed establishes AlmaLinux or Rocky coverage by compatibility
 inference. Vendor-specific feed mapping and fresh complete coverage need their own
 qualification; missing coverage is not zero exposure.
+RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
+they neither match records nor make architecture coverage UNKNOWN
+([Fedora advisory feeds](fedora.md#advisory-feeds)).
 
 ## Lab
 
@@ -133,13 +136,14 @@ digests. The current independent status is:
 | Rocky 9.8 x86_64       | Native inspection matched 422 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
 | Rocky 10.2 x86_64      | Native inspection matched 443 RPM records; no completed lifecycle/dispatch is claimed here.                                                                                                        |
 | AlmaLinux 9.8 x86_64   | Native inspection matched 387 RPM records. Earlier packaged lifecycle failed signed service; corrected connected dispatch passed independently. A full packaged lifecycle rerun is still required. |
-| AlmaLinux 10.2 x86_64  | Authenticated acquisition is not a native inspection/lifecycle pass.                                                                                                                               |
+| AlmaLinux 10.2 x86_64  | Native UEFI inspection matched 380 RPM records (2026-10-10, record below); lifecycle and dispatch not yet run.                                                                                     |
 | Legacy 8               | Consult each vendor's separate acquisition/native rows; do not inherit 9/10 results.                                                                                                               |
 | Rocky 9.8 aarch64      | Passed inspect (418 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 420-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
 | Rocky 10.2 aarch64     | Passed inspect (440 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 442-package publications), and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                  |
 | AlmaLinux 9.8 aarch64  | Passed inspect (384 RPMs), full signed 0.7.0→0.7.1 lifecycle (five 386-package publications) and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                   |
 | AlmaLinux 10.2 aarch64 | Passed inspect (379 RPMs), full signed lifecycle (five 381-package publications) and nine native dispatch scenarios on dgx20 KVM; SELinux Enforcing.                                               |
 | AlmaLinux 8.10 aarch64 | Passed inspect (430 RPMs), full signed lifecycle (five 432-package publications) and nine native dispatch scenarios on dgx20 KVM after the EL8 fixes below; SELinux Enforcing. Not Rocky/RHEL 8.   |
+| Rocky 8.10 aarch64     | Passed inspect (450 RPMs), full signed lifecycle (five 452-package publications) and nine native dispatch scenarios on dgx21 KVM with the EL8 fixes below; SELinux Enforcing. Not RHEL 8.          |
 
 The AlmaLinux corrected dispatch record is
 `$HOME/.cache/lindm-alma-servicefix-20261010/alma9-dispatch-after.json`, SHA-256
@@ -209,6 +213,24 @@ with 0.7.0/0.7.1 RPMs rebuilt from that source (`5e6043f9…`/`ac143d42…`):
   logind validation ([`sessions_text_linux.go`](../../internal/agent/inventory/sessions_text_linux.go);
   `TestLegacyBusctlTextSessions`).
 
+Rocky 8.10 aarch64 (GenericCloud Base `8.10-20240528.0`, new pinned manifest
+[`rocky-8.10-aarch64.json`](../../lab/images/rocky-8.10-aarch64.json); signed
+aggregate `CHECKSUM` by Rocky's 8 key `7051C470…6D745A60`) ran unchanged from the
+exact AlmaLinux 8.10 pin above (same `e10d8953…` source, lab binary `96c29b5d…` and
+RPMs `5e6043f9…`/`ac143d42…`), on `dgx21`; no further EL8 defect appeared. Records
+are under `$HOME/.cache/lindm-mutabledistros5-20261010/`:
+
+| Record                              | SHA-256                                                            |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `rocky8-arm64-dgx21-inspect.json`   | `a78440395d110ccea326f59a3d1d111d66a4cab354a8f6d13f7f8cd6ff8c9ea8` |
+| `rocky8-arm64-dgx21-lifecycle.json` | `e550555f5f8624edcc55276ad4bb282e1324492f2945bf4b13017e36e8e15e18` |
+| `rocky8-arm64-dgx21-dispatch.json`  | `6a7f8f8a1423fe5cda697e8342e86ca488e9700370cf88ddcfdeaa82c1f4bda2` |
+
+AlmaLinux 10.2 x86_64 inspection (`alma10-x86_64-local-inspect.json`, SHA-256
+`76575dcfc770c61da3d0c570f697c77c7fbea2d59845f79f2e0c7bfaf2bfc9bb`, same directory)
+ran locally under OVMF `2024.02-2ubuntu0.10` (Secure Boot disabled) from `4d74dcf`
+plus the MutableDistros5 lab delta.
+
 The original x86 records are under `$HOME/.cache/lindm-mutabledistros-20261010/`,
 indexed by its `evidence-index.json`:
 
@@ -221,9 +243,9 @@ indexed by its `evidence-index.json`:
 
 ## Gaps
 
-Rocky x86_64, AlmaLinux 10.2/8.10 x86_64 and a rerun AlmaLinux 9.8 x86_64
-lifecycle still require the separate complete cells. Rocky 8 and RHEL 8 inherit
-nothing from AlmaLinux 8.10 ARM. EL8 device actions are not covered: the action
+Rocky x86_64, AlmaLinux 10.2 x86_64 lifecycle/dispatch, AlmaLinux 8.10 x86_64 and a
+rerun AlmaLinux 9.8 x86_64 lifecycle still require the separate complete cells.
+RHEL 8 inherits nothing from the AlmaLinux/Rocky 8.10 ARM rows. EL8 device actions are not covered: the action
 provider still requests `PTTYPE`/`PTUUID`/`MOUNTPOINTS`. Desktop, other legacy
 rows, air-gap, actions and physical-machine evidence
 remain exact-scope requirements. The dbus-broker fix closes a demonstrated AlmaLinux

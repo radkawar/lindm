@@ -26,7 +26,7 @@ func (p *Provider) installedIdentity(ctx context.Context, record *resourcev1.Nat
 	_, _ = h.Write(record.GetNativeIdentitySha256())
 	identity := record.GetPackage()
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		result, err := p.run(ctx, "/usr/bin/rpm", []string{"--query", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{INSTALLTIME}\t%{INSTALLTID}\t%{HDRID}\n", identity.GetNativeName() + "." + identity.GetArchitecture()}, "/", nil)
+		result, err := p.run(ctx, "/usr/bin/rpm", []string{"--query", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{INSTALLTIME}\t%{INSTALLTID}\t%{SHA256HEADER}\n", identity.GetNativeName() + "." + identity.GetArchitecture()}, "/", nil)
 		if err != nil {
 			return nil, err
 		}

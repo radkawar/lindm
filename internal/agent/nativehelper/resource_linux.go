@@ -221,7 +221,8 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 			privateNetwork = false
 		}
 		if sysctlprovider.NeedsRuntimeWrite(request) {
-			paths = append(paths, sysctlprovider.ProcPath(key))
+			// ProtectKernelTunables=no leaves /proc/sys writable; a bind mount of
+			// the procfs file itself is refused by SELinux on Fedora.
 			kernelTunables = false
 			if strings.HasPrefix(key, "net.") {
 				caps |= uint64(1) << unix.CAP_NET_ADMIN
@@ -240,7 +241,10 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 			return nil, err
 		}
 		parent := filepath.Dir(path)
-		if _, err := os.Lstat(parent); errors.Is(err, os.ErrNotExist) {
+		// Creating a missing drop-in directory, or releasing one this ledger
+		// created, writes the unit root itself.
+		createdParent := request.GetPlan().GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE && request.GetOwnership().GetBaseline().GetDefinitionFile().GetParentMissing()
+		if _, err := os.Lstat(parent); errors.Is(err, os.ErrNotExist) || createdParent {
 			parent = filepath.Dir(parent)
 		} else if err != nil {
 			return nil, err
@@ -282,6 +286,7 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 		Families  []string
 	}{true, families})
 	properties = setProperty(properties, "RestrictSUIDSGID", true)
+	properties = setProperty(properties, "NoNewPrivileges", true)
 	if accountRoot != "" {
 		properties = setProperty(properties, "BindPaths", []struct {
 			Source        string
@@ -315,6 +320,13 @@ func prepareAccountRoot(directory string) error {
 	defer func() { _ = unix.Close(root) }()
 	if err := unix.Mkdirat(root, "etc", 0700); err != nil && !errors.Is(err, unix.EEXIST) {
 		return err
+	}
+	// Native useradd may create a mailbox under <prefix>/var/{mail,spool/mail}
+	// when the distribution default asks for one; keep that in private scratch.
+	for _, path := range []string{"var", "var/spool", "var/spool/mail", "var/mail"} {
+		if err := unix.Mkdirat(root, path, 0755); err != nil && !errors.Is(err, unix.EEXIST) {
+			return err
+		}
 	}
 	target, err := statefs.OpenDirectory(filepath.Join(directory, "account-root", "etc"))
 	if err != nil {

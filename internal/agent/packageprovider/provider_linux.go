@@ -172,8 +172,8 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		if err != nil {
 			return nil, err
 		}
-		if manager.Kind != dnf.DNF5 {
-			return nil, fmt.Errorf("%w: native DNF5 required", ErrUnsupported)
+		if !manager.AtLeast(dnf.DNF5, minimumDNF5) {
+			return nil, fmt.Errorf("%w: native DNF5 %s or newer required", ErrUnsupported, minimumDNF5)
 		}
 		version = manager.Version
 	}
@@ -541,7 +541,7 @@ func (p *Provider) acquisitionAllowed(before *resourcev1.ResourceObservation, le
 	if o.GetInstalled() && !o.GetRecord().GetProvenanceKnown() {
 		return errors.New("packageprovider: installed provenance unknown; unsafe acquisition refused")
 	}
-	if (o.GetInstalled() || o.GetPinFile() != nil) && p.config.Ownership.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
+	if (o.GetInstalled() || pinClaimsPackage(before.GetRef(), o)) && p.config.Ownership.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
 		return errors.New("packageprovider: existing package/pin requires approved adoption")
 	}
 	return nil

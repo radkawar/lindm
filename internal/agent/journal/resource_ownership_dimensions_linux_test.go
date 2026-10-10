@@ -224,3 +224,47 @@ func TestAccountNewDimensionAfterOwnedNumericIdentityChange(t *testing.T) {
 		}
 	}
 }
+
+func TestCreatedAccountAcquiresDimensionFromLastApplied(t *testing.T) {
+	f := newServiceJournalFixture(t)
+	baseline := ownershipSnapshot(accountResourceRecord(t, f, resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER))
+	baseline.Observation.GetLocalUser().Exists = false
+	created := proto.CloneOf(baseline)
+	created.Observation.GetLocalUser().Exists = true
+	created.Observation.GetLocalUser().Uid = proto.Uint32(24002)
+	created.Observation.GetLocalUser().Shell = "/bin/sh"
+	ledger := &agentv1.ResourceOwnershipLedger{Baseline: baseline, LastApplied: created, OwnedDimensions: []agentv1.ResourceOwnedDimension{agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT}}
+	shell := agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_USER_SHELL
+	if !newOwnershipDimensionMatches(ledger, proto.CloneOf(created), shell) {
+		t.Fatal("created account could not manage a field it set at creation")
+	}
+	foreign := proto.CloneOf(created)
+	foreign.Observation.GetLocalUser().Shell = "/bin/zsh"
+	if newOwnershipDimensionMatches(ledger, foreign, shell) {
+		t.Fatal("foreign edit after creation was adopted")
+	}
+	ledger.OwnedDimensions = nil
+	if newOwnershipDimensionMatches(ledger, proto.CloneOf(created), shell) {
+		t.Fatal("unowned object used last applied instead of the absent baseline")
+	}
+}
+
+func TestCreateOnlyPackageIgnoresOtherDNFVersionlockEntries(t *testing.T) {
+	intent := &agentv1.ResourceExecutionIntent{Ownership: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}}}
+	snapshot := func(name string) *agentv1.ResourceOwnershipSnapshot {
+		return &agentv1.ResourceOwnershipSnapshot{Observation: &resourcev1.ResourceObservation{
+			Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, CanonicalKey: "rpm/crash/aarch64"},
+			Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{
+				Package:     &resourcev1.PackageIdentity{Ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM, NativeName: "crash", Architecture: "aarch64"},
+				PinFile:     &resourcev1.FileIdentity{Path: "/etc/dnf/versionlock.toml"},
+				PinContents: []byte("version = '1.0'\n[[packages]]\nname = '" + name + "'\n[[packages.conditions]]\nkey = 'evr'\ncomparator = '='\nvalue = '0:1.0-1'\n"),
+			}},
+		}}
+	}
+	if !ownershipAcquisitionAllowed(intent, snapshot("proof")) {
+		t.Fatal("another package's shared versionlock entry blocked creation")
+	}
+	if ownershipAcquisitionAllowed(intent, snapshot("crash")) {
+		t.Fatal("existing versionlock entry for the package was acquired without adoption")
+	}
+}

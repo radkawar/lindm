@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +104,7 @@ type VMDispatchResult struct {
 	Hold                   *VMDispatchHoldEvidence         `json:"hold,omitempty"`
 	Power                  *VMPowerEvidence                `json:"power,omitempty"`
 	Resources              *VMResourceEvidence             `json:"resources,omitempty"`
+	RecoveryReadiness      *VMRecoveryReadinessEvidence    `json:"recovery_readiness,omitempty"`
 	Architecture           string                          `json:"architecture,omitempty"`
 }
 
@@ -203,7 +205,19 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 		publicKey = apt.PublicKeyArmor
 	}
-	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, options.Hardware)
+	if options.ResourceKinds["firewall"] && (!options.Resources || options.ResourceExecutionOnly) {
+		return result, errors.New("the firewall kind requires the connected resource phase")
+	}
+	hardware := options.Hardware
+	var firewall *firewallLane
+	if options.ResourceKinds["firewall"] {
+		firewall, hardware, err = newFirewallLane(ctx, manifest, options.CacheDir, options.WorkDir, options.Hardware)
+		if err != nil {
+			return result, err
+		}
+		defer func() { err = errors.Join(err, firewall.Close()) }()
+	}
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, hardware)
 	if err != nil {
 		return result, err
 	}
@@ -248,7 +262,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			return result, errors.New("dispatch on the DNF family requires SELinux Enforcing")
 		}
 	} else {
-		result.SELinux = "not applicable"
+		// Leap 16 and Tumbleweed enforce SELinux by default; record the
+		// kernel's state instead of assuming the family has no SELinux.
+		if result.SELinux, err = guestSELinuxMode(ctx, vm); err != nil {
+			return result, err
+		}
 	}
 	packages, err := newNativeGuestPackages(ctx, vm, artifact, artifact, apt, publicKey, signer.Fingerprint, arch...)
 	if err != nil {
@@ -268,6 +286,11 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	defer func() { err = errors.Join(err, registration.Close()) }()
 	if err := packages.InstallFirst(ctx); err != nil {
 		return result, err
+	}
+	if firewall != nil {
+		if err := firewall.installPeer(ctx, manifest, artifact, apt, publicKey, signer.Fingerprint); err != nil {
+			return result, fmt.Errorf("install probe peer package: %w", err)
+		}
 	}
 	if options.Resources {
 		result.Resources = newVMResourceEvidence()
@@ -319,6 +342,17 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		if err != nil {
 			return result, err
 		}
+	}
+	if firewall != nil {
+		authority, err := fixture.ConfigureConnectivityProbes(ctx, firewall.targets, netip.MustParseAddr(firewallPeer4))
+		if err != nil {
+			return result, fmt.Errorf("configure controller connectivity probes: %w", err)
+		}
+		peer, err := firewall.provisionPeer(ctx, authority)
+		if err != nil {
+			return result, fmt.Errorf("provision probe peer: %w", err)
+		}
+		result.Resources.Fixture = append(result.Resources.Fixture, peer...)
 	}
 	forwards, err := openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
 	if err != nil {
@@ -378,12 +412,34 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if options.Resources {
-		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds)
+		if firewall != nil {
+			firewall.rebootDevice = func(ctx context.Context) error {
+				boot, err := firewallBootID(ctx, vm)
+				if err != nil {
+					return err
+				}
+				err = closeLifecycleForwards(forwards)
+				forwards = nil
+				if err != nil {
+					return err
+				}
+				if err := rebootLifecycleGuest(ctx, vm, boot); err != nil {
+					return err
+				}
+				forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
+				return err
+			}
+		}
+		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall)
 		return result, err
 	}
 	if options.PowerActions {
 		result.Power = new(VMPowerEvidence)
 		err = exerciseNativePower(ctx, vm, control, fixture, result, result.Power)
+		return result, err
+	}
+	result.RecoveryReadiness, err = waitVMRecoveryReadiness(ctx, vm, control, result.DeviceID)
+	if err != nil {
 		return result, err
 	}
 	hold := func() error {

@@ -78,8 +78,8 @@ func helperProvider(ctx context.Context, stateDirectory string, request *agentv1
 			return nil, "", err
 		}
 		manager, err := dnf.ParseVersion(result.stdout)
-		if err != nil || manager.Kind != dnf.DNF5 {
-			return nil, "", fmt.Errorf("%w: native DNF5 required", ErrUnsupported)
+		if err != nil || !manager.AtLeast(dnf.DNF5, minimumDNF5) {
+			return nil, "", fmt.Errorf("%w: native DNF5 %s or newer required", ErrUnsupported, minimumDNF5)
 		}
 		p.managerPath = selected
 	}
@@ -497,7 +497,9 @@ func (p *Provider) checkStagedArtifacts(ctx context.Context, directory string, r
 	if len(found) != countInbound(manifest.GetEntries()) {
 		return errors.New("packageprovider: missing staged package")
 	}
-	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate", "--no-download"}, aptTransactionArgs(request.GetEffectiveDesired())...))
+	// Simulation never fetches; --no-download would instead demand archives under
+	// APT's native file names, while staged artifacts are digest-named.
+	result, err := p.apt(ctx, directory, "/usr/bin/apt-get", append([]string{"--simulate"}, aptTransactionArgs(request.GetEffectiveDesired())...))
 	if err != nil {
 		return err
 	}

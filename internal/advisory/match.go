@@ -122,6 +122,18 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 		return advisorydb.AdvisoryEvaluation{}, previousErr
 	}
 	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt {
+		if previous.FeedID != "" {
+			return previous, nil
+		}
+		// Mark the feed-less recheck against the current configuration so the
+		// background job does not select this unchanged device again.
+		if err := q.TouchAdvisoryEvaluation(ctx, advisorydb.TouchAdvisoryEvaluationParams{DeviceID: deviceID, EvaluatedAt: dbNow, ID: previous.ID}); err != nil {
+			return advisorydb.AdvisoryEvaluation{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return advisorydb.AdvisoryEvaluation{}, err
+		}
+		previous.EvaluatedAt = dbNow
 		return previous, nil
 	}
 	findings := make(map[uuid.UUID]advisorydb.InsertAdvisoryFindingParams)
@@ -142,8 +154,11 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 				unknown("package_architecture_uncovered")
 			}
 		}
+		// Deterministic record/capacity failures persist an UNKNOWN evaluation
+		// instead of failing the background job forever on unchanged evidence.
+	matching:
 		for start := int32(0); start < d.PackageCount.Int32; start += 500 {
-			rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, SnapshotID: *d.CurrentSnapshotID, FirstPosition: start, EndPosition: start + 500})
+			rows, err := q.AdvisoryCandidates(ctx, advisorydb.AdvisoryCandidatesParams{FeedID: selected.ID, Generation: selected.Revision, SnapshotID: *d.CurrentSnapshotID, FirstPosition: start, EndPosition: start + 500})
 			if err != nil {
 				return advisorydb.AdvisoryEvaluation{}, err
 			}
@@ -154,7 +169,8 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 			for _, row := range rows {
 				var record advisoryv1.Advisory
 				if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
-					return advisorydb.AdvisoryEvaluation{}, err
+					unknown("advisory_record_invalid")
+					break matching
 				}
 				if selectedSource.GetDistro() == "rhel" && !record.GetSourceRecordRejected() {
 					if row.ModuleStatus != 1 {
@@ -200,7 +216,8 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 					slices.Sort(f.Cves)
 					f.Cves = slices.Compact(f.Cves)
 					if len(f.Cves) > 2048 {
-						return advisorydb.AdvisoryEvaluation{}, ErrCapacity
+						unknown("matching_capacity_exceeded")
+						break matching
 					}
 					if feed.SeverityRank(previous.Severity) > feed.SeverityRank(f.Severity) {
 						f.Severity = previous.Severity
@@ -210,7 +227,8 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 					} else {
 						comparison, err := feed.Compare(row.Manager, previous.FixedVersion, f.FixedVersion)
 						if err != nil {
-							return advisorydb.AdvisoryEvaluation{}, err
+							unknown("advisory_record_invalid")
+							break matching
 						}
 						if comparison > 0 {
 							f.FixedVersion = previous.FixedVersion
@@ -223,10 +241,11 @@ func (s *Service) Evaluate(ctx context.Context, deviceID uuid.UUID) (advisorydb.
 						f.SourceUrl = previous.SourceUrl
 					}
 				}
-				findings[id] = f
-				if len(findings) > 10000 {
-					return advisorydb.AdvisoryEvaluation{}, ErrCapacity
+				if _, exists := findings[id]; !exists && len(findings) == 10000 {
+					unknown("matching_capacity_exceeded")
+					break matching
 				}
+				findings[id] = f
 			}
 		}
 	}

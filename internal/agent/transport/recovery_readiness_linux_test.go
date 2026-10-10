@@ -151,6 +151,39 @@ func TestReadinessFailureDoesNotFailInventoryPublication(t *testing.T) {
 	}
 }
 
+// A failed readiness RPC must not erase a category the unprivileged collector
+// observed itself; only privileged-only facts and readiness are failed.
+func TestReadinessFailureKeepsIndependentStorage(t *testing.T) {
+	const success = inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
+	f := newRefreshTransportFixture(t)
+	f.readinessErr = errors.New("root RPC unavailable")
+	storage := &inventoryv1.StorageDetails{Status: success}
+	collect := f.r.collectInventory
+	f.r.collectInventory = func(ctx context.Context) (*inventoryv1.NativeObservation, error) {
+		observation, err := collect(ctx)
+		if err == nil {
+			observation.Host.Details.Storage = proto.CloneOf(storage)
+			observation.Host.HardwareSerial = &inventoryv1.ObservedString{Status: success, Value: "previous-root-serial"}
+			observation.Host.Details.Firmware.Mode = &inventoryv1.ObservedString{Status: success, Value: "uefi"}
+		}
+		return observation, err
+	}
+	if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); err != nil {
+		t.Fatal(err)
+	}
+	details := f.publishedHost.GetDetails()
+	if readiness := details.GetRecoveryReadiness(); readiness.GetAvailable() || readiness.GetReason() != "recovery_readiness_executor_unavailable" || readiness.GetBootId() != f.boot {
+		t.Fatalf("readiness failure was not recorded: %v", readiness)
+	}
+	if !proto.Equal(details.GetStorage(), storage) {
+		t.Fatal("readiness failure erased the independently collected storage observation")
+	}
+	if f.publishedHost.GetHardwareSerial().GetStatus() != inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE ||
+		details.GetFirmware().GetMode().GetStatus() != inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE {
+		t.Fatal("readiness failure retained privileged-only serial or firmware evidence")
+	}
+}
+
 func TestDirectCollectorDoesNotInventReadiness(t *testing.T) {
 	f := newRefreshTransportFixture(t)
 	observation, err := f.r.collectInventory(t.Context())

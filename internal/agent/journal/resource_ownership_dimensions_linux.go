@@ -166,6 +166,17 @@ func accountDimensionValueMatches(left, right *agentv1.ResourceOwnershipSnapshot
 	}
 }
 
+// newOwnershipDimensionMatches fences a dimension the ledger starts managing.
+// An object the ledger created has no pre-management value for any attribute,
+// so the new dimension must equal the last state it applied: a foreign edit
+// since then remains drift. Otherwise the original baseline is the fence.
+func newOwnershipDimensionMatches(ledger *agentv1.ResourceOwnershipLedger, current *agentv1.ResourceOwnershipSnapshot, dimension agentv1.ResourceOwnedDimension) bool {
+	if slices.Contains(ledger.GetOwnedDimensions(), agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OBJECT) && ledger.GetLastApplied() != nil {
+		return ownershipDimensionsMatch(ledger.GetLastApplied(), current, []agentv1.ResourceOwnedDimension{dimension})
+	}
+	return baselineOwnershipDimensionMatches(ledger, current, dimension)
+}
+
 // A journal-owned UID/GID change updates the live numeric identity fence, not
 // the original baseline for unrelated fields. New dimensions still require
 // their original baseline value and the same protected native incarnation.

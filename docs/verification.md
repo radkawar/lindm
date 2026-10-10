@@ -257,19 +257,19 @@ zypper is independently observed as an available backend. The local agent RPM
 transactions need no external dependency repository and do not disable signature
 checks. Repository-backed RPM delivery retains signed `repomd.xml`.
 
-| Image                                          | Authenticated acquisition                                                                                                                  | Independent native observation                                                                                                                                                                                                      | Packaged lifecycle / dispatch                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rocky 9.8 GenericCloud Base 20260525.0         | Vendor detached BSD SHA256 CHECKSUM verified and cache reverified offline                                                                  | Passed, 422 RPM records, explicit UEFI/Secure Boot disabled                                                                                                                                                                         | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Rocky 10.2 GenericCloud Base 20260525.0        | Vendor detached BSD SHA256 CHECKSUM verified and cache reverified offline                                                                  | Passed, 443 RPM records, explicit UEFI/Secure Boot disabled                                                                                                                                                                         | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| AlmaLinux 9.8 GenericCloud 20261005            | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Passed, 387 RPM records                                                                                                                                                                                                             | Earlier lifecycle failed signed service after enrollment/upgrade. After removing the dbus-broker v28 argument-filter optimization, independent connected dispatch passed all 10 scenarios with SELinux Enforcing; packaged lifecycle rerun remains required                                                                                                                                                      |
-| AlmaLinux 10.2 GenericCloud 20260817.0         | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Not yet recorded                                                                                                                                                                                                                    | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Ubuntu 22.04 release 20261004                  | Ubuntu signed SHA256SUMS verified and cache reverified offline                                                                             | Passed, 597 dpkg records                                                                                                                                                                                                            | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Rocky 8.10 GenericCloud Base 20240528.0        | Pinned manifest uses aggregate CHECKSUM.sig; 2.06 GB image download incomplete and cancelled at handoff, so actual bytes not authenticated | Not yet recorded                                                                                                                                                                                                                    | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| AlmaLinux 8.10 GenericCloud 20260928           | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Not yet recorded                                                                                                                                                                                                                    | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| openSUSE Leap 16.0 Minimal-VM Cloud Build18.75 | Vendor checksum signature verified; fixed vendor-listed mirror avoids cross-origin redirect relaxation                                     | BIOS exits; UEFI then exited 1 with 63 stderr bytes, later identified on aarch64 as `package collection: COLLECTION_STATUS_UNAVAILABLE` (ndb `Packages.db` not recognised; fixed). No x86_64 rerun yet, so no x86_64 passing record | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| openSUSE Tumbleweed Cloud Snapshot20261007     | Vendor checksum signature verified and cache reverified offline; fixed vendor-listed mirror avoids cross-origin redirect relaxation        | Not yet recorded                                                                                                                                                                                                                    | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Debian 13.7.0 netinst                          | Debian CD signed SHA512SUMS verified, both image digests and exact size checked, cache reverified offline                                  | Passed after privileged source-marker correction: 355 dpkg records, explicit UEFI/Secure Boot disabled                                                                                                                              | Historical 0.5.0→0.5.1 signed-service lane reached reinstall/spool recovery/denied-collection preservation (356 packages), then failed final approver authentication. Post-fix 0.6.0→0.6.1 automatic-trust run was **aborted: host contention** after enrolled/upgraded/rebooted publications (356 packages each), before final revocation. Neither a full pass nor a new distro failure; dispatch remains unrun |
-| Debian 12.15.0 netinst                         | Debian CD signed SHA512SUMS verified, both image digests and exact size checked, cache reverified offline                                  | Not executed                                                                                                                                                                                                                        | Not executed                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Image                                          | Authenticated acquisition                                                                                                                  | Independent native observation                                                                                                | Packaged lifecycle / dispatch                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rocky 9.8 GenericCloud Base 20260525.0         | Vendor detached BSD SHA256 CHECKSUM verified and cache reverified offline                                                                  | Passed, 422 RPM records, explicit UEFI/Secure Boot disabled                                                                   | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Rocky 10.2 GenericCloud Base 20260525.0        | Vendor detached BSD SHA256 CHECKSUM verified and cache reverified offline                                                                  | Passed, 443 RPM records, explicit UEFI/Secure Boot disabled                                                                   | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| AlmaLinux 9.8 GenericCloud 20261005            | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Passed, 387 RPM records                                                                                                       | Earlier lifecycle failed signed service after enrollment/upgrade. After removing the dbus-broker v28 argument-filter optimization, independent connected dispatch passed all 10 scenarios with SELinux Enforcing; packaged lifecycle rerun remains required                                                                                                                                                      |
+| AlmaLinux 10.2 GenericCloud 20260817.0         | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Passed 2026-10-10 under UEFI, 380 RPM records (`alma10-x86_64-local-inspect.json`, below)                                     | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Ubuntu 22.04 release 20261004                  | Ubuntu signed SHA256SUMS verified and cache reverified offline                                                                             | Passed, 597 dpkg records                                                                                                      | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Rocky 8.10 GenericCloud Base 20240528.0        | Pinned manifest uses aggregate CHECKSUM.sig; 2.06 GB image download incomplete and cancelled at handoff, so actual bytes not authenticated | Not yet recorded                                                                                                              | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| AlmaLinux 8.10 GenericCloud 20260928           | Vendor detached CHECKSUM verified and cache reverified offline                                                                             | Not yet recorded                                                                                                              | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| openSUSE Leap 16.0 Minimal-VM Cloud Build18.75 | Vendor checksum signature verified; fixed vendor-listed mirror avoids cross-origin redirect relaxation                                     | Earlier BIOS exit and UEFI 63-byte exit were the ndb `Packages.db` gap (fixed). 2026-10-10 UEFI rerun passed, 378 RPM records | Passed 2026-10-10: signed zypper 0.7.0→0.7.1 automatic-trust lifecycle (five 380-package publications) and nine native dispatch scenarios (records below)                                                                                                                                                                                                                                                        |
+| openSUSE Tumbleweed Cloud Snapshot20261007     | Vendor checksum signature verified and cache reverified offline; fixed vendor-listed mirror avoids cross-origin redirect relaxation        | Not yet recorded                                                                                                              | Not yet recorded                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Debian 13.7.0 netinst                          | Debian CD signed SHA512SUMS verified, both image digests and exact size checked, cache reverified offline                                  | Passed after privileged source-marker correction: 355 dpkg records, explicit UEFI/Secure Boot disabled                        | Historical 0.5.0→0.5.1 signed-service lane reached reinstall/spool recovery/denied-collection preservation (356 packages), then failed final approver authentication. Post-fix 0.6.0→0.6.1 automatic-trust run was **aborted: host contention** after enrolled/upgraded/rebooted publications (356 packages each), before final revocation. Neither a full pass nor a new distro failure; dispatch remains unrun |
+| Debian 12.15.0 netinst                         | Debian CD signed SHA512SUMS verified, both image digests and exact size checked, cache reverified offline                                  | Not executed                                                                                                                  | Not executed                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 The 2026-10-10 continuation used source checkpoint
 `9138d17f8ff6c3673f82cea1590c36c33fca2d22`, same-tree signed 0.6.0→0.6.1
@@ -428,10 +428,47 @@ supports x86_64 and identifies Arch Linux ARM as a separate derivative. The pinn
 official arch-boxes release publishes no aarch64 input. Tumbleweed's official
 [ARM64 installer directory](https://download.opensuse.org/ports/aarch64/tumbleweed/iso/)
 publishes signed Snapshot20261007 DVD/NET media, but its advertised ARM Cloud/KVM
-checksum links return 404 and no matching native QCOW2 was found. A maintained
-SUSE installer-to-golden path, with snapshot-pinned installation content, is a
-prerequisite; an ISO cannot be relabeled as a provisioned cloud disk. These precise
-ARM prerequisites do not change the pending x86_64 Tumbleweed requirements.
+checksum links return 404 and no matching native QCOW2 was found. That prerequisite
+is now met by the maintained installer-to-golden workflow described below and in
+`docs/engineering.md`; the x86_64 Tumbleweed cloud-image cell remains pending.
+
+MutableDistros5 (2026-10-10) closed the remaining ARM gaps, the Leap 16.0 x86_64
+cell and AlmaLinux 10.2 x86_64 inspection.
+Records are under `~/.cache/lindm-mutabledistros5-20261010/`; the source is
+`4d74dcf` plus a lab-only delta (`md5-source-tw2.patch`
+`3a9bca0585cb3aaba93e79b6f91d0e79767c5dbceb74ba847e70c3f4c3e4a987`; plus the
+dispatch SELinux observation in `md5-source-v3.patch`
+`7b6b0d5a2096370f28f5280ba84b6f841d4a1d6a2c60bb03679df74c39bb17b4`). Rocky 8.10
+instead reused the exact AlmaLinux 8.10 EL8 pin (`e10d8953…`, RPMs
+`5e6043f9…`/`ac143d42…`). ARM uses AAVMF and x86_64 uses OVMF
+`2024.02-2ubuntu0.10`, both with Secure Boot disabled, plus virtio-blk, no
+TPM/desktop and isolated local password/WebAuthn authority.
+
+| Distro / lane                         | Observed result                                                                                                                                      | Record / SHA-256                                                                                           |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Rocky 8.10 aarch64 inspect            | Passed 450 native RPM identities, legacy-lsblk storage and systemd 239 sessions                                                                      | `rocky8-arm64-dgx21-inspect.json` / `a78440395d110ccea326f59a3d1d111d66a4cab354a8f6d13f7f8cd6ff8c9ea8`     |
+| Rocky 8.10 aarch64 lifecycle          | Passed full signed lifecycle; five 452-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation/hold; SELinux Enforcing  | `rocky8-arm64-dgx21-lifecycle.json` / `e550555f5f8624edcc55276ad4bb282e1324492f2945bf4b13017e36e8e15e18`   |
+| Rocky 8.10 aarch64 dispatch           | Passed nine native scenarios, real periodic recheck/remediation and revoked denial; SELinux Enforcing; supersession integration-only                 | `rocky8-arm64-dgx21-dispatch.json` / `6a7f8f8a1423fe5cda697e8342e86ca488e9700370cf88ddcfdeaa82c1f4bda2`    |
+| Tumbleweed 20261007 aarch64 inspect   | Installer-built golden from the signed DVD; passed 830 native RPM identities                                                                         | `tw-arm64-dgx21-inspect-v2.json` / `76e793fdd477764a4b8c96afab993daa106ec99218e4ab880fde16d7921c2866`      |
+| Tumbleweed 20261007 aarch64 lifecycle | Passed signed zypper 0.7.0→0.7.1 automatic trust; five 832-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation/hold | `tw-arm64-dgx21-lifecycle-v2.json` / `d29350054997675adcb50bcd72deafa176456ec79b55877f595858eb04d7f37b`    |
+| Tumbleweed 20261007 aarch64 dispatch  | Passed nine native scenarios with real periodic intervals and revoked denial; SELinux Enforcing (kernel-observed); supersession integration-only     | `tw-arm64-dgx21-dispatch-v3.json` / `ba180b62dde4cdf26a5117f8fcc29f55157f7c6a970b93c60cea09e7aa166308`     |
+| Leap 16.0 aarch64 dispatch rerun      | Passed nine native scenarios on dgx20; SELinux Enforcing, replacing the earlier `not applicable` label                                               | `leap16-arm64-dgx20-dispatch-v3.json` / `17289eba4f96fdb1605c590578c572ad3cd037cbceaa3b925e7867fa2be9ba43` |
+| Leap 16.0 x86_64 inspect              | Passed 378 native RPM identities under UEFI after the ndb fix                                                                                        | `leap16-x86_64-local-inspect.json` / `dadb6bc9d37fd93dcaa6eecefc31913c37467738c1c68523904e2f567b2ea2cc`    |
+| Leap 16.0 x86_64 lifecycle            | Passed signed zypper automatic trust; five 380-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation/hold             | `leap16-x86_64-local-lifecycle.json` / `06c36ca389fc455a92f09f8fd87f2010252e508303061d1c0dd7570d2ef8e752`  |
+| Leap 16.0 x86_64 dispatch             | Passed nine native scenarios; ran before the SELinux observation, so its `not applicable` label is not an observation                                | `leap16-x86_64-local-dispatch.json` / `4c0b3341432f59e0e4ab110579f0a37c0873c7ca635395948b1bdb91a320599b`   |
+| AlmaLinux 10.2 x86_64 inspect         | Passed 380 native RPM identities under UEFI; lifecycle/dispatch not yet run (local slot yielded)                                                     | `alma10-x86_64-local-inspect.json` / `76575dcfc770c61da3d0c570f697c77c7fbea2d59845f79f2e0c7bfaf2bfc9bb`    |
+
+Defects fixed with deterministic regressions in these lanes: the vendor ARM DVD's
+hybrid MBR made `xorriso` replay fail, so the remaster declares the vendor FAT image
+as the UEFI El Torito entry. The AutoYaST profile failed the DVD's yast2-schema,
+and `final_halt` rebooted the guest into the installer. The solver picked
+MicroOS's cloud-init configuration. The dispatch lane recorded SELinux
+`not applicable` for zypper guests that actually enforce it. One lifecycle failed
+with `unable to authenticate` right after the reboot. Tumbleweed starts sshd in
+parallel with `systemd-user-sessions`, and pam_nologin rejects logins until
+`/run/nologin` is removed. A delayed-user-sessions guest reproduced "Access denied …
+by PAM account configuration", and the golden now orders sshd after that unit. The
+lab keeps treating authentication failure as terminal.
 
 Arch x86_64 (arch-boxes `20261001.604814`, Archive `2026-10-02`) then passed all
 three lanes locally (KVM, SeaBIOS 1.16.3, virtio-blk, no TPM/desktop, user
@@ -972,28 +1009,35 @@ guests. `N26` and `N43` currently cover baseline host/native-package `inspect`
 only, not the expanded inventory-depth contract or a successful packaged
 lifecycle. Existing `N24`/`N44` service evidence includes provider, packaged
 local execution/history and connected dispatch; continuous-compliance additions
-have their own evidence. `Na` marks the 2026-10-10 aarch64 Debian 12/13 and Leap
-16.0 records (inventory, packaged lifecycle, connected service dispatch); Arch's
-`N` now includes the same x86_64 lanes. Rocky/AlmaLinux ARM records are derivative
-rows, not RHEL evidence, and nothing here covers desktop workflows.
+have their own evidence. `Na` marks the 2026-10-10 aarch64 Debian 12/13, Leap 16.0
+and Tumbleweed 20261007 records (inventory, packaged lifecycle, connected service
+dispatch); Leap's cell also has the same x86_64 lanes, and Arch's
+`N` now includes the same x86_64 lanes. The generic-executor resource cells (files,
+accounts, sysctl, timers/drop-ins, password policy, packages) are aarch64 records
+listed under [the executor cutover](#generic-resource-executor-cutover-phase-2).
+Rocky/AlmaLinux ARM records are derivative rows, not RHEL evidence, and nothing
+here covers desktop workflows.
 Exact builds and observed limits are in the
 [evidence ledger](implementation-plan.md#2-evidence-ledger).
 
 | Resource kind                                     | Code | Ubuntu LTS | Fedora   | RHEL | Debian/SUSE  | Arch/Tumbleweed | Atomic product | NixOS product |
 | ------------------------------------------------- | ---- | ---------- | -------- | ---- | ------------ | --------------- | -------------- | ------------- |
-| Host and native package inventory                 | I    | N24, N26   | N43, N44 | S    | Na Deb, Leap | N Arch; S TW    | S              | S             |
-| Systemd service state                             | I    | N24        | N44      | S    | Na Deb, Leap | N Arch; S TW    | S*             | S*            |
-| Device local accounts/groups                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
+| Host and native package inventory                 | I    | N24, N26   | N43, N44 | S    | Na Deb, Leap | N Arch; Na TW   | S              | S             |
+| Systemd service state                             | I    | N24        | N44      | S    | Na Deb, Leap | N Arch; Na TW   | S*             | S*            |
+| Device local accounts/groups                      | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
 | Sudo policy                                       | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | SSH configuration                                 | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Session/password settings                         | S    | S          | S        | S    | S            | S               | S*             | S*            |
+| Session/password settings                         | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
+| Managed files                                     | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
+| Kernel sysctl                                     | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
+| Systemd timers and drop-ins                       | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
 | Firewall                                          | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Time synchronization                              | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Trust stores                                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Wi-Fi/Ethernet                                    | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | VPN                                               | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | DNS/proxy                                         | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Native repositories/packages                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
+| Native repositories/packages                      | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
 | OS/security-update lifecycle                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Device/user certificates and directory client     | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Recovery escrow, lock/quarantine and sanitization | S    | S          | S        | S    | S            | S               | S*             | S*            |
@@ -1070,6 +1114,129 @@ table ([`qualifiedResourceKinds`](../internal/device/resource_rows.go)) lists it
 with the ownership operations its native Ubuntu 24.04 and Fedora 44 records
 exercised; any other kind, adoption or release behavior remains a visible
 unsupported disposition. Per-kind records follow.
+
+The Fedora 44 aarch64 connected dispatch lane for systemd services also
+**passed** after the cutover (`dgx21` KVM, image `fedora-cloud-44-1.7-aarch64`,
+SELinux enforcing, all ten scenarios):
+`$HOME/.cache/lindm-resourceproviders3-20261010/fedora44-arm64-dgx21-dispatch-q1.json`,
+SHA-256 `beee7a24c81859e5d29d17db4a204d2489edc61b7cf52a8a5b7999a0830f914c`.
+
+Per-kind records were produced by `lab vm resources -phase connected` on aarch64
+cloud-image guests (`ubuntu-noble-20260926-arm64` on `dgx20`,
+`fedora-cloud-44-1.7-aarch64` on `dgx21`, KVM, AAVMF `2024.02-2ubuntu0.10`)
+from a clean source tree whose server qualification table listed every candidate
+kind; the landed tree differs from it only in that table and in lab-only
+failure diagnostics. Every scenario runs through the real server
+assignment, signed intent/challenge/start grant, the protected executor and an
+independent native oracle. All records are under
+`$HOME/.cache/lindm-resourceproviders3-20261010/`:
+
+| Kind (ownership exercised)                                                                                                                                      | Ubuntu 24.04 record | Fedora 44 record | Not exercised                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- | ----------------------------------------------------------------- |
+| Native package (create, restore; exact version, absence, dependency retention, pin drift, wrong signer, unavailable version, interrupted effect without replay) | `pkgfile-q2`        | `pkgfile-q2`     | Any-version and DNF4; repositories other than one signed fixture  |
+| Managed file (create, approved adoption, restore)                                                                                                               | `pkgfile-q2`        | `pkgfile-q2`     | ACLs, other filesystems                                           |
+| Local group (create, restore)                                                                                                                                   | `host-q2`           | `host-q2`        | Adoption of existing groups                                       |
+| Local user (create, restore)                                                                                                                                    | `host-q2`           | `host-q2`        | Password hash delivery, UID reuse, adoption                       |
+| Sysctl (approved adoption, restore)                                                                                                                             | `host-q2`           | `host-q2`        | Persistence across a guest reboot; `net.*` keys                   |
+| Systemd timer and drop-in (create, restore)                                                                                                                     | `host-q2`           | `host-q2`        | Calendar timers firing                                            |
+| Password policy (approved adoption, restore)                                                                                                                    | `password-q2`       | `password-q2`    | History, aging, faillock lockout, interactive PAM password change |
+
+Record files are `<distro>-arm64-<host>-resources-<run>.json` (`ubuntu24-arm64-dgx20-…`,
+`fedora44-arm64-dgx21-…`) with these SHA-256 digests:
+
+| Record                                            | SHA-256                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu24-arm64-dgx20-resources-pkgfile-q2.json`  | `b24781df252af2b5b5950f1641d1e512c1201f1c4dd958db12c522de13498ddb` |
+| `ubuntu24-arm64-dgx20-resources-host-q2.json`     | `3911110c0e15d6cc39cc4839b29978aef5d4090e58570df64c759f1e903711db` |
+| `ubuntu24-arm64-dgx20-resources-password-q2.json` | `8ae48b2095a87053b5d2623bb776e3bfb3f7fd4c05c2a4ae0dd8308a8760b062` |
+| `fedora44-arm64-dgx21-resources-pkgfile-q2.json`  | `245ff01db65edb63146d6830cf22a5215c60c5ac41503bbd3354430f63fde8e5` |
+| `fedora44-arm64-dgx21-resources-host-q2.json`     | `4691d08fdca15fe9801821882fae10a661a83019f47098ec46320e88f6c145c5` |
+| `fedora44-arm64-dgx21-resources-password-q2.json` | `7ac9079e55219f71bad7ef193e5c6f988af606f683e7081556dde099be451e6f` |
+
+Encryption compliance (create, restore; read-only finding, never a storage
+effect) passed `lab vm device-actions -scenario compliance` on x86_64 encrypted
+installer goldens with Secure Boot and swtpm: a LUKS2 root without escrow is
+`DRIFTED`, after a real escrow rotation it is `CONVERGED`, and release leaves the
+independent keyslot evidence unchanged. Records:
+`ubuntu24-amd64-compliance-03.json` SHA-256
+`892c630c71790b98a9bf494c25197304dac923966cdc3fef6b3e7d7d1e5ef640` and
+`fedora44-amd64-compliance-10.json` SHA-256
+`33449d9662b9904037ae07bffaf1bfa4d239860abbdd18ff5b0654fd4c0fe55e` (same
+directory). TPM-binding requirements and physical storage are not exercised.
+
+All six resource records share lindmd `ff346ccfdb61e11e…` built by the lab from that clean tree;
+the Fedora package lane first upgrades the guest to the maintained DNF5
+5.4.6.0 release update.
+
+Native findings fixed before these records: systemd `RestrictSUIDSGID=` makes
+`openat2` fail with `ENOSYS`, so protected path walks open one `O_NOFOLLOW`
+component at a time; Fedora's SELinux refuses a bind mount of a `/proc/sys` file,
+so a sysctl runtime change gets writable `/proc/sys` in its one-use helper and the
+sysctl identity no longer includes the per-mount-namespace procfs inode;
+`matchpathcon -m` takes a file class, not a mode; btrfs compression and
+copy-on-write flags are allocation details; a created account acquires a newly
+managed field against its last applied state, not its absent baseline; an
+inactive timer reports an empty invocation ID; releasing a drop-in whose
+directory the ledger created needs the unit root writable; and a converged
+password policy plans no effect. Fedora additionally needed: RPM 6 removed the
+`HDRID` query tag and reports signatures by key fingerprint; the approved key must
+be in system RPM trust; DNF5 before 5.4.6.0 refuses to store a transaction from
+a read-only `/usr`; `NoNewPrivileges=` breaks RPM's SELinux scriptlet transition
+(exit 127); and DNF's single shared versionlock file is not another package's pin.
+
+##### Firewall zone (create, restore) — two-guest probe lane
+
+`lab vm resources -phase connected -kinds firewall` boots the device and an
+independent probe-peer guest from the same verified image; each holds its own
+host slot. Their second NICs share a lane-private QEMU `dgram` Unix-socket L2
+link (device `52:54:00:77:00:10`, peer `52:54:00:77:00:20`, static
+`192.168.77.0/24` and `fd77::/64`); management and the controller's loopback
+forward stay on the slirp NIC outside the zone boundary. The peer runs the
+packaged `lindm-connectivity-probe.service` with a transport-CA TLS leaf and an
+Ed25519 proof key; the device, the peer and the server's `connectivity_probes`
+carry the same eight dual-stack INPUT TCP / OUTPUT UDP allow/deny targets, and
+the device enables the packaged guard and restore units. A lab-owned
+priority-100 table drops only the DENY tuples so the static deny experiments
+stay meaningful after release. Every converged step carries fresh signed peer
+receipts and the controller's DSSE confirmation; each oracle is the device's own
+`nft -j list ruleset` plus TCP connections from the peer and UDP datagrams
+received by an independent peer witness.
+
+| Scenario                   | Native outcome                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `zone-create-converged`    | Owned table at priority 10; peer reaches TCP 8080, 8081 filtered; UDP 5301 egress dropped (EPERM), 5300 received |
+| `repeat-no-start-grant`    | Verification-only action with fresh probes, no start grant                                                       |
+| `reconcile-rule-change`    | Added TCP 8083 accept becomes reachable from the peer                                                            |
+| `quarantine-precedence`    | A foreign priority -10 drop on 8080 stays final over the zone accept; after its removal verification converges   |
+| `reboot-restore`           | `lindm-firewall-restore.service` succeeds at boot, packets match, verification converges without a start grant   |
+| `release-restores-absence` | Owned table removed; 8081 and UDP 5301 reachable again                                                           |
+
+Clean records (lindmd `d4b3edf90215f0d555d06f4838e5c9b68e0811071bd2f6ab6cbe8eb30aa030a6`,
+lab `4efa654f293c2f3b7d97ade2d5c60fd9915ad27fcf549fad25654705ca748bd3`, built from a
+tree that differs from the landed one only in the qualification table), under
+`$HOME/.cache/lindm-resourceproviders3-20261010/`:
+
+| Record                                    | SHA-256                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `firewall-ubuntu2404-arm64-dgx20-q2.json` | `3a7e842c7b39a17f0bdf12448510a055566e0c9452d4b7249631da7582f51dda` |
+| `firewall-fedora44-arm64-dgx21-q2.json`   | `bb335f97639707ea4f599e58cfd013f224b0d366b09d0970742f8043d846edef` |
+
+Not exercised: the real timed quarantine device action (a lab table imitates its
+priority), active UFW or firewalld rulesets (inactive on the Ubuntu image, not
+installed on the Fedora image), FORWARD probes, partitions, generation-CAS races,
+foreign drift, approved adoption and guard crash boundaries.
+
+Native findings fixed before these records: `/proc/1/ns/net` is ptrace-gated, so
+every capability-bounded firewall helper, the guard and the restore unit failed
+the host-namespace check with `EACCES`; it now compares the per-namespace
+`/proc/<pid>/net/dev` entries. Kernels read back a boolean bitwise expression with
+an explicit `NFTA_BITWISE_OP=0`; the normalizer dropped it but re-marshaled the
+parent with its stale netlink length, so every applied table read back as
+foreign (outcome unknown). An observation directory listing resolved entries
+against a label instead of its path, so one retained observer blocked all later
+observations. The native worker took the guard record lock non-blockingly and
+failed when it met the supervisor's 100 ms recovery poll; it now waits within its
+deadline.
 
 ### Capability matrix dimensions
 
@@ -2947,6 +3114,54 @@ exposure `package_architecture_uncovered` from `gpg-pubkey` rows with an empty
 architecture; and Fedora's published storage `UNAVAILABLE` because the
 executor's root inventory observation failed (`recovery_readiness_executor_unavailable`)
 while the same root `inspect` collection succeeded.
+
+The Fedora storage failure was reproduced on Fedora 44 Cloud 44-1.7 aarch64
+under dgx20 KVM with SELinux Enforcing: `systemd-run --pipe` passed the executor's
+pipes through dbus-broker, whose `dontaudit`ed `fifo_file write` denial reset the
+connection ([Fedora quirk](platforms/fedora.md#agent-services-and-sandbox)).
+Record `~/.cache/lindm-readiness-20261010/fedora44-arm64-dgx20-dispatch-repro1.json`
+(SHA-256 `ac923c07d0180d40c87944be217a41f5774d0957005eda21d3ba52b81744ebf1`) holds
+the executor journal line; `fedora44-arm64-dgx20-dispatch-probe2.json`
+(`1ae232be4791fc483e7bc9fd2c4a527e7eb8348ed1c92399df77634869c1196a`) holds the
+denial. The executor now starts the helper over PID 1's private socket. `lab vm
+dispatch` now fails unless the first published host observation carries executor
+root storage. From source `efa7892` plus diff
+`8e56306ffad57d221eae6161f170cfd933fae85cd958369da9bd634daf21650c`, both arm64
+dispatch lanes passed with storage `SUCCESS` (five devices), firmware `SUCCESS`,
+`smbios_type4` CPU source and the executor's own readiness reason
+`recovery_readiness_not_configured`: Fedora 44 Enforcing
+`fedora44-arm64-dgx20-dispatch-final.json`
+(`21e4134baa75aeb309148bebfec589bc47d77ba06e22782ac17602c554ae4eb0`) and Ubuntu
+24.04 `ubuntu2404-arm64-dgx20-dispatch-final.json`
+(`56dac71a1722617f2d196ef772b4a421a82a9f9f421a5612bbfb7bbd214c19a8`), with no
+AppArmor denial.
+
+Release acceptance `~/acceptance-full-20261010T195842Z` still failed Fedora 44
+x86_64 storage. The private-socket call itself reset: sd-bus read the
+descriptor-carrying start together with BEGIN
+([Fedora quirk](platforms/fedora.md#agent-services-and-sandbox)). A local
+Fedora 44 x86_64 stress run called `GetRecoveryReadiness` directly in bursts and
+concurrently with `load_policy`, daemon-reload and `enable --now` plus agent
+restart. Before the fix, 11 of 44 calls reset within 5 ms with no AVC, and one
+more failed because readiness treated a daemon-reload `UnitRemoved` as final:
+`fedora44-x86_64-local-dispatch-probe5e.json`
+(`ca68d6cc4786d502af1c1a484b602d43fc75d35d6479657c18315cbb3def146a`). A single
+handshake Ping replaced the reset with a 12 s stall in 8 of 36 calls
+(`fedora44-x86_64-local-dispatch-stress-fixed.json`,
+`6deaa16be8d8013695acd8a0d2dfbfed312702c3669562d8553e3a58a76c5b7b`). With repeated
+Pings, all 44 calls succeeded in at most 168 ms
+(`fedora44-x86_64-local-dispatch-stress-fixed2.json`,
+`78cc22c8e1af8d54027c9e0881cc8cabf7a66b3cdb838923bb1eef645b149670`). From
+`efa7892` plus diff `0b2e8f32e6f83de1031e974ca089b996afb447a0d407bc8abfe9b7d36b9bfd72`
+(a later race-detector fix touched only the launcher test fixture), three
+dispatch lanes passed with executor storage `SUCCESS`. Fedora 44 x86_64
+Enforcing: `fedora44-x86_64-local-dispatch-final2.json`
+(`1a4467bfac9d21dbfdd998a58554d7b49fcea8689a62141330ceb0e248666007`). Fedora 44
+aarch64 Enforcing on dgx20: `fedora44-arm64-dgx20-dispatch-final2.json`
+(`d1e639e439673253f733898f1aa73c57990841d07b3b33d478c79a7a5836f614`). Ubuntu
+24.04 arm64 on dgx21: `ubuntu2404-arm64-dgx21-dispatch-final2.json`
+(`44d0288f8062265299b5e46858f0f186bc24e94528bde2f0fd7154c502534cc1`). All records
+are in `~/.cache/lindm-readiness-20261010/`.
 
 ## 5. Physical qualification prerequisites
 

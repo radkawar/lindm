@@ -318,7 +318,7 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 			}
 			result, err = p.run(ctx, "/usr/bin/rpmkeys", []string{"--checksig", "--verbose", path}, "/", nil)
 			if err != nil {
-				return nil, errors.New("packageprovider: package signing key must already be root-provisioned in system RPM trust")
+				return nil, fmt.Errorf("packageprovider: package signing key must already be root-provisioned in system RPM trust: %w", err)
 			}
 			if err := checkRPMSignature(result.stdout, source.GetRpmSigningKeyFingerprint()); err != nil {
 				return nil, err
@@ -353,13 +353,28 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 	}
 	return entries, nil
 }
+
+// minimumDNF5 is the first release that stores a transaction without
+// privileges; older releases refuse the staging sandbox's read-only /usr.
+const minimumDNF5 = "5.4.6.0"
+
 func checkRPMSignature(output []byte, fingerprint string) error {
 	valid := false
 	for line := range strings.SplitSeq(string(output), "\n") {
 		if strings.Contains(line, "NOT OK") || strings.Contains(line, "NOKEY") || strings.Contains(line, "NOTTRUSTED") {
 			return errors.New("packageprovider: untrusted RPM signature")
 		}
-		if !strings.Contains(line, "Signature,") || !strings.HasSuffix(strings.TrimSpace(line), ": OK") {
+		// RPM 4 prints "Signature, key ID <id>: OK"; RPM 6 prints
+		// "signature, key fingerprint: <fingerprint>: OK" for a known key.
+		if !strings.Contains(strings.ToLower(line), "signature,") || !strings.HasSuffix(strings.TrimSpace(line), ": OK") {
+			continue
+		}
+		if _, suffix, ok := strings.Cut(line, "key fingerprint: "); ok {
+			signer, _, ok := strings.Cut(suffix, ":")
+			if !ok || !strings.EqualFold(signer, fingerprint) {
+				return errors.New("packageprovider: wrong RPM signer")
+			}
+			valid = true
 			continue
 		}
 		_, suffix, ok := strings.Cut(line, "key ID ")

@@ -23,7 +23,9 @@ type autoyastProfile struct {
 	Mode struct {
 		Confirm     string `xml:"confirm"`
 		SecondStage string `xml:"second_stage"`
-		FinalHalt   string `xml:"final_halt"`
+		// final_halt applies only after a second stage; without halt the
+		// installer reboots into the vendor DVD and reinstalls.
+		Halt string `xml:"halt"`
 	} `xml:"general>mode"`
 	Drives []struct {
 		Device     string `xml:"device"`
@@ -32,11 +34,15 @@ type autoyastProfile struct {
 	} `xml:"partitioning>drive"`
 	Bootloader struct {
 		Append      string `xml:"append"`
-		UpdateNVRAM string `xml:"update_nvram"`
+		UpdateNVRAM struct {
+			Type  string `xml:"http://www.suse.com/1.0/configns type,attr"`
+			Value string `xml:",chardata"`
+		} `xml:"update_nvram"`
 	} `xml:"bootloader>global"`
-	Patterns []string `xml:"software>patterns>pattern"`
-	Packages []string `xml:"software>packages>package"`
-	AddOns   []struct {
+	InstallRecommended string   `xml:"software>install_recommended"`
+	Patterns           []string `xml:"software>patterns>pattern"`
+	Packages           []string `xml:"software>packages>package"`
+	AddOns             []struct {
 		URL      string `xml:"media_url"`
 		Alias    string `xml:"alias"`
 		Priority string `xml:"priority"`
@@ -64,7 +70,7 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 			if err := xml.Unmarshal(recipe, &profile); err != nil {
 				t.Fatal(err)
 			}
-			if profile.Mode.Confirm != "false" || profile.Mode.SecondStage != "false" || profile.Mode.FinalHalt != "true" {
+			if profile.Mode.Confirm != "false" || profile.Mode.SecondStage != "false" || profile.Mode.Halt != "true" {
 				t.Fatalf("profile is not unattended single-stage poweroff: %+v", profile.Mode)
 			}
 			if len(profile.Drives) != 1 || profile.Drives[0].Device != "/dev/vda" || profile.Drives[0].Initialize != "true" || profile.Drives[0].Use != "all" {
@@ -75,8 +81,16 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 			if architecture == "aarch64" {
 				console = "console=ttyAMA0"
 			}
-			if profile.Bootloader.UpdateNVRAM != "false" || !strings.Contains(profile.Bootloader.Append, console) || !strings.Contains(profile.Bootloader.Append, "net.ifnames=0") {
-				t.Fatalf("bootloader binds NVRAM or loses console: %+v", profile.Bootloader)
+			// YaST's schema (yast2-schema 5.0.3 on the Snapshot20261007 DVD)
+			// types update_nvram as an untyped "true"|"false" string; with
+			// config:type="boolean" the installer stops on an invalid profile.
+			if profile.Bootloader.UpdateNVRAM.Value != "false" || profile.Bootloader.UpdateNVRAM.Type != "" || !strings.Contains(profile.Bootloader.Append, console) || !strings.Contains(profile.Bootloader.Append, "net.ifnames=0") {
+				t.Fatalf("bootloader binds NVRAM, breaks the schema or loses console: %+v", profile.Bootloader)
+			}
+			// The schema names this element install_recommended; any other
+			// software child also invalidates the whole profile.
+			if profile.InstallRecommended != "true" || strings.Contains(string(recipe), "install_recommends") {
+				t.Fatal("software section does not use the schema's install_recommended element")
 			}
 			// The DVD (default priority 99) outranks the one online repository,
 			// whose signed snapshot binding uses this exact URL and alias.
@@ -87,7 +101,9 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 			if strings.Contains(unbound, "://") || strings.Contains(unbound, "add_on_products") {
 				t.Fatal("profile adds an unbound network repository")
 			}
-			for _, want := range []string{"openssh-server", "sudo", "cloud-init"} {
+			// The solver otherwise satisfies cloud-init-config with MicroOS's
+			// configuration (observed on Snapshot20261007), not the TW default.
+			for _, want := range []string{"openssh-server", "sudo", "cloud-init", "cloud-init-config-suse"} {
 				if !containsString(profile.Packages, want) {
 					t.Fatalf("profile lacks package %q", want)
 				}
@@ -114,7 +130,9 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{base64.StdEncoding.EncodeToString([]byte(login)), base64.StdEncoding.EncodeToString([]byte(private)), base64.StdEncoding.EncodeToString([]byte(public)), "datasource_list: [ NoCloud ]", digest + "' > " + installerSourceMarkerPath, "cloud-init clean", "systemctl enable sshd.service"} {
+			// Observed lifecycle flake: sshd answered before systemd-user-sessions
+			// removed /run/nologin, and pam_nologin rejected the pinned key.
+			for _, want := range []string{base64.StdEncoding.EncodeToString([]byte(login)), base64.StdEncoding.EncodeToString([]byte(private)), base64.StdEncoding.EncodeToString([]byte(public)), "datasource_list: [ NoCloud ]", digest + "' > " + installerSourceMarkerPath, "cloud-init clean", "systemctl enable sshd.service", "'[Unit]' 'After=systemd-user-sessions.service' > " + tumbleweedSSHDOrdering} {
 				if !bytes.Contains(payload, []byte(want)) {
 					t.Fatalf("installed provisioning lost %q", want)
 				}

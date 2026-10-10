@@ -63,8 +63,10 @@ func TestNetSysctlReadsHostNamespaceWithoutWriteAuthority(t *testing.T) {
 		t.Fatal("observation received writable proc sysctl")
 	}
 	values = unitValues(t, directory, plan, snapshot("0"), snapshot("1"))
-	if values["ProtectKernelTunables"] != false || unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_NET_ADMIN) == 0 || !slices.Contains(unitValue[[]string](t, values, "ReadWritePaths"), "/proc/sys/net/ipv4/ip_forward") {
-		t.Fatal("approved runtime change missing exact host sysctl authority")
+	// SELinux refuses a bind mount of the procfs file itself, so a runtime
+	// change gets writable /proc/sys and the helper writes only the planned key.
+	if values["ProtectKernelTunables"] != false || unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_NET_ADMIN) == 0 || slices.Contains(unitValue[[]string](t, values, "ReadWritePaths"), "/proc/sys/net/ipv4/ip_forward") {
+		t.Fatal("approved runtime change missing host sysctl authority or binds the procfs file")
 	}
 }
 

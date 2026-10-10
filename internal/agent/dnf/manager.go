@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"io/fs"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,28 @@ const (
 type Manager struct {
 	Kind    Kind
 	Version string
+}
+
+// AtLeast reports whether the manager is the same generation and its dotted
+// numeric version is not older than minimum. ParseVersion validated the shape.
+func (m Manager) AtLeast(kind Kind, minimum string) bool {
+	if m.Kind != kind {
+		return false
+	}
+	have, want := strings.Split(m.Version, "."), strings.Split(minimum, ".")
+	for i := range max(len(have), len(want)) {
+		var a, b int
+		if i < len(have) {
+			a, _ = strconv.Atoi(have[i])
+		}
+		if i < len(want) {
+			b, _ = strconv.Atoi(want[i])
+		}
+		if a != b {
+			return a > b
+		}
+	}
+	return true
 }
 
 // Executable chooses the explicit DNF5 executable before the generic DNF
