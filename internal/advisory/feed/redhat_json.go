@@ -273,11 +273,10 @@ type redHatBranch struct {
 }
 
 type redHatTree struct {
-	branches         []redHatBranch
-	relations        map[string]suseRelationship
-	unsupported      bool
-	invalidRelations bool
-	textBytes        int
+	branches    []redHatBranch
+	relations   map[string]redHatRelationship
+	unsupported bool
+	textBytes   int
 }
 
 func (tree *redHatTree) retain(size int) error {
@@ -361,13 +360,31 @@ func (j *redHatJSON) tree(tree *redHatTree) error {
 				}); err != nil {
 					return err
 				}
-				if _, duplicate := tree.relations[relation.Product.ID]; duplicate || relation.Product.ID == "" {
-					tree.invalidRelations = true
+				if previous, duplicate := tree.relations[relation.Product.ID]; duplicate {
+					// Labels are opaque. Only the declared identity helpers
+					// and edges determine whether a redeclaration conflicts.
+					if previous.Category == relation.Category && previous.Component == relation.Component && previous.Platform == relation.Platform && previous.Product.Helper == relation.Product.Helper {
+						return nil
+					}
+					previous.ambiguous = true
+					if relation.Platform != previous.Platform {
+						if _, retained := previous.platforms[relation.Platform]; !retained {
+							if err := tree.retain(len(relation.Platform)); err != nil {
+								return err
+							}
+							if previous.platforms == nil {
+								previous.platforms = make(map[string]struct{})
+							}
+							previous.platforms[relation.Platform] = struct{}{}
+						}
+					}
+					tree.relations[relation.Product.ID] = previous
+					return nil
 				}
 				if err := tree.retain(len(relation.Category) + len(relation.Component) + len(relation.Platform) + redHatProductBytes(relation.Product)); err != nil {
 					return err
 				}
-				tree.relations[relation.Product.ID] = relation
+				tree.relations[relation.Product.ID] = redHatRelationship{suseRelationship: relation, ambiguous: relation.Product.ID == ""}
 				return nil
 			})
 		case "full_product_names", "product_groups":
@@ -414,10 +431,16 @@ func (tree *redHatTree) products() (map[string]redHatProduct, error) {
 				return nil, errors.New("feed: invalid Red Hat product")
 			}
 			if previous, duplicate := products[p.ID]; duplicate {
-				// Off-scope duplicate legacy module builds remain irrelevant;
-				// relevant relationships must reject their ambiguous identity.
-				previous.unsupported = true
-				products[p.ID] = previous
+				if (previous.product.Helper != p.Helper && !redHatSameComponent(previous, *p)) || previous.arch != branch.arch || previous.unsupported != branch.unsupported {
+					previous.ambiguous = true
+					if p.Helper.CPE != previous.product.Helper.CPE {
+						if previous.cpes == nil {
+							previous.cpes = make(map[string]struct{})
+						}
+						previous.cpes[p.Helper.CPE] = struct{}{}
+					}
+					products[p.ID] = previous
+				}
 			} else {
 				products[p.ID] = redHatProduct{product: *p, arch: branch.arch, unsupported: branch.unsupported}
 			}
@@ -428,6 +451,24 @@ func (tree *redHatTree) products() (map[string]redHatProduct, error) {
 	}
 	tree.branches = nil
 	return products, nil
+}
+
+// redHatSameComponent recognizes a semantic redeclaration of one opaque product
+// ID whose PURLs differ only in components outside the normalized identity, such
+// as the rpmmod version:context of distinct module builds shipping one NEVRA.
+// Both PURLs must be valid native RPMs; any normalized difference stays ambiguous.
+func redHatSameComponent(previous redHatProduct, redeclared suseProduct) bool {
+	if previous.product.Helper.CPE != redeclared.Helper.CPE || previous.product.Helper.PURL == "" || redeclared.Helper.PURL == "" {
+		return false
+	}
+	first, err := redHatPackage(previous)
+	if err != nil {
+		return false
+	}
+	other := previous
+	other.product.Helper = redeclared.Helper
+	second, err := redHatPackage(other)
+	return err == nil && first == second
 }
 
 type redHatVulnerability struct {
@@ -476,7 +517,13 @@ func parseRedHatClaims(ctx context.Context, config *advisoryv1.FeedSource, input
 	if err != nil {
 		return fmt.Errorf("feed: stage Red Hat JSON: %w", err)
 	}
-	defer func() { err = errors.Join(err, file.Close(), os.Remove(file.Name())) }()
+	defer func() {
+		if cleanup := errors.Join(file.Close(), os.Remove(file.Name())); cleanup != nil {
+			// A cleanup/storage failure must not retain a vendor-rejection
+			// marker that the source stager could otherwise accept.
+			err = fmt.Errorf("feed: clean up Red Hat JSON (parse result: %v): %w", err, cleanup)
+		}
+	}()
 	if err := copyArchive(ctx, file, input, redHatRecordBytes); err != nil {
 		return err
 	}
@@ -490,7 +537,7 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	j := &redHatJSON{decoder: json.NewDecoder(&redHatJSONReader{reader: contextFeedReader{ctx, file}})}
 	j.decoder.UseNumber()
 	var notice suseCSAF
-	tree := redHatTree{relations: make(map[string]suseRelationship)}
+	tree := redHatTree{relations: make(map[string]redHatRelationship)}
 	var vulnerabilities int64 = -1
 	vulnerabilitiesPresent := false
 	if err := j.container('{', func(key string) error {
@@ -532,6 +579,17 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 			potential = true
 			break
 		}
+		for cpe := range product.cpes {
+			alternative := product.product
+			alternative.Helper.CPE = cpe
+			if applies, _ := redHatPlatform(config, alternative, "under_investigation"); applies {
+				potential = true
+				break
+			}
+		}
+		if potential {
+			break
+		}
 	}
 	// Signed distributions also contain historical informational advisories.
 	// Product CPEs independently establish scope; an off-scope document cannot
@@ -542,20 +600,18 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	}
 	d := &notice.Document
 	if d.Version != "2.0" || (d.Category != "csaf_security_advisory" && d.Category != "csaf_vex" && d.Category != "csaf_informational_advisory") || d.Tracking.Status != "final" || d.Publisher.Category != "vendor" || d.Publisher.Namespace != "https://www.redhat.com" {
-		return errors.New("feed: unsupported Red Hat CSAF document or publisher")
+		return redHatMetadataRejection(&notice, errors.New("feed: unsupported Red Hat CSAF document or publisher"))
 	}
 	if _, err := timestamp(d.Tracking.Published); err != nil {
-		return err
+		return redHatMetadataRejection(&notice, err)
 	}
 	if tree.unsupported {
-		return errors.New("feed: unsupported Red Hat standalone products or groups")
+		return redHatMetadataRejection(&notice, errors.New("feed: unsupported Red Hat standalone products or groups"))
 	}
-	if tree.invalidRelations {
-		return errors.New("feed: unsupported or duplicate Red Hat relationship")
-	}
-	for id := range tree.relations {
-		if _, collision := products[id]; collision {
-			return errors.New("feed: unsupported or duplicate Red Hat relationship")
+	for id, relation := range tree.relations {
+		if product, collision := products[id]; collision {
+			product.ambiguous, relation.ambiguous = true, true
+			products[id], tree.relations[id] = product, relation
 		}
 	}
 	if d.Category == "csaf_informational_advisory" {
@@ -563,7 +619,7 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 		// including null or an empty array. Genuine RHSA-2023:6529 follows
 		// this profile: its RHEL 9 AppStream update supplies no CVE claims.
 		if vulnerabilitiesPresent {
-			return errors.New("feed: Red Hat informational advisory contains vulnerabilities")
+			return redHatMetadataRejection(&notice, errors.New("feed: Red Hat informational advisory contains vulnerabilities"))
 		}
 		return errRedHatNotApplicable
 	}
@@ -576,6 +632,7 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	j = &redHatJSON{decoder: json.NewDecoder(contextFeedReader{ctx, file})}
 	j.decoder.UseNumber()
 	count := 0
+	var rejected *redHatRejectedRecordError
 	if err := j.container('[', func(string) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -584,12 +641,30 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 		if err := j.vulnerability(&vulnerability); err != nil {
 			return err
 		}
-		return redHatVulnerabilityClaims(config, &notice, vulnerability, products, tree.relations, validator, func(record *advisoryv1.Advisory) error {
+		if rejected != nil {
+			return rejected.includeRejectedPackages(ctx, config, vulnerability, products, tree.relations)
+		}
+		err := redHatVulnerabilityClaims(config, &notice, vulnerability, products, tree.relations, validator, func(record *advisoryv1.Advisory) error {
+			if err := emit(record); err != nil {
+				return &redHatSinkError{cause: err}
+			}
 			count++
-			return emit(record)
+			return nil
 		})
+		if err == nil {
+			return nil
+		}
+		var sink *redHatSinkError
+		if errors.As(err, &sink) {
+			return err
+		}
+		rejected = redHatMetadataRejection(&notice, err)
+		return rejected.includeRejectedPackages(ctx, config, vulnerability, products, tree.relations)
 	}); err != nil {
 		return err
+	}
+	if rejected != nil {
+		return rejected
 	}
 	if count == 0 {
 		return errRedHatNotApplicable

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"testing"
 	"time"
 
@@ -101,8 +100,8 @@ func TestRedHatDirectStatusRequiresProvenOffScopeIdentity(t *testing.T) {
 				}
 				return
 			}
-			if err == nil || errors.Is(err, errRedHatNotApplicable) || doc != nil || calls != 0 {
-				t.Fatalf("unscoped or relevant status was silently discarded: doc=%v calls=%d err=%v", doc, calls, err)
+			if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
+				t.Fatalf("unscoped or relevant status gained clean authority: doc=%v calls=%d err=%v", doc, calls, err)
 			}
 		})
 	}

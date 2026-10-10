@@ -53,11 +53,12 @@ func TestRedHatStreamScopesMetadataPolicyWithoutAcceptingRelevantUnsupportedDocu
 						calls++
 						return nil
 					})
-					if doc != nil || calls != 0 || err == nil {
-						t.Fatalf("unsupported document emitted claims: doc=%v calls=%d err=%v", doc, calls, err)
-					}
-					if offScope := errors.Is(err, errRedHatNotApplicable); offScope != (release == "8.8") {
-						t.Fatalf("metadata policy crossed product scope: release=%s err=%v", release, err)
+					if release == "8.8" {
+						if doc != nil || calls != 0 || !errors.Is(err, errRedHatNotApplicable) {
+							t.Fatalf("metadata policy crossed product scope: doc=%v calls=%d err=%v", doc, calls, err)
+						}
+					} else if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
+						t.Fatalf("unsupported document gained claim authority: doc=%v calls=%d err=%v", doc, calls, err)
 					}
 				})
 			}
@@ -119,12 +120,13 @@ func TestRedHatInformationalProfileRejectsVulnerabilitiesAndMalformedTree(t *tes
 	validator := redHatValidator(t)
 	for _, test := range []struct {
 		name, key, value string
+		rejected         bool
 	}{
-		{"null", "vulnerabilities", "null"},
-		{"empty", "vulnerabilities", "[]"},
-		{"nonempty", "vulnerabilities", `[{"cve":"CVE-2024-6119"}]`},
-		{"wrong-type", "vulnerabilities", "{}"},
-		{"missing-root", "product_tree", `{"branches":[]}`},
+		{"null", "vulnerabilities", "null", true},
+		{"empty", "vulnerabilities", "[]", true},
+		{"nonempty", "vulnerabilities", `[{"cve":"CVE-2024-6119"}]`, true},
+		{"wrong-type", "vulnerabilities", "{}", false},
+		{"missing-root", "product_tree", `{"branches":[]}`, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var document map[string]json.RawMessage
@@ -141,8 +143,12 @@ func TestRedHatInformationalProfileRejectsVulnerabilitiesAndMalformedTree(t *tes
 				calls++
 				return nil
 			})
-			if err == nil || errors.Is(err, errRedHatNotApplicable) || doc != nil || calls != 0 {
-				t.Fatalf("malformed informational profile suppressed: doc=%v calls=%d err=%v", doc, calls, err)
+			if test.rejected {
+				if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
+					t.Fatalf("invalid informational profile gained authority: doc=%v calls=%d err=%v", doc, calls, err)
+				}
+			} else if err == nil || errors.Is(err, errRedHatNotApplicable) || doc != nil || calls != 0 {
+				t.Fatalf("malformed informational JSON suppressed: doc=%v calls=%d err=%v", doc, calls, err)
 			}
 		})
 	}

@@ -1519,7 +1519,7 @@ Signed individual SUSE CSAF is capped at 32 MiB with 64 KiB proofs.
 Red Hat accepts 128 MiB documents, incrementally walks JSON product metadata and
 one vulnerability at a time, and verifies original-byte proofs before publication.
 Acquisition stages at most one 512 MiB compressed archive in a private temporary
-file, removes it on every exit, and bounds each archive to 16 GiB expanded and
+file, removes it on every exit, and bounds each archive to 32 GiB expanded and
 250,000 entries. A private disk-backed reconciliation index is capped at 2 GiB
 with an 8 MiB cache; source-wide claims are never held in a Go map. The configured
 total-claims limit bounds publication independently. Only materializing callers
@@ -1552,8 +1552,15 @@ switch; SQL always protects the active revision. Historical inactive generations
 receive a 35-minute migration grace period covering the older 30-minute import
 command, rather than being mistaken for abandoned concurrent staging immediately.
 
+Streaming refreshes (Red Hat CSAF/VEX archives, OSV ZIP) have no size-derived
+deadline. A progress watchdog aborts a source only when no complete source
+document is parsed and no publication batch commits for
+`progress_timeout_seconds` (default 300); received bytes are not progress. An
+overall `refresh_timeout_seconds` ceiling (default 7,200) applies regardless.
+The staging lease is renewed by a one-minute heartbeat throughout parsing.
+
 Real-source RHEL qualification is explicitly opt-in:
-`LINDM_TEST_DATABASE_URL=... go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=13m`.
+`LINDM_TEST_DATABASE_URL=... go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=2h10m`.
 It acquires both real signed archives and publishes through the production service
 inside an owned disposable test schema. It requires network access and a test role
 with schema-creation privileges, never the demo database or an owner's session.

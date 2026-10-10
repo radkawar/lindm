@@ -218,6 +218,39 @@ func TestNativeSubprocess(t *testing.T) {
 	}
 }
 
+// EL8's util-linux 2.32.1 lsblk exits 1 with empty stdout for the storage
+// column set ("lsblk: unknown column: FSVER,..."). The parser's rejection of
+// that empty document must not hide the native exit status.
+func TestNativeExitPrecedesParserRejection(t *testing.T) {
+	for _, tc := range []struct {
+		mode string
+		want inventoryv1.CollectionStatus
+	}{
+		{"unknown-column", commandFailure},
+		{"empty", invalid},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			executable, err := os.Executable()
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.CommandContext(ctx, executable, "-test.run=^TestInventorySubprocessHelper$")
+			cmd.Env = []string{"LINDM_INVENTORY_HELPER=" + tc.mode, "LANG=C", "LC_ALL=C"}
+			cmd.Dir = "/"
+			cmd.WaitDelay = time.Second
+			status := runCommand(ctx, cmd, func(reader io.Reader) inventoryv1.CollectionStatus {
+				_, status := readStorageGraph(reader)
+				return status
+			})
+			if status != tc.want {
+				t.Fatalf("status=%s want=%s", status, tc.want)
+			}
+		})
+	}
+}
+
 func TestInventorySubprocessHelper(t *testing.T) {
 	mode := os.Getenv("LINDM_INVENTORY_HELPER")
 	if mode == "" {
@@ -240,6 +273,18 @@ func TestInventorySubprocessHelper(t *testing.T) {
 		diagnostic = strings.Repeat("x", 65<<10)
 	case "wait":
 		time.Sleep(30 * time.Second)
+	case "unknown-column":
+		// util-linux closes stdout (close_stdout) before the process exits; the
+		// runner must not kill the tool in that window and lose exit status 1.
+		if os.Stdout.Close() != nil {
+			os.Exit(9)
+		}
+		if _, err := io.WriteString(os.Stderr, "lsblk: unknown column: FSVER,UUID,PARTUUID\n"); err != nil {
+			os.Exit(9)
+		}
+		time.Sleep(300 * time.Millisecond)
+		os.Exit(1)
+	case "empty":
 	default:
 		os.Exit(8)
 	}

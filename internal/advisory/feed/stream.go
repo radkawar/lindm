@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
@@ -25,7 +24,10 @@ func totalClaimsLimit(source *advisoryv1.FeedSource) uint64 {
 // consumers must not expose partial claims. OSV memory is bounded by one entry,
 // not the complete export. Other formats retain their existing bounded decoders.
 // Returned metadata contains no claims; callbacks may serialize but not mutate them.
-func (c *Client) FetchStream(ctx context.Context, source *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+// Streaming formats have no fixed deadline: progress (nil allowed) is marked
+// after each complete source document so the caller's watchdog can abort only
+// when work stops, while each HTTP request keeps its own client timeout.
+func (c *Client) FetchStream(ctx context.Context, source *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 	if source == nil || emit == nil {
 		return nil, errors.New("feed: source and claim consumer required")
 	}
@@ -33,14 +35,10 @@ func (c *Client) FetchStream(ctx context.Context, source *advisoryv1.FeedSource,
 		return nil, fmt.Errorf("feed: validate source: %w", err)
 	}
 	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-		return c.fetchRedHatStream(ctx, source, emit)
+		return c.fetchRedHatStream(ctx, source, emit, progress)
 	}
 	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-		return c.fetchOSVArchive(ctx, source, emit)
+		return c.fetchOSVArchive(ctx, source, emit, progress)
 	}
 	doc, err := c.Fetch(ctx, source)
 	if err != nil {
@@ -49,10 +47,17 @@ func (c *Client) FetchStream(ctx context.Context, source *advisoryv1.FeedSource,
 	return emitDocument(ctx, source, doc, emit)
 }
 
+func markProgress(progress func() error) error {
+	if progress == nil {
+		return nil
+	}
+	return progress()
+}
+
 // ParseStream imports original bytes with the same parser and configured digest
 // checks as online acquisition. It never grants online freshness to imported data;
 // the service applies the offline coverage policy after parsing completes.
-func ParseStream(ctx context.Context, source *advisoryv1.FeedSource, input io.Reader, emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+func ParseStream(ctx context.Context, source *advisoryv1.FeedSource, input io.Reader, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 	if source == nil || input == nil || emit == nil {
 		return nil, errors.New("feed: source, reader and claim consumer required")
 	}
@@ -67,7 +72,7 @@ func ParseStream(ctx context.Context, source *advisoryv1.FeedSource, input io.Re
 		if source.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
 			return stageRedHatStream(ctx, source, validator, input, emit)
 		}
-		return stageOSVArchive(ctx, source, validator, input, emit)
+		return stageOSVArchive(ctx, source, validator, input, emit, progress)
 	}
 	doc, err := Parse(source, contextFeedReader{ctx, input})
 	if err != nil {

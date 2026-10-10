@@ -23,11 +23,21 @@ const (
 )
 
 var errRedHatNotApplicable = errors.New("feed: Red Hat document has no configured host RHEL applicability")
+var errRedHatNonNativeRPM = errors.New("feed: RPM purl is outside the native Red Hat namespace")
+var errRedHatAmbiguousIdentity = errors.New("feed: conflicting Red Hat product or relationship identity")
 
 type redHatProduct struct {
 	product     suseProduct
 	arch        string
 	unsupported bool
+	ambiguous   bool
+	cpes        map[string]struct{}
+}
+
+type redHatRelationship struct {
+	suseRelationship
+	ambiguous bool
+	platforms map[string]struct{}
 }
 
 type redHatRPM struct {
@@ -70,16 +80,22 @@ func redHatConfig(config *advisoryv1.FeedSource) error {
 
 // Legacy module relationships may insert a module between RPM and product.
 // Follow only declared edges, with a depth bound also rejecting cycles.
-func redHatPlatformProduct(id string, products map[string]redHatProduct, relations map[string]suseRelationship, depth int) (suseProduct, string, error) {
+func redHatPlatformProduct(id string, products map[string]redHatProduct, relations map[string]redHatRelationship, depth int) (suseProduct, string, error) {
 	if depth > 8 {
 		return suseProduct{}, "", errors.New("feed: cyclic Red Hat module relationship")
 	}
 	if p, ok := products[id]; ok {
+		if p.ambiguous {
+			return suseProduct{}, "", errRedHatAmbiguousIdentity
+		}
 		return p.product, "", nil
 	}
 	r, ok := relations[id]
 	if !ok {
 		return suseProduct{}, "", errors.New("feed: unresolved Red Hat platform")
+	}
+	if r.ambiguous {
+		return suseProduct{}, "", errRedHatAmbiguousIdentity
 	}
 	p, module, err := redHatPlatformProduct(r.Platform, products, relations, depth+1)
 	if err != nil {
@@ -88,6 +104,9 @@ func redHatPlatformProduct(id string, products map[string]redHatProduct, relatio
 	component, ok := products[r.Component]
 	if !ok || module != "" {
 		return p, "", errors.New("feed: unsupported nested Red Hat module")
+	}
+	if component.ambiguous {
+		return p, "", errRedHatAmbiguousIdentity
 	}
 	if r.Category != "default_component_of" || component.unsupported {
 		return p, "", errors.New("feed: unsupported Red Hat module relationship constraint")
@@ -140,27 +159,59 @@ func redHatModule(value string) (string, string, error) {
 
 func redHatPackage(component redHatProduct) (redHatRPM, error) {
 	var pkg redHatRPM
-	raw := strings.TrimPrefix(component.product.Helper.PURL, "pkg:rpm/redhat/")
+	raw, rpm := strings.CutPrefix(component.product.Helper.PURL, "pkg:rpm/")
+	if !rpm {
+		return pkg, errRedHatNonNativeRPM
+	}
 	if strings.Contains(raw, "#") {
 		return pkg, errors.New("feed: Red Hat RPM fragment unsupported")
 	}
 	identity, query, _ := strings.Cut(raw, "?")
 	name, version, versioned := strings.Cut(identity, "@")
+	separator := strings.LastIndexByte(name, '/')
+	if separator < 1 {
+		return pkg, errors.New("feed: RPM purl lacks namespace")
+	}
+	namespace, name := name[:separator], name[separator+1:]
+	native := false
+	for remaining := namespace; ; {
+		segment, rest, more := strings.Cut(remaining, "/")
+		decoded, err := url.PathUnescape(segment)
+		if err != nil || decoded == "" || strings.ContainsAny(decoded, "%/:@?&# \t\r\n") {
+			return pkg, errors.New("feed: invalid RPM purl namespace")
+		}
+		if remaining == namespace && !more {
+			native = decoded == "redhat"
+		}
+		if !more {
+			break
+		}
+		remaining = rest
+	}
 	// PURL names are path components: decode exactly once, without query
-	// decoding's conversion of a literal '+' into a space. The decoded name
-	// must still agree exactly with the vendor's native RPM NEVRA below.
+	// decoding's conversion of a literal '+' into a space. Display labels and
+	// product IDs are opaque; neither supplies a second package identity.
 	name, err := url.PathUnescape(name)
 	if err != nil || name == "" || strings.ContainsAny(name, "%/@ :\t\n\r") {
-		return pkg, errors.New("feed: invalid Red Hat RPM purl")
+		return pkg, fmt.Errorf("feed: invalid RPM name in Red Hat purl %q", redHatBoundedDiagnostic(component.product.Helper.PURL, 256))
 	}
 	q, err := url.ParseQuery(query)
 	if err != nil {
 		return pkg, errors.New("feed: invalid Red Hat RPM purl")
 	}
 	for key, values := range q {
-		if len(values) != 1 || (key != "arch" && key != "epoch" && key != "rpmmod" && key != "repository_id") {
+		if len(values) != 1 || key == "" || (native && key != "arch" && key != "epoch" && key != "rpmmod" && key != "repository_id") {
 			return pkg, errors.New("feed: unsupported Red Hat RPM qualifier")
 		}
+	}
+	if !native {
+		if versioned {
+			decoded, err := url.PathUnescape(version)
+			if err != nil || decoded == "" || strings.ContainsAny(decoded, "%/@?# \t\r\n") {
+				return pkg, errors.New("feed: invalid RPM purl version")
+			}
+		}
+		return pkg, errRedHatNonNativeRPM
 	}
 	pkg.name, pkg.arch = name, canonicalArch(q.Get("arch"))
 	pkg.source = pkg.arch == "src" || pkg.arch == "nosrc"
@@ -183,14 +234,6 @@ func redHatPackage(component redHatProduct) (redHatRPM, error) {
 			return pkg, errors.New("feed: invalid Red Hat RPM EVR")
 		}
 		pkg.version = epoch + ":" + vr
-		nevra := name + "-" + pkg.version + "." + q.Get("arch")
-		expected := nevra
-		if pkg.module != "" {
-			expected += " (" + pkg.module + ":" + pkg.stream + ")"
-		}
-		if component.product.Name != expected {
-			return pkg, errors.New("feed: Red Hat RPM NEVRA disagrees with purl")
-		}
 	} else if q.Has("epoch") {
 		return pkg, errors.New("feed: unversioned Red Hat RPM has epoch")
 	}

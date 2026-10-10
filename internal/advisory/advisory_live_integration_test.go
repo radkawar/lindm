@@ -3,7 +3,6 @@
 package advisory
 
 import (
-	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -18,8 +17,9 @@ import (
 func TestLiveRHEL9SignedArchivePublication(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	source := &advisoryv1.FeedSource{Id: "rhel-9-standard", Distro: "rhel", Release: "9", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800}
-	ctx, cancel := context.WithTimeout(t.Context(), 12*time.Minute)
-	defer cancel()
+	// The service's progress watchdog and overall ceiling bound the refresh.
+	ctx := t.Context()
+	started := time.Now()
 	service, err := New(ctx, pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
 	if err != nil {
 		t.Fatal(err)
@@ -27,6 +27,7 @@ func TestLiveRHEL9SignedArchivePublication(t *testing.T) {
 	if err := service.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("refresh duration=%s", time.Since(started).Round(time.Second))
 	feeds, err := service.Feeds(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -44,8 +45,11 @@ func TestLiveRHEL9SignedArchivePublication(t *testing.T) {
 		}
 		t.Logf("authenticated archive: url=%s sha256=%x signer=%s", artifact.Url, artifact.Sha256, artifact.SignerFingerprint)
 	}
+	for _, rejected := range status.RejectedRecords {
+		t.Logf("rejected vendor record: id=%s reason=%s packages=%v unscoped=%v", rejected.Id, rejected.Reason, rejected.PackageNames, rejected.Unscoped)
+	}
 	if status.Fresh {
 		t.Fatal("partial RHEL coverage advertised clean completeness")
 	}
-	t.Logf("real RHEL publication: records=%d digest=%s signed_snapshot=%s checked=%s partial_coverage=true", status.AdvisoryCount, status.SourceSha256, status.SnapshotAt.AsTime().Format(time.RFC3339), status.CheckedAt.AsTime().Format(time.RFC3339))
+	t.Logf("real RHEL publication: records=%d rejected=%d digest=%s signed_snapshot=%s checked=%s partial_coverage=true", status.AdvisoryCount, len(status.RejectedRecords), status.SourceSha256, status.SnapshotAt.AsTime().Format(time.RFC3339), status.CheckedAt.AsTime().Format(time.RFC3339))
 }

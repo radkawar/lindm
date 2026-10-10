@@ -88,12 +88,23 @@ message FeedSource {
     gte: 1048576
     lte: 4294967296
   }];
-  // Reject the refresh when malformed OSV records exceed this count. Default 1000.
+  // Reject the refresh when malformed vendor records exceed this count. Default 1000.
   optional uint32 max_rejected_records = 11 [(buf.validate.field).uint32.lte = 10000];
   // Sanity ceiling on emitted normalized claims, including duplicates. Default 5M.
   optional uint64 total_claims_limit = 12 [(buf.validate.field).uint64 = {
     gte: 1
     lte: 20000000
+  }];
+  // No completed source document or committed publication batch for this period
+  // aborts refresh. Defaults to 300 seconds; received bytes are not progress.
+  optional uint32 progress_timeout_seconds = 13 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3600
+  }];
+  // Absolute per-source refresh ceiling regardless of progress. Default 7200 seconds.
+  optional uint32 refresh_timeout_seconds = 14 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 86400
   }];
 }
 

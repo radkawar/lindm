@@ -44,20 +44,21 @@ func runAdvisories(ctx context.Context, args []string) (resultErr error) {
 		return err
 	}
 	defer resources.HTTPClient.CloseIdleConnections()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	pool, err := pgxpool.NewWithConfig(ctx, resources.Database)
+	pool, err := pgxpool.NewWithConfig(startup, resources.Database)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
-	if err := db.Check(ctx, pool); err != nil {
+	if err := db.Check(startup, pool); err != nil {
 		return err
 	}
-	service, err := advisory.New(ctx, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
+	service, err := advisory.New(startup, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
 	if err != nil {
 		return err
 	}
+	cancel()
 	if args[0] == "advisories-refresh" {
 		if err := service.Refresh(ctx); err != nil {
 			return err

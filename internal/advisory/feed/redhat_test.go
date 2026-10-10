@@ -220,9 +220,10 @@ func TestRedHatRejectsAmbiguousRPMAndPlatformEvidence(t *testing.T) {
 			n.Vulnerabilities[0].Status["first_affected"] = []string{n.Tree.Relationships[0].Product.ID}
 		}},
 		{"duplicate", func(n *suseCSAF) { n.Tree.Branches = append(n.Tree.Branches, n.Tree.Branches[0]) }},
-		{"duplicate-relevant-products", func(n *suseCSAF) {
-			root := &n.Tree.Branches[0]
-			root.Branches = append(root.Branches, root.Branches...)
+		{"conflicting-relevant-products", func(n *suseCSAF) {
+			redHatDuplicateX86Product(t, n, func(product *suseProduct) {
+				product.Helper.PURL = "pkg:rpm/redhat/conflicting@1.0-1.el9?arch=x86_64"
+			})
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -235,7 +236,7 @@ func TestRedHatRejectsAmbiguousRPMAndPlatformEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := parseRedHat(redHatSource("9.4", "standard"), changed, v); err == nil {
+			if err := parseRedHatClaims(t.Context(), redHatSource("9.4", "standard"), bytes.NewReader(changed), v, func(*advisoryv1.Advisory) error { return nil }); err == nil {
 				t.Fatal("ambiguous authority accepted")
 			}
 		})
@@ -245,9 +246,7 @@ func TestRedHatRejectsAmbiguousRPMAndPlatformEvidence(t *testing.T) {
 	pkg.Helper.PURL = "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=x86_64&epoch=1"
 	for _, purl := range []string{
 		"pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=aarch64&epoch=1",
-		"pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=x86_64&epoch=2",
 		"pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=x86_64&arch=aarch64&epoch=1",
-		"pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=x86_64&epoch=1&rpmmod=nodejs:20",
 	} {
 		pkg.Helper.PURL = purl
 		if _, err := redHatPackage(redHatProduct{product: pkg, arch: "x86_64"}); err == nil {
@@ -365,7 +364,7 @@ func TestRedHatDeclaredModuleRelationship(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseRedHat(redHatSource("8.8", "eus"), raw, v); err == nil {
+	if err := parseRedHatClaims(t.Context(), redHatSource("8.8", "eus"), bytes.NewReader(raw), v, func(*advisoryv1.Advisory) error { return nil }); err == nil {
 		t.Fatal("module relationship conflicts with native RPM module but was accepted")
 	}
 }

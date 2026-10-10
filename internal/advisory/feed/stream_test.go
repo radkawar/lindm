@@ -23,7 +23,8 @@ func TestOSVStreamRetainsMetadataNotClaims(t *testing.T) {
 			rejected++
 		}
 		return nil
-	})
+	}, nil)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,19 +38,19 @@ func TestOSVStreamConsumerFailureAndClaimCap(t *testing.T) {
 	raw := osvZip(t, map[string][]byte{"notice.json": fixture(t, "ubuntu-USN-6859-1.json")}, zip.Store)
 	failure := errors.New("staging unavailable")
 	calls := 0
-	doc, err := ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return failure })
+	doc, err := ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return failure }, nil)
 	if !errors.Is(err, failure) || doc != nil || calls != 1 {
 		t.Fatalf("consumer failure suppressed/rejected: doc=%v calls=%d err=%v", doc, calls, err)
 	}
 	config.TotalClaimsLimit = proto.Uint64(1)
 	calls = 0
-	doc, err = ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return nil })
+	doc, err = ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return nil }, nil)
 	if err == nil || !strings.Contains(err.Error(), "total claims limit") || doc != nil || calls != 1 {
 		t.Fatalf("claim cap: calls=%d err=%v", calls, err)
 	}
 	config.ExpectedSha256 = make([]byte, 32)
 	calls = 0
-	_, err = ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return nil })
+	_, err = ParseStream(t.Context(), config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { calls++; return nil }, nil)
 	if err == nil || calls != 0 {
 		t.Fatalf("unverified claims emitted: %d %v", calls, err)
 	}
@@ -60,7 +61,7 @@ func TestOSVStreamCancellation(t *testing.T) {
 	raw := osvZip(t, map[string][]byte{"notice.json": fixture(t, "ubuntu-USN-6859-1.json"), "notice2.json": fixture(t, "ubuntu-USN-6859-1.json")}, zip.Store)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	_, err := ParseStream(ctx, config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { cancel(); return ctx.Err() })
+	_, err := ParseStream(ctx, config, bytes.NewReader(raw), func(*advisoryv1.Advisory) error { cancel(); return ctx.Err() }, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation = %v", err)
 	}

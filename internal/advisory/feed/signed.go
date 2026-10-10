@@ -328,8 +328,8 @@ func (c *Client) fetchVendorProofs(ctx context.Context, location string) ([]byte
 }
 
 // fetchRedHatArchives acquires both complete vendor distributions sequentially.
-// Eight logical requests (at most forty with redirects) and parsing share five
-// minutes; the HTTP client retains its two-minute per-request timeout.
+// Each request retains the HTTP client's two-minute timeout; parsing duration is
+// bounded by the caller's progress watchdog and overall ceiling, not here.
 // At most one 512 MiB compressed file is staged; its original bytes are verified
 // before the parser sees them. Freshness must be bounded by the returned oldest
 // signature time, never by the mutable pointer or local download time.
@@ -349,8 +349,6 @@ func (c *Client) fetchRedHatArchives(ctx context.Context, config *advisoryv1.Fee
 	if root.Path != "" && path.Clean(root.Path) != root.Path {
 		return nil, time.Time{}, errors.New("feed: archive provider root is not a confined path")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
 	manifest := &advisoryv1.FeedManifest{Artifacts: make([]*advisoryv1.FeedArtifact, 0, 2)}
 	var oldest time.Time
 	for _, distribution := range []string{"advisories", "vex"} {

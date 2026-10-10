@@ -31,8 +31,8 @@ const (
 )
 
 // Client preserves caller TLS roots and permits at most four HTTPS redirects per
-// request. Ordinary acquisition has a two-minute deadline; signed Red Hat archive
-// acquisition has five minutes and eight logical requests (forty with redirects).
+// request. Ordinary acquisition has a two-minute deadline; streaming Red Hat and
+// OSV archive refreshes are bounded by the publisher's progress watchdog.
 type Client struct {
 	http        *http.Client
 	validator   protovalidate.Validator
@@ -86,10 +86,10 @@ func (c *Client) Fetch(ctx context.Context, config *advisoryv1.FeedSource) (*adv
 	defer cancel()
 	switch config.GetFormat() {
 	case advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP:
-		return c.fetchOSVArchive(ctx, config, nil)
+		return c.fetchOSVArchive(ctx, config, nil, nil)
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF:
 		return collectBoundedClaims(func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
-			return c.fetchRedHatStream(ctx, config, emit)
+			return c.fetchRedHatStream(ctx, config, emit, nil)
 		})
 	case advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF:
 		raw, artifact, signedAt, err := c.fetchSignedCSAF(ctx, config)
@@ -208,7 +208,7 @@ func Parse(config *advisoryv1.FeedSource, raw io.Reader) (*advisoryv1.FeedDocume
 		return nil, fmt.Errorf("feed: validate source: %w", err)
 	}
 	if config.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
-		return stageOSVArchive(context.Background(), config, validator, raw, nil)
+		return stageOSVArchive(context.Background(), config, validator, raw, nil, nil)
 	}
 	data, err := boundedRead(raw, maxBytes)
 	if err != nil {

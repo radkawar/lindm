@@ -22,6 +22,7 @@ import (
 	configv1 "lindm/gen/lindm/config/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/advisory/advisorydb"
+	"lindm/internal/advisory/feed"
 	"lindm/internal/testdb"
 )
 
@@ -32,7 +33,7 @@ func TestAdvisoryStreamPublicationBatchBoundaries(t *testing.T) {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			f := newStreamPublicationFixture(t)
 			doc := f.document("boundary")
-			err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 				if err := f.emit("boundary", 0, count, emit); err != nil {
 					return nil, err
 				}
@@ -50,7 +51,7 @@ func TestAdvisoryStreamPublicationBatchBoundaries(t *testing.T) {
 func TestAdvisoryStreamPublicationDeduplicatesAcrossBatches(t *testing.T) {
 	f := newStreamPublicationFixture(t)
 	doc := f.document("duplicates")
-	err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+	err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 		// Each of the first two COPY batches contains the same 500 claims.
 		for range 2 {
 			if err := f.emit("duplicates", 0, 500, emit); err != nil {
@@ -125,6 +126,38 @@ func TestAdvisoryStreamPublicationFailurePreservesActiveGeneration(t *testing.T)
 	}
 }
 
+// The watchdog aborts only when work stops: marked progress outlives several
+// idle windows, then a silent producer is cancelled with the stall cause.
+func TestAdvisoryStreamPublicationProgressWatchdog(t *testing.T) {
+	f := newStreamPublicationFixture(t)
+	source := proto.CloneOf(f.source)
+	source.ProgressTimeoutSeconds = proto.Uint32(1)
+	service, err := New(t.Context(), f.pool, &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := 0
+	err = service.publishStream(t.Context(), source, f.before.CheckedAt.Time.Add(time.Second), func(ctx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
+		for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+			if err := progress(); err != nil {
+				return nil, err
+			}
+			marked++
+		}
+		if err := f.emit("stalled", 0, 501, emit); err != nil {
+			return nil, err
+		}
+		<-ctx.Done()
+		return nil, context.Cause(ctx)
+	})
+	if !errors.Is(err, feed.ErrRefreshStalled) || marked < 10 {
+		t.Fatalf("watchdog error = %v after %d marks, want stall after sustained progress", err, marked)
+	}
+	// Reconfiguration retired the fixture generation; the aborted staging
+	// generation, including its committed batch, must not survive either.
+	f.assertStorage(t, 0, 0, 0)
+}
+
 func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 	for _, reconfigure := range []bool{false, true} {
 		name := "newer-publication"
@@ -147,7 +180,7 @@ func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err := winner.publishStream(t.Context(), source, f.before.CheckedAt.Time.Add(2*time.Second), func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+			err := winner.publishStream(t.Context(), source, f.before.CheckedAt.Time.Add(2*time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 				if err := f.emit("winner", 0, 501, emit); err != nil {
 					return nil, err
 				}
@@ -335,7 +368,7 @@ func (f *streamPublicationFixture) startBlocked(t *testing.T, label string, coun
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		result <- f.service.publishStream(ctx, f.source, f.before.CheckedAt.Time.Add(time.Second), func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+		result <- f.service.publishStream(ctx, f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 			if err := f.emit(label, 0, pauseAfter, emit); err != nil {
 				return nil, err
 			}

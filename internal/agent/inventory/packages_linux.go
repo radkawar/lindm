@@ -66,7 +66,9 @@ func selectBackend(release map[string]string, stat func(string) (fs.FileInfo, er
 		databases = []string{"/var/lib/dpkg/status"}
 	case "fedora", "rhel", "rocky", "almalinux", "centos", "opensuse", "opensuse-leap", "opensuse-tumbleweed", "sles", "sled":
 		selected = rpm
-		databases = []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/var/lib/rpm/Packages", "/usr/lib/sysimage/rpm/Packages"}
+		// openSUSE Leap 16 and Tumbleweed default to rpm's ndb backend
+		// (Packages.db); Fedora/EL use sqlite and older SUSE BerkeleyDB.
+		databases = []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/usr/lib/sysimage/rpm/Packages.db", "/var/lib/rpm/Packages.db", "/var/lib/rpm/Packages", "/usr/lib/sysimage/rpm/Packages"}
 		if release["ID"] == "fedora" {
 			switch release["VARIANT_ID"] {
 			case "", "workstation", "server", "cloud", "container":
@@ -131,8 +133,13 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, consume func(io.Reader) inve
 	}
 	stop := context.AfterFunc(ctx, func() { _ = stdout.Close() })
 	defer stop()
-	status := consume(stdout)
-	if status != success {
+	output := &drainObserver{reader: stdout}
+	status := consume(output)
+	// A parser that stopped early must not wait for unbounded native output.
+	// After stdout reached EOF the tool is already finishing on its own (lsblk
+	// closes stdout before exit), so killing it would race and hide its exit
+	// status; the context still bounds that wait.
+	if status != success && !output.drained {
 		_ = cmd.Process.Kill()
 	}
 	err = cmd.Wait()
@@ -143,6 +150,14 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, consume func(io.Reader) inve
 		return capacity
 	}
 	if status != success {
+		// A native tool that exited on its own with a failure status (for
+		// example EL8 util-linux 2.32 lsblk rejecting a newer --output column)
+		// is a native command failure, not malformed output. Only our own kill
+		// leaves the parser's verdict authoritative.
+		var exited *exec.ExitError
+		if errors.As(err, &exited) && exited.Exited() {
+			return commandFailure
+		}
 		return status
 	}
 	// Warnings may describe unreadable/ignored database records. Even a zero
@@ -151,6 +166,19 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, consume func(io.Reader) inve
 		return commandFailure
 	}
 	return success
+}
+
+type drainObserver struct {
+	reader  io.Reader
+	drained bool
+}
+
+func (r *drainObserver) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if err == io.EOF {
+		r.drained = true
+	}
+	return n, err
 }
 
 type boundedDiscard struct {

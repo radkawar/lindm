@@ -34,7 +34,7 @@ func osvArchiveBound(config *advisoryv1.FeedSource) int64 {
 	return defaultOSVArchiveBytes
 }
 
-func (c *Client) fetchOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error) (doc *advisoryv1.FeedDocument, err error) {
+func (c *Client) fetchOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error, progress func() error) (doc *advisoryv1.FeedDocument, err error) {
 	file, err := os.CreateTemp("", "lindm-feed-osv-*")
 	if err != nil {
 		return nil, fmt.Errorf("feed: stage OSV archive: %w", err)
@@ -49,10 +49,10 @@ func (c *Client) fetchOSVArchive(ctx context.Context, config *advisoryv1.FeedSou
 	if err != nil {
 		return nil, err
 	}
-	return finishOSVArchive(ctx, config, c.validator, file, digest, emit)
+	return finishOSVArchive(ctx, config, c.validator, file, digest, emit, progress)
 }
 
-func stageOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, validator protovalidate.Validator, input io.Reader, emit func(*advisoryv1.Advisory) error) (doc *advisoryv1.FeedDocument, err error) {
+func stageOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, validator protovalidate.Validator, input io.Reader, emit func(*advisoryv1.Advisory) error, progress func() error) (doc *advisoryv1.FeedDocument, err error) {
 	file, err := os.CreateTemp("", "lindm-feed-osv-*")
 	if err != nil {
 		return nil, fmt.Errorf("feed: stage OSV archive: %w", err)
@@ -67,10 +67,10 @@ func stageOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, validat
 	if err := copyArchive(ctx, io.MultiWriter(file, hash), input, osvArchiveBound(config)); err != nil {
 		return nil, err
 	}
-	return finishOSVArchive(ctx, config, validator, file, hash.Sum(nil), emit)
+	return finishOSVArchive(ctx, config, validator, file, hash.Sum(nil), emit, progress)
 }
 
-func finishOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, validator protovalidate.Validator, file *os.File, digest []byte, emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+func finishOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, validator protovalidate.Validator, file *os.File, digest []byte, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 	if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
 		return nil, errors.New("feed: source checksum mismatch")
 	}
@@ -78,7 +78,7 @@ func finishOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, valida
 	if err != nil {
 		return nil, err
 	}
-	doc, err := parseOSVArchive(ctx, config, file, info.Size(), validator, emit)
+	doc, err := parseOSVArchive(ctx, config, file, info.Size(), validator, emit, progress)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,8 @@ func finishOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, valida
 	return doc, nil
 }
 
-func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input io.ReaderAt, size int64, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+// progress, when non-nil, is marked after each complete source record.
+func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input io.ReaderAt, size int64, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 	ecosystem, err := osvEcosystem(config)
 	if err != nil {
 		return nil, err
@@ -185,6 +186,9 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 			}
 			seen[digest] = struct{}{}
 			doc.Advisories = append(doc.Advisories, advisory)
+		}
+		if err := markProgress(progress); err != nil {
+			return nil, err
 		}
 	}
 	if !matched {

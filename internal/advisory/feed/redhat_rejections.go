@@ -24,6 +24,10 @@ func acceptRedHatDocument(source *advisoryv1.FeedSource, validator protovalidate
 	if err == nil {
 		return nil
 	}
+	var sink *redHatSinkError
+	if errors.As(err, &sink) {
+		return err
+	}
 	var rejected *redHatRejectedRecordError
 	if !errors.As(err, &rejected) {
 		return err

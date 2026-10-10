@@ -18,16 +18,12 @@ import (
 // fetchRedHatStream authenticates originals before parsing, then reconciles the
 // entire source on disk. No partial document or archive escapes to consumers.
 // Consumers still must discard generation staging if emission itself fails.
-func (c *Client) fetchRedHatStream(ctx context.Context, source *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error) (doc *advisoryv1.FeedDocument, err error) {
+// A complete VEX snapshot expands to over 21 GB, so there is no size-derived
+// deadline: progress (nil allowed) is marked after every accepted document.
+func (c *Client) fetchRedHatStream(ctx context.Context, source *advisoryv1.FeedSource, emit func(*advisoryv1.Advisory) error, progress func() error) (doc *advisoryv1.FeedDocument, err error) {
 	if err := redHatConfig(source); err != nil {
 		return nil, err
 	}
-	deadline := 2 * time.Minute
-	if source.GetFormat() == advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES {
-		deadline = 5 * time.Minute
-	}
-	ctx, cancel := context.WithTimeout(ctx, deadline)
-	defer cancel()
 	stager, err := newRedHatStager(ctx, source)
 	if err != nil {
 		return nil, err
@@ -43,9 +39,12 @@ func (c *Client) fetchRedHatStream(ctx context.Context, source *advisoryv1.FeedS
 	switch source.GetFormat() {
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF:
 		artifact, at, err := c.consumeSignedCSAF(ctx, source, func(file *os.File) error {
-			return acceptRedHatDocument(source, c.validator, stager, doc, func() error {
+			if err := acceptRedHatDocument(source, c.validator, stager, doc, func() error {
 				return parseRedHatFile(ctx, source, file, c.validator, stager.add)
-			})
+			}); err != nil {
+				return err
+			}
+			return markProgress(progress)
 		})
 		if err != nil {
 			return nil, err
@@ -57,9 +56,12 @@ func (c *Client) fetchRedHatStream(ctx context.Context, source *advisoryv1.FeedS
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES:
 		manifest, at, err := c.fetchRedHatArchives(ctx, source, func(input io.Reader, _ string) error {
 			return parseRedHatArchiveEach(ctx, source, input, func(entry io.Reader) error {
-				return acceptRedHatDocument(source, c.validator, stager, doc, func() error {
+				if err := acceptRedHatDocument(source, c.validator, stager, doc, func() error {
 					return parseRedHatClaims(ctx, source, entry, c.validator, stager.add)
-				})
+				}); err != nil {
+					return err
+				}
+				return markProgress(progress)
 			})
 		})
 		if err != nil {

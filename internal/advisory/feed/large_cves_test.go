@@ -24,7 +24,8 @@ func TestLargestRealUbuntuKernelNoticePreservesCVEs(t *testing.T) {
 			t.Fatalf("legitimate kernel notice degraded: id=%s cves=%d unknown=%t rejected=%t", record.Id, len(record.Cves), record.AssessmentUnknown, record.SourceRecordRejected)
 		}
 		return nil
-	})
+	}, nil)
+
 	if err != nil {
 		t.Fatal(err)
 	}

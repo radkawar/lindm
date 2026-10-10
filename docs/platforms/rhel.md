@@ -208,18 +208,49 @@ among native-RHEL-9-potential documents, the additional direct-reference forms
 are nonnative versionless products and AMQ versions such as `2026.Q3`. Uppercase
 version text does not case-fold or otherwise rewrite native product identity.
 
+Repeated declarations are not automatically conflicting identities. Identical
+relationship edges/helpers and product helpers/inherited architecture/constraints
+are deduplicated, ignoring opaque display-label differences. A conflicting ID
+remains explicitly ambiguous; it rejects a document only when encountered in a
+relevant status dependency. Exclusion requires every declared platform
+alternative to be provably off-scope. Initial applicability considers the union
+of duplicate CPE declarations, so neither first- nor last-declaration order can
+hide native ambiguity. Scope proofs retain the eight-edge traversal bound and
+memoize indexed references within one vulnerability.
+The [selected original VEX duplicate census](../../artifacts/rhel-selected-vex-duplicate-identities-20261010.json)
+records 618 identical relationship redeclarations in `CVE-2026-33186` and 2,194
+in `CVE-2023-44487`; their conflicting product-helper declarations are outside
+native RHEL 9.8 dependencies and do not invalidate independent native claims.
+One product ID declared once per module build shipping the same NEVRA, whose
+PURLs differ only in `rpmmod` version:context (for example
+`postgresql:15:9020020240213145157:rhel9` and
+`postgresql:15:9030020240209100638:rhel9`), is the same normalized component:
+both PURLs must parse as native RPMs with identical name, EVR, architecture,
+source flag and module name/stream, and the product CPE must match. Any
+normalized difference remains a conflict. The genuine
+[`CVE-2024-0985`](../../internal/advisory/feed/testdata/redhat-cve-2024-0985-provenance.txt)
+member carries 117 such redeclarations.
+
 [Disk-backed reconciliation](../../internal/advisory/feed/redhat_reconcile.go)
 preserves the earliest native RPM fix, first-observation ties, architecture,
 source/binary and module separation, and suppression of bare affected claims
 across the complete source, including both archives. Its private SQLite stage
-has a 2 GiB database limit, an 8 MiB page cache and 500-claim transactions.
+has a 2 GiB database limit and an 8 MiB page cache. Ordinary batches contain at
+most 500 claims; each vendor document uses a single disk-spilling transaction
+so rejection rolls back its entire prefix before another document is accepted.
 The configured total-claim limit applies separately from document-byte limits;
 the materialized compatibility APIs retain their 500,000-claim/128 MiB bounds,
 but streaming publication does not accumulate the normalized export in memory.
 Only fully parsed and reconciled sources reach generation-staging callbacks.
-A signature, parser, storage, cancellation or consumer failure invalidates the
-entire generation; no earlier document may become a partially published source
+A signature, malformed JSON, byte/structure bound, storage, cancellation or
+consumer failure invalidates the entire generation; no earlier document may
+become a partially published source
 ([streaming acquisition](../../internal/advisory/feed/redhat_fetch.go)).
+An applicable document with invalid vendor semantics is instead rejected as a
+whole and exposed in bounded rejected-record metadata, never repaired. The
+configured rejection threshold is enforced (zero requires no rejected records);
+diagnostics are capped at 48 KiB. Unscoped rejection preserves uncertainty for
+all packages whose claims were rolled back, preventing a clean-coverage claim.
 
 Servicing stream matching requires corroborating native Red Hat CPE, enabled
 BaseOS/repository IDs, architecture and release-lock observations. Mixed streams,
@@ -229,14 +260,69 @@ Do not infer entitlement from `VERSION_ID`, rewrite a MAIN.EUS internal identifi
 as an EUS CPE, or treat a derivative as Red Hat. Current complete paired archive
 coverage and freshness are governed by [verification](../verification.md).
 
+Streaming refresh has no size-derived deadline. A progress watchdog aborts only
+when no source document completes and no publication batch commits for
+`progress_timeout_seconds` (default 300); `refresh_timeout_seconds` (default
+7,200) is the overall ceiling, and the staging lease is renewed every minute.
+The real signed 2026-10-04 archive pair (advisories SHA-256
+`708b53ef…5354afc1ee`, VEX `fa61b885…b82182345`, signer
+`77E79ABE93673533ED09EBE2DCE3823597F5EAC4`) was published on 2026-10-10 through
+`TestLiveRHEL9SignedArchivePublication` into an isolated `testdb` schema
+(release `9`, `standard`, x86_64; workstation NVMe, shared host): 1,894,410
+emitted and 1,892,833 unique claims, one rejected document, 7 min 28 s refresh
+(7:28 wall), 236,744 KiB peak RSS, no swaps. The sole rejection is the genuine
+`CVE-2023-44487` `nginx:1.24` RPM name above. The preceding run, before
+module-build redeclarations were recognized, rejected 38 additional module
+documents (PostgreSQL, Node.js, MariaDB, PHP, Ruby and others) as conflicting
+identities (1,892,498 unique claims, 7 min 3 s, 241,884 KiB); each now parses
+without rejection. Coverage remains partial, so freshness is not advertised as
+clean completeness. Run logs are under `~/.cache/lindm-rhel-publication-20261010/`
+(final `lindm-rhel-live-20261010-2.log` SHA-256
+`74a1313711e73f229847b6d226a20582ba7d5e8a99c1d269da4e24dba05cd8bd`).
+
 RPM PURL package names and versions use single path-component percent decoding,
 not form/query decoding: a literal `+` remains `+`, and `gnutls-c%2B%2B` identifies
-the native package `gnutls-c++`. Decoded names still require exact vendor NEVRA
-agreement; invalid escapes, decoded separators, and residual double encoding
-are refused, never repaired. The genuine
+the native package `gnutls-c++`. Invalid escapes, decoded separators and residual
+double encoding are refused, never repaired. The genuine
 [`RHSA-2022:6854` fixture](../../internal/advisory/feed/testdata/redhat-rhsa-2022_6854.json)
 and its [provenance](../../internal/advisory/feed/testdata/redhat-rhsa-2022_6854-provenance.txt)
 retain this identity boundary.
+
+Component identity follows Red Hat's
+[PURL matching logic](https://redhatproductsecurity.github.io/security-data-guidelines/scanning-vendors/#purl-matching-logic)
+and [RPM PURL conventions](https://redhatproductsecurity.github.io/security-data-guidelines/purl/#identifying-rpm-packages):
+PURLs identify components, CPEs identify products, and opaque product IDs join
+them through relationships. Display labels are not a second RPM NEVRA assertion
+and cannot override the PURL name, epoch or version. The native namespace is
+exactly `redhat`, not a prefix: `redhat/rhacm2` and `redhat/rhel9` remain distinct,
+out-of-scope namespaces, never suffix-repaired into host package names.
+This agrees with the reference
+[PURL namespace parser](https://github.com/package-url/packageurl-go/blob/c88ed7b2a2305ec91a087dd6cb7168ca1f42cfe3/packageurl.go#L711-L735)
+and [Clair's native-RPM filter](https://github.com/quay/claircore/blob/7da686f8454001747e3ca122fcaf1d3647f06018/rhel/vex/parser.go#L1273-L1288).
+
+`known_affected` is an unfixed package/source claim for the matched native product,
+even when a component PURL happens to include a version; it does not invent an
+exact affected-version interval from that value. This matches the reference
+[Clair known-affected normalization](https://github.com/quay/claircore/blob/7da686f8454001747e3ca122fcaf1d3647f06018/rhel/vex/parser.go#L779-L831).
+The source's original PURL remains unchanged. `fixed` retains the exact PURL EVR,
+and source-wide reconciliation still suppresses a bare affected claim when a
+native fix exists. Versioned `known_not_affected` claims remain version-specific,
+not blanket clean assertions.
+
+Modules require the documented
+[`rpmmod` qualifier](https://redhatproductsecurity.github.io/security-data-guidelines/purl/#identifying-rpm-modules)
+or an independently declared module relationship. A colon in an RPM name is not
+permission to invent a module. The signed-archive specimens
+[`CVE-2021-27358`](../../internal/advisory/feed/testdata/redhat-cve-2021-27358-provenance.txt),
+[`CVE-2026-103111`](../../internal/advisory/feed/testdata/redhat-cve-2026-103111-provenance.txt)
+and [`CVE-2023-44487`](../../internal/advisory/feed/testdata/redhat-cve-2023-44487-provenance.txt)
+respectively exercise nested-namespace exclusion without discarding independent
+native binary claims, a bare display label with a versioned unfixed PURL, and a
+genuinely invalid `nginx:1.24` RPM name without module metadata. The
+[completed source interpretation census](../../artifacts/rhel-vex-purl-interpretation-20261010.json)
+distinguishes 115 out-of-scope namespace entries and 290 valid display-label
+differences from that one remaining invalid document; the latter is rejected
+unscoped, not normalized to `nginx`.
 
 ## Lab
 

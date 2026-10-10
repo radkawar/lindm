@@ -147,7 +147,6 @@ func TestRedHatStreamRejectsTruncatedAndInvalidJSON(t *testing.T) {
 		{"truncated-vulnerabilities", raw[:len(raw)-1]},
 		{"second-document", append(bytes.Clone(raw), []byte("{}")...)},
 		{"invalid-utf8", bytes.Replace(raw, []byte("Red Hat Security Advisory"), []byte{0xff}, 1)},
-		{"malformed-cve-no-repair", bytes.ReplaceAll(raw, []byte("CVE-2024-6119"), []byte("CVE-2024-6119oops"))},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			calls := 0
@@ -159,6 +158,18 @@ func TestRedHatStreamRejectsTruncatedAndInvalidJSON(t *testing.T) {
 				t.Fatalf("invalid original accepted or emitted claims: doc=%v calls=%d err=%v", doc, calls, err)
 			}
 		})
+	}
+}
+
+func TestRedHatStreamRejectsMalformedCVEWithoutRepairOrPartialClaims(t *testing.T) {
+	raw := bytes.ReplaceAll(redHatFixture(t, "rhsa-2024_6783"), []byte("CVE-2024-6119"), []byte("CVE-2024-6119oops"))
+	calls := 0
+	doc, err := stageRedHatStream(t.Context(), redHatSource("9.4", "standard"), redHatValidator(t), bytes.NewReader(raw), func(*advisoryv1.Advisory) error {
+		calls++
+		return nil
+	})
+	if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped || doc.RejectedRecords[0].Id != "RHSA-2024:6783" {
+		t.Fatalf("malformed CVE was repaired or retained valid prefix claims: doc=%v calls=%d err=%v", doc, calls, err)
 	}
 }
 

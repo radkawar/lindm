@@ -30,6 +30,35 @@ const labUser = "lindm-lab"
 const guestAgent = "/home/lindm-lab/lindm-agent"
 const maxGuestOutput = 64 << 20
 
+// minGuestDiskBytes is the disposable overlay floor. Vendor cloud images
+// expect to be resized before first boot: openSUSE Leap 16.0 Minimal-VM
+// Build18.75 ships a 1.5 GiB disk whose root is too full for one agent RPM
+// until kiwi-repart grows it into a larger disk. EL GenericCloud images
+// already carry 10 GiB. Larger bases keep their own virtual size.
+const minGuestDiskBytes = 10 << 30
+
+// createGuestOverlay writes dir/overlay.qcow2 over the verified standalone
+// base, which QEMU later receives as inherited descriptor 3.
+func createGuestOverlay(ctx context.Context, dir string, base *os.File) error {
+	infoBytes, err := hostCommand(ctx, dir, "qemu-img", []*os.File{base}, "info", "--output=json", "-f", "qcow2", "/proc/self/fd/3")
+	if err != nil {
+		return err
+	}
+	var info struct {
+		Format      string `json:"format"`
+		VirtualSize int64  `json:"virtual-size"`
+		Backing     string `json:"backing-filename"`
+	}
+	if err := json.Unmarshal(infoBytes, &info); err != nil {
+		return fmt.Errorf("decode qcow2 metadata: %w", err)
+	}
+	if info.Format != "qcow2" || info.Backing != "" || info.VirtualSize <= 0 || info.VirtualSize > 64<<30 {
+		return errors.New("base must be standalone qcow2 with virtual size at most 64 GiB")
+	}
+	_, err = hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "-F", "qcow2", "-b", "/proc/self/fd/3", "-u", "overlay.qcow2", strconv.FormatInt(max(info.VirtualSize, minGuestDiskBytes), 10))
+	return err
+}
+
 // guestVM owns a single disposable machine, its credentials, and its directory.
 // Its SSH transport is pinned to the host key injected through private NoCloud.
 // It never changes host networking or exposes a management port off loopback.
@@ -169,22 +198,7 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		return nil, err
 	}
 
-	infoBytes, err := hostCommand(ctx, dir, "qemu-img", []*os.File{base}, "info", "--output=json", "-f", "qcow2", "/proc/self/fd/3")
-	if err != nil {
-		return nil, err
-	}
-	var info struct {
-		Format      string `json:"format"`
-		VirtualSize int64  `json:"virtual-size"`
-		Backing     string `json:"backing-filename"`
-	}
-	if err := json.Unmarshal(infoBytes, &info); err != nil {
-		return nil, fmt.Errorf("decode qcow2 metadata: %w", err)
-	}
-	if info.Format != "qcow2" || info.Backing != "" || info.VirtualSize <= 0 || info.VirtualSize > 64<<30 {
-		return nil, errors.New("base must be standalone qcow2 with virtual size at most 64 GiB")
-	}
-	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "-F", "qcow2", "-b", "/proc/self/fd/3", "-u", "overlay.qcow2", strconv.FormatInt(info.VirtualSize, 10)); err != nil {
+	if err := createGuestOverlay(ctx, dir, base); err != nil {
 		return nil, err
 	}
 

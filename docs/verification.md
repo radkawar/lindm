@@ -1405,6 +1405,17 @@ Durable generation cleanup is covered by isolated PostgreSQL cancellation,
 concurrency, active-generation and expired-writer regressions; its forward
 migration is not yet applied to the running demo.
 
+Full RHEL 9 CSAF/VEX publication was measured on 2026-10-10 with the opt-in
+`TestLiveRHEL9SignedArchivePublication` against both genuine signed 2026-10-04
+archives, publishing through the production service into an isolated `testdb`
+schema of the development database (never the demo): 1,892,833 unique of
+1,894,410 emitted claims, one rejected source document (`CVE-2023-44487`'s
+invalid `nginx:1.24` RPM name), 7 min 28 s refresh and 236,744 KiB peak RSS
+without swaps under the progress watchdog (no fixed short deadline). Logs and
+SHA-256 values are in [RHEL advisory feeds](platforms/rhel.md#advisory-feeds).
+This is source publication only, not device findings, console exposure or
+subscription entitlement evidence; coverage remains reported as partial.
+
 ## 3. Acceptance scenario families
 
 Each family maps to product requirement IDs. Individual deterministic tests must

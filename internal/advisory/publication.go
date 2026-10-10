@@ -16,6 +16,7 @@ import (
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	"lindm/internal/advisory/advisorydb"
+	"lindm/internal/advisory/feed"
 )
 
 const advisoryPublicationBatchSize = 500
@@ -28,13 +29,15 @@ type advisoryGeneration struct {
 // publishStream commits bounded batches under a private generation. Only the
 // final fenced feed update exposes them, after the producer has verified its
 // entire input (including the digest). The producer must call emit serially.
-func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSource, started time.Time, producer func(func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error)) (err error) {
+func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSource, started time.Time, producer func(context.Context, func(*advisoryv1.Advisory) error, func() error) (*advisoryv1.FeedDocument, error)) (err error) {
 	if source == nil || producer == nil {
 		return ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	ctx, progress := feed.NewRefreshProgress(ctx, source)
+	defer progress.Close()
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
 	if err != nil {
 		return err
@@ -48,6 +51,8 @@ func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSour
 	// Never sweep all inactive rows: another producer may still be staging them.
 	cleanup := []advisoryGeneration{generation}
 	defer func() { s.cleanupAdvisoryGenerations(ctx, cleanup) }()
+	ctx, stopHeartbeat := s.startAdvisoryLeaseHeartbeat(ctx, generation.revision, time.Minute)
+	defer stopHeartbeat()
 	limit := source.GetTotalClaimsLimit()
 	if source.TotalClaimsLimit == nil {
 		limit = 5000000
@@ -68,7 +73,7 @@ func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSour
 			return err
 		}
 		unique += inserted
-		return nil
+		return progress.Mark()
 	}
 	emit := func(record *advisoryv1.Advisory) error {
 		if sinkErr != nil {
@@ -111,11 +116,11 @@ func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSour
 		}
 		return sinkErr
 	}
-	doc, err := producer(emit)
+	doc, err := producer(ctx, emit, progress.Mark)
 	if err != nil || sinkErr != nil {
-		return errors.Join(err, sinkErr)
+		return errors.Join(err, sinkErr, context.Cause(ctx))
 	}
-	if err := ctx.Err(); err != nil {
+	if err := context.Cause(ctx); err != nil {
 		return err
 	}
 	if doc == nil || len(doc.GetSourceSha256()) != sha256.Size {
@@ -152,6 +157,12 @@ func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSour
 		}
 	}
 	if err := flush(); err != nil {
+		return err
+	}
+	// Stop and join before removing the lease in the switch transaction. A
+	// successful publication must not race a heartbeat observing its removed key.
+	stopHeartbeat()
+	if err := context.Cause(ctx); err != nil {
 		return err
 	}
 	tx, err := s.pool.Begin(ctx)

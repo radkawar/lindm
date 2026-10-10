@@ -123,7 +123,7 @@ func TestRedHatStreamLargestOriginalDocument(t *testing.T) {
 	config.ExpectedSha256 = redHatLargePin(t)
 	input := redHatLargeFixture(t)
 	consume, assertClaims := redHatLargeConsumer(t, config.Url)
-	doc, err := ParseStream(t.Context(), config, input, consume)
+	doc, err := ParseStream(t.Context(), config, input, consume, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestRedHatFetchStreamLargestAuthenticatedDocument(t *testing.T) {
 	config.Url = server.URL + "/rhsa-2024_9315.json"
 	config.ExpectedSha256 = redHatLargePin(t)
 	consume, assertClaims := redHatLargeConsumer(t, config.Url)
-	doc, err := client.FetchStream(t.Context(), config, consume)
+	doc, err := client.FetchStream(t.Context(), config, consume, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,7 @@ import (
 
 // redHatVulnerabilityClaims preserves vendor applicability and status policy;
 // only the acquisition and retention of CSAF wire data are incremental.
-func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, vulnerability redHatVulnerability, products map[string]redHatProduct, relations map[string]suseRelationship, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
+func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, vulnerability redHatVulnerability, products map[string]redHatProduct, relations map[string]redHatRelationship, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
 	if !validCVE(vulnerability.CVE) {
 		return errors.New("feed: Red Hat vulnerability lacks valid CVE")
 	}
@@ -21,6 +21,7 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 	if err != nil {
 		return err
 	}
+	var scopeMemo map[string]redHatScopeProof
 	// Fixed statuses precede bare affected claims. The disk stager reconciles
 	// the complete source, including fixes in another advisory or archive.
 	for _, status := range []string{"fixed", "known_affected", "known_not_affected", "under_investigation"} {
@@ -32,8 +33,17 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 				}
 				return errors.New("feed: unresolved Red Hat vulnerability relationship")
 			}
+			if relation.ambiguous {
+				if redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+					continue
+				}
+				return errRedHatAmbiguousIdentity
+			}
 			platform, module, err := redHatPlatformProduct(relation.Platform, products, relations, 0)
 			if err != nil {
+				if errors.Is(err, errRedHatAmbiguousIdentity) && redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+					continue
+				}
 				return err
 			}
 			applies, uncertain := redHatPlatform(config, platform, status)
@@ -47,14 +57,18 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 			if !exists {
 				return errors.New("feed: unresolved Red Hat RPM component")
 			}
+			if component.ambiguous {
+				return errRedHatAmbiguousIdentity
+			}
 			if component.unsupported {
 				return errors.New("feed: unsupported relevant Red Hat component constraint")
 			}
-			// Layered content never becomes host RPM evidence from its label.
-			if !strings.HasPrefix(component.product.Helper.PURL, "pkg:rpm/redhat/") {
+			// The PURL namespace, not a product label or path suffix,
+			// distinguishes native RPMs from layered content.
+			pkg, err := redHatPackage(component)
+			if errors.Is(err, errRedHatNonNativeRPM) {
 				continue
 			}
-			pkg, err := redHatPackage(component)
 			if err != nil {
 				return err
 			}
@@ -79,9 +93,9 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 				}
 				record.FixedVersion = pkg.version
 			case "known_affected":
-				if pkg.version != "" {
-					record.IntroducedVersion, record.LastAffectedVersion = pkg.version, pkg.version
-				}
+				// Vendor unfixed status applies to the package/source in this
+				// platform, even when its component PURL includes a version.
+				// Source-wide reconciliation still gives exact fixes priority.
 			case "known_not_affected":
 				record.NotAffected = !uncertain
 				if pkg.version != "" {
@@ -113,8 +127,17 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 				}
 				return errors.New("feed: unresolved Red Hat status product")
 			}
+			if relation.ambiguous {
+				if redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+					continue
+				}
+				return errRedHatAmbiguousIdentity
+			}
 			platform, _, err := redHatPlatformProduct(relation.Platform, products, relations, 0)
 			if err != nil {
+				if errors.Is(err, errRedHatAmbiguousIdentity) && redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+					continue
+				}
 				return err
 			}
 			if applies, _ := redHatPlatform(config, platform, "under_investigation"); applies {
@@ -123,6 +146,53 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 		}
 	}
 	return nil
+}
+
+type redHatScopeProof struct {
+	offScope bool
+	distance uint8
+}
+
+// An ambiguous dependency is irrelevant only when every declared alternative
+// reaches a well-formed off-scope platform. Unknown identifiers and cycles do
+// not prove that a competing native interpretation is absent.
+func redHatReferenceOffScope(config *advisoryv1.FeedSource, id string, products map[string]redHatProduct, relations map[string]redHatRelationship, depth int, memo *map[string]redHatScopeProof) bool {
+	if depth > 8 {
+		return false
+	}
+	if known, exists := (*memo)[id]; exists {
+		return known.offScope && depth+int(known.distance) <= 8
+	}
+	if *memo == nil {
+		*memo = make(map[string]redHatScopeProof)
+	}
+	// A pending/failed proof is false, so cycles cannot prove scope. The
+	// vulnerability-local cache visits each indexed identifier at most once,
+	// rather than expanding shared alternative paths exponentially.
+	(*memo)[id] = redHatScopeProof{}
+	var distance uint8
+	found := false
+	if _, exists := products[id]; exists {
+		found = true
+		if !redHatOffScopeProduct(config, id, products) {
+			return false
+		}
+	}
+	if relation, exists := relations[id]; exists {
+		found = true
+		if !redHatReferenceOffScope(config, relation.Platform, products, relations, depth+1, memo) {
+			return false
+		}
+		distance = (*memo)[relation.Platform].distance + 1
+		for platform := range relation.platforms {
+			if !redHatReferenceOffScope(config, platform, products, relations, depth+1, memo) {
+				return false
+			}
+			distance = max(distance, (*memo)[platform].distance+1)
+		}
+	}
+	(*memo)[id] = redHatScopeProof{offScope: found, distance: distance}
+	return found
 }
 
 // A VEX status can name a declared platform directly, not just a package
@@ -135,7 +205,21 @@ func redHatOffScopeProduct(config *advisoryv1.FeedSource, id string, products ma
 	if !exists {
 		return false
 	}
-	cpe := strings.Split(product.product.Helper.CPE, ":")
+	if !redHatOffScopePlatform(config, product.product) {
+		return false
+	}
+	for cpe := range product.cpes {
+		alternative := product.product
+		alternative.Helper.CPE = cpe
+		if !redHatOffScopePlatform(config, alternative) {
+			return false
+		}
+	}
+	return true
+}
+
+func redHatOffScopePlatform(config *advisoryv1.FeedSource, product suseProduct) bool {
+	cpe := strings.Split(product.Helper.CPE, ":")
 	if len(cpe) < 4 || len(cpe) > 7 || cpe[0] != "cpe" || (cpe[1] != "/o" && cpe[1] != "/a") || cpe[2] != "redhat" || cpe[3] == "" {
 		return false
 	}
@@ -174,7 +258,7 @@ func redHatOffScopeProduct(config *advisoryv1.FeedSource, id string, products ma
 	for _, part := range cpe[:5] {
 		baseBytes += len(part)
 	}
-	product.product.Helper.CPE = product.product.Helper.CPE[:baseBytes]
-	applies, _ := redHatPlatform(config, product.product, "under_investigation")
+	product.Helper.CPE = product.Helper.CPE[:baseBytes]
+	applies, _ := redHatPlatform(config, product, "under_investigation")
 	return !applies
 }

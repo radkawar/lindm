@@ -121,11 +121,9 @@ func (s *Service) Refresh(ctx context.Context) error {
 			return errors.Join(result, err)
 		}
 		started := s.clock().UTC()
-		bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		err := s.publishStream(bounded, source, started, func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
-			return s.client.FetchStream(bounded, source, emit)
+		err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
+			return s.client.FetchStream(producerCtx, source, emit, progress)
 		})
-		cancel()
 		if err != nil {
 			result = errors.Join(result, fmt.Errorf("refresh feed %s: %w", source.GetId(), err))
 			encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
@@ -152,10 +150,8 @@ func (s *Service) Import(ctx context.Context, id string, input io.Reader) error 
 			return errors.New("advisory: offline import requires configured expected_sha256")
 		}
 		started := s.clock().UTC()
-		bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-		return s.publishStream(bounded, source, started, func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
-			doc, err := feed.ParseStream(bounded, source, input, emit)
+		return s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
+			doc, err := feed.ParseStream(producerCtx, source, input, emit, progress)
 			if err != nil {
 				return nil, err
 			}

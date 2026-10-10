@@ -112,12 +112,17 @@ type FeedSource struct {
 	PlatformStream string `protobuf:"bytes,9,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
 	// OSV ZIP is staged on disk. Defaults to 1 GiB; never a memory allocation.
 	MaxArchiveBytes *uint64 `protobuf:"varint,10,opt,name=max_archive_bytes,json=maxArchiveBytes,proto3,oneof" json:"max_archive_bytes,omitempty"`
-	// Reject the refresh when malformed OSV records exceed this count. Default 1000.
+	// Reject the refresh when malformed vendor records exceed this count. Default 1000.
 	MaxRejectedRecords *uint32 `protobuf:"varint,11,opt,name=max_rejected_records,json=maxRejectedRecords,proto3,oneof" json:"max_rejected_records,omitempty"`
 	// Sanity ceiling on emitted normalized claims, including duplicates. Default 5M.
 	TotalClaimsLimit *uint64 `protobuf:"varint,12,opt,name=total_claims_limit,json=totalClaimsLimit,proto3,oneof" json:"total_claims_limit,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// No completed source document or committed publication batch for this period
+	// aborts refresh. Defaults to 300 seconds; received bytes are not progress.
+	ProgressTimeoutSeconds *uint32 `protobuf:"varint,13,opt,name=progress_timeout_seconds,json=progressTimeoutSeconds,proto3,oneof" json:"progress_timeout_seconds,omitempty"`
+	// Absolute per-source refresh ceiling regardless of progress. Default 7200 seconds.
+	RefreshTimeoutSeconds *uint32 `protobuf:"varint,14,opt,name=refresh_timeout_seconds,json=refreshTimeoutSeconds,proto3,oneof" json:"refresh_timeout_seconds,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *FeedSource) Reset() {
@@ -230,6 +235,20 @@ func (x *FeedSource) GetMaxRejectedRecords() uint32 {
 func (x *FeedSource) GetTotalClaimsLimit() uint64 {
 	if x != nil && x.TotalClaimsLimit != nil {
 		return *x.TotalClaimsLimit
+	}
+	return 0
+}
+
+func (x *FeedSource) GetProgressTimeoutSeconds() uint32 {
+	if x != nil && x.ProgressTimeoutSeconds != nil {
+		return *x.ProgressTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *FeedSource) GetRefreshTimeoutSeconds() uint32 {
+	if x != nil && x.RefreshTimeoutSeconds != nil {
+		return *x.RefreshTimeoutSeconds
 	}
 	return 0
 }
@@ -691,7 +710,7 @@ var File_lindm_advisory_v1_feed_proto protoreflect.FileDescriptor
 
 const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x0f\n" +
+	"\x1clindm/advisory/v1/feed.proto\x12\x11lindm.advisory.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x87\x11\n" +
 	"\n" +
 	"FeedSource\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
@@ -710,13 +729,18 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	" \x01(\x04B\x0f\xbaH\f2\n" +
 	"\x18\x80\x80\x80\x80\x10(\x80\x80@H\x00R\x0fmaxArchiveBytes\x88\x01\x01\x12?\n" +
 	"\x14max_rejected_records\x18\v \x01(\rB\b\xbaH\x05*\x03\x18\x90NH\x01R\x12maxRejectedRecords\x88\x01\x01\x12?\n" +
-	"\x12total_claims_limit\x18\f \x01(\x04B\f\xbaH\t2\a\x18\x80\xda\xc4\t(\x01H\x02R\x10totalClaimsLimit\x88\x01\x01:\x97\t\xbaH\x93\t\x1a\xad\x03\n" +
+	"\x12total_claims_limit\x18\f \x01(\x04B\f\xbaH\t2\a\x18\x80\xda\xc4\t(\x01H\x02R\x10totalClaimsLimit\x88\x01\x01\x12I\n" +
+	"\x18progress_timeout_seconds\x18\r \x01(\rB\n" +
+	"\xbaH\a*\x05\x18\x90\x1c(\x01H\x03R\x16progressTimeoutSeconds\x88\x01\x01\x12H\n" +
+	"\x17refresh_timeout_seconds\x18\x0e \x01(\rB\v\xbaH\b*\x06\x18\x80\xa3\x05(\x01H\x04R\x15refreshTimeoutSeconds\x88\x01\x01:\x97\t\xbaH\x93\t\x1a\xad\x03\n" +
 	"\x13feed_source.release\x12]release must identify a numeric distro release, Ubuntu noble, or an explicitly rolling distro\x1a\xb6\x02(this.distro == 'ubuntu' && this.release == 'noble') || (this.distro in ['arch', 'opensuse-tumbleweed'] && this.release == 'rolling') || (!(this.distro in ['arch', 'opensuse-tumbleweed']) && this.release.matches('^[0-9]+(\\\\.[0-9]+)?$') && (this.distro != 'fedora' || this.release.matches('^[1-9][0-9]{1,2}$')))\x1a\xbb\x03\n" +
 	"\x12feed_source.format\x123format must belong to the selected vendor ecosystem\x1a\xef\x02(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian')\x1a\xa2\x02\n" +
 	"\x1bfeed_source.platform_stream\x12SRHEL requires standard, eus or e4s; extended streams require an exact minor release\x1a\xad\x01this.distro == 'rhel' ? (this.platform_stream in ['standard','eus','e4s'] && (this.platform_stream == 'standard' || this.release.contains('.'))) : this.platform_stream == ''B\x14\n" +
 	"\x12_max_archive_bytesB\x17\n" +
 	"\x15_max_rejected_recordsB\x15\n" +
-	"\x13_total_claims_limit\"\xa1\b\n" +
+	"\x13_total_claims_limitB\x1b\n" +
+	"\x19_progress_timeout_secondsB\x1a\n" +
+	"\x18_refresh_timeout_seconds\"\xa1\b\n" +
 	"\bAdvisory\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x02id\x12?\n" +

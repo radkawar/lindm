@@ -89,7 +89,7 @@ func parseOSV(config *advisoryv1.FeedSource, raw []byte, validator protovalidate
 			return nil, err
 		}
 	} else {
-		return parseOSVArchive(context.Background(), config, bytes.NewReader(raw), int64(len(raw)), validator, nil)
+		return parseOSVArchive(context.Background(), config, bytes.NewReader(raw), int64(len(raw)), validator, nil, nil)
 	}
 	if !matched {
 		return nil, errors.New("feed: OSV contains no matching supported product")

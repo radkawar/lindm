@@ -19,16 +19,48 @@ func collectSessions(ctx context.Context) *inventoryv1.SessionCounts {
 	return collectSessionCounts(ctx, runNative)
 }
 
+// busctlJSONSince is the first systemd release whose busctl accepts --json
+// (v240). EL8 ships systemd 239, whose busctl rejects the option; it is read
+// through busctl's fixed text format_cmdline output instead.
+const busctlJSONSince = 240
+
+func busctl(args ...string) backend {
+	return backend{name: "busctl", path: "/usr/bin/busctl", args: args}
+}
+
 func collectSessionCounts(ctx context.Context, run nativeRunner) *inventoryv1.SessionCounts {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	result := &inventoryv1.SessionCounts{}
+	// The JSON interface is used unless busctl itself failed and natively
+	// reports a systemd release that predates it. Other failures stand.
+	text, probed := false, false
+	call := func(jsonArgs, textArgs []string, parseJSON, parseText func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
+		if !text {
+			status := run(ctx, busctl(append([]string{"--system", "--json=short", "--timeout=5s", "--auto-start=no"}, jsonArgs...)...), parseJSON)
+			if status != commandFailure || probed {
+				return status
+			}
+			probed = true
+			release, versionStatus := busctlRelease(ctx, run)
+			if versionStatus != success || release >= busctlJSONSince {
+				return status
+			}
+			text = true
+		}
+		return run(ctx, busctl(append([]string{"--system", "--timeout=5s", "--auto-start=no"}, textArgs...)...), parseText)
+	}
 	var sessions [][]json.RawMessage
 	count := func(method, signature string) *inventoryv1.ObservedUint64 {
 		var rows [][]json.RawMessage
-		status := run(ctx, backend{name: "busctl", path: "/usr/bin/busctl", args: []string{"--system", "--json=short", "--timeout=5s", "--auto-start=no", "call", "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", method}}, func(reader io.Reader) inventoryv1.CollectionStatus {
+		args := []string{"call", "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", method}
+		status := call(args, args, func(reader io.Reader) inventoryv1.CollectionStatus {
 			var parsed inventoryv1.CollectionStatus
 			rows, parsed = parseSessionRows(reader, signature)
+			return parsed
+		}, func(reader io.Reader) inventoryv1.CollectionStatus {
+			var parsed inventoryv1.CollectionStatus
+			rows, parsed = parseSessionRowsText(reader, signature)
 			return parsed
 		})
 		if status != success {
@@ -52,11 +84,18 @@ func collectSessionCounts(ctx context.Context, run nativeRunner) *inventoryv1.Se
 			return result
 		}
 		var session *inventoryv1.ActiveSession
-		status := run(ctx, backend{name: "busctl", path: "/usr/bin/busctl", args: []string{"--system", "--json=short", "--timeout=5s", "--auto-start=no", "call", "org.freedesktop.login1", path, "org.freedesktop.DBus.Properties", "GetAll", "s", "org.freedesktop.login1.Session"}}, func(reader io.Reader) inventoryv1.CollectionStatus {
-			var parsed inventoryv1.CollectionStatus
-			session, parsed = parseActiveSession(reader)
-			return parsed
-		})
+		status := call(
+			[]string{"call", "org.freedesktop.login1", path, "org.freedesktop.DBus.Properties", "GetAll", "s", "org.freedesktop.login1.Session"},
+			append([]string{"get-property", "org.freedesktop.login1", path, "org.freedesktop.login1.Session"}, textSessionProperties...),
+			func(reader io.Reader) inventoryv1.CollectionStatus {
+				var parsed inventoryv1.CollectionStatus
+				session, parsed = parseActiveSession(reader)
+				return parsed
+			}, func(reader io.Reader) inventoryv1.CollectionStatus {
+				var parsed inventoryv1.CollectionStatus
+				session, parsed = parseActiveSessionText(reader)
+				return parsed
+			})
 		if status != success {
 			result.ActiveSessions = &inventoryv1.ActiveSessions{Status: status}
 			return result

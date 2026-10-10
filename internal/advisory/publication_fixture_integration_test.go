@@ -11,7 +11,7 @@ import (
 
 // publish adapts controlled test documents to the production streaming publisher.
 func (s *Service) publish(ctx context.Context, source *advisoryv1.FeedSource, doc *advisoryv1.FeedDocument, started time.Time) error {
-	return s.publishStream(ctx, source, started, func(emit func(*advisoryv1.Advisory) error) (*advisoryv1.FeedDocument, error) {
+	return s.publishStream(ctx, source, started, func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 		if doc == nil {
 			return nil, ErrInvalid
 		}

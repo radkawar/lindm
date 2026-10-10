@@ -151,7 +151,7 @@ func (s *redHatStager) documentClaims(parse func() error) error {
 		rollbackErr := s.tx.Rollback()
 		s.tx = nil
 		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			return errors.Join(err, rollbackErr)
+			return fmt.Errorf("feed: roll back rejected RHEL document: %w", rollbackErr)
 		}
 	}
 	s.count = before
