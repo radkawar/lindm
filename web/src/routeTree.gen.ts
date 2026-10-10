@@ -13,10 +13,16 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedAdvisoriesRouteImport } from './routes/_authenticated/advisories'
+import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDevicesRouteImport } from './routes/_authenticated/devices'
 import { Route as AuthenticatedEnrollmentRouteImport } from './routes/_authenticated/enrollment'
+import { Route as AuthenticatedGroupsRouteImport } from './routes/_authenticated/groups'
+import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
 import { Route as AuthenticatedProfilesRouteImport } from './routes/_authenticated/profiles'
+import { Route as AuthenticatedRolloutsRouteImport } from './routes/_authenticated/rollouts'
 import { Route as AuthenticatedDevicesDeviceIdRouteImport } from './routes/_authenticated/devices_.$deviceId'
 import { Route as AuthenticatedProfilesProfileIdRouteImport } from './routes/_authenticated/profiles_.$profileId'
 import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenticated/profiles_.new'
@@ -40,9 +46,24 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdvisoriesRoute = AuthenticatedAdvisoriesRouteImport.update({
+  id: '/advisories',
+  path: '/advisories',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedApprovalsRoute = AuthenticatedApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDevicesRoute = AuthenticatedDevicesRouteImport.update({
@@ -55,9 +76,25 @@ const AuthenticatedEnrollmentRoute = AuthenticatedEnrollmentRouteImport.update({
   path: '/enrollment',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedGroupsRoute = AuthenticatedGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedIntegrationsRoute =
+  AuthenticatedIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedProfilesRoute = AuthenticatedProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRolloutsRoute = AuthenticatedRolloutsRouteImport.update({
+  id: '/rollouts',
+  path: '/rollouts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDevicesDeviceIdRoute =
@@ -83,10 +120,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/advisories': typeof AuthenticatedAdvisoriesRoute
+  '/approvals': typeof AuthenticatedApprovalsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/groups': typeof AuthenticatedGroupsRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
   '/profiles': typeof AuthenticatedProfilesRoute
+  '/rollouts': typeof AuthenticatedRolloutsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
@@ -95,10 +138,16 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/advisories': typeof AuthenticatedAdvisoriesRoute
+  '/approvals': typeof AuthenticatedApprovalsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
   '/devices': typeof AuthenticatedDevicesRoute
   '/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/groups': typeof AuthenticatedGroupsRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
   '/profiles': typeof AuthenticatedProfilesRoute
+  '/rollouts': typeof AuthenticatedRolloutsRoute
   '/devices/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
@@ -109,10 +158,16 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/enroll': typeof EnrollRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
+  '/_authenticated/advisories': typeof AuthenticatedAdvisoriesRoute
+  '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/devices': typeof AuthenticatedDevicesRoute
   '/_authenticated/enrollment': typeof AuthenticatedEnrollmentRoute
+  '/_authenticated/groups': typeof AuthenticatedGroupsRoute
+  '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
   '/_authenticated/profiles': typeof AuthenticatedProfilesRoute
+  '/_authenticated/rollouts': typeof AuthenticatedRolloutsRoute
   '/_authenticated/devices_/$deviceId': typeof AuthenticatedDevicesDeviceIdRoute
   '/_authenticated/profiles_/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/_authenticated/profiles_/new': typeof AuthenticatedProfilesNewRoute
@@ -123,10 +178,16 @@ export interface FileRouteTypes {
     | '/'
     | '/enroll'
     | '/accounts'
+    | '/advisories'
+    | '/approvals'
     | '/audit'
+    | '/dashboard'
     | '/devices'
     | '/enrollment'
+    | '/groups'
+    | '/integrations'
     | '/profiles'
+    | '/rollouts'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
@@ -135,10 +196,16 @@ export interface FileRouteTypes {
     | '/'
     | '/enroll'
     | '/accounts'
+    | '/advisories'
+    | '/approvals'
     | '/audit'
+    | '/dashboard'
     | '/devices'
     | '/enrollment'
+    | '/groups'
+    | '/integrations'
     | '/profiles'
+    | '/rollouts'
     | '/devices/$deviceId'
     | '/profiles/$profileId'
     | '/profiles/new'
@@ -148,10 +215,16 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/enroll'
     | '/_authenticated/accounts'
+    | '/_authenticated/advisories'
+    | '/_authenticated/approvals'
     | '/_authenticated/audit'
+    | '/_authenticated/dashboard'
     | '/_authenticated/devices'
     | '/_authenticated/enrollment'
+    | '/_authenticated/groups'
+    | '/_authenticated/integrations'
     | '/_authenticated/profiles'
+    | '/_authenticated/rollouts'
     | '/_authenticated/devices_/$deviceId'
     | '/_authenticated/profiles_/$profileId'
     | '/_authenticated/profiles_/new'
@@ -193,11 +266,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/advisories': {
+      id: '/_authenticated/advisories'
+      path: '/advisories'
+      fullPath: '/advisories'
+      preLoaderRoute: typeof AuthenticatedAdvisoriesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/approvals': {
+      id: '/_authenticated/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof AuthenticatedApprovalsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/devices': {
@@ -214,11 +308,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEnrollmentRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/groups': {
+      id: '/_authenticated/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof AuthenticatedGroupsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/integrations': {
+      id: '/_authenticated/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/profiles': {
       id: '/_authenticated/profiles'
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof AuthenticatedProfilesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/rollouts': {
+      id: '/_authenticated/rollouts'
+      path: '/rollouts'
+      fullPath: '/rollouts'
+      preLoaderRoute: typeof AuthenticatedRolloutsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/devices_/$deviceId': {
@@ -247,10 +362,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
+  AuthenticatedAdvisoriesRoute: typeof AuthenticatedAdvisoriesRoute
+  AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDevicesRoute: typeof AuthenticatedDevicesRoute
   AuthenticatedEnrollmentRoute: typeof AuthenticatedEnrollmentRoute
+  AuthenticatedGroupsRoute: typeof AuthenticatedGroupsRoute
+  AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
   AuthenticatedProfilesRoute: typeof AuthenticatedProfilesRoute
+  AuthenticatedRolloutsRoute: typeof AuthenticatedRolloutsRoute
   AuthenticatedDevicesDeviceIdRoute: typeof AuthenticatedDevicesDeviceIdRoute
   AuthenticatedProfilesProfileIdRoute: typeof AuthenticatedProfilesProfileIdRoute
   AuthenticatedProfilesNewRoute: typeof AuthenticatedProfilesNewRoute
@@ -258,10 +379,16 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
+  AuthenticatedAdvisoriesRoute: AuthenticatedAdvisoriesRoute,
+  AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDevicesRoute: AuthenticatedDevicesRoute,
   AuthenticatedEnrollmentRoute: AuthenticatedEnrollmentRoute,
+  AuthenticatedGroupsRoute: AuthenticatedGroupsRoute,
+  AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
   AuthenticatedProfilesRoute: AuthenticatedProfilesRoute,
+  AuthenticatedRolloutsRoute: AuthenticatedRolloutsRoute,
   AuthenticatedDevicesDeviceIdRoute: AuthenticatedDevicesDeviceIdRoute,
   AuthenticatedProfilesProfileIdRoute: AuthenticatedProfilesProfileIdRoute,
   AuthenticatedProfilesNewRoute: AuthenticatedProfilesNewRoute,

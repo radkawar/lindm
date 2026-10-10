@@ -74,7 +74,9 @@ func (d *authorityDatabase) Close() (resultErr error) {
 	if !d.created {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// DROP may wait for PostgreSQL checkpoint/storage work: an exact owned
+	// database DROP took 127 seconds during the capacity lane without FORCE.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	connection, err := pgx.ConnectConfig(ctx, d.admin.Copy())
 	if err != nil {

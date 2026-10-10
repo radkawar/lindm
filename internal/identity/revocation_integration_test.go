@@ -19,7 +19,7 @@ func TestStaleDisableDoesNotRevokeNewerSession(t *testing.T) {
 	subject := uuid.New()
 	row := insertObservedPrincipal(t, ctx, svc, subject)
 	at := time.Now().UTC()
-	oldCookie, denied, err := svc.completeLogin(ctx, subject, directoryObs(subject, at, true))
+	oldCookie, denied, err := svc.completeLogin(ctx, subject.String(), directoryObs(subject, at, true))
 	if err != nil || denied || oldCookie == "" {
 		t.Fatalf("login err=%v denied=%v", err, denied)
 	}
@@ -32,7 +32,7 @@ func TestStaleDisableDoesNotRevokeNewerSession(t *testing.T) {
 	if !sessionRevoked(t, ctx, conn, oldCookie) {
 		t.Fatal("disable observation left the old session active")
 	}
-	freshCookie, denied, err := svc.completeLogin(ctx, subject, directoryObs(subject, at.Add(2*time.Second), true))
+	freshCookie, denied, err := svc.completeLogin(ctx, subject.String(), directoryObs(subject, at.Add(2*time.Second), true))
 	if err != nil || denied || freshCookie == "" {
 		t.Fatalf("re-enable login err=%v denied=%v", err, denied)
 	}
@@ -108,7 +108,7 @@ func TestLogoutAndDirectoryDisableDoNotDeadlock(t *testing.T) {
 	subject := uuid.New()
 	row := insertObservedPrincipal(t, ctx, svc, subject)
 	at := time.Now().UTC()
-	cookie, denied, err := svc.completeLogin(ctx, subject, directoryObs(subject, at, true))
+	cookie, denied, err := svc.completeLogin(ctx, subject.String(), directoryObs(subject, at, true))
 	if err != nil || denied || cookie == "" {
 		t.Fatalf("login err=%v denied=%v", err, denied)
 	}
@@ -180,7 +180,7 @@ func TestLogoutAndDirectoryDisableDoNotDeadlock(t *testing.T) {
 
 func directoryObs(subject uuid.UUID, at time.Time, enabled bool) directoryObservation {
 	return directoryObservation{
-		Found: true, UserID: subject, Enabled: enabled, Direct: true,
+		Found: true, UserID: subject.String(), Enabled: enabled, Direct: true,
 		Groups: []string{"/admins"}, DisplayName: "ada", AcquiredAt: at,
 	}
 }

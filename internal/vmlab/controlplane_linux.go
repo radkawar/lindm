@@ -20,17 +20,25 @@ import (
 // vmControlPlane is a sequential laboratory client, not an authentication or
 // inventory implementation. All authority and observations use the public API.
 type vmControlPlane struct {
-	session *devlab.OwnerSession
-	fixture *devlab.AgentFixture
-	grants  []*vmCreatedGrant
-	devices map[string]bool
-	closed  bool
+	session      *devlab.OwnerSession
+	approver     *devlab.ApprovalSession
+	openApprover func(context.Context) (*devlab.ApprovalSession, error)
+	fixture      *devlab.AgentFixture
+	grants       []*vmCreatedGrant
+	devices      map[string]*vmTrackedDevice
+	closed       bool
 }
 
 type vmCreatedGrant struct {
 	request *adminv1.CreateEnrollmentGrantRequest
 	id      string
 	revoked bool
+}
+
+type vmTrackedDevice struct {
+	request  *adminv1.RevokeDeviceRequest
+	approval *adminv1.Approval
+	revoked  bool
 }
 
 // vmBootstrapMaterial must only be transferred through private SSH stdin. Clear
@@ -80,9 +88,15 @@ type vmPackageSnapshot struct {
 }
 
 func openVMControlPlane(ctx context.Context, repoRoot string, isolated *devlab.AuthorityFixture) (*vmControlPlane, error) {
-	fixture, err := devlab.ReadAgentFixture(ctx, repoRoot)
+	var fixture *devlab.AgentFixture
+	var err error
+	if isolated == nil {
+		fixture, err = devlab.ReadAgentFixture(ctx, repoRoot)
+	} else {
+		fixture, err = isolated.ReadAgentFixture(ctx)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("read existing agent fixture: %w", err)
+		return nil, fmt.Errorf("read control-plane-bound agent fixture: %w", err)
 	}
 	var session *devlab.OwnerSession
 	if isolated == nil {
@@ -93,7 +107,14 @@ func openVMControlPlane(ctx context.Context, repoRoot string, isolated *devlab.A
 	if err != nil {
 		return nil, err
 	}
-	return &vmControlPlane{session: session, fixture: fixture, devices: make(map[string]bool)}, nil
+	// The independent human is unused until cleanup. Authenticating here would
+	// consume its idle-session lifetime during long native scenarios.
+	return &vmControlPlane{
+		session: session, fixture: fixture, devices: make(map[string]*vmTrackedDevice),
+		openApprover: func(ctx context.Context) (*devlab.ApprovalSession, error) {
+			return devlab.OpenApprovalSession(ctx, repoRoot, isolated)
+		},
+	}, nil
 }
 
 func (c *vmControlPlane) BootstrapMaterial(ctx context.Context) (*vmBootstrapMaterial, error) {
@@ -126,7 +147,7 @@ func (c *vmControlPlane) TrackDevice(deviceID string) error {
 		return errors.New("invalid laboratory device registration")
 	}
 	if _, tracked := c.devices[deviceID]; !tracked {
-		c.devices[deviceID] = false
+		c.devices[deviceID] = &vmTrackedDevice{request: &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: deviceID, Reason: "native VM lifecycle laboratory device revocation"}}
 	}
 	return nil
 }
@@ -179,7 +200,7 @@ func (c *vmControlPlane) ReadSnapshot(ctx context.Context, deviceID, cursor stri
 			if pkg == nil || pkg.GetPosition() != result.PackageCount || pkg.GetName() == "" || pkg.GetVersion() == "" || pkg.GetManager() == "" || result.PackageCount >= 100000 {
 				return nil, errors.New("package pagination has incomplete positions or invalid records")
 			}
-			result.packages[nativePackage{name: pkg.GetName(), version: pkg.GetVersion(), architecture: pkg.GetArchitecture(), manager: pkg.GetManager()}]++
+			result.packages[nativePackage{name: pkg.GetName(), version: pkg.GetVersion(), architecture: pkg.GetArchitecture(), manager: pkg.GetManager(), sourceName: pkg.GetSourceName(), sourceVersion: pkg.GetSourceVersion(), module: nativeModuleIdentity(pkg.GetModule())}]++
 			result.PackageCount++
 		}
 		cursor = message.GetNextPageToken()
@@ -384,18 +405,33 @@ func vmCompareHost(truth *vmTruth, host *inventoryv1.HostObservation) error {
 }
 
 func (c *vmControlPlane) RevokeDevice(ctx context.Context, deviceID string) error {
-	revoked, tracked := c.devices[deviceID]
+	device, tracked := c.devices[deviceID]
 	if c.closed || !tracked {
 		return errors.New("refusing to revoke a device not tracked by this laboratory run")
 	}
-	if revoked {
+	if device.revoked {
 		return nil
 	}
-	_, err := c.session.Admin.RevokeDevice(ctx, connect.NewRequest(&adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: deviceID, Reason: "native VM lifecycle laboratory device revocation"}))
+	if device.request.GetApprovalId() == "" {
+		if c.approver == nil {
+			approver, err := c.openApprover(ctx)
+			if err != nil {
+				return vmControlPlaneError("authenticate laboratory device revocation approver", err)
+			}
+			c.approver = approver
+		}
+		approval, err := c.approver.Approve(ctx, c.session, &adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_RevokeDevice{RevokeDevice: device.request}})
+		if err != nil {
+			return vmControlPlaneError("approve laboratory device revocation", err)
+		}
+		device.approval = approval
+		device.request.ApprovalId = approval.GetId()
+	}
+	_, err := c.session.Admin.RevokeDevice(ctx, connect.NewRequest(device.request))
 	if err != nil {
 		return vmControlPlaneError("revoke laboratory device", err)
 	}
-	c.devices[deviceID] = true
+	device.revoked = true
 	return nil
 }
 
@@ -455,6 +491,7 @@ func (c *vmControlPlane) Close(ctx context.Context) error {
 	logout, cancelLogout := context.WithTimeout(base, 15*time.Second)
 	defer cancelLogout()
 	result = errors.Join(result, c.session.Close(logout))
+	result = errors.Join(result, c.approver.Close(base))
 	c.closed = true
 	return result
 }

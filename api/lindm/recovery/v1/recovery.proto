@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package lindm.recovery.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/device_action_recovery.proto";
+import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/execution_trust.proto";
+
+option go_package = "lindm/gen/lindm/recovery/v1;recoveryv1";
+
+// Separate purpose-restricted endpoint. One-action signed proofs authenticate
+// these four methods only; credentials are never ordinary device/admin identity.
+service RecoveryService {
+  rpc AcquireRecoveryWork(AcquireRecoveryWorkRequest) returns (AcquireRecoveryWorkResponse);
+  rpc AuthorizeRecoveryStart(AuthorizeRecoveryStartRequest) returns (AuthorizeRecoveryStartResponse);
+  rpc CheckpointRecoveryAction(CheckpointRecoveryActionRequest) returns (CheckpointRecoveryActionResponse);
+  rpc ReportRecoveryResult(ReportRecoveryResultRequest) returns (ReportRecoveryResultResponse);
+}
+// For every request, payload_sha256 covers deterministic protobuf of the whole
+// typed request with credential_envelope and request_proof cleared. The proof
+// independently binds exact credential bytes, endpoint, boot and incarnation.
+message AcquireRecoveryWorkRequest {
+  bytes credential_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes request_proof = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message AcquireRecoveryWorkResponse {
+  bytes intent_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+  bytes result_nonce = 2 [(buf.validate.field).bytes.len = 32];
+  bytes start_grant_envelope = 3 [(buf.validate.field).bytes.max_len = 65536];
+  lindm.agent.v1.RecoveryCheckpoint checkpoint = 4;
+  lindm.agent.v1.UpdateExecutionTrustRequest trust_update = 5;
+  bool closed = 6;
+  // Exact latest committed public journal snapshot, absent before checkpointing.
+  // TPM recovery compares its deterministic digest to the protected NV anchor.
+  lindm.agent.v1.RecoveryJournal journal = 7;
+}
+message AuthorizeRecoveryStartRequest {
+  bytes credential_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes request_proof = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  lindm.agent.v1.DeviceActionChallenge challenge = 3 [(buf.validate.field).required = true];
+  bytes recovery_image_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+}
+message AuthorizeRecoveryStartResponse {
+  bytes start_grant_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+message CheckpointRecoveryActionRequest {
+  bytes credential_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes request_proof = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  lindm.agent.v1.RecoveryCheckpoint checkpoint = 3 [(buf.validate.field).required = true];
+  // No private key material. Committed atomically with checkpoint before receipt.
+  // The ordinary bounded recovery RPC limit applies to the entire request.
+  lindm.agent.v1.RecoveryJournal journal = 4 [(buf.validate.field).required = true];
+}
+message CheckpointRecoveryActionResponse {
+  bytes checkpoint_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  uint64 sequence = 2 [(buf.validate.field).uint64.gt = 0];
+  bytes receipt_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ReportRecoveryResultRequest {
+  bytes credential_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes request_proof = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  lindm.agent.v1.DeviceActionStatus status = 3 [(buf.validate.field).required = true];
+  bytes result_nonce = 4 [(buf.validate.field).bytes.len = 32];
+}
+message ReportRecoveryResultResponse {
+  bool closed = 1;
+}

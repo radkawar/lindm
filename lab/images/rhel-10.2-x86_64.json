@@ -1,0 +1,15 @@
+{
+  "id":  "rhel-10.2-kvm-x86-64",
+  "distribution":  "rhel",
+  "version":  "10.2",
+  "architecture":  "x86_64",
+  "edition":  "KVM Guest Image",
+  "release":  "2026-05-12T15:00:36Z",
+  "imageFilename":  "rhel-10.2-x86_64-kvm.qcow2",
+  "imageUrl":  "https://api.access.redhat.com/management/v1/images/caaacd0b11bbc4206f8c7fec8594b82b4366b3f88ff974dbbf373832ae676f4f/download",
+  "checksumUrl":  "https://api.access.redhat.com/management/v1/images/rhel/10.2/x86_64",
+  "sha256":  "caaacd0b11bbc4206f8c7fec8594b82b4366b3f88ff974dbbf373832ae676f4f",
+  "imageSizeBytes":  "1162674176",
+  "checksumMode":  "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl":  "https://api.access.redhat.com/management/v1/images/rhel/10.2/x86_64"
+}

@@ -40,9 +40,9 @@ func NewStore(pool *pgxpool.Pool) (*Store, error) {
 		return nil, ErrProfileRejected
 	}
 	rules, err := protovalidate.New(protovalidate.WithMessages(
-		&adminv1.PublishServiceProfileRevisionRequest{},
-		&adminv1.GetServiceProfileRevisionRequest{},
-		&adminv1.ListServiceProfilesRequest{},
+		&adminv1.PublishProfileRevisionRequest{},
+		&adminv1.GetProfileRevisionRequest{},
+		&adminv1.ListProfilesRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func NewStore(pool *pgxpool.Pool) (*Store, error) {
 // Publish requires the caller's fresh principal lock. Lock order is principal,
 // request reservation, profile. Exact retries precede head/clock/capacity checks;
 // they return their original immutable revision and never advance a newer head.
-func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.PublishServiceProfileRevisionRequest, actorID uuid.UUID) (*adminv1.ServiceProfileRevision, error) {
+func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.PublishProfileRevisionRequest, actorID uuid.UUID) (*adminv1.ProfileRevision, error) {
 	if tx == nil || actorID == uuid.Nil || request == nil {
 		return nil, ErrProfileRejected
 	}
@@ -76,7 +76,7 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 		return nil, ErrProfileRejected
 	}
 	var expected *uuid.UUID
-	normalized := &adminv1.PublishServiceProfileRevisionRequest{RequestId: requestID.String(), ProfileId: profileID.String(), Spec: spec, Reason: request.GetReason()}
+	normalized := &adminv1.PublishProfileRevisionRequest{RequestId: requestID.String(), ProfileId: profileID.String(), Spec: spec, Reason: request.GetReason()}
 	if request.ExpectedRevisionId != nil {
 		id, err := uuid.Parse(request.GetExpectedRevisionId())
 		if err != nil {
@@ -90,7 +90,7 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 		return nil, ErrProfileRejected
 	}
 	hash := sha256.New()
-	_, _ = hash.Write([]byte("lindm.service-profile.publish.v1\x00"))
+	_, _ = hash.Write([]byte("lindm.resource-profile.publish.v1\x00"))
 	_, _ = hash.Write(actorID[:])
 	_, _ = hash.Write(encoded)
 	digest := hash.Sum(nil)
@@ -171,13 +171,16 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 		if err != nil {
 			return nil, ErrProfileRejected
 		}
-		resources = append(resources, profiledb.InsertProfileResourcesParams{RevisionID: revisionID, ResourceID: resourceID, UnitName: resource.GetDesired().GetUnit(), RuntimeState: int16(resource.GetDesired().GetRuntime()), EnablementState: int16(resource.GetDesired().GetEnablement())})
-		for _, value := range resource.GetDependsOn() {
-			dependency, err := uuid.Parse(value)
-			if err != nil {
-				return nil, ErrProfileRejected
-			}
-			dependencies = append(dependencies, profiledb.InsertProfileDependenciesParams{RevisionID: revisionID, ResourceID: resourceID, DependencyID: dependency})
+		record := proto.CloneOf(resource)
+		record.DependsOn = nil
+		encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(record)
+		if err != nil {
+			return nil, ErrProfileRejected
+		}
+		ref := resource.GetDesired().GetRef()
+		resources = append(resources, profiledb.InsertProfileResourcesParams{RevisionID: revisionID, ResourceID: resourceID, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), ResourceProto: encoded})
+		for _, dependency := range resource.GetDependsOn() {
+			dependencies = append(dependencies, profiledb.InsertProfileDependenciesParams{RevisionID: revisionID, ResourceID: resourceID, DependencyKind: int16(dependency.GetRef().GetKind()), DependencyKey: dependency.GetRef().GetCanonicalKey(), Condition: int16(dependency.GetCondition())})
 		}
 	}
 	copied, err := q.InsertProfileResources(ctx, resources)
@@ -208,7 +211,7 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 	if err := q.InsertProfileAudit(ctx, profiledb.InsertProfileAuditParams{ID: auditID, OccurredAt: now, ActorID: &actorID, ResourceID: profileID.String(), Reason: request.GetReason()}); err != nil {
 		return nil, err
 	}
-	return &adminv1.ServiceProfileRevision{ProfileId: profileID.String(), RevisionId: revisionID.String(), RevisionNumber: uint64(number), Spec: spec, ActorId: actorID.String(), PublishedAt: timestamppb.New(now.Time), SpecSha256: specDigest[:]}, nil
+	return &adminv1.ProfileRevision{ProfileId: profileID.String(), RevisionId: revisionID.String(), RevisionNumber: uint64(number), Spec: spec, ActorId: actorID.String(), PublishedAt: timestamppb.New(now.Time), SpecSha256: specDigest[:]}, nil
 }
 
 func profileInputError(ctx context.Context, _ error) error {

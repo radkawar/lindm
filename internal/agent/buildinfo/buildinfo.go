@@ -10,6 +10,10 @@ package buildinfo
 
 import "runtime/debug"
 
+// ProtocolVersion identifies the executable-plan protocol implemented by this
+// build, independently of its release stamp.
+const ProtocolVersion uint32 = 1
+
 // Version and Revision are set by packaging ldflags. Leave them empty in source.
 var (
 	Version  string

@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// VendorImageReceipt records a Red Hat authenticated HTTPS publication and the
+// exact acquired bytes. It is local acquisition provenance, not a vendor digital
+// signature and not independently reauthenticated by offline cache verification.
+// Credentials, bearer tokens and temporary CDN download URLs MUST NOT be stored.
+message VendorImageReceipt {
+  option (buf.validate.message).cel = {
+    id: "vendor_receipt.chronology"
+    message: "vendor publication must not postdate acquisition"
+    expression: "this.published_at <= this.acquired_at"
+  };
+  option (buf.validate.message).cel = {
+    id: "vendor_receipt.filename"
+    message: "filename must identify the exact RHEL minor"
+    expression: "this.image_filename == 'rhel-' + this.version + '-x86_64-kvm.qcow2'"
+  };
+  option (buf.validate.message).cel = {
+    id: "vendor_receipt.catalog"
+    message: "metadata must identify the exact Red Hat RHEL version and architecture"
+    expression: "this.metadata_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/x86_64'"
+  };
+  string image_filename = 1 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^rhel-(9|10)\\.[0-9]+-x86_64-kvm\\.qcow2$"
+  }];
+  string sha256 = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  uint64 image_size_bytes = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 17179869184
+  }];
+  string version = 4 [(buf.validate.field).string.pattern = "^(9|10)\\.[0-9]+$"];
+  string architecture = 5 [(buf.validate.field).string.const = "x86_64"];
+  google.protobuf.Timestamp published_at = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp acquired_at = 7 [(buf.validate.field).required = true];
+  string metadata_url = 8 [(buf.validate.field).string = {
+    uri: true
+    max_len: 200
+  }];
+}
+
+// RedHatRegistrationCredentials is ephemeral stdin delivery to the owned guest.
+// Never persist, log, or include an instance in laboratory evidence.
+message RedHatRegistrationCredentials {
+  string organization_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[0-9]+$"
+  }];
+  string activation_key = 2 [(buf.validate.field).string.pattern = "^lindm-lab-[0-9a-f]{32}$"];
+}

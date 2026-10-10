@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/identity/identitydb"
@@ -28,10 +29,14 @@ type Service struct {
 	pool          *pgxpool.Pool
 	issuer        string
 	entraTenant   uuid.UUID
+	okta          *configv1.OktaDirectory
+	google        *configv1.GoogleDirectory
+	broker        *brokerSource
+	scim          *scimService
 	clientID      string
 	publicOrigin  string
 	redirectURI   string
-	adminGroups   []string
+	policy        *authorizationPolicy
 	localIssuer   string
 	localPrimary  bool
 	breakGlass    *configv1.BreakGlassPolicy
@@ -60,7 +65,7 @@ type flightGroup struct {
 }
 
 func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, error) {
-	if pool == nil || (!cfg.Local && (cfg.ClientSecret == "" || cfg.DirectoryClientSecret == "")) {
+	if pool == nil || (!cfg.Local && (cfg.ClientSecret == "" || (cfg.Okta == nil && cfg.Google == nil && cfg.DirectoryClientSecret == ""))) {
 		return nil, errInvalidConfig
 	}
 	origin, redirect, err := parsePublicURL(cfg.PublicURL)
@@ -77,6 +82,10 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 	}
 	rules, err := protovalidate.New(protovalidate.WithMessages(
 		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
+		&authv1.CLIAuthorizationRequest{}, &authv1.CLIExchangeRequest{},
+		&authv1.AuthorizationPolicy{}, &authv1.DeviceScope{},
+		&authv1.RotateSCIMCredentialRequest{}, &configv1.SCIMConfig{},
+		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.ListApprovalsRequest{},
 		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
 	if err != nil {
 		return nil, err
@@ -86,16 +95,23 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 			return nil, err
 		}
 	}
+	policy, err := compilePolicy(cfg, rules)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.Local {
 		s := &Service{pool: pool, issuer: localIssuer, localIssuer: localIssuer,
 			localPrimary: true, publicOrigin: origin, redirectURI: redirect,
-			breakGlass: cfg.BreakGlass, webauthn: webAuthn, dummyHash: dummyPasswordHash(), now: time.Now, rules: rules}
+			policy: policy, breakGlass: cfg.BreakGlass, webauthn: webAuthn, dummyHash: dummyPasswordHash(), now: time.Now, rules: rules}
 		s.directory = &localSource{pool: pool}
 		s.passwordSlots = make(chan struct{}, 2)
-		if err := s.checkOwnerAuthenticationMode(ctx); err != nil {
+		if err := s.activatePolicy(ctx); err != nil {
 			return nil, err
 		}
 		if err := s.terminateEmergencySessions(ctx); err != nil {
+			return nil, err
+		}
+		if err := s.configureSCIM(ctx, cfg.SCIM); err != nil {
 			return nil, err
 		}
 		return s, nil
@@ -111,15 +127,8 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 			return nil, errInvalidConfig
 		}
 	}
-	groups := append([]string(nil), cfg.AdminGroups...)
-	if entraTenant != uuid.Nil {
-		for i, group := range groups {
-			id, err := uuid.Parse(group)
-			if err != nil || id == uuid.Nil {
-				return nil, errInvalidConfig
-			}
-			groups[i] = id.String()
-		}
+	if cfg.Google != nil && cfg.Issuer != "https://accounts.google.com" {
+		return nil, errInvalidConfig
 	}
 	httpClient := cfg.HTTPClient
 	owns := false
@@ -146,10 +155,12 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		pool:          pool,
 		issuer:        cfg.Issuer,
 		entraTenant:   entraTenant,
+		okta:          cfg.Okta,
+		google:        cfg.Google,
 		clientID:      cfg.ClientID,
 		publicOrigin:  origin,
 		redirectURI:   redirect,
-		adminGroups:   groups,
+		policy:        policy,
 		localIssuer:   localIssuer,
 		breakGlass:    cfg.BreakGlass,
 		webauthn:      webAuthn,
@@ -168,19 +179,37 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		verifier: provider.VerifierContext(oidc.ClientContext(context.Background(), httpClient), &oidc.Config{ClientID: cfg.ClientID}),
 		now:      time.Now,
 	}
-	if entraTenant != uuid.Nil {
+	switch {
+	case cfg.Okta != nil:
+		s.directory, err = newOktaSource(ctx, cfg.Okta.GetOrgUrl(), cfg.DirectoryClientID, cfg.Okta.GetDirectoryKeyId(), cfg.DirectoryPrivateKeyPEM, httpClient, s.clock)
+	case cfg.Google != nil:
+		groups := make([]string, 0, len(policy.groups))
+		for group := range policy.groups {
+			groups = append(groups, group)
+		}
+		s.directory, err = newGoogleSource(ctx, cfg.Google.GetServiceAccountEmail(), cfg.Google.GetPrivateKeyId(), cfg.DirectoryPrivateKeyPEM, cfg.Google.GetDelegatedSubject(), groups, httpClient, s.clock)
+	case entraTenant != uuid.Nil:
 		s.oauth.Scopes = append(s.oauth.Scopes, "profile")
 		s.directory, err = newEntraSource(ctx, "https://graph.microsoft.com/v1.0", cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
-	} else {
-		s.directory, err = newKeycloakSource(ctx, cfg.Issuer, cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
+	default:
+		var direct *keycloakSource
+		direct, err = newKeycloakSource(ctx, cfg.Issuer, cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
+		s.directory = direct
+		if err == nil && cfg.Broker != nil {
+			s.broker, err = newBrokerSource(ctx, pool, cfg.Issuer, cfg.Broker, cfg.BrokerDirectoryClientSecret, direct, httpClient, s.clock)
+			s.directory = s.broker
+		}
 	}
 	if err != nil {
 		return nil, err
 	}
-	if err := s.checkOwnerAuthenticationMode(ctx); err != nil {
+	if err := s.activatePolicy(ctx); err != nil {
 		return nil, err
 	}
 	if err := s.terminateEmergencySessions(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.configureSCIM(ctx, cfg.SCIM); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -203,12 +232,25 @@ func (s *Service) clock() time.Time {
 }
 
 func (s *Service) resolve(ctx context.Context, cookie string) (Principal, accessDecision, error) {
+	return s.resolveKind(ctx, cookie, "browser")
+}
+
+func (s *Service) resolveKind(ctx context.Context, cookie, kind string) (Principal, accessDecision, error) {
 	sess, err := s.getSession(ctx, sessionHash(cookie))
 	if errors.Is(err, errNotFound) || errors.Is(err, errUnauthenticated) {
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
 	}
 	if err != nil {
 		return Principal{}, accessDecision{}, err
+	}
+	if sess.Kind != kind {
+		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
+	}
+	if kind == "cli" && sess.BreakGlass && s.breakGlass.GetConsoleOnly() {
+		if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "CLI forbidden by console-only policy"); err != nil {
+			return Principal{}, accessDecision{}, err
+		}
+		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
 	}
 	now := s.clock()
 	if s.localPrimary || sess.BreakGlass {
@@ -244,21 +286,14 @@ func (s *Service) resolve(ctx context.Context, cookie string) (Principal, access
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
 	}
 	if !snap.Local && needsRefresh(now, snap) {
-		subjectID, parseErr := uuid.Parse(snap.Subject)
-		var refreshed directorySnapshot
-		var refreshErr error
-		if parseErr != nil {
-			refreshErr = errDirectoryResponse
-		} else {
-			refreshed, refreshErr = s.refreshPrincipal(ctx, snap.PrincipalID, subjectID)
-		}
+		refreshed, refreshErr := s.refreshPrincipal(ctx, snap.PrincipalID, snap.Subject)
 		if refreshErr != nil {
 			snap.RefreshFailed = true
 		} else {
 			snap = refreshed
 		}
 	}
-	dec := decideAccess(s.clock(), s.accessIssuer(snap), s.adminGroups, snap)
+	dec := decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap)
 	// snap may predate a re-enable. Revocation rechecks under the principal lock.
 	if dec.RevokeSessions {
 		if err := s.revokePrincipal(ctx, snap.PrincipalID); err != nil {
@@ -269,12 +304,14 @@ func (s *Service) resolve(ctx context.Context, cookie string) (Principal, access
 		return Principal{}, dec, nil
 	}
 	principal := s.snapshotPrincipal(snap, dec.Role)
-	principal.CSRFToken = csrfToken(cookie)
+	if kind == "browser" {
+		principal.CSRFToken = csrfToken(cookie)
+	}
 	principal.IncidentReason = sess.IncidentReason
 	return principal, dec, nil
 }
 
-func (s *Service) refreshPrincipal(ctx context.Context, id, subject uuid.UUID) (directorySnapshot, error) {
+func (s *Service) refreshPrincipal(ctx context.Context, id uuid.UUID, subject string) (directorySnapshot, error) {
 	v, err := s.flights.Do("principal:"+id.String(), func() (any, error) {
 		fctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), directoryFetchTimeout)
 		defer cancel()
@@ -312,22 +349,20 @@ func (s *Service) BootstrapOwner(ctx context.Context, issuer, subject string) er
 	if issuer != s.issuer {
 		return ErrIssuerMismatch
 	}
-	userID, err := uuid.Parse(subject)
-	if err != nil || userID == uuid.Nil {
+	if subject == "" {
 		return ErrSubjectUnqualified
 	}
-	subject = userID.String()
 	switch same, err := s.sameInitializedOwner(ctx, issuer, subject); {
 	case err != nil:
 		return err
 	case same:
 		return nil
 	}
-	obs, err := s.observeDirectory(ctx, userID)
+	obs, err := s.observeDirectory(ctx, subject)
 	if err != nil {
 		return ErrDirectoryUnavailable
 	}
-	if !obs.Found || !obs.Enabled || !obs.Direct || obs.UserID != userID {
+	if !obs.Found || !obs.Enabled || !obs.Direct || obs.UserID != subject {
 		return ErrSubjectUnqualified
 	}
 	return s.withTx(ctx, func(q *identitydb.Queries) error {
@@ -365,7 +400,11 @@ func (s *Service) BootstrapOwner(ctx context.Context, issuer, subject string) er
 		if !snap.Qualified || !snap.Enabled || snap.Deactivated || snap.Issuer != s.issuer || snap.Subject != subject {
 			return ErrSubjectUnqualified
 		}
-		n, err := q.PinOwnerRole(ctx, row.ID)
+		digest, err := bindingsDigest(s.policy.bindings(RoleOwner, nil))
+		if err != nil {
+			return err
+		}
+		n, err := q.PinOwnerRole(ctx, identitydb.PinOwnerRoleParams{ID: row.ID, AuthorizationDigest: digest})
 		if err != nil {
 			mapped := s.dbErr(err)
 			if errors.Is(mapped, errUnique) {
@@ -457,16 +496,16 @@ func (s *Service) ownerMatches(ctx context.Context, q *identitydb.Queries, dep i
 	return row.Issuer == issuer && row.Subject == subject && row.PinnedRole == RoleOwner, nil
 }
 
-func (s *Service) denyAbsent(ctx context.Context, subject uuid.UUID, obs directoryObservation) error {
+func (s *Service) denyAbsent(ctx context.Context, subject string, obs directoryObservation) error {
 	return s.withTx(ctx, func(q *identitydb.Queries) error {
 		row, err := q.GetPrincipalByIssuerSubject(ctx, identitydb.GetPrincipalByIssuerSubjectParams{
 			Issuer:  s.issuer,
-			Subject: subject.String(),
+			Subject: subject,
 		})
 		if err != nil {
 			mapped := s.dbErr(err)
 			if errors.Is(mapped, errNotFound) {
-				return s.insertAudit(ctx, q, nil, auditLoginDenied, "subject/"+subject.String(), reasonAbsent)
+				return s.insertAudit(ctx, q, nil, auditLoginDenied, "subject/"+subject, reasonAbsent)
 			}
 			return mapped
 		}
@@ -475,7 +514,7 @@ func (s *Service) denyAbsent(ctx context.Context, subject uuid.UUID, obs directo
 	})
 }
 
-func (s *Service) completeLogin(ctx context.Context, subject uuid.UUID, obs directoryObservation) (string, bool, error) {
+func (s *Service) completeLogin(ctx context.Context, subject string, obs directoryObservation) (string, bool, error) {
 	cookie, err := randomToken()
 	if err != nil {
 		return "", false, err
@@ -489,7 +528,7 @@ func (s *Service) completeLogin(ctx context.Context, subject uuid.UUID, obs dire
 		row, err := q.UpsertPrincipal(ctx, identitydb.UpsertPrincipalParams{
 			ID:          principalID,
 			Issuer:      s.issuer,
-			Subject:     subject.String(),
+			Subject:     subject,
 			DisplayName: obs.DisplayName,
 		})
 		if err != nil {
@@ -499,7 +538,7 @@ func (s *Service) completeLogin(ctx context.Context, subject uuid.UUID, obs dire
 		if err != nil {
 			return err
 		}
-		dec := decideAccess(s.clock(), s.issuer, s.adminGroups, snap)
+		dec := decideAccess(s.clock(), s.issuer, s.policy, snap)
 		actor := row.ID
 		if dec.Kind != accessOK {
 			denied = true

@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+// Numbers and capability identities are permanent. A schema arm is not a
+// declaration that a provider or platform has been implemented or qualified.
+enum ResourceKind {
+  RESOURCE_KIND_UNSPECIFIED = 0;
+  RESOURCE_KIND_SYSTEMD_SERVICE = 1;
+  RESOURCE_KIND_LOCAL_GROUP = 2;
+  RESOURCE_KIND_LOCAL_USER = 3;
+  RESOURCE_KIND_SUDO_RULE = 4;
+  RESOURCE_KIND_SSH_SERVER = 5;
+  RESOURCE_KIND_TIME_SYNC = 6;
+  RESOURCE_KIND_TRUST_CA = 7;
+  RESOURCE_KIND_FIREWALL_ZONE = 8;
+  RESOURCE_KIND_NETWORK_CONNECTION = 9;
+  RESOURCE_KIND_DNS = 10;
+  RESOURCE_KIND_PROXY = 11;
+  RESOURCE_KIND_NATIVE_PACKAGE = 12;
+  RESOURCE_KIND_PACKAGE_REPOSITORY = 13;
+  RESOURCE_KIND_FLATPAK_APP = 14;
+  RESOURCE_KIND_OS_UPDATE_POLICY = 15;
+  RESOURCE_KIND_SESSION_POLICY = 16;
+  RESOURCE_KIND_PASSWORD_POLICY = 17;
+  RESOURCE_KIND_SNAP_APP = 18;
+  RESOURCE_KIND_CERTIFICATE_ENROLLMENT = 19;
+  RESOURCE_KIND_DIRECTORY_CLIENT = 20;
+}
+
+// The server and executor derive this pair from typed identity. The supplied
+// pair is a binding to compare, never an alternative source of identity.
+message ResourceRef {
+  ResourceKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string canonical_key = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 1024
+  }];
+}
+
+enum Presence {
+  PRESENCE_UNSPECIFIED = 0;
+  PRESENCE_PRESENT = 1;
+  PRESENCE_ABSENT = 2;
+}
+
+enum ResourceOperation {
+  RESOURCE_OPERATION_UNSPECIFIED = 0;
+  RESOURCE_OPERATION_RECONCILE = 1;
+  RESOURCE_OPERATION_RELEASE = 2;
+}
+
+// Claims express semantic constraints, not provider-selected command strings.
+// EXACT_SET uses members, VALUE uses value, and REQUIRED/FORBIDDEN describe
+// native object existence. Different writers with identical constraints agree.
+enum ClaimMode {
+  CLAIM_MODE_UNSPECIFIED = 0;
+  CLAIM_MODE_VALUE = 1;
+  CLAIM_MODE_REQUIRED = 2;
+  CLAIM_MODE_FORBIDDEN = 3;
+  CLAIM_MODE_EXACT_SET = 4;
+  CLAIM_MODE_MEMBER = 5;
+}
+
+enum ClaimDomain {
+  CLAIM_DOMAIN_UNSPECIFIED = 0;
+  CLAIM_DOMAIN_SERVICE_RUNTIME = 1;
+  CLAIM_DOMAIN_GROUP_MEMBERSHIP = 2;
+  CLAIM_DOMAIN_ACCOUNT = 3;
+  CLAIM_DOMAIN_GROUP = 4;
+  CLAIM_DOMAIN_ADMINISTRATION = 5;
+  CLAIM_DOMAIN_FIREWALL_INTERFACE = 6;
+  CLAIM_DOMAIN_NETWORK_ROUTE = 7;
+  CLAIM_DOMAIN_PACKAGE = 8;
+  CLAIM_DOMAIN_REPOSITORY = 9;
+  CLAIM_DOMAIN_CREDENTIAL = 10;
+  CLAIM_DOMAIN_CONNECTION = 11;
+  CLAIM_DOMAIN_DNS_OWNER = 12;
+  CLAIM_DOMAIN_PAM_OWNER = 13;
+  CLAIM_DOMAIN_REPOSITORY_ALIAS = 14;
+  CLAIM_DOMAIN_UPDATE_SOURCE = 15;
+  CLAIM_DOMAIN_FIREWALL_PORT = 16;
+  CLAIM_DOMAIN_NATIVE_DEPLOYMENT = 17;
+}
+
+message ResourceClaim {
+  ClaimDomain domain = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string key = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 1024
+  }];
+  ClaimMode mode = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string value = 4 [(buf.validate.field).string.max_bytes = 1024];
+  repeated string members = 5 [(buf.validate.field).repeated = {
+    max_items: 1024
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_bytes: 1024
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "resource_claim.shape"
+    message: "claim values and members must match their mode"
+    expression: "(this.mode in [1,5] ? this.value != '' : this.value == '') && (this.mode == 4 || this.members.size() == 0)"
+  };
+}

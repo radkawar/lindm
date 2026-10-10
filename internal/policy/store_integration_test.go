@@ -15,8 +15,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
-	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/testdb"
 )
 
@@ -40,16 +40,24 @@ func newProfileFixture(t *testing.T) *profileFixture {
 	return &profileFixture{pool: pool, store: store, actor: actor}
 }
 
-func profileRequest() *adminv1.PublishServiceProfileRevisionRequest {
+func profileRequest() *adminv1.PublishProfileRevisionRequest {
 	a, b, c := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	return &adminv1.PublishServiceProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "publish service baseline", Spec: &policyv1.ServiceProfileSpec{Name: "Server baseline", Description: "Ordered service dependency policy", Resources: []*policyv1.ServiceProfileResource{
-		{ResourceId: c, Desired: &agentv1.ServiceDesiredState{Unit: "worker.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}, DependsOn: []string{b, a}},
-		{ResourceId: a, Desired: &agentv1.ServiceDesiredState{Unit: "network.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}},
-		{ResourceId: b, Desired: &agentv1.ServiceDesiredState{Unit: "database.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}, DependsOn: []string{a}},
-	}}}
+	baseline := spec("Server baseline",
+		resource(c, "worker.service", runtimeActive(), enablementEnabled(), []string{b, a}),
+		resource(a, "network.service", runtimeActive(), enablementUnmanaged(), nil),
+		resource(b, "database.service", runtimeActive(), enablementEnabled(), []string{a}),
+	)
+	group := groupResource(uuid.NewString(), "operators")
+	group.Desired.GetLocalGroup().Gid = proto.Uint32(1500)
+	group.Desired.GetLocalGroup().Members = &resourcev1.MemberSet{Mode: resourcev1.SetMode_SET_MODE_ADDITIVE, LocalUserNames: []string{"alice", "bob"}}
+	baseline.Resources = append(baseline.Resources, group)
+	baseline.Resources[0].DependsOn = append(baseline.Resources[0].DependsOn, &policyv1.ResourceDependency{
+		Ref: proto.CloneOf(group.Desired.Ref), Condition: policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_PRESENT,
+	})
+	return &adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "publish resource baseline", Spec: baseline}
 }
 
-func (f *profileFixture) publish(ctx context.Context, request *adminv1.PublishServiceProfileRevisionRequest) (*adminv1.ServiceProfileRevision, error) {
+func (f *profileFixture) publish(ctx context.Context, request *adminv1.PublishProfileRevisionRequest) (*adminv1.ProfileRevision, error) {
 	tx, err := f.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, err
@@ -104,6 +112,9 @@ func TestProfilePublicationRetainsCanonicalHistoryAndRetry(t *testing.T) {
 	slices.Reverse(replay.Spec.Resources)
 	for _, resource := range replay.Spec.Resources {
 		slices.Reverse(resource.DependsOn)
+		if group := resource.GetDesired().GetLocalGroup(); group != nil {
+			slices.Reverse(group.Members.LocalUserNames)
+		}
 	}
 	retried, err := f.publish(t.Context(), replay)
 	if err != nil {
@@ -125,7 +136,7 @@ func TestProfilePublicationRetainsCanonicalHistoryAndRetry(t *testing.T) {
 		t.Fatalf("changed request reuse: %v", err)
 	}
 	var audits, revisions, receipts int
-	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM audit_events WHERE action='service_profile.publish'), (SELECT count(*) FROM service_profile_revisions), (SELECT count(*) FROM service_profile_requests)").Scan(&audits, &revisions, &receipts); err != nil {
+	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM audit_events WHERE action='profile.publish'), (SELECT count(*) FROM profile_revisions), (SELECT count(*) FROM profile_requests)").Scan(&audits, &revisions, &receipts); err != nil {
 		t.Fatal(err)
 	}
 	if audits != 2 || revisions != 2 || receipts != 2 {
@@ -140,7 +151,7 @@ func TestProfileConcurrentHeadCompareAndSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requests := []*adminv1.PublishServiceProfileRevisionRequest{proto.CloneOf(initial), proto.CloneOf(initial)}
+	requests := []*adminv1.PublishProfileRevisionRequest{proto.CloneOf(initial), proto.CloneOf(initial)}
 	for i, request := range requests {
 		request.RequestId = uuid.NewString()
 		request.ExpectedRevisionId = proto.String(first.GetRevisionId())
@@ -148,14 +159,14 @@ func TestProfileConcurrentHeadCompareAndSwap(t *testing.T) {
 	}
 	start := make(chan struct{})
 	var wg sync.WaitGroup
-	results := make([]*adminv1.ServiceProfileRevision, 2)
+	results := make([]*adminv1.ProfileRevision, 2)
 	failures := make([]error, 2)
 	for i := range requests {
 		wg.Go(func() { <-start; results[i], failures[i] = f.publish(t.Context(), requests[i]) })
 	}
 	close(start)
 	wg.Wait()
-	var winner *adminv1.ServiceProfileRevision
+	var winner *adminv1.ProfileRevision
 	conflicts := 0
 	for i, err := range failures {
 		if err == nil {
@@ -180,7 +191,7 @@ func TestProfileConcurrentHeadCompareAndSwap(t *testing.T) {
 		t.Fatal("head differs from the only committed publication")
 	}
 	var revisions, receipts, audits int
-	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM service_profile_revisions),(SELECT count(*) FROM service_profile_requests),(SELECT count(*) FROM audit_events WHERE action='service_profile.publish')").Scan(&revisions, &receipts, &audits); err != nil {
+	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM profile_revisions),(SELECT count(*) FROM profile_requests),(SELECT count(*) FROM audit_events WHERE action='profile.publish')").Scan(&revisions, &receipts, &audits); err != nil {
 		t.Fatal(err)
 	}
 	if revisions != 2 || receipts != 2 || audits != 2 {
@@ -210,7 +221,7 @@ func TestProfileRollbackAndCorruptHeadCannotPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE service_profile_resources SET runtime_state=3 WHERE revision_id=$1 AND unit_name='worker.service'", uuid.MustParse(first.GetRevisionId())); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "UPDATE profile_resources SET resource_proto=resource_proto || decode('a00601','hex') WHERE revision_id=$1 AND canonical_key='worker.service'", uuid.MustParse(first.GetRevisionId())); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.store.Get(t.Context(), profileID, nil); !errors.Is(err, ErrProfileCorrupt) {
@@ -223,10 +234,57 @@ func TestProfileRollbackAndCorruptHeadCannotPublish(t *testing.T) {
 		t.Fatalf("corrupt head was extended: %v", err)
 	}
 	var revisions, receipts, audits int
-	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM service_profile_revisions),(SELECT count(*) FROM service_profile_requests),(SELECT count(*) FROM audit_events WHERE action='service_profile.publish')").Scan(&revisions, &receipts, &audits); err != nil {
+	if err := f.pool.QueryRow(t.Context(), "SELECT (SELECT count(*) FROM profile_revisions),(SELECT count(*) FROM profile_requests),(SELECT count(*) FROM audit_events WHERE action='profile.publish')").Scan(&revisions, &receipts, &audits); err != nil {
 		t.Fatal(err)
 	}
 	if revisions != 1 || receipts != 1 || audits != 1 {
 		t.Fatal("rollback or corrupt-head rejection left accepted evidence")
+	}
+}
+
+func TestProfileRetainedRevisionLookupAndTypedIdentityCorruption(t *testing.T) {
+	f := newProfileFixture(t)
+	request := profileRequest()
+	first, err := f.publish(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := f.pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(t.Context()) }()
+	retained, err := f.store.GetRevisionInTransaction(t.Context(), tx, uuid.MustParse(first.GetRevisionId()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proto.Equal(retained, first) {
+		t.Fatal("retained revision lookup changed typed resources")
+	}
+	if _, err := f.store.GetRevisionInTransaction(t.Context(), tx, uuid.New()); !errors.Is(err, ErrProfileNotFound) {
+		t.Fatalf("missing revision=%v", err)
+	}
+	if err := tx.Rollback(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	// Change both valid typed content and its relational identity consistently:
+	// the immutable digest, not only schema validity, must detect the mutation.
+	for _, item := range first.Spec.Resources {
+		if item.Desired.GetRef().GetKind() != resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP {
+			continue
+		}
+		changed := proto.CloneOf(item)
+		changed.DependsOn = nil
+		changed.Desired.GetLocalGroup().Gid = proto.Uint32(1600)
+		encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.pool.Exec(t.Context(), "UPDATE profile_resources SET resource_proto=$1 WHERE revision_id=$2 AND resource_id=$3", encoded, uuid.MustParse(first.RevisionId), uuid.MustParse(item.ResourceId)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.store.Get(t.Context(), uuid.MustParse(request.ProfileId), nil); !errors.Is(err, ErrProfileCorrupt) {
+		t.Fatalf("typed content tampering=%v", err)
 	}
 }

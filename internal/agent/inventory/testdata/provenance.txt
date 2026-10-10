@@ -1,0 +1,7 @@
+Captured 2026-10-09 from development Linux x86_64 workstation, kernel 7.0.0-34-generic, Intel Core i7-13700K. These are parser fixtures, not physical-machine qualification evidence.
+cpuinfo.txt: exact first processor stanza, /proc/cpuinfo lines 1-28. Other processors deliberately excluded; expected one logical and physical core in this sample.
+meminfo.txt: /proc/meminfo lines 1-18, unchanged bytes, includes total/available/swap measurements.
+modules.txt: /proc/modules lines 1-3, unchanged bytes. Remaining modules deliberately excluded; expected count three.
+sys/class/dmi/id/chassis_type: entire sysfs file, unchanged bytes.
+sys/class/power_supply/ucsi-source-psy-USBC000:001/type: entire sysfs file, unchanged bytes. The other USB supply excluded; fixture intentionally contains no battery.
+Inline JSON in tests is adversarial/constructed native-format evidence, not a claim of capture. EFI fixtures deliberately vary attribute/value bytes to test binary parsing and absence/permission semantics; no Secure Boot hardware qualification claimed.

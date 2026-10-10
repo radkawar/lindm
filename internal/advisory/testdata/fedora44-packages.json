@@ -1,0 +1,10 @@
+{
+  "packages": [
+    {
+      "name": "sudo",
+      "version": "0:1.9.17-7.p2.fc44",
+      "architecture": "x86_64",
+      "manager": "rpm"
+    }
+  ]
+}

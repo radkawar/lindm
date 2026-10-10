@@ -196,6 +196,7 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 				client := inventoryAdminClient(t, f, f.ownerCtx, json)
 				request := &adminv1.ListDevicesRequest{PageSize: shape.pageSize}
 				seen := 0
+				var first *adminv1.ListDevicesResponse
 				for pages := 0; ; pages++ {
 					if pages > len(expected) {
 						t.Fatal("fleet pagination did not terminate")
@@ -206,6 +207,14 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 					}
 					page := response.Msg
 					assertInventoryPageFits(t, page)
+					if page.GetPageToken() == "" || page.GetCursorExpiresAt() == nil || (request.GetPageToken() != "" && page.GetPageToken() != request.GetPageToken()) {
+						t.Fatal("fleet page did not preserve its opaque replay cursor")
+					}
+					if first == nil {
+						first = page
+					} else if !proto.Equal(page.GetCursorExpiresAt(), first.GetCursorExpiresAt()) {
+						t.Fatal("fleet continuation extended the cursor lifetime")
+					}
 					if len(page.Devices) == 0 || int32(len(page.Devices)) > pageLimit(shape.pageSize) {
 						t.Fatalf("invalid fleet page length %d", len(page.Devices))
 					}
@@ -221,10 +230,8 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 					if page.NextPageToken == "" {
 						break
 					}
-					when, id, err := decodeCursor(page.NextPageToken)
-					last := page.Devices[len(page.Devices)-1]
-					if err != nil || id.String() != last.Id || !when.Equal(last.EnrolledAt.AsTime()) {
-						t.Fatalf("fleet cursor does not identify last returned device: %v", err)
+					if page.NextPageToken == page.GetPageToken() {
+						t.Fatal("fleet continuation did not advance the opaque cursor")
 					}
 					request.PageToken = page.NextPageToken
 				}

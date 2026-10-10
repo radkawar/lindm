@@ -117,7 +117,8 @@ func (s *Service) handleLocalLoginFinish(w http.ResponseWriter, r *http.Request)
 
 func (s *Service) accountTransaction(ctx context.Context, fn func(*identitydb.Queries, Principal) error) error {
 	actor, ok := PrincipalFromContext(ctx)
-	if !ok || !Authorize(actor, PermissionManageAccounts) {
+	unrestricted, _ := DeviceScopes(actor, PermissionManageAccounts)
+	if !ok || !unrestricted {
 		return ErrAuthorizationDenied
 	}
 	authorization, err := s.AuthorizeFresh(ctx, actor.ID, PermissionManageAccounts)
@@ -132,6 +133,9 @@ func (s *Service) accountTransaction(ctx context.Context, fn func(*identitydb.Qu
 	if err = s.LockAuthorization(ctx, tx, authorization, PermissionManageAccounts); err != nil {
 		return err
 	}
+	if unrestricted, _ := DeviceScopes(authorization.Principal(), PermissionManageAccounts); !unrestricted {
+		return ErrAuthorizationDenied
+	}
 	if err = fn(identitydb.New(tx), actor); err != nil {
 		return err
 	}
@@ -144,14 +148,18 @@ func accountStatus(err error) int {
 	return statusFor(err)
 }
 func (s *Service) handleAccounts(w http.ResponseWriter, r *http.Request) {
-	response := &authv1.ListAccountsResponse{}
+	response := &authv1.ListAccountsResponse{Roles: append([]string(nil), s.policy.names...)}
 	err := s.accountTransaction(r.Context(), func(q *identitydb.Queries, _ Principal) error {
 		rows, err := q.ListLocalAccounts(r.Context())
 		if err != nil {
 			return s.dbErr(err)
 		}
 		for _, row := range rows {
-			response.Accounts = append(response.Accounts, &authv1.LocalAccount{Id: row.ID.String(), Username: row.Username, Role: row.Role, Enabled: row.Enabled, BreakGlass: row.BreakGlass, Enrolled: row.Enrolled})
+			binding := &authv1.RoleBinding{}
+			if err := protojson.Unmarshal(row.ScopeBinding, binding); err != nil {
+				return errStore
+			}
+			response.Accounts = append(response.Accounts, &authv1.LocalAccount{Id: row.ID.String(), Username: row.Username, Role: row.Role, Enabled: row.Enabled, BreakGlass: row.BreakGlass, Enrolled: row.Enrolled, Scopes: binding.GetScopes()})
 		}
 		return nil
 	})
@@ -172,7 +180,7 @@ func (s *Service) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	var enrollment Enrollment
 	err := s.accountTransaction(r.Context(), func(q *identitydb.Queries, actor Principal) error {
 		var err error
-		enrollment, err = s.createLocalAccount(r.Context(), q, request.GetUsername(), request.GetRole(), request.GetBreakGlass())
+		enrollment, err = s.createLocalAccount(r.Context(), q, request)
 		if err != nil {
 			return err
 		}
@@ -189,6 +197,10 @@ func (s *Service) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	if !s.readAuthRequest(w, r, request) {
 		return
 	}
+	if s.policy.role(request.GetRole()) == nil {
+		writeStatus(w, http.StatusBadRequest)
+		return
+	}
 	id, err := uuid.Parse(request.GetAccountId())
 	if err != nil {
 		writeStatus(w, http.StatusBadRequest)
@@ -202,10 +214,19 @@ func (s *Service) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return s.dbErr(err)
 		}
-		if account.Enabled == request.GetEnabled() && account.Role == request.GetRole() && account.BreakGlass == request.GetBreakGlass() {
+		previous := &authv1.RoleBinding{}
+		if err := protojson.Unmarshal(account.ScopeBinding, previous); err != nil {
+			return errStore
+		}
+		binding := &authv1.RoleBinding{Scopes: request.GetScopes()}
+		encoded, err := protojson.Marshal(binding)
+		if err != nil {
+			return err
+		}
+		if account.Enabled == request.GetEnabled() && account.Role == request.GetRole() && account.BreakGlass == request.GetBreakGlass() && proto.Equal(previous, binding) {
 			return nil
 		}
-		if err := q.UpdateLocalAccount(r.Context(), identitydb.UpdateLocalAccountParams{ID: id, Enabled: request.GetEnabled(), Role: request.GetRole(), BreakGlass: request.GetBreakGlass()}); err != nil {
+		if err := q.UpdateLocalAccount(r.Context(), identitydb.UpdateLocalAccountParams{ID: id, Enabled: request.GetEnabled(), Role: request.GetRole(), BreakGlass: request.GetBreakGlass(), ScopeBinding: encoded}); err != nil {
 			return s.dbErr(err)
 		}
 		role := request.GetRole()

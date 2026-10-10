@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package lindm.auth.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/auth/v1;authv1";
+
+// CLIConfig pins a single server and its trust roots. Store privately (0600).
+message CLIConfig {
+  string server_origin = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  string ca_pem = 2 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 1048576
+  }];
+  string session_token = 3 [(buf.validate.field).string = {pattern: "^$|^[A-Za-z0-9_-]{43}$"}];
+}
+
+// CLIAuthorizationRequest is the validated browser authorization query.
+message CLIAuthorizationRequest {
+  string redirect_uri = 1 [(buf.validate.field).string = {
+    max_bytes: 128
+    pattern: "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}/callback$"
+  }];
+  string code_challenge = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string state = 3 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+}
+
+// CLIExchangeRequest is sent only in a TLS POST body, never in a URL.
+message CLIExchangeRequest {
+  string code = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string code_verifier = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9._~-]{43,128}$"}];
+  string redirect_uri = 3 [(buf.validate.field).string = {
+    max_bytes: 128
+    pattern: "^http://127\\.0\\.0\\.1:[1-9][0-9]{0,4}/callback$"
+  }];
+}
+
+// CLIExchangeResponse contains a secret once; never log this response.
+message CLIExchangeResponse {
+  string token = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  google.protobuf.Timestamp expires_at = 2 [(buf.validate.field).required = true];
+}

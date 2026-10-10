@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { loginHref } from "./session";
 import { fetchAuthenticationOptions } from "./local-api";
 import { LocalForm } from "./local-form";
@@ -16,17 +18,34 @@ export function SignIn({ notice }: { notice: string }) {
     retry: false,
   });
   return (
-    <main id="main" className="mx-auto flex min-h-svh w-full max-w-md items-center px-4 py-8">
+    <main id="main" className="mx-auto flex min-h-svh w-full max-w-lg items-center px-4 py-8">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle>lindm console</CardTitle>
+          <CardTitle>
+            <h1 className="text-2xl font-semibold tracking-tight">lindm console</h1>
+          </CardTitle>
           <CardDescription>Console access is separate from device enrollment.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {notice !== "" ? <p role="status">{notice}</p> : null}
-          {options.isPending ? <p role="status">Loading sign-in options…</p> : null}
+        <CardContent className="flex flex-col gap-5">
+          {notice !== "" ? (
+            <p role="status" className="border bg-muted/30 p-3 text-sm">
+              {notice}
+            </p>
+          ) : null}
+          {options.isPending ? (
+            <div role="status" className="grid gap-3">
+              <span className="text-sm text-muted-foreground">Loading sign-in options…</span>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : null}
           {options.isError ? (
-            <p role="alert">Unable to load sign-in options. Reload to try again.</p>
+            <Alert variant="destructive">
+              <AlertTitle>Sign-in options unavailable</AlertTitle>
+              <AlertDescription>
+                Unable to load sign-in options. Reload to try again.
+              </AlertDescription>
+            </Alert>
           ) : null}
           {options.data?.externalLogin ? (
             <Button render={<a href={loginHref} />}>Sign in with organization</Button>
@@ -37,12 +56,17 @@ export function SignIn({ notice }: { notice: string }) {
               onSuccess={async () => {
                 await client.invalidateQueries({ queryKey: sessionQueryKey });
                 await client.fetchQuery(sessionQueryOptions());
-                await router.navigate({ to: "/devices" });
+                await router.navigate({ to: "/dashboard" });
               }}
             />
           ) : null}
           {options.data?.localLogin ? (
-            <Link to="/enroll">Enroll a local administrator account</Link>
+            <Link
+              to="/enroll"
+              className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Enroll a local administrator account
+            </Link>
           ) : null}
         </CardContent>
       </Card>

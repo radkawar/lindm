@@ -41,23 +41,26 @@ type backend struct {
 
 var dpkg = backend{
 	name: "dpkg", path: "/usr/bin/dpkg-query",
-	args: []string{"--show", "--showformat=${db:Status-Abbrev}\t${Package}\t${Version}\t${Architecture}\n"},
+	args: []string{"--show", "--showformat=${db:Status-Abbrev}\t${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n"},
 }
 var rpm = backend{
 	name: "rpm", path: "/usr/bin/rpm",
-	args: []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\n"},
+	args: []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{MODULARITYLABEL}\n"},
 }
 
 // selectBackend requires explicit vendor/version and native database evidence.
 // ID_LIKE is deliberately not a provider selector. Immutable variants require a
 // dedicated provider even when they expose an RPM database.
 func selectBackend(release map[string]string, stat func(string) (fs.FileInfo, error)) (backend, inventoryv1.CollectionStatus) {
-	if release["VERSION_ID"] == "" {
+	if release["VERSION_ID"] == "" && release["ID"] != "arch" {
 		return backend{}, unavailable
 	}
 	var selected backend
 	var databases []string
 	switch release["ID"] {
+	case "arch":
+		selected = backend{name: "pacman", path: "/var/lib/pacman/local"}
+		databases = []string{selected.path}
 	case "ubuntu", "debian":
 		selected = dpkg
 		databases = []string{"/var/lib/dpkg/status"}
@@ -86,7 +89,7 @@ func selectBackend(release map[string]string, stat func(string) (fs.FileInfo, er
 	for _, path := range databases {
 		info, err := stat(path)
 		if err == nil {
-			if !info.Mode().IsRegular() {
+			if (selected.name == "pacman" && !info.IsDir()) || (selected.name != "pacman" && !info.Mode().IsRegular()) {
 				return selected, invalid
 			}
 			return selected, success
@@ -182,10 +185,11 @@ func validVersion(value string) bool {
 
 func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 	fields := strings.Split(line, "\t")
-	var name, version, arch string
+	var name, version, arch, sourceName, sourceVersion string
+	var module *inventoryv1.ModuleObservation
 	switch manager {
 	case "dpkg":
-		if len(fields) != 4 || len(fields[0]) != 3 {
+		if len(fields) != 6 || len(fields[0]) != 3 {
 			return nil, errInvalid
 		}
 		state := fields[0]
@@ -206,11 +210,26 @@ func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 			return nil, errInvalid
 		}
 		name, version, arch = fields[1], fields[2], fields[3]
+		sourceName, sourceVersion = fields[4], fields[5]
+		if len(sourceName) > 512 || !packageName.MatchString(sourceName) || !validVersion(sourceVersion) {
+			return nil, errInvalid
+		}
+		module = &inventoryv1.ModuleObservation{Status: unavailable}
+	case "pacman":
+		if len(fields) != 3 {
+			return nil, errInvalid
+		}
+		name, version, arch = fields[0], fields[1], fields[2]
+		if prefix, _, found := strings.Cut(version, ":"); found && !epoch.MatchString(prefix) {
+			return nil, errInvalid
+		}
+		module = &inventoryv1.ModuleObservation{Status: unavailable}
 	case "rpm":
-		if len(fields) != 5 || !epoch.MatchString(fields[1]) || !validVersion(fields[2]) || !validVersion(fields[3]) {
+		if len(fields) != 6 || !epoch.MatchString(fields[1]) || !validVersion(fields[2]) || !validVersion(fields[3]) {
 			return nil, errInvalid
 		}
 		name, version, arch = fields[0], fields[1]+":"+fields[2]+"-"+fields[3], fields[4]
+		module = parseModuleLabel(fields[5])
 	default:
 		return nil, errInvalid
 	}
@@ -224,7 +243,24 @@ func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 	if absentArchitecture {
 		arch = ""
 	}
-	return &inventoryv1.Package{Name: name, Version: version, Architecture: arch, Manager: manager}, nil
+	return &inventoryv1.Package{Name: name, Version: version, Architecture: arch, Manager: manager, SourceName: sourceName, SourceVersion: sourceVersion, Module: module}, nil
+}
+
+func parseModuleLabel(label string) *inventoryv1.ModuleObservation {
+	if label == "(none)" {
+		return &inventoryv1.ModuleObservation{Status: success}
+	}
+	parts := strings.Split(label, ":")
+	if len(parts) != 4 || len(parts[0]) > 256 || !packageName.MatchString(parts[0]) ||
+		len(parts[1]) > 256 || !packageName.MatchString(parts[1]) ||
+		len(parts[2]) > 32 || !epoch.MatchString(parts[2]) ||
+		len(parts[3]) > 256 || !packageName.MatchString(parts[3]) {
+		return &inventoryv1.ModuleObservation{Status: invalid}
+	}
+	return &inventoryv1.ModuleObservation{
+		Status: success, Modular: true, Name: parts[0], Stream: parts[1],
+		Version: parts[2], Context: parts[3],
+	}
 }
 
 type parseLimits struct {
@@ -307,6 +343,16 @@ func collectPackages(ctx context.Context, release map[string]string, stat func(s
 		return result
 	}
 	var packages []*inventoryv1.Package
+	if selected.name == "pacman" {
+		packages, result.Status = collectPacman(ctx, selected.path, parseLimits{maxRecords, maxOutputBytes})
+		if ctx.Err() != nil {
+			result.Status = statusFor(ctx.Err())
+		}
+		if result.Status == success {
+			result.Packages = packages
+		}
+		return result
+	}
 	result.Status = run(ctx, selected, func(reader io.Reader) inventoryv1.CollectionStatus {
 		var parsed inventoryv1.CollectionStatus
 		packages, parsed = parsePackages(ctx, reader, selected.name, parseLimits{maxRecords, maxOutputBytes})

@@ -29,7 +29,10 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/callback", s.handleCallback)
 	mux.Handle("POST /auth/logout", s.RequireSession(http.HandlerFunc(s.handleLogout)))
 	mux.Handle("GET /auth/session", s.RequireSession(http.HandlerFunc(s.handleSession)))
+	mux.Handle("GET /auth/settings", s.RequireSession(http.HandlerFunc(s.handleIdentitySettings)))
+	s.registerSCIM(mux)
 	s.registerLocalHTTP(mux)
+	s.registerCLIHTTP(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prepare(w)
 		mux.ServeHTTP(w, r)
@@ -41,18 +44,18 @@ func (s *Service) Handler() http.Handler {
 func (s *Service) RequireSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prepare(w)
-		cookie, ok := readOpaqueCookie(r, sessionCookie)
-		if !ok {
+		cookie, kind, ok := sessionCredential(r)
+		if !ok || (kind == "cli" && !cliBearerPath(r.URL.Path)) {
 			writeStatus(w, http.StatusUnauthorized)
 			return
 		}
-		principal, dec, err := s.resolve(r.Context(), cookie)
+		principal, dec, err := s.resolveKind(r.Context(), cookie, kind)
 		if err != nil {
 			writeStatus(w, statusFor(err))
 			return
 		}
 		if dec.Kind != accessOK {
-			if dec.Kind == accessUnauthenticated {
+			if dec.Kind == accessUnauthenticated && kind == "browser" {
 				clearHostCookie(w, sessionCookie)
 			}
 			writeStatus(w, statusForDecision(dec))
@@ -73,7 +76,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 				}
 			}()
 		}
-		if unsafeMethod(r.Method) && (!originMatches(s.publicOrigin, r.Header.Get("Origin")) || !csrfMatch(cookie, r.Header.Get(csrfHeader))) {
+		if kind == "browser" && unsafeMethod(r.Method) && (!originMatches(s.publicOrigin, r.Header.Get("Origin")) || !csrfMatch(cookie, r.Header.Get(csrfHeader))) {
 			writeStatus(w, http.StatusForbidden)
 			return
 		}
@@ -81,7 +84,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			writeStatus(w, statusFor(err))
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), principal)))
+		next.ServeHTTP(w, r.WithContext(s.withAuthenticatedSession(r.Context(), cookie, principal)))
 	})
 }
 
@@ -148,12 +151,12 @@ func (s *Service) handleCallback(w http.ResponseWriter, r *http.Request) {
 		s.failCallback(w, http.StatusUnauthorized)
 		return
 	}
-	subject, err := s.exchangeAndVerify(ctx, code, verifier, nonceHash)
+	subject, lineage, err := s.exchangeAndVerify(ctx, code, verifier, nonceHash)
 	if err != nil {
 		s.failCallback(w, http.StatusUnauthorized)
 		return
 	}
-	obs, err := s.observeDirectory(ctx, subject)
+	obs, err := s.observeLoginDirectory(ctx, subject, lineage)
 	if err != nil {
 		s.failCallback(w, http.StatusServiceUnavailable)
 		return
@@ -181,7 +184,7 @@ func (s *Service) handleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleLogout(w http.ResponseWriter, r *http.Request) {
-	cookie, ok := readOpaqueCookie(r, sessionCookie)
+	cookie, kind, ok := sessionCredential(r)
 	principal, authenticated := PrincipalFromContext(r.Context())
 	if !ok || !authenticated {
 		writeStatus(w, http.StatusUnauthorized)
@@ -191,7 +194,9 @@ func (s *Service) handleLogout(w http.ResponseWriter, r *http.Request) {
 		writeStatus(w, statusFor(err))
 		return
 	}
-	clearHostCookie(w, sessionCookie)
+	if kind == "browser" {
+		clearHostCookie(w, sessionCookie)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -204,7 +209,7 @@ func (s *Service) handleSession(w http.ResponseWriter, r *http.Request) {
 	writeSession(w, principal)
 }
 
-func (s *Service) exchangeAndVerify(ctx context.Context, code, verifier string, wantNonce []byte) (uuid.UUID, error) {
+func (s *Service) exchangeAndVerify(ctx context.Context, code, verifier string, wantNonce []byte) (string, *brokerLineage, error) {
 	ctx = oidc.ClientContext(ctx, s.httpClient)
 	tok, err := s.oauth.Exchange(ctx, code, oauth2.VerifierOption(verifier))
 	if err != nil {
@@ -214,49 +219,63 @@ func (s *Service) exchangeAndVerify(ctx context.Context, code, verifier string, 
 		} else {
 			slog.Warn("identity token exchange failed")
 		}
-		return uuid.Nil, errUnauthenticated
+		return "", nil, errUnauthenticated
 	}
 	raw, _ := tok.Extra("id_token").(string)
 	if raw == "" || tok.AccessToken == "" {
-		return uuid.Nil, errUnauthenticated
+		return "", nil, errUnauthenticated
 	}
 	idToken, err := s.verifier.Verify(ctx, raw)
 	if err != nil {
 		slog.Warn("identity id token rejected")
-		return uuid.Nil, errUnauthenticated
+		return "", nil, errUnauthenticated
 	}
 	var claims struct {
 		AZP string `json:"azp"`
 		TID string `json:"tid"`
 		OID string `json:"oid"`
+		HD  string `json:"hd"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return uuid.Nil, errUnauthenticated
+		return "", nil, errUnauthenticated
 	}
-	if idToken.Subject == "" || idToken.Issuer != s.issuer || !idTokenAccepted(s.clientID, idToken.Audience, claims.AZP, idToken.Nonce, wantNonce, idToken.IssuedAt, s.clock()) {
-		return uuid.Nil, errUnauthenticated
+	if idToken.Subject == "" || len(idToken.Subject) > 256 || idToken.Issuer != s.issuer || !idTokenAccepted(s.clientID, idToken.Audience, claims.AZP, idToken.Nonce, wantNonce, idToken.IssuedAt, s.clock()) {
+		return "", nil, errUnauthenticated
 	}
 	if idToken.AccessTokenHash != "" {
 		if err := idToken.VerifyAccessToken(tok.AccessToken); err != nil {
-			return uuid.Nil, errUnauthenticated
+			return "", nil, errUnauthenticated
 		}
 	}
 	if s.entraTenant != uuid.Nil {
 		tenant, err := uuid.Parse(claims.TID)
 		if err != nil || tenant != s.entraTenant {
-			return uuid.Nil, errUnauthenticated
+			return "", nil, errUnauthenticated
 		}
 		object, err := uuid.Parse(claims.OID)
 		if err != nil || object == uuid.Nil {
-			return uuid.Nil, errUnauthenticated
+			return "", nil, errUnauthenticated
 		}
-		return object, nil
+		return object.String(), nil, nil
+	}
+	if s.google != nil {
+		if claims.HD != s.google.GetHostedDomain() {
+			return "", nil, errUnauthenticated
+		}
+		return idToken.Subject, nil, nil
+	}
+	if s.okta != nil {
+		return idToken.Subject, nil, nil
 	}
 	subject, err := uuid.Parse(idToken.Subject)
-	if err != nil || subject == uuid.Nil {
-		return uuid.Nil, errUnauthenticated
+	if err != nil || subject == uuid.Nil || subject.String() != idToken.Subject {
+		return "", nil, errUnauthenticated
 	}
-	return subject, nil
+	lineage, err := s.verifyBrokerClaims(ctx, idToken)
+	if err != nil {
+		return "", nil, err
+	}
+	return subject.String(), lineage, nil
 }
 
 func (s *Service) failCallback(w http.ResponseWriter, status int) {
@@ -274,6 +293,9 @@ func writeSession(w http.ResponseWriter, principal Principal) {
 		CsrfToken:      principal.CSRFToken,
 		BreakGlass:     principal.BreakGlass,
 		IncidentReason: principal.IncidentReason,
+		Permissions:    Permissions(principal),
+		ServiceAccount: principal.ServiceAccount,
+		Bindings:       principal.Bindings,
 	})
 	if err != nil {
 		writeStatus(w, http.StatusServiceUnavailable)

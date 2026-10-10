@@ -26,6 +26,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/config"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
@@ -42,10 +43,16 @@ type dispatchFixture struct {
 	directory           *dispatchDirectory
 	key                 ed25519.PrivateKey
 	certificate         []byte
-	revision            *adminv1.ServiceProfileRevision
+	revision            *adminv1.ProfileRevision
+	delegation          *agentv1.ExecutionDelegation
 }
 
 func newDispatchFixture(t *testing.T) *dispatchFixture {
+	t.Helper()
+	return newDispatchFixtureWithDelegationAge(t, time.Hour)
+}
+
+func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration) *dispatchFixture {
 	t.Helper()
 	pool, _ := testdb.Open(t)
 	identityService, actor, directory := dispatchIdentity(t, pool)
@@ -67,7 +74,10 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 	}
 	public := func(key ed25519.PrivateKey) *agentv1.ExecutionKey {
 		t.Helper()
-		pub := key.Public().(ed25519.PublicKey)
+		pub, ok := key.Public().(ed25519.PublicKey)
+		if !ok {
+			t.Fatal("dispatch fixture requires Ed25519 keys")
+		}
 		id, err := trust.KeyID(pub)
 		if err != nil {
 			t.Fatal(err)
@@ -89,6 +99,8 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 	}
 	plan, start := ed25519Key(t), ed25519Key(t)
 	delegation := &agentv1.ExecutionDelegation{DeploymentId: deployment, RootVersion: 1, Version: 1, MinimumRecoveryEpoch: 0, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: []string{"systemd.service.v1"}}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: []string{"systemd.service.v1"}}}}
+	delegation.NotBefore = timestamppb.New(now.Add(-age))
+	f.delegation = delegation
 	tx, err := pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +125,7 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 	acquireTestSession(t, t.Context(), f.service, f.principal, f.key, 0)
 	f.deviceCtx = withDevicePrincipal(t.Context(), f.principal)
 	firstID, secondID := uuid.NewString(), uuid.NewString()
-	published, err := f.service.PublishServiceProfileRevision(f.adminCtx, connect.NewRequest(&adminv1.PublishServiceProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "test dispatch revision", Spec: &policyv1.ServiceProfileSpec{Name: "Dispatch integration", Resources: []*policyv1.ServiceProfileResource{{ResourceId: secondID, Desired: &agentv1.ServiceDesiredState{Unit: "aaa-dependent.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}, DependsOn: []string{firstID}}, {ResourceId: firstID, Desired: &agentv1.ServiceDesiredState{Unit: "zzz-first.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}}}))
+	published, err := f.service.PublishProfileRevision(f.adminCtx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "test dispatch revision", Spec: &policyv1.ResourceProfile{Name: "Dispatch integration", Resources: []*policyv1.ProfileResource{{ResourceId: secondID, Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "aaa-dependent.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "aaa-dependent.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}, DependsOn: []*policyv1.ResourceDependency{{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "zzz-first.service"}, Condition: policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_ACTIVE}}}, {ResourceId: firstID, Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "zzz-first.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "zzz-first.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}}}}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,12 +160,12 @@ func dispatchReleaseRoot(t *testing.T, now time.Time) []byte {
 	return encoded
 }
 
-func (f *dispatchFixture) assignmentRequest(expected *string) *adminv1.SetServiceAssignmentRequest {
-	return &adminv1.SetServiceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: f.principal.DeviceID.String(), ExpectedAssignmentId: expected, Target: &adminv1.ServiceAssignmentTarget{ProfileId: f.revision.GetProfileId(), RevisionId: f.revision.GetRevisionId()}, Reason: "assign integration desired state"}
+func (f *dispatchFixture) assignmentRequest(expected *string) *adminv1.SetResourceAssignmentRequest {
+	return &adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: f.principal.DeviceID.String(), ExpectedAssignmentId: expected, Target: &adminv1.ResourceAssignmentTarget{ProfileId: f.revision.GetProfileId(), RevisionId: f.revision.GetRevisionId()}, Reason: "assign integration desired state"}
 }
-func (f *dispatchFixture) assign(t *testing.T, expected *string) *adminv1.ServiceAssignment {
+func (f *dispatchFixture) assign(t *testing.T, expected *string) *adminv1.ResourceAssignment {
 	t.Helper()
-	result, err := f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(expected)))
+	result, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(expected)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +185,11 @@ func (f *dispatchFixture) intent(t *testing.T, work *devicev1.ServiceWork) *agen
 		t.Fatal("missing service work")
 	}
 	message := new(agentv1.ServiceExecutionIntent)
-	if err := f.service.authority.Verify(t.Context(), work.GetIntentEnvelope(), message, 1, f.service.signing.PlanKey.Public().(ed25519.PublicKey)); err != nil {
+	public, ok := f.service.signing.PlanKey.Public().(ed25519.PublicKey)
+	if !ok {
+		t.Fatal("dispatch fixture requires an Ed25519 plan key")
+	}
+	if err := f.service.authority.Verify(t.Context(), work.GetIntentEnvelope(), message, 1, public); err != nil {
 		t.Fatal(err)
 	}
 	return message

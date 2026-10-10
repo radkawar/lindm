@@ -7,3 +7,6 @@ artifacts/
 web/dist/
 web/gen/
 web/src/routeTree.gen.ts
+# Vendor-pinned bytes: fixtures and image manifests are digest-referenced evidence.
+**/testdata/
+lab/images/

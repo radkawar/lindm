@@ -13,11 +13,16 @@ export function DeviceLifecycleBadge({ state }: { state: DeviceState }) {
   return (
     <Badge
       variant={
-        state === DeviceState.REVOKED || state === DeviceState.RECOVERY_HOLD
-          ? "destructive"
-          : "outline"
+        state === DeviceState.ACTIVE
+          ? "success"
+          : state === DeviceState.REVOKED
+            ? "destructive"
+            : state === DeviceState.PENDING || state === DeviceState.RECOVERY_HOLD
+              ? "warning"
+              : "outline"
       }
     >
+      <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
       {labels[state] ?? "Unknown state"}
     </Badge>
   );

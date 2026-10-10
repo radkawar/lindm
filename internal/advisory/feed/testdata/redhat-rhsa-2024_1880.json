@@ -1,0 +1,1492 @@
+{
+  "document": {
+    "aggregate_severity": {
+      "namespace": "https://access.redhat.com/security/updates/classification/",
+      "text": "Important"
+    },
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "distribution": {
+      "text": "Copyright © Red Hat, Inc. All rights reserved.",
+      "tlp": {
+        "label": "WHITE",
+        "url": "https://www.first.org/tlp/"
+      }
+    },
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "An update for the nodejs:18 module is now available for Red Hat Enterprise Linux 8.8 Extended Update Support.\n\nRed Hat Product Security has rated this update as having a security impact of\nImportant. A Common Vulnerability Scoring System (CVSS) base score, which gives a detailed severity rating, is available for each vulnerability from the CVE link(s) in the References section.",
+        "title": "Topic"
+      },
+      {
+        "category": "general",
+        "text": "Node.js is a software development platform for building fast and scalable\nnetwork applications in the JavaScript programming language.\n\nSecurity Fix(es):\n\n* nodejs:18/nodejs: reading unprocessed HTTP request with unbounded chunk extension allows DoS attacks (CVE-2024-22019)\n\n* nodejs:18/nodejs: vulnerable to timing variant of the Bleichenbacher attack against PKCS#1 v1.5 padding (Marvin) (CVE-2023-46809)\n\n* nodejs:18/nodejs: code injection and privilege escalation through Linux capabilities (CVE-2024-21892)\n\nFor more details about the security issue(s), including the impact, a CVSS\nscore, acknowledgments, and other related information, refer to the CVE page(s) listed in the References section.",
+        "title": "Details"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "This content is licensed under the Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/). If you distribute this content, or a modified version of it, you must provide attribution to Red Hat Inc. and provide a link to the original.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "https://access.redhat.com/security/team/contact/",
+      "issuing_authority": "Red Hat Product Security is responsible for vulnerability handling across all Red Hat products and services.",
+      "name": "Red Hat Product Security",
+      "namespace": "https://www.redhat.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "https://access.redhat.com/errata/RHSA-2024:1880",
+        "url": "https://access.redhat.com/errata/RHSA-2024:1880"
+      },
+      {
+        "category": "external",
+        "summary": "https://access.redhat.com/security/updates/classification/#important",
+        "url": "https://access.redhat.com/security/updates/classification/#important"
+      },
+      {
+        "category": "external",
+        "summary": "2264569",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264569"
+      },
+      {
+        "category": "external",
+        "summary": "2264574",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264574"
+      },
+      {
+        "category": "external",
+        "summary": "2264582",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264582"
+      },
+      {
+        "category": "self",
+        "summary": "Canonical URL",
+        "url": "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_1880.json"
+      }
+    ],
+    "title": "Red Hat Security Advisory: nodejs:18 security update",
+    "tracking": {
+      "current_release_date": "2026-10-09T01:17:23+00:00",
+      "generator": {
+        "date": "2026-10-09T01:17:23+00:00",
+        "engine": {
+          "name": "Red Hat SDEngine",
+          "version": "5.4.2"
+        }
+      },
+      "id": "RHSA-2024:1880",
+      "initial_release_date": "2024-04-18T02:16:48+00:00",
+      "revision_history": [
+        {
+          "date": "2024-04-18T02:16:48+00:00",
+          "number": "1",
+          "summary": "Initial version"
+        },
+        {
+          "date": "2024-04-18T02:16:48+00:00",
+          "number": "2",
+          "summary": "Last updated version"
+        },
+        {
+          "date": "2026-10-09T01:17:23+00:00",
+          "number": "3",
+          "summary": "Last generated version"
+        }
+      ],
+      "status": "final",
+      "version": "3"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+                  "product_id": "AppStream-8.8.0.Z.EUS",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/a:redhat:rhel_eus:8.8::appstream"
+                  }
+                }
+              }
+            ],
+            "category": "product_family",
+            "name": "Red Hat Enterprise Linux"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+                "product": {
+                  "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src (nodejs:18)",
+                  "product_id": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=src&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+                "product": {
+                  "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src (nodejs:18)",
+                  "product_id": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-nodemon@3.0.1-1.module%2Bel8.8.0%2B19757%2B8ca87034?arch=src&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+                "product": {
+                  "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src (nodejs:18)",
+                  "product_id": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging@2021.06-4.module%2Bel8.7.0%2B15582%2B19c314fa?arch=src&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "src"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+                "product": {
+                  "name": "nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch (nodejs:18)",
+                  "product_id": "nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-docs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=noarch&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+                "product": {
+                  "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch (nodejs:18)",
+                  "product_id": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-nodemon@3.0.1-1.module%2Bel8.8.0%2B19757%2B8ca87034?arch=noarch&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+                "product": {
+                  "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch (nodejs:18)",
+                  "product_id": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging@2021.06-4.module%2Bel8.7.0%2B15582%2B19c314fa?arch=noarch&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+                "product": {
+                  "name": "nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch (nodejs:18)",
+                  "product_id": "nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-packaging-bundler@2021.06-4.module%2Bel8.7.0%2B15582%2B19c314fa?arch=noarch&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "noarch"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                "product": {
+                  "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18)",
+                  "product_id": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.2.4-1.18.19.1.1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=aarch64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "aarch64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                "product": {
+                  "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18)",
+                  "product_id": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.2.4-1.18.19.1.1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=ppc64le&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "ppc64le"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                "product": {
+                  "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18)",
+                  "product_id": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.2.4-1.18.19.1.1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=s390x&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "s390x"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debuginfo@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-debugsource@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-devel@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/nodejs-full-i18n@18.19.1-1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                "product": {
+                  "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18)",
+                  "product_id": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/npm@10.2.4-1.18.19.1.1.module%2Bel8.8.0%2B21592%2B14a8b93e?arch=x86_64&epoch=1&rpmmod=nodejs:18:8080020240322102042:63b34585"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "x86_64"
+          }
+        ],
+        "category": "vendor",
+        "name": "Red Hat"
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18"
+        },
+        "product_reference": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18"
+        },
+        "product_reference": "nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18"
+        },
+        "product_reference": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18"
+        },
+        "product_reference": "nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18"
+        },
+        "product_reference": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18"
+        },
+        "product_reference": "nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18"
+        },
+        "product_reference": "nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18"
+        },
+        "product_reference": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18"
+        },
+        "product_reference": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18"
+        },
+        "product_reference": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64 (nodejs:18) as a component of Red Hat Enterprise Linux AppStream EUS (v.8.8)",
+          "product_id": "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        },
+        "product_reference": "npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.EUS"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2023-46809",
+      "cwe": {
+        "id": "CWE-385",
+        "name": "Covert Timing Channel"
+      },
+      "discovery_date": "2024-02-16T00:00:00+00:00",
+      "ids": [
+        {
+          "system_name": "Red Hat Bugzilla ID",
+          "text": "2264569"
+        }
+      ],
+      "notes": [
+        {
+          "category": "description",
+          "text": "A flaw was found in Node.js. The privateDecrypt() API of the crypto library may allow a covert timing side-channel during PKCS#1 v1.5 padding error handling. This issue revealed significant timing differences in decryption for valid and invalid ciphertexts, which may allow a remote attacker to decrypt captured RSA ciphertexts or forge signatures, especially in scenarios involving API endpoints processing JSON Web Encryption messages.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "nodejs: vulnerable to timing variant of the Bleichenbacher attack against PKCS#1 v1.5 padding (Marvin)",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "This Node.js vulnerability poses a notable risk as it allows for covert timing side-channel attacks during RSA ciphertext decryption, potentially enabling attackers to decrypt captured data or forge signatures.\n\nIt's classified as \"Medium\" severity rather than important due to its dependency on specific conditions for exploitation, such as the use of the privateDecrypt() API with PKCS#1 v1.5 padding.",
+          "title": "Statement"
+        },
+        {
+          "category": "general",
+          "text": "The CVSS score(s) listed for this vulnerability do not reflect the associated product's status, and are included for informational purposes to better understand the severity of this vulnerability.",
+          "title": "CVSS score applicability"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        ]
+      },
+      "references": [
+        {
+          "category": "self",
+          "summary": "Canonical URL",
+          "url": "https://access.redhat.com/security/cve/CVE-2023-46809"
+        },
+        {
+          "category": "external",
+          "summary": "RHBZ#2264569",
+          "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264569"
+        },
+        {
+          "category": "external",
+          "summary": "https://www.cve.org/CVERecord?id=CVE-2023-46809",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2023-46809"
+        },
+        {
+          "category": "external",
+          "summary": "https://nvd.nist.gov/vuln/detail/CVE-2023-46809",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-46809"
+        }
+      ],
+      "release_date": "2024-02-16T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2024-04-18T02:16:48+00:00",
+          "details": "Before applying this update, make sure all previously released errata\nrelevant to your system have been applied.\n\nFor details on how to apply this update, refer to:\n\nhttps://access.redhat.com/articles/11258",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ],
+          "restart_required": {
+            "category": "none"
+          },
+          "url": "https://access.redhat.com/errata/RHSA-2024:1880"
+        },
+        {
+          "category": "workaround",
+          "details": "Mitigation for this issue is either not available or the currently available options don't meet the Red Hat Product Security criteria comprising ease of use and deployment, applicability to widespread installation base or stability.",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "HIGH",
+            "attackVector": "NETWORK",
+            "availabilityImpact": "NONE",
+            "baseScore": 5.9,
+            "baseSeverity": "MEDIUM",
+            "confidentialityImpact": "HIGH",
+            "integrityImpact": "NONE",
+            "privilegesRequired": "NONE",
+            "scope": "UNCHANGED",
+            "userInteraction": "NONE",
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "version": "3.1"
+          },
+          "products": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "Moderate"
+        }
+      ],
+      "title": "nodejs: vulnerable to timing variant of the Bleichenbacher attack against PKCS#1 v1.5 padding (Marvin)"
+    },
+    {
+      "cve": "CVE-2024-21892",
+      "cwe": {
+        "id": "CWE-94",
+        "name": "Improper Control of Generation of Code ('Code Injection')"
+      },
+      "discovery_date": "2024-02-16T00:00:00+00:00",
+      "ids": [
+        {
+          "system_name": "Red Hat Bugzilla ID",
+          "text": "2264582"
+        }
+      ],
+      "notes": [
+        {
+          "category": "description",
+          "text": "A flaw was found in Node.js. On Linux, Node.js ignores certain environment variables if an unprivileged user has set them while the process is running with elevated privileges, except for CAP_NET_BIND_SERVICE. Due to a bug in the implementation of this exception, Node.js incorrectly applies this exception even when other capabilities have been set. This flaw allows unprivileged users to inject code that inherits the process's elevated privileges.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "nodejs: code injection and privilege escalation through Linux capabilities",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "This vulnerability is classified as an Important severity rather than Critical due to several factors. While it allows unprivileged users to inject code and potentially escalate privileges in a process running with elevated privileges, it does so under specific conditions and limitations. The vulnerability only affects Linux systems where Node.js is running with elevated privileges, and it relies on a specific bug in handling environment variables set by unprivileged users. Additionally, the impact is constrained to the Node.js environment and does not directly compromise the underlying operating system.",
+          "title": "Statement"
+        },
+        {
+          "category": "general",
+          "text": "The CVSS score(s) listed for this vulnerability do not reflect the associated product's status, and are included for informational purposes to better understand the severity of this vulnerability.",
+          "title": "CVSS score applicability"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        ]
+      },
+      "references": [
+        {
+          "category": "self",
+          "summary": "Canonical URL",
+          "url": "https://access.redhat.com/security/cve/CVE-2024-21892"
+        },
+        {
+          "category": "external",
+          "summary": "RHBZ#2264582",
+          "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264582"
+        },
+        {
+          "category": "external",
+          "summary": "https://www.cve.org/CVERecord?id=CVE-2024-21892",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2024-21892"
+        },
+        {
+          "category": "external",
+          "summary": "https://nvd.nist.gov/vuln/detail/CVE-2024-21892",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-21892"
+        }
+      ],
+      "release_date": "2024-02-16T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2024-04-18T02:16:48+00:00",
+          "details": "Before applying this update, make sure all previously released errata\nrelevant to your system have been applied.\n\nFor details on how to apply this update, refer to:\n\nhttps://access.redhat.com/articles/11258",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ],
+          "restart_required": {
+            "category": "none"
+          },
+          "url": "https://access.redhat.com/errata/RHSA-2024:1880"
+        },
+        {
+          "category": "workaround",
+          "details": "Mitigation for this issue is either not available or the currently available options don't meet the Red Hat Product Security criteria comprising ease of use and deployment, applicability to widespread installation base or stability.",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "LOW",
+            "attackVector": "NETWORK",
+            "availabilityImpact": "NONE",
+            "baseScore": 8.1,
+            "baseSeverity": "HIGH",
+            "confidentialityImpact": "HIGH",
+            "integrityImpact": "HIGH",
+            "privilegesRequired": "LOW",
+            "scope": "UNCHANGED",
+            "userInteraction": "NONE",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+            "version": "3.1"
+          },
+          "products": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "Important"
+        }
+      ],
+      "title": "nodejs: code injection and privilege escalation through Linux capabilities"
+    },
+    {
+      "cve": "CVE-2024-22019",
+      "cwe": {
+        "id": "CWE-400",
+        "name": "Uncontrolled Resource Consumption"
+      },
+      "discovery_date": "2024-02-16T00:00:00+00:00",
+      "ids": [
+        {
+          "system_name": "Red Hat Bugzilla ID",
+          "text": "2264574"
+        }
+      ],
+      "notes": [
+        {
+          "category": "description",
+          "text": "A flaw was found in Node.js due to a lack of safeguards on chunk extension bytes. The server may read an unbounded number of bytes from a single connection, which can allow an attacker to send a specially crafted HTTP request with chunked encoding, leading to resource exhaustion and a denial of service.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "nodejs: reading unprocessed HTTP request with unbounded chunk extension allows DoS attacks",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "While this vulnerability in Node.js HTTP servers poses a significant risk to system stability and availability, it is classified as a important severity issue rather than a critical one due to several factors. Firstly, while the vulnerability can lead to denial of service (DoS) attacks by causing resource exhaustion, it does not directly compromise the confidentiality or integrity of data stored or processed by the server. Additionally, the exploit requires the attacker to send specially crafted HTTP requests, which may limit the ease and scope of potential attacks compared to more critical vulnerabilities that can be exploited remotely without specific conditions.",
+          "title": "Statement"
+        },
+        {
+          "category": "general",
+          "text": "The CVSS score(s) listed for this vulnerability do not reflect the associated product's status, and are included for informational purposes to better understand the severity of this vulnerability.",
+          "title": "CVSS score applicability"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+          "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+        ]
+      },
+      "references": [
+        {
+          "category": "self",
+          "summary": "Canonical URL",
+          "url": "https://access.redhat.com/security/cve/CVE-2024-22019"
+        },
+        {
+          "category": "external",
+          "summary": "RHBZ#2264574",
+          "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2264574"
+        },
+        {
+          "category": "external",
+          "summary": "https://www.cve.org/CVERecord?id=CVE-2024-22019",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2024-22019"
+        },
+        {
+          "category": "external",
+          "summary": "https://nvd.nist.gov/vuln/detail/CVE-2024-22019",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-22019"
+        }
+      ],
+      "release_date": "2024-02-16T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2024-04-18T02:16:48+00:00",
+          "details": "Before applying this update, make sure all previously released errata\nrelevant to your system have been applied.\n\nFor details on how to apply this update, refer to:\n\nhttps://access.redhat.com/articles/11258",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ],
+          "restart_required": {
+            "category": "none"
+          },
+          "url": "https://access.redhat.com/errata/RHSA-2024:1880"
+        },
+        {
+          "category": "workaround",
+          "details": "Mitigation for this issue is either not available or the currently available options don't meet the Red Hat Product Security criteria comprising ease of use and deployment, applicability to widespread installation base or stability.",
+          "product_ids": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "LOW",
+            "attackVector": "NETWORK",
+            "availabilityImpact": "HIGH",
+            "baseScore": 7.5,
+            "baseSeverity": "HIGH",
+            "confidentialityImpact": "NONE",
+            "integrityImpact": "NONE",
+            "privilegesRequired": "NONE",
+            "scope": "UNCHANGED",
+            "userInteraction": "NONE",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+            "version": "3.1"
+          },
+          "products": [
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debuginfo-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-debugsource-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-devel-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-docs-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-full-i18n-1:18.19.1-1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-nodemon-0:3.0.1-1.module+el8.8.0+19757+8ca87034.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-0:2021.06-4.module+el8.7.0+15582+19c314fa.src::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:nodejs-packaging-bundler-0:2021.06-4.module+el8.7.0+15582+19c314fa.noarch::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.aarch64::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.ppc64le::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.s390x::nodejs:18",
+            "AppStream-8.8.0.Z.EUS:npm-1:10.2.4-1.18.19.1.1.module+el8.8.0+21592+14a8b93e.x86_64::nodejs:18"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "Important"
+        }
+      ],
+      "title": "nodejs: reading unprocessed HTTP request with unbounded chunk extension allows DoS attacks"
+    }
+  ]
+}

@@ -1,0 +1,264 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/observations.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+// A true aggregate is never inferred from process exit or an old attestation.
+// The enclosing verification also binds the fresh after-observation and plan.
+message SystemdServiceChecks {
+  SystemdServiceObservation observation = 1 [(buf.validate.field).required = true];
+  bool runtime_matches = 2;
+  bool enablement_matches = 3;
+  bool definition_matches = 4;
+  bool converged = 5;
+  bool job_completed = 6;
+  option (buf.validate.message).cel = {
+    id: "service_checks.convergence"
+    message: "convergence requires matching native evidence without pending work"
+    expression: "!this.converged || (this.runtime_matches && this.enablement_matches && this.definition_matches && this.observation.load_state == 'loaded' && !this.observation.job_pending && !this.observation.need_daemon_reload && !this.observation.transient && this.job_completed)"
+  };
+}
+message LocalGroupChecks {
+  bool local_identity_matches = 1;
+  bool gid_matches = 2;
+  bool members_match = 3;
+  ProbeReceipt nss_reread = 4 [(buf.validate.field).required = true];
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "group_checks.convergence"
+    message: "group convergence requires independent local/NSS identity and membership checks"
+    expression: "!this.converged || (this.local_identity_matches && this.gid_matches && this.members_match && this.nss_reread.passed)"
+  };
+}
+message LocalUserChecks {
+  bool local_identity_matches = 1;
+  bool uid_generation_matches = 2;
+  bool fields_match = 3;
+  bool memberships_match = 4;
+  bool password_policy_matches = 5;
+  bool aging_matches = 6;
+  ProbeReceipt nss_reread = 7 [(buf.validate.field).required = true];
+  bool converged = 8;
+  option (buf.validate.message).cel = {
+    id: "user_checks.convergence"
+    message: "user convergence requires independent identity, fields, membership and private password comparison"
+    expression: "!this.converged || (this.local_identity_matches && this.uid_generation_matches && this.fields_match && this.memberships_match && this.password_policy_matches && this.aging_matches && this.nss_reread.passed)"
+  };
+}
+message SudoRuleChecks {
+  bool owned_file_matches = 1;
+  ProbeReceipt aggregate_syntax = 2 [(buf.validate.field).required = true];
+  ProbeReceipt effective_privileges = 3 [(buf.validate.field).required = true];
+  bool converged = 4;
+  option (buf.validate.message).cel = {
+    id: "sudo_checks.convergence"
+    message: "sudo convergence requires aggregate syntax and effective privilege proofs"
+    expression: "!this.converged || (this.owned_file_matches && this.aggregate_syntax.passed && this.effective_privileges.passed)"
+  };
+}
+message SSHServerChecks {
+  ProbeReceipt syntax = 1 [(buf.validate.field).required = true];
+  bool effective_settings_match = 2;
+  bool match_contexts_match = 3;
+  ProbeReceipt authentication = 4 [(buf.validate.field).required = true];
+  ProbeReceipt connectivity = 5 [(buf.validate.field).required = true];
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "ssh_checks.convergence"
+    message: "SSH convergence requires effective Match settings and fresh authentication/connectivity"
+    expression: "!this.converged || (this.syntax.passed && this.effective_settings_match && this.match_contexts_match && this.authentication.passed && this.connectivity.passed)"
+  };
+}
+message TimeSyncChecks {
+  bool configured = 1;
+  bool synchronized = 2;
+  bool offset_within_bound = 3;
+  bool nts_requirement_met = 4;
+  ProbeReceipt source_reachability = 5 [(buf.validate.field).required = true];
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "time_checks.convergence"
+    message: "configured time is not proof of synchronization"
+    expression: "!this.converged || (this.configured && this.synchronized && this.offset_within_bound && this.nts_requirement_met && this.source_reachability.passed)"
+  };
+}
+message TrustCAChecks {
+  bool owned_source_matches = 1;
+  bool exported_purposes_match = 2;
+  ProbeReceipt tls_chain = 3 [(buf.validate.field).required = true];
+  bool converged = 4;
+  option (buf.validate.message).cel = {
+    id: "ca_checks.convergence"
+    message: "CA convergence requires actual TLS-chain trust behavior"
+    expression: "!this.converged || (this.owned_source_matches && this.exported_purposes_match && this.tls_chain.passed)"
+  };
+}
+message FirewallZoneChecks {
+  bool persistent_matches = 1;
+  bool runtime_matches = 2;
+  bool interface_bindings_match = 3;
+  ProbeReceipt allow_packet_probe = 4 [(buf.validate.field).required = true];
+  ProbeReceipt deny_packet_probe = 5 [(buf.validate.field).required = true];
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "firewall_checks.convergence"
+    message: "firewall convergence requires persistent/runtime state and independent allow/deny packet probes"
+    expression: "!this.converged || (this.persistent_matches && this.runtime_matches && this.interface_bindings_match && this.allow_packet_probe.passed && this.deny_packet_probe.passed)"
+  };
+}
+message NetworkConnectionChecks {
+  bool persistent_matches = 1;
+  bool activation_matches = 2;
+  bool addresses_routes_match = 3;
+  bool credential_version_matches = 4;
+  ProbeReceipt end_to_end_reachability = 5 [(buf.validate.field).required = true];
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "connection_checks.convergence"
+    message: "connection convergence requires activation and end-to-end reachability"
+    expression: "!this.converged || (this.persistent_matches && this.activation_matches && this.addresses_routes_match && this.credential_version_matches && this.end_to_end_reachability.passed)"
+  };
+}
+message DNSChecks {
+  bool persistent_matches = 1;
+  bool effective_matches = 2;
+  ProbeReceipt split_dns_lookup = 3 [(buf.validate.field).required = true];
+  bool security_modes_match = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "dns_checks.convergence"
+    message: "DNS convergence requires persistent state and independent split DNS lookup"
+    expression: "!this.converged || (this.persistent_matches && this.effective_matches && this.split_dns_lookup.passed && this.security_modes_match)"
+  };
+}
+message ProxyChecks {
+  bool consumer_configuration_matches = 1;
+  ProbeReceipt request = 2 [(buf.validate.field).required = true];
+  ProbeReceipt authentication = 3 [(buf.validate.field).required = true];
+  ProbeReceipt bypass = 4 [(buf.validate.field).required = true];
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "proxy_checks.convergence"
+    message: "proxy convergence requires consumer-specific request/authentication/bypass probes"
+    expression: "!this.converged || (this.consumer_configuration_matches && this.request.passed && this.authentication.passed && this.bypass.passed)"
+  };
+}
+message NativePackageChecks {
+  bool native_database_matches = 1;
+  bool exact_version_matches = 2;
+  bool approved_source_matches = 3;
+  ProbeReceipt application_readiness = 4 [(buf.validate.field).required = true];
+  bool side_effects_match_manifest = 5;
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "package_checks.convergence"
+    message: "package convergence requires native DB, source, complete transaction and readiness"
+    expression: "!this.converged || (this.native_database_matches && this.exact_version_matches && this.approved_source_matches && this.application_readiness.passed && this.side_effects_match_manifest)"
+  };
+}
+message RepositoryChecks {
+  bool owned_stanzas_match = 1;
+  bool owned_key_objects_match = 2;
+  ProbeReceipt metadata_signature = 3 [(buf.validate.field).required = true];
+  bool package_signature_policy_matches = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "repository_checks.convergence"
+    message: "repository convergence requires owned objects and signature policy"
+    expression: "!this.converged || (this.owned_stanzas_match && this.owned_key_objects_match && this.metadata_signature.passed && this.package_signature_policy_matches)"
+  };
+}
+message FlatpakAppChecks {
+  bool scope_ref_commit_match = 1;
+  bool permissions_match = 2;
+  ProbeReceipt launch = 3 [(buf.validate.field).required = true];
+  bool unrelated_data_preserved = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "flatpak_checks.convergence"
+    message: "Flatpak convergence requires native identity, permissions, launch and data preservation"
+    expression: "!this.converged || (this.scope_ref_commit_match && this.permissions_match && this.launch.passed && this.unrelated_data_preserved)"
+  };
+}
+message OSUpdateChecks {
+  bool installation_matches = 1;
+  bool deployment_matches = 2;
+  bool reboot_required = 3;
+  bool new_boot_observed = 4;
+  ProbeReceipt new_boot_health = 5;
+  bool maintenance_policy_matches = 6;
+  bool converged = 7;
+  option (buf.validate.message).cel = {
+    id: "update_checks.convergence"
+    message: "installation is not reboot compliance"
+    expression: "!this.converged || (this.installation_matches && this.deployment_matches && this.maintenance_policy_matches && (!this.reboot_required || (this.new_boot_observed && has(this.new_boot_health) && this.new_boot_health.passed)))"
+  };
+}
+message SessionPolicyChecks {
+  bool effective_settings_match = 1;
+  ProbeReceipt visible_session_behavior = 2 [(buf.validate.field).required = true];
+  bool native_owner_matches = 3;
+  bool converged = 4;
+  option (buf.validate.message).cel = {
+    id: "session_checks.convergence"
+    message: "session convergence requires visible behavior, not text alone"
+    expression: "!this.converged || (this.effective_settings_match && this.visible_session_behavior.passed && this.native_owner_matches)"
+  };
+}
+message PasswordPolicyChecks {
+  bool effective_settings_match = 1;
+  ProbeReceipt weak_password_rejection = 2 [(buf.validate.field).required = true];
+  ProbeReceipt lockout_behavior = 3 [(buf.validate.field).required = true];
+  bool native_pam_owner_matches = 4;
+  bool converged = 5;
+  option (buf.validate.message).cel = {
+    id: "password_checks.convergence"
+    message: "password convergence requires real rejection and lockout behavior"
+    expression: "!this.converged || (this.effective_settings_match && this.weak_password_rejection.passed && this.lockout_behavior.passed && this.native_pam_owner_matches)"
+  };
+}
+message SnapAppChecks {
+  bool revision_channel_match = 1;
+  bool confinement_matches = 2;
+  bool interface_grants_match = 3;
+  bool native_change_completed = 4;
+  ProbeReceipt launch = 5 [(buf.validate.field).required = true];
+  bool data_preserved = 6;
+  bool converged = 7;
+  option (buf.validate.message).cel = {
+    id: "snap_checks.convergence"
+    message: "Snap convergence requires exact revision/confinement, completed change, launch and data preservation"
+    expression: "!this.converged || (this.revision_channel_match && this.confinement_matches && this.interface_grants_match && this.native_change_completed && this.launch.passed && this.data_preserved)"
+  };
+}
+message CertificateEnrollmentChecks {
+  bool public_certificate_matches = 1;
+  bool key_ownership_matches = 2;
+  bool consumers_active = 3;
+  ProbeReceipt tls_client_acceptance = 4 [(buf.validate.field).required = true];
+  ProbeReceipt removal_revocation_behavior = 5;
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "credential_checks.convergence"
+    message: "credential convergence requires real TLS client acceptance and owned key/consumer identity"
+    expression: "!this.converged || (this.public_certificate_matches && this.key_ownership_matches && this.consumers_active && this.tls_client_acceptance.passed && (!has(this.removal_revocation_behavior) || this.removal_revocation_behavior.passed))"
+  };
+}
+message DirectoryClientChecks {
+  bool native_join_matches = 1;
+  bool account_mapping_matches = 2;
+  ProbeReceipt domain_authentication = 3 [(buf.validate.field).required = true];
+  ProbeReceipt offline_outage_policy = 4 [(buf.validate.field).required = true];
+  bool unrelated_join_artifacts_preserved = 5;
+  bool converged = 6;
+  option (buf.validate.message).cel = {
+    id: "directory_checks.convergence"
+    message: "directory convergence requires a real account fixture and outage behavior"
+    expression: "!this.converged || (this.native_join_matches && this.account_mapping_matches && this.domain_authentication.passed && this.offline_outage_policy.passed && this.unrelated_join_artifacts_preserved)"
+  };
+}

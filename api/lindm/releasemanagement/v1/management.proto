@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package lindm.releasemanagement.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/update/v1/update.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/releasemanagement/v1;releasemanagementv1";
+
+// Global release controls require fresh, unrestricted release_updates.manage.
+service ReleaseManagementService {
+  rpc GetRollout(GetRolloutRequest) returns (GetRolloutResponse);
+  rpc SetRollout(SetRolloutRequest) returns (SetRolloutResponse);
+  rpc RegisterReleaseSeries(RegisterReleaseSeriesRequest) returns (RegisterReleaseSeriesResponse);
+  rpc GetCompatibility(GetCompatibilityRequest) returns (GetCompatibilityResponse);
+}
+message GetRolloutRequest {
+  string ring = 1 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+}
+message GetRolloutResponse {
+  lindm.update.v1.AgentUpdateChannel channel = 1;
+  // A committed intent is not evidence of successful publication.
+  string pending_request_id = 2;
+}
+message SetRolloutRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string ring = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  bool paused = 3;
+  uint32 eligible_percentage = 4 [(buf.validate.field).uint32.lte = 100];
+  uint64 expected_generation = 5 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775806
+  }];
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message SetRolloutResponse {
+  lindm.update.v1.AgentUpdateChannel channel = 1;
+}
+// Release records are append-only. Support end dates may only be extended.
+// The newest three released minor series remain supported regardless of end date.
+message ReleaseSeries {
+  uint32 major = 1 [(buf.validate.field).uint32.lte = 2147483647];
+  uint32 minor = 2 [(buf.validate.field).uint32.lte = 2147483647];
+  google.protobuf.Timestamp released_at = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp support_until = 4 [(buf.validate.field).required = true];
+  uint32 minimum_protocol = 5 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 2147483647
+  }];
+  uint32 maximum_protocol = 6 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 2147483647
+  }];
+  option (buf.validate.message).cel = {
+    id: "release.support_window"
+    message: "support must last at least 90 days and protocol bounds must be ordered"
+    expression: "this.support_until >= this.released_at + duration('7776000s') && this.minimum_protocol <= this.maximum_protocol"
+  };
+}
+message RegisterReleaseSeriesRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  ReleaseSeries series = 2 [(buf.validate.field).required = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RegisterReleaseSeriesResponse {
+  ReleaseSeries series = 1;
+}
+message GetCompatibilityRequest {}
+message GetCompatibilityResponse {
+  string server_release = 1;
+  uint32 server_protocol = 2;
+  repeated ReleaseSeries series = 3;
+}

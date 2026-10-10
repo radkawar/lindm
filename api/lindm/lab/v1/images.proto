@@ -12,8 +12,13 @@ option go_package = "lindm/gen/lindm/lab/v1;labv1";
 message ImageManifest {
   option (buf.validate.message).cel = {
     id: "image.signature_mode"
-    message: "detached checksums require a signature URL; clearsigned checksums must not specify one"
-    expression: "(this.checksum_mode == 1 && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))"
+    message: "signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims"
+    expression: "this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))"
+  };
+  option (buf.validate.message).cel = {
+    id: "image.arch_repository_snapshot"
+    message: "Arch Linux images require a pinned repository snapshot date"
+    expression: "this.distribution != 'arch' || has(this.repository_snapshot_date)"
   };
 
   string id = 1 [(buf.validate.field).string = {
@@ -62,15 +67,21 @@ message ImageManifest {
   ];
   // Vendor keyservers require query parameters. Credentials/fragments remain
   // prohibited; redirects are restricted to the original HTTPS origin.
-  string key_url = 11 [(buf.validate.field).string = {
-    uri: true
-    max_len: 2048
-    pattern: "^https://[^/@?#]+(/[^#]*)?$"
-  }];
+  string key_url = 11 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string = {
+      uri: true
+      max_len: 2048
+      pattern: "^https://[^/@?#]+(/[^#]*)?$"
+    }
+  ];
   string sha256 = 12 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
   // Full signing-key or primary-key fingerprint. A primary fingerprint also
   // permits its cryptographically bound signing subkeys, as reported by gpgv.
-  string signer_fingerprint = 13 [(buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"];
+  string signer_fingerprint = 13 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.pattern = "^([0-9A-F]{40}|[0-9A-F]{64})$"
+  ];
   uint64 image_size_bytes = 14 [(buf.validate.field).uint64 = {
     gt: 0
     lte: 17179869184
@@ -79,9 +90,10 @@ message ImageManifest {
     defined_only: true
     not_in: 0
   }];
-  // Independent vendor publication of the trusted full fingerprint, not merely
-  // the key download or an unauthenticated key-ID lookup.
+  // Independent vendor publication of the trusted full fingerprint or public
+  // key, not merely the keyserver download or an unauthenticated key-ID lookup.
   string signer_provenance_url = 16 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
     (buf.validate.field).string.uri = true,
     (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
   ];
@@ -89,12 +101,22 @@ message ImageManifest {
     (buf.validate.field).string.uri = true,
     (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
   ];
+  // Guest package repositories use this immutable YYYY-MM-DD snapshot.
+  // Required for Arch Linux Archive; the image build date is a separate pin.
+  optional string repository_snapshot_date = 18 [(buf.validate.field).string.pattern = "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"];
 }
 
 enum ChecksumMode {
   CHECKSUM_MODE_UNSPECIFIED = 0;
-  // Ubuntu SHA256SUMS plus separate OpenPGP SHA256SUMS.gpg.
+  // Ubuntu/Arch SHA256SUMS or Rocky BSD-format SHA256 plus detached OpenPGP.
   CHECKSUM_MODE_DETACHED = 1;
   // Fedora OpenPGP clearsigned CHECKSUM, parsed only from gpgv's verified output.
   CHECKSUM_MODE_CLEARSIGNED = 2;
+  // RHEL published checksum acquired through authenticated vendor HTTPS.
+  // Offline checks bind exact bytes to the pinned manifest and acquisition
+  // receipt; they do not reauthenticate the API or claim an OpenPGP signature.
+  CHECKSUM_MODE_VENDOR_AUTHENTICATED = 3;
+  // Debian SHA512SUMS plus detached OpenPGP signature. Authenticate SHA-512
+  // against signed metadata while retaining the required SHA-256 pin/cache key.
+  CHECKSUM_MODE_DETACHED_SHA512 = 4;
 }

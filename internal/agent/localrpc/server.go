@@ -37,7 +37,7 @@ type ListenConfig struct {
 // Serve listens on a root-owned Unix socket, authorizes SO_PEERCRED, and
 // unlinks only that socket on shutdown. It does not remove the runtime directory.
 func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.ExecutorServiceHandler) error {
-	if handler == nil || cfg.NetworkUID == 0 || cfg.SocketName == "" {
+	if handler == nil || cfg.NetworkUID == 0 || cfg.NetworkGID == 0 || cfg.SocketName == "" {
 		return errors.New("invalid executor listener")
 	}
 	dir, err := openRuntimeDirectory(cfg.Directory)
@@ -65,6 +65,16 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.StartServiceExecutionRequest{},
 		&agentv1.GetServiceExecutionRequest{},
 		&agentv1.AttestServiceExecutionRequest{},
+		&agentv1.PrepareDeviceActionRequest{},
+		&agentv1.StartDeviceActionRequest{},
+		&agentv1.GetDeviceActionRequest{},
+		&agentv1.AttestDeviceActionRequest{},
+		&agentv1.ConfirmDeviceActionEscrowRequest{},
+		&agentv1.SupplyDeviceActionCredentialRequest{},
+		&agentv1.PrepareDeviceActionRecoveryRequest{},
+		&agentv1.CommitDeviceActionRecoveryRequest{},
+		&agentv1.ExchangeAgentUpdateRequest{},
+		&agentv1.GetAgentUpdateRequest{},
 		&agentv1.StatusRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
@@ -134,7 +144,7 @@ func (g *peerGate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func authorize(procedure string, uid, networkUID uint32) error {
-	rootOnly := procedure == agentv1connect.ExecutorServicePrepareBootstrapProcedure || procedure == agentv1connect.ExecutorServiceInstallEnrollmentProcedure
+	rootOnly := procedure == agentv1connect.ExecutorServicePrepareBootstrapProcedure || procedure == agentv1connect.ExecutorServiceInstallEnrollmentProcedure || procedure == agentv1connect.ExecutorServiceImportOfflineEnrollmentProcedure || procedure == agentv1connect.ExecutorServiceSupplyDeviceActionCredentialProcedure
 	known := rootOnly ||
 		procedure == agentv1connect.ExecutorServiceGetConnectionProcedure ||
 		procedure == agentv1connect.ExecutorServiceSignTLSClientMessageProcedure ||
@@ -148,6 +158,15 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceStartServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetServiceExecutionProcedure ||
 		procedure == agentv1connect.ExecutorServiceAttestServiceExecutionProcedure ||
+		procedure == agentv1connect.ExecutorServicePrepareDeviceActionProcedure ||
+		procedure == agentv1connect.ExecutorServiceStartDeviceActionProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetDeviceActionProcedure ||
+		procedure == agentv1connect.ExecutorServiceAttestDeviceActionProcedure ||
+		procedure == agentv1connect.ExecutorServiceConfirmDeviceActionEscrowProcedure ||
+		procedure == agentv1connect.ExecutorServicePrepareDeviceActionRecoveryProcedure ||
+		procedure == agentv1connect.ExecutorServiceCommitDeviceActionRecoveryProcedure ||
+		procedure == agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure ||
+		procedure == agentv1connect.ExecutorServiceGetAgentUpdateProcedure ||
 		procedure == agentv1connect.ExecutorServiceStatusProcedure
 	if !known || uid != 0 && (uid != networkUID || rootOnly) {
 		return errors.New("permission denied")
@@ -191,6 +210,16 @@ func peerCredential(conn net.Conn) (uint32, error) {
 		if err != nil {
 			controlErr = err
 			return
+		}
+		if cred.Uid != 0 {
+			if cred.Gid == 0 {
+				controlErr = errors.New("unprivileged peer belongs to group zero")
+				return
+			}
+			if err := rejectRootPeerGroup(int(fd)); err != nil {
+				controlErr = err
+				return
+			}
 		}
 		uid = cred.Uid
 	}); err != nil {

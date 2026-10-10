@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package lindm.integrations.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/integrations/v1;integrationsv1";
+
+service ReportService {
+  rpc CreateAuditExport(CreateAuditExportRequest) returns (CreateAuditExportResponse);
+  rpc UpsertReportSchedule(UpsertReportScheduleRequest) returns (UpsertReportScheduleResponse);
+  rpc ListReportSchedules(ListReportSchedulesRequest) returns (ListReportSchedulesResponse);
+  rpc ListReportArtifacts(ListReportArtifactsRequest) returns (ListReportArtifactsResponse);
+  rpc DownloadReportArtifact(DownloadReportArtifactRequest) returns (DownloadReportArtifactResponse);
+}
+
+enum ReportKind {
+  REPORT_KIND_UNSPECIFIED = 0;
+  REPORT_KIND_INVENTORY = 1;
+  REPORT_KIND_COMPLIANCE = 2;
+  REPORT_KIND_FINDINGS = 3;
+  REPORT_KIND_AUDIT = 4;
+}
+
+enum ReportFormat {
+  REPORT_FORMAT_UNSPECIFIED = 0;
+  REPORT_FORMAT_CSV = 1;
+  REPORT_FORMAT_JSON = 2;
+  REPORT_FORMAT_JSONL = 3;
+}
+
+message ReportSchedule {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  ReportKind kind = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      1,
+      2,
+      3
+    ]
+  }];
+  ReportFormat format = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      1,
+      2
+    ]
+  }];
+  uint32 interval_seconds = 5 [(buf.validate.field).uint32 = {
+    gte: 300
+    lte: 31536000
+  }];
+  uint32 retention_days = 6 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3650
+  }];
+  bool enabled = 7;
+  // Zero creates; updates compare-and-swap the current revision.
+  uint64 revision = 8 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  google.protobuf.Timestamp next_run_at = 9;
+}
+
+message CreateAuditExportRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 after_sequence = 2 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  // Exactly 32 bytes; genesis uses all zero bytes. Pin the previous signed checkpoint.
+  bytes after_hash = 3 [(buf.validate.field).bytes.len = 32];
+  uint32 max_events = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100000
+  }];
+  uint32 retention_days = 5 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3650
+  }];
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message CreateAuditExportResponse {
+  ReportArtifact artifact = 1;
+}
+message UpsertReportScheduleRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  ReportSchedule schedule = 2 [(buf.validate.field).required = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message UpsertReportScheduleResponse {
+  ReportSchedule schedule = 1;
+}
+message ListReportSchedulesRequest {
+  string after_id = 1 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 100];
+}
+message ListReportSchedulesResponse {
+  repeated ReportSchedule schedules = 1;
+  string next_after_id = 2;
+}
+message ListReportArtifactsRequest {
+  string after_id = 1 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 100];
+}
+message ListReportArtifactsResponse {
+  repeated ReportArtifact artifacts = 1;
+  string next_after_id = 2;
+}
+message ReportArtifact {
+  string id = 1;
+  string schedule_id = 2;
+  ReportKind kind = 3;
+  ReportFormat format = 4;
+  // queued, building, published, or failed. Failed artifacts never expose partial data.
+  string state = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  uint64 byte_count = 8;
+  uint64 row_count = 9;
+  uint32 chunk_count = 10;
+  ReportSignedManifest signed_manifest = 11;
+  string failure_reason = 12;
+}
+message DownloadReportArtifactRequest {
+  string artifact_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 chunk_index = 2 [(buf.validate.field).uint32.lte = 127];
+}
+message DownloadReportArtifactResponse {
+  bytes data = 1;
+  uint32 next_chunk_index = 2;
+  bool finished = 3;
+  ReportSignedManifest signed_manifest = 4;
+}
+
+// A JSONL line. Hash exact decoded payload bytes, never reserialize the JSON payload.
+// SHA256("lindm-audit-v1\u0000" || UUID(chain_id)[16] || sequence_be64 ||
+//        previous_hash[32] || payload). Audit payload is PostgreSQL JSON, UTF-8.
+message AuditChainRecord {
+  uint64 sequence = 1;
+  bytes previous_hash = 2;
+  bytes row_hash = 3;
+  bytes payload = 4;
+}
+
+// Signed bytes are "lindm-report-manifest-v1\u0000" followed by the exact
+// deterministic protobuf serialization provided in ReportSignedManifest.manifest.
+message ReportManifest {
+  uint32 version = 1;
+  string artifact_id = 2;
+  ReportKind kind = 3;
+  ReportFormat format = 4;
+  google.protobuf.Timestamp created_at = 5;
+  uint64 byte_count = 6;
+  uint64 row_count = 7;
+  bytes content_sha256 = 8;
+  string signature_algorithm = 9;
+  bytes public_key_sha256 = 10;
+  string chain_id = 11;
+  uint64 after_sequence = 12;
+  bytes after_hash = 13;
+  uint64 final_sequence = 14;
+  bytes final_hash = 15;
+  uint64 captured_head_sequence = 16;
+  bytes captured_head_hash = 17;
+}
+message ReportSignedManifest {
+  bytes manifest = 1;
+  bytes signature = 2;
+  // PKIX SubjectPublicKeyInfo. Trust requires an out-of-band pin, not this key alone.
+  bytes public_key_der = 3;
+  repeated bytes certificate_der = 4;
+}
+
+// AuditChainRecord.payload contains this JSON shape. Preserve and hash the
+// original bytes; parsing is for display only, never chain reconstruction.
+message AuditEventPayload {
+  string id = 1;
+  google.protobuf.Timestamp occurred_at = 2 [json_name = "occurred_at"];
+  string actor_id = 3 [json_name = "actor_id"];
+  string action = 4;
+  string resource_id = 5 [json_name = "resource_id"];
+  string reason = 6;
+}
+
+// Report JSON arrays and CSV columns use these explicit snake-case field names.
+// CSV applies spreadsheet-formula neutralization; nullable database observations
+// become null/empty values, not a claim that evidence is present.
+message InventoryReportRow {
+  string device_id = 1 [json_name = "device_id"];
+  string hostname = 2;
+  string state = 3;
+  string os_id = 4 [json_name = "os_id"];
+  string os_version = 5 [json_name = "os_version"];
+  string architecture = 6;
+  google.protobuf.Timestamp enrolled_at = 7 [json_name = "enrolled_at"];
+  google.protobuf.Timestamp last_seen_at = 8 [json_name = "last_seen_at"];
+  google.protobuf.Timestamp host_received_at = 9 [json_name = "host_received_at"];
+  google.protobuf.Timestamp snapshot_received_at = 10 [json_name = "snapshot_received_at"];
+  uint64 published_sequence = 11 [json_name = "published_sequence"];
+}
+
+message ComplianceReportRow {
+  string device_id = 1 [json_name = "device_id"];
+  string assignment_id = 2 [json_name = "assignment_id"];
+  string resource_id = 3 [json_name = "resource_id"];
+  string unit_name = 4 [json_name = "unit_name"];
+  string reason = 5;
+  google.protobuf.Timestamp last_verified_at = 6 [json_name = "last_verified_at"];
+  google.protobuf.Timestamp observed_at = 7 [json_name = "observed_at"];
+  string state = 8;
+}
+
+message FindingsReportRow {
+  string finding_id = 1 [json_name = "finding_id"];
+  string device_id = 2 [json_name = "device_id"];
+  string advisory_id = 3 [json_name = "advisory_id"];
+  string package_name = 4 [json_name = "package_name"];
+  string installed_version = 5 [json_name = "installed_version"];
+  string fixed_version = 6 [json_name = "fixed_version"];
+  string architecture = 7;
+  string severity = 8;
+  string state = 9;
+  google.protobuf.Timestamp evaluated_at = 10 [json_name = "evaluated_at"];
+  google.protobuf.Timestamp inventory_at = 11 [json_name = "inventory_at"];
+}

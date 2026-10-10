@@ -65,13 +65,14 @@ func newEntraSource(ctx context.Context, base, clientID, secret, tokenURL string
 	return s, nil
 }
 
-func (s *entraSource) Observe(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
-	if subject == uuid.Nil {
+func (s *entraSource) Observe(ctx context.Context, subject string) (directoryObservation, error) {
+	expected, err := uuid.Parse(subject)
+	if err != nil || expected == uuid.Nil || expected.String() != subject {
 		return directoryObservation{}, errDirectoryResponse
 	}
 	ctx, cancel := context.WithTimeout(ctx, directoryFetchTimeout)
 	defer cancel()
-	userURL := s.base + "/users/" + subject.String()
+	userURL := s.base + "/users/" + subject
 	body, status, err := s.graphGet(ctx, userURL+"?$select=id,accountEnabled,displayName")
 	if err != nil {
 		return directoryObservation{}, err
@@ -91,10 +92,10 @@ func (s *entraSource) Observe(ctx context.Context, subject uuid.UUID) (directory
 		return directoryObservation{}, errDirectoryResponse
 	}
 	id, err := uuid.Parse(user.ID)
-	if err != nil || id != subject {
+	if err != nil || id != expected {
 		return directoryObservation{}, errDirectoryResponse
 	}
-	obs := directoryObservation{Found: true, UserID: id, Enabled: *user.AccountEnabled, Direct: true, DisplayName: sanitizeDisplay(user.DisplayName)}
+	obs := directoryObservation{Found: true, UserID: subject, Enabled: *user.AccountEnabled, Direct: true, DisplayName: sanitizeDisplay(user.DisplayName)}
 	if !obs.Enabled {
 		return obs, nil
 	}

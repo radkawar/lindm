@@ -94,6 +94,105 @@ required utility stylesheet is vendored with attribution; the CLI was removed fr
 the development dependency graph after an unresolved transitive advisory. Generated
 UI remains owned, reviewable source rather than a reason to suppress dependency audit.
 
+The console applies [shadcn preset `b1Q5GC`](https://ui.shadcn.com/create?preset=b1Q5GC&template=vite):
+Nova (Base UI registry `base-nova`), neutral base, blue theme, zero radius,
+IBM Plex Sans with inherited headings, Lucide icons, default/solid menus with
+subtle accent, and neutral chart colors. These settings were confirmed through
+the create page in Chromium and `npx shadcn@latest preset decode b1Q5GC --json`
+(CLI 4.21.4). The [official CLI](https://ui.shadcn.com/docs/cli) supports
+`apply --preset b1Q5GC`; it was run in an isolated Vite scratch copy before porting
+theme variables and regenerated primitive changes. Keep the existing `cn` alias
+and vendored utility stylesheet; do not add the CLI to `package.json`.
+IBM Plex Sans is an exact-pinned Fontsource package bundled by Vite, not a runtime
+CDN fetch; its redistribution notice is `web/LICENSE.fonts`. No Next.js, pnpm,
+remote fonts, analytics, or runtime registry requests are introduced.
+
+The sidebar-07-derived shell has permission-aware collapsible groups, breadcrumbs,
+a role/break-glass account menu, keyboard skip link, and a locally persisted
+light/dark toggle. Control/Command-K opens the official command palette with
+navigation and search within the first 200 authorized devices; it does not claim
+an unbounded fleet search. Dialog labels remain inside their accessible portal.
+Feature pages use consistent headings, responsive controls, skeletons, and
+actionable empty/error states. Toasts report accepted mutations, not proof of
+native execution, and never contain enrollment/recovery secrets. Inline normalized
+errors and ambiguous same-request-ID recovery remain authoritative; no mutation
+retry behavior changes.
+Forms compose the official shadcn Select rather than native dropdowns; controlled
+enum conversions, disabled state, and named uncontrolled form values are preserved.
+Long operational caveats live in accessible info tooltips or help disclosures,
+while destructive confirmation warnings remain visible.
+
+`/dashboard` is the signed-in landing page. Its narrow `GetFleetSummary` admin RPC
+uses SQL aggregates across the caller's authorized device scopes, never page
+samples or fabricated fleet totals. Lifecycle, contact freshness, service
+compliance dispositions, and OS counts describe that complete authorized set.
+Service dispositions count current-generation resources, not allegedly compliant
+devices; devices without assigned resources are counted separately.
+OS groups are bounded to the top 20 with an exact remainder count. Recent contact
+means within 24 hours of the database snapshot; absent contact remains unknown.
+A separate first-five stale-device preview uses the existing last-contact filter
+and links to that filtered list. It is a live read in normal enrollment order,
+not an oldest-first list or a source of aggregate counts.
+Findings count affected results by severity, excluding accepted/unknown results;
+evaluated and unknown active-device populations remain separate. Pending unexpired
+approvals honor independent action and inbox-management device scopes. That count
+uses identity's fresh-authorization transaction, not the fleet snapshot, and
+counts pending records rather than a promise that their requests are actionable.
+Existing consume-time fences remain authoritative. Recent
+device and service actions are newest-first across generations with a bounded
+response. Sections unavailable to a caller remain explicitly unavailable rather
+than reporting a misleading zero. Recorded actions are not proof of successful
+native execution. Principal-scoped query cancellation and invalidation remain
+in force.
+The dashboard presents exact distributions as an OS/version donut, service-resource
+stacked bar, and severity bars through official shadcn chart primitives and pinned
+Recharts, with the preset's neutral chart colors. Exact text legends remain
+available independently of the charts; animations are disabled and no trend is
+invented where historical aggregate data is absent. Chart custom properties are
+scoped using style attributes, not injected style elements, preserving the server's
+strict Content-Security-Policy without allowing inline style blocks.
+
+Device tables offer compact single-line rows, relative timestamps with absolute
+tooltips, status dots, current-page sorting, column visibility, and density.
+The always-visible hostname-prefix/OS/label toolbar retains advanced typed filters.
+Hostname prefix matching is literal and case-sensitive. Server SQL applies scope
+and the bounded page before projecting the worst current-head service disposition;
+no per-row RPC fanout occurs. Last verification is the oldest resource proof only
+when every current resource has proof; no resources means unassigned, not compliant.
+The prefix participates in cursor filter binding. Sorting never changes server
+order or cursor meaning; Previous/Next, expiry, and paged exports remain intact.
+Revocation is a row action dialog retaining its existing approval/reason flow and
+ambiguous request identity after dismissal. Detail header actions focus existing
+permission-gated forms rather than sending mutations. Tabs separate Overview,
+Inventory, Services/Compliance, Encryption/Actions, Findings, and History.
+Inventory mounts on first activation (or an explicit package-search deep link),
+so opening Overview does not silently start an inventory cursor. Encryption/actions
+unmount when inactive so recovery secrets cannot survive a tab change.
+
+For isolated visual acceptance, build embedded assets and run a disposable console:
+
+```sh
+npm run build:web
+go build -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0' \
+  -o artifacts/bin/lindmd-ui ./cmd/lindmd
+go run ./cmd/lab console -repo . -lindmd artifacts/bin/lindmd-ui \
+  -devices 300 -packages 200 -assignment-percent 20 -enrollment-workers 8
+```
+
+This uses protected development trust and running PostgreSQL, but not Keycloak or
+the shared `:18444` listener. The fixture owns a database and dynamic loopback HTTPS
+origin, populates real enrollment/inventory/service RPC paths, prints a one-time
+enrollment secret for the separate `console-owner` account, then holds until
+interrupted. Treat the terminal output as sensitive. Trust the development CA in
+a dedicated browser profile; enroll at the printed `/enroll` URL with a password
+and user-verifying WebAuthn authenticator, then sign in. Chromium acceptance may
+use a CDP virtual internal authenticator with user verification enabled. Population
+is synthetic lab data, not native machine evidence; reporting stops after seeding.
+Interrupting the command cleans its owned process/database/material. Never point
+the generator at a production tenant or publish enrollment/browser credentials.
+The fixture also enables real integration/report RPCs with its own protected,
+random encryption key; no destinations or schedules are preconfigured.
+
 Organize `web/src` around working product features:
 
 | Directory                                                      | Responsibility                                                     |
@@ -125,8 +224,9 @@ WebAuthn user verification; it never treats the password challenge as a session.
 Use a current HTTPS browser with native WebAuthn JSON conversion support. `/enroll`
 accepts a manually entered one-time secret and new password, registers an
 authenticator, then directs the user back to sign in. Never put enrollment secrets
-in links. Owners manage local accounts at `/accounts`: create, enable/disable,
-change owner/admin role or break-glass designation, and reset credentials.
+in links. Principals with unrestricted `accounts.manage` manage local accounts at
+`/accounts`: create, enable/disable, select built-in or custom roles and device
+scopes, change break-glass designation, and reset credentials.
 Issued enrollment secrets remain component-memory-only and disappear on navigation.
 Account mutations send the session CSRF header and are never automatically retried.
 Every authenticated route displays a persistent emergency banner for break-glass
@@ -158,15 +258,302 @@ For focused work, run `go test -race ./internal/agent/inventory ./internal/trust
 tests require GnuPG tools and use isolated real keys plus local TLS servers, not
 vendor downloads. Actual pinned image acquisition and native-observation VM scenarios
 are separate maintained lab commands, not hidden in unit tests or pre-commit hooks.
-The VM lane requires accessible KVM, QEMU, `qemu-img` and `cloud-localds`; it neither
-changes host security nor substitutes container observations for a real guest.
+Image verification supports detached GNU SHA256SUMS and BSD SHA256 CHECKSUM
+(including Rocky), Fedora clearsigned SHA256, and explicit
+`CHECKSUM_MODE_DETACHED_SHA512` for signed Debian-style SHA512SUMS. SHA512 mode
+requires a detached signature, independently pinned full signer fingerprint and
+provenance, and hashes image bytes against the authenticated SHA512 record as well
+as the manifest's required SHA256 pin in one streaming pass. Cache identities remain
+`sha256-<pin>`; offline reuse rechecks both digests and the signature. Missing or
+ambiguous records, invalid signatures, and either digest mismatch fail closed.
+This is verifier capability, not current Debian cloud-image authentication:
+[Debian's cloud publication](https://cloud.debian.org/images/cloud/) describes
+signatures only for legacy OpenStack images, not current per-distribution images.
+Unsigned current Debian checksum metadata cannot use this signed mode; no signature,
+trusted fingerprint, or vendor qualification is inferred from HTTPS downloads.
+Debian 12/13 native lanes instead use `lab/images/debian-12-amd64.json` and
+`lab/images/debian-13-amd64.json`, pinned official netinst ISOs authenticated by
+Debian's signed SHA512SUMS. Inspect, lifecycle and dispatch require explicit UEFI
+firmware flags for these manifests. The first run installs an unencrypted ext4
+guest through Debian preseed with signed Debian repository packages, preserving
+vendor EFI/kernel payloads; it never substitutes a direct-kernel boot. Installation
+has guest-only network access and requires `xorriso` in addition to normal VM tools.
+A successful installer exit is insufficient: a disposable first boot must complete
+NoCloud, authenticate fresh pinned SSH, and prove Debian version, ext4 root and the
+root-only installer-source marker before the local golden disk is published.
+Identity/provisioning probes use noninteractive `sudo sh -eu`; failures
+identify a fixed probe label without printing marker contents or relaxing its mode.
+The private `<image-cache>/debian-installed` cache binds source ISO digest, recipe
+version, architecture/storage and firmware bytes/version. Reuse reauthenticates the
+source ISO and checks local disk integrity; the derived disk is not vendor-signed,
+and repository packages reflect the signed suite at installation time rather than
+a reproducible snapshot. Each normal run uses a fresh overlay and SSH credentials.
+These maintained paths are not passing Debian lifecycle or physical-validation
+claims until their native commands complete and evidence is recorded.
+The default native VM lane requires accessible KVM, QEMU, `qemu-img` and
+`cloud-localds`. Explicit foreign-architecture runs use QEMU TCG instead; neither
+path changes host security or substitutes container observations for a real guest.
 The integration lane also exercises real `cloud-localds` cancellation: staging stays
 inside the owned private run directory and helper descendants stop before cleanup.
 It requires `cloud-image-utils`, but not KVM or a booted guest.
+
+The encrypted installer lane is `lab vm encrypted -manifest
+lab/images/ubuntu-noble-encrypted-amd64.json` (or
+`lab/images/fedora-44-encrypted-x86_64.json`). Supply `-firmware-code`,
+`-firmware-vars`, `-firmware-package` and the exact installed
+`-firmware-version`; `-secure-boot` requires an enrolled PK/KEK/db template and
+actual guest SecureBoot=1/SetupMode=0. Ubuntu hosts can use the `ovmf` package's
+`OVMF_CODE_4M.secboot.fd` and `OVMF_VARS_4M.ms.fd`; the off variant uses
+`OVMF_CODE_4M.secboot.fd` and unenrolled `OVMF_VARS_4M.fd`, without
+`-secure-boot`, to observe SecureBoot=0/SetupMode=1. The non-Secure-Boot
+`OVMF_CODE_4M.fd` can omit the SecureBoot variable entirely; unavailable is not
+proof of disabled enforcement. Package ownership/version and both firmware
+digests are checked, not inferred from filenames. Updating host firmware produces
+a different golden-cache key rather than silently changing an existing machine.
+
+Original-device recovery lanes can explicitly supply the Go lab API's
+`EncryptedFirmwareOptions.OwnedDBCertificate`: one public PEM certificate for
+the run-owned signer, never a private key or certificate bundle. This requires
+Secure Boot and the same package-pinned, already enrolled PK/KEK/db template.
+`virt-fw-vars --add-db` modifies only a private run NVRAM derivative; the harness
+verifies the exact certificate DER in firmware db (not MOK), retains the original
+db bytes and rejects changes to PK, KEK, dbx or unrelated firmware variables.
+Evidence records the certificate DER SHA-256 and source/final initial VARS
+SHA-256 separately. The signer also binds the golden-cache key when this explicit
+option is used; ordinary vendor fixtures and their cache keys are unchanged.
+Enrollment evidence is not a Secure Boot pass: the running guest must still
+report SecureBoot=1/SetupMode=0 and the qualified systemd-boot LoaderInfo before
+the separately signed original-device recovery handoff can proceed. Guest disk
+and bootloader provisioning remains inside the disposable guest; this firmware
+hook neither accesses host EFI variables nor handles the signing private key.
+
+This lane additionally needs `swtpm`, `xorriso`, `mcopy`, `virt-fw-vars`, and
+`guestfish` with its direct QEMU appliance/cryptsetup support. Official ISO
+manifests reuse the existing digest, exact-size and vendor OpenPGP verification.
+Only installer configuration is remastered; vendor-signed shim, GRUB and kernel
+remain intact. Ubuntu autoinstall and Fedora kickstart install LVM on LUKS2,
+serial initramfs unlock and pinned lab SSH keys. `-desktop gnome` or `-desktop kde`
+installs the real desktop through native installer/package tooling and configures
+lab-only autologin; its display is a private Unix VNC socket, never a TCP listener.
+Fedora desktop packages use the release repository with RPM signature checking.
+Desktop/session assertions remain separate from the encryption smoke assertions.
+
+`-tpm-boot` is a separate golden-cache dimension: it installs a systemd/dracut
+early-boot path, TPM libraries/tools and `tpm2-device=auto` while preserving the
+existing LUKS UUID/map name. It does **not** enroll a token. Ubuntu's default
+initramfs-tools path remains a separate negative tuple; token enrollment alone
+is not proof of unattended boot. The TPM action lane must enroll through the real
+provider and then call `ColdBoot` with an empty secret, which fails immediately
+if a passphrase prompt appears. `systemd` supplies Ubuntu 24.04's cryptsetup
+tools; Fedora 44 supplies them in `systemd-udev`, not a nonexistent
+`systemd-cryptsetup` package.
+
+On hosts whose installed kernel is not caller-readable, supply both
+`SUPERMIN_KERNEL` and `SUPERMIN_MODULES` explicitly for the libguestfs appliance.
+Use a private, readable copy of a packaged kernel and its matching installed
+module directory; never relax `/boot` permissions. The harness validates both
+paths, records the selected kernel SHA-256/module-directory version, and forwards
+these variables only to guestfish. It does not invoke sudo implicitly or claim
+that the selected module-directory name is an observed booted-kernel version.
+
+`-golden-cache` holds private, immutable installed disks, matching NVRAM/TPM state
+and lab-only unlock/SSH credentials. Never enroll a golden or treat these
+credentials as production secrets. Each run gets a qcow2 overlay and copied
+NVRAM/TPM; the cache verifies every stored machine-state digest before reuse.
+Snapshots require a stopped machine, include all state and flatten disk backing
+chains. The guest-independent header oracle opens only regular qcow2 files
+read-only inside libguestfs; it never attaches host NBD or calls cryptsetup on a
+host block device. Successful empty-header observation is distinct from an
+appliance failure and alone is not a sanitization claim.
+
+Reusable `EncryptedVM` primitives provide chosen-key or unattended `ColdBoot`,
+observed unlock outcome/boot ID, guest-native `Run`, graceful `PowerOff`, hard
+`Kill`, complete `Snapshot`, root-only `Headers`, whole-machine `HeadersAll`, and
+QMP `NetworkLink`. `HeadersAll` includes whole-disk LUKS containers and partitions,
+identifies each observation as `root` or `extra-N`, and rejects duplicate LUKS UUIDs
+across disks. Both header APIs require a stopped, detached target. `BootRecovery`
+starts a separately verified disposable cloud root for an off-target journal,
+then attaches the stopped target by a checked descriptor with explicit virtual
+serial/WWN. Its lifecycle excludes concurrent normal target boots or snapshots.
+This is laboratory recovery-operator plumbing, not production handoff authority
+or a durable external journal after the recovery VM is removed.
+`PowerOff` first requires acknowledgement of a short systemd shutdown timer,
+matching the lifecycle reboot pattern, then requires successful owned-QEMU exit
+before stopping swtpm. It does not reinterpret an SSH error as successful shutdown;
+the timer prevents poweroff from racing the SSH command's exit-status reply.
+Recovery package preparation can explicitly select `VMHardwareOptions.AllowNetwork`
+for signed native package acquisition. The default remains restricted user-mode
+networking; evidence distinguishes egress permission, and no variant installs a
+host bridge or changes host firewall rules.
+
+Configured cloud guests retain the verified base descriptor for
+`stoppedDiskSamples`: a read-only explicit QEMU backing graph samples 4 KiB at the
+first, middle and final regions without guest software or host block devices.
+Evidence records logical size, offsets and SHA-256 hashes; three matching samples
+do not establish whole-drive sanitization. `closeAfterExpectedExit` accepts only
+an already reaped successful process and then removes private state. Callers must
+prove the intended recovery outcome separately and sample before cleanup; normal
+service-lane `close` still rejects unexpected process exits.
+
+Shared `VMHardwareOptions` selects x86_64/aarch64, KVM/TCG, UEFI or x86 legacy
+BIOS, TPM2 or TPM absence, virtio-blk/scsi, NVMe or SATA/AHCI, up to four extra
+1 GiB disks and a virtio GPU/private VNC display. Encrypted installer manifests
+derive the guest architecture from the signed-media manifest, rejecting an
+explicit hardware mismatch. The `*-encrypted-arm64.json` Ubuntu and
+`*-encrypted-aarch64.json` Fedora routes use package-pinned AAVMF,
+`qemu-system-aarch64 -machine virt`, the PL011 serial console, a virtio-SCSI
+installer CD and the TPM2 MMIO device. Select `-accelerator tcg` on x86 hosts;
+these runs remain limited to two guest CPUs and record real elapsed time.
+Availability of this route is not a native qualification claim: passing tuples
+and evidence are listed separately in verification. Extra disks are blank,
+not implicitly encrypted.
+The opt-in inventory fixture formats only the first extra disk's explicit lab
+serial, refuses existing signatures/children, and requires existing cryptsetup,
+filesystem and optionally LVM tools. It supports LUKS1, LUKS2 and LVM-on-LUKS2;
+it never installs guest dependencies silently or modifies the guest root.
+
+UEFI cloud guests permit firmware initialization resets while waiting for the
+pinned SSH host key. Readiness also executes one successful quiet command within
+the existing five-minute boot deadline: SSH authentication alone precedes native
+PAM/session initialization and does not prove that a command channel is usable.
+Only transport startup failures and explicit temporary channel rejection may poll
+that side-effect-free readiness command; authentication, host-key, protocol and
+command failures remain terminal. Scheduled lifecycle reboots retain the old
+pinned SSH transport until remote shutdown, bounded by a two-minute deadline,
+then independently require a changed boot ID before cloud-init readiness.
+For callers that disallow reboots, readiness requires QMP acknowledgement of
+shutdown-on-reboot before that command.
+BIOS guests retain startup shutdown-on-reboot, and explicit reboot-enabled or
+encrypted guests retain their existing policy. A firmware reset terminating QEMU
+can also make swtpm exit normally; that is a startup failure, not TPM qualification.
+
+`go run ./cmd/lab images redhat discover -version 9.8 -token-file FILE` reads the
+official Red Hat x86_64 KVM catalog without creating a subscription or accepting
+terms. The [vendor release table](https://access.redhat.com/articles/red-hat-enterprise-linux-release-dates)
+lists `9.8` and `10.2` as the current minors, both generally available May 19, 2026.
+Version selection is explicit, not a mutable "latest" pin. `images redhat fetch
+-version MINOR -token-file FILE -manifest NEW_FILE [-cache DIR]` obtains the authorized download, verifies its
+published SHA-256 and exact CDN Content-Length, and imports it into the same
+digest-addressed cache used by VM lanes. The default cache is `.cache/lab/images`;
+the manifest parent must already exist. The token file must be a current-user-owned
+mode-0600 regular file, not a symlink. An eligible RHEL subscription (including an
+activated Developer subscription) and **Download Software and Updates** permission
+are required; an offline token alone does not grant download entitlement.
+
+Authentication follows [Red Hat's refresh-grant documentation](https://access.redhat.com/articles/3626371)
+and its [download API contract](https://api.access.redhat.com/management/v1/swagger.json).
+Credentials remain in memory and are never printed or persisted. HTTPS requests
+are bounded, API authentication never follows redirects, and the separate
+allowlisted CDN request carries no bearer token. Only sanitized protobuf manifests
+and receipts are persisted privately; temporary signed download URLs are excluded.
+The RHEL-specific `VENDOR_AUTHENTICATED` mode records an authenticated HTTPS vendor
+checksum, **not an OpenPGP signature**. Offline `images verify -manifest FILE
+[-cache DIR]` checks receipt/manifest agreement, exact size and every image byte;
+it cannot reauthenticate the historical HTTPS publication or detect a local owner
+replacing both pins and evidence. Ubuntu/Fedora continue requiring their pinned
+vendor signatures. Acquisition evidence is not guest lifecycle qualification.
+
+`lab vm lifecycle` (including `-control-plane-trust`) and `lab vm dispatch`
+accept `-redhat-token-file FILE` for RHEL. Also supply `-allow-network` explicitly:
+registration and entitled metadata refresh require guest user-mode egress; the
+default QEMU `restrict=on` intentionally cannot reach vendor endpoints. This changes
+only the disposable guest's user-mode network and is recorded as `user-egress`.
+The same protected offline-token file policy applies. The hosted RHSM API
+additionally requires `rhc administrator`;
+the lane reads the authorized organization and creates one random
+`lindm-lab-<32 lowercase hex>` activation key, never a new organization.
+Organization/key material uses the existing `RedHatRegistrationCredentials`
+protobuf JSON contract over ephemeral pinned-SSH stdin only. The guest invokes
+its installed `subscription-manager register` entrypoint with in-memory parser
+arguments, not operating-system arguments or environment. Native output and RHSM
+logging are suppressed, including opt-in host failure diagnostics.
+
+Registration refuses a preexisting consumer or ownership marker. The lane checks
+native identity, requires enabled repositories, and performs a bounded
+`dnf --refresh makecache` with unavailable repositories treated as errors.
+This observes authorized metadata access without installing unnecessary packages.
+Evidence contains only registration, identity, metadata-refresh, unregister and
+activation-key-deletion booleans. An owned guest is unregistered before its key is
+deleted, using separate cancellation-independent deadlines while QEMU is still
+alive; a failed unregister does not skip key deletion and both errors propagate.
+No token is needed for the existing offline local-RPM path, whose systemd
+dependency is already installed; any RHEL repository package acquisition requires
+registration. Fedora and RHEL retain the identical pinned-key RPM rejection,
+install, upgrade and removal path with configured repositories excluded.
+Lifecycle records SELinux Enforcing before and after; native running-service
+assertions also require it. Dispatch retains its explicit Enforcing observation.
+
+The client refreshes expiring access credentials from the protected token file
+without retrying mutations. After an interrupted process, stop all lab lanes, then
+explicitly run `lab images redhat cleanup-keys -token-file FILE
+-confirm-delete-lab-keys`. Cleanup deletes only that exact laboratory key namespace
+and prints counts, never key names or organization identifiers; it cannot
+unregister an unreachable guest. It neither changes unrelated keys nor accepts
+subscription terms. A failed lane or lease creation alone is not qualification
+evidence; the native checks and cleanup must complete.
+
 `go run ./cmd/lab auth check` exercises the running server's normal SSO/CSRF path
 against the fixed development fixture. The reusable development-session helper keeps
 passwords/cookies in memory, restricts TLS destinations and credential form actions,
 and revokes its console session. It is not an alternate production authentication API.
+
+`devlab.OpenApprovalSession` gives native lanes a separate real approver. In
+Keycloak mode it creates a randomly named test-owned administrator through the
+lab-admin client, follows normal code/PKCE login, and deletes that user at cleanup;
+it changes no shared group or realm policy. Local fixtures use their independently
+enrolled WebAuthn approver. `ApprovalSession.Approve` creates the typed request as
+the requester and approves it through the second human's Admin API. The shared
+VM control plane retains device-revocation request and approval IDs for exact
+retries, and revokes the owned device before closing either session. Dispatch
+records the two-human revocation approval as nonsecret evidence.
+
+`devlab.OpenLocalAuthorityFixture` uses the same disposable database/process lifecycle
+with local-primary authentication and ephemeral loopback listeners; it never binds
+the shared admin port or resets the development fixture. It invokes the real
+`lindmd bootstrap-owner -config FILE -username owner` CLI, captures the one-time
+enrollment output only in bounded memory, and enrolls the owner through the real
+HTTPS password/WebAuthn endpoints. The owner creates a distinct second owner through
+the account API, then that approver enrolls with an independent credential. Both
+expose the normal `OwnerSession` AdminService client. `StepUp` revokes the old session
+and performs fresh password plus verified WebAuthn login; account revocation uses
+the normal account-update API, not database principal/session/credential inserts.
+`RestoreAccount` can re-enable only the owned approver through that same API;
+previous sessions and approvals stay revoked, requiring a fresh approver login.
+
+The maintained `internal/devlab/webauthnlab` helper uses standard-library P-256
+signatures and real WebAuthn responses shared with identity tests. It simulates
+presence/user-verification flags, not hardware custody or human intent. Golangci
+`depguard` enforces its lab/test-only import boundary. `ConfigureDeviceActions`
+generates private temporary RSA escrow transport, independent wrapping and online
+execution keys, admits no wildcard or service capabilities, and requires two-person
+recovery reveal. Its returned seven-action delegation still needs real Admin API
+admission. Secrets remain in memory or mode-0600 files beneath the owned private
+temporary directory; closing removes that directory and the disposable database.
+This headless fixture qualifies server authentication/authorization, not browser
+WebAuthn UI behavior or physical authenticator assurance.
+
+`devlab.OpenDeviceActionAuthorityFixture` additionally signs both allocated admin
+and device listener ports into its private bootstrap before server startup.
+`ReadAgentFixture` returns those verified public provisioning bytes; recovery guests
+must use their exact signed origins, with normal TLS hostname verification, rather
+than a shared-port tunnel or an unsigned endpoint override. Ordinary native and
+interactive console fixtures retain their existing origin contracts.
+
+`go run ./cmd/lab cli check -root . [-record NEW_FILE]` qualifies `lindmctl`
+against the already-running development server and real Keycloak fixture. It uses
+the maintained browserless Keycloak helper, explicitly submits the CLI approval
+form with CSRF, and completes the client's loopback/S256-PKCE exchange. It checks
+`whoami`, a bounded AdminService device read, logout and revoked-bearer denial.
+Only nonsecret results are emitted; optional evidence is exclusively created with
+mode `0600`. Temporary CLI configuration is private and removed, and both owned
+sessions are revoked. Without `-lindmd FILE`, the lane fails when the required
+fixture/server is absent. Supplying a prebuilt `-lindmd FILE` instead creates an
+owned migrated database and console server on `127.0.0.1:18444`, failing if that
+port is occupied; cleanup removes only those owned resources. Both modes require
+the running development PostgreSQL/Keycloak dependencies and never replace, reset
+or stop the shared laboratory. Local-mode CLI qualification remains the existing
+software-WebAuthn identity integration plus a manual browser login/approval flow;
+this Keycloak lane is not evidence that the local browser flow has been exercised.
 
 Local identity tests use a real PostgreSQL schema and a software P-256 WebAuthn
 authenticator, not a verifier mock. The `TestLocal*` and `TestBreakGlass*` integration
@@ -178,8 +565,8 @@ add a Chromium CDP virtual authenticator with user verification enabled and comp
 
 The generated protobuf-JSON HTTP contract is `GET /auth/options`, plus
 `POST /auth/local/login/begin`, `/auth/local/login/finish`,
-`/auth/local/enroll/begin` and `/auth/local/enroll/finish`. Owner-only account
-operations are `GET /auth/accounts` and `POST /auth/accounts/create`,
+`/auth/local/enroll/begin` and `/auth/local/enroll/finish`. Unrestricted
+`accounts.manage` operations are `GET /auth/accounts` and `POST /auth/accounts/create`,
 `/auth/accounts/update`, `/auth/accounts/reset`. Unsafe requests require the exact
 configured origin; account mutations additionally require the session CSRF token.
 Responses are no-store. Enrollment finishes without creating a session.
@@ -212,6 +599,33 @@ rollback. It reports nonsecret owned identifiers and bounded cleanup results.
 An unavailable or invalid supplied fixture fails; it never falls back to cached
 authority or changes shared users, groups, realm settings or application tables.
 
+The primary-source oneof also includes Okta and Google Workspace. Their OAuth
+service credentials are separate from browser login; protected PEM resources are
+loaded through the existing owned-file boundary. `DirectorySource` uses opaque
+immutable strings, not a universal UUID assumption. Only UUID-native adapters
+parse UUIDs. Provider TLS tests use documented response shapes and real JWT
+signatures; they are not live-tenant qualification. The README gives exact
+least-privilege setup and lifecycle/outage procedures for each provider.
+
+Supplemental `/scim/v2` uses connector-specific rotating hash-only credentials,
+configured immutable correlations and bounded RFC 7643/7644 representations.
+`POST /auth/scim/credentials/rotate` requires unrestricted account management,
+normal session CSRF and exact origin. `GET /auth/settings` is a read-only
+protobuf-JSON account-management endpoint exposing configured sources and only
+the requesting principal's freshness. SCIM integration tests require real
+Postgres isolated schemas and cover conditional mutation, tombstones and races.
+
+The broker fixture has dedicated `lindm-upstream` and `lindm-broker` realms.
+The upstream lab-admin has only user management/view access. The **broker realm
+only** additionally grants its lab-admin `manage-clients`, so each broker check
+can create/delete a uniquely named OIDC client with an exact ephemeral-loopback
+redirect. No wildcard redirect, master administrator or access to the shared
+`lindm` realm is introduced. Production directory clients remain read-only.
+Permanent fixture imports require a parent-coordinated dev reset; a lab check
+must never reset the shared fixture. Test-owned user/group/client prefixes define
+the leftover-cleanup boundary. SAML signed persistent NameID feeds signed broker
+session claims; user-editable imported attributes cannot establish lineage.
+
 Entra uses the same `DirectorySource`, durable observation/version transitions and
 worker transaction fences as Keycloak. Its public-cloud OIDC client requests
 `openid profile` and binds issuer + signed tenant-local object ID, not pairwise
@@ -222,7 +636,7 @@ delay separately; no retry or outage extends the 30/60-second refresh/denial rul
 `TestEntra*` uses local `httptest` TLS servers with signed OIDC tokens and documented
 Graph shapes. These are deterministic unit/race checks, **not live Entra
 qualification**. A live tenant, two registered apps with admin-consented Graph
-application access, and test-owned users/groups remain prerequisites for R1.
+application access, and test-owned users/groups remain prerequisites for launch.
 The [Entra setup and manual qualification procedure](../README.md#microsoft-entra-id)
 lists exact calls, least privileges, disable/removal/deletion/outage scenarios and
 required timing evidence. The greenfield identity migration admits an `entra`
@@ -244,6 +658,48 @@ configuration intentionally rejects arbitrary `search_path` parameters. Lab-only
 cluster administration creates the uniquely named database; the subprocess receives
 only a non-superuser migrator URL. Owned server shutdown precedes database cleanup.
 Neither this fixture nor the fresh-authorization fixture changes shared IdP policy.
+Isolated authority fixtures generate their own current-schema typed configuration
+from verified public provisioning trust and manifest-checked development
+certificates/URLs; they never decode the shared `server.json` as a template.
+`ReadPublicAgentFixture` verifies public root/bootstrap bindings without reading
+offline signing keys. The normal shared-server fixture reader still requires the
+shared configuration to match. This permits isolated labs during a greenfield
+schema cutover without resetting another lane's running development environment.
+
+`go run ./cmd/lab load -repo . -lindmd artifacts/bin/lindmd -record NEW_FILE`
+uses that same disposable database/real-process boundary without binding the
+shared admin port. `internal/loadlab` simulates real enrollment, device mTLS,
+session proofs, jittered sync/work polling, 2,000-package snapshots and signed
+service challenges/results; it cannot target an arbitrary production server.
+Build the isolated server with an explicit development release identity, for
+example `go build -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0' -o artifacts/bin/lindmd ./cmd/lindmd`.
+The fixture registers that actual release through the admin API; simulated
+sessions obtain its version/protocol through authenticated compatibility reads,
+rather than bypassing the production compatibility gate.
+The default 500→2,000→5,000→10,000 ramp uses 11-minute plateaus and stops on an
+SLO breach. `-seed`, `-stages`, `-stage-duration`, `-packages`,
+`-assignment-percent`, `-enrollment-workers`, `-pool-size` and `-profile-dir` describe bounded repeatable
+experiments. Records are exclusive, private, nonsecret files, including failures.
+`-database-storage shared` retains the development-cluster boundary.
+`-database-storage tmpfs` and `nvme` instead start an exact-owned pinned PostgreSQL
+18.6 container with the maintained TLS, roles and `pg_stat_statements` configuration.
+The former is labelled **storage: tmpfs (no durable fsync cost)** and cannot
+qualify durable capacity. The latter uses an owned sparse file backed by verified
+NVMe, a loop device and XFS; it never formats a host block device. It requires
+local Docker, `mkfs.xfs`, `findmnt`, `lsblk`, `losetup`, `mount`, `umount` and
+noninteractive sudo for the exact-owned loop/mount lifecycle.
+Use disjoint `-generator-cpus 0-3 -server-cpus 4-11 -postgres-cpus 12-19`
+after checking the host topology. Generator re-exec and server `taskset` apply
+before Go starts; Docker applies the PostgreSQL CPU set. Records retain effective
+thread affinity, bounded `iostat -dx 1 2` observations and QEMU process counts.
+CPU sets are not exclusive reservations against other host jobs.
+Dedicated container regression: set `LINDM_CONSOLE_REPOSITORY`,
+`LINDM_CONSOLE_LINDMD` and `LINDM_LOAD_POSTGRES_INTEGRATION=tmpfs` (then `nvme`)
+and run `go test -race -tags=integration,consolelab ./internal/devlab -run '^TestDedicatedLoadPostgresTLSRolesExtensionAndCleanup$' -count=1 -timeout=10m`.
+See [capacity interpretation](security-and-operations.md#connected-capacity-laboratory)
+for cadence, measured quantities, saturation-proxy limitations and exclusions.
+Run focused checks with `go test -race ./internal/loadlab ./internal/devlab`
+and the pinned golangci-lint against those packages plus `./cmd/lab`.
 
 `go run ./cmd/lab profiles check-catalog -lindmd <prebuilt-server> -repo .`
 uses the same private real-process/database boundary for profile publication.
@@ -266,11 +722,20 @@ active/enabled then inactive/disabled revisions, strictly increasing sequences,
 device-signed ingested history, server restart retaining an open action ID,
 no-drift completion without a start grant, successful assignments at guest clock
 offsets of +90 and −90 seconds (with time sync disabled and restored afterward),
-and revocation without native effect.
+and revocation without native effect. Assignments use the normal API's minimum
+300-second reconcile interval. After initial convergence, the unchanged assignment
+must complete a fresh periodic read-only check without a start grant (`COMPLIANT`).
+The lab then disables/stops the unit out of band and requires the next periodic
+action to detect that drift, obtain a start grant and restore active/enabled state
+(`DRIFT_REMEDIATED`). Both checks record fresh sequences, verification timestamps
+and independent native/start-witness observations; no production timer bypass exists.
+Each periodic wait allows eight minutes; the command budget is 50 minutes plus
+any hold, with external timeouts requiring additional cleanup allowance.
 An inert pre-enrollment fixture and independent systemctl/start-witness observations
-remain separate from server evidence. `-record` includes build digests, timing and
-explicit failure state and never overwrites an earlier run. Owned guests, private
-server processes, signing material and databases are cleaned up.
+remain separate from server evidence. `-record` includes assignment intervals,
+compliance snapshots, build digests, timing and explicit failure state and never
+overwrites an earlier run. Owned guests, private server processes, signing material
+and databases are cleaned up.
 Optional `-hold 45m` reserves the normal development console port and pauses before
 revocation, keeping the guest, database and real server available for authenticated
 browser assignments. The ordinary dev server must not occupy port 18444. The
@@ -281,16 +746,66 @@ natively exercised**: acquisition requires the executor-held mTLS signer, so
 stopping that executor cannot deterministically hold an unstarted acquired action.
 No product fault seam is added. See [the command details](agent-enrollment.md#running-the-connected-service-dispatch-lane).
 
-The authenticated **Profiles** console uses these same catalog RPCs. Editors use
-the generated protobuf constraints, including shared custom validation rules,
-instead of a second handwritten schema. Resource dependencies are typed references;
-the resolver additionally rejects cycles and preserves blocked/conflicting results.
+The catalog uses `ResourceProfile` and `ProfileResource` with closed
+`ResourceDesiredState` arms. Canonical identity is the pair of resource kind and
+canonical key, not a service unit or an administrator-supplied opaque key.
+Publication persists immutable typed protobuf resource records together with
+relational identities and dependency references/conditions. Reads validate both
+representations and the deterministic revision digest. Expected-head CAS,
+actor-bound request receipts, original-revision retries and append-only history
+remain independent of device activation.
+
+Resolution retains priority and contributor provenance across heterogeneous
+resources. Equal-priority optional dimensions merge only when compatible;
+explicit false/zero and managed empty sets remain specified values.
+Known set-valued fields, including membership and verification-check sets, are
+canonicalized on owned copies before immutable hashing and equal-priority merging.
+Their permutation does not change a revision digest or manufacture a conflict.
+Ordered native lists such as SSH matches, firewall rules, DNS servers/search
+domains and routes retain their supplied order.
+Ownership, applicability and verification policies must agree rather than silently expanding
+authority. Cross-resource native claims can conflict even across different kinds
+or priorities; no desired state is returned for a conflict. Dependency conditions
+are retained, cycles conflict, and their dependents are blocked. Repeated target
+matches may select different priorities or revisions of one profile; identical
+revision/priority matches are deduplicated. A typed schema arm or ready catalog
+preview is not evidence that a native provider is implemented or qualified.
+
+The authenticated **Profiles** console uses the generic catalog RPCs. Each resource
+is edited as strict generated `ProfileResource` protobuf JSON, with an expandable
+generated field reference covering every declared desired-state arm. Unknown fields
+are rejected and generated protobuf constraints, including shared custom rules,
+validate publication rather than a second handwritten schema. Desired references,
+ownership, verification, applicability and dependency conditions remain typed.
+The resolver additionally rejects noncanonical identities and dependency cycles and
+preserves blocked/conflicting results. Catalog publication does not certify native
+backend support.
 The editor captures one request ID and payload before sending, retains an ambiguous
 attempt across route navigation, and only changes its expected head/request identity
 on an explicit rebase or replacement. Revision refresh failures do not discard an
 unsent draft. These drafts and attempts are tab-memory state, not durable browser
 storage: full reload and sign-out clear them. Exact server-side retry receipts and
 retained revisions remain durable.
+
+The existing **Groups** page retains static authorization membership under
+unrestricted `accounts.manage`; its dynamic targeting section uses unrestricted
+`inventory.manage` and never creates RBAC membership from inventory predicates.
+**Rollouts** exposes real target-assignment and rollout administration, bounded
+100-record keyset pages, and typed ring/health policy documents. Global edits require
+unrestricted `resources.assign`; device preview and activation honor device scopes.
+Preview displays the immutable device-generation snapshot, input/resolution/preview
+digests, captured assignment revisions, resource conflicts, contributor revisions
+and explicitly unsupported dispatch capabilities. Dispatch support is not a native
+qualification claim. Activation pins the displayed device ID, preview ID and digest
+and never rebases automatically; the server rechecks freshness and authority.
+When policy requires an independent human, the console submits that exact activation
+to the existing approval inbox; execution attaches its approval ID without changing
+the captured target. Mutations have no automatic retry, and ambiguous requests
+retain their exact identity in scoped tab memory.
+Device **Resources / Compliance** shows generic desired references, typed
+dependencies and retained ownership-safe release rows. Signed service-action history
+remains service-specific evidence during Phase 1, not fabricated evidence for other
+resource kinds.
 
 Optional `execution_signing.plan_key_file` and `start_key_file` are distinct protected
 file references to single unencrypted PKCS#8 Ed25519 private keys. Loading excludes
@@ -404,6 +919,288 @@ recovery, ownership-safe release or distro certification. In particular, a
 production worker's execution placement on a noexec state volume still needs
 separate design and qualification.
 
+### Server deployment laboratory
+
+Build embedded console assets with `npm run build:web`, then run:
+
+```sh
+go run ./cmd/lab vm server -manifest lab/images/ubuntu-noble-amd64.json -repo . -record /private/new-server-vm.json
+go run ./cmd/lab server compose -repo . -record /private/new-server-compose.json
+```
+
+Both `lab packages build` (agent) and `lab packages build-server` accept `-arch
+amd64` or `-arch arm64`; omitted means the build host. `-repo` source compilation
+sets Linux, the explicit Go target and `CGO_ENABLED=0`, with private intermediate
+and output paths rather than shared binaries. Go callers set
+`packaging.BuildRequest.TargetArchitecture`, including through `SourceRequest`.
+DEB metadata uses `amd64`/`arm64`; RPM uses `x86_64`/`aarch64`. A mismatching ELF
+machine, Go module identity or embedded target settings fails closed. Native-host
+builds execute `version`; foreign-host builds read the actual version string through
+its ELF symbol/load segment and record `version_validation=embedded-build-metadata`,
+not native execution. Foreign prebuilt executables must retain ELF symbols. Go's
+`-trimpath` intentionally omits linker arguments from build settings, so their text
+is not treated as proof of the stamped value. No QEMU-user dependency or guest
+behavior is inferred.
+Two clean source compilations and real DEB/signed RPM archives per target and
+product are exercised by `TestCrossArchitectureSourcePackages`; its small Go module
+fixtures test packaging boundaries, not the production agent/server protocols.
+
+The VM lane needs the existing KVM/QEMU/cloud-init and native signed-package tools,
+plus guest distribution repository access for PostgreSQL. It uses no shared dev
+database, IdP or host port 18444. It snapshots bounded Go/SQL/native/embedded-console
+inputs once, records their digest, then builds two `lindmd` DEBs plus a clean
+repeated build from those same bytes. It authenticates the repository with a fresh
+isolated signing key and installs
+PostgreSQL with verify-full TLS and separate runtime/migration roles, invokes the
+explicit migration unit and claims a LOCAL owner exactly once. It proves HTTPS
+health/readiness, embedded console, LOCAL auth options, protected RPC 401, service
+hardening, restart and signed package upgrade. Backup uses real `pg_dump`, a
+config/key ownership/hash inventory, database destruction and `pg_restore`; owner
+and a clearly identified pending backup-fixture device row must remain identical.
+Purge must retain keys/config/database. The fixture device is not enrollment proof;
+the lane does not claim a WebAuthn ceremony or stale-restore dispatch reconciliation.
+
+The independent Compose lane requires local Docker/Compose v2 and access to pinned
+image registries (or cached images). It creates a unique project and random
+loopback ports, builds the static embedded-console image, runs migration explicitly,
+checks LOCAL bootstrap/public/protected surfaces, live DB TLS/role separation and
+actual container confinement, then removes only its owned project/volumes/image.
+Both lanes emit nonsecret records exclusively to a new `-record` path; private
+fixtures and one-time enrollment output are never evidence. These commands are
+native/container qualification, not substitutes for physical or full release gates.
+Production steps and secret inventories are in the
+[operations runbooks](security-and-operations.md#native-single-host-installation).
+
+### Advisory feed operations
+
+Configure `advisories.feeds` in the server protobuf JSON. Each `FeedSource` names
+`id`, `distro`, `release`, HTTPS `url`, `format` and `maxAgeSeconds` (one minute–seven
+days). RPM metadata/CSAF and Arch require explicit architecture. Vendor OSV uses
+`FEED_FORMAT_OSV_ZIP` or `FEED_FORMAT_OSV_JSON`; Fedora uses
+`FEED_FORMAT_RPM_REPOMD`. Other authoritative formats are:
+
+- `FEED_FORMAT_REDHAT_CSAF`: one signed Red Hat advisory/VEX JSON document.
+- `FEED_FORMAT_REDHAT_CSAF_ARCHIVES`: root
+  `https://security.access.redhat.com/data/csaf/v2/`, acquiring both signed weekly
+  distributions through their `archive_latest.txt` pointers. Use the seven-day
+  freshness ceiling for weekly publication; missing a new weekly archive expires
+  the old evidence rather than silently extending it.
+- `FEED_FORMAT_SUSE_CSAF`: a signed vendor JSON notice, exact SLES major/service-pack
+  or Leap major/minor. Tumbleweed uses `rolling`, but GA-media aggregate notices
+  are rejected as fix boundaries.
+- `FEED_FORMAT_ARCH_JSON`: `arch`, `rolling`, `x86_64`, official
+  `https://security.archlinux.org/all.json`; the official `advisories.json` companion
+  supplies dates only for exact AVG/package matches. AUR/derivatives are not covered.
+- `FEED_FORMAT_DEBIAN_TRACKER_JSON`: Debian numeric release and
+  `https://security-tracker.debian.org/tracker/data/json`. A release absent from the
+  export is rejected, not interpreted as clean.
+
+RHEL requires `platformStream` of `standard`, `eus` or `e4s`. Mainstream may select
+major `9`; EUS/E4S require an exact minor, corroborated by native inventory. Format
+and distro are protobuf-validated, and overlapping RHEL major/minor source scopes
+are rejected. These new sources deliberately remain partial when the vendor
+format/mapping cannot establish a complete applicable binary universe.
+
+`lindmd advisories-refresh -config FILE` explicitly fetches and atomically publishes
+configured feeds. `advisories.refreshEnabled` defaults to false: air-gapped
+deployments perform no scheduled feed egress. When enabled, refresh defaults to
+six hours (configurable one hour–seven days). Package/host evidence defaults to
+24-hour validity, configurable five minutes–seven days. Inventory matching and
+expiry handling do not need network access.
+
+`lindmd advisories-import -config FILE -feed ID -file FILE` admits cached vendor
+bytes only when that feed has an out-of-band `expectedSha256` pin (protobuf JSON
+base64). The raw compressed/ZIP bytes are hashed before decompression. For repository
+metadata, configure `FEED_FORMAT_RPM_UPDATEINFO` and pin the referenced updateinfo
+bytes; bare repomd without its companion is not importable. A byte pin does not
+prove acquisition time: file imports contribute findings but cannot establish
+current complete coverage, even for a complete archive. This prevents an old file
+from becoming an apparently fresh clean result merely by reimporting it. Signed
+offline-bundle custody and replay protection remain a separate protocol.
+
+Online Red Hat/SUSE proofs use pinned vendor OpenPGP keys retained under
+`internal/advisory/feed/keys`; its provenance records the trust-bootstrap limits.
+The console exposes artifact digests, signer fingerprints and signed snapshot time
+separately from last successful fetch. Composite feed status SHA-256 hashes the
+deterministically encoded protobuf `FeedManifest`; `expectedSha256` pins that
+manifest for Red Hat archives, and raw primary bytes for other formats. Offline
+individual CSAF imports still require externally authenticated operator pins and
+do not claim signature provenance; paired Red Hat archive import requires the
+separate replay-fenced bundle protocol.
+
+Ordinary input is capped at 128 MiB compressed, 512 MiB expanded and 500,000
+normalized records. Signed individual CSAF is capped at 32 MiB with 64 KiB proofs.
+Red Hat acquisition stages at most one 512 MiB compressed archive in a private
+temporary file, removes it on every exit, bounds each archive to 16 GiB expanded
+and 250,000 entries, and bounds the combined normalized data to 128 MiB/500,000
+records. Eight logical requests (forty including redirects) and parsing share one
+five-minute deadline. Database insertion uses bounded COPY batches. A scheduled
+matcher scans at most 100 devices per minute; reads evaluate the current snapshot
+immediately. Expiry is rechecked at read time independently of scan progress.
+Findings pages are row- and byte-bounded. Failed refreshes preserve historical
+evidence and expose an error without resetting freshness.
+
+### Signed release repository core (P20/L17)
+
+`internal/releaseupdate` uses maintained go-tuf v2 metadata and updater verification.
+`lab release repository` composes its focused `RunCLI` entry point and accepts
+`development-keys`, `init`, `publish`, `promote`, `rollout`, `rotate`, and `mirror`.
+Every operation uses explicit paths. `development-keys -keys DIR` is conspicuously
+development-only; production private custody is provisioned independently.
+
+Repositories contain `metadata/` and hash-prefixed `targets/` with consistent
+snapshots. Five distinct root/targets/rollout/snapshot/timestamp signing identities
+are required. Library callers can supply quorum signers; file custody is explicit
+owner-private PKCS#8. Keep `root.pem` and `targets.pem` offline. Online custody
+contains only `rollout.pem`, `snapshot.pem` and `timestamp.pem`; the loader rejects
+exposed offline files, including symlinks. The terminating rollout delegation can
+sign only `channels/*.json`; packages and native signatures remain top-level targets.
+Their complete protobuf artifact identity and compatibility contract is bound in
+offline-signed target metadata. Root rotation requires predecessor and successor
+root quorums plus offline targets authority. Never put private custody inside the
+published tree.
+
+`publish -repository DIR -keys DIR -channel FILE -target LOGICAL=SOURCE` consumes
+strict protobuf JSON `lindm.update.v1.AgentUpdateChannel`; repeat `-target` for
+packages and release attestations. Agent choices are restricted to logical paths
+under `packages/lindm-agent/` and carry numeric release identity, exact native
+package version, architecture, package format, and explicit agent/protocol windows.
+Other products can be ordinary signed targets but cannot become self-update choices.
+`promote -repository DIR -keys ONLINE_DIR -channel FILE` can select only exact
+offline-authorized artifact contracts. It cannot introduce package bytes or alter
+their native version, architecture or compatibility windows. Pause/percentage
+updates leave top-level targets bytes and version unchanged. Offline targets expiry
+cannot be extended by online custody: schedule offline renewal before seven days.
+Arch choices must also bind `signatureTargetPath` to the package logical path plus
+`.sig`. Publish that detached native signature as a distinct TUF target, capped
+at 64 KiB. `Selection` exposes its verified transport hints and `StageSignature`
+checks the same private snapshot-bound descriptor before staging. The executor
+places it adjacent to the package and retains pacman's native signature policy;
+TUF transport verification does not replace native keyring trust.
+Channels bind their ring, generation, seven-day maximum validity, pause state and
+stable device/ring percentage eligibility. Rollout updates use
+`-ring`, `-paused`, `-percentage`, `-expected-generation`, and `-request-id`; the
+signed intent identity makes exact retries distinguishable from concurrent changes.
+
+The client receives authenticated bootstrap `release_root_json`, a private state
+directory, and an injected bounded transport callback. It never constructs a
+network client. The native root process owns metadata verification and selection;
+the unprivileged process supplies requested relative paths and bytes. Verified
+high-water metadata is atomically fsynced before the next untrusted metadata read,
+including timestamp advancement when a later refresh step fails. Checkpoints bind
+the bootstrap digest, clock floor, and accepted channel generations/digests.
+A separate fsynced initialization marker makes disappearance of either protected
+checkpoint component a fail-closed error, not permission to reset rollback state.
+Metadata is capped at 4 MiB per role, catalogs at 1 MiB, targets at 2 GiB, and the
+repository at 4096 targets. Packages are streamed through SHA-256/length checking
+to private staging and atomically published only after successful fsync.
+
+The read-only HTTP handler accepts GET/HEAD only and rejects indexes, traversal,
+symlinks, private paths and temporary names. Air-gap
+`mirror -repository DEST -source SOURCE -root AUTHENTICATED_ROOT` transports the
+same signed public files, verifies the complete root chain and every streamed
+target, and commits the timestamp last. It does not disable freshness checks.
+Root/targets/snapshot/timestamp validity limits are 365 days/7 days/7 days/1 day;
+operators must refresh publication before expiration even in isolated sites.
+
+Focused regression source covers actual signatures, root rotation/quorums,
+rollback across restart and interrupted refresh, freeze, mix-and-match, catalog
+binding/equivocation, target tampering, streaming cancellation, publication recovery,
+and mirrored/HTTP boundaries. Run `go test -race ./internal/releaseupdate` after
+all integration slices land; these library tests do not claim native package
+transaction or full platform qualification.
+
+### Clean release exports and custody (P20/L17)
+
+`lab release build` creates two isolated source, HOME, Go module/compiler and npm
+cache trees, installs the pinned frontend dependencies and builds all three
+products for `amd64` and `arm64`. Native exports are DEB/RPM for `lindmd`,
+`lindm-agent` and `lindmctl`; OCI exports are the server and CLI. An agent container
+is not a substitute for host systemd/package ownership. Complete unsigned native
+archives and deterministic OCI archives must match between both builders before
+atomic export. RPM signatures are compared separately from the pre-sign archive.
+
+Every artifact has a CycloneDX dependency SBOM and DSSE in-toto artifact/provenance
+statements signed by a distinct pinned release-attestation key. These statements
+describe two isolated builds on this host/toolchain, not independent organizations,
+hermetic networking, transparency-log inclusion or SLSA certification. Release
+verification uses an externally obtained public key and key ID, never a trust key
+from the export being checked.
+
+```sh
+go run ./cmd/lab release build -repo . -output /private/release-export \
+  -version 1.2.3 -revision RELEASE_LABEL -source-date-epoch UNIX_SECONDS \
+  -signer-home /private/package-signing -fingerprint PACKAGE_FINGERPRINT \
+  -attestation-key /private/attestation.pem -attestation-key-id PINNED_SPKI_ID \
+  -oci-ca-bundle /private/approved-roots.pem -oci-ca-sha256 PINNED_CA_SHA256 \
+  -signing-trust-inventory /private/signing-public-inventory.json \
+  -signing-trust-inventory-sha256 PINNED_INVENTORY_SHA256
+go run ./cmd/lab release verify -directory /private/release-export \
+  -public-key /private/trusted-attestation-public.pem -key-id PINNED_SPKI_ID
+```
+
+Production attestation custody is operator-provisioned PKCS#8 mode `0600` with the
+purpose sidecar required by the tool. The strict protobuf `SigningTrustInventory`
+contains authenticated execution and TLS public keys and signed TUF public trust
+metadata, including delegated-role identities. All domains are required. Keys are
+compared by actual public material, not incompatible OpenPGP/TUF identifier strings;
+the same exclusions reach the native package signer. Inventory and CA pins must
+come from an independently authenticated release-custodian process.
+
+OCI images are deterministic nonroot scratch images with a `0555` static executable
+and the explicitly pinned CA bundle at `0444`; that material is covered by the image
+digest, SBOM and provenance. Supply appropriate roots for public OIDC and configured
+outbound TLS services. No ambient host root bundle is captured. Server startup still
+requires operator configuration/secrets, explicit migration, read-only rootfs and
+data volumes as described in the production runbook. The existing distroless
+Compose image is a separate pinned deployment definition, not byte-identical to
+these release OCI exports.
+
+`release attestation-keygen`, `packages keygen`, and `-development-key` are explicit
+laboratory facilities, not production custody provisioning. Required build tools,
+fresh module/npm downloads and the pinned toolchain must be available; publication
+does not silently exclude a failing architecture or format.
+
+### Native unattended update verification (P20/L08/L17)
+
+The maintained `lab vm updates` lane builds signed agent packages at `0.1.0` and
+`0.2.0` from one immutable source snapshot, plus a matching local-auth control plane.
+These are distinct release stamps from the same checkout, not historical release
+implementations. It uses an isolated database and dynamic host listeners; the guest's
+fixed TLS origins are forwarded through its owned SSH connection. It never binds
+the shared host `:18444`, modifies development trust, or requires an external IdP.
+
+```sh
+go run ./cmd/lab vm updates -repo . \
+  -manifest lab/images/ubuntu-noble-amd64.json \
+  -record artifacts/updates-ubuntu.json
+go run ./cmd/lab vm updates -repo . \
+  -manifest lab/images/fedora-44-x86_64.json \
+  -record artifacts/updates-fedora.json
+```
+
+Use the repository's pinned manifest filename for Fedora when selecting a snapshot.
+The image cache, built embedded console, running development PostgreSQL and normal
+native package/signing tools are prerequisites. `-lab FILE` selects a prebuilt guest
+probe; otherwise the current lab executable is uploaded. `-diagnostics DIR` opts
+into private failure diagnostics. `-record` refuses overwrite and contains public
+build/runtime identities and observations, never keys, sessions or grant secrets.
+
+The lane observes signed pause and zero-percent holds, timestamp rollback, mixed
+targets, actual expiration of a previously valid unchanged timestamp, and package
+byte tampering before native admission. It then applies a kernel-verified I/O limit
+to the owned update slice, waits for an actual native unpack temporary file and
+installer PID in the update helper's cgroup, and issues an owned QEMU `system_reset`.
+After a different boot ID, the persistent protected helper must finish the exact
+native update; package database, architecture, binary stamp/digest, daemon readiness
+and unchanged enrollment identity are checked. A fresh signed downgrade offer must
+remain rejected. Fedora requires SELinux Enforcing throughout.
+
+This is KVM/QEMU guest-reset and virtual-block-device evidence, not physical power
+removal or drive-cache qualification. A library test or manual package installation
+does not substitute for this lane. Native arm64, Arch/zypper transactions and other
+hardware/OS tuples require their own recorded runs.
+
 ## 2. Toolchain and quality gates
 
 Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node
@@ -463,6 +1260,18 @@ Use a small Makefile as orchestration once product code exists. Use Go for lifec
 stateful orchestration, declarative manifests for matrices, and existing tools for
 format/lint/build/packaging. Shell recipes should compose tools, not contain a second
 implementation of business logic. CI calls the same targets as developers.
+
+For in-place greenfield migration edits, recover a stale shared development schema
+with `go run ./cmd/dev recreate-database -confirm-delete`, not a cluster reset.
+Coordinate the shared server and any tests using schemas inside `lindm` first:
+the command terminates connections and deletes that entire database only. It verifies
+the running checkout-owned Compose PostgreSQL container, protected secret mount and
+loopback endpoint, uses the fixture superuser over verified TLS, retains cluster
+roles and all other databases, and reapplies initial database permissions. Explicit
+`lindm_migrator` migration, metadata-write restriction and authentication-mode owner
+bootstrap use the same path as `up` (local mode prints the one-shot command).
+Keycloak, volumes, certificates and secrets are untouched. Consent is mandatory
+even when no server is connected; arbitrary database selection is not supported.
 
 | Required target                         | Contract                                                                                                                                                                |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

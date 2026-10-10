@@ -38,7 +38,7 @@ func (s *Service) getConnection(ctx context.Context, req *agentv1.GetConnectionR
 		return nil, err
 	}
 	defer s.mu.Unlock()
-	loaded, err := s.enrolled(ctx)
+	loaded, err := s.reportIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +51,7 @@ func (s *Service) getConnection(ctx context.Context, req *agentv1.GetConnectionR
 		CertificateNotAfter: protoTimestamp(loaded.cert.NotAfter), RenewAfter: loaded.state.GetRenewAfter(),
 		IdentityExpired: !certUsable(loaded.cert, now), RenewalPending: loaded.renewal != nil,
 	}
+	out.DeviceActionReportOnly = s.liveRoot != nil
 	if boot, err := s.bootID(); err == nil {
 		if _, idErr := canonicalUUID(boot); idErr == nil {
 			out.ObservedBootId = boot
@@ -110,7 +111,7 @@ func (s *Service) signTLS(ctx context.Context, req *agentv1.SignTLSClientMessage
 		return nil, err
 	}
 	defer s.mu.Unlock()
-	loaded, err := s.enrolled(ctx)
+	loaded, err := s.reportIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}

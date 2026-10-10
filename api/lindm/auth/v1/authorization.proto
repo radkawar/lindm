@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package lindm.auth.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/auth/v1;authv1";
+
+// Dimensions within one scope are ANDed; values in device_ids/group_ids are ORed.
+// Every label must match. Bindings OR their scopes; no scopes means unrestricted.
+message DeviceScope {
+  repeated string labels = 1 [
+    (buf.validate.field).repeated.max_items = 64,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1,
+    (buf.validate.field).repeated.items.string.max_len = 128
+  ];
+  repeated string device_ids = 2 [
+    (buf.validate.field).repeated.max_items = 1000,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.uuid = true
+  ];
+  repeated string group_ids = 3 [
+    (buf.validate.field).repeated.max_items = 100,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.uuid = true
+  ];
+}
+
+// Resolved bindings retain the association between a grant and its device scopes.
+message RoleBinding {
+  string role = 1;
+  repeated string permissions = 2;
+  repeated DeviceScope scopes = 3;
+}
+
+message RoleDefinition {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_.-]*$"
+    not_in: [
+      "owner",
+      "admin",
+      "operator",
+      "helpdesk",
+      "auditor"
+    ]
+  }];
+  repeated string permissions = 2 [
+    (buf.validate.field).repeated.min_items = 1,
+    (buf.validate.field).repeated.max_items = 21,
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string = {
+      in: [
+        "fleet.read",
+        "enrollment.manage",
+        "device.revoke",
+        "audit.read",
+        "execution_trust.manage",
+        "profiles.manage",
+        "resources.assign",
+        "accounts.manage",
+        "inventory.manage",
+        "recovery_keys.read",
+        "remote_execution.run",
+        "scripts.run",
+        "destructive.execute",
+        "approvals.manage",
+        "integrations.manage",
+        "release_updates.manage",
+        "advisory_exceptions.manage",
+        "encryption.manage",
+        "actions.lock",
+        "actions.release-lock",
+        "actions.quarantine"
+      ]
+    }
+  ];
+}
+
+message GroupBinding {
+  // Exact Keycloak group path or canonical Entra tenant group object UUID.
+  string group = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+  string role = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_.-]*$"
+  }];
+  repeated DeviceScope scopes = 3 [(buf.validate.field).repeated.max_items = 100];
+}
+
+message AuthorizationPolicy {
+  option (buf.validate.message).cel = {
+    id: "authorization.unique_roles"
+    message: "custom role names must be unique"
+    expression: "this.roles.all(r, this.roles.filter(other, other.name == r.name).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "authorization.known_roles"
+    message: "group bindings must reference a built-in or configured role"
+    expression: "this.group_bindings.all(b, b.role in ['owner', 'admin', 'operator', 'helpdesk', 'auditor'] || this.roles.exists(r, r.name == b.role))"
+  };
+  repeated RoleDefinition roles = 1 [(buf.validate.field).repeated.max_items = 100];
+  repeated GroupBinding group_bindings = 2 [(buf.validate.field).repeated.max_items = 1000];
+  repeated string approval_required_permissions = 3 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string = {
+      in: [
+        "resources.assign",
+        "execution_trust.manage",
+        "remote_execution.run",
+        "recovery_keys.read",
+        "encryption.manage",
+        "actions.lock",
+        "actions.release-lock",
+        "actions.quarantine"
+      ]
+    }
+  ];
+}

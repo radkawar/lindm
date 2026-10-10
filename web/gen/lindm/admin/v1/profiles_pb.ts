@@ -7,8 +7,8 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { ServiceProfileSpec } from "../../policy/v1/service_profile_pb.js";
-import { file_lindm_policy_v1_service_profile } from "../../policy/v1/service_profile_pb.js";
+import type { ResourceProfile } from "../../policy/v1/profile_pb.js";
+import { file_lindm_policy_v1_profile } from "../../policy/v1/profile_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -16,15 +16,15 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/profiles.proto.
  */
 export const file_lindm_admin_v1_profiles: GenFile = /*@__PURE__*/
-  fileDesc("Ch1saW5kbS9hZG1pbi92MS9wcm9maWxlcy5wcm90bxIObGluZG0uYWRtaW4udjEipgIKFlNlcnZpY2VQcm9maWxlUmV2aXNpb24SHAoKcHJvZmlsZV9pZBgBIAEoCUIIukgFcgOwAQESHQoLcmV2aXNpb25faWQYAiABKAlCCLpIBXIDsAEBEiAKD3JldmlzaW9uX251bWJlchgDIAEoBEIHukgEMgIgABI5CgRzcGVjGAQgASgLMiMubGluZG0ucG9saWN5LnYxLlNlcnZpY2VQcm9maWxlU3BlY0IGukgDyAEBEhoKCGFjdG9yX2lkGAUgASgJQgi6SAVyA7ABARI4CgxwdWJsaXNoZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESHAoLc3BlY19zaGEyNTYYByABKAxCB7pIBHoCaCAi8AIKJFB1Ymxpc2hTZXJ2aWNlUHJvZmlsZVJldmlzaW9uUmVxdWVzdBJCCgpyZXF1ZXN0X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkIKCnByb2ZpbGVfaWQYAiABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESUQoUZXhwZWN0ZWRfcmV2aXNpb25faWQYAyABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQFIAIgBARI5CgRzcGVjGAQgASgLMiMubGluZG0ucG9saWN5LnYxLlNlcnZpY2VQcm9maWxlU3BlY0IGukgDyAEBEhkKBnJlYXNvbhgFIAEoCUIJukgGcgSYtRgBQhcKFV9leHBlY3RlZF9yZXZpc2lvbl9pZCJpCiVQdWJsaXNoU2VydmljZVByb2ZpbGVSZXZpc2lvblJlc3BvbnNlEkAKCHJldmlzaW9uGAEgASgLMiYubGluZG0uYWRtaW4udjEuU2VydmljZVByb2ZpbGVSZXZpc2lvbkIGukgDyAEBIsABCiBHZXRTZXJ2aWNlUHJvZmlsZVJldmlzaW9uUmVxdWVzdBJCCgpwcm9maWxlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkgKC3JldmlzaW9uX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBSACIAQFCDgoMX3JldmlzaW9uX2lkImUKIUdldFNlcnZpY2VQcm9maWxlUmV2aXNpb25SZXNwb25zZRJACghyZXZpc2lvbhgBIAEoCzImLmxpbmRtLmFkbWluLnYxLlNlcnZpY2VQcm9maWxlUmV2aXNpb25CBrpIA8gBASJWChpMaXN0U2VydmljZVByb2ZpbGVzUmVxdWVzdBIaCglwYWdlX3NpemUYASABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgCIAEoCUIIukgFcgMYgAQi7QEKFVNlcnZpY2VQcm9maWxlU3VtbWFyeRISCgpwcm9maWxlX2lkGAEgASgJEhMKC3JldmlzaW9uX2lkGAIgASgJEhcKD3JldmlzaW9uX251bWJlchgDIAEoBBIMCgRuYW1lGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhYKDnJlc291cmNlX2NvdW50GAYgASgNEhAKCGFjdG9yX2lkGAcgASgJEjAKDHB1Ymxpc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLc3BlY19zaGEyNTYYCSABKAwibwobTGlzdFNlcnZpY2VQcm9maWxlc1Jlc3BvbnNlEjcKCHByb2ZpbGVzGAEgAygLMiUubGluZG0uYWRtaW4udjEuU2VydmljZVByb2ZpbGVTdW1tYXJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCUIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_policy_v1_service_profile, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch1saW5kbS9hZG1pbi92MS9wcm9maWxlcy5wcm90bxIObGluZG0uYWRtaW4udjEinAIKD1Byb2ZpbGVSZXZpc2lvbhIcCgpwcm9maWxlX2lkGAEgASgJQgi6SAVyA7ABARIdCgtyZXZpc2lvbl9pZBgCIAEoCUIIukgFcgOwAQESIAoPcmV2aXNpb25fbnVtYmVyGAMgASgEQge6SAQyAiAAEjYKBHNwZWMYBCABKAsyIC5saW5kbS5wb2xpY3kudjEuUmVzb3VyY2VQcm9maWxlQga6SAPIAQESGgoIYWN0b3JfaWQYBSABKAlCCLpIBXIDsAEBEjgKDHB1Ymxpc2hlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARIcCgtzcGVjX3NoYTI1NhgHIAEoDEIHukgEegJoICLmAgodUHVibGlzaFByb2ZpbGVSZXZpc2lvblJlcXVlc3QSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJCCgpwcm9maWxlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBElEKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBSACIAQESNgoEc3BlYxgEIAEoCzIgLmxpbmRtLnBvbGljeS52MS5SZXNvdXJjZVByb2ZpbGVCBrpIA8gBARIZCgZyZWFzb24YBSABKAlCCbpIBnIEmLUYAUIXChVfZXhwZWN0ZWRfcmV2aXNpb25faWQiWwoeUHVibGlzaFByb2ZpbGVSZXZpc2lvblJlc3BvbnNlEjkKCHJldmlzaW9uGAEgASgLMh8ubGluZG0uYWRtaW4udjEuUHJvZmlsZVJldmlzaW9uQga6SAPIAQEiuQEKGUdldFByb2ZpbGVSZXZpc2lvblJlcXVlc3QSQgoKcHJvZmlsZV9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJICgtyZXZpc2lvbl9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABAUgAiAEBQg4KDF9yZXZpc2lvbl9pZCJXChpHZXRQcm9maWxlUmV2aXNpb25SZXNwb25zZRI5CghyZXZpc2lvbhgBIAEoCzIfLmxpbmRtLmFkbWluLnYxLlByb2ZpbGVSZXZpc2lvbkIGukgDyAEBIk8KE0xpc3RQcm9maWxlc1JlcXVlc3QSGgoJcGFnZV9zaXplGAEgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEIuYBCg5Qcm9maWxlU3VtbWFyeRISCgpwcm9maWxlX2lkGAEgASgJEhMKC3JldmlzaW9uX2lkGAIgASgJEhcKD3JldmlzaW9uX251bWJlchgDIAEoBBIMCgRuYW1lGAQgASgJEhMKC2Rlc2NyaXB0aW9uGAUgASgJEhYKDnJlc291cmNlX2NvdW50GAYgASgNEhAKCGFjdG9yX2lkGAcgASgJEjAKDHB1Ymxpc2hlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEwoLc3BlY19zaGEyNTYYCSABKAwiYQoUTGlzdFByb2ZpbGVzUmVzcG9uc2USMAoIcHJvZmlsZXMYASADKAsyHi5saW5kbS5hZG1pbi52MS5Qcm9maWxlU3VtbWFyeRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAlCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_policy_v1_profile, file_lindm_validation_v1_string_rules]);
 
 /**
  * A published revision is immutable. Publishing changes the catalog head, not
  * an assignment: devices remain pinned to explicitly activated revisions.
  *
- * @generated from message lindm.admin.v1.ServiceProfileRevision
+ * @generated from message lindm.admin.v1.ProfileRevision
  */
-export type ServiceProfileRevision = Message<"lindm.admin.v1.ServiceProfileRevision"> & {
+export type ProfileRevision = Message<"lindm.admin.v1.ProfileRevision"> & {
   /**
    * @generated from field: string profile_id = 1;
    */
@@ -41,9 +41,9 @@ export type ServiceProfileRevision = Message<"lindm.admin.v1.ServiceProfileRevis
   revisionNumber: bigint;
 
   /**
-   * @generated from field: lindm.policy.v1.ServiceProfileSpec spec = 4;
+   * @generated from field: lindm.policy.v1.ResourceProfile spec = 4;
    */
-  spec?: ServiceProfileSpec | undefined;
+  spec?: ResourceProfile | undefined;
 
   /**
    * @generated from field: string actor_id = 5;
@@ -62,16 +62,16 @@ export type ServiceProfileRevision = Message<"lindm.admin.v1.ServiceProfileRevis
 };
 
 /**
- * Describes the message lindm.admin.v1.ServiceProfileRevision.
- * Use `create(ServiceProfileRevisionSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.ProfileRevision.
+ * Use `create(ProfileRevisionSchema)` to create a new message.
  */
-export const ServiceProfileRevisionSchema: GenMessage<ServiceProfileRevision> = /*@__PURE__*/
+export const ProfileRevisionSchema: GenMessage<ProfileRevision> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 0);
 
 /**
- * @generated from message lindm.admin.v1.PublishServiceProfileRevisionRequest
+ * @generated from message lindm.admin.v1.PublishProfileRevisionRequest
  */
-export type PublishServiceProfileRevisionRequest = Message<"lindm.admin.v1.PublishServiceProfileRevisionRequest"> & {
+export type PublishProfileRevisionRequest = Message<"lindm.admin.v1.PublishProfileRevisionRequest"> & {
   /**
    * @generated from field: string request_id = 1;
    */
@@ -92,9 +92,9 @@ export type PublishServiceProfileRevisionRequest = Message<"lindm.admin.v1.Publi
   expectedRevisionId?: string | undefined;
 
   /**
-   * @generated from field: lindm.policy.v1.ServiceProfileSpec spec = 4;
+   * @generated from field: lindm.policy.v1.ResourceProfile spec = 4;
    */
-  spec?: ServiceProfileSpec | undefined;
+  spec?: ResourceProfile | undefined;
 
   /**
    * @generated from field: string reason = 5;
@@ -103,35 +103,35 @@ export type PublishServiceProfileRevisionRequest = Message<"lindm.admin.v1.Publi
 };
 
 /**
- * Describes the message lindm.admin.v1.PublishServiceProfileRevisionRequest.
- * Use `create(PublishServiceProfileRevisionRequestSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.PublishProfileRevisionRequest.
+ * Use `create(PublishProfileRevisionRequestSchema)` to create a new message.
  */
-export const PublishServiceProfileRevisionRequestSchema: GenMessage<PublishServiceProfileRevisionRequest> = /*@__PURE__*/
+export const PublishProfileRevisionRequestSchema: GenMessage<PublishProfileRevisionRequest> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 1);
 
 /**
- * @generated from message lindm.admin.v1.PublishServiceProfileRevisionResponse
+ * @generated from message lindm.admin.v1.PublishProfileRevisionResponse
  */
-export type PublishServiceProfileRevisionResponse = Message<"lindm.admin.v1.PublishServiceProfileRevisionResponse"> & {
+export type PublishProfileRevisionResponse = Message<"lindm.admin.v1.PublishProfileRevisionResponse"> & {
   /**
    * An exact retry returns the originally published revision, not a later head.
    *
-   * @generated from field: lindm.admin.v1.ServiceProfileRevision revision = 1;
+   * @generated from field: lindm.admin.v1.ProfileRevision revision = 1;
    */
-  revision?: ServiceProfileRevision | undefined;
+  revision?: ProfileRevision | undefined;
 };
 
 /**
- * Describes the message lindm.admin.v1.PublishServiceProfileRevisionResponse.
- * Use `create(PublishServiceProfileRevisionResponseSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.PublishProfileRevisionResponse.
+ * Use `create(PublishProfileRevisionResponseSchema)` to create a new message.
  */
-export const PublishServiceProfileRevisionResponseSchema: GenMessage<PublishServiceProfileRevisionResponse> = /*@__PURE__*/
+export const PublishProfileRevisionResponseSchema: GenMessage<PublishProfileRevisionResponse> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 2);
 
 /**
- * @generated from message lindm.admin.v1.GetServiceProfileRevisionRequest
+ * @generated from message lindm.admin.v1.GetProfileRevisionRequest
  */
-export type GetServiceProfileRevisionRequest = Message<"lindm.admin.v1.GetServiceProfileRevisionRequest"> & {
+export type GetProfileRevisionRequest = Message<"lindm.admin.v1.GetProfileRevisionRequest"> & {
   /**
    * @generated from field: string profile_id = 1;
    */
@@ -146,33 +146,33 @@ export type GetServiceProfileRevisionRequest = Message<"lindm.admin.v1.GetServic
 };
 
 /**
- * Describes the message lindm.admin.v1.GetServiceProfileRevisionRequest.
- * Use `create(GetServiceProfileRevisionRequestSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.GetProfileRevisionRequest.
+ * Use `create(GetProfileRevisionRequestSchema)` to create a new message.
  */
-export const GetServiceProfileRevisionRequestSchema: GenMessage<GetServiceProfileRevisionRequest> = /*@__PURE__*/
+export const GetProfileRevisionRequestSchema: GenMessage<GetProfileRevisionRequest> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 3);
 
 /**
- * @generated from message lindm.admin.v1.GetServiceProfileRevisionResponse
+ * @generated from message lindm.admin.v1.GetProfileRevisionResponse
  */
-export type GetServiceProfileRevisionResponse = Message<"lindm.admin.v1.GetServiceProfileRevisionResponse"> & {
+export type GetProfileRevisionResponse = Message<"lindm.admin.v1.GetProfileRevisionResponse"> & {
   /**
-   * @generated from field: lindm.admin.v1.ServiceProfileRevision revision = 1;
+   * @generated from field: lindm.admin.v1.ProfileRevision revision = 1;
    */
-  revision?: ServiceProfileRevision | undefined;
+  revision?: ProfileRevision | undefined;
 };
 
 /**
- * Describes the message lindm.admin.v1.GetServiceProfileRevisionResponse.
- * Use `create(GetServiceProfileRevisionResponseSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.GetProfileRevisionResponse.
+ * Use `create(GetProfileRevisionResponseSchema)` to create a new message.
  */
-export const GetServiceProfileRevisionResponseSchema: GenMessage<GetServiceProfileRevisionResponse> = /*@__PURE__*/
+export const GetProfileRevisionResponseSchema: GenMessage<GetProfileRevisionResponse> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 4);
 
 /**
- * @generated from message lindm.admin.v1.ListServiceProfilesRequest
+ * @generated from message lindm.admin.v1.ListProfilesRequest
  */
-export type ListServiceProfilesRequest = Message<"lindm.admin.v1.ListServiceProfilesRequest"> & {
+export type ListProfilesRequest = Message<"lindm.admin.v1.ListProfilesRequest"> & {
   /**
    * @generated from field: uint32 page_size = 1;
    */
@@ -185,16 +185,16 @@ export type ListServiceProfilesRequest = Message<"lindm.admin.v1.ListServiceProf
 };
 
 /**
- * Describes the message lindm.admin.v1.ListServiceProfilesRequest.
- * Use `create(ListServiceProfilesRequestSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.ListProfilesRequest.
+ * Use `create(ListProfilesRequestSchema)` to create a new message.
  */
-export const ListServiceProfilesRequestSchema: GenMessage<ListServiceProfilesRequest> = /*@__PURE__*/
+export const ListProfilesRequestSchema: GenMessage<ListProfilesRequest> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 5);
 
 /**
- * @generated from message lindm.admin.v1.ServiceProfileSummary
+ * @generated from message lindm.admin.v1.ProfileSummary
  */
-export type ServiceProfileSummary = Message<"lindm.admin.v1.ServiceProfileSummary"> & {
+export type ProfileSummary = Message<"lindm.admin.v1.ProfileSummary"> & {
   /**
    * @generated from field: string profile_id = 1;
    */
@@ -242,22 +242,22 @@ export type ServiceProfileSummary = Message<"lindm.admin.v1.ServiceProfileSummar
 };
 
 /**
- * Describes the message lindm.admin.v1.ServiceProfileSummary.
- * Use `create(ServiceProfileSummarySchema)` to create a new message.
+ * Describes the message lindm.admin.v1.ProfileSummary.
+ * Use `create(ProfileSummarySchema)` to create a new message.
  */
-export const ServiceProfileSummarySchema: GenMessage<ServiceProfileSummary> = /*@__PURE__*/
+export const ProfileSummarySchema: GenMessage<ProfileSummary> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 6);
 
 /**
- * @generated from message lindm.admin.v1.ListServiceProfilesResponse
+ * @generated from message lindm.admin.v1.ListProfilesResponse
  */
-export type ListServiceProfilesResponse = Message<"lindm.admin.v1.ListServiceProfilesResponse"> & {
+export type ListProfilesResponse = Message<"lindm.admin.v1.ListProfilesResponse"> & {
   /**
    * These are catalog heads, not evidence of deployment or native compliance.
    *
-   * @generated from field: repeated lindm.admin.v1.ServiceProfileSummary profiles = 1;
+   * @generated from field: repeated lindm.admin.v1.ProfileSummary profiles = 1;
    */
-  profiles: ServiceProfileSummary[];
+  profiles: ProfileSummary[];
 
   /**
    * @generated from field: string next_page_token = 2;
@@ -266,9 +266,9 @@ export type ListServiceProfilesResponse = Message<"lindm.admin.v1.ListServicePro
 };
 
 /**
- * Describes the message lindm.admin.v1.ListServiceProfilesResponse.
- * Use `create(ListServiceProfilesResponseSchema)` to create a new message.
+ * Describes the message lindm.admin.v1.ListProfilesResponse.
+ * Use `create(ListProfilesResponseSchema)` to create a new message.
  */
-export const ListServiceProfilesResponseSchema: GenMessage<ListServiceProfilesResponse> = /*@__PURE__*/
+export const ListProfilesResponseSchema: GenMessage<ListProfilesResponse> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_profiles, 7);
 

@@ -94,10 +94,38 @@ func testManifest(image []byte, fingerprint string, mode labv1.ChecksumMode) *la
 		Sha256: hex.EncodeToString(hash[:]), SignerFingerprint: fingerprint, ImageSizeBytes: uint64(len(image)), ChecksumMode: mode,
 		SignerProvenanceUrl: "https://example.invalid/security/", ReleaseProvenanceUrl: "https://example.invalid/releases/1.0/",
 	}
-	if mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
+	if mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED || mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 {
 		m.SignatureUrl = proto.String("https://example.invalid/signature")
 	}
 	return m
+}
+
+func TestManifestRepositorySnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		distribution string
+		snapshot     *string
+		wantError    bool
+	}{
+		{name: "other distribution unpinned", distribution: "fedora"},
+		{name: "Arch unpinned", distribution: "arch", wantError: true},
+		{name: "Arch pinned", distribution: "arch", snapshot: proto.String("2026-10-02")},
+		{name: "empty date", distribution: "arch", snapshot: proto.String(""), wantError: true},
+		{name: "mutable alias", distribution: "arch", snapshot: proto.String("latest"), wantError: true},
+		{name: "unpadded date", distribution: "arch", snapshot: proto.String("2026-1-2"), wantError: true},
+		{name: "invalid month", distribution: "arch", snapshot: proto.String("2026-13-02"), wantError: true},
+		{name: "invalid day", distribution: "arch", snapshot: proto.String("2026-10-32"), wantError: true},
+		{name: "path injection", distribution: "arch", snapshot: proto.String("../../etc"), wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manifest := testManifest([]byte("image"), strings.Repeat("A", 40), labv1.ChecksumMode_CHECKSUM_MODE_DETACHED)
+			manifest.Distribution = tc.distribution
+			manifest.RepositorySnapshotDate = tc.snapshot
+			if err := validateManifest(manifest); (err != nil) != tc.wantError {
+				t.Fatalf("validateManifest() = %v, want error %t", err, tc.wantError)
+			}
+		})
+	}
 }
 
 func checksumText(m *labv1.ImageManifest) string {
@@ -110,7 +138,7 @@ func checksumText(m *labv1.ImageManifest) string {
 func (f signingFixture) signed(t *testing.T, m *labv1.ImageManifest, text string) (checksum, signature []byte) {
 	t.Helper()
 	args := []string{"--local-user", f.primary, "--digest-algo", "SHA256", "--output", "-"}
-	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
+	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED || m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 {
 		return []byte(text), f.gpg(t, []byte(text), append(args, "--detach-sign")...)
 	}
 	return f.gpg(t, []byte(text), append(args, "--clearsign")...), nil
@@ -131,10 +159,14 @@ func TestVerifyArtifactsSignedBoundaries(t *testing.T) {
 	fixture := newSigningFixture(t)
 	other := newSigningFixture(t)
 	image := []byte("finite fixture cloud image bytes\n")
-	for _, mode := range []labv1.ChecksumMode{labv1.ChecksumMode_CHECKSUM_MODE_DETACHED, labv1.ChecksumMode_CHECKSUM_MODE_CLEARSIGNED} {
+	for _, mode := range []labv1.ChecksumMode{labv1.ChecksumMode_CHECKSUM_MODE_DETACHED, labv1.ChecksumMode_CHECKSUM_MODE_CLEARSIGNED, labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512} {
 		t.Run(mode.String(), func(t *testing.T) {
 			original := testManifest(image, fixture.primary, mode)
-			checksum, signature := fixture.signed(t, original, checksumText(original))
+			text := checksumText(original)
+			if mode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 {
+				text = sha512ChecksumText(original, image)
+			}
+			checksum, signature := fixture.signed(t, original, text)
 			t.Run("primary authorizes bound signing subkey", func(t *testing.T) {
 				result, err := VerifyArtifacts(context.Background(), original, writeArtifacts(t, image, checksum, signature, fixture.key))
 				if err != nil {
@@ -158,12 +190,12 @@ func TestVerifyArtifactsSignedBoundaries(t *testing.T) {
 					payload, sums, sig, key := bytes.Clone(image), bytes.Clone(checksum), bytes.Clone(signature), bytes.Clone(fixture.key)
 					switch failure {
 					case "wrong signer":
-						sums, sig = other.signed(t, m, checksumText(m))
+						sums, sig = other.signed(t, m, text)
 						key = append(key, other.key...)
 					case "unsigned":
-						sums, sig = []byte(checksumText(m)), nil
+						sums, sig = []byte(text), nil
 					case "tampered checksum":
-						sums = bytes.Replace(sums, []byte(m.Sha256), []byte(strings.Repeat("0", 64)), 1)
+						sums = bytes.Replace(sums, []byte(m.ImageFilename), []byte("other.qcow2"), 1)
 					case "tampered image":
 						payload[0] ^= 1
 					case "truncated image":
@@ -171,9 +203,9 @@ func TestVerifyArtifactsSignedBoundaries(t *testing.T) {
 					case "wrong pinned digest":
 						m.Sha256 = strings.Repeat("0", 64)
 					case "missing filename":
-						sums, sig = fixture.signed(t, m, strings.ReplaceAll(checksumText(m), m.ImageFilename, "other.qcow2"))
+						sums, sig = fixture.signed(t, m, strings.ReplaceAll(text, m.ImageFilename, "other.qcow2"))
 					case "duplicate filename":
-						sums, sig = fixture.signed(t, m, checksumText(m)+checksumText(m))
+						sums, sig = fixture.signed(t, m, text+text)
 					case "unrelated keyring":
 						key = other.key
 					}

@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"lindm/db"
+	"lindm/internal/agent/buildinfo"
 	"lindm/internal/config"
 	"lindm/internal/identity"
 	"lindm/internal/server"
@@ -33,11 +34,22 @@ func main() {
 }
 
 func run(ctx context.Context, args []string) error {
+	if err := disableCoreDumps(); err != nil {
+		return err
+	}
 	if len(args) == 0 {
-		return errors.New("usage: lindmd {serve|migrate|bootstrap-owner|check-config} -config FILE")
+		return errors.New("usage: lindmd {serve|migrate|bootstrap-owner|check-config|advisories-refresh|advisories-import} -config FILE; lindmd version")
 	}
 	command := args[0]
 	switch command {
+	case "version":
+		if len(args) != 1 {
+			return errors.New("version accepts no arguments")
+		}
+		_, err := io.WriteString(os.Stdout, buildinfo.Line())
+		return err
+	case "advisories-refresh", "advisories-import":
+		return runAdvisories(ctx, args)
 	case "serve", "migrate", "bootstrap-owner", "check-config":
 	default:
 		return fmt.Errorf("unknown command %q", command)
@@ -100,7 +112,7 @@ func run(ctx context.Context, args []string) error {
 		}
 		subject = object.String()
 	} else if issuer == "" || subject == "" || username != "" || tenantID != "" || objectID != "" {
-		return errors.New("keycloak bootstrap-owner requires -issuer and -subject and rejects -username/-tenant-id/-object-id")
+		return errors.New("external bootstrap-owner requires -issuer and -subject and rejects -username/-tenant-id/-object-id")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

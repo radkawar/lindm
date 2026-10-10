@@ -14,23 +14,30 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 )
 
 // Config is the process dependency injection for one configured issuer.
 // It is not a serialized user-config schema.
 type Config struct {
-	Local                 bool
-	BreakGlass            *configv1.BreakGlassPolicy
-	Issuer                string
-	EntraTenantID         string
-	ClientID              string
-	ClientSecret          string
-	DirectoryClientID     string
-	DirectoryClientSecret string
-	PublicURL             string
-	AdminGroups           []string
-	HTTPClient            *http.Client
+	Local                       bool
+	BreakGlass                  *configv1.BreakGlassPolicy
+	Issuer                      string
+	EntraTenantID               string
+	ClientID                    string
+	ClientSecret                string
+	DirectoryClientID           string
+	DirectoryClientSecret       string
+	Okta                        *configv1.OktaDirectory
+	Google                      *configv1.GoogleDirectory
+	DirectoryPrivateKeyPEM      []byte
+	SCIM                        *configv1.SCIMConfig
+	Broker                      *configv1.KeycloakBrokerUpstream
+	BrokerDirectoryClientSecret string
+	PublicURL                   string
+	Policy                      *authv1.AuthorizationPolicy
+	HTTPClient                  *http.Client
 }
 
 // Principal is the authenticated admin stored in the request context.
@@ -45,23 +52,41 @@ type Principal struct {
 	BreakGlass         bool
 	IncidentReason     string
 	AllowedPermissions []string
+	Bindings           []*authv1.RoleBinding
+	ServiceAccount     bool
 }
 
 // Permission is an authorization action. Unknown values are denied.
 type Permission string
 
 const (
-	PermissionReadFleet            Permission = "fleet.read"
-	PermissionManageEnrollment     Permission = "enrollment.manage"
-	PermissionRevokeDevice         Permission = "device.revoke"
-	PermissionReadAudit            Permission = "audit.read"
-	PermissionManageExecutionTrust Permission = "execution_trust.manage"
-	PermissionManageProfiles       Permission = "profiles.manage"
-	PermissionAssignServices       Permission = "services.assign"
-	PermissionManageAccounts       Permission = "accounts.manage"
+	PermissionReadFleet                Permission = "fleet.read"
+	PermissionManageEnrollment         Permission = "enrollment.manage"
+	PermissionRevokeDevice             Permission = "device.revoke"
+	PermissionReadAudit                Permission = "audit.read"
+	PermissionManageExecutionTrust     Permission = "execution_trust.manage"
+	PermissionManageProfiles           Permission = "profiles.manage"
+	PermissionAssignResources          Permission = "resources.assign"
+	PermissionManageAccounts           Permission = "accounts.manage"
+	PermissionManageInventory          Permission = "inventory.manage"
+	PermissionReadRecoveryKeys         Permission = "recovery_keys.read"
+	PermissionRunRemoteExecution       Permission = "remote_execution.run"
+	PermissionRunScripts               Permission = "scripts.run"
+	PermissionExecuteDestructive       Permission = "destructive.execute"
+	PermissionManageApprovals          Permission = "approvals.manage"
+	PermissionManageIntegrations       Permission = "integrations.manage"
+	PermissionManageReleaseUpdates     Permission = "release_updates.manage"
+	PermissionManageAdvisoryExceptions Permission = "advisory_exceptions.manage"
+	PermissionManageEncryption         Permission = "encryption.manage"
+	PermissionLockDevice               Permission = "actions.lock"
+	PermissionReleaseLockDevice        Permission = "actions.release-lock"
+	PermissionQuarantineDevice         Permission = "actions.quarantine"
 
-	RoleOwner = "owner"
-	RoleAdmin = "admin"
+	RoleOwner    = "owner"
+	RoleAdmin    = "admin"
+	RoleOperator = "operator"
+	RoleHelpdesk = "helpdesk"
+	RoleAuditor  = "auditor"
 )
 
 // Bootstrap and directory failures returned to the owner command.
@@ -76,7 +101,7 @@ var (
 type principalContextKey struct{}
 
 // WithPrincipal stores p for PrincipalFromContext. It does not grant authority;
-// Authorize still evaluates Role.
+// Authorize still evaluates the resolved permission bindings.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
 }
@@ -85,37 +110,6 @@ func WithPrincipal(ctx context.Context, p Principal) context.Context {
 func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 	p, ok := ctx.Value(principalContextKey{}).(Principal)
 	return p, ok
-}
-
-// Authorize applies the role policy and intersects emergency grants with their
-// explicit allowlist. Account management is owner-only; unknown permissions deny.
-func Authorize(p Principal, perm Permission) bool {
-	if p.BreakGlass {
-		allowed := false
-		for _, value := range p.AllowedPermissions {
-			if value == string(perm) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return false
-		}
-	}
-	if perm == PermissionManageAccounts {
-		return p.Role == RoleOwner
-	}
-	switch p.Role {
-	case RoleOwner, RoleAdmin:
-	default:
-		return false
-	}
-	switch perm {
-	case PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignServices:
-		return true
-	default:
-		return false
-	}
 }
 
 // New builds the selected authoritative source and compiles request validation.

@@ -36,12 +36,8 @@ func (m *managementLoop) start(parent context.Context) func() {
 		defer close(done)
 		defer m.cache.Close()
 		for ctx.Err() == nil {
-			if err := synchronizeExecutionTrust(ctx, m.executor, &m.cache, m.gate); err != nil {
-				if ctx.Err() == nil {
-					slog.Warn("execution trust synchronization incomplete", "error", err)
-				}
-			} else if err := m.dispatchServices(ctx); err != nil && ctx.Err() == nil {
-				slog.Warn("service dispatch incomplete", "error", err)
+			if err := m.cycle(ctx); err != nil && ctx.Err() == nil {
+				slog.Warn("management synchronization incomplete", "error", err)
 			}
 			if ctx.Err() != nil {
 				return
@@ -59,6 +55,33 @@ func (m *managementLoop) start(parent context.Context) func() {
 		cancel()
 		<-done
 	}
+}
+
+func (m *managementLoop) cycle(ctx context.Context) error {
+	connection, err := rpc(ctx, m.executor.GetConnection, &agentv1.GetConnectionRequest{})
+	if err != nil {
+		return err
+	}
+	if connection.GetDeviceActionReportOnly() {
+		return m.dispatchDeviceActions(ctx)
+	}
+	if err := synchronizeExecutionTrust(ctx, m.executor, &m.cache, m.gate); err != nil {
+		return err
+	}
+	actionErr := m.dispatchDeviceActions(ctx)
+	if ctx.Err() != nil {
+		return errors.Join(actionErr, ctx.Err())
+	}
+	// An action may have entered its memory-only report window while running.
+	// Never follow it with trust/session/service mutations against the journal.
+	connection, err = rpc(ctx, m.executor.GetConnection, &agentv1.GetConnectionRequest{})
+	if err != nil {
+		return errors.Join(actionErr, err)
+	}
+	if connection.GetDeviceActionReportOnly() {
+		return actionErr
+	}
+	return errors.Join(actionErr, m.dispatchServices(ctx))
 }
 
 func synchronizeExecutionTrust(ctx context.Context, executor agentv1connect.ExecutorServiceClient, cache *connectionCache, gate authorityGate) error {

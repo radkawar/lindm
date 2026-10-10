@@ -1,0 +1,19 @@
+{
+  "id": "ubuntu-resolute-20260927-amd64",
+  "distribution": "ubuntu",
+  "version": "26.04",
+  "architecture": "amd64",
+  "edition": "server-cloudimg",
+  "release": "resolute-release-20260927",
+  "imageFilename": "ubuntu-26.04-server-cloudimg-amd64.img",
+  "imageUrl": "https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-amd64.img",
+  "checksumUrl": "https://cloud-images.ubuntu.com/releases/resolute/release-20260927/SHA256SUMS",
+  "signatureUrl": "https://cloud-images.ubuntu.com/releases/resolute/release-20260927/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xD2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81",
+  "sha256": "8800651811af9a85465ad1d552add729947bb16488dddb4a9b5305a3d97332b2",
+  "signerFingerprint": "D2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81",
+  "imageSizeBytes": "865115136",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://ubuntu.com/docs/public-images/public-images-how-to/verify-image-checksum/",
+  "releaseProvenanceUrl": "https://cloud-images.ubuntu.com/releases/resolute/release-20260927/"
+}

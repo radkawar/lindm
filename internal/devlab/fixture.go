@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/config"
 )
@@ -83,7 +84,8 @@ func initialize(root, authentication string) (err error) {
 	secrets := make(map[string]string)
 	secretNames := []string{"postgres-password", "runtime-password", "migrator-password"}
 	if authentication == "keycloak" {
-		secretNames = append(secretNames, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password")
+		secretNames = append(secretNames, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password",
+			"broker-directory-secret", "broker-admin-secret", "broker-upstream-directory-secret", "broker-upstream-admin-secret")
 	}
 	for _, name := range secretNames {
 		var bytes [32]byte
@@ -101,22 +103,18 @@ func initialize(root, authentication string) (err error) {
 	}
 	files["database-url"] = dsn("lindm_runtime", secrets["runtime-password"])
 	files["migration-database-url"] = dsn("lindm_migrator", secrets["migrator-password"])
-	files["database-init.sql"] = []byte(fmt.Sprintf(`-- Only cryptographically generated URL-safe passwords are interpolated.
-CREATE ROLE lindm_migrator LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-CREATE ROLE lindm_runtime LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER DATABASE lindm OWNER TO lindm_migrator;
-REVOKE ALL ON DATABASE lindm FROM PUBLIC;
-GRANT CONNECT ON DATABASE lindm TO lindm_runtime;
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-ALTER SCHEMA public OWNER TO lindm_migrator;
-GRANT USAGE ON SCHEMA public TO lindm_runtime;
-ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO lindm_runtime;
-ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO lindm_runtime;
-`, secrets["migrator-password"], secrets["runtime-password"]))
+	files["database-init.sql"] = []byte(databaseRoleSQL(secrets["migrator-password"], secrets["runtime-password"]) + applicationDatabaseSQL)
 	if authentication == "keycloak" {
 		files["realm.json"], err = realmFile(secrets)
 		if err != nil {
 			return err
+		}
+		brokerFiles, err := brokerRealmFiles(secrets)
+		if err != nil {
+			return err
+		}
+		for name, data := range brokerFiles {
+			files[name] = data
 		}
 	}
 	cfg := &configv1.ServerConfig{
@@ -127,13 +125,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, S
 		Tls:            &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
 		DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"},
 		Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{
-			Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret", AdministratorGroups: []string{"/mdm-admins"},
+			Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: "console-secret", DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: "directory-secret",
 		}}},
+		Authorization:        &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: "/mdm-admins", Role: "admin"}}},
 		TrustedCaFile:        "transport-ca.crt",
 		InventoryBudgetBytes: proto.Uint64(10 << 30),
 	}
 	if authentication == "local" {
 		cfg.Authentication = &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}
+		cfg.Authorization = nil
 	}
 	files["server.json"], err = (protojson.MarshalOptions{Indent: "  "}).Marshal(cfg)
 	if err != nil {
@@ -157,6 +157,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, S
 	return os.Rename(tmp, dir)
 }
 
+// Both maintained development and dedicated load clusters use identical roles.
+// Callers supply only cryptographically generated URL-safe passwords.
+func databaseRoleSQL(migrator, runtime string) string {
+	return fmt.Sprintf(`CREATE ROLE lindm_migrator LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+CREATE ROLE lindm_runtime LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+`, migrator, runtime)
+}
+
 func validateFixture(dir string) error {
 	m, err := readManifest(dir)
 	if err != nil {
@@ -171,7 +179,8 @@ func validateFixture(dir string) error {
 	}
 	names := []string{"transport-ca.crt", "transport-ca.key", "device-ca.crt", "device-ca.key", "server.crt", "server.key", "postgres-password", "runtime-password", "migrator-password", "database-url", "migration-database-url", "database-init.sql", "server.json"}
 	if !local {
-		names = append(names, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password", "realm.json")
+		names = append(names, "console-secret", "directory-secret", "lab-admin-secret", "owner-password", "administrator-password", "realm.json",
+			"broker-directory-secret", "broker-admin-secret", "broker-upstream-directory-secret", "broker-upstream-admin-secret", "broker-realm.json", "broker-upstream-realm.json")
 	}
 	for _, name := range names {
 		path := filepath.Join(dir, name)

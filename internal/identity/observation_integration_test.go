@@ -22,14 +22,14 @@ func TestDelayedLoginDoesNotAuthorizeAfterDisable(t *testing.T) {
 	base := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	if err := svc.withTx(ctx, func(q *identitydb.Queries) error {
 		_, err := svc.writeObservation(ctx, q, row.ID, directoryObservation{
-			Found: true, UserID: subject, Enabled: false, Direct: true, AcquiredAt: base.Add(time.Second),
+			Found: true, UserID: subject.String(), Enabled: false, Direct: true, AcquiredAt: base.Add(time.Second),
 		})
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	_, denied, err := svc.completeLogin(ctx, subject, directoryObservation{
-		Found: true, UserID: subject, Enabled: true, Direct: true, Groups: []string{"/admins"}, DisplayName: "stale", AcquiredAt: base,
+	_, denied, err := svc.completeLogin(ctx, subject.String(), directoryObservation{
+		Found: true, UserID: subject.String(), Enabled: true, Direct: true, Groups: []string{"/admins"}, DisplayName: "stale", AcquiredAt: base,
 	})
 	if !errors.Is(err, errStaleObservation) || denied {
 		t.Fatalf("stale login err=%v denied=%v", err, denied)
@@ -58,7 +58,7 @@ func TestAuthorizationChangesAreAuditedAndRolledBack(t *testing.T) {
 	apply := func(at time.Time, groups []string) error {
 		return svc.withTx(ctx, func(q *identitydb.Queries) error {
 			_, err := svc.writeObservation(ctx, q, row.ID, directoryObservation{
-				Found: true, UserID: subject, Enabled: true, Direct: true, Groups: groups, AcquiredAt: at,
+				Found: true, UserID: subject.String(), Enabled: true, Direct: true, Groups: groups, AcquiredAt: at,
 			})
 			return err
 		})
@@ -78,7 +78,7 @@ func TestAuthorizationChangesAreAuditedAndRolledBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if role := effectiveRole(snap.PinnedRole, snap.Groups, svc.adminGroups); role != "" || Authorize(Principal{Role: role}, PermissionManageEnrollment) {
+	if role := effectiveRole(snap.PinnedRole, snap.Groups, svc.policy); role != "" || Authorize(Principal{Role: role}, PermissionManageEnrollment) {
 		t.Fatalf("removed admin still authorized as %q", role)
 	}
 	if _, err := conn.Exec(ctx, `
@@ -140,12 +140,16 @@ func integrationService(t *testing.T) (*Service, context.Context, *pgx.Conn) {
 	t.Helper()
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
-	return &Service{
-		pool:        pool,
-		issuer:      "https://idp.example/realms/lindm",
-		adminGroups: []string{"/admins"},
-		now:         time.Now,
-	}, ctx, conn
+	svc := &Service{
+		pool:   pool,
+		issuer: "https://idp.example/realms/lindm",
+		policy: mappedPolicy(t, "/admins"),
+		now:    time.Now,
+	}
+	if err := svc.activatePolicy(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return svc, ctx, conn
 }
 
 func insertObservedPrincipal(t *testing.T, ctx context.Context, svc *Service, subject uuid.UUID) identitydb.Principal {

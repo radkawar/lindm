@@ -4,6 +4,7 @@ package lindm.auth.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/auth/v1/authorization.proto";
 
 option go_package = "lindm/gen/lindm/auth/v1;authv1";
 
@@ -19,6 +20,9 @@ message SessionPrincipal {
   string csrf_token = 6;
   bool break_glass = 7;
   string incident_reason = 8;
+  repeated string permissions = 9;
+  bool service_account = 10;
+  repeated RoleBinding bindings = 11;
 }
 
 // All authentication endpoints use protobuf JSON and no-store responses.
@@ -87,10 +91,12 @@ message LocalAccount {
   bool enabled = 4;
   bool break_glass = 5;
   bool enrolled = 6;
+  repeated DeviceScope scopes = 7;
 }
 
 message ListAccountsResponse {
   repeated LocalAccount accounts = 1;
+  repeated string roles = 2;
 }
 
 message CreateAccountRequest {
@@ -105,12 +111,12 @@ message CreateAccountRequest {
     pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
   }];
   string role = 2 [(buf.validate.field).string = {
-    in: [
-      "owner",
-      "admin"
-    ]
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_.-]*$"
   }];
   bool break_glass = 3;
+  repeated DeviceScope scopes = 4 [(buf.validate.field).repeated.max_items = 100];
 }
 
 message UpdateAccountRequest {
@@ -122,12 +128,12 @@ message UpdateAccountRequest {
   string account_id = 1 [(buf.validate.field).string.uuid = true];
   bool enabled = 2;
   string role = 3 [(buf.validate.field).string = {
-    in: [
-      "owner",
-      "admin"
-    ]
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_.-]*$"
   }];
   bool break_glass = 4;
+  repeated DeviceScope scopes = 5 [(buf.validate.field).repeated.max_items = 100];
 }
 
 message ResetAccountRequest {
@@ -139,4 +145,34 @@ message AccountEnrollment {
   string account_id = 1;
   string secret = 2;
   google.protobuf.Timestamp expires_at = 3;
+}
+
+// GET /auth/settings is read-only and requires unrestricted accounts.manage.
+// Observations describe only the signed-in principal, never tenant-wide health.
+message IdentitySettings {
+  string primary_source = 1;
+  string issuer = 2;
+  uint32 refresh_interval_seconds = 3;
+  uint32 max_snapshot_age_seconds = 4;
+  bool scim_enabled = 5;
+  bool broker_enabled = 6;
+  bool break_glass_enabled = 7;
+  string upstream_source = 8;
+  google.protobuf.Timestamp observed_at = 9;
+  bool current = 10;
+  bool local_authority = 11;
+}
+
+message RotateSCIMCredentialRequest {
+  string connector_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_-]*$"
+  }];
+}
+
+// Returned once, no-store; the bearer token must never enter logs or query caches.
+message SCIMCredential {
+  string connector_id = 1;
+  string bearer_token = 2;
 }

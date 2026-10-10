@@ -10,6 +10,8 @@ option go_package = "lindm/gen/lindm/enrollment/v1;enrollmentv1";
 service EnrollmentService {
   rpc Enroll(EnrollRequest) returns (EnrollResponse);
   rpc RetrieveIssuance(RetrieveIssuanceRequest) returns (RetrieveIssuanceResponse);
+  rpc Provision(ProvisionRequest) returns (ProvisionResponse);
+  rpc RetrieveProvisioningIssuance(RetrieveProvisioningIssuanceRequest) returns (RetrieveProvisioningIssuanceResponse);
 }
 message EnrollRequest {
   string grant_secret = 1 [(buf.validate.field).string = {
@@ -37,4 +39,44 @@ message RetrieveIssuanceRequest {
 message RetrieveIssuanceResponse {
   bytes certificate_pem = 1;
   google.protobuf.Timestamp expires_at = 2;
+}
+
+message ProvisionRequest {
+  // Absent only on the internal verified offline-import adapter.
+  string provisioning_token = 1 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string = {
+      min_len: 32
+      max_len: 256
+    }
+  ];
+  string transaction_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes csr_pem = 3 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  string installation_id = 4 [(buf.validate.field).string.uuid = true];
+}
+message ProvisionResponse {
+  string device_id = 1;
+  string enrollment_generation = 2;
+  // pending_approval carries no certificate or agent authority.
+  string state = 3;
+  bytes certificate_pem = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+message RetrieveProvisioningIssuanceRequest {
+  bytes authority_proof = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message RetrieveProvisioningIssuanceResponse {
+  ProvisionResponse enrollment = 1 [(buf.validate.field).required = true];
+}
+message ProvisioningRetrieval {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string transaction_id = 2 [(buf.validate.field).string.uuid = true];
+  string installation_id = 3 [(buf.validate.field).string.uuid = true];
+  bytes csr_sha256 = 4 [(buf.validate.field).bytes.len = 32];
 }

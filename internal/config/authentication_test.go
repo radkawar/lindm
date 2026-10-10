@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 )
 
@@ -74,7 +75,7 @@ func TestBreakGlassSchema(t *testing.T) {
 		{name: "missing incident reason requirement", change: func(p *configv1.BreakGlassPolicy) { p.RequireIncidentReason = false }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			policy := &configv1.BreakGlassPolicy{AllowedPermissions: []string{"accounts.manage", "services.assign"}, MaxSessionLifetime: durationpb.New(time.Hour), RequireIncidentReason: true}
+			policy := &configv1.BreakGlassPolicy{AllowedPermissions: []string{"accounts.manage", "resources.assign"}, MaxSessionLifetime: durationpb.New(time.Hour), RequireIncidentReason: true}
 			if test.change != nil {
 				test.change(policy)
 			}
@@ -89,7 +90,6 @@ func TestEntraSchema(t *testing.T) {
 	entra := &configv1.EntraDirectory{
 		TenantId: "5026e756-92d1-4328-8cc1-5f6c9b5a51a9", ClientId: "cd614dd3-f636-4492-999c-5143d67f415a",
 		DirectoryClientId: "a2a762fd-82cb-4616-8ed4-355aaf81d695", ClientSecretFile: "login-secret", DirectoryClientSecretFile: "directory-secret",
-		AdministratorGroupObjectIds: []string{"7cc5c60f-cdd5-483e-a692-d585144c643a"},
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(entra))
 	if err != nil {
@@ -103,7 +103,6 @@ func TestEntraSchema(t *testing.T) {
 		func(e *configv1.EntraDirectory) { e.ClientId = e.DirectoryClientId },
 		func(e *configv1.EntraDirectory) { e.ClientId = strings.ToUpper(e.DirectoryClientId) },
 		func(e *configv1.EntraDirectory) { e.DirectoryClientSecretFile = "" },
-		func(e *configv1.EntraDirectory) { e.AdministratorGroupObjectIds = []string{"display-name"} },
 	} {
 		invalid := proto.CloneOf(entra)
 		change(invalid)
@@ -182,4 +181,33 @@ func TestEntraSecretFiles(t *testing.T) {
 
 func localAuthentication() *configv1.AuthenticationConfig {
 	return &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}
+}
+
+func TestAuthorizationSourceSchema(t *testing.T) {
+	validator, err := protovalidate.New(protovalidate.WithMessages(&configv1.ServerConfig{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name  string
+		local bool
+		group string
+		valid bool
+	}{
+		{name: "exact Keycloak path", group: "/operators", valid: true},
+		{name: "not a Keycloak path", group: "operators"},
+		{name: "empty Keycloak path", group: "/"},
+		{name: "local cannot union directory", local: true, group: "/operators"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := executionSigningSchemaConfig()
+			if test.local {
+				cfg.Authentication = localAuthentication()
+			}
+			cfg.Authorization = &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: test.group, Role: "operator"}}}
+			if err := validator.Validate(cfg); (err == nil) != test.valid {
+				t.Fatalf("source validation=%v, want valid=%v", err, test.valid)
+			}
+		})
+	}
 }

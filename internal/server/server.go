@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -15,10 +16,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"lindm/db"
+	"lindm/internal/advisory"
+	"lindm/internal/agent/buildinfo"
 	"lindm/internal/config"
 	"lindm/internal/device"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
+	"lindm/internal/integrations"
+	"lindm/internal/reports"
 	"lindm/web"
 )
 
@@ -28,16 +33,22 @@ func NewIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Reso
 	authentication := resources.Proto.GetAuthentication()
 	keycloak := authentication.GetKeycloak()
 	cfg := identity.Config{
-		Local:                 authentication.GetLocal() != nil,
-		BreakGlass:            resources.Proto.GetBreakGlass(),
-		Issuer:                keycloak.GetIssuer(),
-		ClientID:              keycloak.GetClientId(),
-		ClientSecret:          resources.ClientSecret,
-		DirectoryClientID:     keycloak.GetDirectoryClientId(),
-		DirectoryClientSecret: resources.DirectoryClientSecret,
-		PublicURL:             resources.Proto.GetPublicUrl(),
-		AdminGroups:           keycloak.GetAdministratorGroups(),
-		HTTPClient:            resources.HTTPClient,
+		Local:                       authentication.GetLocal() != nil,
+		BreakGlass:                  resources.Proto.GetBreakGlass(),
+		Issuer:                      keycloak.GetIssuer(),
+		ClientID:                    keycloak.GetClientId(),
+		ClientSecret:                resources.ClientSecret,
+		DirectoryClientID:           keycloak.GetDirectoryClientId(),
+		DirectoryClientSecret:       resources.DirectoryClientSecret,
+		PublicURL:                   resources.Proto.GetPublicUrl(),
+		Policy:                      resources.Proto.GetAuthorization(),
+		HTTPClient:                  resources.HTTPClient,
+		Okta:                        authentication.GetOkta(),
+		Google:                      authentication.GetGoogle(),
+		DirectoryPrivateKeyPEM:      resources.DirectoryPrivateKeyPEM,
+		SCIM:                        authentication.GetScim(),
+		Broker:                      keycloak.GetUpstream(),
+		BrokerDirectoryClientSecret: resources.BrokerDirectoryClientSecret,
 	}
 	if entra := authentication.GetEntra(); entra != nil {
 		issuer, err := identity.EntraIssuer(entra.GetTenantId())
@@ -48,7 +59,15 @@ func NewIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Reso
 		cfg.EntraTenantID = entra.GetTenantId()
 		cfg.ClientID = entra.GetClientId()
 		cfg.DirectoryClientID = entra.GetDirectoryClientId()
-		cfg.AdminGroups = entra.GetAdministratorGroupObjectIds()
+	}
+	if okta := authentication.GetOkta(); okta != nil {
+		cfg.Issuer = okta.GetIssuer()
+		cfg.ClientID = okta.GetClientId()
+		cfg.DirectoryClientID = okta.GetDirectoryClientId()
+	}
+	if google := authentication.GetGoogle(); google != nil {
+		cfg.Issuer = "https://accounts.google.com"
+		cfg.ClientID = google.GetClientId()
 	}
 	return identity.New(ctx, pool, cfg)
 }
@@ -84,17 +103,48 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return fmt.Errorf("initialize execution authority: %w", err)
 	}
+	advisories, err := advisory.New(startup, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
+	if err != nil {
+		return fmt.Errorf("initialize advisories: %w", err)
+	}
+	releaseHandler, releasePublisher, err := newReleaseRepository(resources)
+	if err != nil {
+		return fmt.Errorf("initialize release repository: %w", err)
+	}
 	devices, err := device.New(pool, device.Config{
-		DeploymentID:         resources.Proto.GetDeploymentId(),
-		CACertificate:        resources.DeviceCACertificate,
-		CAKey:                resources.DeviceCAKey,
-		InventoryBudgetBytes: resources.InventoryBudgetBytes,
-		ExecutionAuthority:   execution,
-		Identity:             auth,
-		ExecutionSigning:     resources.ExecutionSigning,
+		DeploymentID:                 resources.Proto.GetDeploymentId(),
+		CACertificate:                resources.DeviceCACertificate,
+		CAKey:                        resources.DeviceCAKey,
+		InventoryBudgetBytes:         resources.InventoryBudgetBytes,
+		ExecutionAuthority:           execution,
+		Identity:                     auth,
+		ExecutionSigning:             resources.ExecutionSigning,
+		Advisories:                   advisories,
+		Escrow:                       resources.Escrow,
+		EscrowRevealApprovalRequired: resources.EscrowRevealApprovalRequired,
+		ReleasePublisher:             releasePublisher,
+		ServerRelease:                buildinfo.Current().Version,
+		ServerProtocol:               buildinfo.ProtocolVersion,
+		RequireReleaseCompatibility:  true,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)
+	}
+	var deliveries *integrations.Service
+	var reporting *reports.Service
+	if resources.Proto.GetIntegrations() != nil {
+		deliveries, err = integrations.New(pool, auth, resources.IntegrationEncryptionKey, time.Now)
+		if err != nil {
+			return fmt.Errorf("initialize integrations: %w", err)
+		}
+		signer, ok := resources.ServerCertificate.PrivateKey.(crypto.Signer)
+		if !ok {
+			return errors.New("server TLS key cannot sign report manifests")
+		}
+		reporting, err = reports.New(pool, auth, signer, resources.ServerCertificate.Certificate)
+		if err != nil {
+			return fmt.Errorf("initialize reports: %w", err)
+		}
 	}
 	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
 	cleanupDone := make(chan struct{})
@@ -106,15 +156,38 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		cancelCleanup()
 		<-cleanupDone
 	}()
+	advisoryCtx, cancelAdvisories := context.WithCancel(ctx)
+	advisoryDone := make(chan struct{})
+	go func() {
+		defer close(advisoryDone)
+		advisories.Run(advisoryCtx)
+	}()
+	defer func() {
+		cancelAdvisories()
+		<-advisoryDone
+	}()
 	console, err := web.Handler()
 	if err != nil {
 		return err
 	}
 
 	adminMux := http.NewServeMux()
-	adminMux.Handle("/auth/", auth.Handler())
+	identityHandler := auth.Handler()
+	adminMux.Handle("/auth/", identityHandler)
+	adminMux.Handle("/scim/v2/", identityHandler)
 	path, handler := devices.AdminHandler()
 	adminMux.Handle(path, auth.RequireSession(handler))
+	path, handler = devices.ReleaseManagementHandler()
+	adminMux.Handle(path, auth.RequireSession(handler))
+	if releaseHandler != nil {
+		adminMux.Handle("/updates/", http.StripPrefix("/updates/", releaseHandler))
+	}
+	if deliveries != nil {
+		path, handler = deliveries.AdminHandler()
+		adminMux.Handle(path, auth.RequireSession(handler))
+		path, handler = reporting.AdminHandler()
+		adminMux.Handle(path, auth.RequireSession(handler))
+	}
 	path, handler = devices.EnrollmentHandler()
 	adminMux.Handle(path, handler)
 	adminMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -159,18 +232,34 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return errors.Join(fmt.Errorf("bind device listener: %w", err), adminListener.Close())
 	}
+	profiling, err := newProfiler(ctx, resources.Proto.GetProfiling())
+	if err != nil {
+		return errors.Join(err, adminListener.Close(), deviceListener.Close())
+	}
 
-	stopped := make(chan error, 2)
+	workerContext, cancelWorkers := context.WithCancel(ctx)
+	defer cancelWorkers()
+	stopped := make(chan error, 5)
 	go func() { stopped <- serve(admin, adminListener) }()
 	go func() { stopped <- serve(deviceServer, deviceListener) }()
 	slog.Info("control plane ready", "admin", admin.Addr, "device", deviceServer.Addr)
 	remaining := 2
+	if profiling != nil {
+		remaining++
+		go func() { stopped <- profiling.run(workerContext) }()
+	}
+	if deliveries != nil {
+		remaining += 2
+		go func() { stopped <- deliveries.Run(workerContext) }()
+		go func() { stopped <- reporting.Run(workerContext) }()
+	}
 	var serveErr error
 	select {
 	case <-ctx.Done():
 	case serveErr = <-stopped:
 		remaining--
 	}
+	cancelWorkers()
 	shutdownErr := shutdown(admin, deviceServer)
 	cancelRequests()
 	for range remaining {

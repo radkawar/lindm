@@ -10,6 +10,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -21,7 +23,8 @@ import (
 func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.GetDeviceRequest]) (*connect.Response[adminv1.GetDeviceResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadFleet); err != nil {
+	actor, err := s.require(ctx, identity.PermissionReadFleet)
+	if err != nil {
 		return nil, err
 	}
 	if err := s.acquire(ctx); err != nil {
@@ -43,6 +46,9 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := devicedb.New(tx)
+	if err := requireDeviceScope(ctx, q, actor, identity.PermissionReadFleet, id); err != nil {
+		return nil, mapErr(err)
+	}
 	row, err := q.GetDeviceDetail(ctx, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -53,6 +59,14 @@ func (s *Service) GetDevice(ctx context.Context, req *connect.Request[adminv1.Ge
 	device, err := deviceFromDetail(row)
 	if err != nil {
 		return nil, mapErr(err)
+	}
+	metadata, err := q.GetDeviceMetadata(ctx, id)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	device.Metadata = new(adminv1.DeviceMetadata)
+	if err := protojson.Unmarshal(metadata, device.Metadata); err != nil {
+		return nil, mapErr(errInternalState)
 	}
 	response := &adminv1.GetDeviceResponse{Device: device}
 	if row.CurrentGenerationID != nil {
@@ -133,7 +147,7 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 	limit := pageLimit(req.Msg.GetPageSize())
 	var response *adminv1.ListDevicePackagesResponse
 	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
-		device, err := q.GetDeviceForUpdate(ctx, deviceID)
+		device, err := lockDeviceScope(ctx, q, actor, identity.PermissionReadFleet, deviceID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				return errNotFound
@@ -229,6 +243,13 @@ func (s *Service) ListDevicePackages(ctx context.Context, req *connect.Request[a
 			}
 			item := &adminv1.DevicePackage{
 				Position: uint32(row.Position), Name: row.Name, Version: row.Version, Architecture: row.Architecture, Manager: row.Manager,
+				SourceName: row.SourceName, SourceVersion: row.SourceVersion,
+			}
+			if row.ModuleStatus != 0 {
+				item.Module = &inventoryv1.ModuleObservation{
+					Status: inventoryv1.CollectionStatus(row.ModuleStatus), Modular: row.ModuleName != "",
+					Name: row.ModuleName, Stream: row.ModuleStream, Version: row.ModuleVersion, Context: row.ModuleContext,
+				}
 			}
 			fits, err := budget.take(item)
 			if err != nil {
@@ -325,6 +346,12 @@ func hostDetail(row devicedb.GetHostObservationRow) (*adminv1.HostObservationDet
 	}
 	if observation.HardwareSerial, err = observedMessage(row.HardwareSerialStatus, row.HardwareSerialValue); err != nil {
 		return nil, err
+	}
+	if len(row.Details) != 0 {
+		observation.Details = &inventoryv1.NativeDetails{}
+		if err := proto.Unmarshal(row.Details, observation.Details); err != nil {
+			return nil, errInternalState
+		}
 	}
 	return &adminv1.HostObservationDetail{Sequence: uint64(row.Sequence), Observation: observation, ReceivedAt: timestamppb.New(received)}, nil
 }

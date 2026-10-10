@@ -14,17 +14,20 @@ ExecStartPre=/usr/bin/systemd-tmpfiles --create /usr/lib/tmpfiles.d/lindm.conf
 DynamicUser=no
 User=root
 Group=root
-# G2 scope: CapabilityBoundingSet and AmbientCapabilities are intentionally
-# unset. This process is root. A reduced bounding set would misrepresent G2
-# and can break later native providers whose privileges are not enumerated.
+# Default service-only scope retains its existing root capability set.
+# Opt-in imperative-action provisioning installs an explicit bounded set in the
+# per-target drop-in; native qualification must run with that exception installed.
 # NoNewPrivileges=yes still blocks setuid helpers from raising privileges.
-# ProtectSystem=strict makes /usr, /boot, and /etc read-only. A later provider
-# that installs packages or edits /etc needs a reviewed unit exception.
+# ProtectSystem=strict makes /usr, /boot, and /etc read-only. Root's explicit
+# allow_account_lock provisioning grants /etc writes for shadow atomic renames.
 # ProtectHome=yes excludes /home, /root, and /run/user. A later provider that
 # must manage home directories needs a reviewed exception.
 # RestrictAddressFamilies=AF_UNIX. Outbound TLS belongs to lindm-agent.service.
-# PrivateDevices=yes hides TPM and disk devices. Software keys do not use
-# them. A TPM provider needs a reviewed DeviceAllow, not a blanket removal.
+# PrivateDevices=yes hides TPM and disk devices. Root provisioning can run
+# lindm-agent action-sandbox -install after qualifying targets in executor.json.
+# That owned drop-in retains PrivateDevices and binds/allows exact block nodes,
+# mapper control and configured TPM only; it also bounds provider capabilities.
+# Never disable PrivateDevices or allow all block devices to enable an action.
 # UMask=0077. The executor must chmod the socket to 0660 after bind.
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -48,6 +51,10 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 UMask=0077
+# Credentials transiently cross RPC decoder memory before entering locked buffers.
+# Qualified action hosts require cgroup v2 swap accounting for this no-swap fence.
+MemorySwapMax=0
+LimitCORE=0
 WorkingDirectory=/var/lib/lindm/executor
 ReadOnlyPaths=/var
 ReadWritePaths=/var/lib/lindm/executor /run/lindm

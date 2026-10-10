@@ -11,13 +11,16 @@ import (
 	"os"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/config"
 	"lindm/internal/agent/enrollment"
 	"lindm/internal/agent/executor"
+	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
 	"lindm/internal/agent/transport"
 )
@@ -30,10 +33,25 @@ func serveExecutor(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if actionConfig := doc.Proto.GetActionProvider(); actionConfig.GetRecoveryEnvironment() && actionConfig.GetProtectedStateDirectory() != doc.StateDirectory {
+		return errors.New("recovery action state directory must be the actual executor journal directory")
+	}
+	// Pin before opening the journal: retained account ownership contains exact
+	// shadow credentials even before the provider factory is constructed.
+	if actionMemoryRequired(doc.Proto.GetActionProvider()) {
+		if err := actionprovider.PinLiveRootMemory(); err != nil {
+			return err
+		}
+	}
 	return executor.Run(ctx, executor.Config{
 		StateDirectory: doc.StateDirectory, RuntimeDirectory: doc.RuntimeDirectory,
 		SocketName: doc.SocketName, NetworkUID: doc.NetworkUID, NetworkGID: doc.NetworkGID,
 		RequireRoot: true,
+		ActionProviderFactory: func(store *journal.Store) (executor.DeviceActionProvider, error) {
+			return nativeActionProvider(doc.Proto.GetActionProvider(), store)
+		},
+		RecoveryBoot: recoveryBootConfig(doc.Proto.GetRecoveryBoot()),
+		Updates:      doc.Proto.GetUpdates(),
 	})
 }
 
@@ -56,11 +74,12 @@ func bootstrapCommand(ctx context.Context, args []string) error {
 	rootPath := flags.String("root", "", "authenticated execution-root document")
 	bundlePath := flags.String("bundle", "", "DSSE-signed bootstrap bundle")
 	grantPath := flags.String("grant", "", "protected grant file, or - for stdin")
+	tokenPath := flags.String("provisioning-token-file", "", "root-only boot-delivered reusable provisioning token file")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *rootPath == "" || *bundlePath == "" || *grantPath == "" {
-		return errors.New("bootstrap requires -root FILE -bundle FILE -grant FILE")
+	if flags.NArg() != 0 || *rootPath == "" || *bundlePath == "" || (*grantPath == "") == (*tokenPath == "") || *tokenPath == "-" {
+		return errors.New("bootstrap requires -root FILE -bundle FILE and exactly one of -grant FILE or -provisioning-token-file FILE")
 	}
 	root, err := readNoFollow(*rootPath, 64<<10, false)
 	if err != nil {
@@ -70,21 +89,56 @@ func bootstrapCommand(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read bootstrap bundle: %w", err)
 	}
+	if *tokenPath != "" {
+		*grantPath = *tokenPath
+	}
 	grant, err := readGrant(*grantPath)
 	if err != nil {
 		return err
 	}
-	return finishEnrollment(ctx, &agentv1.PrepareBootstrapRequest{ExecutionRootJson: root, BootstrapEnvelope: bundle, PendingGrant: grant})
+	return finishEnrollment(ctx, &agentv1.PrepareBootstrapRequest{ExecutionRootJson: root, BootstrapEnvelope: bundle, PendingGrant: grant, ProvisioningToken: *tokenPath != ""})
 }
 
 func resumeCommand(ctx context.Context, args []string) error {
-	if len(args) != 0 {
-		return errors.New("resume accepts no arguments")
-	}
 	if os.Geteuid() != 0 {
 		return errors.New("resume requires root")
 	}
-	return finishEnrollment(ctx, &agentv1.PrepareBootstrapRequest{Resume: true})
+	flags := flag.NewFlagSet("resume", flag.ContinueOnError)
+	wait := flags.Uint64("wait-seconds", 0, "bounded root-only approval wait, at most 86400 seconds")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("resume accepts only -wait-seconds SECONDS")
+	}
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.EnrollmentResumeOptions{}), protovalidate.WithDisableLazy())
+	if err != nil {
+		return err
+	}
+	if err := validator.Validate(&agentv1.EnrollmentResumeOptions{WaitSeconds: *wait}); err != nil {
+		return errors.New("invalid enrollment resume wait")
+	}
+	if *wait == 0 {
+		return finishEnrollment(ctx, &agentv1.PrepareBootstrapRequest{Resume: true})
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(*wait)*time.Second)
+	defer cancel()
+	for {
+		err := finishEnrollment(ctx, &agentv1.PrepareBootstrapRequest{Resume: true})
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, enrollment.ErrPendingApproval) && connect.CodeOf(err) != connect.CodeUnavailable && connect.CodeOf(err) != connect.CodeDeadlineExceeded {
+			return err
+		}
+		timer := time.NewTimer(5 * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("enrollment resume wait ended without installation: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
 }
 
 func finishEnrollment(ctx context.Context, request *agentv1.PrepareBootstrapRequest) error {
@@ -97,11 +151,28 @@ func finishEnrollment(ctx context.Context, request *agentv1.PrepareBootstrapRequ
 		return err
 	}
 	defer func() { _ = cleanup() }()
+	status, err := client.Status(ctx, connect.NewRequest(&agentv1.StatusRequest{}))
+	if err != nil {
+		return err
+	}
+	if status.Msg.GetLifecycle() == agentv1.Lifecycle_LIFECYCLE_ENROLLED {
+		if !status.Msg.GetTlsUsable() {
+			return errors.New("installed identity is not usable; explicit identity recovery is required")
+		}
+		return nil
+	}
 	prepared, err := client.PrepareBootstrap(ctx, connect.NewRequest(request))
 	if err != nil {
 		return err
 	}
 	enrolled, err := enrollment.Enroll(ctx, prepared.Msg)
+	if errors.Is(err, enrollment.ErrPendingApproval) {
+		if request.GetResume() {
+			return enrollment.ErrPendingApproval
+		}
+		_, printErr := fmt.Println("Enrollment reserved; awaiting administrator approval. Run lindm-agent resume after approval.")
+		return printErr
+	}
 	if err != nil {
 		return fmt.Errorf("enrollment rejected: %w", err)
 	}

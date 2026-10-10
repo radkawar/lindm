@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 type dirStack struct {
@@ -155,7 +157,7 @@ func resolveInstallSnapshotDirectory(root *os.Root, logicalPath string) (*os.Fil
 	if err := unix.Fstat(int(rootFile.Fd()), &rootStat); err != nil {
 		return nil, "", err
 	}
-	if !trustedDirectory(&rootStat) {
+	if !custody.TrustedDirectory(&rootStat) {
 		return nil, "", fmt.Errorf("%w: untrusted snapshot root", ErrUnsupported)
 	}
 	file, canonical, err := openLogicalDirectory(int(rootFile.Fd()), logicalPath)
@@ -241,7 +243,7 @@ func openLogicalDirectory(rootFD int, logicalPath string) (*os.File, string, err
 			}
 			pending = append(splitSnapshotPath(target), pending...)
 		case unix.S_IFDIR:
-			if !trustedDirectory(&st) {
+			if !custody.TrustedDirectory(&st) {
 				_ = unix.Close(next)
 				return nil, "", fmt.Errorf("%w: untrusted snapshot directory %s", ErrUnsupported, nextPath)
 			}
@@ -262,7 +264,7 @@ func pinReadableDir(stack *dirStack) (*os.File, string, error) {
 	if err := unix.Fstat(stack.top(), &before); err != nil {
 		return nil, "", err
 	}
-	if before.Mode&unix.S_IFMT != unix.S_IFDIR || !trustedDirectory(&before) {
+	if !custody.TrustedDirectory(&before) {
 		return nil, "", fmt.Errorf("%w: snapshot path is not a trusted directory", ErrUnsupported)
 	}
 	canonical := stack.canonical()
@@ -402,7 +404,7 @@ func (s *session) walkLogical(path string, class pathClass, recurseFinal bool, s
 			}
 			pending = append(splitSnapshotPath(target), pending...)
 		case unix.S_IFDIR:
-			if !trustedDirectory(&st) {
+			if !custody.TrustedDirectory(&st) {
 				_ = unix.Close(next)
 				return fmt.Errorf("%w: untrusted snapshot directory %s", ErrUnsupported, pathHere)
 			}
@@ -660,7 +662,7 @@ func (s *session) captureEntry(parentFD int, parentPath, name string, class path
 	}
 	switch st.Mode & unix.S_IFMT {
 	case unix.S_IFDIR:
-		if !trustedDirectory(&st) {
+		if !custody.TrustedDirectory(&st) {
 			return fmt.Errorf("%w: untrusted snapshot directory %s", ErrUnsupported, path)
 		}
 		return s.observeDir(next, path, st, class, true, ancestors)

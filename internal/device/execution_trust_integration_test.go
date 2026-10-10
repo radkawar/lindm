@@ -25,7 +25,7 @@ func TestUnprovisionedExecutionTrustStillFencesDeviceAuthority(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestUnprovisionedExecutionTrustStillFencesDeviceAuthority(t *testing.T) {
 		t.Fatalf("conflicting predecessor did not enter recovery hold: %v", err)
 	}
 	denied(nextCtx, 2, connect.CodePermissionDenied)
-	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire held trust-fetch identity"})); err != nil {
+	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire held trust-fetch identity"})); err != nil {
 		t.Fatal(err)
 	}
 	denied(nextCtx, 2, connect.CodePermissionDenied)

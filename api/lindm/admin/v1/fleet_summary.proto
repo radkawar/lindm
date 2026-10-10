@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+message GetFleetSummaryRequest {
+  // Zero selects ten. The newest authorized actions are returned, not a sample
+  // used to calculate any aggregate.
+  uint32 recent_action_limit = 1 [(buf.validate.field).uint32.lte = 20];
+}
+
+message FleetLifecycleSummary {
+  uint64 total_devices = 1;
+  uint64 pending_devices = 2;
+  uint64 active_devices = 3;
+  uint64 revoked_devices = 4;
+  uint64 recovery_hold_devices = 5;
+}
+
+message FleetContactSummary {
+  // Recent includes exactly 24 hours ago; stale is strictly older.
+  uint64 recent_devices = 1;
+  uint64 stale_devices = 2;
+  uint64 unknown_devices = 3;
+  uint32 stale_after_seconds = 4;
+}
+
+message FleetOSCount {
+  // Latest successful host projection. Empty values mean not yet known.
+  string os_id = 1;
+  string os_version = 2;
+  uint64 devices = 3;
+}
+
+message FleetOSSummary {
+  // The twenty largest OS ID/version groups, ordered by count descending,
+  // then OS ID/version ascending. Counts cover all authorized devices.
+  repeated FleetOSCount groups = 1;
+  // Exact count in all remaining groups, not an estimate or hidden population.
+  uint64 other_devices = 2;
+}
+
+message FleetServiceComplianceSummary {
+  // Resource counts for current enrollment-generation assignment heads only.
+  // Uses GetDeviceServiceState compliance semantics, including dependencies.
+  uint64 total_resources = 1;
+  uint64 compliant_resources = 2;
+  uint64 drift_remediated_resources = 3;
+  uint64 attention_resources = 4;
+  uint64 stale_resources = 5;
+  uint64 unknown_resources = 6;
+  // No current head or a cleared/empty head; never called compliant.
+  uint64 unassigned_devices = 7;
+}
+
+message FleetFindingSummary {
+  // Open means canonical advisory_finding_status state=affected. Accepted and
+  // unknown findings are excluded. Counts are findings, not distinct devices.
+  uint64 critical_findings = 1;
+  uint64 high_findings = 2;
+  uint64 medium_findings = 3;
+  uint64 low_findings = 4;
+  // Includes every other severity spelling, including unspecified severity.
+  uint64 other_findings = 5;
+  // Same current evaluation semantics as ListAdvisorySummary; active devices only.
+  uint64 evaluated_devices = 6;
+  uint64 unknown_devices = 7;
+}
+
+message FleetApprovalSummary {
+  // Pending, unexpired requests visible through the caller's approval inbox.
+  // Action-specific and inbox-management scopes both apply, independently of
+  // fleet.read scope. This is not a global pending count or an approval grant.
+  // Counted in identity's own fresh-authorization transaction, independently
+  // of observed_at. Pending records may still fail approval authority fences.
+  uint64 pending_approvals = 1;
+}
+
+message FleetRecentAction {
+  string action_id = 1;
+  string device_id = 2;
+  // Present only for imperative device actions; service actions use unit.
+  string capability = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp start_authorized_at = 6;
+  google.protobuf.Timestamp closed_at = 7;
+  string closed_reason = 8;
+  bool outcome_unknown = 9;
+  // "device" for imperative actions; "service" for service-resource actions.
+  string kind = 10;
+  // Present only for service actions.
+  string resource_id = 11;
+  string unit = 12;
+}
+
+message GetFleetSummaryResponse {
+  // Database transaction time for fleet, contact, service and finding counts.
+  google.protobuf.Timestamp observed_at = 1;
+  FleetLifecycleSummary lifecycle = 2;
+  FleetContactSummary contact = 3;
+  FleetOSSummary operating_systems = 4;
+  FleetServiceComplianceSummary service_compliance = 5;
+  // Absent when the advisory service is unavailable, never an implied zero.
+  FleetFindingSummary findings = 6;
+  // Absent when identity is unavailable or the caller cannot view an inbox.
+  FleetApprovalSummary approvals = 7;
+  // Newest service and imperative device actions by issued_at descending,
+  // then action ID and kind descending, across all fleet.read-authorized
+  // devices and generations. Server records are not native execution proof;
+  // no action payload or recovery secret is included.
+  repeated FleetRecentAction recent_actions = 8;
+}

@@ -85,6 +85,25 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 		}
 		return nil, errKey
 	}
+	if file := state.GetOfflineAuthorization(); file != nil {
+		verifier, err := authority.NewExecutionVerifier(verified)
+		if err != nil {
+			return nil, errKey
+		}
+		root, delegation, err := verifier.VerifyOfflineChain(ctx, verified.Root, file.GetRootTransitions(), file.GetDelegationEnvelope(), admission)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, errKey
+		}
+		if _, err := verifier.VerifyOfflineAuthorization(ctx, root, delegation, file.GetAuthorizationEnvelope(), admission); err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, errKey
+		}
+	}
 	deployment, err := canonicalUUID(verified.Root.GetDeploymentId())
 	if err != nil {
 		return nil, err
@@ -175,7 +194,7 @@ func bind(ctx context.Context, authority *trust.Authority, state *agentv1.Execut
 			}
 			return nil, errKey
 		}
-		if !proto.Equal(claim, pending) {
+		if !proto.Equal(claim, pending) || claim.GetInstallationId() != state.GetInstallationId() {
 			return nil, errKey
 		}
 	}

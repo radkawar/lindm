@@ -60,7 +60,7 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 		if err != nil {
 			return nil, mapErr(errInternalState)
 		}
-		approval, authorizationErr = s.identity.AuthorizeFresh(ctx, actor, identity.PermissionAssignServices)
+		approval, authorizationErr = s.identity.AuthorizeFresh(ctx, actor, identity.PermissionAssignResources)
 		if authorizationErr != nil && !assignmentAuthorizationDenied(authorizationErr) {
 			return nil, executionError(authorizationErr)
 		}
@@ -71,12 +71,15 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if approval != nil {
-		if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignServices); err != nil {
+		if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
 			if !assignmentAuthorizationDenied(err) {
 				return nil, executionError(err)
 			}
 			authorizationErr = err
 		}
+	}
+	if err := s.targeting.Lock(ctx, tx); err != nil {
+		return nil, mapErr(err)
 	}
 	var snapshot *executionauthority.Snapshot
 	var verifier *trust.ExecutionVerifier
@@ -90,6 +93,14 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 	device, err := s.lockAuthority(ctx, q, principal)
 	if err != nil {
 		return nil, mapErr(err)
+	}
+	if approval != nil && authorizationErr == nil {
+		if err := requireDeviceScope(ctx, q, approval.Principal(), identity.PermissionAssignResources, principal.DeviceID); err != nil {
+			if !errors.Is(err, errNotFound) {
+				return nil, mapErr(err)
+			}
+			authorizationErr = identity.ErrAuthorizationDenied
+		}
 	}
 	if uint64(device.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
 		return nil, mapErr(errSessionFenced)
@@ -109,6 +120,9 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 	if !enrollmentIssuanceResumable(device.certificate, now) {
 		return nil, mapErr(errCertificateRejected)
 	}
+	if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{ID: principal.DeviceID, LastSeenAt: timestamptz(now)}); err != nil {
+		return nil, mapErr(err)
+	}
 	if len(action.StartGrantEnvelope) != 0 {
 		if !bytes.Equal(action.ChallengeProof, req.Msg.GetChallengeProof()) {
 			return nil, rpcError(connect.CodeAlreadyExists, "service_start_conflict")
@@ -118,13 +132,25 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 		}
 		return noStore(&devicev1.AuthorizeServiceStartResponse{StartGrantEnvelope: action.StartGrantEnvelope}), nil
 	}
+	if err := s.requireReleaseCompatibility(ctx, q, principal.GenerationID, req.Msg.GetSessionEpoch()); err != nil {
+		return nil, mapErr(err)
+	}
+	if err := requireActionRestriction(ctx, q, principal.DeviceID, nil); err != nil {
+		return nil, mapErr(err)
+	}
 	if action.ClosedAt.Valid {
 		return nil, rpcError(connect.CodeFailedPrecondition, "service_action_closed")
+	}
+	targetEligible, err := s.targeting.CheckExecution(ctx, tx, principal.DeviceID, principal.GenerationID, action.AssignmentID)
+	if err != nil {
+		return nil, mapErr(err)
 	}
 	rejectReason := ""
 	switch {
 	case head.ID != action.AssignmentID:
 		rejectReason = "assignment_changed"
+	case !targetEligible:
+		rejectReason = "targeting_paused_or_changed"
 	case !now.Before(action.ExpiresAt.Time):
 		rejectReason = "expired_unstarted"
 	case authorizationErr != nil || approval.Version() != intent.GetAuthorizationVersion():
@@ -180,7 +206,7 @@ func (s *Service) AuthorizeServiceStart(ctx context.Context, req *connect.Reques
 	if err := dispatchAudit(ctx, q, &head.ActorID, "service_action.start", id, "fresh_actor_authorization"); err != nil {
 		return nil, mapErr(err)
 	}
-	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignServices); err != nil {
+	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
 		return nil, executionError(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

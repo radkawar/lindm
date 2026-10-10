@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package lindm.update.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/update/v1;updatev1";
+
+// A target signed by the root-delegated top-level targets role. Only agent
+// packages may appear here; other products remain ordinary repository targets.
+message AgentUpdateArtifact {
+  option (buf.validate.message).cel = {
+    id: "artifact.protocol_window"
+    message: "protocol window must be ordered"
+    expression: "this.minimum_protocol_version <= this.maximum_protocol_version"
+  };
+  option (buf.validate.message).cel = {
+    id: "artifact.package_format"
+    message: "target extension must match the native package format"
+    expression: "(this.package_format == 'deb' && this.target_path.endsWith('.deb')) || (this.package_format == 'rpm' && this.target_path.endsWith('.rpm')) || (this.package_format == 'arch' && this.target_path.endsWith('.pkg.tar.zst'))"
+  };
+  option (buf.validate.message).cel = {
+    id: "artifact.detached_signature"
+    message: "Arch requires an adjacent detached signature target; optional signatures must bind the package path"
+    expression: "(this.package_format != 'arch' || this.signature_target_path != '') && (this.signature_target_path == '' || this.signature_target_path == this.target_path + '.sig')"
+  };
+  string version = 1 [(buf.validate.field).string = {
+    max_len: 32
+    pattern: "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})$"
+  }];
+  string architecture = 2 [(buf.validate.field).string = {
+    in: [
+      "amd64",
+      "arm64"
+    ]
+  }];
+  string package_format = 3 [(buf.validate.field).string = {
+    in: [
+      "deb",
+      "rpm",
+      "arch"
+    ]
+  }];
+  string target_path = 4 [(buf.validate.field).string = {
+    max_len: 512
+    pattern: "^packages/lindm-agent/[a-zA-Z0-9._/-]+\\.(deb|rpm|pkg\\.tar\\.zst)$"
+  }];
+  string minimum_agent_version = 5 [(buf.validate.field).string = {
+    max_len: 32
+    pattern: "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})$"
+  }];
+  string maximum_agent_version = 6 [(buf.validate.field).string = {
+    max_len: 32
+    pattern: "^(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})$"
+  }];
+  uint32 minimum_protocol_version = 7 [(buf.validate.field).uint32.gte = 1];
+  uint32 maximum_protocol_version = 8 [(buf.validate.field).uint32.gte = 1];
+  // Exact version observed by the native package database after installation.
+  string native_version = 9 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9.+:~_-]+$"
+  }];
+  // A distinct TUF-authenticated native package signature, mandatory for Arch.
+  string signature_target_path = 10 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string = {
+      max_len: 516
+      pattern: "^packages/lindm-agent/[a-zA-Z0-9._/-]+\\.(deb|rpm|pkg\\.tar\\.zst)\\.sig$"
+    }
+  ];
+}
+
+message AgentUpdateChannel {
+  option (buf.validate.message).cel = {
+    id: "channel.validity"
+    message: "catalog validity must be positive and at most seven days"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('604800s')"
+  };
+  string ring = 1 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  bool paused = 2;
+  uint32 eligible_percentage = 3 [(buf.validate.field).uint32.lte = 100];
+  uint64 generation = 4 [(buf.validate.field).uint64.gte = 1];
+  google.protobuf.Timestamp issued_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 6 [(buf.validate.field).required = true];
+  repeated AgentUpdateArtifact artifacts = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  // Optional exact operator intent identity, carried through signed crash recovery.
+  string rollout_request_id = 8 [(buf.validate.field).string.max_len = 128];
+}
+
+// One atomic executor-owned checkpoint. Never accepted from the network.
+message ClientState {
+  bytes bootstrap_sha256 = 1;
+  bytes root_json = 2;
+  bytes timestamp_json = 3;
+  bytes snapshot_json = 4;
+  bytes targets_json = 5;
+  google.protobuf.Timestamp observed_at = 6;
+  map<string, uint64> channel_generations = 7;
+  map<string, string> channel_sha256 = 8;
+  // Verified channels-only delegated metadata; persisted with top-level fences.
+  bytes rollout_json = 9;
+}

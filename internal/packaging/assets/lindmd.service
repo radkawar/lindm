@@ -1,0 +1,42 @@
+[Unit]
+Description=Lindm control-plane server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lindmd
+Group=lindmd
+ExecStart=/usr/bin/lindmd serve -config /etc/lindm/server.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=45s
+UMask=0077
+MemorySwapMax=0
+LimitCORE=0
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=-/etc/lindm/migrate
+
+[Install]
+WantedBy=multi-user.target

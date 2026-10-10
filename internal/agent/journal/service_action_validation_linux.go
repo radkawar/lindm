@@ -20,6 +20,11 @@ func servicePlanDrifts(record *agentv1.ServiceExecutionRecord) bool {
 	return record.GetNativePlan().GetChangeRuntime() || record.GetNativePlan().GetChangeEnablement()
 }
 
+func readOnlyServiceSuccess(record *agentv1.ServiceExecutionRecord) bool {
+	return record.GetState() == agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED &&
+		len(record.GetStartGrantEnvelope()) == 0 && record.GetStartedAt() == nil && !servicePlanDrifts(record)
+}
+
 func canonicalServiceID(value string) bool {
 	id, err := uuid.Parse(value)
 	return err == nil && id != uuid.Nil && id.String() == value
@@ -144,7 +149,7 @@ func (s *Store) decodeServiceAction(row journaldb.ServiceAction) (*agentv1.Servi
 	intent := record.GetIntent()
 	if row.ActionID != intent.GetActionId() || row.DeploymentID != intent.GetDeploymentId() || row.DeviceID != intent.GetDeviceId() ||
 		row.EnrollmentGeneration != intent.GetEnrollmentGeneration() || row.Unit != intent.GetDesired().GetUnit() ||
-		row.ResourceSequence != int64(intent.GetResourceSequence()) || row.State != int64(record.GetState()) {
+		row.ResourceSequence != int64(intent.GetResourceSequence()) || row.State != int64(record.GetState()) || (row.ReadOnlySuccess == 1) != readOnlyServiceSuccess(record) {
 		return nil, ErrRecoveryHold
 	}
 	return record, nil

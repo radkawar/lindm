@@ -275,11 +275,16 @@ func waitVMExecutionTrust(ctx context.Context, vm *guestVM, authority *adminv1.G
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	var last *agentv1.GetExecutionTrustResponse
 	for {
 		view, err := readVMExecutionTrust(ctx, vm)
 		if err != nil {
+			if ctx.Err() != nil && last != nil {
+				return nil, fmt.Errorf("execution trust synchronization deadline: wanted root=%d delegation=%d; last observed root=%d delegation=%d: %w", authority.GetRoot().GetVersion(), authority.GetDelegation().GetVersion(), last.GetRootVersion(), last.GetDelegationVersion(), err)
+			}
 			return nil, err
 		}
+		last = view
 		if view.GetRootVersion() == authority.GetRoot().GetVersion() && view.GetDelegationVersion() == authority.GetDelegation().GetVersion() {
 			if !bytes.Equal(view.GetRootSha256(), rootDigest[:]) || !bytes.Equal(view.GetDelegationSha256(), delegationDigest[:]) || view.GetMinimumRecoveryEpoch() != authority.GetDelegation().GetMinimumRecoveryEpoch() || !proto.Equal(view.GetRootExpiresAt(), authority.GetRoot().GetExpiresAt()) || !proto.Equal(view.GetDelegationExpiresAt(), authority.GetDelegation().GetExpiresAt()) {
 				return nil, errors.New("automatically imported trust does not match the admitted signed authority")

@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/offline_enrollment.proto";
 import "lindm/agent/v1/trust.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
@@ -41,11 +42,18 @@ message ExecutorJournalState {
   google.protobuf.Timestamp renew_after = 19;
   RenewalCommitReceipt renewal_receipt = 20;
   SessionCommitReceipt session_receipt = 21;
+  bool provisioning_token = 22;
+  OfflineEnrollmentAuthorizationFile offline_authorization = 23;
 
   option (buf.validate.message).cel = {
     id: "executor_journal.enrollment_shape"
     message: "pending enrollment retains its grant; installed identity pins device/generation and removes the grant"
-    expression: "(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))"
+    expression: "(this.certificate_pem.size() == 0 && (this.pending_grant.size() >= 32 || has(this.offline_authorization)) && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))"
+  };
+  option (buf.validate.message).cel = {
+    id: "executor_journal.offline_authority"
+    message: "offline authorization is separate from online bearer credentials"
+    expression: "!has(this.offline_authorization) || (!this.provisioning_token && this.pending_grant == '')"
   };
   option (buf.validate.message).cel = {
     id: "executor_journal.session_shape"
@@ -102,4 +110,57 @@ message SessionCommitReceipt {
     gt: 0
     lte: 9223372036854775807
   }];
+  // Build identity from the exact executor-signed acquisition acknowledged by
+  // the server. A changed build reacquires even when the boot ID is unchanged.
+  string agent_release = 3 [(buf.validate.field).string.max_len = 128];
+  uint32 agent_protocol_version = 4 [(buf.validate.field).uint32.lte = 2147483647];
+}
+
+// Executor-only shadow ownership. These messages contain password hashes and
+// MUST NOT enter public plans, observations, errors, logs, or the network spool.
+message AccountLockSnapshot {
+  string username = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"];
+  uint32 uid = 2 [(buf.validate.field).uint32.gt = 0];
+  string passwd_entry = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  string shadow_entry = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+enum AccountLockPhase {
+  ACCOUNT_LOCK_PHASE_UNSPECIFIED = 0;
+  ACCOUNT_LOCK_PHASE_DISABLE_PENDING = 1;
+  ACCOUNT_LOCK_PHASE_DISABLED = 2;
+  ACCOUNT_LOCK_PHASE_RELEASE_PENDING = 3;
+  ACCOUNT_LOCK_PHASE_RELEASED = 4;
+  ACCOUNT_LOCK_PHASE_PRESERVED = 5;
+}
+
+message AccountLockEntry {
+  AccountLockSnapshot prior = 1 [(buf.validate.field).required = true];
+  AccountLockSnapshot expected = 2 [(buf.validate.field).required = true];
+  AccountLockPhase phase = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // An interrupted release can only attempt restoration under a NEW explicitly
+  // authorized release action; the same action never replays a native effect.
+  string release_action_id = 4 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+message AccountLockLedger {
+  string lock_action_id = 1 [(buf.validate.field).string.uuid = true];
+  repeated AccountLockEntry accounts = 2 [(buf.validate.field).repeated.max_items = 128];
+  option (buf.validate.message).cel = {
+    id: "account_lock.identities"
+    message: "account names and UIDs are unique and immutable across the lock"
+    expression: "this.accounts.all(a, a.prior.username == a.expected.username && a.prior.uid == a.expected.uid && this.accounts.filter(b, a.prior.username == b.prior.username || a.prior.uid == b.prior.uid).size() == 1)"
+  };
 }

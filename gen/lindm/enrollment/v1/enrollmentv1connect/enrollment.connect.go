@@ -39,12 +39,20 @@ const (
 	// EnrollmentServiceRetrieveIssuanceProcedure is the fully-qualified name of the EnrollmentService's
 	// RetrieveIssuance RPC.
 	EnrollmentServiceRetrieveIssuanceProcedure = "/lindm.enrollment.v1.EnrollmentService/RetrieveIssuance"
+	// EnrollmentServiceProvisionProcedure is the fully-qualified name of the EnrollmentService's
+	// Provision RPC.
+	EnrollmentServiceProvisionProcedure = "/lindm.enrollment.v1.EnrollmentService/Provision"
+	// EnrollmentServiceRetrieveProvisioningIssuanceProcedure is the fully-qualified name of the
+	// EnrollmentService's RetrieveProvisioningIssuance RPC.
+	EnrollmentServiceRetrieveProvisioningIssuanceProcedure = "/lindm.enrollment.v1.EnrollmentService/RetrieveProvisioningIssuance"
 )
 
 // EnrollmentServiceClient is a client for the lindm.enrollment.v1.EnrollmentService service.
 type EnrollmentServiceClient interface {
 	Enroll(context.Context, *connect.Request[v1.EnrollRequest]) (*connect.Response[v1.EnrollResponse], error)
 	RetrieveIssuance(context.Context, *connect.Request[v1.RetrieveIssuanceRequest]) (*connect.Response[v1.RetrieveIssuanceResponse], error)
+	Provision(context.Context, *connect.Request[v1.ProvisionRequest]) (*connect.Response[v1.ProvisionResponse], error)
+	RetrieveProvisioningIssuance(context.Context, *connect.Request[v1.RetrieveProvisioningIssuanceRequest]) (*connect.Response[v1.RetrieveProvisioningIssuanceResponse], error)
 }
 
 // NewEnrollmentServiceClient constructs a client for the lindm.enrollment.v1.EnrollmentService
@@ -70,13 +78,27 @@ func NewEnrollmentServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(enrollmentServiceMethods.ByName("RetrieveIssuance")),
 			connect.WithClientOptions(opts...),
 		),
+		provision: connect.NewClient[v1.ProvisionRequest, v1.ProvisionResponse](
+			httpClient,
+			baseURL+EnrollmentServiceProvisionProcedure,
+			connect.WithSchema(enrollmentServiceMethods.ByName("Provision")),
+			connect.WithClientOptions(opts...),
+		),
+		retrieveProvisioningIssuance: connect.NewClient[v1.RetrieveProvisioningIssuanceRequest, v1.RetrieveProvisioningIssuanceResponse](
+			httpClient,
+			baseURL+EnrollmentServiceRetrieveProvisioningIssuanceProcedure,
+			connect.WithSchema(enrollmentServiceMethods.ByName("RetrieveProvisioningIssuance")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // enrollmentServiceClient implements EnrollmentServiceClient.
 type enrollmentServiceClient struct {
-	enroll           *connect.Client[v1.EnrollRequest, v1.EnrollResponse]
-	retrieveIssuance *connect.Client[v1.RetrieveIssuanceRequest, v1.RetrieveIssuanceResponse]
+	enroll                       *connect.Client[v1.EnrollRequest, v1.EnrollResponse]
+	retrieveIssuance             *connect.Client[v1.RetrieveIssuanceRequest, v1.RetrieveIssuanceResponse]
+	provision                    *connect.Client[v1.ProvisionRequest, v1.ProvisionResponse]
+	retrieveProvisioningIssuance *connect.Client[v1.RetrieveProvisioningIssuanceRequest, v1.RetrieveProvisioningIssuanceResponse]
 }
 
 // Enroll calls lindm.enrollment.v1.EnrollmentService.Enroll.
@@ -89,11 +111,24 @@ func (c *enrollmentServiceClient) RetrieveIssuance(ctx context.Context, req *con
 	return c.retrieveIssuance.CallUnary(ctx, req)
 }
 
+// Provision calls lindm.enrollment.v1.EnrollmentService.Provision.
+func (c *enrollmentServiceClient) Provision(ctx context.Context, req *connect.Request[v1.ProvisionRequest]) (*connect.Response[v1.ProvisionResponse], error) {
+	return c.provision.CallUnary(ctx, req)
+}
+
+// RetrieveProvisioningIssuance calls
+// lindm.enrollment.v1.EnrollmentService.RetrieveProvisioningIssuance.
+func (c *enrollmentServiceClient) RetrieveProvisioningIssuance(ctx context.Context, req *connect.Request[v1.RetrieveProvisioningIssuanceRequest]) (*connect.Response[v1.RetrieveProvisioningIssuanceResponse], error) {
+	return c.retrieveProvisioningIssuance.CallUnary(ctx, req)
+}
+
 // EnrollmentServiceHandler is an implementation of the lindm.enrollment.v1.EnrollmentService
 // service.
 type EnrollmentServiceHandler interface {
 	Enroll(context.Context, *connect.Request[v1.EnrollRequest]) (*connect.Response[v1.EnrollResponse], error)
 	RetrieveIssuance(context.Context, *connect.Request[v1.RetrieveIssuanceRequest]) (*connect.Response[v1.RetrieveIssuanceResponse], error)
+	Provision(context.Context, *connect.Request[v1.ProvisionRequest]) (*connect.Response[v1.ProvisionResponse], error)
+	RetrieveProvisioningIssuance(context.Context, *connect.Request[v1.RetrieveProvisioningIssuanceRequest]) (*connect.Response[v1.RetrieveProvisioningIssuanceResponse], error)
 }
 
 // NewEnrollmentServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -115,12 +150,28 @@ func NewEnrollmentServiceHandler(svc EnrollmentServiceHandler, opts ...connect.H
 		connect.WithSchema(enrollmentServiceMethods.ByName("RetrieveIssuance")),
 		connect.WithHandlerOptions(opts...),
 	)
+	enrollmentServiceProvisionHandler := connect.NewUnaryHandler(
+		EnrollmentServiceProvisionProcedure,
+		svc.Provision,
+		connect.WithSchema(enrollmentServiceMethods.ByName("Provision")),
+		connect.WithHandlerOptions(opts...),
+	)
+	enrollmentServiceRetrieveProvisioningIssuanceHandler := connect.NewUnaryHandler(
+		EnrollmentServiceRetrieveProvisioningIssuanceProcedure,
+		svc.RetrieveProvisioningIssuance,
+		connect.WithSchema(enrollmentServiceMethods.ByName("RetrieveProvisioningIssuance")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.enrollment.v1.EnrollmentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case EnrollmentServiceEnrollProcedure:
 			enrollmentServiceEnrollHandler.ServeHTTP(w, r)
 		case EnrollmentServiceRetrieveIssuanceProcedure:
 			enrollmentServiceRetrieveIssuanceHandler.ServeHTTP(w, r)
+		case EnrollmentServiceProvisionProcedure:
+			enrollmentServiceProvisionHandler.ServeHTTP(w, r)
+		case EnrollmentServiceRetrieveProvisioningIssuanceProcedure:
+			enrollmentServiceRetrieveProvisioningIssuanceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -136,4 +187,12 @@ func (UnimplementedEnrollmentServiceHandler) Enroll(context.Context, *connect.Re
 
 func (UnimplementedEnrollmentServiceHandler) RetrieveIssuance(context.Context, *connect.Request[v1.RetrieveIssuanceRequest]) (*connect.Response[v1.RetrieveIssuanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.enrollment.v1.EnrollmentService.RetrieveIssuance is not implemented"))
+}
+
+func (UnimplementedEnrollmentServiceHandler) Provision(context.Context, *connect.Request[v1.ProvisionRequest]) (*connect.Response[v1.ProvisionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.enrollment.v1.EnrollmentService.Provision is not implemented"))
+}
+
+func (UnimplementedEnrollmentServiceHandler) RetrieveProvisioningIssuance(context.Context, *connect.Request[v1.RetrieveProvisioningIssuanceRequest]) (*connect.Response[v1.RetrieveProvisioningIssuanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.enrollment.v1.EnrollmentService.RetrieveProvisioningIssuance is not implemented"))
 }

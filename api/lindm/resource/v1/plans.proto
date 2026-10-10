@@ -1,0 +1,707 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/accounts.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/credentials.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/network.proto";
+import "lindm/resource/v1/observations.proto";
+import "lindm/resource/v1/software.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+enum Reversibility {
+  REVERSIBILITY_UNSPECIFIED = 0;
+  REVERSIBILITY_REVERSIBLE = 1;
+  REVERSIBILITY_PARTIAL = 2;
+  REVERSIBILITY_IRREVERSIBLE = 3;
+}
+enum RollbackScope {
+  ROLLBACK_SCOPE_UNSPECIFIED = 0;
+  ROLLBACK_SCOPE_OWNED_DIMENSIONS = 1;
+  ROLLBACK_SCOPE_NATIVE_CHECKPOINT = 2;
+  ROLLBACK_SCOPE_DEPLOYMENT = 3;
+  ROLLBACK_SCOPE_NONE = 4;
+}
+enum ConfirmationPolicy {
+  CONFIRMATION_POLICY_UNSPECIFIED = 0;
+  CONFIRMATION_POLICY_NOT_REQUIRED = 1;
+  CONFIRMATION_POLICY_CONNECTIVITY = 2;
+  CONFIRMATION_POLICY_INDEPENDENT_OPERATOR = 3;
+}
+message PlanSafety {
+  repeated ClaimDomain lock_domains = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  Reversibility reversibility = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  RollbackScope rollback_scope = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ConfirmationPolicy confirmation = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bool reboot_required = 5;
+  repeated ArtifactRef prerequisite_manifests = 6 [(buf.validate.field).repeated.max_items = 128];
+}
+message CheckpointRef {
+  string checkpoint_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes baseline_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp rollback_deadline = 3 [(buf.validate.field).required = true];
+}
+message OwnershipInverseBinding {
+  bytes ledger_revision_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes last_applied_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bytes native_identity_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  // Digest of the executor-local typed inverse, never server-provided old data.
+  bytes inverse_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+}
+enum NativeObjectChange {
+  NATIVE_OBJECT_CHANGE_UNSPECIFIED = 0;
+  NATIVE_OBJECT_CHANGE_CREATE = 1;
+  NATIVE_OBJECT_CHANGE_UPDATE = 2;
+  NATIVE_OBJECT_CHANGE_REMOVE_OWNED = 3;
+  NATIVE_OBJECT_CHANGE_RESTORE_OWNED = 4;
+  NATIVE_OBJECT_CHANGE_OBSERVE = 5;
+}
+message SystemdServicePlan {
+  SystemdServiceDesired desired = 1 [(buf.validate.field).required = true];
+  SystemdServiceObservation before = 2 [(buf.validate.field).required = true];
+  bool change_runtime = 3;
+  bool change_enablement = 4;
+  repeated InstallLink install_projection = 5 [(buf.validate.field).repeated.max_items = 128];
+  repeated ResourceRef related_units = 6 [(buf.validate.field).repeated.max_items = 64];
+  OwnershipInverseBinding inverse = 7;
+  option (buf.validate.message).cel = {
+    id: "systemd_plan.unit_binding"
+    message: "service plan must bind the observed canonical unit"
+    expression: "this.desired.unit == this.before.unit"
+  };
+  option (buf.validate.message).cel = {
+    id: "systemd_plan.managed_changes"
+    message: "unmanaged dimensions cannot request changes"
+    expression: "(!this.change_runtime || this.desired.runtime != 1) && (!this.change_enablement || this.desired.enablement != 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "systemd_plan.related"
+    message: "install projection claims only services"
+    expression: "this.related_units.all(r, r.kind == 1)"
+  };
+}
+message MemberEdgeChange {
+  string user = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
+  string group = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
+  bool present = 3;
+}
+message LocalGroupPlan {
+  LocalGroupDesired desired = 1 [(buf.validate.field).required = true];
+  NativeObjectChange change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated MemberEdgeChange member_edges = 3 [(buf.validate.field).repeated.max_items = 1024];
+  bytes expected_local_revision = 4 [(buf.validate.field).bytes.len = 32];
+  bytes expected_identity_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 6;
+}
+enum UserField {
+  USER_FIELD_UNSPECIFIED = 0;
+  USER_FIELD_PRIMARY_GROUP = 1;
+  USER_FIELD_HOME = 2;
+  USER_FIELD_SHELL = 3;
+  USER_FIELD_PASSWORD = 4;
+  USER_FIELD_AGING = 5;
+  USER_FIELD_ACCOUNT_LOCK = 6;
+}
+message LocalUserPlan {
+  LocalUserDesired desired = 1 [(buf.validate.field).required = true];
+  NativeObjectChange change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated UserField fields = 3 [(buf.validate.field).repeated = {
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  repeated MemberEdgeChange member_edges = 4 [(buf.validate.field).repeated.max_items = 1024];
+  bytes expected_local_revision = 5 [(buf.validate.field).bytes.len = 32];
+  bytes expected_identity_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  optional uint32 expected_uid = 7;
+  optional string expected_uid_generation = 8 [(buf.validate.field).string.uuid = true];
+  bool create_home = 9;
+  OwnershipInverseBinding inverse = 10;
+}
+message SudoRulePlan {
+  SudoRuleDesired desired = 1 [(buf.validate.field).required = true];
+  NativeObjectChange change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bytes rendered_candidate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes expected_aggregate_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  ProbeReceipt aggregate_validation = 5 [(buf.validate.field).required = true];
+  OwnershipInverseBinding inverse = 6;
+}
+enum SSHDirective {
+  SSH_DIRECTIVE_UNSPECIFIED = 0;
+  SSH_DIRECTIVE_PORT = 1;
+  SSH_DIRECTIVE_ROOT_LOGIN = 2;
+  SSH_DIRECTIVE_PASSWORD_AUTH = 3;
+  SSH_DIRECTIVE_KEYBOARD_INTERACTIVE_AUTH = 4;
+  SSH_DIRECTIVE_PUBLIC_KEY_AUTH = 5;
+  SSH_DIRECTIVE_EMPTY_PASSWORDS = 6;
+  SSH_DIRECTIVE_MAX_AUTH_TRIES = 7;
+  SSH_DIRECTIVE_CLIENT_ALIVE_INTERVAL = 8;
+  SSH_DIRECTIVE_CLIENT_ALIVE_COUNT = 9;
+  SSH_DIRECTIVE_TCP_FORWARDING = 10;
+  SSH_DIRECTIVE_X11_FORWARDING = 11;
+  SSH_DIRECTIVE_ALLOW_USERS = 12;
+  SSH_DIRECTIVE_ALLOW_GROUPS = 13;
+  SSH_DIRECTIVE_MATCH = 14;
+}
+enum ReloadMechanism {
+  RELOAD_MECHANISM_UNSPECIFIED = 0;
+  RELOAD_MECHANISM_SYSTEMD_RELOAD = 1;
+  RELOAD_MECHANISM_NATIVE_DBUS = 2;
+  RELOAD_MECHANISM_NATIVE_REEXEC = 3;
+  RELOAD_MECHANISM_NONE = 4;
+}
+message SSHServerPlan {
+  SSHServerDesired desired = 1 [(buf.validate.field).required = true];
+  repeated SSHDirective changed_directives = 2 [(buf.validate.field).repeated = {
+    max_items: 14
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes candidate_graph_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  ReloadMechanism reload = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ProbeReceipt syntax_validation = 5 [(buf.validate.field).required = true];
+  CheckpointRef checkpoint = 6;
+  OwnershipInverseBinding inverse = 7;
+}
+message TimeSyncPlan {
+  TimeSyncDesired desired = 1 [(buf.validate.field).required = true];
+  bool change_sources = 2;
+  bool change_nts = 3;
+  ResourceRef daemon = 4 [(buf.validate.field).required = true];
+  bool start_daemon = 5;
+  bytes candidate_configuration_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 7;
+  option (buf.validate.message).cel = {
+    id: "time_plan.daemon"
+    message: "time plan must claim its daemon service"
+    expression: "this.daemon.kind == 1"
+  };
+}
+message TrustCAPlan {
+  TrustCADesired desired = 1 [(buf.validate.field).required = true];
+  NativeObjectChange anchor_change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bool rebuild_store = 3;
+  bytes expected_store_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 5;
+}
+message FirewallObjectDelta {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  NativeObjectChange change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  FirewallRule rule = 3;
+  option (buf.validate.message).cel = {
+    id: "firewall_delta.rule"
+    message: "new rules require a matching typed rule"
+    expression: "((this.change in [1,2]) ? has(this.rule) : true) && (!has(this.rule) || this.rule.rule_id == this.rule_id)"
+  };
+}
+message FirewallZonePlan {
+  FirewallZoneDesired desired = 1 [(buf.validate.field).required = true];
+  bytes compiled_ruleset_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  repeated FirewallObjectDelta objects = 3 [(buf.validate.field).repeated.max_items = 256];
+  CheckpointRef checkpoint = 4 [(buf.validate.field).required = true];
+  bytes expected_persistent_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bytes expected_kernel_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 7;
+}
+enum ConnectionStep {
+  CONNECTION_STEP_UNSPECIFIED = 0;
+  CONNECTION_STEP_ADD = 1;
+  CONNECTION_STEP_UPDATE2 = 2;
+  CONNECTION_STEP_ACTIVATE = 3;
+  CONNECTION_STEP_DELETE_OWNED = 4;
+  CONNECTION_STEP_RESTORE_OWNED = 5;
+}
+message NetworkConnectionPlan {
+  NetworkConnectionDesired desired = 1 [(buf.validate.field).required = true];
+  repeated ConnectionStep steps = 2 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  ConnectionMedium plugin = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  uint64 expected_settings_revision = 4;
+  bytes candidate_settings_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  CheckpointRef checkpoint = 6 [(buf.validate.field).required = true];
+  ProbeReceipt rollback_receipt = 7;
+  OwnershipInverseBinding inverse = 8;
+}
+enum DNSField {
+  DNS_FIELD_UNSPECIFIED = 0;
+  DNS_FIELD_SERVERS = 1;
+  DNS_FIELD_SEARCH_DOMAINS = 2;
+  DNS_FIELD_ROUTING_DOMAINS = 3;
+  DNS_FIELD_DNSSEC = 4;
+  DNS_FIELD_DNS_OVER_TLS = 5;
+  DNS_FIELD_IGNORE_AUTO_DNS = 6;
+}
+message DNSPlan {
+  DNSDesired desired = 1 [(buf.validate.field).required = true];
+  repeated DNSField fields = 2 [(buf.validate.field).repeated = {
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes candidate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  ReloadMechanism reload = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  CheckpointRef checkpoint = 5 [(buf.validate.field).required = true];
+  OwnershipInverseBinding inverse = 6;
+}
+enum ProxyField {
+  PROXY_FIELD_UNSPECIFIED = 0;
+  PROXY_FIELD_MODE = 1;
+  PROXY_FIELD_ENDPOINTS = 2;
+  PROXY_FIELD_AUTHENTICATION = 3;
+  PROXY_FIELD_BYPASS = 4;
+  PROXY_FIELD_PAC = 5;
+}
+message ProxyPlan {
+  ProxyDesired desired = 1 [(buf.validate.field).required = true];
+  repeated ProxyField fields = 2 [(buf.validate.field).repeated = {
+    max_items: 5
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes candidate_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  ReloadMechanism reload = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  CheckpointRef checkpoint = 5;
+  OwnershipInverseBinding inverse = 6;
+}
+enum PackageTransactionOperation {
+  PACKAGE_TRANSACTION_OPERATION_UNSPECIFIED = 0;
+  PACKAGE_TRANSACTION_OPERATION_INSTALL = 1;
+  PACKAGE_TRANSACTION_OPERATION_UPGRADE = 2;
+  PACKAGE_TRANSACTION_OPERATION_REMOVE_OWNED = 3;
+  PACKAGE_TRANSACTION_OPERATION_APPROVED_DOWNGRADE = 4;
+}
+message PackageTransactionEntry {
+  PackageIdentity package = 1 [(buf.validate.field).required = true];
+  PackageTransactionOperation operation = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  NativeVersion before = 3;
+  NativeVersion after = 4;
+  ArtifactRef artifact = 5;
+  ResourceRef source = 6 [(buf.validate.field).required = true];
+  bool direct_request = 7;
+  bool owned_installation = 8;
+  option (buf.validate.message).cel = {
+    id: "package_transaction_entry.shape"
+    message: "install/upgrade entries bind exact bytes and versions; removal binds owned prior state"
+    expression: "this.source.kind == 13 && (this.operation == 3 ? has(this.before) && !has(this.after) && this.owned_installation : has(this.after) && has(this.artifact))"
+  };
+}
+message PackageTransactionManifest {
+  repeated PackageTransactionEntry entries = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4096
+  }];
+  bytes native_database_revision = 2 [(buf.validate.field).bytes.len = 32];
+  SourceSnapshot sources = 3 [(buf.validate.field).required = true];
+  string native_lock_identity = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  repeated ResourceRef affected_resources = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+  repeated bytes affected_desired_sha256 = 6 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+    items: {
+      bytes: {len: 32}
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "package_manifest.bindings"
+    message: "every affected resource binds a desired digest"
+    expression: "this.affected_resources.size() == this.affected_desired_sha256.size()"
+  };
+}
+message NativePackagePlan {
+  NativePackageDesired desired = 1 [(buf.validate.field).required = true];
+  // Complete PackageTransactionManifest, streamed and digest-addressed.
+  ArtifactRef transaction_manifest = 2 [(buf.validate.field).required = true];
+  bytes native_database_revision = 3 [(buf.validate.field).bytes.len = 32];
+  string native_lock_identity = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  OwnershipInverseBinding inverse = 5;
+}
+message RepositoryPlan {
+  RepositoryDesired desired = 1 [(buf.validate.field).required = true];
+  NativeObjectChange stanza_change = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated ArtifactRef key_artifacts = 3 [(buf.validate.field).repeated.max_items = 16];
+  repeated FileIdentity owned_objects = 4 [(buf.validate.field).repeated.max_items = 64];
+  bytes candidate_stanza_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  ProbeReceipt signature_validation = 6 [(buf.validate.field).required = true];
+  OwnershipInverseBinding inverse = 7;
+}
+enum AppTransactionOperation {
+  APP_TRANSACTION_OPERATION_UNSPECIFIED = 0;
+  APP_TRANSACTION_OPERATION_INSTALL = 1;
+  APP_TRANSACTION_OPERATION_UPDATE = 2;
+  APP_TRANSACTION_OPERATION_REMOVE_OWNED_PRESERVE_DATA = 3;
+  APP_TRANSACTION_OPERATION_PERMISSIONS = 4;
+}
+message FlatpakAppPlan {
+  FlatpakAppDesired desired = 1 [(buf.validate.field).required = true];
+  repeated AppTransactionOperation operations = 2 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  ArtifactRef transaction_manifest = 3 [(buf.validate.field).required = true];
+  FlatpakPermissionPolicy permission_delta = 4;
+  bytes installation_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 6;
+}
+enum UpdateCheckpoint {
+  UPDATE_CHECKPOINT_UNSPECIFIED = 0;
+  UPDATE_CHECKPOINT_DOWNLOAD = 1;
+  UPDATE_CHECKPOINT_INSTALL = 2;
+  UPDATE_CHECKPOINT_STAGE_DEPLOYMENT = 3;
+  UPDATE_CHECKPOINT_DRAIN = 4;
+  UPDATE_CHECKPOINT_REBOOT = 5;
+  UPDATE_CHECKPOINT_NEW_BOOT_HEALTH = 6;
+}
+message OSUpdatePlan {
+  OSUpdateDesired desired = 1 [(buf.validate.field).required = true];
+  ArtifactRef transaction_manifest = 2 [(buf.validate.field).required = true];
+  repeated UpdateCheckpoint checkpoints = 3 [(buf.validate.field).repeated = {
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  DeploymentIdentity target_deployment = 4;
+  bytes maintenance_lease_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  string previous_boot_id = 6 [(buf.validate.field).string.uuid = true];
+  OwnershipInverseBinding inverse = 7;
+}
+enum SessionField {
+  SESSION_FIELD_UNSPECIFIED = 0;
+  SESSION_FIELD_IDLE_LOCK = 1;
+  SESSION_FIELD_LOCK_ON_SUSPEND = 2;
+  SESSION_FIELD_IDLE_TERMINATE = 3;
+  SESSION_FIELD_CONCURRENT_LIMIT = 4;
+}
+message SessionPolicyPlan {
+  SessionPolicyDesired desired = 1 [(buf.validate.field).required = true];
+  repeated SessionField fields = 2 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  repeated FileIdentity owned_settings = 3 [(buf.validate.field).repeated.max_items = 64];
+  bytes candidate_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 5;
+}
+enum PasswordField {
+  PASSWORD_FIELD_UNSPECIFIED = 0;
+  PASSWORD_FIELD_LENGTH = 1;
+  PASSWORD_FIELD_CLASSES = 2;
+  PASSWORD_FIELD_HISTORY = 3;
+  PASSWORD_FIELD_MAX_AGE = 4;
+  PASSWORD_FIELD_MIN_AGE = 5;
+  PASSWORD_FIELD_WARN = 6;
+  PASSWORD_FIELD_FAILURE_LIMIT = 7;
+  PASSWORD_FIELD_UNLOCK_AFTER = 8;
+  PASSWORD_FIELD_ENFORCE_ROOT = 9;
+}
+message PasswordPolicyPlan {
+  PasswordPolicyDesired desired = 1 [(buf.validate.field).required = true];
+  repeated PasswordField fields = 2 [(buf.validate.field).repeated = {
+    max_items: 9
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  string pam_owner = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  repeated FileIdentity owned_profile_objects = 4 [(buf.validate.field).repeated.max_items = 64];
+  bytes candidate_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 6;
+}
+message SnapAppPlan {
+  SnapAppDesired desired = 1 [(buf.validate.field).required = true];
+  repeated AppTransactionOperation operations = 2 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  ArtifactRef transaction_manifest = 3 [(buf.validate.field).required = true];
+  repeated SnapInterfaceGrant interface_delta = 4 [(buf.validate.field).repeated.max_items = 64];
+  bytes expected_state_revision = 5 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 6;
+}
+enum CredentialStep {
+  CREDENTIAL_STEP_UNSPECIFIED = 0;
+  CREDENTIAL_STEP_GENERATE_KEY = 1;
+  CREDENTIAL_STEP_ISSUE = 2;
+  CREDENTIAL_STEP_RENEW = 3;
+  CREDENTIAL_STEP_ACTIVATE_CONSUMER = 4;
+  CREDENTIAL_STEP_REVOKE_OWNED = 5;
+  CREDENTIAL_STEP_REMOVE_OWNED_KEY = 6;
+}
+message CertificateEnrollmentPlan {
+  CertificateEnrollmentDesired desired = 1 [(buf.validate.field).required = true];
+  repeated CredentialStep steps = 2 [(buf.validate.field).repeated = {
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes issuer_policy_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes expected_public_certificate_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  OwnershipInverseBinding inverse = 5;
+}
+enum DirectoryStep {
+  DIRECTORY_STEP_UNSPECIFIED = 0;
+  DIRECTORY_STEP_JOIN = 1;
+  DIRECTORY_STEP_CHANGE_OWNED = 2;
+  DIRECTORY_STEP_LEAVE_OWNED = 3;
+  DIRECTORY_STEP_RESTORE_OWNED = 4;
+}
+message DirectoryClientPlan {
+  DirectoryClientDesired desired = 1 [(buf.validate.field).required = true];
+  repeated DirectoryStep steps = 2 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bytes expected_join_identity = 3 [(buf.validate.field).bytes.len = 32];
+  bytes candidate_configuration_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  ProbeReceipt remote_receipt = 5;
+  OwnershipInverseBinding inverse = 6;
+}
+
+// Artifact-addressed manifests remain closed protobuf payloads. They are
+// streamed separately instead of increasing the signed plan envelope limit.
+message FlatpakTransactionEntry {
+  InstallationBinding installation = 1 [(buf.validate.field).required = true];
+  string app_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  string branch = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  AppTransactionOperation operation = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional string before_commit = 6 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  optional string after_commit = 7 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  ResourceRef remote = 8 [(buf.validate.field).required = true];
+  repeated ArtifactRef objects = 9 [(buf.validate.field).repeated.max_items = 4096];
+  bool runtime_dependency = 10;
+  bool owned_installation = 11;
+  option (buf.validate.message).cel = {
+    id: "flatpak_transaction.shape"
+    message: "native transaction binds exact commits and only removes owned installs"
+    expression: "this.remote.kind == 13 && (this.operation == 3 ? has(this.before_commit) && !has(this.after_commit) && this.owned_installation : has(this.after_commit))"
+  };
+}
+message SnapTransactionEntry {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 40
+  }];
+  string instance_key = 2 [(buf.validate.field).string.max_len = 10];
+  AppTransactionOperation operation = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint64 before_revision = 4 [(buf.validate.field).uint64.gt = 0];
+  optional uint64 after_revision = 5 [(buf.validate.field).uint64.gt = 0];
+  SnapConfinement confinement = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ArtifactRef snap = 7;
+  ArtifactRef assertion_chain = 8;
+  bool base_dependency = 9;
+  bool owned_installation = 10;
+  option (buf.validate.message).cel = {
+    id: "snap_transaction.shape"
+    message: "native transaction binds exact revisions and assertions and only removes owned installs"
+    expression: "this.operation == 3 ? has(this.before_revision) && !has(this.after_revision) && this.owned_installation : has(this.after_revision) && has(this.snap) && has(this.assertion_chain)"
+  };
+}
+message AppTransactionEntry {
+  oneof app {
+    option (buf.validate.oneof).required = true;
+    FlatpakTransactionEntry flatpak = 1;
+    SnapTransactionEntry snap = 2;
+  }
+}
+message ResourceDigestBinding {
+  ResourceRef ref = 1 [(buf.validate.field).required = true];
+  bytes desired_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+message AppTransactionManifest {
+  repeated AppTransactionEntry entries = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4096
+  }];
+  bytes native_revision_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  repeated ResourceDigestBinding affected = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+  bool preserve_application_data = 4 [(buf.validate.field).bool.const = true];
+  bool preserve_unrelated_runtimes = 5 [(buf.validate.field).bool.const = true];
+}
+message DeploymentTransactionManifest {
+  SourceSnapshot source = 1 [(buf.validate.field).required = true];
+  DeploymentIdentity before = 2 [(buf.validate.field).required = true];
+  DeploymentIdentity target = 3 [(buf.validate.field).required = true];
+  repeated ArtifactRef content_objects = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4096
+  }];
+  repeated ResourceDigestBinding affected = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+  }];
+  bytes approved_composition_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  repeated UpdateCheckpoint checkpoints = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bool retains_previous_deployment = 8;
+  bool rolls_back_user_data = 9 [(buf.validate.field).bool.const = false];
+}

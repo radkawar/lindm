@@ -31,9 +31,12 @@ const consoleOrigin = "https://localhost:18444"
 // impersonation. Close revokes the console session through its normal HTTP route.
 type OwnerSession struct {
 	Admin     adminv1connect.AdminServiceClient
+	AccountID string
 	client    *http.Client
 	transport *http.Transport
 	csrf      string
+	origin    string
+	local     *localAccount
 }
 
 // OpenOwnerSession follows the server's authorization-code/S256-PKCE flow and
@@ -46,16 +49,31 @@ func OpenOwnerSession(ctx context.Context, repoRoot string) (_ *OwnerSession, re
 // openOwnerSession changes only this session's TCP destination. Logical URLs,
 // TLS hostname verification, redirect checks and CSRF origins remain unchanged.
 func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *OwnerSession, resultErr error) {
+	return openFixtureSession(ctx, repoRoot, adminAddress, nil)
+}
+
+type fixtureLoginAccount struct {
+	username, password, subject, role string
+}
+
+// Only fixed or test-owned Keycloak accounts may reach this private login path.
+func openFixtureSession(ctx context.Context, repoRoot, adminAddress string, account *fixtureLoginAccount) (_ *OwnerSession, resultErr error) {
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return nil, err
 	}
 	dir := FixturePath(root)
-	if err := validateFixture(dir); err != nil {
-		return nil, err
-	}
-	if err := requireKeycloakFixture(dir); err != nil {
-		return nil, err
+	if adminAddress != "" {
+		if err := validateAuthorityFixture(dir); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := validateFixture(dir); err != nil {
+			return nil, err
+		}
+		if err := requireKeycloakFixture(dir); err != nil {
+			return nil, err
+		}
 	}
 	tlsConfig, err := trustClient(dir)
 	if err != nil {
@@ -83,7 +101,7 @@ func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *Ow
 		}
 		return nil
 	}}
-	session := &OwnerSession{client: client, transport: transport}
+	session := &OwnerSession{client: client, transport: transport, origin: consoleOrigin}
 	defer func() {
 		if resultErr != nil {
 			transport.CloseIdleConnections()
@@ -109,13 +127,16 @@ func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *Ow
 	if err != nil {
 		return nil, err
 	}
-	password, err := os.ReadFile(filepath.Join(dir, "owner-password"))
-	if err != nil {
-		return nil, errors.New("read protected fixture owner credential failed")
+	if account == nil {
+		password, err := os.ReadFile(filepath.Join(dir, "owner-password"))
+		if err != nil {
+			return nil, errors.New("read protected fixture owner credential failed")
+		}
+		account = &fixtureLoginAccount{username: "owner", password: strings.TrimSpace(string(password)), subject: ownerSubject, role: "owner"}
+		clear(password)
 	}
-	form.Set("username", "owner")
-	form.Set("password", strings.TrimSpace(string(password)))
-	clear(password)
+	form.Set("username", account.username)
+	form.Set("password", account.password)
 	req, err = http.NewRequestWithContext(ctx, http.MethodPost, action.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
@@ -149,9 +170,10 @@ func openOwnerSession(ctx context.Context, repoRoot, adminAddress string) (_ *Ow
 		return nil, err
 	}
 	principal := new(authv1.SessionPrincipal)
-	if response.StatusCode != http.StatusOK || protojson.Unmarshal(body, principal) != nil || principal.GetIssuer() != issuer || principal.GetSubject() != ownerSubject || principal.GetRole() != "owner" || principal.GetCsrfToken() == "" {
-		return nil, errors.New("fixture session does not bind the expected authorized owner")
+	if response.StatusCode != http.StatusOK || protojson.Unmarshal(body, principal) != nil || principal.GetIssuer() != issuer || principal.GetSubject() != account.subject || principal.GetRole() != account.role || principal.GetCsrfToken() == "" {
+		return nil, errors.New("fixture session does not bind the expected authorized account")
 	}
+	session.AccountID = principal.GetId()
 	session.csrf = principal.GetCsrfToken()
 	session.Admin = adminv1connect.NewAdminServiceClient(client, consoleOrigin, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
@@ -175,11 +197,11 @@ func ownerDialContext(adminAddress string) func(context.Context, string, string)
 
 func (s *OwnerSession) Close(ctx context.Context) error {
 	defer s.transport.CloseIdleConnections()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, consoleOrigin+"/auth/logout", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.origin+"/auth/logout", nil)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Origin", consoleOrigin)
+	req.Header.Set("Origin", s.origin)
 	req.Header.Set("X-CSRF-Token", s.csrf)
 	response, err := s.client.Do(req)
 	if err != nil {

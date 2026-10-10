@@ -49,6 +49,9 @@ func validateManifest(m *labv1.ImageManifest) error {
 		return fmt.Errorf("validate image manifest: %w", err)
 	}
 	for _, raw := range []string{m.ImageUrl, m.ChecksumUrl, m.KeyUrl, m.SignerProvenanceUrl, m.ReleaseProvenanceUrl} {
+		if raw == "" {
+			continue // Required URLs and vendor-mode omissions are schema-validated.
+		}
 		if _, err := httpsURL(raw); err != nil {
 			return err
 		}
@@ -57,6 +60,9 @@ func validateManifest(m *labv1.ImageManifest) error {
 		if _, err := httpsURL(m.GetSignatureUrl()); err != nil {
 			return err
 		}
+	}
+	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED {
+		return nil // The schema pins the authenticated API locator, not a CDN URL.
 	}
 	u, err := httpsURL(m.ImageUrl)
 	if err != nil {

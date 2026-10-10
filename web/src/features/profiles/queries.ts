@@ -7,7 +7,7 @@ export function profilesQueryOptions(lifetime: AuthLifetime, pageSize: number, p
     queryKey: ["profiles", lifetime.generation, pageSize, pageToken] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
-      const response = await adminClient.listServiceProfiles(
+      const response = await adminClient.listProfiles(
         { pageSize, pageToken },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
@@ -28,7 +28,7 @@ export function profileRevisionQueryOptions(
     // A catalog head used as a compare-and-swap target must not stay pinned.
     staleTime: 0,
     queryFn: async ({ signal }) => {
-      const response = await adminClient.getServiceProfileRevision(
+      const response = await adminClient.getProfileRevision(
         revisionId === "" ? { profileId } : { profileId, revisionId },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );

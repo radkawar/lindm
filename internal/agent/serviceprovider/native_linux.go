@@ -272,10 +272,12 @@ func (p *Provider) changeRuntime(ctx context.Context, desired *agentv1.ServiceDe
 	signals := make(chan *dbus.Signal, 32)
 	p.conn.Signal(signals)
 	defer p.conn.RemoveSignal(signals)
+	// Older system buses accept arg2 matches but fail to deliver JobRemoved's
+	// uoss body through them (observed on AlmaLinux 9). Match the authenticated
+	// manager here and check the exact unit/job locally in jobResult instead.
 	match := []dbus.MatchOption{
 		dbus.WithMatchSender(p.owner), dbus.WithMatchObjectPath(managerPath),
 		dbus.WithMatchInterface(managerInterface), dbus.WithMatchMember("JobRemoved"),
-		dbus.WithMatchArg(2, desired.GetUnit()),
 	}
 	if err := p.conn.AddMatchSignalContext(ctx, match...); err != nil {
 		return fmt.Errorf("install job match: %w", err)

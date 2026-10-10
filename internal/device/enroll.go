@@ -76,6 +76,13 @@ func (s *Service) Enroll(ctx context.Context, req *connect.Request[enrollmentv1.
 }
 
 func (s *Service) issueEnrollment(ctx context.Context, q *devicedb.Queries, grant devicedb.GetGrantByHashForUpdateRow, pub crypto.PublicKey, transactionID uuid.UUID, pubHash []byte) (*issuedCert, uuid.UUID, uuid.UUID, error) {
+	binding, err := q.GetRecoveryEnrollmentGrant(ctx, grant.ID)
+	if err == nil {
+		return s.recoverEnrollment(ctx, q, grant, binding, pub, transactionID, pubHash)
+	}
+	if err != pgx.ErrNoRows {
+		return nil, uuid.Nil, uuid.Nil, err
+	}
 	now := s.now()
 	deviceID := uuid.New()
 	generation := uuid.New()

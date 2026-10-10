@@ -39,6 +39,9 @@ const (
 	// ExecutorServiceInstallEnrollmentProcedure is the fully-qualified name of the ExecutorService's
 	// InstallEnrollment RPC.
 	ExecutorServiceInstallEnrollmentProcedure = "/lindm.agent.v1.ExecutorService/InstallEnrollment"
+	// ExecutorServiceImportOfflineEnrollmentProcedure is the fully-qualified name of the
+	// ExecutorService's ImportOfflineEnrollment RPC.
+	ExecutorServiceImportOfflineEnrollmentProcedure = "/lindm.agent.v1.ExecutorService/ImportOfflineEnrollment"
 	// ExecutorServiceGetConnectionProcedure is the fully-qualified name of the ExecutorService's
 	// GetConnection RPC.
 	ExecutorServiceGetConnectionProcedure = "/lindm.agent.v1.ExecutorService/GetConnection"
@@ -75,6 +78,36 @@ const (
 	// ExecutorServiceAttestServiceExecutionProcedure is the fully-qualified name of the
 	// ExecutorService's AttestServiceExecution RPC.
 	ExecutorServiceAttestServiceExecutionProcedure = "/lindm.agent.v1.ExecutorService/AttestServiceExecution"
+	// ExecutorServicePrepareDeviceActionProcedure is the fully-qualified name of the ExecutorService's
+	// PrepareDeviceAction RPC.
+	ExecutorServicePrepareDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/PrepareDeviceAction"
+	// ExecutorServiceStartDeviceActionProcedure is the fully-qualified name of the ExecutorService's
+	// StartDeviceAction RPC.
+	ExecutorServiceStartDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/StartDeviceAction"
+	// ExecutorServiceGetDeviceActionProcedure is the fully-qualified name of the ExecutorService's
+	// GetDeviceAction RPC.
+	ExecutorServiceGetDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/GetDeviceAction"
+	// ExecutorServiceAttestDeviceActionProcedure is the fully-qualified name of the ExecutorService's
+	// AttestDeviceAction RPC.
+	ExecutorServiceAttestDeviceActionProcedure = "/lindm.agent.v1.ExecutorService/AttestDeviceAction"
+	// ExecutorServiceConfirmDeviceActionEscrowProcedure is the fully-qualified name of the
+	// ExecutorService's ConfirmDeviceActionEscrow RPC.
+	ExecutorServiceConfirmDeviceActionEscrowProcedure = "/lindm.agent.v1.ExecutorService/ConfirmDeviceActionEscrow"
+	// ExecutorServicePrepareDeviceActionRecoveryProcedure is the fully-qualified name of the
+	// ExecutorService's PrepareDeviceActionRecovery RPC.
+	ExecutorServicePrepareDeviceActionRecoveryProcedure = "/lindm.agent.v1.ExecutorService/PrepareDeviceActionRecovery"
+	// ExecutorServiceCommitDeviceActionRecoveryProcedure is the fully-qualified name of the
+	// ExecutorService's CommitDeviceActionRecovery RPC.
+	ExecutorServiceCommitDeviceActionRecoveryProcedure = "/lindm.agent.v1.ExecutorService/CommitDeviceActionRecovery"
+	// ExecutorServiceSupplyDeviceActionCredentialProcedure is the fully-qualified name of the
+	// ExecutorService's SupplyDeviceActionCredential RPC.
+	ExecutorServiceSupplyDeviceActionCredentialProcedure = "/lindm.agent.v1.ExecutorService/SupplyDeviceActionCredential"
+	// ExecutorServiceExchangeAgentUpdateProcedure is the fully-qualified name of the ExecutorService's
+	// ExchangeAgentUpdate RPC.
+	ExecutorServiceExchangeAgentUpdateProcedure = "/lindm.agent.v1.ExecutorService/ExchangeAgentUpdate"
+	// ExecutorServiceGetAgentUpdateProcedure is the fully-qualified name of the ExecutorService's
+	// GetAgentUpdate RPC.
+	ExecutorServiceGetAgentUpdateProcedure = "/lindm.agent.v1.ExecutorService/GetAgentUpdate"
 	// ExecutorServiceStatusProcedure is the fully-qualified name of the ExecutorService's Status RPC.
 	ExecutorServiceStatusProcedure = "/lindm.agent.v1.ExecutorService/Status"
 )
@@ -89,6 +122,8 @@ type ExecutorServiceClient interface {
 	// pending key and deployment, then commits and removes the grant before
 	// acknowledgment. Root only.
 	InstallEnrollment(context.Context, *connect.Request[v1.InstallEnrollmentRequest]) (*connect.Response[v1.InstallEnrollmentResponse], error)
+	// Root-only signed offline response import; rejects already installed attempts.
+	ImportOfflineEnrollment(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequest]) (*connect.Response[v1.ImportOfflineEnrollmentResponse], error)
 	// GetConnection returns public connection material. An expired active
 	// certificate is not a TLS credential. Pending retrieval public data is
 	// still returned. session_epoch is usable only after CommitSession and
@@ -129,6 +164,18 @@ type ExecutorServiceClient interface {
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
 	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
+	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
+	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
+	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
+	AttestDeviceAction(context.Context, *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error)
+	ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error)
+	PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error)
+	CommitDeviceActionRecovery(context.Context, *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error)
+	// Root-only one-use owner credential; never persisted or returned.
+	SupplyDeviceActionCredential(context.Context, *connect.Request[v1.SupplyDeviceActionCredentialRequest]) (*connect.Response[v1.SupplyDeviceActionCredentialResponse], error)
+	// Bounded untrusted transport answers to executor-selected TUF fetches.
+	ExchangeAgentUpdate(context.Context, *connect.Request[v1.ExchangeAgentUpdateRequest]) (*connect.Response[v1.ExchangeAgentUpdateResponse], error)
+	GetAgentUpdate(context.Context, *connect.Request[v1.GetAgentUpdateRequest]) (*connect.Response[v1.GetAgentUpdateResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -155,6 +202,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			httpClient,
 			baseURL+ExecutorServiceInstallEnrollmentProcedure,
 			connect.WithSchema(executorServiceMethods.ByName("InstallEnrollment")),
+			connect.WithClientOptions(opts...),
+		),
+		importOfflineEnrollment: connect.NewClient[v1.ImportOfflineEnrollmentRequest, v1.ImportOfflineEnrollmentResponse](
+			httpClient,
+			baseURL+ExecutorServiceImportOfflineEnrollmentProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("ImportOfflineEnrollment")),
 			connect.WithClientOptions(opts...),
 		),
 		getConnection: connect.NewClient[v1.GetConnectionRequest, v1.GetConnectionResponse](
@@ -229,6 +282,66 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
 			connect.WithClientOptions(opts...),
 		),
+		prepareDeviceAction: connect.NewClient[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse](
+			httpClient,
+			baseURL+ExecutorServicePrepareDeviceActionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("PrepareDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		startDeviceAction: connect.NewClient[v1.StartDeviceActionRequest, v1.StartDeviceActionResponse](
+			httpClient,
+			baseURL+ExecutorServiceStartDeviceActionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("StartDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceAction: connect.NewClient[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetDeviceActionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		attestDeviceAction: connect.NewClient[v1.AttestDeviceActionRequest, v1.AttestDeviceActionResponse](
+			httpClient,
+			baseURL+ExecutorServiceAttestDeviceActionProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("AttestDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		confirmDeviceActionEscrow: connect.NewClient[v1.ConfirmDeviceActionEscrowRequest, v1.ConfirmDeviceActionEscrowResponse](
+			httpClient,
+			baseURL+ExecutorServiceConfirmDeviceActionEscrowProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionEscrow")),
+			connect.WithClientOptions(opts...),
+		),
+		prepareDeviceActionRecovery: connect.NewClient[v1.PrepareDeviceActionRecoveryRequest, v1.PrepareDeviceActionRecoveryResponse](
+			httpClient,
+			baseURL+ExecutorServicePrepareDeviceActionRecoveryProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("PrepareDeviceActionRecovery")),
+			connect.WithClientOptions(opts...),
+		),
+		commitDeviceActionRecovery: connect.NewClient[v1.CommitDeviceActionRecoveryRequest, v1.CommitDeviceActionRecoveryResponse](
+			httpClient,
+			baseURL+ExecutorServiceCommitDeviceActionRecoveryProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("CommitDeviceActionRecovery")),
+			connect.WithClientOptions(opts...),
+		),
+		supplyDeviceActionCredential: connect.NewClient[v1.SupplyDeviceActionCredentialRequest, v1.SupplyDeviceActionCredentialResponse](
+			httpClient,
+			baseURL+ExecutorServiceSupplyDeviceActionCredentialProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("SupplyDeviceActionCredential")),
+			connect.WithClientOptions(opts...),
+		),
+		exchangeAgentUpdate: connect.NewClient[v1.ExchangeAgentUpdateRequest, v1.ExchangeAgentUpdateResponse](
+			httpClient,
+			baseURL+ExecutorServiceExchangeAgentUpdateProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("ExchangeAgentUpdate")),
+			connect.WithClientOptions(opts...),
+		),
+		getAgentUpdate: connect.NewClient[v1.GetAgentUpdateRequest, v1.GetAgentUpdateResponse](
+			httpClient,
+			baseURL+ExecutorServiceGetAgentUpdateProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("GetAgentUpdate")),
+			connect.WithClientOptions(opts...),
+		),
 		status: connect.NewClient[v1.StatusRequest, v1.StatusResponse](
 			httpClient,
 			baseURL+ExecutorServiceStatusProcedure,
@@ -240,21 +353,32 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // executorServiceClient implements ExecutorServiceClient.
 type executorServiceClient struct {
-	prepareBootstrap        *connect.Client[v1.PrepareBootstrapRequest, v1.PrepareBootstrapResponse]
-	installEnrollment       *connect.Client[v1.InstallEnrollmentRequest, v1.InstallEnrollmentResponse]
-	getConnection           *connect.Client[v1.GetConnectionRequest, v1.GetConnectionResponse]
-	signTLSClientMessage    *connect.Client[v1.SignTLSClientMessageRequest, v1.SignTLSClientMessageResponse]
-	prepareSession          *connect.Client[v1.PrepareSessionRequest, v1.PrepareSessionResponse]
-	commitSession           *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
-	prepareRenewal          *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
-	commitRenewal           *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
-	updateExecutionTrust    *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
-	getExecutionTrust       *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
-	prepareServiceExecution *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
-	startServiceExecution   *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
-	getServiceExecution     *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
-	attestServiceExecution  *connect.Client[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse]
-	status                  *connect.Client[v1.StatusRequest, v1.StatusResponse]
+	prepareBootstrap             *connect.Client[v1.PrepareBootstrapRequest, v1.PrepareBootstrapResponse]
+	installEnrollment            *connect.Client[v1.InstallEnrollmentRequest, v1.InstallEnrollmentResponse]
+	importOfflineEnrollment      *connect.Client[v1.ImportOfflineEnrollmentRequest, v1.ImportOfflineEnrollmentResponse]
+	getConnection                *connect.Client[v1.GetConnectionRequest, v1.GetConnectionResponse]
+	signTLSClientMessage         *connect.Client[v1.SignTLSClientMessageRequest, v1.SignTLSClientMessageResponse]
+	prepareSession               *connect.Client[v1.PrepareSessionRequest, v1.PrepareSessionResponse]
+	commitSession                *connect.Client[v1.CommitSessionRequest, v1.CommitSessionResponse]
+	prepareRenewal               *connect.Client[v1.PrepareRenewalRequest, v1.PrepareRenewalResponse]
+	commitRenewal                *connect.Client[v1.CommitRenewalRequest, v1.CommitRenewalResponse]
+	updateExecutionTrust         *connect.Client[v1.UpdateExecutionTrustRequest, v1.UpdateExecutionTrustResponse]
+	getExecutionTrust            *connect.Client[v1.GetExecutionTrustRequest, v1.GetExecutionTrustResponse]
+	prepareServiceExecution      *connect.Client[v1.PrepareServiceExecutionRequest, v1.PrepareServiceExecutionResponse]
+	startServiceExecution        *connect.Client[v1.StartServiceExecutionRequest, v1.StartServiceExecutionResponse]
+	getServiceExecution          *connect.Client[v1.GetServiceExecutionRequest, v1.GetServiceExecutionResponse]
+	attestServiceExecution       *connect.Client[v1.AttestServiceExecutionRequest, v1.AttestServiceExecutionResponse]
+	prepareDeviceAction          *connect.Client[v1.PrepareDeviceActionRequest, v1.PrepareDeviceActionResponse]
+	startDeviceAction            *connect.Client[v1.StartDeviceActionRequest, v1.StartDeviceActionResponse]
+	getDeviceAction              *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
+	attestDeviceAction           *connect.Client[v1.AttestDeviceActionRequest, v1.AttestDeviceActionResponse]
+	confirmDeviceActionEscrow    *connect.Client[v1.ConfirmDeviceActionEscrowRequest, v1.ConfirmDeviceActionEscrowResponse]
+	prepareDeviceActionRecovery  *connect.Client[v1.PrepareDeviceActionRecoveryRequest, v1.PrepareDeviceActionRecoveryResponse]
+	commitDeviceActionRecovery   *connect.Client[v1.CommitDeviceActionRecoveryRequest, v1.CommitDeviceActionRecoveryResponse]
+	supplyDeviceActionCredential *connect.Client[v1.SupplyDeviceActionCredentialRequest, v1.SupplyDeviceActionCredentialResponse]
+	exchangeAgentUpdate          *connect.Client[v1.ExchangeAgentUpdateRequest, v1.ExchangeAgentUpdateResponse]
+	getAgentUpdate               *connect.Client[v1.GetAgentUpdateRequest, v1.GetAgentUpdateResponse]
+	status                       *connect.Client[v1.StatusRequest, v1.StatusResponse]
 }
 
 // PrepareBootstrap calls lindm.agent.v1.ExecutorService.PrepareBootstrap.
@@ -265,6 +389,11 @@ func (c *executorServiceClient) PrepareBootstrap(ctx context.Context, req *conne
 // InstallEnrollment calls lindm.agent.v1.ExecutorService.InstallEnrollment.
 func (c *executorServiceClient) InstallEnrollment(ctx context.Context, req *connect.Request[v1.InstallEnrollmentRequest]) (*connect.Response[v1.InstallEnrollmentResponse], error) {
 	return c.installEnrollment.CallUnary(ctx, req)
+}
+
+// ImportOfflineEnrollment calls lindm.agent.v1.ExecutorService.ImportOfflineEnrollment.
+func (c *executorServiceClient) ImportOfflineEnrollment(ctx context.Context, req *connect.Request[v1.ImportOfflineEnrollmentRequest]) (*connect.Response[v1.ImportOfflineEnrollmentResponse], error) {
+	return c.importOfflineEnrollment.CallUnary(ctx, req)
 }
 
 // GetConnection calls lindm.agent.v1.ExecutorService.GetConnection.
@@ -327,6 +456,56 @@ func (c *executorServiceClient) AttestServiceExecution(ctx context.Context, req 
 	return c.attestServiceExecution.CallUnary(ctx, req)
 }
 
+// PrepareDeviceAction calls lindm.agent.v1.ExecutorService.PrepareDeviceAction.
+func (c *executorServiceClient) PrepareDeviceAction(ctx context.Context, req *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error) {
+	return c.prepareDeviceAction.CallUnary(ctx, req)
+}
+
+// StartDeviceAction calls lindm.agent.v1.ExecutorService.StartDeviceAction.
+func (c *executorServiceClient) StartDeviceAction(ctx context.Context, req *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error) {
+	return c.startDeviceAction.CallUnary(ctx, req)
+}
+
+// GetDeviceAction calls lindm.agent.v1.ExecutorService.GetDeviceAction.
+func (c *executorServiceClient) GetDeviceAction(ctx context.Context, req *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error) {
+	return c.getDeviceAction.CallUnary(ctx, req)
+}
+
+// AttestDeviceAction calls lindm.agent.v1.ExecutorService.AttestDeviceAction.
+func (c *executorServiceClient) AttestDeviceAction(ctx context.Context, req *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error) {
+	return c.attestDeviceAction.CallUnary(ctx, req)
+}
+
+// ConfirmDeviceActionEscrow calls lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow.
+func (c *executorServiceClient) ConfirmDeviceActionEscrow(ctx context.Context, req *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error) {
+	return c.confirmDeviceActionEscrow.CallUnary(ctx, req)
+}
+
+// PrepareDeviceActionRecovery calls lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery.
+func (c *executorServiceClient) PrepareDeviceActionRecovery(ctx context.Context, req *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error) {
+	return c.prepareDeviceActionRecovery.CallUnary(ctx, req)
+}
+
+// CommitDeviceActionRecovery calls lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery.
+func (c *executorServiceClient) CommitDeviceActionRecovery(ctx context.Context, req *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error) {
+	return c.commitDeviceActionRecovery.CallUnary(ctx, req)
+}
+
+// SupplyDeviceActionCredential calls lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential.
+func (c *executorServiceClient) SupplyDeviceActionCredential(ctx context.Context, req *connect.Request[v1.SupplyDeviceActionCredentialRequest]) (*connect.Response[v1.SupplyDeviceActionCredentialResponse], error) {
+	return c.supplyDeviceActionCredential.CallUnary(ctx, req)
+}
+
+// ExchangeAgentUpdate calls lindm.agent.v1.ExecutorService.ExchangeAgentUpdate.
+func (c *executorServiceClient) ExchangeAgentUpdate(ctx context.Context, req *connect.Request[v1.ExchangeAgentUpdateRequest]) (*connect.Response[v1.ExchangeAgentUpdateResponse], error) {
+	return c.exchangeAgentUpdate.CallUnary(ctx, req)
+}
+
+// GetAgentUpdate calls lindm.agent.v1.ExecutorService.GetAgentUpdate.
+func (c *executorServiceClient) GetAgentUpdate(ctx context.Context, req *connect.Request[v1.GetAgentUpdateRequest]) (*connect.Response[v1.GetAgentUpdateResponse], error) {
+	return c.getAgentUpdate.CallUnary(ctx, req)
+}
+
 // Status calls lindm.agent.v1.ExecutorService.Status.
 func (c *executorServiceClient) Status(ctx context.Context, req *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {
 	return c.status.CallUnary(ctx, req)
@@ -342,6 +521,8 @@ type ExecutorServiceHandler interface {
 	// pending key and deployment, then commits and removes the grant before
 	// acknowledgment. Root only.
 	InstallEnrollment(context.Context, *connect.Request[v1.InstallEnrollmentRequest]) (*connect.Response[v1.InstallEnrollmentResponse], error)
+	// Root-only signed offline response import; rejects already installed attempts.
+	ImportOfflineEnrollment(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequest]) (*connect.Response[v1.ImportOfflineEnrollmentResponse], error)
 	// GetConnection returns public connection material. An expired active
 	// certificate is not a TLS credential. Pending retrieval public data is
 	// still returned. session_epoch is usable only after CommitSession and
@@ -382,6 +563,18 @@ type ExecutorServiceHandler interface {
 	// Signs a nonce-bound snapshot of protected action history using the current
 	// device identity/session. Does not observe native state or authorize effects.
 	AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error)
+	PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error)
+	StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error)
+	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
+	AttestDeviceAction(context.Context, *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error)
+	ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error)
+	PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error)
+	CommitDeviceActionRecovery(context.Context, *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error)
+	// Root-only one-use owner credential; never persisted or returned.
+	SupplyDeviceActionCredential(context.Context, *connect.Request[v1.SupplyDeviceActionCredentialRequest]) (*connect.Response[v1.SupplyDeviceActionCredentialResponse], error)
+	// Bounded untrusted transport answers to executor-selected TUF fetches.
+	ExchangeAgentUpdate(context.Context, *connect.Request[v1.ExchangeAgentUpdateRequest]) (*connect.Response[v1.ExchangeAgentUpdateResponse], error)
+	GetAgentUpdate(context.Context, *connect.Request[v1.GetAgentUpdateRequest]) (*connect.Response[v1.GetAgentUpdateResponse], error)
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
@@ -404,6 +597,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		ExecutorServiceInstallEnrollmentProcedure,
 		svc.InstallEnrollment,
 		connect.WithSchema(executorServiceMethods.ByName("InstallEnrollment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceImportOfflineEnrollmentHandler := connect.NewUnaryHandler(
+		ExecutorServiceImportOfflineEnrollmentProcedure,
+		svc.ImportOfflineEnrollment,
+		connect.WithSchema(executorServiceMethods.ByName("ImportOfflineEnrollment")),
 		connect.WithHandlerOptions(opts...),
 	)
 	executorServiceGetConnectionHandler := connect.NewUnaryHandler(
@@ -478,6 +677,66 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("AttestServiceExecution")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServicePrepareDeviceActionHandler := connect.NewUnaryHandler(
+		ExecutorServicePrepareDeviceActionProcedure,
+		svc.PrepareDeviceAction,
+		connect.WithSchema(executorServiceMethods.ByName("PrepareDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceStartDeviceActionHandler := connect.NewUnaryHandler(
+		ExecutorServiceStartDeviceActionProcedure,
+		svc.StartDeviceAction,
+		connect.WithSchema(executorServiceMethods.ByName("StartDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetDeviceActionHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetDeviceActionProcedure,
+		svc.GetDeviceAction,
+		connect.WithSchema(executorServiceMethods.ByName("GetDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceAttestDeviceActionHandler := connect.NewUnaryHandler(
+		ExecutorServiceAttestDeviceActionProcedure,
+		svc.AttestDeviceAction,
+		connect.WithSchema(executorServiceMethods.ByName("AttestDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceConfirmDeviceActionEscrowHandler := connect.NewUnaryHandler(
+		ExecutorServiceConfirmDeviceActionEscrowProcedure,
+		svc.ConfirmDeviceActionEscrow,
+		connect.WithSchema(executorServiceMethods.ByName("ConfirmDeviceActionEscrow")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServicePrepareDeviceActionRecoveryHandler := connect.NewUnaryHandler(
+		ExecutorServicePrepareDeviceActionRecoveryProcedure,
+		svc.PrepareDeviceActionRecovery,
+		connect.WithSchema(executorServiceMethods.ByName("PrepareDeviceActionRecovery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceCommitDeviceActionRecoveryHandler := connect.NewUnaryHandler(
+		ExecutorServiceCommitDeviceActionRecoveryProcedure,
+		svc.CommitDeviceActionRecovery,
+		connect.WithSchema(executorServiceMethods.ByName("CommitDeviceActionRecovery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceSupplyDeviceActionCredentialHandler := connect.NewUnaryHandler(
+		ExecutorServiceSupplyDeviceActionCredentialProcedure,
+		svc.SupplyDeviceActionCredential,
+		connect.WithSchema(executorServiceMethods.ByName("SupplyDeviceActionCredential")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceExchangeAgentUpdateHandler := connect.NewUnaryHandler(
+		ExecutorServiceExchangeAgentUpdateProcedure,
+		svc.ExchangeAgentUpdate,
+		connect.WithSchema(executorServiceMethods.ByName("ExchangeAgentUpdate")),
+		connect.WithHandlerOptions(opts...),
+	)
+	executorServiceGetAgentUpdateHandler := connect.NewUnaryHandler(
+		ExecutorServiceGetAgentUpdateProcedure,
+		svc.GetAgentUpdate,
+		connect.WithSchema(executorServiceMethods.ByName("GetAgentUpdate")),
+		connect.WithHandlerOptions(opts...),
+	)
 	executorServiceStatusHandler := connect.NewUnaryHandler(
 		ExecutorServiceStatusProcedure,
 		svc.Status,
@@ -490,6 +749,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServicePrepareBootstrapHandler.ServeHTTP(w, r)
 		case ExecutorServiceInstallEnrollmentProcedure:
 			executorServiceInstallEnrollmentHandler.ServeHTTP(w, r)
+		case ExecutorServiceImportOfflineEnrollmentProcedure:
+			executorServiceImportOfflineEnrollmentHandler.ServeHTTP(w, r)
 		case ExecutorServiceGetConnectionProcedure:
 			executorServiceGetConnectionHandler.ServeHTTP(w, r)
 		case ExecutorServiceSignTLSClientMessageProcedure:
@@ -514,6 +775,26 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceGetServiceExecutionHandler.ServeHTTP(w, r)
 		case ExecutorServiceAttestServiceExecutionProcedure:
 			executorServiceAttestServiceExecutionHandler.ServeHTTP(w, r)
+		case ExecutorServicePrepareDeviceActionProcedure:
+			executorServicePrepareDeviceActionHandler.ServeHTTP(w, r)
+		case ExecutorServiceStartDeviceActionProcedure:
+			executorServiceStartDeviceActionHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetDeviceActionProcedure:
+			executorServiceGetDeviceActionHandler.ServeHTTP(w, r)
+		case ExecutorServiceAttestDeviceActionProcedure:
+			executorServiceAttestDeviceActionHandler.ServeHTTP(w, r)
+		case ExecutorServiceConfirmDeviceActionEscrowProcedure:
+			executorServiceConfirmDeviceActionEscrowHandler.ServeHTTP(w, r)
+		case ExecutorServicePrepareDeviceActionRecoveryProcedure:
+			executorServicePrepareDeviceActionRecoveryHandler.ServeHTTP(w, r)
+		case ExecutorServiceCommitDeviceActionRecoveryProcedure:
+			executorServiceCommitDeviceActionRecoveryHandler.ServeHTTP(w, r)
+		case ExecutorServiceSupplyDeviceActionCredentialProcedure:
+			executorServiceSupplyDeviceActionCredentialHandler.ServeHTTP(w, r)
+		case ExecutorServiceExchangeAgentUpdateProcedure:
+			executorServiceExchangeAgentUpdateHandler.ServeHTTP(w, r)
+		case ExecutorServiceGetAgentUpdateProcedure:
+			executorServiceGetAgentUpdateHandler.ServeHTTP(w, r)
 		case ExecutorServiceStatusProcedure:
 			executorServiceStatusHandler.ServeHTTP(w, r)
 		default:
@@ -531,6 +812,10 @@ func (UnimplementedExecutorServiceHandler) PrepareBootstrap(context.Context, *co
 
 func (UnimplementedExecutorServiceHandler) InstallEnrollment(context.Context, *connect.Request[v1.InstallEnrollmentRequest]) (*connect.Response[v1.InstallEnrollmentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.InstallEnrollment is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) ImportOfflineEnrollment(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequest]) (*connect.Response[v1.ImportOfflineEnrollmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ImportOfflineEnrollment is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) GetConnection(context.Context, *connect.Request[v1.GetConnectionRequest]) (*connect.Response[v1.GetConnectionResponse], error) {
@@ -579,6 +864,46 @@ func (UnimplementedExecutorServiceHandler) GetServiceExecution(context.Context, 
 
 func (UnimplementedExecutorServiceHandler) AttestServiceExecution(context.Context, *connect.Request[v1.AttestServiceExecutionRequest]) (*connect.Response[v1.AttestServiceExecutionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestServiceExecution is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) PrepareDeviceAction(context.Context, *connect.Request[v1.PrepareDeviceActionRequest]) (*connect.Response[v1.PrepareDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareDeviceAction is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) StartDeviceAction(context.Context, *connect.Request[v1.StartDeviceActionRequest]) (*connect.Response[v1.StartDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.StartDeviceAction is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetDeviceAction is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) AttestDeviceAction(context.Context, *connect.Request[v1.AttestDeviceActionRequest]) (*connect.Response[v1.AttestDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.AttestDeviceAction is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) ConfirmDeviceActionEscrow(context.Context, *connect.Request[v1.ConfirmDeviceActionEscrowRequest]) (*connect.Response[v1.ConfirmDeviceActionEscrowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) PrepareDeviceActionRecovery(context.Context, *connect.Request[v1.PrepareDeviceActionRecoveryRequest]) (*connect.Response[v1.PrepareDeviceActionRecoveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) CommitDeviceActionRecovery(context.Context, *connect.Request[v1.CommitDeviceActionRecoveryRequest]) (*connect.Response[v1.CommitDeviceActionRecoveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) SupplyDeviceActionCredential(context.Context, *connect.Request[v1.SupplyDeviceActionCredentialRequest]) (*connect.Response[v1.SupplyDeviceActionCredentialResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) ExchangeAgentUpdate(context.Context, *connect.Request[v1.ExchangeAgentUpdateRequest]) (*connect.Response[v1.ExchangeAgentUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ExchangeAgentUpdate is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) GetAgentUpdate(context.Context, *connect.Request[v1.GetAgentUpdateRequest]) (*connect.Response[v1.GetAgentUpdateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.GetAgentUpdate is not implemented"))
 }
 
 func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {

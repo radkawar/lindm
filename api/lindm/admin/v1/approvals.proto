@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/assignments.proto";
+import "lindm/admin/v1/device_actions.proto";
+import "lindm/admin/v1/enrollment_recovery.proto";
+import "lindm/admin/v1/provisioning.proto";
+import "lindm/admin/v1/targeting.proto";
+import "lindm/agent/v1/execution_trust.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+message RevokeDeviceRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string approval_id = 4 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+message UpdateExecutionAuthorityRequest {
+  lindm.agent.v1.UpdateExecutionTrustRequest update = 1 [(buf.validate.field).required = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string approval_id = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+
+enum ApprovalState {
+  APPROVAL_STATE_UNSPECIFIED = 0;
+  APPROVAL_STATE_PENDING = 1;
+  APPROVAL_STATE_APPROVED = 2;
+  APPROVAL_STATE_REJECTED = 3;
+  APPROVAL_STATE_CONSUMED = 4;
+  APPROVAL_STATE_EXPIRED = 5;
+}
+
+message Approval {
+  string id = 1;
+  string requester_id = 2;
+  string approver_id = 3;
+  string action = 4;
+  string permission = 5;
+  string device_id = 6;
+  bytes payload_sha256 = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  ApprovalState state = 10;
+  string decision_reason = 11;
+  oneof payload {
+    RevokeDeviceRequest revoke_device = 12;
+    SetResourceAssignmentRequest set_resource_assignment = 13;
+    UpdateExecutionAuthorityRequest update_execution_authority = 14;
+    CreateDeviceActionRequest create_device_action = 15;
+    RevealRecoveryKeyRequest reveal_recovery_key = 16;
+    ApprovePendingEnrollmentRequest approve_pending_enrollment = 17;
+    CreateRecoveryEnrollmentGrantRequest recover_device = 18;
+    ActivateTargetPreviewRequest activate_target_preview = 19;
+  }
+}
+
+message CreateApprovalRequest {
+  uint32 lifetime_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 3600
+  }];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    RevokeDeviceRequest revoke_device = 2;
+    SetResourceAssignmentRequest set_resource_assignment = 3;
+    UpdateExecutionAuthorityRequest update_execution_authority = 4;
+    CreateDeviceActionRequest create_device_action = 5;
+    RevealRecoveryKeyRequest reveal_recovery_key = 6;
+    ApprovePendingEnrollmentRequest approve_pending_enrollment = 7;
+    CreateRecoveryEnrollmentGrantRequest recover_device = 8;
+    ActivateTargetPreviewRequest activate_target_preview = 9;
+  }
+}
+message CreateApprovalResponse {
+  Approval approval = 1;
+}
+message ListApprovalsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 2 [(buf.validate.field).string.max_len = 512];
+}
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+  string next_page_token = 2;
+}
+message ApproveApprovalRequest {
+  string approval_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message ApproveApprovalResponse {
+  Approval approval = 1;
+}
+message RejectApprovalRequest {
+  string approval_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RejectApprovalResponse {
+  Approval approval = 1;
+}

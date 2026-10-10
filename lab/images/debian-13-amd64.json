@@ -1,0 +1,19 @@
+{
+  "id": "debian-13-amd64",
+  "distribution": "debian",
+  "version": "13",
+  "architecture": "amd64",
+  "edition": "netinst",
+  "release": "13.7.0",
+  "imageFilename": "debian-13.7.0-amd64-netinst.iso",
+  "imageUrl": "https://saimei.ftp.acc.umu.se/debian-cd/13.7.0/amd64/iso-cd/debian-13.7.0-amd64-netinst.iso",
+  "checksumUrl": "https://cdimage.debian.org/debian-cd/13.7.0/amd64/iso-cd/SHA512SUMS",
+  "signatureUrl": "https://cdimage.debian.org/debian-cd/13.7.0/amd64/iso-cd/SHA512SUMS.sign",
+  "keyUrl": "https://www.debian.org/CD/key-DA87E80D6294BE9B.txt",
+  "sha256": "a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355",
+  "signerFingerprint": "DF9B9C49EAA9298432589D76DA87E80D6294BE9B",
+  "imageSizeBytes": "792723456",
+  "checksumMode": "CHECKSUM_MODE_DETACHED_SHA512",
+  "signerProvenanceUrl": "https://www.debian.org/CD/verify",
+  "releaseProvenanceUrl": "https://cdimage.debian.org/debian-cd/13.7.0/amd64/iso-cd/"
+}

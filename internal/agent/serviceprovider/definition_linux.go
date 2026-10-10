@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 const (
@@ -159,15 +161,11 @@ func (g *legacyIncludeGuard) scan(data []byte) bool {
 	return false
 }
 
-func trustedDirectory(stat *unix.Stat_t) bool {
-	return stat.Mode&unix.S_IFMT == unix.S_IFDIR && stat.Uid == 0 && stat.Mode&0022 == 0
-}
-
 // openProtectedFile resolves even vendor /lib symlinks without following any
 // unchecked directory. Each link is pinned with O_PATH|O_NOFOLLOW and read via
 // its own descriptor; both the original and resolved ancestry must be trusted.
 // Unlike private agent state, these files may be world-readable but may never
-// have a non-root owner or group/world-writable ancestry (including sticky dirs).
+// have a non-root owner or ancestry writable outside root's group (even sticky dirs).
 func openProtectedFile(path string, maxBytes int64) (*os.File, string, unix.Stat_t, error) {
 	var zero unix.Stat_t
 	if maxBytes <= 0 || !strings.HasPrefix(path, "/") || strings.ContainsRune(path, '\x00') || len(path) > maxDefinitionPath {
@@ -183,7 +181,7 @@ func openProtectedFile(path string, maxBytes int64) (*os.File, string, unix.Stat
 	if err := unix.Fstat(fd, &rootStat); err != nil {
 		return nil, "", zero, err
 	}
-	if !trustedDirectory(&rootStat) {
+	if !custody.TrustedDirectory(&rootStat) {
 		return nil, "", zero, fmt.Errorf("untrusted root directory")
 	}
 	pending := strings.Split(strings.TrimPrefix(path, "/"), "/")
@@ -242,7 +240,7 @@ func openProtectedFile(path string, maxBytes int64) (*os.File, string, unix.Stat
 			continue
 		}
 		if stat.Mode&unix.S_IFMT == unix.S_IFDIR {
-			if !trustedDirectory(&stat) {
+			if !custody.TrustedDirectory(&stat) {
 				_ = unix.Close(next)
 				return nil, "", zero, fmt.Errorf("writable definition directory")
 			}

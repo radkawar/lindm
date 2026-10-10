@@ -9,6 +9,9 @@ install -o postgres -g postgres -m 0600 /run/lindm-dev/postgres-password /var/li
 install -o postgres -g postgres -m 0600 /run/lindm-dev/database-init.sql /docker-entrypoint-initdb.d/10-lindm.sql
 export POSTGRES_PASSWORD_FILE=/var/lib/postgresql/bootstrap-password
 exec /usr/local/bin/docker-entrypoint.sh postgres \
+  -c shared_preload_libraries=pg_stat_statements \
+  -c compute_query_id=on \
+  -c pg_stat_statements.track=top \
   -c ssl=on \
   -c ssl_cert_file=/var/lib/postgresql/server.crt \
   -c ssl_key_file=/var/lib/postgresql/server.key \

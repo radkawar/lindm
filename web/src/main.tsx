@@ -5,11 +5,17 @@ import { queryClient } from "./app/query";
 import { router } from "./app/router";
 import "./styles/globals.css";
 
-const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
-document.documentElement.classList.toggle("dark", colorScheme.matches);
-colorScheme.addEventListener("change", (event) => {
-  document.documentElement.classList.toggle("dark", event.matches);
-});
+let preferredTheme: string | null = null;
+try {
+  preferredTheme = localStorage.getItem("lindm-theme");
+} catch {
+  // System preference is available even when browser storage is disabled.
+}
+const dark =
+  preferredTheme === "dark" ||
+  (preferredTheme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+document.documentElement.classList.toggle("dark", dark);
+document.documentElement.style.colorScheme = dark ? "dark" : "light";
 
 const root = document.querySelector("#root");
 if (root === null) throw new Error("Console root element is missing.");

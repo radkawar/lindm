@@ -4,6 +4,29 @@
 
 package journaldb
 
+type AccountLock struct {
+	LockActionID string
+	Revision     int64
+	Record       []byte
+}
+
+type AccountLockOwner struct {
+	Username     string
+	Uid          int64
+	LockActionID string
+}
+
+type DeviceAction struct {
+	ActionID             string
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	ActionSequence       int64
+	Revision             int64
+	State                int64
+	Record               []byte
+}
+
 type ServiceAction struct {
 	ActionID             string
 	DeploymentID         string
@@ -14,6 +37,7 @@ type ServiceAction struct {
 	Revision             int64
 	State                int64
 	Record               []byte
+	ReadOnlySuccess      int64
 }
 
 type ServiceResourceFloor struct {

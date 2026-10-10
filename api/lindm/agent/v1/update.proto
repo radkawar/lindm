@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Explicit root-owned opt-in. Repository TLS uses the bootstrap transport CA;
+// release authority always uses the independently pinned bootstrap TUF root.
+message AgentUpdateConfig {
+  string repository_url = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string ring = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  uint32 poll_interval_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 86400
+  }];
+  NativeUpdateManager manager = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+
+enum NativeUpdateManager {
+  NATIVE_UPDATE_MANAGER_UNSPECIFIED = 0;
+  NATIVE_UPDATE_MANAGER_APT = 1;
+  NATIVE_UPDATE_MANAGER_DNF = 2;
+  NATIVE_UPDATE_MANAGER_ZYPPER = 3;
+  NATIVE_UPDATE_MANAGER_PACMAN = 4;
+}
+
+// The network process can answer only an outstanding executor-generated request.
+// It cannot choose a path, version, hash, trust root, or executable.
+message ExchangeAgentUpdateRequest {
+  string request_id = 1 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  bytes data = 2 [(buf.validate.field).bytes.max_len = 262144];
+  bool eof = 3;
+  bool not_found = 4;
+  bool failed = 5;
+  option (buf.validate.message).cel = {
+    id: "update.exchange_reply"
+    message: "empty polling has no reply data; failures carry no bytes"
+    expression: "(this.request_id != '' || (this.data.size() == 0 && !this.eof && !this.not_found && !this.failed)) && (!(this.not_found || this.failed) || this.data.size() == 0)"
+  };
+}
+
+message AgentUpdateFetch {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string path = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  uint64 offset = 3;
+  uint32 limit = 4 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 262144
+  }];
+}
+
+message ExchangeAgentUpdateResponse {
+  string repository_url = 1;
+  AgentUpdateFetch fetch = 2;
+  AgentUpdateStatus status = 3;
+  uint32 poll_interval_seconds = 4;
+}
+
+message GetAgentUpdateRequest {}
+message GetAgentUpdateResponse {
+  AgentUpdateStatus status = 1;
+}
+
+// Diagnostic facts are historical, not claims of current package health.
+message AgentUpdateStatus {
+  bool enabled = 1;
+  string phase = 2;
+  string version = 3;
+  string transaction_id = 4;
+  string reason = 5;
+  google.protobuf.Timestamp observed_at = 6;
+  google.protobuf.Timestamp attempt_started_at = 7;
+  google.protobuf.Timestamp attempt_finished_at = 8;
+  string last_outcome = 9;
+  google.protobuf.Timestamp last_metadata_at = 10;
+}
+
+// Root-owned durable state, not an RPC request. The transaction is immutable once
+// admitted; helper completion never substitutes for native installed observation.
+message AgentUpdateTransaction {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string version = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[0-9]+[.][0-9]+[.][0-9]+$"
+  }];
+  string native_version = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[0-9][A-Za-z0-9.+:~_-]*$"
+  }];
+  NativeUpdateManager manager = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string architecture = 5 [(buf.validate.field).string = {
+    in: [
+      "amd64",
+      "arm64"
+    ]
+  }];
+  string sha256 = 6 [(buf.validate.field).string = {
+    len: 64
+    pattern: "^[a-f0-9]+$"
+  }];
+  uint64 length = 7 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 1073741824
+  }];
+  google.protobuf.Timestamp admitted_at = 8 [(buf.validate.field).required = true];
+  // Exact installed predecessor observed before admission. Recovery never
+  // overwrites an independently changed native package version.
+  string previous_native_version = 9 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  // Earliest expiry of the verified catalog and complete TUF role chain.
+  google.protobuf.Timestamp verified_expires_at = 10 [(buf.validate.field).required = true];
+  string previous_version = 11 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[0-9]+[.][0-9]+[.][0-9]+$"
+  }];
+}
+
+message AgentUpdateJournal {
+  option (buf.validate.message).cel = {
+    id: "update_journal.transaction"
+    message: "only idle state omits a transaction; installed state binds its exact version"
+    expression: "(this.phase == 'idle') == !has(this.transaction) && (this.phase != 'installed' || this.installed_version == this.transaction.version)"
+  };
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string installed_version = 2 [(buf.validate.field).string.max_len = 64];
+  AgentUpdateTransaction transaction = 3;
+  string phase = 4 [(buf.validate.field).string = {
+    in: [
+      "idle",
+      "staged",
+      "applying",
+      "installed",
+      "rejected",
+      "recovery_required"
+    ]
+  }];
+  string reason = 5 [(buf.validate.field).string.max_len = 256];
+  google.protobuf.Timestamp observed_at = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp attempt_started_at = 7;
+  google.protobuf.Timestamp attempt_finished_at = 8;
+  string last_outcome = 9 [(buf.validate.field).string.max_len = 64];
+  google.protobuf.Timestamp last_metadata_at = 10;
+}
+
+// The detached helper's durable boundary, independently readable after reboot.
+message AgentUpdateHelperState {
+  string phase = 1 [(buf.validate.field).string = {
+    in: [
+      "installing",
+      "installed",
+      "rejected",
+      "recovery_required"
+    ]
+  }];
+  google.protobuf.Timestamp observed_at = 2 [(buf.validate.field).required = true];
+}

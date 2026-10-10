@@ -8,25 +8,55 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 
 	labv1 "lindm/gen/lindm/lab/v1"
 )
 
-func newVerifiedGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool) (vm *guestVM, verified *VerifiedImage, err error) {
-	// Fail on missing acceleration before fetching a large official image.
-	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+func newVerifiedGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool) (*guestVM, *VerifiedImage, error) {
+	return newVerifiedGuestWithHardware(ctx, manifest, cacheDir, workDir, allowReboot, nil)
+}
+
+func newVerifiedGuestWithHardware(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions) (vm *guestVM, verified *VerifiedImage, err error) {
+	return newVerifiedSeededGuest(ctx, manifest, cacheDir, workDir, allowReboot, hardware, nil)
+}
+
+func newVerifiedSeededGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheDir, workDir string, allowReboot bool, hardware *VMHardwareOptions, seed *unattendedSeed) (vm *guestVM, verified *VerifiedImage, err error) {
+	h, err := defaultVMHardware(hardware)
 	if err != nil {
-		return nil, nil, fmt.Errorf("KVM access is required (no software fallback): %w", err)
-	}
-	if err := kvm.Close(); err != nil {
 		return nil, nil, err
+	}
+	if manifest == nil {
+		return nil, nil, errors.New("VM image manifest is required")
+	}
+	architecture := manifest.Architecture
+	switch architecture {
+	case "amd64":
+		architecture = "x86_64"
+	case "arm64":
+		architecture = "aarch64"
+	}
+	if architecture != h.Architecture {
+		return nil, nil, errors.New("VM image and selected hardware architectures differ")
+	}
+	// Fail on missing selected acceleration before fetching a large image.
+	if err := checkVMAcceleration(h); err != nil {
+		return nil, nil, err
+	}
+	if manifest.Distribution == "debian" && manifest.Edition == "netinst" && h.Firmware == nil {
+		return nil, nil, errors.New("debian netinst requires explicit UEFI firmware")
 	}
 	verified, err = (Fetcher{}).Fetch(ctx, manifest, cacheDir)
 	if err != nil {
 		return nil, nil, err
 	}
-	base, err := openRegular(verified.Path)
+	image := verified
+	if manifest.Distribution == "debian" && manifest.Edition == "netinst" {
+		image, err = debianInstalledImage(ctx, manifest, verified, cacheDir, workDir, h)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	base, err := openRegular(image.Path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -40,14 +70,14 @@ func newVerifiedGuest(ctx context.Context, manifest *labv1.ImageManifest, cacheD
 		}
 	}()
 	hash := sha256.New()
-	count, err := copyVMBytes(ctx, hash, base, verified.Size)
+	count, err := copyVMBytes(ctx, hash, base, image.Size)
 	if err != nil {
 		return nil, nil, fmt.Errorf("pin verified image: %w", err)
 	}
-	if count != verified.Size || hex.EncodeToString(hash.Sum(nil)) != verified.SHA256 {
+	if count != image.Size || hex.EncodeToString(hash.Sum(nil)) != image.SHA256 {
 		return nil, nil, errors.New("verified image changed before VM launch")
 	}
-	vm, err = newGuestVM(ctx, base, workDir, allowReboot)
+	vm, err = newSeededGuestVM(ctx, base, workDir, allowReboot, &h, seed)
 	if err != nil {
 		return nil, nil, err
 	}

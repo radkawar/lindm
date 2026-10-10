@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 var ErrUnsafe = errors.New("unsafe agent state filesystem boundary")
@@ -93,6 +95,9 @@ func checkAncestor(fd int) error {
 	var info unix.Stat_t
 	if err := unix.Fstat(fd, &info); err != nil {
 		return err
+	}
+	if custody.TrustedDirectory(&info) {
+		return nil
 	}
 	// Sticky trusted parents (notably /tmp) cannot rename an entry owned
 	// by this UID/root. Diagnostics alone may accept another final owner.

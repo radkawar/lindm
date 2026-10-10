@@ -79,6 +79,29 @@ func (q *Queries) ClearOpenSnapshot(ctx context.Context, arg ClearOpenSnapshotPa
 	return err
 }
 
+const getDeviceAuthority = `-- name: GetDeviceAuthority :one
+SELECT
+    id,
+    state,
+    current_generation_id
+FROM devices
+WHERE id = $1
+`
+
+type GetDeviceAuthorityRow struct {
+	ID                  uuid.UUID
+	State               string
+	CurrentGenerationID *uuid.UUID
+}
+
+// Read-only authority callers must use a coherent transaction snapshot.
+func (q *Queries) GetDeviceAuthority(ctx context.Context, id uuid.UUID) (GetDeviceAuthorityRow, error) {
+	row := q.db.QueryRow(ctx, getDeviceAuthority, id)
+	var i GetDeviceAuthorityRow
+	err := row.Scan(&i.ID, &i.State, &i.CurrentGenerationID)
+	return i, err
+}
+
 const getDeviceDetail = `-- name: GetDeviceDetail :one
 SELECT
     d.id,
@@ -243,167 +266,6 @@ type InsertEnrollmentGenerationParams struct {
 func (q *Queries) InsertEnrollmentGeneration(ctx context.Context, arg InsertEnrollmentGenerationParams) error {
 	_, err := q.db.Exec(ctx, insertEnrollmentGeneration, arg.ID, arg.DeviceID, arg.CreatedAt)
 	return err
-}
-
-const listDevicesAfter = `-- name: ListDevicesAfter :many
-SELECT
-    d.id,
-    d.current_generation_id,
-    d.hostname,
-    d.os_id,
-    d.os_version,
-    d.architecture,
-    d.state,
-    d.enrolled_at,
-    d.last_seen_at,
-    d.published_sequence,
-    coalesce(g.host_sequence, 0) AS host_sequence,
-    coalesce(g.package_sequence, 0) AS package_sequence,
-    d.host_received_at,
-    d.package_attempt_received_at,
-    d.snapshot_received_at
-FROM devices d
-LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
-WHERE (d.enrolled_at, d.id) < ($1::timestamptz, $2::uuid)
-ORDER BY d.enrolled_at DESC, d.id DESC
-LIMIT $3::int
-`
-
-type ListDevicesAfterParams struct {
-	CursorEnrolledAt pgtype.Timestamptz
-	CursorID         uuid.UUID
-	RowLimit         int32
-}
-
-type ListDevicesAfterRow struct {
-	ID                       uuid.UUID
-	CurrentGenerationID      *uuid.UUID
-	Hostname                 string
-	OsID                     string
-	OsVersion                string
-	Architecture             string
-	State                    string
-	EnrolledAt               pgtype.Timestamptz
-	LastSeenAt               pgtype.Timestamptz
-	PublishedSequence        int64
-	HostSequence             int64
-	PackageSequence          int64
-	HostReceivedAt           pgtype.Timestamptz
-	PackageAttemptReceivedAt pgtype.Timestamptz
-	SnapshotReceivedAt       pgtype.Timestamptz
-}
-
-func (q *Queries) ListDevicesAfter(ctx context.Context, arg ListDevicesAfterParams) ([]ListDevicesAfterRow, error) {
-	rows, err := q.db.Query(ctx, listDevicesAfter, arg.CursorEnrolledAt, arg.CursorID, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDevicesAfterRow{}
-	for rows.Next() {
-		var i ListDevicesAfterRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CurrentGenerationID,
-			&i.Hostname,
-			&i.OsID,
-			&i.OsVersion,
-			&i.Architecture,
-			&i.State,
-			&i.EnrolledAt,
-			&i.LastSeenAt,
-			&i.PublishedSequence,
-			&i.HostSequence,
-			&i.PackageSequence,
-			&i.HostReceivedAt,
-			&i.PackageAttemptReceivedAt,
-			&i.SnapshotReceivedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listDevicesFirst = `-- name: ListDevicesFirst :many
-SELECT
-    d.id,
-    d.current_generation_id,
-    d.hostname,
-    d.os_id,
-    d.os_version,
-    d.architecture,
-    d.state,
-    d.enrolled_at,
-    d.last_seen_at,
-    d.published_sequence,
-    coalesce(g.host_sequence, 0) AS host_sequence,
-    coalesce(g.package_sequence, 0) AS package_sequence,
-    d.host_received_at,
-    d.package_attempt_received_at,
-    d.snapshot_received_at
-FROM devices d
-LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
-ORDER BY d.enrolled_at DESC, d.id DESC
-LIMIT $1::int
-`
-
-type ListDevicesFirstRow struct {
-	ID                       uuid.UUID
-	CurrentGenerationID      *uuid.UUID
-	Hostname                 string
-	OsID                     string
-	OsVersion                string
-	Architecture             string
-	State                    string
-	EnrolledAt               pgtype.Timestamptz
-	LastSeenAt               pgtype.Timestamptz
-	PublishedSequence        int64
-	HostSequence             int64
-	PackageSequence          int64
-	HostReceivedAt           pgtype.Timestamptz
-	PackageAttemptReceivedAt pgtype.Timestamptz
-	SnapshotReceivedAt       pgtype.Timestamptz
-}
-
-func (q *Queries) ListDevicesFirst(ctx context.Context, rowLimit int32) ([]ListDevicesFirstRow, error) {
-	rows, err := q.db.Query(ctx, listDevicesFirst, rowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDevicesFirstRow{}
-	for rows.Next() {
-		var i ListDevicesFirstRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CurrentGenerationID,
-			&i.Hostname,
-			&i.OsID,
-			&i.OsVersion,
-			&i.Architecture,
-			&i.State,
-			&i.EnrolledAt,
-			&i.LastSeenAt,
-			&i.PublishedSequence,
-			&i.HostSequence,
-			&i.PackageSequence,
-			&i.HostReceivedAt,
-			&i.PackageAttemptReceivedAt,
-			&i.SnapshotReceivedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const publishDeviceSnapshot = `-- name: PublishDeviceSnapshot :exec

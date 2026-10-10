@@ -1,0 +1,575 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+enum PackageEcosystem {
+  PACKAGE_ECOSYSTEM_UNSPECIFIED = 0;
+  PACKAGE_ECOSYSTEM_DEB = 1;
+  PACKAGE_ECOSYSTEM_RPM = 2;
+  PACKAGE_ECOSYSTEM_ALPM = 3;
+  PACKAGE_ECOSYSTEM_NIX = 4;
+}
+message PackageIdentity {
+  PackageEcosystem ecosystem = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // For Nix this is an owner-approved catalog identity, not a nixpkgs expression.
+  string native_name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$"
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$"
+  }];
+}
+message AnyApprovedVersion {}
+message RPMVersion {
+  uint64 epoch = 1;
+  string version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[^\\x00\\r\\n /]+$"
+  }];
+  string release = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[^\\x00\\r\\n /]+$"
+  }];
+}
+message ALPMVersion {
+  uint64 epoch = 1;
+  string pkgver = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[^\\x00\\r\\n /]+$"
+  }];
+  string pkgrel = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[0-9]+(\\.[0-9]+)*$"
+  }];
+}
+message NixVersion {
+  string catalog_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes input_digest = 2 [(buf.validate.field).bytes.len = 32];
+}
+message NativeVersion {
+  oneof version {
+    option (buf.validate.oneof).required = true;
+    string deb = 1 [(buf.validate.field).string = {
+      min_len: 1
+      max_len: 256
+      pattern: "^[0-9][a-zA-Z0-9.+:~\\-]*$"
+    }];
+    RPMVersion rpm = 2;
+    ALPMVersion alpm = 3;
+    NixVersion nix = 4;
+  }
+}
+enum PackageRemovalPolicy {
+  PACKAGE_REMOVAL_POLICY_UNSPECIFIED = 0;
+  PACKAGE_REMOVAL_POLICY_PRESERVE_DATA = 1;
+  PACKAGE_REMOVAL_POLICY_RETAIN_INSTALLATION = 2;
+}
+message NativePackageDesired {
+  PackageIdentity package = 1 [(buf.validate.field).required = true];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  oneof version {
+    option (buf.validate.oneof).required = true;
+    AnyApprovedVersion any = 3;
+    NativeVersion exact = 4;
+  }
+  ResourceRef repository = 5 [(buf.validate.field).required = true];
+  PackageRemovalPolicy removal = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "native_package.repository"
+    message: "source must be an approved repository"
+    expression: "this.repository.kind == 13"
+  };
+  option (buf.validate.message).cel = {
+    id: "native_package.version"
+    message: "exact version must match package ecosystem"
+    expression: "!has(this.exact) || ((this.package.ecosystem == 1 && has(this.exact.deb)) || (this.package.ecosystem == 2 && has(this.exact.rpm)) || (this.package.ecosystem == 3 && has(this.exact.alpm)) || (this.package.ecosystem == 4 && has(this.exact.nix)))"
+  };
+}
+message AptRepository {
+  string uri = 1 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^@#]+$"
+  }];
+  string suite = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+  }];
+  repeated string components = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        max_len: 64
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9_./-]*$"
+      }
+    }
+  }];
+  repeated string architectures = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        max_len: 64
+        pattern: "^[a-zA-Z0-9_.-]+$"
+      }
+    }
+  }];
+  ArtifactRef signing_key = 5 [(buf.validate.field).required = true];
+}
+message RepositoryURLs {
+  repeated string urls = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      string: {
+        uri: true
+        max_len: 2048
+        pattern: "^https://[^@#]+$"
+      }
+    }
+  }];
+}
+message RpmRepository {
+  string native_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  oneof location {
+    option (buf.validate.oneof).required = true;
+    RepositoryURLs base_urls = 2;
+    string metalink = 3 [(buf.validate.field).string = {
+      uri: true
+      max_len: 2048
+      pattern: "^https://[^@#]+$"
+    }];
+  }
+  repeated ArtifactRef signing_keys = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  bool require_metadata_signature = 5 [(buf.validate.field).bool.const = true];
+  bool require_package_signature = 6 [(buf.validate.field).bool.const = true];
+}
+message AlpmRepository {
+  string native_name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  string snapshot_uri = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^@#]+$"
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  repeated ArtifactRef signing_keys = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+}
+message FlatpakRemote {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  string url = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^@#]+$"
+  }];
+  string collection_id = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+    pattern: "^[a-zA-Z][a-zA-Z0-9_-]*(\\.[a-zA-Z0-9_-]+)+$"
+  }];
+  ArtifactRef verification_key = 4 [(buf.validate.field).required = true];
+}
+message NixCacheKey {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  bytes ed25519_public_key = 2 [(buf.validate.field).bytes.len = 32];
+}
+message NixInput {
+  string approved_input_id = 1 [(buf.validate.field).string.uuid = true];
+  string revision = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  bytes nar_hash_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  repeated NixCacheKey cache_public_keys = 4 [(buf.validate.field).repeated.max_items = 16];
+}
+message OstreeRemote {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  string url = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^@#]+$"
+  }];
+  string ref = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_./-]*$"
+  }];
+  repeated ArtifactRef commit_signing_keys = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+}
+message RepositoryDesired {
+  string repository_id = 1 [(buf.validate.field).string.uuid = true];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  oneof source {
+    option (buf.validate.oneof).required = true;
+    AptRepository apt = 3;
+    RpmRepository rpm = 4;
+    AlpmRepository alpm = 5;
+    FlatpakRemote flatpak = 6;
+    NixInput nix = 7;
+    OstreeRemote ostree = 8;
+  }
+  SecretRef authentication = 9;
+  option (buf.validate.message).cel = {
+    id: "repository.secret"
+    message: "repository authentication is purpose limited"
+    expression: "!has(this.authentication) || this.authentication.purpose == 8"
+  };
+}
+enum FlatpakFilesystem {
+  FLATPAK_FILESYSTEM_UNSPECIFIED = 0;
+  FLATPAK_FILESYSTEM_HOME = 1;
+  FLATPAK_FILESYSTEM_DOCUMENTS = 2;
+  FLATPAK_FILESYSTEM_DOWNLOADS = 3;
+  FLATPAK_FILESYSTEM_REMOVABLE = 4;
+}
+message FlatpakFilesystemGrant {
+  FlatpakFilesystem scope = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bool writable = 2;
+}
+enum FlatpakDevice {
+  FLATPAK_DEVICE_UNSPECIFIED = 0;
+  FLATPAK_DEVICE_DRI = 1;
+  FLATPAK_DEVICE_KVM = 2;
+}
+enum FlatpakPortal {
+  FLATPAK_PORTAL_UNSPECIFIED = 0;
+  FLATPAK_PORTAL_CAMERA = 1;
+  FLATPAK_PORTAL_MICROPHONE = 2;
+  FLATPAK_PORTAL_LOCATION = 3;
+  FLATPAK_PORTAL_BACKGROUND = 4;
+}
+message FlatpakPermissionPolicy {
+  repeated FlatpakFilesystemGrant filesystems = 1 [(buf.validate.field).repeated.max_items = 4];
+  repeated FlatpakDevice devices = 2 [(buf.validate.field).repeated = {
+    max_items: 2
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  bool network = 3;
+  repeated FlatpakPortal portals = 4 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+}
+message FlatpakAppDesired {
+  InstallationBinding installation = 1 [(buf.validate.field).required = true];
+  string app_id = 2 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z][a-zA-Z0-9_-]*(\\.[a-zA-Z0-9_-]+){2,}$"
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  string branch = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  Presence presence = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ResourceRef remote = 6 [(buf.validate.field).required = true];
+  optional string commit = 7 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  FlatpakPermissionPolicy permissions = 8;
+  option (buf.validate.message).cel = {
+    id: "flatpak.remote"
+    message: "remote must identify a Flatpak repository"
+    expression: "this.remote.kind == 13 && this.remote.canonical_key.startsWith('flatpak/')"
+  };
+}
+enum UpdateSelection {
+  UPDATE_SELECTION_UNSPECIFIED = 0;
+  UPDATE_SELECTION_SECURITY = 1;
+  UPDATE_SELECTION_ALL = 2;
+}
+enum Weekday {
+  WEEKDAY_UNSPECIFIED = 0;
+  WEEKDAY_MONDAY = 1;
+  WEEKDAY_TUESDAY = 2;
+  WEEKDAY_WEDNESDAY = 3;
+  WEEKDAY_THURSDAY = 4;
+  WEEKDAY_FRIDAY = 5;
+  WEEKDAY_SATURDAY = 6;
+  WEEKDAY_SUNDAY = 7;
+}
+enum DSTBehavior {
+  DST_BEHAVIOR_UNSPECIFIED = 0;
+  DST_BEHAVIOR_SKIP_GAP_FIRST_FOLD = 1;
+  DST_BEHAVIOR_NEXT_VALID_FIRST_FOLD = 2;
+}
+message MaintenanceWindow {
+  string time_zone = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9_+-]+(/[a-zA-Z0-9_+-]+)*$"
+  }];
+  repeated Weekday weekdays = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 7
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  uint32 local_start_minute = 3 [(buf.validate.field).uint32.lte = 1439];
+  uint32 duration_minutes = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1440
+  }];
+  DSTBehavior dst = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+enum InhibitorPolicy {
+  INHIBITOR_POLICY_UNSPECIFIED = 0;
+  INHIBITOR_POLICY_RESPECT = 1;
+  INHIBITOR_POLICY_APPROVED_OVERRIDE = 2;
+}
+enum ServerDrainPolicy {
+  SERVER_DRAIN_POLICY_UNSPECIFIED = 0;
+  SERVER_DRAIN_POLICY_NOT_REQUIRED = 1;
+  SERVER_DRAIN_POLICY_REQUIRE_RECEIPT = 2;
+}
+message RebootPolicy {
+  bool allowed = 1;
+  google.protobuf.Timestamp deadline = 2;
+  uint32 max_deferrals = 3 [(buf.validate.field).uint32.lte = 100];
+  InhibitorPolicy inhibitors = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ServerDrainPolicy server_drain = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "reboot_policy.deadline"
+    message: "automatic reboot requires a deadline"
+    expression: "!this.allowed || has(this.deadline)"
+  };
+}
+message RolloutBudget {
+  uint32 max_unavailable = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1000000
+  }];
+  uint32 max_failure_percent = 2 [(buf.validate.field).uint32.lte = 100];
+  uint32 health_window_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 30
+    lte: 604800
+  }];
+}
+message ReleaseUpgradeTarget {
+  PlatformProduct source = 1 [(buf.validate.field).required = true];
+  PlatformProduct target = 2 [(buf.validate.field).required = true];
+  string approval_id = 3 [(buf.validate.field).string.uuid = true];
+  option (buf.validate.message).cel = {
+    id: "release_upgrade.change"
+    message: "release upgrade must identify a different target version of the same product and architecture"
+    expression: "this.source.os_id == this.target.os_id && this.source.product == this.target.product && this.source.architecture == this.target.architecture && this.source.version != this.target.version"
+  };
+}
+message RepositorySnapshot {
+  ResourceRef repository = 1 [(buf.validate.field).required = true];
+  bytes metadata_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  repeated bytes signer_sha256 = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      bytes: {len: 32}
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "repository_snapshot.kind"
+    message: "snapshot must bind a repository"
+    expression: "this.repository.kind == 13"
+  };
+}
+message RepositorySnapshots {
+  repeated RepositorySnapshot repositories = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+}
+message OstreeSnapshot {
+  ResourceRef remote = 1 [(buf.validate.field).required = true];
+  bytes commit_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "ostree_snapshot.kind"
+    message: "snapshot must bind an OSTree repository"
+    expression: "this.remote.kind == 13 && this.remote.canonical_key.startsWith('ostree/')"
+  };
+}
+message NixSnapshot {
+  NixInput input = 1 [(buf.validate.field).required = true];
+  ArtifactRef closure_manifest = 2 [(buf.validate.field).required = true];
+}
+message SourceSnapshot {
+  oneof source {
+    option (buf.validate.oneof).required = true;
+    RepositorySnapshots repositories = 1;
+    OstreeSnapshot ostree = 2;
+    NixSnapshot nix = 3;
+  }
+}
+message OSUpdateDesired {
+  UpdateSelection selection = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  MaintenanceWindow maintenance = 2 [(buf.validate.field).required = true];
+  RebootPolicy reboot = 3 [(buf.validate.field).required = true];
+  repeated PackageIdentity exclusions = 4 [(buf.validate.field).repeated.max_items = 256];
+  RolloutBudget budget = 5 [(buf.validate.field).required = true];
+  ReleaseUpgradeTarget release_upgrade = 6;
+  SourceSnapshot source = 7 [(buf.validate.field).required = true];
+}
+enum SnapConfinement {
+  SNAP_CONFINEMENT_UNSPECIFIED = 0;
+  SNAP_CONFINEMENT_STRICT = 1;
+  SNAP_CONFINEMENT_CLASSIC = 2;
+  SNAP_CONFINEMENT_DEVMODE = 3;
+}
+enum SnapInterface {
+  SNAP_INTERFACE_UNSPECIFIED = 0;
+  SNAP_INTERFACE_NETWORK = 1;
+  SNAP_INTERFACE_NETWORK_BIND = 2;
+  SNAP_INTERFACE_HOME = 3;
+  SNAP_INTERFACE_REMOVABLE_MEDIA = 4;
+  SNAP_INTERFACE_CAMERA = 5;
+  SNAP_INTERFACE_AUDIO_RECORD = 6;
+  SNAP_INTERFACE_DESKTOP = 7;
+}
+message SnapInterfaceGrant {
+  SnapInterface interface = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string plug = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-z0-9][a-z0-9-]*$"
+  }];
+  string slot_snap = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 40
+    pattern: "^[a-z0-9][a-z0-9-]*$"
+  }];
+  string slot = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-z0-9][a-z0-9-]*$"
+  }];
+}
+message SnapAppDesired {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 40
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+  }];
+  string instance_key = 2 [(buf.validate.field).string = {
+    max_len: 10
+    pattern: "^[a-z0-9]*$"
+  }];
+  Presence presence = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string channel = 4 [(buf.validate.field).string = {
+    max_len: 128
+    pattern: "^([a-zA-Z0-9_.-]+/)?(stable|candidate|beta|edge)(/[a-zA-Z0-9_.-]+)?$"
+  }];
+  optional uint64 revision = 5 [(buf.validate.field).uint64.gt = 0];
+  SnapConfinement confinement = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated SnapInterfaceGrant interfaces = 7 [(buf.validate.field).repeated.max_items = 64];
+}

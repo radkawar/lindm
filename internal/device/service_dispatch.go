@@ -31,6 +31,13 @@ func (s *Service) GetServiceWork(ctx context.Context, req *connect.Request[devic
 	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
 		return nil, invalid("invalid_service_work_request")
 	}
+	idle, err := s.serviceWorkIdle(ctx, principal, req.Msg.GetSessionEpoch())
+	if err != nil {
+		return nil, executionError(err)
+	}
+	if idle {
+		return noStore(&devicev1.GetServiceWorkResponse{}), nil
+	}
 	work, choice, err := s.getServiceWork(ctx, principal, req.Msg.GetSessionEpoch(), nil, nil, nil)
 	if err != nil {
 		return nil, executionError(err)
@@ -39,7 +46,7 @@ func (s *Service) GetServiceWork(ctx context.Context, req *connect.Request[devic
 		if s.identity == nil {
 			return nil, rpcError(connect.CodeFailedPrecondition, "service_authorization_unavailable")
 		}
-		approval, authorizationErr := s.identity.AuthorizeFresh(ctx, choice.ActorID, identity.PermissionAssignServices)
+		approval, authorizationErr := s.identity.AuthorizeFresh(ctx, choice.ActorID, identity.PermissionAssignResources)
 		if authorizationErr != nil && !assignmentAuthorizationDenied(authorizationErr) {
 			return nil, executionError(authorizationErr)
 		}
@@ -51,22 +58,72 @@ func (s *Service) GetServiceWork(ctx context.Context, req *connect.Request[devic
 	return noStore(&devicev1.GetServiceWorkResponse{Work: work}), nil
 }
 
+// An empty poll linearizes at its read snapshot. A concurrently assigned head is
+// observed by the next poll; nothing is leased, signed or acknowledged here.
+// Any head/open action falls back to the complete locked path below, which
+// rechecks device authority and the assigning actor before minting work.
+func (s *Service) serviceWorkIdle(ctx context.Context, principal devicePrincipal, epoch uint64) (bool, error) {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := devicedb.New(tx)
+	pending, err := q.HasServiceWork(ctx, devicedb.HasServiceWorkParams{GenerationID: principal.GenerationID, DeviceID: principal.DeviceID})
+	if err != nil {
+		return false, err
+	}
+	if pending {
+		return false, tx.Commit(ctx)
+	}
+	device, err := s.readAuthority(ctx, q, principal)
+	if err != nil {
+		return false, err
+	}
+	if uint64(device.generation.SessionEpoch) != epoch {
+		return false, errSessionFenced
+	}
+	if err := s.requireReleaseCompatibility(ctx, q, principal.GenerationID, epoch); err != nil {
+		return false, err
+	}
+	now, err := dispatchClock(ctx, q)
+	if err != nil {
+		return false, err
+	}
+	if !enrollmentIssuanceResumable(device.certificate, now) {
+		return false, errCertificateRejected
+	}
+	restriction, err := q.GetDeviceActionRestriction(ctx, principal.DeviceID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
+	}
+	if restriction.Quarantined {
+		// Keep both quarantine denial and durable expiry on the existing write
+		// path. A read-only poll must not invent a second quarantine policy.
+		return false, tx.Commit(ctx)
+	}
+	return true, tx.Commit(ctx)
+}
+
 // The first transaction either replays work or captures the exact mint choice.
 // Only after it ends is the directory consulted. The second transaction fences
 // that approval before authority/device/head/action locks and rechecks the choice.
-func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal, epoch uint64, choice *devicedb.ServiceAssignment, approval *identity.Authorization, authorizationErr error) (*devicev1.ServiceWork, *devicedb.ServiceAssignment, error) {
+func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal, epoch uint64, choice *devicedb.ResourceAssignment, approval *identity.Authorization, authorizationErr error) (*devicev1.ServiceWork, *devicedb.ResourceAssignment, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if approval != nil {
-		if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignServices); err != nil {
+		if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
 			if !assignmentAuthorizationDenied(err) {
 				return nil, nil, err
 			}
 			authorizationErr = err
 		}
+	}
+	if err := s.targeting.Lock(ctx, tx); err != nil {
+		return nil, nil, err
 	}
 	var snapshot *executionauthority.Snapshot
 	var verifier *trust.ExecutionVerifier
@@ -87,6 +144,14 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if uint64(device.generation.SessionEpoch) != epoch {
 		return nil, nil, errSessionFenced
 	}
+	if approval != nil {
+		if err := requireDeviceScope(ctx, q, approval.Principal(), identity.PermissionAssignResources, principal.DeviceID); err != nil {
+			if !errors.Is(err, errNotFound) {
+				return nil, nil, err
+			}
+			authorizationErr = identity.ErrAuthorizationDenied
+		}
+	}
 	head, headErr := q.LockServiceAssignment(ctx, principal.GenerationID)
 	if headErr != nil && !errors.Is(headErr, pgx.ErrNoRows) {
 		return nil, nil, headErr
@@ -95,12 +160,20 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if actionErr != nil && !errors.Is(actionErr, pgx.ErrNoRows) {
 		return nil, nil, actionErr
 	}
+	if actionErr != nil || len(action.StartGrantEnvelope) == 0 {
+		if err := s.requireReleaseCompatibility(ctx, q, principal.GenerationID, epoch); err != nil {
+			return nil, nil, err
+		}
+	}
 	now, err := dispatchClock(ctx, q)
 	if err != nil {
 		return nil, nil, err
 	}
 	if !enrollmentIssuanceResumable(device.certificate, now) {
 		return nil, nil, errCertificateRejected
+	}
+	if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{ID: principal.DeviceID, LastSeenAt: timestamptz(now)}); err != nil {
+		return nil, nil, err
 	}
 	if actionErr == nil && len(action.StartGrantEnvelope) == 0 {
 		reason := ""
@@ -131,14 +204,24 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 		}
 		return work, nil, nil
 	}
-	if errors.Is(headErr, pgx.ErrNoRows) || head.RevisionID == nil || head.BlockedReason != "" {
+	if err := requireActionRestriction(ctx, q, principal.DeviceID, nil); err != nil {
+		return nil, nil, err
+	}
+	if errors.Is(headErr, pgx.ErrNoRows) || head.BlockedReason != "" {
+		return nil, nil, tx.Commit(ctx)
+	}
+	eligible, err := s.targeting.CheckExecution(ctx, tx, principal.DeviceID, principal.GenerationID, head.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !eligible {
 		return nil, nil, tx.Commit(ctx)
 	}
 	resources, err := q.ListServiceResources(ctx, head.ID)
 	if err != nil {
 		return nil, nil, err
 	}
-	candidate, err := eligibleServiceResource(resources)
+	candidate, err := eligibleServiceResource(resources, now, time.Duration(head.ReconcileIntervalSeconds)*time.Second)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -173,17 +256,27 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if capacity.Actions >= 262144 {
 		return nil, nil, rpcError(connect.CodeResourceExhausted, "service_action_capacity")
 	}
-	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: principal.GenerationID, UnitName: candidate.GetDesired().GetUnit()})
+	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: int16(candidate.GetDesired().GetRef().GetKind()), CanonicalKey: candidate.GetDesired().GetRef().GetCanonicalKey()})
 	if err != nil {
 		return nil, nil, err
 	}
 	notBefore := now.Add(-trust.MaxDeviceClockSkew)
+	if snapshot.Delegation.GetNotBefore().AsTime().After(notBefore) {
+		notBefore = snapshot.Delegation.GetNotBefore().AsTime()
+	}
 	expires := notBefore.Add(12 * time.Minute)
 	if snapshot.Delegation.GetExpiresAt().AsTime().Before(expires) {
 		expires = snapshot.Delegation.GetExpiresAt().AsTime()
 	}
+	if !expires.After(notBefore) || !expires.After(now) {
+		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_window_empty")
+	}
 	id := uuid.New()
-	intent := &agentv1.ServiceExecutionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), DesiredRevision: head.ID.String(), ActorId: head.ActorID.String(), ResourceSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: approval.Version(), NotBefore: timestamppb.New(notBefore), ExpiresAt: timestamppb.New(expires), Desired: candidate.GetDesired()}
+	serviceDesired, err := serviceExecutionDesired(candidate.GetDesired())
+	if err != nil {
+		return nil, nil, err
+	}
+	intent := &agentv1.ServiceExecutionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), DesiredRevision: head.ID.String(), ActorId: head.ActorID.String(), ResourceSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: approval.Version(), NotBefore: timestamppb.New(notBefore), ExpiresAt: timestamppb.New(expires), Desired: serviceDesired}
 	envelope, err := s.authority.Sign(ctx, intent, s.signing.PlanKey)
 	if err != nil {
 		return nil, nil, rpcError(connect.CodeFailedPrecondition, "execution_signing_rejected")
@@ -213,7 +306,7 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignServices); err != nil {
+	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {
 		return nil, nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -222,22 +315,39 @@ func (s *Service) getServiceWork(ctx context.Context, principal devicePrincipal,
 	return work, nil, nil
 }
 
-func eligibleServiceResource(rows []devicedb.ServiceAssignmentResource) (*policyv1.ServiceProfileResource, error) {
+func eligibleServiceResource(rows []devicedb.ResourceAssignmentResource, now time.Time, interval time.Duration) (*policyv1.ProfileResource, error) {
 	dispositions := make(map[string]int16, len(rows))
+	desired := make(map[string]*policyv1.ProfileResource, len(rows))
 	for _, row := range rows {
-		dispositions[row.ResourceID.String()] = row.Disposition
+		item := new(policyv1.ProfileResource)
+		if err := proto.Unmarshal(row.Document, item); err != nil {
+			return nil, errInternalState
+		}
+		desired[resourceRefKey(item.GetDesired().GetRef())] = item
+		disposition := row.Disposition
+		// Due dependencies must be reverified before their dependents. The rows
+		// are already topologically ordered, so checks retain the initial order.
+		recheck := interval
+		if row.VerificationMaxAgeSeconds > 0 {
+			recheck = min(recheck, time.Duration(row.VerificationMaxAgeSeconds)*time.Second/2)
+		}
+		if disposition == 3 && (!row.LastVerifiedAt.Valid || !now.Before(row.LastVerifiedAt.Time.Add(recheck))) {
+			disposition = 1
+		}
+		dispositions[resourceRefKey(item.GetDesired().GetRef())] = disposition
 	}
 	for _, row := range rows {
-		if row.Disposition != 1 {
-			continue
-		}
-		resource := new(policyv1.ServiceProfileResource)
-		if err := proto.Unmarshal(row.Document, resource); err != nil {
+		resource := desired[resourceRefKeyFromRow(row)]
+		if resource == nil {
 			return nil, errInternalState
+		}
+		if dispositions[resourceRefKey(resource.GetDesired().GetRef())] != 1 {
+			continue
 		}
 		eligible := true
 		for _, dependency := range resource.GetDependsOn() {
-			if dispositions[dependency] != 3 {
+			key := resourceRefKey(dependency.GetRef())
+			if dispositions[key] != 3 || !resourceDependencySatisfied(desired[key], dependency.GetCondition()) {
 				eligible = false
 				break
 			}
@@ -249,7 +359,7 @@ func eligibleServiceResource(rows []devicedb.ServiceAssignmentResource) (*policy
 	return nil, nil
 }
 
-func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, action devicedb.ServiceAction, reason string, now time.Time) error {
+func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, reason string, now time.Time) error {
 	if len(action.StartGrantEnvelope) != 0 {
 		return errInternalState
 	}
@@ -259,7 +369,7 @@ func closeUnstartedServiceAction(ctx context.Context, q *devicedb.Queries, actio
 	return q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: 1, Reason: reason})
 }
 
-func issueServiceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ServiceAction, now time.Time) (*devicev1.ServiceWork, error) {
+func issueServiceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, now time.Time) (*devicev1.ServiceWork, error) {
 	var nonce [32]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return nil, err
@@ -291,7 +401,7 @@ func assignmentAuthorizationDenied(err error) bool {
 	return errors.Is(err, identity.ErrAuthorizationDenied) || errors.Is(err, identity.ErrAuthorizationChanged) || errors.Is(err, identity.ErrSubjectUnqualified)
 }
 
-func serviceActionRevision(action devicedb.ServiceAction) (uint64, error) {
+func serviceActionRevision(action devicedb.ResourceAction) (uint64, error) {
 	n := action.ActionRevision
 	if !n.Valid || n.NaN || n.Int == nil || n.Exp != 0 || !n.Int.IsUint64() {
 		return 0, errInternalState

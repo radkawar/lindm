@@ -28,10 +28,13 @@ type VMLifecycleOptions struct {
 	CacheDir          string
 	WorkDir           string
 	DiagnosticsDir    string
+	Hardware          *VMHardwareOptions
 	LabBinary         string
+	RedHatTokenFile   string
 	First             packaging.Artifact
 	Second            packaging.Artifact
 	APT               *packaging.APTRepository
+	Arch              []*packaging.ArchRepository
 	PublicKey         string
 	SignerFingerprint string
 	Rejections        []packaging.RejectionCase
@@ -52,9 +55,13 @@ type VMLifecycleOptions struct {
 type VMLifecycleResult struct {
 	Distribution             string                         `json:"distribution"`
 	Version                  string                         `json:"version"`
+	RepositorySnapshotDate   string                         `json:"repository_snapshot_date,omitempty"`
 	ImageID                  string                         `json:"image_id"`
 	ImageSHA256              string                         `json:"image_sha256"`
 	Runtime                  *vmRuntimeEvidence             `json:"runtime"`
+	RedHat                   *VMRedHatEvidence              `json:"redhat,omitempty"`
+	SELinuxBefore            string                         `json:"selinux_before,omitempty"`
+	SELinuxAfter             string                         `json:"selinux_after,omitempty"`
 	UpgradeBaseline          *vmInventoryEvidence           `json:"upgrade_baseline"`
 	FirstArtifactSHA256      string                         `json:"first_artifact_sha256"`
 	SecondArtifactSHA256     string                         `json:"second_artifact_sha256"`
@@ -84,11 +91,15 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if manifest.GetDistribution() != "ubuntu" && manifest.GetDistribution() != "fedora" {
-		return nil, errors.New("native lifecycle requires Ubuntu or Fedora")
+	format, err := NativePackageFormat(manifest.GetDistribution())
+	if err != nil {
+		return nil, err
 	}
 	if manifest.GetArchitecture() != "amd64" && manifest.GetArchitecture() != "x86_64" {
 		return nil, errors.New("native lifecycle requires amd64/x86_64")
+	}
+	if err := validateVMRedHatToken(manifest.GetDistribution(), options.RedHatTokenFile); err != nil {
+		return nil, err
 	}
 	if options.ObserveFor < 0 || options.ObserveFor > 10*time.Minute {
 		return nil, errors.New("observation interval must be between zero and ten minutes")
@@ -102,10 +113,6 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if err := packaging.UpgradeOrdered(options.First.Version, options.Second.Version); err != nil {
 		return nil, err
 	}
-	format := packaging.FormatDEB
-	if manifest.GetDistribution() == "fedora" {
-		format = packaging.FormatRPM
-	}
 	if options.First.Format != format || options.Second.Format != format {
 		return nil, errors.New("native artifacts do not match the selected distribution")
 	}
@@ -115,7 +122,7 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Minute+2*options.ObserveFor)
 	defer cancel()
-	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, true)
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, options.Hardware)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +143,34 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
 		return nil, fmt.Errorf("native guest cloud-init: %w", err)
 	}
-	packages, err := newNativeGuestPackages(ctx, vm, options.First, options.Second, options.APT, options.PublicKey, options.SignerFingerprint)
+	if err := pinArchRepositories(ctx, vm, manifest); err != nil {
+		return nil, err
+	}
+	packages, err := newNativeGuestPackages(ctx, vm, options.First, options.Second, options.APT, options.PublicKey, options.SignerFingerprint, options.Arch...)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
 	result := &VMLifecycleResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), ImageSHA256: verified.SHA256, FirstArtifactSHA256: options.First.SHA256, SecondArtifactSHA256: options.Second.SHA256, SignerFingerprint: options.SignerFingerprint}
 	result.Runtime = runtimeEvidence
+	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
+	if packages.family == familyDNF {
+		result.SELinuxBefore, err = serviceGuestEnforcing(ctx, vm)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
+		return nil, err
+	}
+	if options.RedHatTokenFile != "" {
+		result.RedHat = new(VMRedHatEvidence)
+	}
+	registration, err := registerVMRedHat(ctx, vm, options.RedHatTokenFile, result.RedHat)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, registration.Close()) }()
 	for _, rejection := range cases {
 		var rejected *nativeAuthRejection
 		if failure := packages.RejectArtifact(ctx, rejection.Artifact, rejection.APT); !errors.As(failure, &rejected) {
@@ -151,9 +179,6 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		result.RejectedArtifacts = append(result.RejectedArtifacts, rejection.Name)
 	}
 	if err := packages.InstallFirst(ctx); err != nil {
-		return nil, err
-	}
-	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
 		return nil, err
 	}
 	var isolated *devlab.AuthorityFixture
@@ -181,6 +206,14 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, control.Close(context.WithoutCancel(ctx))) }()
+	// Admit only the actual server stamp and the two signed native artifact
+	// versions under test through normal release-management authorization.
+	// Empty selects the server's own reported identity, never a guessed version.
+	for _, version := range [3]string{"", options.First.Version, options.Second.Version} {
+		if err := control.session.RegisterRelease(ctx, version); err != nil {
+			return nil, fmt.Errorf("register lifecycle release under test: %w", err)
+		}
+	}
 	material, err := control.BootstrapMaterial(ctx)
 	if err != nil {
 		return nil, err
@@ -417,6 +450,9 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 	if format == packaging.FormatRPM {
 		provider = "/usr/bin/rpm"
 	}
+	if format == packaging.FormatArch {
+		provider = "/var/lib/pacman/local"
+	}
 	fault := "/run/systemd/system/lindm-agent.service.d/lindm-lab-permission.conf"
 	if err := lifecycleCommand(ctx, vm, "deny native collector in its service namespace", "test ! -e "+fault+"; install -d -m 0755 /run/systemd/system/lindm-agent.service.d; printf '[Service]\\nInaccessiblePaths="+provider+"\\n' > "+fault+"; systemctl daemon-reload; systemctl restart lindm-agent.service"); err != nil {
 		return nil, err
@@ -440,6 +476,12 @@ func LifecycleVM(ctx context.Context, manifest *labv1.ImageManifest, options VML
 		return nil, err
 	}
 	result.MissingJournalHeld = true
+	if packages.family == familyDNF {
+		result.SELinuxAfter, err = serviceGuestEnforcing(ctx, vm)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
 }
 

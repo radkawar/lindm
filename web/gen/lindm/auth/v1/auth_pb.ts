@@ -7,13 +7,15 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { DeviceScope, RoleBinding } from "./authorization_pb.js";
+import { file_lindm_auth_v1_authorization } from "./authorization_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file lindm/auth/v1/auth.proto.
  */
 export const file_lindm_auth_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEipQEKEFNlc3Npb25QcmluY2lwYWwSCgoCaWQYASABKAkSDgoGaXNzdWVyGAIgASgJEg8KB3N1YmplY3QYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEgwKBHJvbGUYBSABKAkSEgoKY3NyZl90b2tlbhgGIAEoCRITCgticmVha19nbGFzcxgHIAEoCBIXCg9pbmNpZGVudF9yZWFzb24YCCABKAkiWQoVQXV0aGVudGljYXRpb25PcHRpb25zEhYKDmV4dGVybmFsX2xvZ2luGAEgASgIEhMKC2xvY2FsX2xvZ2luGAIgASgIEhMKC2JyZWFrX2dsYXNzGAMgASgIIpkBChFMb2NhbExvZ2luUmVxdWVzdBI5Cgh1c2VybmFtZRgBIAEoCUInukgkciIQARhAMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIEisKD2luY2lkZW50X3JlYXNvbhgDIAEoCUISukgPcg0YgAQogAgyBV4kfFxTIlIKFkxvY2FsRW5yb2xsbWVudFJlcXVlc3QSGgoGc2VjcmV0GAEgASgJQgq6SAdyBSABKIAIEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIIlEKEVdlYkF1dGhuQ2hhbGxlbmdlEhkKBXRva2VuGAEgASgJQgq6SAdyBSABKIAIEiEKDG9wdGlvbnNfanNvbhgCIAEoCUILukgIcgYgASiAgAQiWAoVV2ViQXV0aG5GaW5pc2hSZXF1ZXN0EhkKBXRva2VuGAEgASgJQgq6SAdyBSABKIAIEiQKD2NyZWRlbnRpYWxfanNvbhgCIAEoCUILukgIcgYgASiAgAQicgoMTG9jYWxBY2NvdW50EgoKAmlkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEgwKBHJvbGUYAyABKAkSDwoHZW5hYmxlZBgEIAEoCBITCgticmVha19nbGFzcxgFIAEoCBIQCghlbnJvbGxlZBgGIAEoCCJFChRMaXN0QWNjb3VudHNSZXNwb25zZRItCghhY2NvdW50cxgBIAMoCzIbLmxpbmRtLmF1dGgudjEuTG9jYWxBY2NvdW50IoICChRDcmVhdGVBY2NvdW50UmVxdWVzdBI5Cgh1c2VybmFtZRgBIAEoCUInukgkciIQARhAMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEiEKBHJvbGUYAiABKAlCE7pIEHIOUgVvd25lclIFYWRtaW4SEwoLYnJlYWtfZ2xhc3MYAyABKAg6d7pIdBpyCiBjcmVhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIvYBChRVcGRhdGVBY2NvdW50UmVxdWVzdBIcCgphY2NvdW50X2lkGAEgASgJQgi6SAVyA7ABARIPCgdlbmFibGVkGAIgASgIEiEKBHJvbGUYAyABKAlCE7pIEHIOUgVvd25lclIFYWRtaW4SEwoLYnJlYWtfZ2xhc3MYBCABKAg6d7pIdBpyCiB1cGRhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIjMKE1Jlc2V0QWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQEiZwoRQWNjb3VudEVucm9sbG1lbnQSEgoKYWNjb3VudF9pZBgBIAEoCRIOCgZzZWNyZXQYAiABKAkSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCIFoebGluZG0vZ2VuL2xpbmRtL2F1dGgvdjE7YXV0aHYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEigQIKEFNlc3Npb25QcmluY2lwYWwSCgoCaWQYASABKAkSDgoGaXNzdWVyGAIgASgJEg8KB3N1YmplY3QYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEgwKBHJvbGUYBSABKAkSEgoKY3NyZl90b2tlbhgGIAEoCRITCgticmVha19nbGFzcxgHIAEoCBIXCg9pbmNpZGVudF9yZWFzb24YCCABKAkSEwoLcGVybWlzc2lvbnMYCSADKAkSFwoPc2VydmljZV9hY2NvdW50GAogASgIEiwKCGJpbmRpbmdzGAsgAygLMhoubGluZG0uYXV0aC52MS5Sb2xlQmluZGluZyJZChVBdXRoZW50aWNhdGlvbk9wdGlvbnMSFgoOZXh0ZXJuYWxfbG9naW4YASABKAgSEwoLbG9jYWxfbG9naW4YAiABKAgSEwoLYnJlYWtfZ2xhc3MYAyABKAgimQEKEUxvY2FsTG9naW5SZXF1ZXN0EjkKCHVzZXJuYW1lGAEgASgJQie6SCRyIhABGEAyHF5bQS1aYS16MC05XVtBLVphLXowLTkuXy1dKiQSHAoIcGFzc3dvcmQYAiABKAlCCrpIB3IFIAwogAgSKwoPaW5jaWRlbnRfcmVhc29uGAMgASgJQhK6SA9yDRiABCiACDIFXiR8XFMiUgoWTG9jYWxFbnJvbGxtZW50UmVxdWVzdBIaCgZzZWNyZXQYASABKAlCCrpIB3IFIAEogAgSHAoIcGFzc3dvcmQYAiABKAlCCrpIB3IFIAwogAgiUQoRV2ViQXV0aG5DaGFsbGVuZ2USGQoFdG9rZW4YASABKAlCCrpIB3IFIAEogAgSIQoMb3B0aW9uc19qc29uGAIgASgJQgu6SAhyBiABKICABCJYChVXZWJBdXRobkZpbmlzaFJlcXVlc3QSGQoFdG9rZW4YASABKAlCCrpIB3IFIAEogAgSJAoPY3JlZGVudGlhbF9qc29uGAIgASgJQgu6SAhyBiABKICABCKeAQoMTG9jYWxBY2NvdW50EgoKAmlkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEgwKBHJvbGUYAyABKAkSDwoHZW5hYmxlZBgEIAEoCBITCgticmVha19nbGFzcxgFIAEoCBIQCghlbnJvbGxlZBgGIAEoCBIqCgZzY29wZXMYByADKAsyGi5saW5kbS5hdXRoLnYxLkRldmljZVNjb3BlIlQKFExpc3RBY2NvdW50c1Jlc3BvbnNlEi0KCGFjY291bnRzGAEgAygLMhsubGluZG0uYXV0aC52MS5Mb2NhbEFjY291bnQSDQoFcm9sZXMYAiADKAkiwwIKFENyZWF0ZUFjY291bnRSZXF1ZXN0EjkKCHVzZXJuYW1lGAEgASgJQie6SCRyIhABGEAyHF5bQS1aYS16MC05XVtBLVphLXowLTkuXy1dKiQSLAoEcm9sZRgCIAEoCUIeukgbchkQARhAMhNeW2Etel1bYS16MC05Xy4tXSokEhMKC2JyZWFrX2dsYXNzGAMgASgIEjQKBnNjb3BlcxgEIAMoCzIaLmxpbmRtLmF1dGgudjEuRGV2aWNlU2NvcGVCCLpIBZIBAhBkOne6SHQacgogY3JlYXRlX2FjY291bnQuYnJlYWtfZ2xhc3Nfb3duZXISI2JyZWFrLWdsYXNzIGFjY291bnRzIG11c3QgYmUgb3duZXJzGikhdGhpcy5icmVha19nbGFzcyB8fCB0aGlzLnJvbGUgPT0gJ293bmVyJyK3AgoUVXBkYXRlQWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQESDwoHZW5hYmxlZBgCIAEoCBIsCgRyb2xlGAMgASgJQh66SBtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQSEwoLYnJlYWtfZ2xhc3MYBCABKAgSNAoGc2NvcGVzGAUgAygLMhoubGluZG0uYXV0aC52MS5EZXZpY2VTY29wZUIIukgFkgECEGQ6d7pIdBpyCiB1cGRhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIjMKE1Jlc2V0QWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQEiZwoRQWNjb3VudEVucm9sbG1lbnQSEgoKYWNjb3VudF9pZBgBIAEoCRIOCgZzZWNyZXQYAiABKAkSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAivQIKEElkZW50aXR5U2V0dGluZ3MSFgoOcHJpbWFyeV9zb3VyY2UYASABKAkSDgoGaXNzdWVyGAIgASgJEiAKGHJlZnJlc2hfaW50ZXJ2YWxfc2Vjb25kcxgDIAEoDRIgChhtYXhfc25hcHNob3RfYWdlX3NlY29uZHMYBCABKA0SFAoMc2NpbV9lbmFibGVkGAUgASgIEhYKDmJyb2tlcl9lbmFibGVkGAYgASgIEhsKE2JyZWFrX2dsYXNzX2VuYWJsZWQYByABKAgSFwoPdXBzdHJlYW1fc291cmNlGAggASgJEi8KC29ic2VydmVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdjdXJyZW50GAogASgIEhcKD2xvY2FsX2F1dGhvcml0eRgLIAEoCCJSChtSb3RhdGVTQ0lNQ3JlZGVudGlhbFJlcXVlc3QSMwoMY29ubmVjdG9yX2lkGAEgASgJQh26SBpyGBABGEAyEl5bYS16XVthLXowLTlfLV0qJCI8Cg5TQ0lNQ3JlZGVudGlhbBIUCgxjb25uZWN0b3JfaWQYASABKAkSFAoMYmVhcmVyX3Rva2VuGAIgASgJQiBaHmxpbmRtL2dlbi9saW5kbS9hdXRoL3YxO2F1dGh2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_auth_v1_authorization]);
 
 /**
  * SessionPrincipal is returned as protobuf JSON by GET /auth/session. Browser
@@ -62,6 +64,21 @@ export type SessionPrincipal = Message<"lindm.auth.v1.SessionPrincipal"> & {
    * @generated from field: string incident_reason = 8;
    */
   incidentReason: string;
+
+  /**
+   * @generated from field: repeated string permissions = 9;
+   */
+  permissions: string[];
+
+  /**
+   * @generated from field: bool service_account = 10;
+   */
+  serviceAccount: boolean;
+
+  /**
+   * @generated from field: repeated lindm.auth.v1.RoleBinding bindings = 11;
+   */
+  bindings: RoleBinding[];
 };
 
 /**
@@ -230,6 +247,11 @@ export type LocalAccount = Message<"lindm.auth.v1.LocalAccount"> & {
    * @generated from field: bool enrolled = 6;
    */
   enrolled: boolean;
+
+  /**
+   * @generated from field: repeated lindm.auth.v1.DeviceScope scopes = 7;
+   */
+  scopes: DeviceScope[];
 };
 
 /**
@@ -247,6 +269,11 @@ export type ListAccountsResponse = Message<"lindm.auth.v1.ListAccountsResponse">
    * @generated from field: repeated lindm.auth.v1.LocalAccount accounts = 1;
    */
   accounts: LocalAccount[];
+
+  /**
+   * @generated from field: repeated string roles = 2;
+   */
+  roles: string[];
 };
 
 /**
@@ -274,6 +301,11 @@ export type CreateAccountRequest = Message<"lindm.auth.v1.CreateAccountRequest">
    * @generated from field: bool break_glass = 3;
    */
   breakGlass: boolean;
+
+  /**
+   * @generated from field: repeated lindm.auth.v1.DeviceScope scopes = 4;
+   */
+  scopes: DeviceScope[];
 };
 
 /**
@@ -306,6 +338,11 @@ export type UpdateAccountRequest = Message<"lindm.auth.v1.UpdateAccountRequest">
    * @generated from field: bool break_glass = 4;
    */
   breakGlass: boolean;
+
+  /**
+   * @generated from field: repeated lindm.auth.v1.DeviceScope scopes = 5;
+   */
+  scopes: DeviceScope[];
 };
 
 /**
@@ -360,4 +397,115 @@ export type AccountEnrollment = Message<"lindm.auth.v1.AccountEnrollment"> & {
  */
 export const AccountEnrollmentSchema: GenMessage<AccountEnrollment> = /*@__PURE__*/
   messageDesc(file_lindm_auth_v1_auth, 11);
+
+/**
+ * GET /auth/settings is read-only and requires unrestricted accounts.manage.
+ * Observations describe only the signed-in principal, never tenant-wide health.
+ *
+ * @generated from message lindm.auth.v1.IdentitySettings
+ */
+export type IdentitySettings = Message<"lindm.auth.v1.IdentitySettings"> & {
+  /**
+   * @generated from field: string primary_source = 1;
+   */
+  primarySource: string;
+
+  /**
+   * @generated from field: string issuer = 2;
+   */
+  issuer: string;
+
+  /**
+   * @generated from field: uint32 refresh_interval_seconds = 3;
+   */
+  refreshIntervalSeconds: number;
+
+  /**
+   * @generated from field: uint32 max_snapshot_age_seconds = 4;
+   */
+  maxSnapshotAgeSeconds: number;
+
+  /**
+   * @generated from field: bool scim_enabled = 5;
+   */
+  scimEnabled: boolean;
+
+  /**
+   * @generated from field: bool broker_enabled = 6;
+   */
+  brokerEnabled: boolean;
+
+  /**
+   * @generated from field: bool break_glass_enabled = 7;
+   */
+  breakGlassEnabled: boolean;
+
+  /**
+   * @generated from field: string upstream_source = 8;
+   */
+  upstreamSource: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp observed_at = 9;
+   */
+  observedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: bool current = 10;
+   */
+  current: boolean;
+
+  /**
+   * @generated from field: bool local_authority = 11;
+   */
+  localAuthority: boolean;
+};
+
+/**
+ * Describes the message lindm.auth.v1.IdentitySettings.
+ * Use `create(IdentitySettingsSchema)` to create a new message.
+ */
+export const IdentitySettingsSchema: GenMessage<IdentitySettings> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 12);
+
+/**
+ * @generated from message lindm.auth.v1.RotateSCIMCredentialRequest
+ */
+export type RotateSCIMCredentialRequest = Message<"lindm.auth.v1.RotateSCIMCredentialRequest"> & {
+  /**
+   * @generated from field: string connector_id = 1;
+   */
+  connectorId: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.RotateSCIMCredentialRequest.
+ * Use `create(RotateSCIMCredentialRequestSchema)` to create a new message.
+ */
+export const RotateSCIMCredentialRequestSchema: GenMessage<RotateSCIMCredentialRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 13);
+
+/**
+ * Returned once, no-store; the bearer token must never enter logs or query caches.
+ *
+ * @generated from message lindm.auth.v1.SCIMCredential
+ */
+export type SCIMCredential = Message<"lindm.auth.v1.SCIMCredential"> & {
+  /**
+   * @generated from field: string connector_id = 1;
+   */
+  connectorId: string;
+
+  /**
+   * @generated from field: string bearer_token = 2;
+   */
+  bearerToken: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.SCIMCredential.
+ * Use `create(SCIMCredentialSchema)` to create a new message.
+ */
+export const SCIMCredentialSchema: GenMessage<SCIMCredential> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 14);
 

@@ -7,7 +7,34 @@ linters:
   enable:
     - bodyclose
     - sqlclosecheck
+    - depguard
   settings:
+    depguard:
+      rules:
+        lab-authenticator:
+          files:
+            - "$all"
+            - "!$test"
+            - "!**/internal/devlab/**"
+          deny:
+            - pkg: "lindm/internal/devlab/webauthnlab"
+              desc: "Software WebAuthn credentials are laboratory-only; production must use real clients."
+        production-lab-boundary:
+          files:
+            - "$all"
+            - "!$test"
+            - "!**/cmd/dev/**"
+            - "!**/cmd/lab/**"
+            - "!**/internal/devlab/**"
+            - "!**/internal/vmlab/**"
+            - "!**/internal/loadlab/**"
+          deny:
+            - pkg: "lindm/internal/devlab"
+              desc: "Development authentication and authority fixtures must not enter production binaries."
+            - pkg: "lindm/internal/vmlab"
+              desc: "VM qualification belongs only to laboratory entrypoints."
+            - pkg: "lindm/internal/loadlab"
+              desc: "Load qualification belongs only to laboratory entrypoints."
     errcheck:
       check-type-assertions: true
   exclusions:

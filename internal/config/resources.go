@@ -18,25 +18,35 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/escrow"
 	"lindm/internal/pki"
 )
 
 // Resources contains resolved dependencies, not a second serialized schema.
 // HTTPClient owns its transport; close idle connections during server shutdown.
 type Resources struct {
-	Proto                 *configv1.ServerConfig
-	Database              *pgxpool.Config
-	ServerCertificate     tls.Certificate
-	DeviceCACertificate   *x509.Certificate
-	DeviceCAKey           crypto.Signer
-	HTTPClient            *http.Client
-	ClientSecret          string
-	DirectoryClientSecret string
-	InventoryBudgetBytes  int64
-	ExecutionBootstrap    *ExecutionBootstrap
+	Proto                       *configv1.ServerConfig
+	Database                    *pgxpool.Config
+	ServerCertificate           tls.Certificate
+	DeviceCACertificate         *x509.Certificate
+	DeviceCAKey                 crypto.Signer
+	HTTPClient                  *http.Client
+	ClientSecret                string
+	DirectoryClientSecret       string
+	DirectoryPrivateKeyPEM      []byte
+	BrokerDirectoryClientSecret string
+	InventoryBudgetBytes        int64
+	ExecutionBootstrap          *ExecutionBootstrap
 	// ExecutionSigning is nil unless execution_signing is configured. Loaded
 	// keys are not a delegation and do not authorize issuance.
 	ExecutionSigning *ExecutionSigning
+	// IntegrationEncryptionKey protects destination credentials at rest.
+	IntegrationEncryptionKey []byte
+	// Escrow uses distinct ingress and wrapping keys, never inventory storage.
+	Escrow                       *escrow.Custody
+	EscrowRevealApprovalRequired bool
+	ReleaseRepositoryDirectory   string
+	ReleaseSigningDirectory      string
 }
 
 // Address renders the typed bind address using the standard IPv6-aware formatter.
@@ -118,6 +128,26 @@ func (d *Document) Resolve() (*Resources, error) {
 	if err != nil {
 		return nil, err
 	}
+	if integration := cfg.GetIntegrations(); integration != nil {
+		result.IntegrationEncryptionKey, err = readFile(reference(base, integration.GetEncryptionKeyFile()), true)
+		if err != nil {
+			return nil, fmt.Errorf("read integrations.encryption_key_file: %w", err)
+		}
+		if len(result.IntegrationEncryptionKey) != 32 {
+			return nil, errors.New("integrations.encryption_key_file must contain exactly 32 raw bytes")
+		}
+	}
+	result.Escrow, err = d.escrowCustody()
+	if err != nil {
+		return nil, fmt.Errorf("load recovery escrow custody: %w", err)
+	}
+	result.EscrowRevealApprovalRequired = cfg.GetEscrow().GetRevealApprovalRequired()
+	if release := cfg.GetReleaseRepository(); release != nil {
+		result.ReleaseRepositoryDirectory = reference(base, release.GetDirectory())
+		if release.GetSigning() != nil {
+			result.ReleaseSigningDirectory = reference(base, release.GetSigning().GetDirectory())
+		}
+	}
 
 	if err := d.authenticationSecrets(result); err != nil {
 		return nil, err
@@ -152,28 +182,59 @@ func (d *Document) Resolve() (*Resources, error) {
 }
 
 func (d *Document) authenticationSecrets(result *Resources) error {
-	var provider, loginFile, directoryFile string
-	if keycloak := d.Proto.GetAuthentication().GetKeycloak(); keycloak != nil {
+	auth := d.Proto.GetAuthentication()
+	var provider, loginFile, directoryFile, privateKeyFile string
+	if keycloak := auth.GetKeycloak(); keycloak != nil {
 		provider, loginFile, directoryFile = "keycloak", keycloak.GetClientSecretFile(), keycloak.GetDirectoryClientSecretFile()
-	} else if entra := d.Proto.GetAuthentication().GetEntra(); entra != nil {
+		if upstream := keycloak.GetUpstream(); upstream != nil {
+			secret, err := d.authenticationSecret("keycloak.upstream.directory_client_secret_file", upstream.GetDirectoryClientSecretFile())
+			if err != nil {
+				return err
+			}
+			result.BrokerDirectoryClientSecret = secret
+		}
+	} else if entra := auth.GetEntra(); entra != nil {
 		provider, loginFile, directoryFile = "entra", entra.GetClientSecretFile(), entra.GetDirectoryClientSecretFile()
+	} else if okta := auth.GetOkta(); okta != nil {
+		provider, loginFile, privateKeyFile = "okta", okta.GetClientSecretFile(), okta.GetDirectoryPrivateKeyFile()
+	} else if google := auth.GetGoogle(); google != nil {
+		provider, loginFile, privateKeyFile = "google", google.GetClientSecretFile(), google.GetPrivateKeyFile()
 	} else {
 		return nil
 	}
-	secret, err := readFile(reference(d.base, loginFile), true)
+	var err error
+	result.ClientSecret, err = d.authenticationSecret(provider+".client_secret_file", loginFile)
 	if err != nil {
-		return fmt.Errorf("read authentication.%s.client_secret_file: %w", provider, err)
+		return err
 	}
-	result.ClientSecret = strings.TrimSpace(string(secret))
-	secret, err = readFile(reference(d.base, directoryFile), true)
-	if err != nil {
-		return fmt.Errorf("read authentication.%s.directory_client_secret_file: %w", provider, err)
+	if directoryFile != "" {
+		result.DirectoryClientSecret, err = d.authenticationSecret(provider+".directory_client_secret_file", directoryFile)
+		if err != nil {
+			return err
+		}
 	}
-	result.DirectoryClientSecret = strings.TrimSpace(string(secret))
-	if result.ClientSecret == "" || result.DirectoryClientSecret == "" {
-		return fmt.Errorf("%s secret files must not be empty", provider)
+	if privateKeyFile != "" {
+		result.DirectoryPrivateKeyPEM, err = readFile(reference(d.base, privateKeyFile), true)
+		if err != nil {
+			return fmt.Errorf("read authentication.%s directory private key: %w", provider, err)
+		}
+		if len(bytes.TrimSpace(result.DirectoryPrivateKeyPEM)) == 0 {
+			return fmt.Errorf("authentication.%s directory private key must not be empty", provider)
+		}
 	}
 	return nil
+}
+
+func (d *Document) authenticationSecret(field, path string) (string, error) {
+	secret, err := readFile(reference(d.base, path), true)
+	if err != nil {
+		return "", fmt.Errorf("read authentication.%s: %w", field, err)
+	}
+	value := strings.TrimSpace(string(secret))
+	if value == "" {
+		return "", fmt.Errorf("authentication.%s must not be empty", field)
+	}
+	return value, nil
 }
 
 // Database resolves only the runtime database credential.

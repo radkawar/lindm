@@ -27,10 +27,10 @@ var (
 )
 
 // AcceptServiceAction atomically fences current enrollment/trust, advances the
-// resource sequence and supersedes unstarted work. There is no eviction: sequence
-// floors and exact historical evidence survive all completed actions. Unfinished
-// work reserves its entire bounded lifecycle before admission, so recording its
-// native outcome does not compete with later work for capacity.
+// resource sequence and supersedes unstarted work. Resource floors and protected
+// outcomes are never evicted; older read-only successes have bounded retention.
+// Unfinished work reserves its entire bounded lifecycle before admission, so
+// recording its native outcome does not compete with later work for capacity.
 func (s *Store) AcceptServiceAction(ctx context.Context, authorityRevision, trustRevision int64, record *agentv1.ServiceExecutionRecord) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -118,18 +118,19 @@ func (s *Store) AcceptServiceAction(ctx context.Context, authorityRevision, trus
 	if superseded != nil {
 		delta += int64(len(superseded)) - serviceActionCapacityBytes(agentv1.ServiceExecutionState(previous.State), len(previous.Record))
 	}
-	if err := changeServiceActionUsage(ctx, q, usage, 1, delta); err != nil {
-		return 0, err
-	}
 	if superseded != nil {
 		if err := replaceServiceAction(ctx, q, previous, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUPERSEDED, superseded); err != nil {
 			return 0, err
 		}
 	}
+	var readOnly int64
+	if readOnlyServiceSuccess(record) {
+		readOnly = 1
+	}
 	if err := q.InsertServiceAction(ctx, journaldb.InsertServiceActionParams{
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
 		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Unit: intent.GetDesired().GetUnit(),
-		ResourceSequence: int64(intent.GetResourceSequence()), State: int64(record.GetState()), Record: encoded,
+		ResourceSequence: int64(intent.GetResourceSequence()), State: int64(record.GetState()), Record: encoded, ReadOnlySuccess: readOnly,
 	}); err != nil {
 		return 0, serviceActionWriteError(ctx)
 	}
@@ -139,10 +140,49 @@ func (s *Store) AcceptServiceAction(ctx context.Context, authorityRevision, trus
 	}); err != nil {
 		return 0, serviceActionWriteError(ctx)
 	}
+	prunedCount, prunedBytes, err := s.pruneReadOnlyServiceActions(ctx, q)
+	if err != nil {
+		return 0, err
+	}
+	if err := changeServiceActionUsage(ctx, q, usage, 1-prunedCount, delta-prunedBytes); err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, serviceActionWriteError(ctx)
 	}
 	return 1, nil
+}
+
+// Keep the newest 256 non-floor read-only records as well as every current
+// resource floor. Admission order is SQLite's durable rowid, not device time.
+// Pruning and its returned accounting deltas belong to the caller's transaction.
+func (s *Store) pruneReadOnlyServiceActions(ctx context.Context, q *journaldb.Queries) (int64, int64, error) {
+	var count, size int64
+	for {
+		row, err := q.OldReadOnlyServiceAction(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return count, size, nil
+		}
+		if err != nil {
+			return 0, 0, stateReadError(ctx)
+		}
+		record, _, err := s.checkedServiceAction(ctx, q, row)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !readOnlyServiceSuccess(record) {
+			return 0, 0, ErrRecoveryHold
+		}
+		deleted, err := q.DeleteReadOnlyServiceAction(ctx, row.ActionID)
+		if err != nil {
+			return 0, 0, serviceActionWriteError(ctx)
+		}
+		if deleted != 1 {
+			return 0, 0, ErrRecoveryHold
+		}
+		count++
+		size += int64(len(row.Record))
+	}
 }
 
 // LoadServiceAction returns an independently decoded record. Exact RPC retries

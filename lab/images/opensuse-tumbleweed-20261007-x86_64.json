@@ -1,0 +1,19 @@
+{
+  "id": "opensuse-tumbleweed-20261007-x86-64",
+  "distribution": "opensuse-tumbleweed",
+  "version": "20261007",
+  "architecture": "x86_64",
+  "edition": "minimal-vm-cloud",
+  "release": "Snapshot20261007",
+  "imageFilename": "openSUSE-Tumbleweed-Minimal-VM.x86_64-1.0.0-Cloud-Snapshot20261007.qcow2",
+  "imageUrl": "https://ftp.gwdg.de/pub/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-Minimal-VM.x86_64-1.0.0-Cloud-Snapshot20261007.qcow2",
+  "checksumUrl": "https://download.opensuse.org/tumbleweed/appliances/openSUSE-Tumbleweed-Minimal-VM.x86_64-1.0.0-Cloud-Snapshot20261007.qcow2.sha256",
+  "signatureUrl": "https://download.opensuse.org/tumbleweed/appliances/openSUSE-Tumbleweed-Minimal-VM.x86_64-1.0.0-Cloud-Snapshot20261007.qcow2.sha256.asc",
+  "keyUrl": "https://download.opensuse.org/tumbleweed/repo/oss/repodata/repomd.xml.key",
+  "sha256": "ba2c573a5894fbd27e6d19916abae222e04daaadad7aa10e8ebface2ebaf0884",
+  "signerFingerprint": "AD485664E901B867051AB15F35A2F86E29B700A4",
+  "imageSizeBytes": "319534080",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://build.opensuse.org/projects/openSUSE:Tumbleweed/signing_keys",
+  "releaseProvenanceUrl": "https://download.opensuse.org/tumbleweed/appliances/"
+}

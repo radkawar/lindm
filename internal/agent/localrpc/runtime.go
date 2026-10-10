@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 var errRuntimeUnsafe = errors.New("unsafe executor runtime directory")
@@ -38,7 +40,7 @@ func openRuntimeDirectory(directory string) (*os.File, error) {
 			_ = unix.Close(fd)
 			return nil, err
 		}
-		if info.Mode&unix.S_IFMT != unix.S_IFDIR || info.Uid != 0 && info.Uid != uint32(os.Geteuid()) || info.Mode&0022 != 0 && info.Mode&unix.S_ISVTX == 0 {
+		if !custody.TrustedDirectory(&info) && (info.Mode&unix.S_IFMT != unix.S_IFDIR || info.Uid != 0 && info.Uid != uint32(os.Geteuid()) || info.Mode&0022 != 0 && info.Mode&unix.S_ISVTX == 0) {
 			_ = unix.Close(fd)
 			return nil, errRuntimeUnsafe
 		}
@@ -54,7 +56,7 @@ func openRuntimeDirectory(directory string) (*os.File, error) {
 		_ = unix.Close(fd)
 		return nil, err
 	}
-	if info.Uid != uint32(os.Geteuid()) || info.Mode&unix.S_IFMT != unix.S_IFDIR || info.Mode&0022 != 0 {
+	if info.Uid != uint32(os.Geteuid()) || (!custody.TrustedDirectory(&info) && (info.Mode&unix.S_IFMT != unix.S_IFDIR || info.Mode&0022 != 0)) {
 		_ = unix.Close(fd)
 		return nil, errRuntimeUnsafe
 	}

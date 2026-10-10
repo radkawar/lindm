@@ -2,18 +2,21 @@ import { queryOptions } from "@tanstack/react-query";
 import { adminClient } from "@/lib/rpc";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import type { PackageSearch } from "./package-search";
+import { deviceFilter, type DeviceSearch } from "./search";
 
-export function devicesQueryOptions(lifetime: AuthLifetime, pageSize: number, pageToken: string) {
+export function devicesQueryOptions(lifetime: AuthLifetime, search: DeviceSearch) {
   return queryOptions({
-    queryKey: ["devices", lifetime.generation, pageSize, pageToken] as const,
+    queryKey: ["devices", lifetime.generation, search] as const,
     meta: { authGeneration: lifetime.generation },
+    retry: false,
+    staleTime: 0,
     queryFn: async ({ signal }) => {
       const response = await adminClient.listDevices(
-        { pageSize, pageToken },
+        { pageSize: search.pageSize, pageToken: search.pageToken, filter: deviceFilter(search) },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();
-      return { devices: response.devices, nextPageToken: response.nextPageToken };
+      return response;
     },
   });
 }
@@ -48,6 +51,21 @@ export function devicePackagesQueryOptions(
     queryFn: async ({ signal }) => {
       const response = await adminClient.listDevicePackages(
         { deviceId, ...search },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response;
+    },
+  });
+}
+
+export function attributeDefinitionsQueryOptions(lifetime: AuthLifetime, afterKey: string) {
+  return queryOptions({
+    queryKey: ["attribute-definitions", lifetime.generation, afterKey] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listAttributeDefinitions(
+        { pageSize: 100, afterKey },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

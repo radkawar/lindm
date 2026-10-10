@@ -13,7 +13,7 @@ import (
 func TestAuthorizeDefaultDeny(t *testing.T) {
 	perms := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles}
 	allow := []string{RoleOwner, RoleAdmin}
-	deny := []string{"", "auditor", "operator", "helpdesk", "owner ", "Admin"}
+	deny := []string{"", "owner ", "Admin", "unknown"}
 	for _, role := range allow {
 		for _, perm := range perms {
 			if !Authorize(Principal{Role: role}, perm) {
@@ -36,7 +36,7 @@ func TestAuthorizeDefaultDeny(t *testing.T) {
 func TestDecideOwnerDeniedOnDisableAndOutage(t *testing.T) {
 	now := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	owner := freshOwner(now)
-	if d := decideAccess(now, owner.Issuer, []string{"/admins"}, owner); d.Kind != accessOK || d.Role != RoleOwner {
+	if d := decideAccess(now, owner.Issuer, mappedPolicy(t, "/admins"), owner); d.Kind != accessOK || d.Role != RoleOwner {
 		t.Fatalf("fresh owner = %#v", d)
 	}
 	disabled := owner
@@ -66,23 +66,23 @@ func TestDecideAdminGroupExactAndDefaultDeny(t *testing.T) {
 	now := time.Now().UTC()
 	snap := freshUser(now)
 	snap.Groups = []string{"/operators", "/admins/extra"}
-	if d := decideAccess(now, snap.Issuer, []string{"/admins"}, snap); d.Kind != accessOK || d.Role != "" {
+	if d := decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), snap); d.Kind != accessOK || d.Role != "" {
 		t.Fatalf("prefix group granted %#v", d)
 	}
 	snap.Groups = []string{"/admins"}
-	if d := decideAccess(now, snap.Issuer, []string{"/admins"}, snap); d.Kind != accessOK || d.Role != RoleAdmin {
+	if d := decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), snap); d.Kind != accessOK || d.Role != RoleAdmin {
 		t.Fatalf("exact admin group = %#v", d)
 	}
 	snap.Groups = nil
-	if d := decideAccess(now, snap.Issuer, []string{"/admins"}, snap); d.Kind != accessOK || d.Role != "" {
+	if d := decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), snap); d.Kind != accessOK || d.Role != "" {
 		t.Fatalf("unassigned user = %#v", d)
 	}
-	if Authorize(Principal{Role: dRole(now, snap)}, PermissionReadAudit) {
+	if Authorize(Principal{Role: decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), snap).Role}, PermissionReadAudit) {
 		t.Fatal("unassigned role granted audit")
 	}
 	unqualified := snap
 	unqualified.Qualified = false
-	if d := decideAccess(now, snap.Issuer, []string{"/admins"}, unqualified); d.Kind != accessUnauthenticated || !d.RevokeSessions {
+	if d := decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), unqualified); d.Kind != accessUnauthenticated || !d.RevokeSessions {
 		t.Fatalf("unqualified admin group = %#v", d)
 	}
 	tombstone := snap
@@ -90,7 +90,7 @@ func TestDecideAdminGroupExactAndDefaultDeny(t *testing.T) {
 	tombstone.Enabled = true
 	tombstone.Deactivated = true
 	tombstone.DeactivationSource = deactivationSCIM
-	if d := decideAccess(now, snap.Issuer, []string{"/admins"}, tombstone); d.Kind != accessUnauthenticated || d.Role != "" {
+	if d := decideAccess(now, snap.Issuer, mappedPolicy(t, "/admins"), tombstone); d.Kind != accessUnauthenticated || d.Role != "" {
 		t.Fatalf("scim tombstone = %#v", d)
 	}
 }
@@ -228,8 +228,4 @@ func freshUser(now time.Time) directorySnapshot {
 		ObservedAt:  now.Add(-5 * time.Second),
 		Qualified:   true,
 	}
-}
-
-func dRole(now time.Time, snap directorySnapshot) string {
-	return decideAccess(now, snap.Issuer, []string{"/admins"}, snap).Role
 }

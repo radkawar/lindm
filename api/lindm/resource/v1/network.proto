@@ -1,0 +1,461 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+enum TimeBackendPreference {
+  TIME_BACKEND_PREFERENCE_UNSPECIFIED = 0;
+  TIME_BACKEND_PREFERENCE_EXISTING = 1;
+  TIME_BACKEND_PREFERENCE_CHRONY = 2;
+  TIME_BACKEND_PREFERENCE_TIMESYNCD = 3;
+}
+enum TimeSourceMode {
+  TIME_SOURCE_MODE_UNSPECIFIED = 0;
+  TIME_SOURCE_MODE_SERVER = 1;
+  TIME_SOURCE_MODE_POOL = 2;
+}
+message TimeSource {
+  Host host = 1 [(buf.validate.field).required = true];
+  TimeSourceMode mode = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  uint32 port = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  bool prefer = 4;
+  bool iburst = 5;
+}
+message TimeSyncDesired {
+  TimeBackendPreference backend = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated TimeSource sources = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  optional bool require_network_time_security = 3;
+  uint32 max_offset_milliseconds = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 86400000
+  }];
+  uint32 convergence_timeout_seconds = 5 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3600
+  }];
+}
+enum FirewallVerdict {
+  FIREWALL_VERDICT_UNSPECIFIED = 0;
+  FIREWALL_VERDICT_ACCEPT = 1;
+  FIREWALL_VERDICT_DROP = 2;
+  FIREWALL_VERDICT_REJECT = 3;
+}
+enum FirewallDirection {
+  FIREWALL_DIRECTION_UNSPECIFIED = 0;
+  FIREWALL_DIRECTION_INPUT = 1;
+  FIREWALL_DIRECTION_OUTPUT = 2;
+  FIREWALL_DIRECTION_FORWARD = 3;
+}
+enum IPFamily {
+  IP_FAMILY_UNSPECIFIED = 0;
+  IP_FAMILY_IPV4 = 1;
+  IP_FAMILY_IPV6 = 2;
+}
+enum IPProtocol {
+  IP_PROTOCOL_UNSPECIFIED = 0;
+  IP_PROTOCOL_TCP = 1;
+  IP_PROTOCOL_UDP = 2;
+  IP_PROTOCOL_ICMP = 3;
+  IP_PROTOCOL_ICMPV6 = 4;
+}
+message FirewallRule {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 priority = 2 [(buf.validate.field).int32 = {
+    gte: -32768
+    lte: 32767
+  }];
+  FirewallDirection direction = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  IPFamily family = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  IPProtocol protocol = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated CIDR sources = 6 [(buf.validate.field).repeated.max_items = 64];
+  repeated CIDR destinations = 7 [(buf.validate.field).repeated.max_items = 64];
+  repeated PortRange source_ports = 8 [(buf.validate.field).repeated.max_items = 64];
+  repeated PortRange destination_ports = 9 [(buf.validate.field).repeated.max_items = 64];
+  optional uint32 icmp_type = 10 [(buf.validate.field).uint32.lte = 255];
+  optional uint32 icmp_code = 11 [(buf.validate.field).uint32.lte = 255];
+  FirewallVerdict verdict = 12 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "firewall_rule.protocol"
+    message: "ports and ICMP selectors must match protocol and family"
+    expression: "(this.protocol in [1,2] ? !has(this.icmp_type) && !has(this.icmp_code) : this.source_ports.size() == 0 && this.destination_ports.size() == 0) && (this.protocol != 3 || this.family == 1) && (this.protocol != 4 || this.family == 2) && (!has(this.icmp_code) || has(this.icmp_type))"
+  };
+  option (buf.validate.message).cel = {
+    id: "firewall_rule.family"
+    message: "CIDRs must match the rule family"
+    expression: "this.sources.all(c, c.network_address.contains(':') == (this.family == 2)) && this.destinations.all(c, c.network_address.contains(':') == (this.family == 2))"
+  };
+}
+message FirewallZoneDesired {
+  string zone_id = 1 [(buf.validate.field).string.uuid = true];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated InterfaceSelector interfaces = 3 [(buf.validate.field).repeated.max_items = 64];
+  repeated CIDR source_networks = 4 [(buf.validate.field).repeated.max_items = 64];
+  FirewallVerdict default_ingress = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  FirewallVerdict default_egress = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated FirewallRule rules = 7 [(buf.validate.field).repeated.max_items = 256];
+  option (buf.validate.message).cel = {
+    id: "firewall_zone.rule_ids"
+    message: "rule identities must be unique"
+    expression: "this.rules.all(r, this.rules.filter(x, x.rule_id == r.rule_id).size() == 1)"
+  };
+}
+enum ActivationPolicy {
+  ACTIVATION_POLICY_UNSPECIFIED = 0;
+  ACTIVATION_POLICY_PERSIST_ONLY = 1;
+  ACTIVATION_POLICY_ACTIVATE = 2;
+}
+enum IPMethod {
+  IP_METHOD_UNSPECIFIED = 0;
+  IP_METHOD_DHCP = 1;
+  IP_METHOD_STATIC = 2;
+  IP_METHOD_DISABLED = 3;
+}
+message IPAddress {
+  string address = 1 [(buf.validate.field).string.ip = true];
+  uint32 prefix_length = 2 [(buf.validate.field).uint32.lte = 128];
+  option (buf.validate.message).cel = {
+    id: "ip_address.prefix"
+    message: "IPv4 prefix must be at most 32"
+    expression: "this.address.contains(':') || this.prefix_length <= 32"
+  };
+}
+message IPRoute {
+  CIDR destination = 1 [(buf.validate.field).required = true];
+  optional string gateway = 2 [(buf.validate.field).string.ip = true];
+  uint32 metric = 3;
+  option (buf.validate.message).cel = {
+    id: "ip_route.family"
+    message: "route gateway and destination must have the same family"
+    expression: "!has(this.gateway) || this.gateway.contains(':') == this.destination.network_address.contains(':')"
+  };
+}
+message IPSettings {
+  IPMethod method = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated IPAddress addresses = 2 [(buf.validate.field).repeated.max_items = 32];
+  optional string gateway = 3 [(buf.validate.field).string.ip = true];
+  repeated IPRoute routes = 4 [(buf.validate.field).repeated.max_items = 128];
+  optional uint32 route_metric = 5;
+  option (buf.validate.message).cel = {
+    id: "ip_settings.method"
+    message: "static configuration needs addresses; disabled configuration has no routes"
+    expression: "(this.method == 2 ? this.addresses.size() > 0 : this.addresses.size() == 0) && (this.method != 3 || (!has(this.gateway) && this.routes.size() == 0 && !has(this.route_metric)))"
+  };
+}
+message EAPCredential {
+  CertificateTrustRefs server_trust = 1 [(buf.validate.field).required = true];
+  repeated string server_names = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      string: {
+        hostname: true
+        max_len: 253
+      }
+    }
+  }];
+  string identity = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[^\\x00\\r\\n]+$"
+  }];
+  oneof authentication {
+    option (buf.validate.oneof).required = true;
+    ResourceRef certificate = 4;
+    SecretRef password = 5;
+  }
+  option (buf.validate.message).cel = {
+    id: "eap_credential.purpose"
+    message: "EAP authentication must use a leaf credential or EAP password"
+    expression: "(!has(this.certificate) || this.certificate.kind == 19) && (!has(this.password) || this.password.purpose == 3)"
+  };
+}
+message Ethernet {
+  optional uint32 mtu = 1 [(buf.validate.field).uint32 = {
+    gte: 576
+    lte: 65535
+  }];
+  optional string mac_binding = 2 [(buf.validate.field).string.pattern = "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"];
+  EAPCredential eap = 3;
+}
+enum WiFiSecurity {
+  WI_FI_SECURITY_UNSPECIFIED = 0;
+  WI_FI_SECURITY_WPA2_PERSONAL = 1;
+  WI_FI_SECURITY_WPA3_PERSONAL = 2;
+  WI_FI_SECURITY_WPA2_EAP = 3;
+  WI_FI_SECURITY_WPA3_EAP = 4;
+}
+message WiFi {
+  bytes ssid = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32
+  }];
+  bool hidden = 2;
+  WiFiSecurity security = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  oneof authentication {
+    option (buf.validate.oneof).required = true;
+    SecretRef psk = 4;
+    EAPCredential eap = 5;
+  }
+  option (buf.validate.message).cel = {
+    id: "wifi.authentication"
+    message: "WiFi credential must match security mode and purpose"
+    expression: "(this.security in [1,2]) == has(this.psk) && (!has(this.psk) || this.psk.purpose == 2)"
+  };
+}
+message OpenVPNTLS {
+  Endpoint endpoint = 1 [(buf.validate.field).required = true];
+  IPProtocol transport = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      1,
+      2
+    ]
+  }];
+  string server_name = 3 [(buf.validate.field).string = {
+    hostname: true
+    max_len: 253
+  }];
+  EAPCredential credential = 4 [(buf.validate.field).required = true];
+  repeated IPRoute routes = 5 [(buf.validate.field).repeated.max_items = 128];
+}
+message WireGuardPeer {
+  bytes public_key = 1 [(buf.validate.field).bytes.len = 32];
+  Endpoint endpoint = 2;
+  repeated CIDR allowed_ips = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  SecretRef preshared_key = 4;
+  uint32 persistent_keepalive_seconds = 5 [(buf.validate.field).uint32.lte = 65535];
+  option (buf.validate.message).cel = {
+    id: "wireguard_peer.purpose"
+    message: "WireGuard peer requires purpose-limited secret"
+    expression: "!has(this.preshared_key) || this.preshared_key.purpose == 6"
+  };
+}
+message WireGuard {
+  SecretRef private_key = 1 [(buf.validate.field).required = true];
+  optional uint32 listen_port = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  repeated WireGuardPeer peers = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  option (buf.validate.message).cel = {
+    id: "wireguard.purpose"
+    message: "WireGuard requires purpose-limited private key"
+    expression: "this.private_key.purpose == 5"
+  };
+}
+message IPsecIKEv2 {
+  Endpoint endpoint = 1 [(buf.validate.field).required = true];
+  string remote_identity = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string local_identity = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  EAPCredential credential = 4 [(buf.validate.field).required = true];
+  repeated IPRoute routes = 5 [(buf.validate.field).repeated.max_items = 128];
+}
+message VPN {
+  oneof plugin {
+    option (buf.validate.oneof).required = true;
+    OpenVPNTLS openvpn_tls = 1;
+    WireGuard wireguard = 2;
+    IPsecIKEv2 ipsec_ikev2 = 3;
+  }
+}
+message NetworkConnectionDesired {
+  string connection_uuid = 1 [(buf.validate.field).string.uuid = true];
+  string display_name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  Presence presence = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  InterfaceSelector device = 4 [(buf.validate.field).required = true];
+  bool autoconnect = 5;
+  ActivationPolicy activation = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  IPSettings ipv4 = 7;
+  IPSettings ipv6 = 8;
+  oneof medium {
+    option (buf.validate.oneof).required = true;
+    Ethernet ethernet = 9;
+    WiFi wifi = 10;
+    VPN vpn = 11;
+  }
+  option (buf.validate.message).cel = {
+    id: "connection.ipv4"
+    message: "IPv4 settings cannot contain IPv6 addresses"
+    expression: "!has(this.ipv4) || (this.ipv4.addresses.all(a, !a.address.contains(':')) && (!has(this.ipv4.gateway) || !this.ipv4.gateway.contains(':')) && this.ipv4.routes.all(r, !r.destination.network_address.contains(':')))"
+  };
+  option (buf.validate.message).cel = {
+    id: "connection.ipv6"
+    message: "IPv6 settings cannot contain IPv4 addresses"
+    expression: "!has(this.ipv6) || (this.ipv6.addresses.all(a, a.address.contains(':')) && (!has(this.ipv6.gateway) || this.ipv6.gateway.contains(':')) && this.ipv6.routes.all(r, r.destination.network_address.contains(':')))"
+  };
+}
+enum DNSSECMode {
+  DNSSEC_MODE_UNSPECIFIED = 0;
+  DNSSEC_MODE_DISABLED = 1;
+  DNSSEC_MODE_ALLOW_DOWNGRADE = 2;
+  DNSSEC_MODE_REQUIRED = 3;
+}
+enum DNSOverTLSMode {
+  DNS_OVER_TLS_MODE_UNSPECIFIED = 0;
+  DNS_OVER_TLS_MODE_DISABLED = 1;
+  DNS_OVER_TLS_MODE_OPPORTUNISTIC = 2;
+  DNS_OVER_TLS_MODE_REQUIRED = 3;
+}
+message DNSServer {
+  string address = 1 [(buf.validate.field).string.ip = true];
+  optional string server_name = 2 [(buf.validate.field).string = {
+    hostname: true
+    max_len: 253
+  }];
+  optional uint32 port = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+}
+message DNSServerList {
+  repeated DNSServer servers = 1 [(buf.validate.field).repeated.max_items = 32];
+}
+message DNSDesired {
+  oneof scope {
+    option (buf.validate.oneof).required = true;
+    SystemScope system = 1;
+    ConnectionScope connection = 2;
+  }
+  DNSServerList servers = 3;
+  DomainList search_domains = 4;
+  DomainList routing_domains = 5;
+  optional DNSSECMode dnssec = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional DNSOverTLSMode dns_over_tls = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional bool ignore_auto_dns = 8;
+  option (buf.validate.message).cel = {
+    id: "dns.dimension"
+    message: "manage at least one resolver dimension"
+    expression: "has(this.servers) || has(this.search_domains) || has(this.routing_domains) || has(this.dnssec) || has(this.dns_over_tls) || has(this.ignore_auto_dns)"
+  };
+}
+message ProxyConsumer {
+  oneof consumer {
+    option (buf.validate.oneof).required = true;
+    SystemScope packages = 1;
+    SystemScope system_environment = 2;
+    PersonDesktopBinding person = 3;
+  }
+}
+message DirectProxy {}
+message ProxyBypass {
+  oneof target {
+    option (buf.validate.oneof).required = true;
+    Host host = 1;
+    CIDR network = 2;
+  }
+}
+message ManualProxy {
+  Endpoint http = 1;
+  Endpoint https = 2;
+  Endpoint socks = 3;
+  SecretRef authentication = 4;
+  repeated ProxyBypass bypass = 5 [(buf.validate.field).repeated.max_items = 128];
+  option (buf.validate.message).cel = {
+    id: "manual_proxy.dimension"
+    message: "manual proxy requires an endpoint"
+    expression: "has(this.http) || has(this.https) || has(this.socks)"
+  };
+  option (buf.validate.message).cel = {
+    id: "manual_proxy.purpose"
+    message: "proxy authentication is purpose limited"
+    expression: "!has(this.authentication) || this.authentication.purpose == 7"
+  };
+}
+message PACProxy {
+  oneof source {
+    option (buf.validate.oneof).required = true;
+    ArtifactRef artifact = 1;
+    string https_origin = 2 [(buf.validate.field).string = {
+      uri: true
+      max_len: 2048
+      pattern: "^https://[^/@?#]+/?$"
+    }];
+  }
+  bytes sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "pac.digest"
+    message: "artifact and PAC digests must agree"
+    expression: "!has(this.artifact) || this.sha256 == this.artifact.sha256"
+  };
+}
+message ProxyDesired {
+  ProxyConsumer scope = 1 [(buf.validate.field).required = true];
+  oneof mode {
+    option (buf.validate.oneof).required = true;
+    DirectProxy direct = 2;
+    ManualProxy manual = 3;
+    PACProxy pac = 4;
+  }
+}

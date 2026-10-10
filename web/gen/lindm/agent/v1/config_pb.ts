@@ -5,6 +5,14 @@
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { RecoveryCustody } from "./device_action_recovery_pb.js";
+import { file_lindm_agent_v1_device_action_recovery } from "./device_action_recovery_pb.js";
+import type { SanitizeMethod, StorageTarget } from "./device_actions_pb.js";
+import { file_lindm_agent_v1_device_actions } from "./device_actions_pb.js";
+import type { AgentUpdateConfig } from "./update_pb.js";
+import { file_lindm_agent_v1_update } from "./update_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -12,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/agent/v1/config.proto.
  */
 export const file_lindm_agent_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChtsaW5kbS9hZ2VudC92MS9jb25maWcucHJvdG8SDmxpbmRtLmFnZW50LnYxIu8BCgtBZ2VudENvbmZpZxIiCg9zdGF0ZV9kaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARIkChFydW50aW1lX2RpcmVjdG9yeRgCIAEoCUIJukgGcgSQtRgBEjEKC3NvY2tldF9uYW1lGAMgASgJQhy6SBlyFxABGEAyEV5bQS1aYS16MC05Ll8tXSskEj8KDG5ldHdvcmtfdXNlchgEIAEoCUIpukgmciQQARggMhheW2Etel9dW2EtejAtOV8tXXswLDMxfSRaBHJvb3QSIgoPc3Bvb2xfZGlyZWN0b3J5GAUgASgJQgm6SAZyBJC1GAFCIlogbGluZG0vZ2VuL2xpbmRtL2FnZW50L3YxO2FnZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChtsaW5kbS9hZ2VudC92MS9jb25maWcucHJvdG8SDmxpbmRtLmFnZW50LnYxIqMDCgtBZ2VudENvbmZpZxIiCg9zdGF0ZV9kaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARIkChFydW50aW1lX2RpcmVjdG9yeRgCIAEoCUIJukgGcgSQtRgBEjEKC3NvY2tldF9uYW1lGAMgASgJQhy6SBlyFxABGEAyEV5bQS1aYS16MC05Ll8tXSskEj8KDG5ldHdvcmtfdXNlchgEIAEoCUIpukgmciQQARggMhheW2Etel9dW2EtejAtOV8tXXswLDMxfSRaBHJvb3QSIgoPc3Bvb2xfZGlyZWN0b3J5GAUgASgJQgm6SAZyBJC1GAESQwoPYWN0aW9uX3Byb3ZpZGVyGAYgASgLMioubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uUHJvdmlkZXJDb25maWcSOQoNcmVjb3ZlcnlfYm9vdBgHIAEoCzIiLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Qm9vdENvbmZpZxIyCgd1cGRhdGVzGAggASgLMiEubGluZG0uYWdlbnQudjEuQWdlbnRVcGRhdGVDb25maWci/gMKGkRldmljZUFjdGlvblByb3ZpZGVyQ29uZmlnEkAKB3RhcmdldHMYASADKAsyJS5saW5kbS5hZ2VudC52MS5RdWFsaWZpZWRBY3Rpb25UYXJnZXRCCLpIBZIBAhAgEhoKEmFsbG93X3Nlc3Npb25fbG9jaxgCIAEoCBIYChBhbGxvd19xdWFyYW50aW5lGAMgASgIEiwKFG1hbmFnZW1lbnRfZW5kcG9pbnRzGAQgAygJQg66SAuSAQgQICIEcgJwARIjCgtkbnNfc2VydmVycxgFIAMoCUIOukgLkgEIEAgiBHICcAESJAoScXVhcmFudGluZV9zZWNvbmRzGAYgASgNQgi6SAUqAxisAhIhChlwcm90ZWN0ZWRfc3RhdGVfZGlyZWN0b3J5GAcgASgJEhwKFHJlY292ZXJ5X2Vudmlyb25tZW50GAggASgIEiQKHGFsbG93X2xpdmVfcm9vdF9jcnlwdG9fZXJhc2UYCSABKAgSHgoWYWxsb3dfcmVjb3ZlcnlfaGFuZG9mZhgKIAEoCBIaChJhbGxvd19hY2NvdW50X2xvY2sYCyABKAgSTAoScHJvdGVjdGVkX2FjY291bnRzGAwgAygJQjC6SC2SASoQgAEYASIjciEyH15bYS16QS1aX11bYS16QS1aMC05Xy4tXXswLDMxfSQigAMKFVF1YWxpZmllZEFjdGlvblRhcmdldBI1CgZ0YXJnZXQYASABKAsyHS5saW5kbS5hZ2VudC52MS5TdG9yYWdlVGFyZ2V0Qga6SAPIAQESJwoWb3duZXJfcmVjb3Zlcnlfa2V5c2xvdBgCIAEoDUIHukgEKgIYHxIfChdhbGxvd19yZWNvdmVyeV9yb3RhdGlvbhgDIAEoCBIaChJhbGxvd190cG0yX2JpbmRpbmcYBCABKAgSGgoSYWxsb3dfY3J5cHRvX2VyYXNlGAUgASgIEhcKD2FsbG93X292ZXJ3cml0ZRgGIAEoCBIVCg1hbGxvd19kaXNjYXJkGAcgASgIEiIKEHF1YWxpZmljYXRpb25faWQYCCABKAlCCLpIBXIDGIACEloKF25hdGl2ZV9zYW5pdGl6ZV9tZXRob2RzGAkgAygOMh4ubGluZG0uYWdlbnQudjEuU2FuaXRpemVNZXRob2RCGbpIFpIBExAEGAEiDYIBChABGAMYBBgFGAYiuAUKFVJlY292ZXJ5UnVudGltZUNvbmZpZxIiCg9zdGF0ZV9kaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARIeCghrZXlfZmlsZRgCIAEoCUIMukgJ2AEBcgSQtRgBEiAKCnNlcnZlcl91cmwYAyABKAlCDLpICXIHgLUYAYgBARIhCg5zZXJ2ZXJfY2FfZmlsZRgEIAEoCUIJukgGcgSQtRgBEkQKCHByb3ZpZGVyGAYgASgLMioubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uUHJvdmlkZXJDb25maWdCBrpIA8gBARIcCglyb290X2ZpbGUYByABKAlCCbpIBnIEkLUYARIhCg5ib290c3RyYXBfZmlsZRgIIAEoCUIJukgGcgSQtRgBEiMKEmNlcnRpZmljYXRlX3NoYTI1NhgJIAEoDEIHukgEegJoIBI8CgdjdXN0b2R5GAogASgOMh8ubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlDdXN0b2R5Qgq6SAeCAQQQASAAEkEKFWJvb3RzdHJhcF92ZXJpZmllZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBATrLAbpIxwEaxAEKGHJlY292ZXJ5X3J1bnRpbWUuY3VzdG9keRJOb2ZmLXRhcmdldCBjdXN0b2R5IHJlcXVpcmVzIGl0cyBrZXkgZmlsZTsgVFBNIGN1c3RvZHkgY2Fubm90IHNlbGVjdCBhIGtleSBmaWxlGlgodGhpcy5jdXN0b2R5ID09IDEgJiYgdGhpcy5rZXlfZmlsZSAhPSAnJykgfHwgKHRoaXMuY3VzdG9keSA9PSAyICYmIHRoaXMua2V5X2ZpbGUgPT0gJycpSgQIBRAGUhVyZWNvdmVyeV9pbWFnZV9zaGEyNTYiuwQKElJlY292ZXJ5Qm9vdENvbmZpZxIdCgppbWFnZV9maWxlGAEgASgJQgm6SAZyBJC1GAESHQoMaW1hZ2Vfc2hhMjU2GAIgASgMQge6SAR6AmggEiEKCmltYWdlX3NpemUYAyABKARCDbpICjIIGICAgIAEIAASKgoXc2lnbmVyX2NlcnRpZmljYXRlX2ZpbGUYBCABKAlCCbpIBnIEkLUYARIqChlzaWduZXJfY2VydGlmaWNhdGVfc2hhMjU2GAUgASgMQge6SAR6AmggEiAKDWVzcF9kaXJlY3RvcnkYBiABKAlCCbpIBnIEkLUYARIiCg9zdGF0ZV9kaXJlY3RvcnkYByABKAlCCbpIBnIEkLUYARI8CgdjdXN0b2R5GAggASgOMh8ubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlDdXN0b2R5Qgq6SAeCAQQQASAAEiYKFWV4cGVjdGVkX3BjcjExX3NoYTI1NhgJIAEoDEIHukgEegIYIDq/AbpIuwEauAEKFXJlY292ZXJ5X2Jvb3QuY3VzdG9keRI3VFBNIGN1c3RvZHkgcmVxdWlyZXMgdGhlIGV4YWN0IHF1YWxpZmllZCByZWNvdmVyeSBQQ1IxMRpmKHRoaXMuY3VzdG9keSA9PSAyID8gdGhpcy5leHBlY3RlZF9wY3IxMV9zaGEyNTYuc2l6ZSgpID09IDMyIDogdGhpcy5leHBlY3RlZF9wY3IxMV9zaGEyNTYuc2l6ZSgpID09IDApQiJaIGxpbmRtL2dlbi9saW5kbS9hZ2VudC92MTthZ2VudHYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_device_action_recovery, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_update, file_lindm_validation_v1_string_rules]);
 
 /**
  * AgentConfig is the serialized configuration for the privileged executor and
@@ -66,6 +74,25 @@ export type AgentConfig = Message<"lindm.agent.v1.AgentConfig"> & {
    * @generated from field: string spool_directory = 5;
    */
   spoolDirectory: string;
+
+  /**
+   * Native imperative actions are opt-in; absent configuration refuses them.
+   *
+   * @generated from field: lindm.agent.v1.DeviceActionProviderConfig action_provider = 6;
+   */
+  actionProvider?: DeviceActionProviderConfig | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.RecoveryBootConfig recovery_boot = 7;
+   */
+  recoveryBoot?: RecoveryBootConfig | undefined;
+
+  /**
+   * Only the executor's copy grants update authority. Absent means disabled.
+   *
+   * @generated from field: lindm.agent.v1.AgentUpdateConfig updates = 8;
+   */
+  updates?: AgentUpdateConfig | undefined;
 };
 
 /**
@@ -74,4 +101,276 @@ export type AgentConfig = Message<"lindm.agent.v1.AgentConfig"> & {
  */
 export const AgentConfigSchema: GenMessage<AgentConfig> = /*@__PURE__*/
   messageDesc(file_lindm_agent_v1_config, 0);
+
+/**
+ * Root-owned local qualification, never remotely supplied execution authority.
+ *
+ * @generated from message lindm.agent.v1.DeviceActionProviderConfig
+ */
+export type DeviceActionProviderConfig = Message<"lindm.agent.v1.DeviceActionProviderConfig"> & {
+  /**
+   * @generated from field: repeated lindm.agent.v1.QualifiedActionTarget targets = 1;
+   */
+  targets: QualifiedActionTarget[];
+
+  /**
+   * @generated from field: bool allow_session_lock = 2;
+   */
+  allowSessionLock: boolean;
+
+  /**
+   * @generated from field: bool allow_quarantine = 3;
+   */
+  allowQuarantine: boolean;
+
+  /**
+   * @generated from field: repeated string management_endpoints = 4;
+   */
+  managementEndpoints: string[];
+
+  /**
+   * @generated from field: repeated string dns_servers = 5;
+   */
+  dnsServers: string[];
+
+  /**
+   * @generated from field: uint32 quarantine_seconds = 6;
+   */
+  quarantineSeconds: number;
+
+  /**
+   * Existing protected off-target mount containing executor journal and identity.
+   *
+   * @generated from field: string protected_state_directory = 7;
+   */
+  protectedStateDirectory: string;
+
+  /**
+   * Provisioned only by a qualified signed recovery environment.
+   *
+   * @generated from field: bool recovery_environment = 8;
+   */
+  recoveryEnvironment: boolean;
+
+  /**
+   * Separate local opt-in for the encrypted live-root, forced-poweroff mode.
+   *
+   * @generated from field: bool allow_live_root_crypto_erase = 9;
+   */
+  allowLiveRootCryptoErase: boolean;
+
+  /**
+   * @generated from field: bool allow_recovery_handoff = 10;
+   */
+  allowRecoveryHandoff: boolean;
+
+  /**
+   * @generated from field: bool allow_account_lock = 11;
+   */
+  allowAccountLock: boolean;
+
+  /**
+   * Root is always protected, even when omitted here. Keep break-glass and
+   * administrator login paths in this root-owned list.
+   *
+   * @generated from field: repeated string protected_accounts = 12;
+   */
+  protectedAccounts: string[];
+};
+
+/**
+ * Describes the message lindm.agent.v1.DeviceActionProviderConfig.
+ * Use `create(DeviceActionProviderConfigSchema)` to create a new message.
+ */
+export const DeviceActionProviderConfigSchema: GenMessage<DeviceActionProviderConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 1);
+
+/**
+ * @generated from message lindm.agent.v1.QualifiedActionTarget
+ */
+export type QualifiedActionTarget = Message<"lindm.agent.v1.QualifiedActionTarget"> & {
+  /**
+   * @generated from field: lindm.agent.v1.StorageTarget target = 1;
+   */
+  target?: StorageTarget | undefined;
+
+  /**
+   * An independent owner credential must remain usable throughout rotation.
+   *
+   * @generated from field: uint32 owner_recovery_keyslot = 2;
+   */
+  ownerRecoveryKeyslot: number;
+
+  /**
+   * @generated from field: bool allow_recovery_rotation = 3;
+   */
+  allowRecoveryRotation: boolean;
+
+  /**
+   * @generated from field: bool allow_tpm2_binding = 4;
+   */
+  allowTpm2Binding: boolean;
+
+  /**
+   * @generated from field: bool allow_crypto_erase = 5;
+   */
+  allowCryptoErase: boolean;
+
+  /**
+   * @generated from field: bool allow_overwrite = 6;
+   */
+  allowOverwrite: boolean;
+
+  /**
+   * @generated from field: bool allow_discard = 7;
+   */
+  allowDiscard: boolean;
+
+  /**
+   * An attributable hardware/method qualification reference, not evidence generated
+   * by the running action. Empty qualification refuses destructive operations.
+   *
+   * @generated from field: string qualification_id = 8;
+   */
+  qualificationId: string;
+
+  /**
+   * @generated from field: repeated lindm.agent.v1.SanitizeMethod native_sanitize_methods = 9;
+   */
+  nativeSanitizeMethods: SanitizeMethod[];
+};
+
+/**
+ * Describes the message lindm.agent.v1.QualifiedActionTarget.
+ * Use `create(QualifiedActionTargetSchema)` to create a new message.
+ */
+export const QualifiedActionTargetSchema: GenMessage<QualifiedActionTarget> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 2);
+
+/**
+ * Authenticated recovery-image configuration. Every path is resolved locally
+ * from protected provisioning, never from a remote action request.
+ *
+ * @generated from message lindm.agent.v1.RecoveryRuntimeConfig
+ */
+export type RecoveryRuntimeConfig = Message<"lindm.agent.v1.RecoveryRuntimeConfig"> & {
+  /**
+   * @generated from field: string state_directory = 1;
+   */
+  stateDirectory: string;
+
+  /**
+   * @generated from field: string key_file = 2;
+   */
+  keyFile: string;
+
+  /**
+   * @generated from field: string server_url = 3;
+   */
+  serverUrl: string;
+
+  /**
+   * @generated from field: string server_ca_file = 4;
+   */
+  serverCaFile: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.DeviceActionProviderConfig provider = 6;
+   */
+  provider?: DeviceActionProviderConfig | undefined;
+
+  /**
+   * @generated from field: string root_file = 7;
+   */
+  rootFile: string;
+
+  /**
+   * @generated from field: string bootstrap_file = 8;
+   */
+  bootstrapFile: string;
+
+  /**
+   * Embedded signer pin avoids an impossible self-hash of the signed UKI.
+   *
+   * @generated from field: bytes certificate_sha256 = 9;
+   */
+  certificateSha256: Uint8Array;
+
+  /**
+   * @generated from field: lindm.agent.v1.RecoveryCustody custody = 10;
+   */
+  custody: RecoveryCustody;
+
+  /**
+   * Authenticated image-provisioning admission time for the static bootstrap.
+   * Historical bootstrap restoration never relaxes current execution authority.
+   *
+   * @generated from field: google.protobuf.Timestamp bootstrap_verified_at = 11;
+   */
+  bootstrapVerifiedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.agent.v1.RecoveryRuntimeConfig.
+ * Use `create(RecoveryRuntimeConfigSchema)` to create a new message.
+ */
+export const RecoveryRuntimeConfigSchema: GenMessage<RecoveryRuntimeConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 3);
+
+/**
+ * @generated from message lindm.agent.v1.RecoveryBootConfig
+ */
+export type RecoveryBootConfig = Message<"lindm.agent.v1.RecoveryBootConfig"> & {
+  /**
+   * @generated from field: string image_file = 1;
+   */
+  imageFile: string;
+
+  /**
+   * @generated from field: bytes image_sha256 = 2;
+   */
+  imageSha256: Uint8Array;
+
+  /**
+   * @generated from field: uint64 image_size = 3;
+   */
+  imageSize: bigint;
+
+  /**
+   * @generated from field: string signer_certificate_file = 4;
+   */
+  signerCertificateFile: string;
+
+  /**
+   * @generated from field: bytes signer_certificate_sha256 = 5;
+   */
+  signerCertificateSha256: Uint8Array;
+
+  /**
+   * @generated from field: string esp_directory = 6;
+   */
+  espDirectory: string;
+
+  /**
+   * @generated from field: string state_directory = 7;
+   */
+  stateDirectory: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.RecoveryCustody custody = 8;
+   */
+  custody: RecoveryCustody;
+
+  /**
+   * @generated from field: bytes expected_pcr11_sha256 = 9;
+   */
+  expectedPcr11Sha256: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.agent.v1.RecoveryBootConfig.
+ * Use `create(RecoveryBootConfigSchema)` to create a new message.
+ */
+export const RecoveryBootConfigSchema: GenMessage<RecoveryBootConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_config, 4);
 

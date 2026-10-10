@@ -82,7 +82,7 @@ func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *a
 	if challenge.GetDeploymentId() != intent.GetDeploymentId() || challenge.GetDeviceId() != intent.GetDeviceId() || challenge.GetEnrollmentGeneration() != intent.GetEnrollmentGeneration() || challenge.GetActionId() != intent.GetActionId() || challenge.GetDesiredRevision() != intent.GetDesiredRevision() || challenge.GetResourceSequence() != intent.GetResourceSequence() || challenge.GetRecoveryEpoch() != intent.GetRecoveryEpoch() || !bytes.Equal(challenge.GetIntentSha256(), intentHash[:]) || !bytes.Equal(challenge.GetNativePlanSha256(), planHash[:]) || !proto.Equal(prepared.GetNativePlan().GetDesired(), intent.GetDesired()) {
 		return nil, nil, errors.New("device challenge does not bind the requested intent and native plan")
 	}
-	if now.Before(challenge.GetIssuedAt().AsTime()) || !now.Before(challenge.GetExpiresAt().AsTime()) || challenge.GetIssuedAt().AsTime().Before(intent.GetNotBefore().AsTime()) || challenge.GetExpiresAt().AsTime().After(intent.GetExpiresAt().AsTime()) {
+	if !serviceChallengeWindow(now, intent, challenge) {
 		return nil, nil, errors.New("device challenge is outside the signing window")
 	}
 	grant := &agentv1.ServiceExecutionStartGrant{
@@ -91,6 +91,17 @@ func (f *ExecutionTrustExercise) SignServiceStart(ctx context.Context, intent *a
 	}
 	envelope, err := f.authority.Sign(ctx, grant, f.startKey)
 	return grant, envelope, err
+}
+
+func serviceChallengeWindow(now time.Time, intent *agentv1.ServiceExecutionIntent, challenge *agentv1.ServiceExecutionChallenge) bool {
+	issued, expires := challenge.GetIssuedAt().AsTime(), challenge.GetExpiresAt().AsTime()
+	notBefore, intentExpires := intent.GetNotBefore().AsTime(), intent.GetExpiresAt().AsTime()
+	// Guest timestamps use the production tolerance. The host-issued intent
+	// remains valid on host time; tolerance never extends its authority window.
+	return !issued.After(now.Add(trust.MaxDeviceClockSkew)) &&
+		now.Add(-trust.MaxDeviceClockSkew).Before(expires) &&
+		!now.Before(notBefore) && now.Before(intentExpires) &&
+		!issued.Before(notBefore) && !expires.After(intentExpires)
 }
 
 // VerifyServiceAttestation uses the fixture's independently pinned device CA,

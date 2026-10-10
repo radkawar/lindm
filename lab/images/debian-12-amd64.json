@@ -1,0 +1,19 @@
+{
+  "id": "debian-12-amd64",
+  "distribution": "debian",
+  "version": "12",
+  "architecture": "amd64",
+  "edition": "netinst",
+  "release": "12.15.0",
+  "imageFilename": "debian-12.15.0-amd64-netinst.iso",
+  "imageUrl": "https://laotzu.ftp.acc.umu.se/cdimage/archive/12.15.0/amd64/iso-cd/debian-12.15.0-amd64-netinst.iso",
+  "checksumUrl": "https://cdimage.debian.org/cdimage/archive/12.15.0/amd64/iso-cd/SHA512SUMS",
+  "signatureUrl": "https://cdimage.debian.org/cdimage/archive/12.15.0/amd64/iso-cd/SHA512SUMS.sign",
+  "keyUrl": "https://www.debian.org/CD/key-DA87E80D6294BE9B.txt",
+  "sha256": "cd4462c06aa8892e692c0c4b9c17802f38c8ab8690e85cbfb5ccaa5956e9af17",
+  "signerFingerprint": "DF9B9C49EAA9298432589D76DA87E80D6294BE9B",
+  "imageSizeBytes": "709885952",
+  "checksumMode": "CHECKSUM_MODE_DETACHED_SHA512",
+  "signerProvenanceUrl": "https://www.debian.org/CD/verify",
+  "releaseProvenanceUrl": "https://cdimage.debian.org/cdimage/archive/12.15.0/amd64/iso-cd/"
+}

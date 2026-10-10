@@ -1,0 +1,13 @@
+{
+  "cpe": {
+    "status": "COLLECTION_STATUS_SUCCESS",
+    "value": "cpe:/o:redhat:enterprise_linux:9::baseos"
+  },
+  "releasever_lock": {
+    "status": "COLLECTION_STATUS_UNAVAILABLE"
+  },
+  "repositories": {
+    "status": "COLLECTION_STATUS_SUCCESS",
+    "backend": "dnf4"
+  }
+}

@@ -9,6 +9,7 @@ import {
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AuthenticationOptionsSchema,
+  IdentitySettingsSchema,
   WebAuthnChallengeSchema,
   WebAuthnFinishRequestSchema,
   LocalLoginRequestSchema,
@@ -65,6 +66,13 @@ export async function fetchAuthenticationOptions(signal?: AbortSignal) {
   return decode(
     AuthenticationOptionsSchema,
     await request("/auth/options", undefined, undefined, signal),
+  );
+}
+
+export async function fetchIdentitySettings(signal: AbortSignal) {
+  return decode(
+    IdentitySettingsSchema,
+    await request("/auth/settings", undefined, undefined, signal),
   );
 }
 

@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -33,14 +35,19 @@ export function AuditView({
   const now = new Date();
 
   return (
-    <section className="flex flex-col gap-4" aria-busy={list.isFetching}>
+    <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Audit</h1>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Audit</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Local append history for this deployment. It is not an external tamper-proof trail.
-            Secrets are not recorded here.
+            Local append history for this deployment.
           </p>
+          <details className="text-xs text-muted-foreground">
+            <summary className="w-fit cursor-pointer py-1">Audit limitations</summary>
+            <p className="mt-2">
+              It is not an external tamper-proof trail. Secrets are not recorded here.
+            </p>
+          </details>
         </div>
         <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
           Refresh
@@ -54,29 +61,34 @@ export function AuditView({
           </AlertDescription>
         </Alert>
       ) : null}
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="audit-page-size">Page size</Label>
-        <select
+        <SelectField
           id="audit-page-size"
-          className="h-8 rounded-lg border border-input bg-background px-2"
+          className="h-9"
           value={pageSize}
-          onChange={(event) => {
-            const next = Number(event.target.value);
+          onValueChange={(value) => {
+            const next = Number(value);
             if (next === 50 || next === 100 || next === 200) {
               onSearch({ pageSize: next, pageToken: "" });
             }
           }}
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+          options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
+        />
       </div>
-      {list.isPending ? <p role="status">Loading audit events…</p> : null}
+      {list.isPending ? (
+        <div role="status" className="grid gap-3 border p-4">
+          <span className="text-sm text-muted-foreground">Loading audit events…</span>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : null}
       {list.isSuccess && list.data.events.length === 0 ? (
-        <p role="status">
+        <p
+          role="status"
+          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
+        >
           {pageToken === "" ? "No audit events are recorded." : "This page has no audit events."}
         </p>
       ) : null}
@@ -114,14 +126,16 @@ export function AuditView({
                   <TableCell className="font-mono text-xs">
                     {event.actorId.trim() || "Unknown actor"}
                   </TableCell>
-                  <TableCell>{event.reason.trim() || "—"}</TableCell>
+                  <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
+                    {event.reason.trim() || "—"}
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       ) : null}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" disabled={pageToken === ""} onClick={pagination.previous}>
           {pagination.previousLabel}
         </Button>

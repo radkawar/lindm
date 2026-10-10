@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,7 +93,7 @@ export function LocalForm({
   }
 
   return (
-    <form className="grid gap-3" onSubmit={(event) => void submit(event)}>
+    <form className="grid gap-3" aria-busy={busy} onSubmit={(event) => void submit(event)}>
       {enrollment ? (
         <>
           <Label htmlFor="account-secret">One-time enrollment secret</Label>
@@ -150,7 +151,12 @@ export function LocalForm({
           ? "Set your password, then register a security key or passkey with user verification. Enrollment does not sign you in."
           : "After your password is accepted, verify with your registered security key or passkey."}
       </p>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <Alert variant="destructive">
+          <AlertTitle>{enrollment ? "Enrollment failed" : "Sign-in failed"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
       <Button type="submit" disabled={busy}>
         {busy ? "Waiting for authenticator…" : enrollment ? "Enroll account" : "Sign in locally"}
       </Button>

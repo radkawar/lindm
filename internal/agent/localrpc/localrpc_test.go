@@ -87,6 +87,15 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		agentv1connect.ExecutorServiceStartServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceGetServiceExecutionProcedure,
 		agentv1connect.ExecutorServiceAttestServiceExecutionProcedure,
+		agentv1connect.ExecutorServicePrepareDeviceActionProcedure,
+		agentv1connect.ExecutorServiceStartDeviceActionProcedure,
+		agentv1connect.ExecutorServiceGetDeviceActionProcedure,
+		agentv1connect.ExecutorServiceAttestDeviceActionProcedure,
+		agentv1connect.ExecutorServiceConfirmDeviceActionEscrowProcedure,
+		agentv1connect.ExecutorServicePrepareDeviceActionRecoveryProcedure,
+		agentv1connect.ExecutorServiceCommitDeviceActionRecoveryProcedure,
+		agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure,
+		agentv1connect.ExecutorServiceGetAgentUpdateProcedure,
 	} {
 		for _, uid := range []uint32{0, 40} {
 			if err := authorize(procedure, uid, 40); err != nil {
@@ -99,6 +108,18 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	}
 	if err := authorize(agentv1connect.ExecutorServiceInstallEnrollmentProcedure, 40, 40); err == nil {
 		t.Fatal("network UID was authorized for enrollment")
+	}
+	if err := authorize(agentv1connect.ExecutorServiceImportOfflineEnrollmentProcedure, 40, 40); err == nil {
+		t.Fatal("network UID was authorized for offline enrollment")
+	}
+	if err := authorize(agentv1connect.ExecutorServiceImportOfflineEnrollmentProcedure, 0, 40); err != nil {
+		t.Fatalf("root offline import denied: %v", err)
+	}
+	if err := authorize(agentv1connect.ExecutorServiceSupplyDeviceActionCredentialProcedure, 40, 40); err == nil {
+		t.Fatal("network UID was authorized to supply a local owner credential")
+	}
+	if err := authorize(agentv1connect.ExecutorServiceSupplyDeviceActionCredentialProcedure, 0, 40); err != nil {
+		t.Fatalf("root credential upload denied: %v", err)
 	}
 	if err := authorize("/lindm.agent.v1.ExecutorService/NotAMethod", 0, 40); err == nil {
 		t.Fatal("unknown procedure was authorized")
@@ -117,12 +138,16 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	if networkUID == 0 {
 		networkUID = 1
 	}
+	networkGID := uint32(os.Getegid())
+	if networkGID == 0 {
+		networkGID = 1
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	handler := &recordingHandler{}
 	errc := make(chan error, 1)
 	go func() {
-		errc <- Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: networkUID, NetworkGID: uint32(os.Getegid())}, handler)
+		errc <- Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: networkUID, NetworkGID: networkGID}, handler)
 	}()
 	// Fixture dial does not weaken production Dial, which still requires UID 0.
 	client, cleanup, err := dial(waitSocket(t, filepath.Join(dir, "executor.sock")), func(net.Conn) error { return nil })

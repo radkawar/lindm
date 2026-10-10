@@ -1,0 +1,179 @@
+Distro advisory fixture provenance (acquired 2026-10-09)
+=======================================================
+
+All JSON fixtures are byte-for-byte HTTPS responses from the OSV API, which
+retains each vendor's source URL in database_specific.source. They have not been
+rewritten to match lindm. OSV is a transport/normalization source, not evidence
+that every distro publishes complete binary-package mappings. These fixtures do
+not imply complete ecosystem coverage. No network access is required by tests.
+
+ubuntu-USN-6859-1.json (3242 bytes)
+  GET https://api.osv.dev/v1/vulns/USN-6859-1
+  SHA256 e179d515688434574c1835bbff757f0839e37e08fd8d3301168513cbcbdd2f4e
+  Vendor https://github.com/canonical/ubuntu-security-notices/blob/main/osv/usn/USN-6859-1.json
+  Advisory https://ubuntu.com/security/notices/USN-6859-1
+  Copyright Canonical Ltd and contributors. CC-BY-SA-4.0:
+  https://github.com/canonical/ubuntu-security-notices/blob/main/LICENSE
+  https://creativecommons.org/licenses/by-sa/4.0/legalcode
+  Original response includes both jammy and noble; tests require noble only.
+  Noble source openssh and explicit binary maps fix 1:9.6p1-3ubuntu13.3.
+  No binary-to-source map is invented when that upstream information is absent.
+
+debian-DSA-5724-1.json (578 bytes)
+  GET https://api.osv.dev/v1/vulns/DSA-5724-1
+  SHA256 26841e28408b0912ae777691790b8e966492d9b6fc92c42aa3eab648a92b7e58
+  Vendor https://storage.googleapis.com/debian-osv/dsa-osv/DSA-5724-1.json
+  Upstream https://www.debian.org/security/2024/dsa-5724
+  Debian Security Team; source-only openssh, Debian 12, fix 1:9.2p1-2+deb12u3.
+  Licensing caveat: no explicit blanket data license was located for the tracker
+  export; GPL notices on tracker software must not be represented as a license
+  for all vulnerability data. This tiny original factual regression specimen is
+  retained with attribution. Resolve data redistribution terms with the Debian
+  Security Team before public redistribution of the fixture/database:
+  https://security-tracker.debian.org/tracker/
+  https://lists.debian.org/debian-security-tracker/2026/09/msg00023.html
+
+rocky-RLSA-2024-6783.json (1308 bytes)
+  GET https://api.osv.dev/v1/vulns/RLSA-2024%3A6783
+  SHA256 2be38769894ce8b419202930dd5fbdd1e2c64db48ae3f6de7e9d2c39f5e524db
+  Vendor https://storage.googleapis.com/resf-osv-data/RLSA-2024:6783.json
+  Advisory https://errata.rockylinux.org/RLSA-2024:6783
+  Credits Rocky Enterprise Software Foundation and Red Hat. Vendor attributes
+  Red Hat RHSA-2024:6783 under CC-BY-4.0, with vendor modifications:
+  https://creativecommons.org/licenses/by/4.0/
+  No local modifications. OSV names openssl only, although the vendor HTML lists
+  openssl-libs/devel/perl too. Therefore Rocky OSV imports NEVER establish complete
+  binary coverage; no absent binary map is inferred from an SRPM-looking name.
+  Fix 1:3.0.7-28.el9_4 is a distro backport, not upstream OpenSSL's release fix.
+
+alma-ALSA-2024-6783.json (2284 bytes)
+  GET https://api.osv.dev/v1/vulns/ALSA-2024%3A6783
+  SHA256 23b2a57735fdb26997c6251c9d27c1f5d3c59b18102ee0d12ca7550dde52bd9c
+  Vendor https://github.com/AlmaLinux/osv-database/blob/master/advisories/almalinux9/ALSA-2024:6783.json
+  Copyright (c) 2023 AlmaLinux OS. MIT license reproduced below, from:
+  https://github.com/AlmaLinux/osv-database/blob/master/LICENSE
+  Original response explicitly names openssl-libs/devel/perl in addition to
+  openssl. No local modifications. RHEL-derived text is attributed to Red Hat
+  RHSA-2024:6783 (CC-BY-4.0, above). Binary fix 1:3.0.7-28.el9_4.
+
+fedora44-repomd.xml (7055 bytes)
+  GET https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml
+  SHA256 1660dfbeda6955b4677a244cfc7af321e4ed5bb6e1aff2eac11bdfb32e2564ee
+  Original repomd response; references this exact immutable updateinfo object:
+  https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/f7508933e5ed78ccc41d1cea6dc7d5f93d998b7fe97e7c9e84268e2ce8aadcac-updateinfo.xml.zst
+  Original compressed bytes: 2176421
+  Compressed SHA256 f7508933e5ed78ccc41d1cea6dc7d5f93d998b7fe97e7c9e84268e2ce8aadcac
+  Decompressed bytes: 46007906
+  Decompressed SHA256 d29325ac2ed7bd60d9553d834a6ae6d1675e5e2f9d0be6572ada182d1110f52d
+  The entire object was actually downloaded and decompressed with zstd, not
+  manufactured from a Bodhi API example. To keep the fixture small, the full
+  compressed/decompressed objects are not checked in. Metadata research found
+  3105 entries: 409 security, 907 bugfix, 979 enhancement, 151 newpackage, 659
+  unspecified. One explicitly labelled Fedora45 nonsecurity shim entry occurs
+  in this Fedora44 repository; product-labelled records must not be mixed.
+
+fedora44-sudo.xml (14113 bytes)
+  Exact contiguous <update ...>...</update> bytes extracted from that original
+  XML for FEDORA-2026-7d4732cbab; not parsed/reserialized, values not changed,
+  no fabricated collection/root added, no trailing newline added.
+  SHA256 3ed801b9bccd9f65bbba7d04421fb0395549cd4f076699fedc5f1d7915476d0f
+  Advisory https://bodhi.fedoraproject.org/updates/FEDORA-2026-7d4732cbab
+  Vendor fixed binaries: 0:1.9.17-10.p2.fc44 (CVE-2026-96512 in description).
+  Exact CVE tokens explicitly disclosed in vendor description/summary are
+  retained even when structured references are empty; no package-name inference.
+  Tests bind x86_64/noarch records; source and foreign architectures cannot leak.
+  Copyright (C) 2026 Red Hat, Inc. and others, retained in the original node.
+  Fedora content default CC-BY-SA-4.0, subject to explicit upstream licenses:
+  https://docs.fedoraproject.org/en-US/legal/fpca/
+  https://creativecommons.org/licenses/by-sa/4.0/legalcode
+  Extraction is the only local change. A single update is partial coverage.
+  Synthetic transport/compression envelopes in tests are labelled as such and
+  do not pretend to be a complete downloaded vendor snapshot.
+
+fedora45-shim.xml (1877 bytes)
+  Exact contiguous original node for FEDORA-2026-47312bda9b from the same
+  downloaded Fedora44 updateinfo object; it explicitly names Fedora45/F45.
+  SHA256 f4a4a9f276aed0e061a2aabe3c4fbee06f2630eb4a105f426128d4c60f230928
+  Copyright (C) 2026 Red Hat, Inc. and others; Fedora licensing links above.
+  Extraction only, no rewritten product labels. The regression combines this
+  original node with the original sudo node in an explicitly synthetic XML
+  wrapper and requires that Fedora45 never enter Fedora44 findings.
+
+Native version vectors
+----------------------
+
+dpkg-versions.txt: all 43 original __DATA__ rows, unchanged, from:
+  https://raw.githubusercontent.com/guillemj/dpkg/f4941036b04e787c2803d6359802d6725d2476c6/scripts/t/Dpkg_Version.t
+  Original source SHA256 59c8d762acef6cb718dc9b755c04fb070a4ad9e691b57bc0e479e3f188ca36ae
+  Extracted rows SHA256 41d0adf1fe8ee5215754547a9f52b279cafbdc06a7be11aa40e573f12f8874e2
+  Upstream test file declares GPL-2.0-or-later and no warranty. Only input/result
+  data are retained here, not upstream Perl implementation/test machinery.
+  https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+rpm-versions.txt: all 91 active RPMVERCMP(a, b, result) rows, with only the
+  macro wrapper/comma separators changed to whitespace; no vectors invented:
+  https://raw.githubusercontent.com/rpm-software-management/rpm/5dae33c3d0c51c97d5834fe2ecf768b6f5483b81/tests/rpmvercmp.at
+  Original source SHA256 55df5ca66658a69b36d251f1ecef151a798baaac47d20a312ac8274718659438
+  Extracted rows SHA256 4fd7a79aa7e5b4f9328ab81fccbe9b9da0c0b59b424e58b124fe1d6a140d33a1
+  Commented-out known-oddity examples are not active upstream test vectors and
+  were not included. Includes all active tilde/caret snapshot cases.
+  RPM contributors; repository COPYING provides GPL version 2 for tests:
+  https://github.com/rpm-software-management/rpm/blob/5dae33c3d0c51c97d5834fe2ecf768b6f5483b81/COPYING
+  https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+  Only input/result data retained; implementation independently follows native
+  comparison semantics. No native implementation code is copied into lindm.
+
+Adapter boundaries
+------------------
+  New/Fetch own HTTPS-only TLS-verified retrieval, max four redirects per each
+  of at most two documents, two-minute deadline, 128MiB raw document limit
+  (2MiB repomd), 512MiB decompression limit, 250000 upstream entries and 500000
+  normalized package/range records. OSV individual records are bounded to 2MiB.
+  Source SHA256 covers original raw compressed/ZIP bytes, not normalized JSON.
+  Optional expected_sha256 is an out-of-band pin; repomd additionally binds its
+  companion updateinfo by vendor SHA256. TLS is not a vendor signing-key check.
+  Parse is shared online/offline. RPM_REPOMD raw imports contain updateinfo bytes;
+  isolated repomd cannot be treated as an advisory document. Offline custody and
+  source trust remain with the authenticated importing administrator.
+  OSV JSON and single XML update nodes are always partial. A selected ZIP is
+  partial. The canonical osv-vulnerabilities.storage.googleapis.com ecosystem
+  all.zip URL and full updateinfo can represent complete coverage only within
+  configured product/architecture and available source maps. Arbitrary mirrors
+  named all.zip do not assert completeness; raw offline imports retain the
+  original source configuration and its custody/pin.
+  Unknown ranges, module streams, missing source mapping, unknown XML/JSON
+  shapes and malformed timestamps fail explicitly; they do not produce clean.
+  Rocky OSV cannot establish complete binary coverage. Red Hat/Rocky/Alma are
+  not interchangeable. RHEL EUS/module products are not guessed from a major
+  version. Unsupported native product formats return errors.
+  Fedora adapter derives numeric releases from configuration; real captured
+  fixture evidence here is Fedora44, not a claim of qualifying every release.
+  Ubuntu LTS mappings are 22.04/jammy, 24.04/noble and 26.04/resolute; noble is
+  the only accepted codename alias. Debian supported numeric releases are
+  11/12/13; Rocky/Alma vendor major streams 8/9/10. Inventory matching
+  remains exact configured release (noble/24.04 alias only), preventing silent
+  minor/EUS substitution. Binary architecture aliases do not alter package EVRs.
+
+AlmaLinux OSV MIT notice
+-----------------------
+MIT License
+
+Copyright (c) 2023 AlmaLinux OS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -464,6 +464,11 @@ type SessionAcquisition struct {
 	PredecessorEpoch     uint64                 `protobuf:"varint,5,opt,name=predecessor_epoch,json=predecessorEpoch,proto3" json:"predecessor_epoch,omitempty"`
 	Incarnation          string                 `protobuf:"bytes,6,opt,name=incarnation,proto3" json:"incarnation,omitempty"`
 	BootId               string                 `protobuf:"bytes,7,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	// Executor-signed build identity. Empty legacy/development claims cannot
+	// establish support; update retrieval and inventory remain available.
+	AgentRelease         string `protobuf:"bytes,8,opt,name=agent_release,json=agentRelease,proto3" json:"agent_release,omitempty"`
+	AgentProtocolVersion uint32 `protobuf:"varint,9,opt,name=agent_protocol_version,json=agentProtocolVersion,proto3" json:"agent_protocol_version,omitempty"`
+	InstallationId       string `protobuf:"bytes,10,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -547,6 +552,27 @@ func (x *SessionAcquisition) GetBootId() string {
 	return ""
 }
 
+func (x *SessionAcquisition) GetAgentRelease() string {
+	if x != nil {
+		return x.AgentRelease
+	}
+	return ""
+}
+
+func (x *SessionAcquisition) GetAgentProtocolVersion() uint32 {
+	if x != nil {
+		return x.AgentProtocolVersion
+	}
+	return 0
+}
+
+func (x *SessionAcquisition) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
 var File_lindm_agent_v1_trust_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_trust_proto_rawDesc = "" +
@@ -597,7 +623,7 @@ const file_lindm_agent_v1_trust_proto_rawDesc = "" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
 	"\x15enrollment_generation\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x14enrollmentGeneration\x128\n" +
-	"\x13issuance_request_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\"\xce\x02\n" +
+	"\x13issuance_request_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\"\x99\x04\n" +
 	"\x12SessionAcquisition\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
@@ -606,7 +632,11 @@ const file_lindm_agent_v1_trust_proto_rawDesc = "" +
 	"request_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12+\n" +
 	"\x11predecessor_epoch\x18\x05 \x01(\x04R\x10predecessorEpoch\x12*\n" +
 	"\vincarnation\x18\x06 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vincarnation\x12!\n" +
-	"\aboot_id\x18\a \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootIdB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\aboot_id\x18\a \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12-\n" +
+	"\ragent_release\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\fagentRelease\x12A\n" +
+	"\x16agent_protocol_version\x18\t \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\xff\xff\aR\x14agentProtocolVersion\x12W\n" +
+	"\x0finstallation_id\x18\n" +
+	" \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x0einstallationIdB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_trust_proto_rawDescOnce sync.Once

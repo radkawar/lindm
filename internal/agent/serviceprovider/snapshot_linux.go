@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/custody"
 )
 
 const (
@@ -197,7 +199,7 @@ func openHostSnapshotRoot() (int, error) {
 		_ = unix.Close(fd)
 		return -1, err
 	}
-	if !trustedDirectory(&st) {
+	if !custody.TrustedDirectory(&st) {
 		_ = unix.Close(fd)
 		return -1, fmt.Errorf("%w: untrusted snapshot root", ErrUnsupported)
 	}
@@ -224,7 +226,7 @@ func snapshotFromRoot(ctx context.Context, rootFD int, destination *os.Root, inp
 	if err := unix.Fstat(dup, &rootStat); err != nil {
 		return zero, err
 	}
-	if !trustedDirectory(&rootStat) {
+	if !custody.TrustedDirectory(&rootStat) {
 		return zero, fmt.Errorf("%w: untrusted snapshot root", ErrUnsupported)
 	}
 	s := &session{
@@ -468,7 +470,7 @@ func fillMeta(node *snapNode, st unix.Stat_t) {
 	node.gid = st.Gid
 	node.dev = st.Dev
 	node.ino = st.Ino
-	node.nlink = st.Nlink
+	node.nlink = uint64(st.Nlink)
 	node.rdev = st.Rdev
 	node.size = st.Size
 	node.mtimeSec = st.Mtim.Sec
@@ -479,7 +481,7 @@ func fillMeta(node *snapNode, st unix.Stat_t) {
 
 func metaMatches(node *snapNode, st unix.Stat_t) bool {
 	return node.mode == st.Mode && node.uid == st.Uid && node.gid == st.Gid &&
-		node.dev == st.Dev && node.ino == st.Ino && node.nlink == st.Nlink &&
+		node.dev == st.Dev && node.ino == st.Ino && node.nlink == uint64(st.Nlink) &&
 		node.rdev == st.Rdev && node.size == st.Size &&
 		node.mtimeSec == st.Mtim.Sec && node.mtimeNsec == st.Mtim.Nsec &&
 		node.ctimeSec == st.Ctim.Sec && node.ctimeNsec == st.Ctim.Nsec

@@ -73,6 +73,13 @@ func (r iteratorForInsertSnapshotPackages) Values() ([]interface{}, error) {
 		r.rows[0].Version,
 		r.rows[0].Architecture,
 		r.rows[0].Manager,
+		r.rows[0].SourceName,
+		r.rows[0].SourceVersion,
+		r.rows[0].ModuleStatus,
+		r.rows[0].ModuleName,
+		r.rows[0].ModuleStream,
+		r.rows[0].ModuleVersion,
+		r.rows[0].ModuleContext,
 	}, nil
 }
 
@@ -81,5 +88,5 @@ func (r iteratorForInsertSnapshotPackages) Err() error {
 }
 
 func (q *Queries) InsertSnapshotPackages(ctx context.Context, arg []InsertSnapshotPackagesParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"snapshot_packages"}, []string{"snapshot_id", "position", "name", "version", "architecture", "manager"}, &iteratorForInsertSnapshotPackages{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"snapshot_packages"}, []string{"snapshot_id", "position", "name", "version", "architecture", "manager", "source_name", "source_version", "module_status", "module_name", "module_stream", "module_version", "module_context"}, &iteratorForInsertSnapshotPackages{rows: arg})
 }

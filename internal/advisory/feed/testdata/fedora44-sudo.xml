@@ -1,0 +1,140 @@
+<update from="updates@fedoraproject.org" status="stable" type="security" version="2.0">
+    <id>FEDORA-2026-7d4732cbab</id>
+    <title>sudo-1.9.17-10.p2.fc44</title>
+    <issued date="2026-10-07 12:59:51"/>
+    <updated date="2026-10-08 02:31:15"/>
+    <rights>Copyright (C) 2026 Red Hat, Inc. and others.</rights>
+    <release>Fedora 44</release>
+    <severity>Important</severity>
+    <summary>sudo-1.9.17-10.p2.fc44 security update</summary>
+    <description>Fix for CVE-2026-96512</description>
+    <references/>
+    <pkglist>
+      <collection short="F44">
+        <name>Fedora 44</name>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="src" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/SRPMS/s/sudo-1.9.17-10.p2.fc44.src.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.src.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-debugsource" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-debugsource-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-debugsource-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-debuginfo-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-debuginfo-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-logsrvd-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-logsrvd-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-python-plugin-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-python-plugin-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-devel" version="1.9.17" release="10.p2.fc44" epoch="0" arch="i686" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/i386/s/sudo-devel-1.9.17-10.p2.fc44.i686.rpm">
+          <filename>sudo-devel-1.9.17-10.p2.fc44.i686.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-debugsource" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-debugsource-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-debugsource-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-logsrvd-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-logsrvd-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-python-plugin-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-python-plugin-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-devel" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-devel-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-devel-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="x86_64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/x86_64/s/sudo-1.9.17-10.p2.fc44.x86_64.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-python-plugin-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-python-plugin-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-logsrvd-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-logsrvd-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-devel" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-devel-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-devel-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-debugsource" version="1.9.17" release="10.p2.fc44" epoch="0" arch="aarch64" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/aarch64/s/sudo-debugsource-1.9.17-10.p2.fc44.aarch64.rpm">
+          <filename>sudo-debugsource-1.9.17-10.p2.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="sudo-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-devel" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-devel-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-devel-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-python-plugin-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-python-plugin-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-logsrvd-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-logsrvd-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-debugsource" version="1.9.17" release="10.p2.fc44" epoch="0" arch="ppc64le" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/ppc64le/s/sudo-debugsource-1.9.17-10.p2.fc44.ppc64le.rpm">
+          <filename>sudo-debugsource-1.9.17-10.p2.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="sudo-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-debuginfo-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-debuginfo-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-debugsource" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-debugsource-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-debugsource-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-logsrvd-debuginfo-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-logsrvd" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-logsrvd-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-logsrvd-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin-debuginfo" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-python-plugin-debuginfo-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-python-plugin" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-python-plugin-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-python-plugin-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo-devel" version="1.9.17" release="10.p2.fc44" epoch="0" arch="s390x" src="https://download.fedoraproject.org/pub/fedora/linux/updates/testing/44/s390x/s/sudo-devel-1.9.17-10.p2.fc44.s390x.rpm">
+          <filename>sudo-devel-1.9.17-10.p2.fc44.s390x.rpm</filename>
+        </package>
+      </collection>
+    </pkglist>
+  </update>

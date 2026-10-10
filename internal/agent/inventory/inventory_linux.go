@@ -10,6 +10,9 @@ import (
 	"os"
 
 	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 )
@@ -19,7 +22,15 @@ import (
 // An error indicates that the resulting evidence could not be validated.
 func Collect(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 	host, release := collectHost(ctx, readHostFile)
-	if host.OsId.Status != success || host.OsVersion.Status != success {
+	host.Details = collectDetails(ctx, detailSources{
+		readFile: readDetailFile, readDir: readDetailDir, stat: os.Stat,
+		run: runNative, sessions: collectSessions,
+	})
+	host.FinishedAt = timestamppb.Now()
+	if err := boundHostDetails(host); err != nil {
+		return nil, fmt.Errorf("bound host observation: %w", err)
+	}
+	if !nativePackageIdentityAvailable(host) {
 		release = nil
 	}
 	result := &inventoryv1.NativeObservation{
@@ -30,4 +41,42 @@ func Collect(ctx context.Context) (*inventoryv1.NativeObservation, error) {
 		return nil, fmt.Errorf("validate native observation: %w", err)
 	}
 	return result, nil
+}
+
+func nativePackageIdentityAvailable(host *inventoryv1.HostObservation) bool {
+	return host.OsId.Status == success && (host.OsVersion.Status == success ||
+		host.OsId.Value == "arch" && host.OsVersion.Status == unavailable)
+}
+
+func boundHostDetails(host *inventoryv1.HostObservation) error {
+	data, err := (protojson.MarshalOptions{Multiline: true}).Marshal(host)
+	if err != nil {
+		return err
+	}
+	if proto.Size(host) <= 512<<10 && len(data) <= 512<<10 {
+		return nil
+	}
+	details := host.Details
+	if details.Storage.Status == success {
+		details.Storage = &inventoryv1.StorageDetails{Status: capacity}
+	}
+	if details.Network.Status == success {
+		details.Network = &inventoryv1.NetworkDetails{Status: capacity}
+	}
+	if details.Power.Batteries.Status == success {
+		details.Power.Batteries = &inventoryv1.BatteryDetails{Status: capacity}
+	}
+	if details.LocalUsers.Status == success {
+		details.LocalUsers = &inventoryv1.LocalUsers{Status: capacity}
+	}
+	if details.Flatpak.Status == success {
+		details.Flatpak = &inventoryv1.ApplicationDetails{Status: capacity}
+	}
+	if details.Snap.Status == success {
+		details.Snap = &inventoryv1.ApplicationDetails{Status: capacity}
+	}
+	if details.Platform != nil && details.Platform.Repositories.Status == success {
+		details.Platform.Repositories = &inventoryv1.RepositoryObservation{Status: capacity}
+	}
+	return nil
 }

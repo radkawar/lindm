@@ -32,7 +32,7 @@ func TestRenewalProofAndLostIssuanceRetrieval(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestRenewalProofAndLostIssuanceRetrieval(t *testing.T) {
 	if _, err := client.RetrieveIssuance(ctx, connect.NewRequest(retrieve)); connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("held issuance recovered: %v", err)
 	}
-	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire held key"})); err != nil {
+	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire held key"})); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := client.RetrieveIssuance(ctx, connect.NewRequest(retrieve)); connect.CodeOf(err) != connect.CodeUnauthenticated {

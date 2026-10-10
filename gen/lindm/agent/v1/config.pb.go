@@ -10,6 +10,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
 	sync "sync"
@@ -48,8 +49,13 @@ type AgentConfig struct {
 	// The executor does not open it. It must be canonical and distinct from the
 	// state and runtime directories.
 	SpoolDirectory string `protobuf:"bytes,5,opt,name=spool_directory,json=spoolDirectory,proto3" json:"spool_directory,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Native imperative actions are opt-in; absent configuration refuses them.
+	ActionProvider *DeviceActionProviderConfig `protobuf:"bytes,6,opt,name=action_provider,json=actionProvider,proto3" json:"action_provider,omitempty"`
+	RecoveryBoot   *RecoveryBootConfig         `protobuf:"bytes,7,opt,name=recovery_boot,json=recoveryBoot,proto3" json:"recovery_boot,omitempty"`
+	// Only the executor's copy grants update authority. Absent means disabled.
+	Updates       *AgentUpdateConfig `protobuf:"bytes,8,opt,name=updates,proto3" json:"updates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AgentConfig) Reset() {
@@ -117,18 +123,576 @@ func (x *AgentConfig) GetSpoolDirectory() string {
 	return ""
 }
 
+func (x *AgentConfig) GetActionProvider() *DeviceActionProviderConfig {
+	if x != nil {
+		return x.ActionProvider
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetRecoveryBoot() *RecoveryBootConfig {
+	if x != nil {
+		return x.RecoveryBoot
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetUpdates() *AgentUpdateConfig {
+	if x != nil {
+		return x.Updates
+	}
+	return nil
+}
+
+// Root-owned local qualification, never remotely supplied execution authority.
+type DeviceActionProviderConfig struct {
+	state               protoimpl.MessageState   `protogen:"open.v1"`
+	Targets             []*QualifiedActionTarget `protobuf:"bytes,1,rep,name=targets,proto3" json:"targets,omitempty"`
+	AllowSessionLock    bool                     `protobuf:"varint,2,opt,name=allow_session_lock,json=allowSessionLock,proto3" json:"allow_session_lock,omitempty"`
+	AllowQuarantine     bool                     `protobuf:"varint,3,opt,name=allow_quarantine,json=allowQuarantine,proto3" json:"allow_quarantine,omitempty"`
+	ManagementEndpoints []string                 `protobuf:"bytes,4,rep,name=management_endpoints,json=managementEndpoints,proto3" json:"management_endpoints,omitempty"`
+	DnsServers          []string                 `protobuf:"bytes,5,rep,name=dns_servers,json=dnsServers,proto3" json:"dns_servers,omitempty"`
+	QuarantineSeconds   uint32                   `protobuf:"varint,6,opt,name=quarantine_seconds,json=quarantineSeconds,proto3" json:"quarantine_seconds,omitempty"`
+	// Existing protected off-target mount containing executor journal and identity.
+	ProtectedStateDirectory string `protobuf:"bytes,7,opt,name=protected_state_directory,json=protectedStateDirectory,proto3" json:"protected_state_directory,omitempty"`
+	// Provisioned only by a qualified signed recovery environment.
+	RecoveryEnvironment bool `protobuf:"varint,8,opt,name=recovery_environment,json=recoveryEnvironment,proto3" json:"recovery_environment,omitempty"`
+	// Separate local opt-in for the encrypted live-root, forced-poweroff mode.
+	AllowLiveRootCryptoErase bool `protobuf:"varint,9,opt,name=allow_live_root_crypto_erase,json=allowLiveRootCryptoErase,proto3" json:"allow_live_root_crypto_erase,omitempty"`
+	AllowRecoveryHandoff     bool `protobuf:"varint,10,opt,name=allow_recovery_handoff,json=allowRecoveryHandoff,proto3" json:"allow_recovery_handoff,omitempty"`
+	AllowAccountLock         bool `protobuf:"varint,11,opt,name=allow_account_lock,json=allowAccountLock,proto3" json:"allow_account_lock,omitempty"`
+	// Root is always protected, even when omitted here. Keep break-glass and
+	// administrator login paths in this root-owned list.
+	ProtectedAccounts []string `protobuf:"bytes,12,rep,name=protected_accounts,json=protectedAccounts,proto3" json:"protected_accounts,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *DeviceActionProviderConfig) Reset() {
+	*x = DeviceActionProviderConfig{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceActionProviderConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceActionProviderConfig) ProtoMessage() {}
+
+func (x *DeviceActionProviderConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceActionProviderConfig.ProtoReflect.Descriptor instead.
+func (*DeviceActionProviderConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *DeviceActionProviderConfig) GetTargets() []*QualifiedActionTarget {
+	if x != nil {
+		return x.Targets
+	}
+	return nil
+}
+
+func (x *DeviceActionProviderConfig) GetAllowSessionLock() bool {
+	if x != nil {
+		return x.AllowSessionLock
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetAllowQuarantine() bool {
+	if x != nil {
+		return x.AllowQuarantine
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetManagementEndpoints() []string {
+	if x != nil {
+		return x.ManagementEndpoints
+	}
+	return nil
+}
+
+func (x *DeviceActionProviderConfig) GetDnsServers() []string {
+	if x != nil {
+		return x.DnsServers
+	}
+	return nil
+}
+
+func (x *DeviceActionProviderConfig) GetQuarantineSeconds() uint32 {
+	if x != nil {
+		return x.QuarantineSeconds
+	}
+	return 0
+}
+
+func (x *DeviceActionProviderConfig) GetProtectedStateDirectory() string {
+	if x != nil {
+		return x.ProtectedStateDirectory
+	}
+	return ""
+}
+
+func (x *DeviceActionProviderConfig) GetRecoveryEnvironment() bool {
+	if x != nil {
+		return x.RecoveryEnvironment
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetAllowLiveRootCryptoErase() bool {
+	if x != nil {
+		return x.AllowLiveRootCryptoErase
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetAllowRecoveryHandoff() bool {
+	if x != nil {
+		return x.AllowRecoveryHandoff
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetAllowAccountLock() bool {
+	if x != nil {
+		return x.AllowAccountLock
+	}
+	return false
+}
+
+func (x *DeviceActionProviderConfig) GetProtectedAccounts() []string {
+	if x != nil {
+		return x.ProtectedAccounts
+	}
+	return nil
+}
+
+type QualifiedActionTarget struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Target *StorageTarget         `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	// An independent owner credential must remain usable throughout rotation.
+	OwnerRecoveryKeyslot  uint32 `protobuf:"varint,2,opt,name=owner_recovery_keyslot,json=ownerRecoveryKeyslot,proto3" json:"owner_recovery_keyslot,omitempty"`
+	AllowRecoveryRotation bool   `protobuf:"varint,3,opt,name=allow_recovery_rotation,json=allowRecoveryRotation,proto3" json:"allow_recovery_rotation,omitempty"`
+	AllowTpm2Binding      bool   `protobuf:"varint,4,opt,name=allow_tpm2_binding,json=allowTpm2Binding,proto3" json:"allow_tpm2_binding,omitempty"`
+	AllowCryptoErase      bool   `protobuf:"varint,5,opt,name=allow_crypto_erase,json=allowCryptoErase,proto3" json:"allow_crypto_erase,omitempty"`
+	AllowOverwrite        bool   `protobuf:"varint,6,opt,name=allow_overwrite,json=allowOverwrite,proto3" json:"allow_overwrite,omitempty"`
+	AllowDiscard          bool   `protobuf:"varint,7,opt,name=allow_discard,json=allowDiscard,proto3" json:"allow_discard,omitempty"`
+	// An attributable hardware/method qualification reference, not evidence generated
+	// by the running action. Empty qualification refuses destructive operations.
+	QualificationId       string           `protobuf:"bytes,8,opt,name=qualification_id,json=qualificationId,proto3" json:"qualification_id,omitempty"`
+	NativeSanitizeMethods []SanitizeMethod `protobuf:"varint,9,rep,packed,name=native_sanitize_methods,json=nativeSanitizeMethods,proto3,enum=lindm.agent.v1.SanitizeMethod" json:"native_sanitize_methods,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *QualifiedActionTarget) Reset() {
+	*x = QualifiedActionTarget{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QualifiedActionTarget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QualifiedActionTarget) ProtoMessage() {}
+
+func (x *QualifiedActionTarget) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QualifiedActionTarget.ProtoReflect.Descriptor instead.
+func (*QualifiedActionTarget) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *QualifiedActionTarget) GetTarget() *StorageTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *QualifiedActionTarget) GetOwnerRecoveryKeyslot() uint32 {
+	if x != nil {
+		return x.OwnerRecoveryKeyslot
+	}
+	return 0
+}
+
+func (x *QualifiedActionTarget) GetAllowRecoveryRotation() bool {
+	if x != nil {
+		return x.AllowRecoveryRotation
+	}
+	return false
+}
+
+func (x *QualifiedActionTarget) GetAllowTpm2Binding() bool {
+	if x != nil {
+		return x.AllowTpm2Binding
+	}
+	return false
+}
+
+func (x *QualifiedActionTarget) GetAllowCryptoErase() bool {
+	if x != nil {
+		return x.AllowCryptoErase
+	}
+	return false
+}
+
+func (x *QualifiedActionTarget) GetAllowOverwrite() bool {
+	if x != nil {
+		return x.AllowOverwrite
+	}
+	return false
+}
+
+func (x *QualifiedActionTarget) GetAllowDiscard() bool {
+	if x != nil {
+		return x.AllowDiscard
+	}
+	return false
+}
+
+func (x *QualifiedActionTarget) GetQualificationId() string {
+	if x != nil {
+		return x.QualificationId
+	}
+	return ""
+}
+
+func (x *QualifiedActionTarget) GetNativeSanitizeMethods() []SanitizeMethod {
+	if x != nil {
+		return x.NativeSanitizeMethods
+	}
+	return nil
+}
+
+// Authenticated recovery-image configuration. Every path is resolved locally
+// from protected provisioning, never from a remote action request.
+type RecoveryRuntimeConfig struct {
+	state          protoimpl.MessageState      `protogen:"open.v1"`
+	StateDirectory string                      `protobuf:"bytes,1,opt,name=state_directory,json=stateDirectory,proto3" json:"state_directory,omitempty"`
+	KeyFile        string                      `protobuf:"bytes,2,opt,name=key_file,json=keyFile,proto3" json:"key_file,omitempty"`
+	ServerUrl      string                      `protobuf:"bytes,3,opt,name=server_url,json=serverUrl,proto3" json:"server_url,omitempty"`
+	ServerCaFile   string                      `protobuf:"bytes,4,opt,name=server_ca_file,json=serverCaFile,proto3" json:"server_ca_file,omitempty"`
+	Provider       *DeviceActionProviderConfig `protobuf:"bytes,6,opt,name=provider,proto3" json:"provider,omitempty"`
+	RootFile       string                      `protobuf:"bytes,7,opt,name=root_file,json=rootFile,proto3" json:"root_file,omitempty"`
+	BootstrapFile  string                      `protobuf:"bytes,8,opt,name=bootstrap_file,json=bootstrapFile,proto3" json:"bootstrap_file,omitempty"`
+	// Embedded signer pin avoids an impossible self-hash of the signed UKI.
+	CertificateSha256 []byte          `protobuf:"bytes,9,opt,name=certificate_sha256,json=certificateSha256,proto3" json:"certificate_sha256,omitempty"`
+	Custody           RecoveryCustody `protobuf:"varint,10,opt,name=custody,proto3,enum=lindm.agent.v1.RecoveryCustody" json:"custody,omitempty"`
+	// Authenticated image-provisioning admission time for the static bootstrap.
+	// Historical bootstrap restoration never relaxes current execution authority.
+	BootstrapVerifiedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=bootstrap_verified_at,json=bootstrapVerifiedAt,proto3" json:"bootstrap_verified_at,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RecoveryRuntimeConfig) Reset() {
+	*x = RecoveryRuntimeConfig{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryRuntimeConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryRuntimeConfig) ProtoMessage() {}
+
+func (x *RecoveryRuntimeConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryRuntimeConfig.ProtoReflect.Descriptor instead.
+func (*RecoveryRuntimeConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RecoveryRuntimeConfig) GetStateDirectory() string {
+	if x != nil {
+		return x.StateDirectory
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetKeyFile() string {
+	if x != nil {
+		return x.KeyFile
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetServerUrl() string {
+	if x != nil {
+		return x.ServerUrl
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetServerCaFile() string {
+	if x != nil {
+		return x.ServerCaFile
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetProvider() *DeviceActionProviderConfig {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+func (x *RecoveryRuntimeConfig) GetRootFile() string {
+	if x != nil {
+		return x.RootFile
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetBootstrapFile() string {
+	if x != nil {
+		return x.BootstrapFile
+	}
+	return ""
+}
+
+func (x *RecoveryRuntimeConfig) GetCertificateSha256() []byte {
+	if x != nil {
+		return x.CertificateSha256
+	}
+	return nil
+}
+
+func (x *RecoveryRuntimeConfig) GetCustody() RecoveryCustody {
+	if x != nil {
+		return x.Custody
+	}
+	return RecoveryCustody_RECOVERY_CUSTODY_UNSPECIFIED
+}
+
+func (x *RecoveryRuntimeConfig) GetBootstrapVerifiedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.BootstrapVerifiedAt
+	}
+	return nil
+}
+
+type RecoveryBootConfig struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	ImageFile               string                 `protobuf:"bytes,1,opt,name=image_file,json=imageFile,proto3" json:"image_file,omitempty"`
+	ImageSha256             []byte                 `protobuf:"bytes,2,opt,name=image_sha256,json=imageSha256,proto3" json:"image_sha256,omitempty"`
+	ImageSize               uint64                 `protobuf:"varint,3,opt,name=image_size,json=imageSize,proto3" json:"image_size,omitempty"`
+	SignerCertificateFile   string                 `protobuf:"bytes,4,opt,name=signer_certificate_file,json=signerCertificateFile,proto3" json:"signer_certificate_file,omitempty"`
+	SignerCertificateSha256 []byte                 `protobuf:"bytes,5,opt,name=signer_certificate_sha256,json=signerCertificateSha256,proto3" json:"signer_certificate_sha256,omitempty"`
+	EspDirectory            string                 `protobuf:"bytes,6,opt,name=esp_directory,json=espDirectory,proto3" json:"esp_directory,omitempty"`
+	StateDirectory          string                 `protobuf:"bytes,7,opt,name=state_directory,json=stateDirectory,proto3" json:"state_directory,omitempty"`
+	Custody                 RecoveryCustody        `protobuf:"varint,8,opt,name=custody,proto3,enum=lindm.agent.v1.RecoveryCustody" json:"custody,omitempty"`
+	ExpectedPcr11Sha256     []byte                 `protobuf:"bytes,9,opt,name=expected_pcr11_sha256,json=expectedPcr11Sha256,proto3" json:"expected_pcr11_sha256,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *RecoveryBootConfig) Reset() {
+	*x = RecoveryBootConfig{}
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryBootConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryBootConfig) ProtoMessage() {}
+
+func (x *RecoveryBootConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_config_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryBootConfig.ProtoReflect.Descriptor instead.
+func (*RecoveryBootConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_config_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RecoveryBootConfig) GetImageFile() string {
+	if x != nil {
+		return x.ImageFile
+	}
+	return ""
+}
+
+func (x *RecoveryBootConfig) GetImageSha256() []byte {
+	if x != nil {
+		return x.ImageSha256
+	}
+	return nil
+}
+
+func (x *RecoveryBootConfig) GetImageSize() uint64 {
+	if x != nil {
+		return x.ImageSize
+	}
+	return 0
+}
+
+func (x *RecoveryBootConfig) GetSignerCertificateFile() string {
+	if x != nil {
+		return x.SignerCertificateFile
+	}
+	return ""
+}
+
+func (x *RecoveryBootConfig) GetSignerCertificateSha256() []byte {
+	if x != nil {
+		return x.SignerCertificateSha256
+	}
+	return nil
+}
+
+func (x *RecoveryBootConfig) GetEspDirectory() string {
+	if x != nil {
+		return x.EspDirectory
+	}
+	return ""
+}
+
+func (x *RecoveryBootConfig) GetStateDirectory() string {
+	if x != nil {
+		return x.StateDirectory
+	}
+	return ""
+}
+
+func (x *RecoveryBootConfig) GetCustody() RecoveryCustody {
+	if x != nil {
+		return x.Custody
+	}
+	return RecoveryCustody_RECOVERY_CUSTODY_UNSPECIFIED
+}
+
+func (x *RecoveryBootConfig) GetExpectedPcr11Sha256() []byte {
+	if x != nil {
+		return x.ExpectedPcr11Sha256
+	}
+	return nil
+}
+
 var File_lindm_agent_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xba\x02\n" +
+	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a\x1blindm/agent/v1/update.proto\x1a&lindm/validation/v1/string_rules.proto\"\x95\x04\n" +
 	"\vAgentConfig\x122\n" +
 	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x126\n" +
 	"\x11runtime_directory\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10runtimeDirectory\x12=\n" +
 	"\vsocket_name\x18\x03 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18@2\x11^[A-Za-z0-9._-]+$R\n" +
 	"socketName\x12L\n" +
 	"\fnetwork_user\x18\x04 \x01(\tB)\xbaH&r$\x10\x01\x18 2\x18^[a-z_][a-z0-9_-]{0,31}$Z\x04rootR\vnetworkUser\x122\n" +
-	"\x0fspool_directory\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0espoolDirectoryB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\x0fspool_directory\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0espoolDirectory\x12S\n" +
+	"\x0faction_provider\x18\x06 \x01(\v2*.lindm.agent.v1.DeviceActionProviderConfigR\x0eactionProvider\x12G\n" +
+	"\rrecovery_boot\x18\a \x01(\v2\".lindm.agent.v1.RecoveryBootConfigR\frecoveryBoot\x12;\n" +
+	"\aupdates\x18\b \x01(\v2!.lindm.agent.v1.AgentUpdateConfigR\aupdates\"\xe1\x05\n" +
+	"\x1aDeviceActionProviderConfig\x12I\n" +
+	"\atargets\x18\x01 \x03(\v2%.lindm.agent.v1.QualifiedActionTargetB\b\xbaH\x05\x92\x01\x02\x10 R\atargets\x12,\n" +
+	"\x12allow_session_lock\x18\x02 \x01(\bR\x10allowSessionLock\x12)\n" +
+	"\x10allow_quarantine\x18\x03 \x01(\bR\x0fallowQuarantine\x12A\n" +
+	"\x14management_endpoints\x18\x04 \x03(\tB\x0e\xbaH\v\x92\x01\b\x10 \"\x04r\x02p\x01R\x13managementEndpoints\x12/\n" +
+	"\vdns_servers\x18\x05 \x03(\tB\x0e\xbaH\v\x92\x01\b\x10\b\"\x04r\x02p\x01R\n" +
+	"dnsServers\x127\n" +
+	"\x12quarantine_seconds\x18\x06 \x01(\rB\b\xbaH\x05*\x03\x18\xac\x02R\x11quarantineSeconds\x12:\n" +
+	"\x19protected_state_directory\x18\a \x01(\tR\x17protectedStateDirectory\x121\n" +
+	"\x14recovery_environment\x18\b \x01(\bR\x13recoveryEnvironment\x12>\n" +
+	"\x1callow_live_root_crypto_erase\x18\t \x01(\bR\x18allowLiveRootCryptoErase\x124\n" +
+	"\x16allow_recovery_handoff\x18\n" +
+	" \x01(\bR\x14allowRecoveryHandoff\x12,\n" +
+	"\x12allow_account_lock\x18\v \x01(\bR\x10allowAccountLock\x12_\n" +
+	"\x12protected_accounts\x18\f \x03(\tB0\xbaH-\x92\x01*\x10\x80\x01\x18\x01\"#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\x11protectedAccounts\"\x9f\x04\n" +
+	"\x15QualifiedActionTarget\x12=\n" +
+	"\x06target\x18\x01 \x01(\v2\x1d.lindm.agent.v1.StorageTargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12=\n" +
+	"\x16owner_recovery_keyslot\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18\x1fR\x14ownerRecoveryKeyslot\x126\n" +
+	"\x17allow_recovery_rotation\x18\x03 \x01(\bR\x15allowRecoveryRotation\x12,\n" +
+	"\x12allow_tpm2_binding\x18\x04 \x01(\bR\x10allowTpm2Binding\x12,\n" +
+	"\x12allow_crypto_erase\x18\x05 \x01(\bR\x10allowCryptoErase\x12'\n" +
+	"\x0fallow_overwrite\x18\x06 \x01(\bR\x0eallowOverwrite\x12#\n" +
+	"\rallow_discard\x18\a \x01(\bR\fallowDiscard\x123\n" +
+	"\x10qualification_id\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x0fqualificationId\x12q\n" +
+	"\x17native_sanitize_methods\x18\t \x03(\x0e2\x1e.lindm.agent.v1.SanitizeMethodB\x19\xbaH\x16\x92\x01\x13\x10\x04\x18\x01\"\r\x82\x01\n" +
+	"\x10\x01\x18\x03\x18\x04\x18\x05\x18\x06R\x15nativeSanitizeMethods\"\xbe\x06\n" +
+	"\x15RecoveryRuntimeConfig\x122\n" +
+	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x12'\n" +
+	"\bkey_file\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\akeyFile\x12+\n" +
+	"\n" +
+	"server_url\x18\x03 \x01(\tB\f\xbaH\tr\a\x80\xb5\x18\x01\x88\x01\x01R\tserverUrl\x12/\n" +
+	"\x0eserver_ca_file\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fserverCaFile\x12N\n" +
+	"\bprovider\x18\x06 \x01(\v2*.lindm.agent.v1.DeviceActionProviderConfigB\x06\xbaH\x03\xc8\x01\x01R\bprovider\x12&\n" +
+	"\troot_file\x18\a \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\brootFile\x120\n" +
+	"\x0ebootstrap_file\x18\b \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\x126\n" +
+	"\x12certificate_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\x12E\n" +
+	"\acustody\x18\n" +
+	" \x01(\x0e2\x1f.lindm.agent.v1.RecoveryCustodyB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\acustody\x12V\n" +
+	"\x15bootstrap_verified_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x13bootstrapVerifiedAt:\xcb\x01\xbaH\xc7\x01\x1a\xc4\x01\n" +
+	"\x18recovery_runtime.custody\x12Noff-target custody requires its key file; TPM custody cannot select a key file\x1aX(this.custody == 1 && this.key_file != '') || (this.custody == 2 && this.key_file == '')J\x04\b\x05\x10\x06R\x15recovery_image_sha256\"\xca\x05\n" +
+	"\x12RecoveryBootConfig\x12(\n" +
+	"\n" +
+	"image_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\timageFile\x12*\n" +
+	"\fimage_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\vimageSha256\x12,\n" +
+	"\n" +
+	"image_size\x18\x03 \x01(\x04B\r\xbaH\n" +
+	"2\b\x18\x80\x80\x80\x80\x04 \x00R\timageSize\x12A\n" +
+	"\x17signer_certificate_file\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x15signerCertificateFile\x12C\n" +
+	"\x19signer_certificate_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x17signerCertificateSha256\x12.\n" +
+	"\resp_directory\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fespDirectory\x122\n" +
+	"\x0fstate_directory\x18\a \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x12E\n" +
+	"\acustody\x18\b \x01(\x0e2\x1f.lindm.agent.v1.RecoveryCustodyB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\acustody\x12;\n" +
+	"\x15expected_pcr11_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02\x18 R\x13expectedPcr11Sha256:\xbf\x01\xbaH\xbb\x01\x1a\xb8\x01\n" +
+	"\x15recovery_boot.custody\x127TPM custody requires the exact qualified recovery PCR11\x1af(this.custody == 2 ? this.expected_pcr11_sha256.size() == 32 : this.expected_pcr11_sha256.size() == 0)B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_config_proto_rawDescOnce sync.Once
@@ -142,16 +706,35 @@ func file_lindm_agent_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_config_proto_rawDescData
 }
 
-var file_lindm_agent_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_lindm_agent_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_lindm_agent_v1_config_proto_goTypes = []any{
-	(*AgentConfig)(nil), // 0: lindm.agent.v1.AgentConfig
+	(*AgentConfig)(nil),                // 0: lindm.agent.v1.AgentConfig
+	(*DeviceActionProviderConfig)(nil), // 1: lindm.agent.v1.DeviceActionProviderConfig
+	(*QualifiedActionTarget)(nil),      // 2: lindm.agent.v1.QualifiedActionTarget
+	(*RecoveryRuntimeConfig)(nil),      // 3: lindm.agent.v1.RecoveryRuntimeConfig
+	(*RecoveryBootConfig)(nil),         // 4: lindm.agent.v1.RecoveryBootConfig
+	(*AgentUpdateConfig)(nil),          // 5: lindm.agent.v1.AgentUpdateConfig
+	(*StorageTarget)(nil),              // 6: lindm.agent.v1.StorageTarget
+	(SanitizeMethod)(0),                // 7: lindm.agent.v1.SanitizeMethod
+	(RecoveryCustody)(0),               // 8: lindm.agent.v1.RecoveryCustody
+	(*timestamppb.Timestamp)(nil),      // 9: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_config_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	4,  // 1: lindm.agent.v1.AgentConfig.recovery_boot:type_name -> lindm.agent.v1.RecoveryBootConfig
+	5,  // 2: lindm.agent.v1.AgentConfig.updates:type_name -> lindm.agent.v1.AgentUpdateConfig
+	2,  // 3: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
+	6,  // 4: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	7,  // 5: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
+	1,  // 6: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	8,  // 7: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	9,  // 8: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	8,  // 9: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_config_proto_init() }
@@ -159,13 +742,16 @@ func file_lindm_agent_v1_config_proto_init() {
 	if File_lindm_agent_v1_config_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_device_action_recovery_proto_init()
+	file_lindm_agent_v1_device_actions_proto_init()
+	file_lindm_agent_v1_update_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_config_proto_rawDesc), len(file_lindm_agent_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

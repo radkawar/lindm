@@ -49,7 +49,7 @@ func TestAuthorizationVersionTracksEffectiveRole(t *testing.T) {
 	for i, step := range steps {
 		t.Run(step.name, func(t *testing.T) {
 			obs := directoryObservation{
-				Found: step.found, UserID: subject, Enabled: step.enabled, Direct: step.direct,
+				Found: step.found, UserID: subject.String(), Enabled: step.enabled, Direct: step.direct,
 				Groups: step.groups, DisplayName: step.name, AcquiredAt: base.Add(time.Duration(i) * time.Second),
 			}
 			if err := applyAuthorizationObservation(ctx, svc, row.ID, obs); err != nil {
@@ -235,7 +235,11 @@ func TestAuthorizationOwnerPinInvalidatesAdminGrant(t *testing.T) {
 		if _, err := q.GetPrincipalForUpdate(ctx, admin.actorID); err != nil {
 			return err
 		}
-		n, err := q.PinOwnerRole(ctx, admin.actorID)
+		digest, err := bindingsDigest(svc.policy.bindings(RoleOwner, nil))
+		if err != nil {
+			return err
+		}
+		n, err := q.PinOwnerRole(ctx, identitydb.PinOwnerRoleParams{ID: admin.actorID, AuthorizationDigest: digest})
 		if err != nil {
 			return err
 		}
@@ -313,7 +317,7 @@ func TestLockAuthorizationFencesDurableMutation(t *testing.T) {
 	}{
 		{name: "valid"},
 		{name: "foreign issuing service", change: func(a *Authorization) {
-			a.service = &Service{pool: svc.pool, issuer: svc.issuer, adminGroups: svc.adminGroups, now: time.Now}
+			a.service = &Service{pool: svc.pool, issuer: svc.issuer, policy: svc.policy, now: time.Now}
 		}, want: ErrAuthorizationDenied},
 		{name: "unknown permission", change: func(a *Authorization) { a.permission = Permission("unknown.permission") }, want: ErrAuthorizationDenied},
 		{name: "read approval cannot revoke a device", change: func(a *Authorization) { a.permission = PermissionReadFleet }, want: ErrAuthorizationDenied},
@@ -633,11 +637,17 @@ func authorizationFromSnapshot(t *testing.T, ctx context.Context, svc *Service, 
 	if !snap.Enabled || !snap.Qualified || snap.Deactivated || snap.AuthorizationRole == "" {
 		t.Fatalf("authorization fixture is not qualified: %+v", snap)
 	}
+	principal := svc.snapshotPrincipal(snap, snap.AuthorizationRole)
+	digest, err := bindingsDigest(principal.Bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &Authorization{
 		service: svc, actorID: actor, role: snap.AuthorizationRole,
 		permission: PermissionRevokeDevice, version: snap.AuthorizationVersion,
 		observedAt: snap.ObservedAt, expiresAt: snap.ObservedAt.Add(30 * time.Second),
 		monotonicDeadline: time.Now().Add(30 * time.Second),
+		principal:         clonePrincipal(principal), bindingsDigest: digest,
 	}
 }
 

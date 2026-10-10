@@ -35,7 +35,12 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 	if _, err := parseUUID(claim.GetIncarnation()); err != nil {
 		return nil, errAuthorityRejected
 	}
-	if _, err := parseUUID(claim.GetBootId()); err != nil {
+	bootID, err := parseUUID(claim.GetBootId())
+	if err != nil {
+		return nil, errAuthorityRejected
+	}
+	installationID, err := parseUUID(claim.GetInstallationId())
+	if err != nil {
 		return nil, errAuthorityRejected
 	}
 	digest := sha256.Sum256(req.Msg.GetAuthorityProof())
@@ -58,6 +63,17 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 			response = &devicev1.AcquireSessionResponse{SessionEpoch: uint64(receipt.SessionEpoch), HostSequence: uint64(receipt.HostSequence), PackageSequence: uint64(receipt.PackageSequence), ServerTime: timestamppb.New(acceptedAt)}
 			return nil
 		}
+		installation, installationErr := q.GetEnrollmentInstallation(ctx, principal.GenerationID)
+		if installationErr != nil && installationErr != pgx.ErrNoRows {
+			return installationErr
+		}
+		if installationErr == nil && installation.InstallationID != installationID {
+			if err := holdClonedIdentity(ctx, q, principal, "conflicting_installation_identity"); err != nil {
+				return err
+			}
+			held = true
+			return nil
+		}
 		// DSSE's outer JSON encoding is not signed. A changed encoding of an
 		// existing request must conflict, not let the transport manufacture a
 		// second protected successor claim and place the device in clone hold.
@@ -69,13 +85,7 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 		if predecessor < current {
 			// The denial is returned only after commit. Returning it from this
 			// transaction would roll back the durable ambiguity fence and audit.
-			if err := q.HoldDevice(ctx, principal.DeviceID); err != nil {
-				return err
-			}
-			if err := q.HoldGeneration(ctx, principal.GenerationID); err != nil {
-				return err
-			}
-			if err := insertAudit(ctx, q, nil, actionDeviceRecoveryHold, principal.DeviceID.String(), "consumed_session_predecessor"); err != nil {
+			if err := holdClonedIdentity(ctx, q, principal, "consumed_session_predecessor"); err != nil {
 				return err
 			}
 			held = true
@@ -87,6 +97,15 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 		if current >= maxSessionReceipts {
 			return errReceiptCapacity
 		}
+		bound, err := q.PutEnrollmentSessionInstallation(ctx, devicedb.PutEnrollmentSessionInstallationParams{
+			GenerationID: principal.GenerationID, InstallationID: installationID, BootID: &bootID,
+		})
+		if err != nil {
+			return err
+		}
+		if bound != 1 {
+			return errInternalState
+		}
 		next := current + 1
 		if err := q.InsertSessionReceipt(ctx, devicedb.InsertSessionReceiptParams{
 			GenerationID: principal.GenerationID, RequestID: requestID, RequestDigest: digest[:],
@@ -96,6 +115,13 @@ func (s *Service) AcquireSession(ctx context.Context, req *connect.Request[devic
 			return err
 		}
 		if err := q.AdvanceSessionEpoch(ctx, devicedb.AdvanceSessionEpochParams{SessionEpoch: next, ID: principal.GenerationID}); err != nil {
+			return err
+		}
+		if err := q.PutDeviceReleaseReport(ctx, devicedb.PutDeviceReleaseReportParams{
+			GenerationID: principal.GenerationID, SessionEpoch: next,
+			AgentRelease: claim.GetAgentRelease(), ProtocolVersion: int32(claim.GetAgentProtocolVersion()),
+			ReportedAt: timestamptz(authority.now),
+		}); err != nil {
 			return err
 		}
 		if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(authority.now), ID: principal.DeviceID}); err != nil {
@@ -148,4 +174,14 @@ func (s *Service) authorityBinding(deployment, deviceID, generation string, prin
 	// UUID parsers accept equivalent noncanonical encodings, but signed identity
 	// authority uses only the canonical strings delivered at enrollment.
 	return deployment == s.deploymentID.String() && deviceID == principal.DeviceID.String() && generation == principal.GenerationID.String()
+}
+
+func holdClonedIdentity(ctx context.Context, q *devicedb.Queries, principal devicePrincipal, reason string) error {
+	if err := q.HoldDevice(ctx, principal.DeviceID); err != nil {
+		return err
+	}
+	if err := q.HoldGeneration(ctx, principal.GenerationID); err != nil {
+		return err
+	}
+	return insertAudit(ctx, q, nil, actionDeviceRecoveryHold, principal.DeviceID.String(), reason)
 }

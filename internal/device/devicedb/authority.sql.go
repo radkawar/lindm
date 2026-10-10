@@ -64,7 +64,8 @@ type GetGenerationAuthorityRow struct {
 	CurrentSnapshotID      *uuid.UUID
 }
 
-// All authority reads/writes below are performed after GetDeviceForUpdate.
+// Authority writes serialize after GetDeviceForUpdate. Read-only polling may
+// read authority in a REPEATABLE READ, READ ONLY transaction instead.
 func (q *Queries) GetGenerationAuthority(ctx context.Context, id uuid.UUID) (GetGenerationAuthorityRow, error) {
 	row := q.db.QueryRow(ctx, getGenerationAuthority, id)
 	var i GetGenerationAuthorityRow

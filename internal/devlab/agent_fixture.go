@@ -22,10 +22,25 @@ type AgentFixture struct {
 // ReadAgentFixture verifies existing protected trust; it does not initialize or
 // replace trust. Run the explicit development trust command before using it.
 func ReadAgentFixture(ctx context.Context, repoRoot string) (*AgentFixture, error) {
+	return readAgentFixture(ctx, repoRoot, true)
+}
+
+// ReadPublicAgentFixture verifies immutable development provisioning trust and
+// certificate bindings without interpreting the shared server configuration.
+// Isolated labs generate a current-schema configuration of their own.
+func ReadPublicAgentFixture(ctx context.Context, repoRoot string) (*AgentFixture, error) {
+	return readAgentFixture(ctx, repoRoot, false)
+}
+
+func readAgentFixture(ctx context.Context, repoRoot string, checkServer bool) (*AgentFixture, error) {
 	var result *AgentFixture
 	err := locked(ctx, repoRoot, func(root string) error {
 		fixture := FixturePath(root)
-		if err := validateFixture(fixture); err != nil {
+		validate := validateAuthorityFixture
+		if checkServer {
+			validate = validateFixture
+		}
+		if err := validate(fixture); err != nil {
 			return err
 		}
 		authority, err := trust.New()
@@ -33,8 +48,19 @@ func ReadAgentFixture(ctx context.Context, repoRoot string) (*AgentFixture, erro
 			return err
 		}
 		dir := filepath.Join(fixture, "agent-trust")
-		if err := verifyDevelopmentTrust(ctx, authority, dir); err != nil {
-			return err
+		if checkServer {
+			if err := verifyDevelopmentTrust(ctx, authority, dir); err != nil {
+				return err
+			}
+		} else {
+			if err := protected(dir, true); err != nil {
+				return err
+			}
+			for _, name := range []string{"execution-root.json", "bootstrap.dsse.json"} {
+				if err := protected(filepath.Join(dir, name), false); err != nil {
+					return err
+				}
+			}
 		}
 		execution, err := os.ReadFile(filepath.Join(dir, "execution-root.json"))
 		if err != nil {
@@ -48,9 +74,14 @@ func ReadAgentFixture(ctx context.Context, repoRoot string) (*AgentFixture, erro
 		if err != nil {
 			return err
 		}
-		document, err := config.Load(filepath.Join(fixture, "server.json"))
-		if err != nil {
-			return err
+		if checkServer {
+			document, err := config.Load(filepath.Join(fixture, "server.json"))
+			if err != nil {
+				return err
+			}
+			if verified.Bundle.GetDeploymentId() != document.Proto.GetDeploymentId() || verified.Bundle.GetEnrollmentOrigin() != document.Proto.GetPublicUrl() {
+				return errors.New("existing agent trust does not bind the development server configuration")
+			}
 		}
 		transport, err := os.ReadFile(filepath.Join(fixture, "transport-ca.crt"))
 		if err != nil {
@@ -60,7 +91,7 @@ func ReadAgentFixture(ctx context.Context, repoRoot string) (*AgentFixture, erro
 		if err != nil {
 			return err
 		}
-		if verified.Bundle.GetDeploymentId() != document.Proto.GetDeploymentId() || verified.Bundle.GetEnrollmentOrigin() != consoleOrigin || verified.Bundle.GetEnrollmentOrigin() != document.Proto.GetPublicUrl() || verified.Bundle.GetDeviceOrigin() != "https://localhost:18445" || !bytes.Equal(verified.Bundle.GetTransportCaPem(), transport) || !bytes.Equal(verified.Bundle.GetDeviceCaPem(), device) {
+		if verified.Bundle.GetEnrollmentOrigin() != consoleOrigin || verified.Bundle.GetDeviceOrigin() != "https://localhost:18445" || !bytes.Equal(verified.Bundle.GetTransportCaPem(), transport) || !bytes.Equal(verified.Bundle.GetDeviceCaPem(), device) {
 			return errors.New("existing agent trust does not bind the development fixture")
 		}
 		result = &AgentFixture{ExecutionRootJSON: execution, BootstrapEnvelope: bundle}

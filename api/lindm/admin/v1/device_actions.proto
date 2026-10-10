@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_actions.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Immutable imperative action, never a desired-state assignment or retry policy.
+message DeviceAction {
+  string action_id = 1;
+  string device_id = 2;
+  string enrollment_generation = 3;
+  lindm.agent.v1.DeviceActionSpec spec = 4;
+  string actor_id = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  lindm.agent.v1.DeviceActionStatus status = 8;
+  string closed_reason = 9;
+  uint64 action_revision = 10;
+}
+message CreateDeviceActionRequest {
+  string request_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string device_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string enrollment_generation = 3 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  lindm.agent.v1.DeviceActionSpec spec = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).required = true];
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string approval_id = 7 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+message CreateDeviceActionResponse {
+  DeviceAction action = 1 [(buf.validate.field).required = true];
+}
+message GetDeviceActionsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 3 [(buf.validate.field).string.max_len = 512];
+}
+message GetDeviceActionsResponse {
+  repeated DeviceAction actions = 1;
+  string next_page_token = 2;
+  // Server restriction fences, not a fresh observation of native session state.
+  bool sessions_locked = 3;
+  bool quarantined = 4;
+  // Conservative server expiry includes the start-grant and native timeout.
+  google.protobuf.Timestamp quarantine_until = 5;
+  // Original lock owning the conservative fence; release never unlocks a screen.
+  string lock_action_id = 6;
+}
+message GetDeviceActionRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetDeviceActionResponse {
+  DeviceAction action = 1 [(buf.validate.field).required = true];
+}
+message GetDeviceEncryptionRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  // When set, select evidence and escrow for this exact volume only.
+  string luks_uuid = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+message DeviceRecoveryEscrow {
+  string action_id = 1;
+  string luks_uuid = 2;
+  uint32 keyslot = 3;
+  google.protobuf.Timestamp stored_at = 4;
+  // Custody only; does not imply the old managed keyslot was retired.
+  bool retirement_confirmed = 5;
+}
+message GetDeviceEncryptionResponse {
+  lindm.agent.v1.DeviceActionObservation observation = 1;
+  DeviceRecoveryEscrow escrow = 2;
+  string escrow_key_id = 3;
+  bytes escrow_public_key = 4;
+}
+// Requires dedicated permission, recent step-up, reason and audited custody access.
+// Return bytes must remain memory-only, outside query caches, URLs and logs.
+message RevealRecoveryKeyRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string action_id = 3 [(buf.validate.field).string.uuid = true];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string approval_id = 5 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+}
+message RevealRecoveryKeyResponse {
+  bytes recovery_key = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 4096
+  }];
+}

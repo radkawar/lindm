@@ -126,11 +126,19 @@ INSERT INTO snapshot_packages (
     name,
     version,
     architecture,
-    manager
-) VALUES ($1, $2, $3, $4, $5, $6);
+    manager,
+    source_name,
+    source_version,
+    module_status,
+    module_name,
+    module_stream,
+    module_version,
+    module_context
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
 
 -- name: ListSnapshotPackages :many
-SELECT position, name, version, architecture, manager
+SELECT position, name, version, architecture, manager, source_name, source_version,
+       module_status, module_name, module_stream, module_version, module_context
 FROM snapshot_packages
 WHERE snapshot_id = sqlc.arg('snapshot_id')
   AND position >= sqlc.arg('next_position')
@@ -256,7 +264,8 @@ INSERT INTO host_observations (
     hardware_model_status,
     hardware_model_value,
     hardware_serial_status,
-    hardware_serial_value
+    hardware_serial_value,
+    details
 ) VALUES (
     sqlc.arg('generation_id'),
     sqlc.arg('sequence'),
@@ -281,7 +290,8 @@ INSERT INTO host_observations (
     sqlc.arg('hardware_model_status'),
     sqlc.arg('hardware_model_value'),
     sqlc.arg('hardware_serial_status'),
-    sqlc.arg('hardware_serial_value')
+    sqlc.arg('hardware_serial_value'),
+    sqlc.arg('details')
 )
 ON CONFLICT (generation_id) DO UPDATE SET
     sequence = EXCLUDED.sequence,
@@ -306,7 +316,8 @@ ON CONFLICT (generation_id) DO UPDATE SET
     hardware_model_status = EXCLUDED.hardware_model_status,
     hardware_model_value = EXCLUDED.hardware_model_value,
     hardware_serial_status = EXCLUDED.hardware_serial_status,
-    hardware_serial_value = EXCLUDED.hardware_serial_value;
+    hardware_serial_value = EXCLUDED.hardware_serial_value,
+    details = EXCLUDED.details;
 
 -- name: GetHostObservation :one
 SELECT
@@ -332,7 +343,8 @@ SELECT
     hardware_model_status,
     hardware_model_value,
     hardware_serial_status,
-    hardware_serial_value
+    hardware_serial_value,
+    details
 FROM host_observations
 WHERE generation_id = sqlc.arg('generation_id');
 

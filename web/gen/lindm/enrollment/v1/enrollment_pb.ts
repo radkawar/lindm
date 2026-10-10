@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/enrollment/v1/enrollment.proto.
  */
 export const file_lindm_enrollment_v1_enrollment: GenFile = /*@__PURE__*/
-  fileDesc("CiRsaW5kbS9lbnJvbGxtZW50L3YxL2Vucm9sbG1lbnQucHJvdG8SE2xpbmRtLmVucm9sbG1lbnQudjEicQoNRW5yb2xsUmVxdWVzdBIgCgxncmFudF9zZWNyZXQYASABKAlCCrpIB3IFECAYgAISIAoOdHJhbnNhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEhwKB2Nzcl9wZW0YAyABKAxCC7pICHoGEEAYgIABIosBCg5FbnJvbGxSZXNwb25zZRIRCglkZXZpY2VfaWQYASABKAkSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEhcKD2NlcnRpZmljYXRlX3BlbRgDIAEoDBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI/ChdSZXRyaWV2ZUlzc3VhbmNlUmVxdWVzdBIkCg9hdXRob3JpdHlfcHJvb2YYASABKAxCC7pICHoGEAEYgIABImMKGFJldHJpZXZlSXNzdWFuY2VSZXNwb25zZRIXCg9jZXJ0aWZpY2F0ZV9wZW0YASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAy1wEKEUVucm9sbG1lbnRTZXJ2aWNlElEKBkVucm9sbBIiLmxpbmRtLmVucm9sbG1lbnQudjEuRW5yb2xsUmVxdWVzdBojLmxpbmRtLmVucm9sbG1lbnQudjEuRW5yb2xsUmVzcG9uc2USbwoQUmV0cmlldmVJc3N1YW5jZRIsLmxpbmRtLmVucm9sbG1lbnQudjEuUmV0cmlldmVJc3N1YW5jZVJlcXVlc3QaLS5saW5kbS5lbnJvbGxtZW50LnYxLlJldHJpZXZlSXNzdWFuY2VSZXNwb25zZUIsWipsaW5kbS9nZW4vbGluZG0vZW5yb2xsbWVudC92MTtlbnJvbGxtZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiRsaW5kbS9lbnJvbGxtZW50L3YxL2Vucm9sbG1lbnQucHJvdG8SE2xpbmRtLmVucm9sbG1lbnQudjEicQoNRW5yb2xsUmVxdWVzdBIgCgxncmFudF9zZWNyZXQYASABKAlCCrpIB3IFECAYgAISIAoOdHJhbnNhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEhwKB2Nzcl9wZW0YAyABKAxCC7pICHoGEEAYgIABIosBCg5FbnJvbGxSZXNwb25zZRIRCglkZXZpY2VfaWQYASABKAkSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEhcKD2NlcnRpZmljYXRlX3BlbRgDIAEoDBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCI/ChdSZXRyaWV2ZUlzc3VhbmNlUmVxdWVzdBIkCg9hdXRob3JpdHlfcHJvb2YYASABKAxCC7pICHoGEAEYgIABImMKGFJldHJpZXZlSXNzdWFuY2VSZXNwb25zZRIXCg9jZXJ0aWZpY2F0ZV9wZW0YASABKAwSLgoKZXhwaXJlc19hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAioAEKEFByb3Zpc2lvblJlcXVlc3QSKQoScHJvdmlzaW9uaW5nX3Rva2VuGAEgASgJQg26SArYAQFyBRAgGIACEiAKDnRyYW5zYWN0aW9uX2lkGAIgASgJQgi6SAVyA7ABARIcCgdjc3JfcGVtGAMgASgMQgu6SAh6BhBAGICAARIhCg9pbnN0YWxsYXRpb25faWQYBCABKAlCCLpIBXIDsAEBIp0BChFQcm92aXNpb25SZXNwb25zZRIRCglkZXZpY2VfaWQYASABKAkSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEg0KBXN0YXRlGAMgASgJEhcKD2NlcnRpZmljYXRlX3BlbRgEIAEoDBIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJLCiNSZXRyaWV2ZVByb3Zpc2lvbmluZ0lzc3VhbmNlUmVxdWVzdBIkCg9hdXRob3JpdHlfcHJvb2YYASABKAxCC7pICHoGEAEYgIABImoKJFJldHJpZXZlUHJvdmlzaW9uaW5nSXNzdWFuY2VSZXNwb25zZRJCCgplbnJvbGxtZW50GAEgASgLMiYubGluZG0uZW5yb2xsbWVudC52MS5Qcm92aXNpb25SZXNwb25zZUIGukgDyAEBIpoBChVQcm92aXNpb25pbmdSZXRyaWV2YWwSHwoNZGVwbG95bWVudF9pZBgBIAEoCUIIukgFcgOwAQESIAoOdHJhbnNhY3Rpb25faWQYAiABKAlCCLpIBXIDsAEBEiEKD2luc3RhbGxhdGlvbl9pZBgDIAEoCUIIukgFcgOwAQESGwoKY3NyX3NoYTI1NhgEIAEoDEIHukgEegJoIDLJAwoRRW5yb2xsbWVudFNlcnZpY2USUQoGRW5yb2xsEiIubGluZG0uZW5yb2xsbWVudC52MS5FbnJvbGxSZXF1ZXN0GiMubGluZG0uZW5yb2xsbWVudC52MS5FbnJvbGxSZXNwb25zZRJvChBSZXRyaWV2ZUlzc3VhbmNlEiwubGluZG0uZW5yb2xsbWVudC52MS5SZXRyaWV2ZUlzc3VhbmNlUmVxdWVzdBotLmxpbmRtLmVucm9sbG1lbnQudjEuUmV0cmlldmVJc3N1YW5jZVJlc3BvbnNlEloKCVByb3Zpc2lvbhIlLmxpbmRtLmVucm9sbG1lbnQudjEuUHJvdmlzaW9uUmVxdWVzdBomLmxpbmRtLmVucm9sbG1lbnQudjEuUHJvdmlzaW9uUmVzcG9uc2USkwEKHFJldHJpZXZlUHJvdmlzaW9uaW5nSXNzdWFuY2USOC5saW5kbS5lbnJvbGxtZW50LnYxLlJldHJpZXZlUHJvdmlzaW9uaW5nSXNzdWFuY2VSZXF1ZXN0GjkubGluZG0uZW5yb2xsbWVudC52MS5SZXRyaWV2ZVByb3Zpc2lvbmluZ0lzc3VhbmNlUmVzcG9uc2VCLFoqbGluZG0vZ2VuL2xpbmRtL2Vucm9sbG1lbnQvdjE7ZW5yb2xsbWVudHYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message lindm.enrollment.v1.EnrollRequest
@@ -114,6 +114,145 @@ export const RetrieveIssuanceResponseSchema: GenMessage<RetrieveIssuanceResponse
   messageDesc(file_lindm_enrollment_v1_enrollment, 3);
 
 /**
+ * @generated from message lindm.enrollment.v1.ProvisionRequest
+ */
+export type ProvisionRequest = Message<"lindm.enrollment.v1.ProvisionRequest"> & {
+  /**
+   * Absent only on the internal verified offline-import adapter.
+   *
+   * @generated from field: string provisioning_token = 1;
+   */
+  provisioningToken: string;
+
+  /**
+   * @generated from field: string transaction_id = 2;
+   */
+  transactionId: string;
+
+  /**
+   * @generated from field: bytes csr_pem = 3;
+   */
+  csrPem: Uint8Array;
+
+  /**
+   * @generated from field: string installation_id = 4;
+   */
+  installationId: string;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.ProvisionRequest.
+ * Use `create(ProvisionRequestSchema)` to create a new message.
+ */
+export const ProvisionRequestSchema: GenMessage<ProvisionRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 4);
+
+/**
+ * @generated from message lindm.enrollment.v1.ProvisionResponse
+ */
+export type ProvisionResponse = Message<"lindm.enrollment.v1.ProvisionResponse"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string enrollment_generation = 2;
+   */
+  enrollmentGeneration: string;
+
+  /**
+   * pending_approval carries no certificate or agent authority.
+   *
+   * @generated from field: string state = 3;
+   */
+  state: string;
+
+  /**
+   * @generated from field: bytes certificate_pem = 4;
+   */
+  certificatePem: Uint8Array;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 5;
+   */
+  expiresAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.ProvisionResponse.
+ * Use `create(ProvisionResponseSchema)` to create a new message.
+ */
+export const ProvisionResponseSchema: GenMessage<ProvisionResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 5);
+
+/**
+ * @generated from message lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest
+ */
+export type RetrieveProvisioningIssuanceRequest = Message<"lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest"> & {
+  /**
+   * @generated from field: bytes authority_proof = 1;
+   */
+  authorityProof: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest.
+ * Use `create(RetrieveProvisioningIssuanceRequestSchema)` to create a new message.
+ */
+export const RetrieveProvisioningIssuanceRequestSchema: GenMessage<RetrieveProvisioningIssuanceRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 6);
+
+/**
+ * @generated from message lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse
+ */
+export type RetrieveProvisioningIssuanceResponse = Message<"lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse"> & {
+  /**
+   * @generated from field: lindm.enrollment.v1.ProvisionResponse enrollment = 1;
+   */
+  enrollment?: ProvisionResponse | undefined;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse.
+ * Use `create(RetrieveProvisioningIssuanceResponseSchema)` to create a new message.
+ */
+export const RetrieveProvisioningIssuanceResponseSchema: GenMessage<RetrieveProvisioningIssuanceResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 7);
+
+/**
+ * @generated from message lindm.enrollment.v1.ProvisioningRetrieval
+ */
+export type ProvisioningRetrieval = Message<"lindm.enrollment.v1.ProvisioningRetrieval"> & {
+  /**
+   * @generated from field: string deployment_id = 1;
+   */
+  deploymentId: string;
+
+  /**
+   * @generated from field: string transaction_id = 2;
+   */
+  transactionId: string;
+
+  /**
+   * @generated from field: string installation_id = 3;
+   */
+  installationId: string;
+
+  /**
+   * @generated from field: bytes csr_sha256 = 4;
+   */
+  csrSha256: Uint8Array;
+};
+
+/**
+ * Describes the message lindm.enrollment.v1.ProvisioningRetrieval.
+ * Use `create(ProvisioningRetrievalSchema)` to create a new message.
+ */
+export const ProvisioningRetrievalSchema: GenMessage<ProvisioningRetrieval> = /*@__PURE__*/
+  messageDesc(file_lindm_enrollment_v1_enrollment, 8);
+
+/**
  * @generated from service lindm.enrollment.v1.EnrollmentService
  */
 export const EnrollmentService: GenService<{
@@ -132,6 +271,22 @@ export const EnrollmentService: GenService<{
     methodKind: "unary";
     input: typeof RetrieveIssuanceRequestSchema;
     output: typeof RetrieveIssuanceResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.enrollment.v1.EnrollmentService.Provision
+   */
+  provision: {
+    methodKind: "unary";
+    input: typeof ProvisionRequestSchema;
+    output: typeof ProvisionResponseSchema;
+  },
+  /**
+   * @generated from rpc lindm.enrollment.v1.EnrollmentService.RetrieveProvisioningIssuance
+   */
+  retrieveProvisioningIssuance: {
+    methodKind: "unary";
+    input: typeof RetrieveProvisioningIssuanceRequestSchema;
+    output: typeof RetrieveProvisioningIssuanceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_lindm_enrollment_v1_enrollment, 0);

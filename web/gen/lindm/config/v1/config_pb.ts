@@ -7,6 +7,10 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Duration } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_duration } from "@bufbuild/protobuf/wkt";
+import type { FeedSource } from "../../advisory/v1/feed_pb.js";
+import { file_lindm_advisory_v1_feed } from "../../advisory/v1/feed_pb.js";
+import type { AuthorizationPolicy } from "../../auth/v1/authorization_pb.js";
+import { file_lindm_auth_v1_authorization } from "../../auth/v1/authorization_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -14,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/config/v1/config.proto.
  */
 export const file_lindm_config_v1_config: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEi3AoKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEkUKDmF1dGhlbnRpY2F0aW9uGAggASgLMiUubGluZG0uY29uZmlnLnYxLkF1dGhlbnRpY2F0aW9uQ29uZmlnQga6SAPIAQESIQoPdHJ1c3RlZF9jYV9maWxlGAkgASgJQgi6SAVyAxiAIBI5ChZpbnZlbnRvcnlfYnVkZ2V0X2J5dGVzGAogASgEQhS6SBEyDxj//////////38ogICAIEgAiAEBEiwKEWRldmljZV9wdWJsaWNfdXJsGAsgASgJQgy6SAlyB4C1GAGIAQFIAYgBARJGChNleGVjdXRpb25fYm9vdHN0cmFwGAwgASgLMikubGluZG0uY29uZmlnLnYxLkV4ZWN1dGlvbkJvb3RzdHJhcENvbmZpZxJCChFleGVjdXRpb25fc2lnbmluZxgNIAEoCzInLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25TaWduaW5nQ29uZmlnEjYKC2JyZWFrX2dsYXNzGA4gASgLMiEubGluZG0uY29uZmlnLnYxLkJyZWFrR2xhc3NQb2xpY3k67wO6SOsDGrIBChJsaXN0ZW5lcnMuZGlzdGluY3QSNGFkbWluaXN0cmF0aXZlIGFuZCBkZXZpY2UgbGlzdGVuZXJzIG11c3QgYmUgZGlzdGluY3QaZiFoYXModGhpcy5hZG1pbl9saXN0ZW5lcikgfHwgIWhhcyh0aGlzLmRldmljZV9saXN0ZW5lcikgfHwgdGhpcy5hZG1pbl9saXN0ZW5lciAhPSB0aGlzLmRldmljZV9saXN0ZW5lchqPAQobZXhlY3V0aW9uX3NpZ25pbmcuYm9vdHN0cmFwEjFleGVjdXRpb24gc2lnbmluZyByZXF1aXJlcyBhbiBleGVjdXRpb24gYm9vdHN0cmFwGj0haGFzKHRoaXMuZXhlY3V0aW9uX3NpZ25pbmcpIHx8IGhhcyh0aGlzLmV4ZWN1dGlvbl9ib290c3RyYXApGqEBCiFleGVjdXRpb25fYm9vdHN0cmFwLmRldmljZV9vcmlnaW4SPWV4ZWN1dGlvbiBib290c3RyYXAgcmVxdWlyZXMgYW4gZXhwbGljaXQgcHVibGljIGRldmljZSBvcmlnaW4aPSFoYXModGhpcy5leGVjdXRpb25fYm9vdHN0cmFwKSB8fCBoYXModGhpcy5kZXZpY2VfcHVibGljX3VybClCGQoXX2ludmVudG9yeV9idWRnZXRfYnl0ZXNCFAoSX2RldmljZV9wdWJsaWNfdXJsIlsKGEV4ZWN1dGlvbkJvb3RzdHJhcENvbmZpZxIcCglyb290X2ZpbGUYASABKAlCCbpIBnIEkLUYARIhCg5ib290c3RyYXBfZmlsZRgCIAEoCUIJukgGcgSQtRgBIukBChZFeGVjdXRpb25TaWduaW5nQ29uZmlnEiAKDXBsYW5fa2V5X2ZpbGUYASABKAlCCbpIBnIEkLUYARIhCg5zdGFydF9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBOokBukiFARqCAQogZXhlY3V0aW9uX3NpZ25pbmcuZGlzdGluY3RfZmlsZXMSM3BsYW4gYW5kIHN0YXJ0IHNpZ25pbmcga2V5cyBtdXN0IHVzZSBkaXN0aW5jdCBmaWxlcxopdGhpcy5wbGFuX2tleV9maWxlICE9IHRoaXMuc3RhcnRfa2V5X2ZpbGUiRQoOTGlzdGVuZXJDb25maWcSGAoHYWRkcmVzcxgBIAEoCUIHukgEcgJwARIZCgRwb3J0GAIgASgNQgu6SAgqBhj//wMoASKVAQoORGF0YWJhc2VDb25maWcSGwoIdXJsX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjCg9tYXhfY29ubmVjdGlvbnMYAiABKA1CCrpIByoFGIACKAISKgoSbWlncmF0aW9uX3VybF9maWxlGAMgASgJQgm6SAZyBJC1GAFIAIgBAUIVChNfbWlncmF0aW9uX3VybF9maWxlIlUKCVRMU0NvbmZpZxIjChBjZXJ0aWZpY2F0ZV9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoQcHJpdmF0ZV9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBIloKDkRldmljZUNBQ29uZmlnEiMKEGNlcnRpZmljYXRlX2ZpbGUYASABKAlCCbpIBnIEkLUYARIjChBwcml2YXRlX2tleV9maWxlGAIgASgJQgm6SAZyBJC1GAEiyQEKFEF1dGhlbnRpY2F0aW9uQ29uZmlnEjUKBWxvY2FsGAEgASgLMiQubGluZG0uY29uZmlnLnYxLkxvY2FsQXV0aGVudGljYXRpb25IABI2CghrZXljbG9haxgCIAEoCzIiLmxpbmRtLmNvbmZpZy52MS5LZXljbG9ha0RpcmVjdG9yeUgAEjAKBWVudHJhGAMgASgLMh8ubGluZG0uY29uZmlnLnYxLkVudHJhRGlyZWN0b3J5SABCEAoHcHJpbWFyeRIFukgCCAEiFQoTTG9jYWxBdXRoZW50aWNhdGlvbiKMAwoRS2V5Y2xvYWtEaXJlY3RvcnkSHAoGaXNzdWVyGAEgASgJQgy6SAlyB4i1GAGIAQESHQoJY2xpZW50X2lkGAIgASgJQgq6SAdyBRABGIACEiUKEmNsaWVudF9zZWNyZXRfZmlsZRgDIAEoCUIJukgGcgSQtRgBEicKE2RpcmVjdG9yeV9jbGllbnRfaWQYBCABKAlCCrpIB3IFEAEYgAISLwocZGlyZWN0b3J5X2NsaWVudF9zZWNyZXRfZmlsZRgFIAEoCUIJukgGcgSQtRgBEjQKFGFkbWluaXN0cmF0b3JfZ3JvdXBzGAYgAygJQha6SBOSARAQZBgBIgpyCBACGIAEOgEvOoIBukh/Gn0KGWtleWNsb2FrLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZCK6BAoORW50cmFEaXJlY3RvcnkSQQoJdGVuYW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKCWNsaWVudF9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIlChJjbGllbnRfc2VjcmV0X2ZpbGUYAyABKAlCCbpIBnIEkLUYARJLChNkaXJlY3RvcnlfY2xpZW50X2lkGAQgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEi8KHGRpcmVjdG9yeV9jbGllbnRfc2VjcmV0X2ZpbGUYBSABKAlCCbpIBnIEkLUYARJfCh5hZG1pbmlzdHJhdG9yX2dyb3VwX29iamVjdF9pZHMYBiADKAlCN7pINJIBMRBkGAEiK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQE6mwG6SJcBGpQBChZlbnRyYS5zZXBhcmF0ZV9jbGllbnRzEjRsb2dpbiBhbmQgZGlyZWN0b3J5IGFjY2VzcyBtdXN0IHVzZSBzZXBhcmF0ZSBjbGllbnRzGkR0aGlzLmNsaWVudF9pZC5sb3dlckFzY2lpKCkgIT0gdGhpcy5kaXJlY3RvcnlfY2xpZW50X2lkLmxvd2VyQXNjaWkoKSLXAgoQQnJlYWtHbGFzc1BvbGljeRK3AQoTYWxsb3dlZF9wZXJtaXNzaW9ucxgBIAMoCUKZAbpIlQGSAZEBCAEQCBgBIogBcoUBUgpmbGVldC5yZWFkUhFlbnJvbGxtZW50Lm1hbmFnZVINZGV2aWNlLnJldm9rZVIKYXVkaXQucmVhZFIWZXhlY3V0aW9uX3RydXN0Lm1hbmFnZVIPcHJvZmlsZXMubWFuYWdlUg9zZXJ2aWNlcy5hc3NpZ25SD2FjY291bnRzLm1hbmFnZRIUCgxjb25zb2xlX29ubHkYAiABKAgSSQoUbWF4X3Nlc3Npb25fbGlmZXRpbWUYAyABKAsyGS5nb29nbGUucHJvdG9idWYuRHVyYXRpb25CELpIDcgBAaoBByIDCJAcKgASKAoXcmVxdWlyZV9pbmNpZGVudF9yZWFzb24YBCABKAhCB7pIBGoCCAFCJFoibGluZG0vZ2VuL2xpbmRtL2NvbmZpZy92MTtjb25maWd2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_duration, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChxsaW5kbS9jb25maWcvdjEvY29uZmlnLnByb3RvEg9saW5kbS5jb25maWcudjEi7xMKDFNlcnZlckNvbmZpZxJFCg1kZXBsb3ltZW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEiAKCnB1YmxpY191cmwYAiABKAlCDLpICXIHgLUYAYgBARI/Cg5hZG1pbl9saXN0ZW5lchgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEkAKD2RldmljZV9saXN0ZW5lchgEIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEjkKCGRhdGFiYXNlGAUgASgLMh8ubGluZG0uY29uZmlnLnYxLkRhdGFiYXNlQ29uZmlnQga6SAPIAQESLwoDdGxzGAYgASgLMhoubGluZG0uY29uZmlnLnYxLlRMU0NvbmZpZ0IGukgDyAEBEjoKCWRldmljZV9jYRgHIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5EZXZpY2VDQUNvbmZpZ0IGukgDyAEBEkUKDmF1dGhlbnRpY2F0aW9uGAggASgLMiUubGluZG0uY29uZmlnLnYxLkF1dGhlbnRpY2F0aW9uQ29uZmlnQga6SAPIAQESIQoPdHJ1c3RlZF9jYV9maWxlGAkgASgJQgi6SAVyAxiAIBI5ChZpbnZlbnRvcnlfYnVkZ2V0X2J5dGVzGAogASgEQhS6SBEyDxj//////////38ogICAIEgAiAEBEiwKEWRldmljZV9wdWJsaWNfdXJsGAsgASgJQgy6SAlyB4C1GAGIAQFIAYgBARJGChNleGVjdXRpb25fYm9vdHN0cmFwGAwgASgLMikubGluZG0uY29uZmlnLnYxLkV4ZWN1dGlvbkJvb3RzdHJhcENvbmZpZxJCChFleGVjdXRpb25fc2lnbmluZxgNIAEoCzInLmxpbmRtLmNvbmZpZy52MS5FeGVjdXRpb25TaWduaW5nQ29uZmlnEjYKC2JyZWFrX2dsYXNzGA4gASgLMiEubGluZG0uY29uZmlnLnYxLkJyZWFrR2xhc3NQb2xpY3kSMwoKYWR2aXNvcmllcxgPIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5BZHZpc29yeUNvbmZpZxI5CgxpbnRlZ3JhdGlvbnMYECABKAsyIy5saW5kbS5jb25maWcudjEuSW50ZWdyYXRpb25zQ29uZmlnEjkKDWF1dGhvcml6YXRpb24YESABKAsyIi5saW5kbS5hdXRoLnYxLkF1dGhvcml6YXRpb25Qb2xpY3kSLQoGZXNjcm93GBIgASgLMh0ubGluZG0uY29uZmlnLnYxLkVzY3Jvd0NvbmZpZxIzCglwcm9maWxpbmcYEyABKAsyIC5saW5kbS5jb25maWcudjEuUHJvZmlsaW5nQ29uZmlnEkQKEnJlbGVhc2VfcmVwb3NpdG9yeRgUIAEoCzIoLmxpbmRtLmNvbmZpZy52MS5SZWxlYXNlUmVwb3NpdG9yeUNvbmZpZzqtCrpIqQoasgEKEmxpc3RlbmVycy5kaXN0aW5jdBI0YWRtaW5pc3RyYXRpdmUgYW5kIGRldmljZSBsaXN0ZW5lcnMgbXVzdCBiZSBkaXN0aW5jdBpmIWhhcyh0aGlzLmFkbWluX2xpc3RlbmVyKSB8fCAhaGFzKHRoaXMuZGV2aWNlX2xpc3RlbmVyKSB8fCB0aGlzLmFkbWluX2xpc3RlbmVyICE9IHRoaXMuZGV2aWNlX2xpc3RlbmVyGoICChtwcm9maWxpbmcuZGlzdGluY3RfbGlzdGVuZXISJnByb2ZpbGluZyBtdXN0IHVzZSBhIHNlcGFyYXRlIGxpc3RlbmVyGroBIWhhcyh0aGlzLnByb2ZpbGluZykgfHwgKCghaGFzKHRoaXMuYWRtaW5fbGlzdGVuZXIpIHx8IHRoaXMucHJvZmlsaW5nLmxpc3RlbmVyICE9IHRoaXMuYWRtaW5fbGlzdGVuZXIpICYmICghaGFzKHRoaXMuZGV2aWNlX2xpc3RlbmVyKSB8fCB0aGlzLnByb2ZpbGluZy5saXN0ZW5lciAhPSB0aGlzLmRldmljZV9saXN0ZW5lcikpGo8BChtleGVjdXRpb25fc2lnbmluZy5ib290c3RyYXASMWV4ZWN1dGlvbiBzaWduaW5nIHJlcXVpcmVzIGFuIGV4ZWN1dGlvbiBib290c3RyYXAaPSFoYXModGhpcy5leGVjdXRpb25fc2lnbmluZykgfHwgaGFzKHRoaXMuZXhlY3V0aW9uX2Jvb3RzdHJhcCkaoQEKIWV4ZWN1dGlvbl9ib290c3RyYXAuZGV2aWNlX29yaWdpbhI9ZXhlY3V0aW9uIGJvb3RzdHJhcCByZXF1aXJlcyBhbiBleHBsaWNpdCBwdWJsaWMgZGV2aWNlIG9yaWdpbho9IWhhcyh0aGlzLmV4ZWN1dGlvbl9ib290c3RyYXApIHx8IGhhcyh0aGlzLmRldmljZV9wdWJsaWNfdXJsKRq2BAoUYXV0aG9yaXphdGlvbi5zb3VyY2USO2RpcmVjdG9yeSBtYXBwaW5ncyBtdXN0IG1hdGNoIHRoZSBzZWxlY3RlZCBhdXRob3JpdHkgc291cmNlGuADIWhhcyh0aGlzLmF1dGhvcml6YXRpb24pIHx8IHRoaXMuYXV0aG9yaXphdGlvbi5ncm91cF9iaW5kaW5ncy5hbGwoYiwgaGFzKHRoaXMuYXV0aGVudGljYXRpb24ua2V5Y2xvYWspID8gYi5ncm91cC5zdGFydHNXaXRoKCcvJykgJiYgc2l6ZShiLmdyb3VwKSA+IDEgOiBoYXModGhpcy5hdXRoZW50aWNhdGlvbi5lbnRyYSkgPyBiLmdyb3VwLm1hdGNoZXMoJ15bMC05YS1mXXs4fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXs0fS1bMC05YS1mXXsxMn0kJykgJiYgYi5ncm91cCAhPSAnMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwJyA6IGhhcyh0aGlzLmF1dGhlbnRpY2F0aW9uLm9rdGEpID8gYi5ncm91cC5tYXRjaGVzKCdeMDBnW0EtWmEtejAtOV17MTd9JCcpIDogaGFzKHRoaXMuYXV0aGVudGljYXRpb24uZ29vZ2xlKSA/IGIuZ3JvdXAubWF0Y2hlcygnXltBLVphLXowLTlfLV17MSwyNTZ9JCcpIDogZmFsc2UpQhkKF19pbnZlbnRvcnlfYnVkZ2V0X2J5dGVzQhQKEl9kZXZpY2VfcHVibGljX3VybCJzChdSZWxlYXNlUmVwb3NpdG9yeUNvbmZpZxIcCglkaXJlY3RvcnkYASABKAlCCbpIBnIEkLUYARI6CgdzaWduaW5nGAIgASgLMikubGluZG0uY29uZmlnLnYxLlJlbGVhc2VSZXBvc2l0b3J5U2lnbmluZyI4ChhSZWxlYXNlUmVwb3NpdG9yeVNpZ25pbmcSHAoJZGlyZWN0b3J5GAEgASgJQgm6SAZyBJC1GAEipgQKDkFkdmlzb3J5Q29uZmlnEjYKBWZlZWRzGAEgAygLMh0ubGluZG0uYWR2aXNvcnkudjEuRmVlZFNvdXJjZUIIukgFkgECECASFwoPcmVmcmVzaF9lbmFibGVkGAIgASgIEjMKGHJlZnJlc2hfaW50ZXJ2YWxfc2Vjb25kcxgDIAEoDUIMukgJKgcYgPUkKJAcSACIAQESNAoZaW52ZW50b3J5X21heF9hZ2Vfc2Vjb25kcxgEIAEoDUIMukgJKgcYgPUkKKwCSAGIAQE6nAK6SJgCGpUCChFhZHZpc29yaWVzLnVuaXF1ZRI+ZmVlZCBJRHMgYW5kIGRpc3Ryby9yZWxlYXNlL3N0cmVhbSBjb21iaW5hdGlvbnMgbXVzdCBiZSB1bmlxdWUavwF0aGlzLmZlZWRzLmFsbChmLCB0aGlzLmZlZWRzLmZpbHRlcih4LCB4LmlkID09IGYuaWQpLnNpemUoKSA9PSAxICYmIHRoaXMuZmVlZHMuZmlsdGVyKHgsIHguZGlzdHJvID09IGYuZGlzdHJvICYmIHgucmVsZWFzZSA9PSBmLnJlbGVhc2UgJiYgeC5wbGF0Zm9ybV9zdHJlYW0gPT0gZi5wbGF0Zm9ybV9zdHJlYW0pLnNpemUoKSA9PSAxKUIbChlfcmVmcmVzaF9pbnRlcnZhbF9zZWNvbmRzQhwKGl9pbnZlbnRvcnlfbWF4X2FnZV9zZWNvbmRzIjwKEkludGVncmF0aW9uc0NvbmZpZxImChNlbmNyeXB0aW9uX2tleV9maWxlGAEgASgJQgm6SAZyBJC1GAEijQIKDEVzY3Jvd0NvbmZpZxIlChJ0cmFuc3BvcnRfa2V5X2ZpbGUYASABKAlCCbpIBnIEkLUYARIkChF3cmFwcGluZ19rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBEiAKGHJldmVhbF9hcHByb3ZhbF9yZXF1aXJlZBgDIAEoCDqNAbpIiQEahgEKFWVzY3Jvdy5kaXN0aW5jdF9maWxlcxI6ZXNjcm93IHRyYW5zcG9ydCBhbmQgd3JhcHBpbmcga2V5cyBtdXN0IHVzZSBkaXN0aW5jdCBmaWxlcxoxdGhpcy50cmFuc3BvcnRfa2V5X2ZpbGUgIT0gdGhpcy53cmFwcGluZ19rZXlfZmlsZSJbChhFeGVjdXRpb25Cb290c3RyYXBDb25maWcSHAoJcm9vdF9maWxlGAEgASgJQgm6SAZyBJC1GAESIQoOYm9vdHN0cmFwX2ZpbGUYAiABKAlCCbpIBnIEkLUYASLpAQoWRXhlY3V0aW9uU2lnbmluZ0NvbmZpZxIgCg1wbGFuX2tleV9maWxlGAEgASgJQgm6SAZyBJC1GAESIQoOc3RhcnRfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYATqJAbpIhQEaggEKIGV4ZWN1dGlvbl9zaWduaW5nLmRpc3RpbmN0X2ZpbGVzEjNwbGFuIGFuZCBzdGFydCBzaWduaW5nIGtleXMgbXVzdCB1c2UgZGlzdGluY3QgZmlsZXMaKXRoaXMucGxhbl9rZXlfZmlsZSAhPSB0aGlzLnN0YXJ0X2tleV9maWxlIkUKDkxpc3RlbmVyQ29uZmlnEhgKB2FkZHJlc3MYASABKAlCB7pIBHICcAESGQoEcG9ydBgCIAEoDUILukgIKgYY//8DKAEi3wIKD1Byb2ZpbGluZ0NvbmZpZxI5CghsaXN0ZW5lchgBIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5MaXN0ZW5lckNvbmZpZ0IGukgDyAEBEiYKE2NwdV9wcm9maWxlX3NlY29uZHMYAiABKA1CCbpIBioEGDwoARIrChZtdXRleF9wcm9maWxlX2ZyYWN0aW9uGAMgASgNQgu6SAgqBhjAhD0oARIsChVibG9ja19wcm9maWxlX3JhdGVfbnMYBCABKA1CDbpICioIGICU69wDKAE6jQG6SIkBGoYBChJwcm9maWxpbmcubG9vcGJhY2sSK3Byb2ZpbGluZyByZXF1aXJlcyBsaXRlcmFsIDEyNy4wLjAuMSBvciA6OjEaQ2hhcyh0aGlzLmxpc3RlbmVyKSAmJiB0aGlzLmxpc3RlbmVyLmFkZHJlc3MgaW4gWycxMjcuMC4wLjEnLCAnOjoxJ10ilQEKDkRhdGFiYXNlQ29uZmlnEhsKCHVybF9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoPbWF4X2Nvbm5lY3Rpb25zGAIgASgNQgq6SAcqBRiAAigCEioKEm1pZ3JhdGlvbl91cmxfZmlsZRgDIAEoCUIJukgGcgSQtRgBSACIAQFCFQoTX21pZ3JhdGlvbl91cmxfZmlsZSJVCglUTFNDb25maWcSIwoQY2VydGlmaWNhdGVfZmlsZRgBIAEoCUIJukgGcgSQtRgBEiMKEHByaXZhdGVfa2V5X2ZpbGUYAiABKAlCCbpIBnIEkLUYASJaCg5EZXZpY2VDQUNvbmZpZxIjChBjZXJ0aWZpY2F0ZV9maWxlGAEgASgJQgm6SAZyBJC1GAESIwoQcHJpdmF0ZV9rZXlfZmlsZRgCIAEoCUIJukgGcgSQtRgBIvEDChRBdXRoZW50aWNhdGlvbkNvbmZpZxI1CgVsb2NhbBgBIAEoCzIkLmxpbmRtLmNvbmZpZy52MS5Mb2NhbEF1dGhlbnRpY2F0aW9uSAASNgoIa2V5Y2xvYWsYAiABKAsyIi5saW5kbS5jb25maWcudjEuS2V5Y2xvYWtEaXJlY3RvcnlIABIwCgVlbnRyYRgDIAEoCzIfLmxpbmRtLmNvbmZpZy52MS5FbnRyYURpcmVjdG9yeUgAEi4KBG9rdGEYBCABKAsyHi5saW5kbS5jb25maWcudjEuT2t0YURpcmVjdG9yeUgAEjIKBmdvb2dsZRgFIAEoCzIgLmxpbmRtLmNvbmZpZy52MS5Hb29nbGVEaXJlY3RvcnlIABIpCgRzY2ltGAYgASgLMhsubGluZG0uY29uZmlnLnYxLlNDSU1Db25maWc6lgG6SJIBGo8BChxhdXRoZW50aWNhdGlvbi5zY2ltX2V4dGVybmFsEkpTQ0lNIHN1cHBsZW1lbnRzIGFuIGV4dGVybmFsIGF1dGhvcml0eSBhbmQgY2Fubm90IHByb3Zpc2lvbiBsb2NhbCBhY2NvdW50cxojIWhhcyh0aGlzLnNjaW0pIHx8ICFoYXModGhpcy5sb2NhbClCEAoHcHJpbWFyeRIFukgCCAEiFQoTTG9jYWxBdXRoZW50aWNhdGlvbiLJBAoRS2V5Y2xvYWtEaXJlY3RvcnkSHAoGaXNzdWVyGAEgASgJQgy6SAlyB4i1GAGIAQESHQoJY2xpZW50X2lkGAIgASgJQgq6SAdyBRABGIACEiUKEmNsaWVudF9zZWNyZXRfZmlsZRgDIAEoCUIJukgGcgSQtRgBEicKE2RpcmVjdG9yeV9jbGllbnRfaWQYBCABKAlCCrpIB3IFEAEYgAISLwocZGlyZWN0b3J5X2NsaWVudF9zZWNyZXRfZmlsZRgFIAEoCUIJukgGcgSQtRgBEjkKCHVwc3RyZWFtGAcgASgLMicubGluZG0uY29uZmlnLnYxLktleWNsb2FrQnJva2VyVXBzdHJlYW06ngK6SJoCGn0KGWtleWNsb2FrLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaKnRoaXMuY2xpZW50X2lkICE9IHRoaXMuZGlyZWN0b3J5X2NsaWVudF9pZBqYAQoaa2V5Y2xvYWsuZGlzdGluY3RfdXBzdHJlYW0SPmJyb2tlciBmcmVzaG5lc3MgcmVxdWlyZXMgYSBkaXN0aW5jdCBvcmlnaW5hbCBkaXJlY3RvcnkgaXNzdWVyGjohaGFzKHRoaXMudXBzdHJlYW0pIHx8IHRoaXMudXBzdHJlYW0uaXNzdWVyICE9IHRoaXMuaXNzdWVySgQIBhAHUhRhZG1pbmlzdHJhdG9yX2dyb3VwcyL/AwoORW50cmFEaXJlY3RvcnkSQQoJdGVuYW50X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKCWNsaWVudF9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIlChJjbGllbnRfc2VjcmV0X2ZpbGUYAyABKAlCCbpIBnIEkLUYARJLChNkaXJlY3RvcnlfY2xpZW50X2lkGAQgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEi8KHGRpcmVjdG9yeV9jbGllbnRfc2VjcmV0X2ZpbGUYBSABKAlCCbpIBnIEkLUYATqbAbpIlwEalAEKFmVudHJhLnNlcGFyYXRlX2NsaWVudHMSNGxvZ2luIGFuZCBkaXJlY3RvcnkgYWNjZXNzIG11c3QgdXNlIHNlcGFyYXRlIGNsaWVudHMaRHRoaXMuY2xpZW50X2lkLmxvd2VyQXNjaWkoKSAhPSB0aGlzLmRpcmVjdG9yeV9jbGllbnRfaWQubG93ZXJBc2NpaSgpSgQIBhAHUh5hZG1pbmlzdHJhdG9yX2dyb3VwX29iamVjdF9pZHMikAMKDU9rdGFEaXJlY3RvcnkSHAoGaXNzdWVyGAEgASgJQgy6SAlyB4i1GAGIAQESHQoJY2xpZW50X2lkGAIgASgJQgq6SAdyBRABGIACEiUKEmNsaWVudF9zZWNyZXRfZmlsZRgDIAEoCUIJukgGcgSQtRgBEh0KB29yZ191cmwYBCABKAlCDLpICXIHgLUYAYgBARInChNkaXJlY3RvcnlfY2xpZW50X2lkGAUgASgJQgq6SAdyBRABGIACEiQKEGRpcmVjdG9yeV9rZXlfaWQYBiABKAlCCrpIB3IFEAEYgAISLQoaZGlyZWN0b3J5X3ByaXZhdGVfa2V5X2ZpbGUYByABKAlCCbpIBnIEkLUYATp+ukh7GnkKFW9rdGEuc2VwYXJhdGVfY2xpZW50cxI0bG9naW4gYW5kIGRpcmVjdG9yeSBhY2Nlc3MgbXVzdCB1c2Ugc2VwYXJhdGUgY2xpZW50cxoqdGhpcy5jbGllbnRfaWQgIT0gdGhpcy5kaXJlY3RvcnlfY2xpZW50X2lkIpcCCg9Hb29nbGVEaXJlY3RvcnkSHQoJY2xpZW50X2lkGAEgASgJQgq6SAdyBRABGIACEiUKEmNsaWVudF9zZWNyZXRfZmlsZRgCIAEoCUIJukgGcgSQtRgBEikKFXNlcnZpY2VfYWNjb3VudF9lbWFpbBgDIAEoCUIKukgHcgUYwAJgARIiCg5wcml2YXRlX2tleV9pZBgEIAEoCUIKukgHcgUQARiAAhIjChBwcml2YXRlX2tleV9maWxlGAUgASgJQgm6SAZyBJC1GAESJQoRZGVsZWdhdGVkX3N1YmplY3QYBiABKAlCCrpIB3IFGMACYAESIwoNaG9zdGVkX2RvbWFpbhgHIAEoCUIMukgJcgcQARj9AWgBIvMBChZLZXljbG9ha0Jyb2tlclVwc3RyZWFtEiwKBWFsaWFzGAEgASgJQh26SBpyGBABGIACMhFeW0EtWmEtejAtOV8uLV0rJBIzCgxjb25uZWN0b3JfaWQYAiABKAlCHbpIGnIYEAEYQDISXlthLXpdW2EtejAtOV8tXSokEhwKBmlzc3VlchgDIAEoCUIMukgJcgeItRgBiAEBEicKE2RpcmVjdG9yeV9jbGllbnRfaWQYBCABKAlCCrpIB3IFEAEYgAISLwocZGlyZWN0b3J5X2NsaWVudF9zZWNyZXRfZmlsZRgFIAEoCUIJukgGcgSQtRgBIt4BCgpTQ0lNQ29uZmlnEj4KCmNvbm5lY3RvcnMYASADKAsyHi5saW5kbS5jb25maWcudjEuU0NJTUNvbm5lY3RvckIKukgHkgEECAEQIDqPAbpIiwEaiAEKFnNjaW0udW5pcXVlX2Nvbm5lY3RvcnMSIVNDSU0gY29ubmVjdG9yIElEcyBtdXN0IGJlIHVuaXF1ZRpLdGhpcy5jb25uZWN0b3JzLmFsbChjLCB0aGlzLmNvbm5lY3RvcnMuZmlsdGVyKHgsIHguaWQgPT0gYy5pZCkuc2l6ZSgpID09IDEpIoYDCg1TQ0lNQ29ubmVjdG9yEikKAmlkGAEgASgJQh26SBpyGBABGEAyEl5bYS16XVthLXowLTlfLV0qJBJDCgxjb3JyZWxhdGlvbnMYAiADKAsyIC5saW5kbS5jb25maWcudjEuU0NJTUNvcnJlbGF0aW9uQgu6SAiSAQUIARCQTjqEArpIgAIa/QEKGHNjaW0udW5pcXVlX2NvcnJlbGF0aW9ucxJJaW1tdXRhYmxlIHByb3ZpZGVyIGFuZCBsb2dpbiBpZGVudGl0aWVzIG11c3QgYmUgdW5pcXVlIHdpdGhpbiBhIGNvbm5lY3RvchqVAXRoaXMuY29ycmVsYXRpb25zLmFsbChjLCB0aGlzLmNvcnJlbGF0aW9ucy5maWx0ZXIoeCwgeC5wcm92aWRlcl9pZCA9PSBjLnByb3ZpZGVyX2lkIHx8ICh4Lmlzc3VlciA9PSBjLmlzc3VlciAmJiB4LnN1YmplY3QgPT0gYy5zdWJqZWN0KSkuc2l6ZSgpID09IDEpIm0KD1NDSU1Db3JyZWxhdGlvbhIfCgtwcm92aWRlcl9pZBgBIAEoCUIKukgHcgUQARiAAhIcCgZpc3N1ZXIYAiABKAlCDLpICXIHiLUYAYgBARIbCgdzdWJqZWN0GAMgASgJQgq6SAdyBRABGIACItwEChBCcmVha0dsYXNzUG9saWN5ErwDChNhbGxvd2VkX3Blcm1pc3Npb25zGAEgAygJQp4DukiaA5IBlgMIARAVGAEijQNyigNSCmZsZWV0LnJlYWRSEWVucm9sbG1lbnQubWFuYWdlUg1kZXZpY2UucmV2b2tlUgphdWRpdC5yZWFkUhZleGVjdXRpb25fdHJ1c3QubWFuYWdlUg9wcm9maWxlcy5tYW5hZ2VSEHJlc291cmNlcy5hc3NpZ25SD2FjY291bnRzLm1hbmFnZVIQaW52ZW50b3J5Lm1hbmFnZVIScmVjb3Zlcnlfa2V5cy5yZWFkUhRyZW1vdGVfZXhlY3V0aW9uLnJ1blILc2NyaXB0cy5ydW5SE2Rlc3RydWN0aXZlLmV4ZWN1dGVSEGFwcHJvdmFscy5tYW5hZ2VSE2ludGVncmF0aW9ucy5tYW5hZ2VSFnJlbGVhc2VfdXBkYXRlcy5tYW5hZ2VSGmFkdmlzb3J5X2V4Y2VwdGlvbnMubWFuYWdlUhFlbmNyeXB0aW9uLm1hbmFnZVIMYWN0aW9ucy5sb2NrUhRhY3Rpb25zLnJlbGVhc2UtbG9ja1ISYWN0aW9ucy5xdWFyYW50aW5lEhQKDGNvbnNvbGVfb25seRgCIAEoCBJJChRtYXhfc2Vzc2lvbl9saWZldGltZRgDIAEoCzIZLmdvb2dsZS5wcm90b2J1Zi5EdXJhdGlvbkIQukgNyAEBqgEHIgMIkBwqABIoChdyZXF1aXJlX2luY2lkZW50X3JlYXNvbhgEIAEoCEIHukgEagIIAUIkWiJsaW5kbS9nZW4vbGluZG0vY29uZmlnL3YxO2NvbmZpZ3YxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_duration, file_lindm_advisory_v1_feed, file_lindm_auth_v1_authorization, file_lindm_validation_v1_string_rules]);
 
 /**
  * ServerConfig is the only serialized configuration contract for lindmd.
@@ -106,6 +110,46 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
    * @generated from field: lindm.config.v1.BreakGlassPolicy break_glass = 14;
    */
   breakGlass?: BreakGlassPolicy | undefined;
+
+  /**
+   * No network requests occur unless refresh_enabled is explicitly true.
+   *
+   * @generated from field: lindm.config.v1.AdvisoryConfig advisories = 15;
+   */
+  advisories?: AdvisoryConfig | undefined;
+
+  /**
+   * Enables integrations and report workers on this replica.
+   *
+   * @generated from field: lindm.config.v1.IntegrationsConfig integrations = 16;
+   */
+  integrations?: IntegrationsConfig | undefined;
+
+  /**
+   * @generated from field: lindm.auth.v1.AuthorizationPolicy authorization = 17;
+   */
+  authorization?: AuthorizationPolicy | undefined;
+
+  /**
+   * Separate recovery transport and at-rest custody; absent disables escrow.
+   *
+   * @generated from field: lindm.config.v1.EscrowConfig escrow = 18;
+   */
+  escrow?: EscrowConfig | undefined;
+
+  /**
+   * Operator-only diagnostics. Absent means no listener or runtime sampling.
+   *
+   * @generated from field: lindm.config.v1.ProfilingConfig profiling = 19;
+   */
+  profiling?: ProfilingConfig | undefined;
+
+  /**
+   * Public signed repository; private signing keys are outside this directory.
+   *
+   * @generated from field: lindm.config.v1.ReleaseRepositoryConfig release_repository = 20;
+   */
+  releaseRepository?: ReleaseRepositoryConfig | undefined;
 };
 
 /**
@@ -114,6 +158,133 @@ export type ServerConfig = Message<"lindm.config.v1.ServerConfig"> & {
  */
 export const ServerConfigSchema: GenMessage<ServerConfig> = /*@__PURE__*/
   messageDesc(file_lindm_config_v1_config, 0);
+
+/**
+ * @generated from message lindm.config.v1.ReleaseRepositoryConfig
+ */
+export type ReleaseRepositoryConfig = Message<"lindm.config.v1.ReleaseRepositoryConfig"> & {
+  /**
+   * @generated from field: string directory = 1;
+   */
+  directory: string;
+
+  /**
+   * Absent signing disables mutation but still permits verified update retrieval.
+   *
+   * @generated from field: lindm.config.v1.ReleaseRepositorySigning signing = 2;
+   */
+  signing?: ReleaseRepositorySigning | undefined;
+};
+
+/**
+ * Describes the message lindm.config.v1.ReleaseRepositoryConfig.
+ * Use `create(ReleaseRepositoryConfigSchema)` to create a new message.
+ */
+export const ReleaseRepositoryConfigSchema: GenMessage<ReleaseRepositoryConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 1);
+
+/**
+ * @generated from message lindm.config.v1.ReleaseRepositorySigning
+ */
+export type ReleaseRepositorySigning = Message<"lindm.config.v1.ReleaseRepositorySigning"> & {
+  /**
+   * Protected directory with rollout.pem, snapshot.pem and timestamp.pem only.
+   * Offline root.pem and targets.pem must not be present or exposed to lindmd.
+   *
+   * @generated from field: string directory = 1;
+   */
+  directory: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.ReleaseRepositorySigning.
+ * Use `create(ReleaseRepositorySigningSchema)` to create a new message.
+ */
+export const ReleaseRepositorySigningSchema: GenMessage<ReleaseRepositorySigning> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 2);
+
+/**
+ * @generated from message lindm.config.v1.AdvisoryConfig
+ */
+export type AdvisoryConfig = Message<"lindm.config.v1.AdvisoryConfig"> & {
+  /**
+   * @generated from field: repeated lindm.advisory.v1.FeedSource feeds = 1;
+   */
+  feeds: FeedSource[];
+
+  /**
+   * @generated from field: bool refresh_enabled = 2;
+   */
+  refreshEnabled: boolean;
+
+  /**
+   * @generated from field: optional uint32 refresh_interval_seconds = 3;
+   */
+  refreshIntervalSeconds?: number | undefined;
+
+  /**
+   * @generated from field: optional uint32 inventory_max_age_seconds = 4;
+   */
+  inventoryMaxAgeSeconds?: number | undefined;
+};
+
+/**
+ * Describes the message lindm.config.v1.AdvisoryConfig.
+ * Use `create(AdvisoryConfigSchema)` to create a new message.
+ */
+export const AdvisoryConfigSchema: GenMessage<AdvisoryConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 3);
+
+/**
+ * @generated from message lindm.config.v1.IntegrationsConfig
+ */
+export type IntegrationsConfig = Message<"lindm.config.v1.IntegrationsConfig"> & {
+  /**
+   * Exactly 32 raw bytes, loaded through the protected secret-file boundary.
+   * All replicas must use the same key; retain it with encrypted database backups.
+   *
+   * @generated from field: string encryption_key_file = 1;
+   */
+  encryptionKeyFile: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.IntegrationsConfig.
+ * Use `create(IntegrationsConfigSchema)` to create a new message.
+ */
+export const IntegrationsConfigSchema: GenMessage<IntegrationsConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 4);
+
+/**
+ * @generated from message lindm.config.v1.EscrowConfig
+ */
+export type EscrowConfig = Message<"lindm.config.v1.EscrowConfig"> & {
+  /**
+   * One protected PKCS#8 RSA private key, at least 3072 bits.
+   *
+   * @generated from field: string transport_key_file = 1;
+   */
+  transportKeyFile: string;
+
+  /**
+   * Exactly 32 random raw bytes. Never reuse another domain's encryption key.
+   *
+   * @generated from field: string wrapping_key_file = 2;
+   */
+  wrappingKeyFile: string;
+
+  /**
+   * @generated from field: bool reveal_approval_required = 3;
+   */
+  revealApprovalRequired: boolean;
+};
+
+/**
+ * Describes the message lindm.config.v1.EscrowConfig.
+ * Use `create(EscrowConfigSchema)` to create a new message.
+ */
+export const EscrowConfigSchema: GenMessage<EscrowConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 5);
 
 /**
  * @generated from message lindm.config.v1.ExecutionBootstrapConfig
@@ -135,7 +306,7 @@ export type ExecutionBootstrapConfig = Message<"lindm.config.v1.ExecutionBootstr
  * Use `create(ExecutionBootstrapConfigSchema)` to create a new message.
  */
 export const ExecutionBootstrapConfigSchema: GenMessage<ExecutionBootstrapConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 1);
+  messageDesc(file_lindm_config_v1_config, 6);
 
 /**
  * ExecutionSigningConfig names protected unencrypted PKCS#8 Ed25519 files for
@@ -160,7 +331,7 @@ export type ExecutionSigningConfig = Message<"lindm.config.v1.ExecutionSigningCo
  * Use `create(ExecutionSigningConfigSchema)` to create a new message.
  */
 export const ExecutionSigningConfigSchema: GenMessage<ExecutionSigningConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 2);
+  messageDesc(file_lindm_config_v1_config, 7);
 
 /**
  * Binding uses an explicit IP address and port rather than a second address
@@ -185,7 +356,46 @@ export type ListenerConfig = Message<"lindm.config.v1.ListenerConfig"> & {
  * Use `create(ListenerConfigSchema)` to create a new message.
  */
 export const ListenerConfigSchema: GenMessage<ListenerConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 3);
+  messageDesc(file_lindm_config_v1_config, 8);
+
+/**
+ * ProfilingConfig enables a private plaintext HTTP listener, never a public RPC
+ * surface. Only literal loopback addresses are admitted; do not proxy this port.
+ * Sampling is process-wide for this server lifetime. The server exclusively owns
+ * block sampling and restores its disabled baseline on shutdown.
+ *
+ * @generated from message lindm.config.v1.ProfilingConfig
+ */
+export type ProfilingConfig = Message<"lindm.config.v1.ProfilingConfig"> & {
+  /**
+   * @generated from field: lindm.config.v1.ListenerConfig listener = 1;
+   */
+  listener?: ListenerConfig | undefined;
+
+  /**
+   * Fixed duration of each CPU capture; request parameters cannot extend it.
+   *
+   * @generated from field: uint32 cpu_profile_seconds = 2;
+   */
+  cpuProfileSeconds: number;
+
+  /**
+   * @generated from field: uint32 mutex_profile_fraction = 3;
+   */
+  mutexProfileFraction: number;
+
+  /**
+   * @generated from field: uint32 block_profile_rate_ns = 4;
+   */
+  blockProfileRateNs: number;
+};
+
+/**
+ * Describes the message lindm.config.v1.ProfilingConfig.
+ * Use `create(ProfilingConfigSchema)` to create a new message.
+ */
+export const ProfilingConfigSchema: GenMessage<ProfilingConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 9);
 
 /**
  * @generated from message lindm.config.v1.DatabaseConfig
@@ -215,7 +425,7 @@ export type DatabaseConfig = Message<"lindm.config.v1.DatabaseConfig"> & {
  * Use `create(DatabaseConfigSchema)` to create a new message.
  */
 export const DatabaseConfigSchema: GenMessage<DatabaseConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 4);
+  messageDesc(file_lindm_config_v1_config, 10);
 
 /**
  * @generated from message lindm.config.v1.TLSConfig
@@ -237,7 +447,7 @@ export type TLSConfig = Message<"lindm.config.v1.TLSConfig"> & {
  * Use `create(TLSConfigSchema)` to create a new message.
  */
 export const TLSConfigSchema: GenMessage<TLSConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 5);
+  messageDesc(file_lindm_config_v1_config, 11);
 
 /**
  * @generated from message lindm.config.v1.DeviceCAConfig
@@ -259,7 +469,7 @@ export type DeviceCAConfig = Message<"lindm.config.v1.DeviceCAConfig"> & {
  * Use `create(DeviceCAConfigSchema)` to create a new message.
  */
 export const DeviceCAConfigSchema: GenMessage<DeviceCAConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 6);
+  messageDesc(file_lindm_config_v1_config, 12);
 
 /**
  * @generated from message lindm.config.v1.AuthenticationConfig
@@ -286,7 +496,24 @@ export type AuthenticationConfig = Message<"lindm.config.v1.AuthenticationConfig
      */
     value: EntraDirectory;
     case: "entra";
+  } | {
+    /**
+     * @generated from field: lindm.config.v1.OktaDirectory okta = 4;
+     */
+    value: OktaDirectory;
+    case: "okta";
+  } | {
+    /**
+     * @generated from field: lindm.config.v1.GoogleDirectory google = 5;
+     */
+    value: GoogleDirectory;
+    case: "google";
   } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: lindm.config.v1.SCIMConfig scim = 6;
+   */
+  scim?: SCIMConfig | undefined;
 };
 
 /**
@@ -294,7 +521,7 @@ export type AuthenticationConfig = Message<"lindm.config.v1.AuthenticationConfig
  * Use `create(AuthenticationConfigSchema)` to create a new message.
  */
 export const AuthenticationConfigSchema: GenMessage<AuthenticationConfig> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 7);
+  messageDesc(file_lindm_config_v1_config, 13);
 
 /**
  * Local authentication uses only Postgres, passwords and mandatory WebAuthn.
@@ -309,7 +536,7 @@ export type LocalAuthentication = Message<"lindm.config.v1.LocalAuthentication">
  * Use `create(LocalAuthenticationSchema)` to create a new message.
  */
 export const LocalAuthenticationSchema: GenMessage<LocalAuthentication> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 8);
+  messageDesc(file_lindm_config_v1_config, 14);
 
 /**
  * @generated from message lindm.config.v1.KeycloakDirectory
@@ -341,9 +568,11 @@ export type KeycloakDirectory = Message<"lindm.config.v1.KeycloakDirectory"> & {
   directoryClientSecretFile: string;
 
   /**
-   * @generated from field: repeated string administrator_groups = 6;
+   * Broker imports are restrictions only; upstream observations establish freshness.
+   *
+   * @generated from field: lindm.config.v1.KeycloakBrokerUpstream upstream = 7;
    */
-  administratorGroups: string[];
+  upstream?: KeycloakBrokerUpstream | undefined;
 };
 
 /**
@@ -351,7 +580,7 @@ export type KeycloakDirectory = Message<"lindm.config.v1.KeycloakDirectory"> & {
  * Use `create(KeycloakDirectorySchema)` to create a new message.
  */
 export const KeycloakDirectorySchema: GenMessage<KeycloakDirectory> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 9);
+  messageDesc(file_lindm_config_v1_config, 15);
 
 /**
  * Microsoft Entra ID public-cloud OIDC and authoritative Microsoft Graph access.
@@ -383,11 +612,6 @@ export type EntraDirectory = Message<"lindm.config.v1.EntraDirectory"> & {
    * @generated from field: string directory_client_secret_file = 5;
    */
   directoryClientSecretFile: string;
-
-  /**
-   * @generated from field: repeated string administrator_group_object_ids = 6;
-   */
-  administratorGroupObjectIds: string[];
 };
 
 /**
@@ -395,7 +619,212 @@ export type EntraDirectory = Message<"lindm.config.v1.EntraDirectory"> & {
  * Use `create(EntraDirectorySchema)` to create a new message.
  */
 export const EntraDirectorySchema: GenMessage<EntraDirectory> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 10);
+  messageDesc(file_lindm_config_v1_config, 16);
+
+/**
+ * @generated from message lindm.config.v1.OktaDirectory
+ */
+export type OktaDirectory = Message<"lindm.config.v1.OktaDirectory"> & {
+  /**
+   * @generated from field: string issuer = 1;
+   */
+  issuer: string;
+
+  /**
+   * @generated from field: string client_id = 2;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: string client_secret_file = 3;
+   */
+  clientSecretFile: string;
+
+  /**
+   * @generated from field: string org_url = 4;
+   */
+  orgUrl: string;
+
+  /**
+   * @generated from field: string directory_client_id = 5;
+   */
+  directoryClientId: string;
+
+  /**
+   * @generated from field: string directory_key_id = 6;
+   */
+  directoryKeyId: string;
+
+  /**
+   * Protected PEM RSA key for private_key_jwt, never an API token.
+   *
+   * @generated from field: string directory_private_key_file = 7;
+   */
+  directoryPrivateKeyFile: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.OktaDirectory.
+ * Use `create(OktaDirectorySchema)` to create a new message.
+ */
+export const OktaDirectorySchema: GenMessage<OktaDirectory> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 17);
+
+/**
+ * @generated from message lindm.config.v1.GoogleDirectory
+ */
+export type GoogleDirectory = Message<"lindm.config.v1.GoogleDirectory"> & {
+  /**
+   * @generated from field: string client_id = 1;
+   */
+  clientId: string;
+
+  /**
+   * @generated from field: string client_secret_file = 2;
+   */
+  clientSecretFile: string;
+
+  /**
+   * @generated from field: string service_account_email = 3;
+   */
+  serviceAccountEmail: string;
+
+  /**
+   * @generated from field: string private_key_id = 4;
+   */
+  privateKeyId: string;
+
+  /**
+   * Protected PEM RSA service-account key; delegation is read-only directory access.
+   *
+   * @generated from field: string private_key_file = 5;
+   */
+  privateKeyFile: string;
+
+  /**
+   * @generated from field: string delegated_subject = 6;
+   */
+  delegatedSubject: string;
+
+  /**
+   * Exact Workspace hosted-domain claim required from the signed login identity.
+   *
+   * @generated from field: string hosted_domain = 7;
+   */
+  hostedDomain: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.GoogleDirectory.
+ * Use `create(GoogleDirectorySchema)` to create a new message.
+ */
+export const GoogleDirectorySchema: GenMessage<GoogleDirectory> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 18);
+
+/**
+ * @generated from message lindm.config.v1.KeycloakBrokerUpstream
+ */
+export type KeycloakBrokerUpstream = Message<"lindm.config.v1.KeycloakBrokerUpstream"> & {
+  /**
+   * @generated from field: string alias = 1;
+   */
+  alias: string;
+
+  /**
+   * @generated from field: string connector_id = 2;
+   */
+  connectorId: string;
+
+  /**
+   * @generated from field: string issuer = 3;
+   */
+  issuer: string;
+
+  /**
+   * @generated from field: string directory_client_id = 4;
+   */
+  directoryClientId: string;
+
+  /**
+   * @generated from field: string directory_client_secret_file = 5;
+   */
+  directoryClientSecretFile: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.KeycloakBrokerUpstream.
+ * Use `create(KeycloakBrokerUpstreamSchema)` to create a new message.
+ */
+export const KeycloakBrokerUpstreamSchema: GenMessage<KeycloakBrokerUpstream> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 19);
+
+/**
+ * SCIM is a supplemental deny/revocation channel, never a freshness or grant source.
+ *
+ * @generated from message lindm.config.v1.SCIMConfig
+ */
+export type SCIMConfig = Message<"lindm.config.v1.SCIMConfig"> & {
+  /**
+   * @generated from field: repeated lindm.config.v1.SCIMConnector connectors = 1;
+   */
+  connectors: SCIMConnector[];
+};
+
+/**
+ * Describes the message lindm.config.v1.SCIMConfig.
+ * Use `create(SCIMConfigSchema)` to create a new message.
+ */
+export const SCIMConfigSchema: GenMessage<SCIMConfig> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 20);
+
+/**
+ * @generated from message lindm.config.v1.SCIMConnector
+ */
+export type SCIMConnector = Message<"lindm.config.v1.SCIMConnector"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: repeated lindm.config.v1.SCIMCorrelation correlations = 2;
+   */
+  correlations: SCIMCorrelation[];
+};
+
+/**
+ * Describes the message lindm.config.v1.SCIMConnector.
+ * Use `create(SCIMConnectorSchema)` to create a new message.
+ */
+export const SCIMConnectorSchema: GenMessage<SCIMConnector> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 21);
+
+/**
+ * @generated from message lindm.config.v1.SCIMCorrelation
+ */
+export type SCIMCorrelation = Message<"lindm.config.v1.SCIMCorrelation"> & {
+  /**
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+
+  /**
+   * @generated from field: string issuer = 2;
+   */
+  issuer: string;
+
+  /**
+   * @generated from field: string subject = 3;
+   */
+  subject: string;
+};
+
+/**
+ * Describes the message lindm.config.v1.SCIMCorrelation.
+ * Use `create(SCIMCorrelationSchema)` to create a new message.
+ */
+export const SCIMCorrelationSchema: GenMessage<SCIMCorrelation> = /*@__PURE__*/
+  messageDesc(file_lindm_config_v1_config, 22);
 
 /**
  * @generated from message lindm.config.v1.BreakGlassPolicy
@@ -431,5 +860,5 @@ export type BreakGlassPolicy = Message<"lindm.config.v1.BreakGlassPolicy"> & {
  * Use `create(BreakGlassPolicySchema)` to create a new message.
  */
 export const BreakGlassPolicySchema: GenMessage<BreakGlassPolicy> = /*@__PURE__*/
-  messageDesc(file_lindm_config_v1_config, 11);
+  messageDesc(file_lindm_config_v1_config, 23);
 

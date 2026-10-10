@@ -17,13 +17,16 @@ CREATE TABLE principals (
   directory_observed_at timestamptz NULL,
   authorization_version bigint NOT NULL DEFAULT 1,
   authorization_role text NOT NULL DEFAULT '',
+  authorization_digest bytea NOT NULL DEFAULT '' CHECK (octet_length(authorization_digest) IN (0, 32)),
+  service_account boolean NOT NULL DEFAULT false,
+  lifecycle_not_before timestamptz NOT NULL DEFAULT '-infinity',
   CONSTRAINT principals_authorization_version_positive CHECK (authorization_version > 0),
-  CONSTRAINT principals_authorization_role_known CHECK (authorization_role IN ('', 'owner', 'admin')),
+  CONSTRAINT principals_authorization_role_known CHECK (authorization_role = '' OR authorization_role ~ '^[a-z][a-z0-9_.-]{0,63}$'),
   CONSTRAINT principals_issuer_len CHECK (char_length(issuer) BETWEEN 1 AND 2048),
   CONSTRAINT principals_subject_len CHECK (char_length(subject) BETWEEN 1 AND 256),
   CONSTRAINT principals_display_name_len CHECK (char_length(display_name) <= 256),
   CONSTRAINT principals_pinned_role_chk CHECK (pinned_role IN ('', 'owner')),
-  CONSTRAINT principals_deactivation_source_chk CHECK (deactivation_source IN ('', 'keycloak', 'entra', 'scim')),
+  CONSTRAINT principals_deactivation_source_chk CHECK (deactivation_source IN ('', 'keycloak', 'entra', 'okta', 'google', 'scim')),
   CONSTRAINT principals_deactivation_pair CHECK (
     (deactivated_at IS NULL AND deactivation_source = '')
     OR (deactivated_at IS NOT NULL AND deactivation_source <> '')
@@ -45,6 +48,13 @@ CREATE TABLE deployment_identity (
 );
 
 INSERT INTO deployment_identity (id) VALUES (true);
+
+-- The active startup policy fences old replicas and all pending actor authority.
+CREATE TABLE authorization_policy (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  digest bytea NOT NULL DEFAULT '' CHECK (octet_length(digest) IN (0, 32))
+);
+INSERT INTO authorization_policy (id) VALUES (true);
 
 CREATE TABLE principal_lineage (
   principal_id uuid PRIMARY KEY REFERENCES principals (id) ON DELETE RESTRICT,
@@ -87,6 +97,7 @@ CREATE TABLE sessions (
   revoked_at timestamptz NULL,
   break_glass boolean NOT NULL DEFAULT false,
   incident_reason text NOT NULL DEFAULT '',
+  kind text NOT NULL DEFAULT 'browser' CHECK (kind IN ('browser', 'cli')),
   CONSTRAINT sessions_incident_reason CHECK (
     (NOT break_glass AND incident_reason = '') OR
     (break_glass AND char_length(incident_reason) BETWEEN 1 AND 512
@@ -104,6 +115,26 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX sessions_principal_active_idx ON sessions (principal_id) WHERE revoked_at IS NULL;
+
+-- Browser-bound, bounded pending requests and hash-only one-use PKCE codes.
+CREATE TABLE cli_auth_requests (
+  binding_hash bytea PRIMARY KEY CHECK (octet_length(binding_hash) = 32),
+  redirect_uri text NOT NULL CHECK (octet_length(redirect_uri) <= 128),
+  code_challenge text NOT NULL CHECK (octet_length(code_challenge) = 43),
+  state text NOT NULL CHECK (octet_length(state) = 43),
+  expires_at timestamptz NOT NULL DEFAULT now() + interval '5 minutes'
+);
+CREATE INDEX cli_auth_requests_expiry ON cli_auth_requests(expires_at);
+
+CREATE TABLE cli_auth_codes (
+  code_hash bytea PRIMARY KEY CHECK (octet_length(code_hash) = 32),
+  browser_session_hash bytea NOT NULL REFERENCES sessions(token_hash) ON DELETE CASCADE,
+  authorization_version bigint NOT NULL,
+  redirect_uri text NOT NULL CHECK (octet_length(redirect_uri) <= 128),
+  code_challenge text NOT NULL CHECK (octet_length(code_challenge) = 43),
+  expires_at timestamptz NOT NULL DEFAULT now() + interval '1 minute'
+);
+CREATE INDEX cli_auth_codes_expiry ON cli_auth_codes(expires_at);
 
 CREATE TABLE auth_flows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -151,9 +182,10 @@ CREATE INDEX audit_events_actor_id_idx ON audit_events (actor_id);
 CREATE TABLE local_accounts (
   id uuid PRIMARY KEY REFERENCES principals(id) ON DELETE RESTRICT,
   username text NOT NULL UNIQUE CHECK (username ~ '^[A-Za-z0-9._-]{1,64}$'),
-  role text NOT NULL CHECK (role IN ('owner', 'admin')),
+  role text NOT NULL CHECK (role ~ '^[a-z][a-z0-9_.-]{0,63}$'),
   enabled boolean NOT NULL DEFAULT true,
   break_glass boolean NOT NULL DEFAULT false,
+  scope_binding jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(scope_binding) = 'object'),
   password_hash text NOT NULL DEFAULT '' CHECK (octet_length(password_hash) <= 512),
   failed_attempts integer NOT NULL DEFAULT 0 CHECK (failed_attempts BETWEEN 0 AND 5),
   locked_until timestamptz,
@@ -188,20 +220,110 @@ CREATE TABLE local_ceremonies (
 CREATE INDEX local_ceremonies_expiry ON local_ceremonies(expires_at);
 CREATE UNIQUE INDEX local_ceremonies_account ON local_ceremonies(account_id);
 
+-- Immutable action/target/payload authority; only the decision state can advance.
+CREATE TABLE approval_requests (
+  id uuid PRIMARY KEY,
+  requester_id uuid NOT NULL REFERENCES principals(id) ON DELETE RESTRICT,
+  requester_version bigint NOT NULL CHECK (requester_version > 0),
+  action text NOT NULL CHECK (action IN ('device.revoke', 'device.recover', 'enrollment.approve', 'resources.assign', 'resources.activate_preview', 'execution_trust.manage', 'device.action', 'recovery_key.reveal')),
+  permission text NOT NULL CHECK (
+    (action IN ('device.revoke', 'resources.assign', 'execution_trust.manage') AND permission = action)
+    OR (action = 'device.action' AND permission IN ('encryption.manage', 'actions.lock', 'actions.release-lock', 'actions.quarantine', 'destructive.execute'))
+    OR (action = 'resources.activate_preview' AND permission = 'resources.assign')
+    OR (action = 'recovery_key.reveal' AND permission = 'recovery_keys.read')
+    OR (action = 'device.recover' AND permission = 'device.revoke')
+    OR (action = 'enrollment.approve' AND permission = 'enrollment.manage')
+  ),
+  device_id uuid,
+  mutation_id text NOT NULL CHECK (octet_length(mutation_id) BETWEEN 1 AND 128),
+  payload bytea NOT NULL CHECK (octet_length(payload) BETWEEN 1 AND 1048576),
+  payload_sha256 bytea NOT NULL CHECK (octet_length(payload_sha256) = 32),
+  created_at timestamptz NOT NULL,
+  expires_at timestamptz NOT NULL,
+  state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'approved', 'rejected', 'consumed')),
+  approver_id uuid REFERENCES principals(id) ON DELETE RESTRICT,
+  approver_version bigint NOT NULL DEFAULT 0,
+  decision_reason text NOT NULL DEFAULT '' CHECK (char_length(decision_reason) <= 512),
+  consumed_at timestamptz,
+  CHECK (expires_at > created_at AND expires_at <= created_at + interval '1 hour'),
+  CHECK ((action = 'execution_trust.manage') = (device_id IS NULL)),
+  CHECK (approver_id IS NULL OR approver_id <> requester_id),
+  CHECK ((state = 'pending' AND approver_id IS NULL AND approver_version = 0)
+    OR (state <> 'pending' AND approver_id IS NOT NULL AND approver_version > 0)),
+  CHECK ((state = 'consumed') = (consumed_at IS NOT NULL))
+);
+CREATE INDEX approval_requests_requester ON approval_requests(requester_id, id);
+CREATE UNIQUE INDEX approval_requests_mutation ON approval_requests(requester_id, action, mutation_id);
+
+-- SCIM credentials are independent of login sessions and scoped to one connector.
+-- Configuration fingerprints fence removed/remapped connectors on old replicas.
+CREATE TABLE scim_connectors (
+  id text PRIMARY KEY CHECK (id ~ '^[a-z][a-z0-9_-]{0,63}$'),
+  config_digest bytea NOT NULL CHECK (octet_length(config_digest) = 32),
+  credential_hash bytea UNIQUE CHECK (octet_length(credential_hash) = 32),
+  enabled boolean NOT NULL DEFAULT true
+);
+
+-- Correlation is durable and immutable, even after resource deletion/config removal.
+CREATE TABLE scim_correlations (
+  connector_id text NOT NULL REFERENCES scim_connectors(id) ON DELETE RESTRICT,
+  provider_id text NOT NULL CHECK (char_length(provider_id) BETWEEN 1 AND 256),
+  issuer text NOT NULL CHECK (char_length(issuer) BETWEEN 1 AND 2048),
+  subject text NOT NULL CHECK (char_length(subject) BETWEEN 1 AND 256),
+  PRIMARY KEY (connector_id, provider_id),
+  UNIQUE (issuer, subject)
+);
+
+CREATE TABLE scim_resources (
+  id uuid PRIMARY KEY,
+  connector_id text NOT NULL REFERENCES scim_connectors(id) ON DELETE RESTRICT,
+  resource_type text NOT NULL CHECK (resource_type IN ('User', 'Group')),
+  external_id text NOT NULL DEFAULT '' CHECK (char_length(external_id) <= 256),
+  user_name text NOT NULL DEFAULT '' CHECK (char_length(user_name) <= 256),
+  principal_id uuid UNIQUE REFERENCES principals(id) ON DELETE RESTRICT,
+  document jsonb NOT NULL CHECK (jsonb_typeof(document) = 'object' AND octet_length(document::text) <= 131072),
+  version bigint NOT NULL DEFAULT 1 CHECK (version > 0),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  modified_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  deleted boolean NOT NULL DEFAULT false,
+  CHECK ((resource_type = 'User') = (principal_id IS NOT NULL)),
+  UNIQUE (connector_id, id)
+);
+CREATE UNIQUE INDEX scim_resources_external ON scim_resources(connector_id, resource_type, external_id) WHERE external_id <> '';
+CREATE UNIQUE INDEX scim_users_name ON scim_resources(connector_id, lower(user_name)) WHERE resource_type = 'User' AND NOT deleted;
+CREATE INDEX scim_resources_page ON scim_resources(connector_id, resource_type, id) WHERE NOT deleted;
+
+CREATE TABLE scim_group_members (
+  connector_id text NOT NULL,
+  group_id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (group_id, user_id),
+  FOREIGN KEY (connector_id, group_id) REFERENCES scim_resources(connector_id, id) ON DELETE RESTRICT,
+  FOREIGN KEY (connector_id, user_id) REFERENCES scim_resources(connector_id, id) ON DELETE RESTRICT
+);
+
 -- +goose Down
 -- +goose StatementBegin
 DO $$
 BEGIN
+  DROP TABLE IF EXISTS scim_group_members;
+  DROP TABLE IF EXISTS scim_resources;
+  DROP TABLE IF EXISTS scim_correlations;
+  DROP TABLE IF EXISTS scim_connectors;
+  DROP TABLE IF EXISTS approval_requests;
   DROP TABLE IF EXISTS local_ceremonies;
   DROP TABLE IF EXISTS local_enrollments;
   DROP TABLE IF EXISTS local_credentials;
   DROP TABLE IF EXISTS local_accounts;
   DROP TABLE IF EXISTS audit_events;
+  DROP TABLE IF EXISTS cli_auth_codes;
+  DROP TABLE IF EXISTS cli_auth_requests;
   DROP TABLE IF EXISTS auth_flows;
   DROP TABLE IF EXISTS sessions;
   DROP TABLE IF EXISTS principal_groups;
   DROP TABLE IF EXISTS principal_lineage;
   DROP TABLE IF EXISTS deployment_identity;
+  DROP TABLE IF EXISTS authorization_policy;
   DROP TABLE IF EXISTS principals;
 END $$;
 -- +goose StatementEnd

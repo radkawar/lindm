@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Explicit two-person authorization to replace one known device generation.
+// Inventory/hardware similarity never creates this linkage automatically.
+message CreateRecoveryEnrollmentGrantRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string expected_generation_id = 3 [(buf.validate.field).string.uuid = true];
+  uint32 lifetime_seconds = 4 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 900
+  }];
+  string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string approval_id = 6 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  // Must match current state at issuance; later revocation invalidates the grant.
+  bool expected_revoked = 7;
+  option (buf.validate.message).cel = {
+    id: "recovery_enrollment.nonzero_identity"
+    message: "recovery request, device and expected generation must be nonzero"
+    expression: "[this.request_id, this.device_id, this.expected_generation_id].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+}
+
+message CreateRecoveryEnrollmentGrantResponse {
+  string grant_id = 1;
+  string secret = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  bool secret_delivery_unknown = 4;
+}

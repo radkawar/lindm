@@ -247,6 +247,308 @@ func (x *RetrieveIssuanceResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ProvisionRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absent only on the internal verified offline-import adapter.
+	ProvisioningToken string `protobuf:"bytes,1,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
+	TransactionId     string `protobuf:"bytes,2,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	CsrPem            []byte `protobuf:"bytes,3,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
+	InstallationId    string `protobuf:"bytes,4,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ProvisionRequest) Reset() {
+	*x = ProvisionRequest{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProvisionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProvisionRequest) ProtoMessage() {}
+
+func (x *ProvisionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProvisionRequest.ProtoReflect.Descriptor instead.
+func (*ProvisionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ProvisionRequest) GetProvisioningToken() string {
+	if x != nil {
+		return x.ProvisioningToken
+	}
+	return ""
+}
+
+func (x *ProvisionRequest) GetTransactionId() string {
+	if x != nil {
+		return x.TransactionId
+	}
+	return ""
+}
+
+func (x *ProvisionRequest) GetCsrPem() []byte {
+	if x != nil {
+		return x.CsrPem
+	}
+	return nil
+}
+
+func (x *ProvisionRequest) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
+type ProvisionResponse struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId             string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	EnrollmentGeneration string                 `protobuf:"bytes,2,opt,name=enrollment_generation,json=enrollmentGeneration,proto3" json:"enrollment_generation,omitempty"`
+	// pending_approval carries no certificate or agent authority.
+	State          string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	CertificatePem []byte                 `protobuf:"bytes,4,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
+	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ProvisionResponse) Reset() {
+	*x = ProvisionResponse{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProvisionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProvisionResponse) ProtoMessage() {}
+
+func (x *ProvisionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProvisionResponse.ProtoReflect.Descriptor instead.
+func (*ProvisionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ProvisionResponse) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ProvisionResponse) GetEnrollmentGeneration() string {
+	if x != nil {
+		return x.EnrollmentGeneration
+	}
+	return ""
+}
+
+func (x *ProvisionResponse) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ProvisionResponse) GetCertificatePem() []byte {
+	if x != nil {
+		return x.CertificatePem
+	}
+	return nil
+}
+
+func (x *ProvisionResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type RetrieveProvisioningIssuanceRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthorityProof []byte                 `protobuf:"bytes,1,opt,name=authority_proof,json=authorityProof,proto3" json:"authority_proof,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RetrieveProvisioningIssuanceRequest) Reset() {
+	*x = RetrieveProvisioningIssuanceRequest{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveProvisioningIssuanceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveProvisioningIssuanceRequest) ProtoMessage() {}
+
+func (x *RetrieveProvisioningIssuanceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveProvisioningIssuanceRequest.ProtoReflect.Descriptor instead.
+func (*RetrieveProvisioningIssuanceRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RetrieveProvisioningIssuanceRequest) GetAuthorityProof() []byte {
+	if x != nil {
+		return x.AuthorityProof
+	}
+	return nil
+}
+
+type RetrieveProvisioningIssuanceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enrollment    *ProvisionResponse     `protobuf:"bytes,1,opt,name=enrollment,proto3" json:"enrollment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetrieveProvisioningIssuanceResponse) Reset() {
+	*x = RetrieveProvisioningIssuanceResponse{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveProvisioningIssuanceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveProvisioningIssuanceResponse) ProtoMessage() {}
+
+func (x *RetrieveProvisioningIssuanceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveProvisioningIssuanceResponse.ProtoReflect.Descriptor instead.
+func (*RetrieveProvisioningIssuanceResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RetrieveProvisioningIssuanceResponse) GetEnrollment() *ProvisionResponse {
+	if x != nil {
+		return x.Enrollment
+	}
+	return nil
+}
+
+type ProvisioningRetrieval struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	DeploymentId   string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	TransactionId  string                 `protobuf:"bytes,2,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	InstallationId string                 `protobuf:"bytes,3,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	CsrSha256      []byte                 `protobuf:"bytes,4,opt,name=csr_sha256,json=csrSha256,proto3" json:"csr_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ProvisioningRetrieval) Reset() {
+	*x = ProvisioningRetrieval{}
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProvisioningRetrieval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProvisioningRetrieval) ProtoMessage() {}
+
+func (x *ProvisioningRetrieval) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_enrollment_v1_enrollment_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProvisioningRetrieval.ProtoReflect.Descriptor instead.
+func (*ProvisioningRetrieval) Descriptor() ([]byte, []int) {
+	return file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ProvisioningRetrieval) GetDeploymentId() string {
+	if x != nil {
+		return x.DeploymentId
+	}
+	return ""
+}
+
+func (x *ProvisioningRetrieval) GetTransactionId() string {
+	if x != nil {
+		return x.TransactionId
+	}
+	return ""
+}
+
+func (x *ProvisioningRetrieval) GetInstallationId() string {
+	if x != nil {
+		return x.InstallationId
+	}
+	return ""
+}
+
+func (x *ProvisioningRetrieval) GetCsrSha256() []byte {
+	if x != nil {
+		return x.CsrSha256
+	}
+	return nil
+}
+
 var File_lindm_enrollment_v1_enrollment_proto protoreflect.FileDescriptor
 
 const file_lindm_enrollment_v1_enrollment_proto_rawDesc = "" +
@@ -268,10 +570,37 @@ const file_lindm_enrollment_v1_enrollment_proto_rawDesc = "" +
 	"\x18RetrieveIssuanceResponse\x12'\n" +
 	"\x0fcertificate_pem\x18\x01 \x01(\fR\x0ecertificatePem\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xd7\x01\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xda\x01\n" +
+	"\x10ProvisionRequest\x12<\n" +
+	"\x12provisioning_token\x18\x01 \x01(\tB\r\xbaH\n" +
+	"\xd8\x01\x01r\x05\x10 \x18\x80\x02R\x11provisioningToken\x12/\n" +
+	"\x0etransaction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\rtransactionId\x12$\n" +
+	"\acsr_pem\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\x121\n" +
+	"\x0finstallation_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\"\xdf\x01\n" +
+	"\x11ProvisionResponse\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x123\n" +
+	"\x15enrollment_generation\x18\x02 \x01(\tR\x14enrollmentGeneration\x12\x14\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12'\n" +
+	"\x0fcertificate_pem\x18\x04 \x01(\fR\x0ecertificatePem\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"[\n" +
+	"#RetrieveProvisioningIssuanceRequest\x124\n" +
+	"\x0fauthority_proof\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\"v\n" +
+	"$RetrieveProvisioningIssuanceResponse\x12N\n" +
+	"\n" +
+	"enrollment\x18\x01 \x01(\v2&.lindm.enrollment.v1.ProvisionResponseB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"enrollment\"\xd2\x01\n" +
+	"\x15ProvisioningRetrieval\x12-\n" +
+	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12/\n" +
+	"\x0etransaction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\rtransactionId\x121\n" +
+	"\x0finstallation_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12&\n" +
+	"\n" +
+	"csr_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\tcsrSha2562\xc9\x03\n" +
 	"\x11EnrollmentService\x12Q\n" +
 	"\x06Enroll\x12\".lindm.enrollment.v1.EnrollRequest\x1a#.lindm.enrollment.v1.EnrollResponse\x12o\n" +
-	"\x10RetrieveIssuance\x12,.lindm.enrollment.v1.RetrieveIssuanceRequest\x1a-.lindm.enrollment.v1.RetrieveIssuanceResponseB,Z*lindm/gen/lindm/enrollment/v1;enrollmentv1b\x06proto3"
+	"\x10RetrieveIssuance\x12,.lindm.enrollment.v1.RetrieveIssuanceRequest\x1a-.lindm.enrollment.v1.RetrieveIssuanceResponse\x12Z\n" +
+	"\tProvision\x12%.lindm.enrollment.v1.ProvisionRequest\x1a&.lindm.enrollment.v1.ProvisionResponse\x12\x93\x01\n" +
+	"\x1cRetrieveProvisioningIssuance\x128.lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest\x1a9.lindm.enrollment.v1.RetrieveProvisioningIssuanceResponseB,Z*lindm/gen/lindm/enrollment/v1;enrollmentv1b\x06proto3"
 
 var (
 	file_lindm_enrollment_v1_enrollment_proto_rawDescOnce sync.Once
@@ -285,26 +614,37 @@ func file_lindm_enrollment_v1_enrollment_proto_rawDescGZIP() []byte {
 	return file_lindm_enrollment_v1_enrollment_proto_rawDescData
 }
 
-var file_lindm_enrollment_v1_enrollment_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_lindm_enrollment_v1_enrollment_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_lindm_enrollment_v1_enrollment_proto_goTypes = []any{
-	(*EnrollRequest)(nil),            // 0: lindm.enrollment.v1.EnrollRequest
-	(*EnrollResponse)(nil),           // 1: lindm.enrollment.v1.EnrollResponse
-	(*RetrieveIssuanceRequest)(nil),  // 2: lindm.enrollment.v1.RetrieveIssuanceRequest
-	(*RetrieveIssuanceResponse)(nil), // 3: lindm.enrollment.v1.RetrieveIssuanceResponse
-	(*timestamppb.Timestamp)(nil),    // 4: google.protobuf.Timestamp
+	(*EnrollRequest)(nil),                        // 0: lindm.enrollment.v1.EnrollRequest
+	(*EnrollResponse)(nil),                       // 1: lindm.enrollment.v1.EnrollResponse
+	(*RetrieveIssuanceRequest)(nil),              // 2: lindm.enrollment.v1.RetrieveIssuanceRequest
+	(*RetrieveIssuanceResponse)(nil),             // 3: lindm.enrollment.v1.RetrieveIssuanceResponse
+	(*ProvisionRequest)(nil),                     // 4: lindm.enrollment.v1.ProvisionRequest
+	(*ProvisionResponse)(nil),                    // 5: lindm.enrollment.v1.ProvisionResponse
+	(*RetrieveProvisioningIssuanceRequest)(nil),  // 6: lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest
+	(*RetrieveProvisioningIssuanceResponse)(nil), // 7: lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse
+	(*ProvisioningRetrieval)(nil),                // 8: lindm.enrollment.v1.ProvisioningRetrieval
+	(*timestamppb.Timestamp)(nil),                // 9: google.protobuf.Timestamp
 }
 var file_lindm_enrollment_v1_enrollment_proto_depIdxs = []int32{
-	4, // 0: lindm.enrollment.v1.EnrollResponse.expires_at:type_name -> google.protobuf.Timestamp
-	4, // 1: lindm.enrollment.v1.RetrieveIssuanceResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 2: lindm.enrollment.v1.EnrollmentService.Enroll:input_type -> lindm.enrollment.v1.EnrollRequest
-	2, // 3: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:input_type -> lindm.enrollment.v1.RetrieveIssuanceRequest
-	1, // 4: lindm.enrollment.v1.EnrollmentService.Enroll:output_type -> lindm.enrollment.v1.EnrollResponse
-	3, // 5: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:output_type -> lindm.enrollment.v1.RetrieveIssuanceResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	9, // 0: lindm.enrollment.v1.EnrollResponse.expires_at:type_name -> google.protobuf.Timestamp
+	9, // 1: lindm.enrollment.v1.RetrieveIssuanceResponse.expires_at:type_name -> google.protobuf.Timestamp
+	9, // 2: lindm.enrollment.v1.ProvisionResponse.expires_at:type_name -> google.protobuf.Timestamp
+	5, // 3: lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse.enrollment:type_name -> lindm.enrollment.v1.ProvisionResponse
+	0, // 4: lindm.enrollment.v1.EnrollmentService.Enroll:input_type -> lindm.enrollment.v1.EnrollRequest
+	2, // 5: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:input_type -> lindm.enrollment.v1.RetrieveIssuanceRequest
+	4, // 6: lindm.enrollment.v1.EnrollmentService.Provision:input_type -> lindm.enrollment.v1.ProvisionRequest
+	6, // 7: lindm.enrollment.v1.EnrollmentService.RetrieveProvisioningIssuance:input_type -> lindm.enrollment.v1.RetrieveProvisioningIssuanceRequest
+	1, // 8: lindm.enrollment.v1.EnrollmentService.Enroll:output_type -> lindm.enrollment.v1.EnrollResponse
+	3, // 9: lindm.enrollment.v1.EnrollmentService.RetrieveIssuance:output_type -> lindm.enrollment.v1.RetrieveIssuanceResponse
+	5, // 10: lindm.enrollment.v1.EnrollmentService.Provision:output_type -> lindm.enrollment.v1.ProvisionResponse
+	7, // 11: lindm.enrollment.v1.EnrollmentService.RetrieveProvisioningIssuance:output_type -> lindm.enrollment.v1.RetrieveProvisioningIssuanceResponse
+	8, // [8:12] is the sub-list for method output_type
+	4, // [4:8] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_lindm_enrollment_v1_enrollment_proto_init() }
@@ -318,7 +658,7 @@ func file_lindm_enrollment_v1_enrollment_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_enrollment_v1_enrollment_proto_rawDesc), len(file_lindm_enrollment_v1_enrollment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

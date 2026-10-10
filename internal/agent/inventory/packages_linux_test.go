@@ -19,11 +19,11 @@ import (
 )
 
 func TestDPKGInstalledEvidence(t *testing.T) {
-	input := "rc \tremoved\t1.0-1\tamd64\n" +
-		"ii \tzlib1g\t1:1.3.dfsg-2ubuntu1\tamd64\n" +
-		"hi \tlibc6\t2.39-0ubuntu8.6\ti386\n" +
-		"ii \tlibc6\t2.39-0ubuntu8.6\tamd64\n" +
-		"un \tnever-installed\t\t\n"
+	input := "rc \tremoved\t1.0-1\tamd64\tremoved\t1.0-1\n" +
+		"ii \tzlib1g\t1:1.3.dfsg-2ubuntu1\tamd64\tzlib\t1:1.3.dfsg-2ubuntu1\n" +
+		"hi \tlibc6\t2.39-0ubuntu8.6\ti386\tglibc\t2.39-0ubuntu8.6\n" +
+		"ii \tlibc6\t2.39-0ubuntu8.6\tamd64\tglibc\t2.39-0ubuntu8.6\n" +
+		"un \tnever-installed\t\t\t\t\n"
 	rows, status := parsePackages(context.Background(), strings.NewReader(input), "dpkg", parseLimits{maxRecords, maxOutputBytes})
 	if status != success || len(rows) != 3 {
 		t.Fatalf("status=%s rows=%v", status, rows)
@@ -31,12 +31,15 @@ func TestDPKGInstalledEvidence(t *testing.T) {
 	if rows[0].Name != "libc6" || rows[0].Architecture != "amd64" || rows[1].Architecture != "i386" || rows[2].Version != "1:1.3.dfsg-2ubuntu1" || rows[2].Manager != "dpkg" {
 		t.Fatalf("lost installed package identity or ordering: %v", rows)
 	}
+	if rows[0].SourceName != "glibc" || rows[0].SourceVersion != "2.39-0ubuntu8.6" || rows[2].SourceName != "zlib" || rows[2].SourceVersion != "1:1.3.dfsg-2ubuntu1" {
+		t.Fatalf("lost native source identity: %v", rows)
+	}
 }
 
 func TestRPMEpochAndMultipleVersions(t *testing.T) {
-	input := "kernel-core\t0\t6.9.3\t200.fc40\tx86_64\n" +
-		"kernel-core\t0\t6.9.2\t200.fc40\tx86_64\n" +
-		"vim-enhanced\t2\t9.1\t1.el9\tx86_64\n"
+	input := "kernel-core\t0\t6.9.3\t200.fc40\tx86_64\t(none)\n" +
+		"kernel-core\t0\t6.9.2\t200.fc40\tx86_64\t(none)\n" +
+		"vim-enhanced\t2\t9.1\t1.el9\tx86_64\t(none)\n"
 	rows, status := parsePackages(context.Background(), strings.NewReader(input), "rpm", parseLimits{maxRecords, maxOutputBytes})
 	if status != success || len(rows) != 3 {
 		t.Fatalf("status=%s rows=%v", status, rows)
@@ -49,8 +52,9 @@ func TestRPMEpochAndMultipleVersions(t *testing.T) {
 func TestRPMImportedSigningKeyPreservesCompleteInventory(t *testing.T) {
 	// Native RPM 4.x output after importing the pinned Ubuntu cloud-image key
 	// into an isolated RPM database. Signing-key headers have no ARCH tag.
-	input := "gpg-pubkey\t0\t7db87c81\t4ab02935\t(none)\n" +
-		"kernel-core\t0\t6.9.3\t200.fc40\tx86_64\n"
+	// The added modularity column below is a constructed nonmodular boundary.
+	input := "gpg-pubkey\t0\t7db87c81\t4ab02935\t(none)\t(none)\n" +
+		"kernel-core\t0\t6.9.3\t200.fc40\tx86_64\t(none)\n"
 	rows, status := parsePackages(t.Context(), strings.NewReader(input), "rpm", parseLimits{maxRecords, maxOutputBytes})
 	if status != success || len(rows) != 2 {
 		t.Fatalf("native signing-key metadata invalidated complete inventory: status=%s rows=%v", status, rows)
@@ -65,19 +69,21 @@ func TestInvalidPackageOutputNeverPublishesPartialRows(t *testing.T) {
 	for _, tc := range []struct {
 		name, manager, valid, bad string
 	}{
-		{"truncated", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t1\tamd64"},
-		{"columns", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t1\n"},
-		{"status", "dpkg", "ii \tgood\t1\tamd64\n", "xx \tbad\t1\tamd64\n"},
-		{"reinst-required", "dpkg", "ii \tgood\t1\tamd64\n", "iiR\tbad\t1\tamd64\n"},
-		{"invalid-residual", "dpkg", "ii \tgood\t1\tamd64\n", "rc \tbad name\t1\tamd64\n"},
-		{"nul", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t1\x00\tamd64\n"},
-		{"invalid-utf8", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t\xff\tamd64\n"},
-		{"rpm-epoch", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t(none)\t1\t1\tx86_64\n"},
-		{"rpm-release", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t\tx86_64\n"},
-		{"rpm-empty-architecture", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t1\t\n"},
-		{"rpm-malformed-architecture", "rpm", "good\t0\t1\t1\tx86_64\n", "bad\t0\t1\t1\t(broken)\n"},
-		{"dpkg-absent-architecture", "dpkg", "ii \tgood\t1\tamd64\n", "ii \tbad\t1\t(none)\n"},
-		{"blank", "rpm", "good\t0\t1\t1\tx86_64\n", "\n"},
+		{"truncated", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\tamd64\tbad\t1"},
+		{"columns", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\n"},
+		{"status", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "xx \tbad\t1\tamd64\tbad\t1\n"},
+		{"reinst-required", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "iiR\tbad\t1\tamd64\tbad\t1\n"},
+		{"invalid-residual", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "rc \tbad name\t1\tamd64\tbad\t1\n"},
+		{"nul", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\x00\tamd64\tbad\t1\n"},
+		{"invalid-utf8", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t\xff\tamd64\tbad\t1\n"},
+		{"missing-source", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\tamd64\t\t\n"},
+		{"invalid-source-version", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\tamd64\tbad\t1 invalid\n"},
+		{"rpm-epoch", "rpm", "good\t0\t1\t1\tx86_64\t(none)\n", "bad\t(none)\t1\t1\tx86_64\t(none)\n"},
+		{"rpm-release", "rpm", "good\t0\t1\t1\tx86_64\t(none)\n", "bad\t0\t1\t\tx86_64\t(none)\n"},
+		{"rpm-empty-architecture", "rpm", "good\t0\t1\t1\tx86_64\t(none)\n", "bad\t0\t1\t1\t\t(none)\n"},
+		{"rpm-malformed-architecture", "rpm", "good\t0\t1\t1\tx86_64\t(none)\n", "bad\t0\t1\t1\t(broken)\t(none)\n"},
+		{"dpkg-absent-architecture", "dpkg", "ii \tgood\t1\tamd64\tgood\t1\n", "ii \tbad\t1\t(none)\tbad\t1\n"},
+		{"blank", "rpm", "good\t0\t1\t1\tx86_64\t(none)\n", "\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rows, status := parsePackages(context.Background(), strings.NewReader(tc.valid+tc.bad), tc.manager, parseLimits{maxRecords, maxOutputBytes})
@@ -89,7 +95,7 @@ func TestInvalidPackageOutputNeverPublishesPartialRows(t *testing.T) {
 }
 
 func TestPackageCapacityAndCancellation(t *testing.T) {
-	line := "ii \tgood\t1\tamd64\n"
+	line := "ii \tgood\t1\tamd64\tgood\t1\n"
 	for _, tc := range []struct {
 		name, input string
 		limits      parseLimits
@@ -160,7 +166,7 @@ func TestBackendRequiresVendorVersionAndDatabase(t *testing.T) {
 func TestFailedCommandDiscardsParsedRows(t *testing.T) {
 	stat := fixtureStat(fstest.MapFS{"var/lib/dpkg/status": {Data: []byte("db")}})
 	run := func(ctx context.Context, _ backend, consume func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
-		if status := consume(strings.NewReader("ii \tgood\t1\tamd64\n")); status != success {
+		if status := consume(strings.NewReader("ii \tgood\t1\tamd64\tgood\t1\n")); status != success {
 			t.Fatalf("parse status=%s", status)
 		}
 		return commandFailure
@@ -221,7 +227,7 @@ func TestInventorySubprocessHelper(t *testing.T) {
 	exit := 0
 	switch mode {
 	case "complete", "failure", "warning":
-		output = "ii \tgood\t1\tamd64\n"
+		output = "ii \tgood\t1\tamd64\tgood\t1\n"
 		if mode == "failure" {
 			exit = 7
 		}
@@ -229,7 +235,7 @@ func TestInventorySubprocessHelper(t *testing.T) {
 			diagnostic = "database record ignored\n"
 		}
 	case "truncated":
-		output = "ii \tgood\t1\tamd64"
+		output = "ii \tgood\t1\tamd64\tgood\t1"
 	case "stderr-capacity":
 		diagnostic = strings.Repeat("x", 65<<10)
 	case "wait":
@@ -275,5 +281,44 @@ func TestCanceledCollectionDoesNotRunNativeTool(t *testing.T) {
 	}
 	if err := protovalidate.Validate(result); err != nil {
 		t.Fatalf("invalid cancellation evidence: %v", err)
+	}
+}
+
+func TestRPMModuleIdentityIsNativeEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		label   string
+		status  inventoryv1.CollectionStatus
+		modular bool
+	}{
+		{"nodejs:18:9030020230914123456:abcd1234", success, true},
+		{"(none)", success, false},
+		{"", invalid, false},
+		{"nodejs:18:20230914", invalid, false},
+		{"nodejs:18:latest:abcd1234", invalid, false},
+		{"nodejs:18:20230914:abcd1234:unexpected", invalid, false},
+		{"nodejs:18:" + strings.Repeat("1", 33) + ":abcd1234", invalid, false},
+	} {
+		pkg, err := parsePackageLine("nodejs\t1\t18.17.1\t1.module+el9.3.0+1\tx86_64\t"+tc.label, "rpm")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pkg.Module.Status != tc.status || pkg.Module.Modular != tc.modular {
+			t.Fatalf("module %q: %v", tc.label, pkg.Module)
+		}
+		if tc.modular && (pkg.Module.Name != "nodejs" || pkg.Module.Stream != "18" || pkg.Module.Version != "9030020230914123456" || pkg.Module.Context != "abcd1234") {
+			t.Fatalf("lost native module identity: %v", pkg.Module)
+		}
+		if err := protovalidate.Validate(pkg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// EL-compatible-looking release names do not establish modularity.
+	plain, err := parsePackageLine("nodejs\t1\t18.17.1\t1.module+el9.3.0+1\tx86_64\t(none)", "rpm")
+	if err != nil || plain.Module.Modular || plain.Module.Status != success {
+		t.Fatalf("inferred modularity from release: %v %v", plain, err)
+	}
+	dpkg, err := parsePackageLine("ii \tnodejs\t18.17.1-1\tamd64\tnodejs\t18.17.1-1", "dpkg")
+	if err != nil || dpkg.Module.Status != unavailable {
+		t.Fatalf("non-RPM module evidence: %v %v", dpkg, err)
 	}
 }

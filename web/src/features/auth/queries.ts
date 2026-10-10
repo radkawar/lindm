@@ -1,4 +1,6 @@
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
+import { toJsonString } from "@bufbuild/protobuf";
+import { SessionPrincipalSchema } from "../../../gen/lindm/auth/v1/auth_pb";
 import { clearCsrfToken, setCsrfToken } from "@/lib/rpc";
 import { getAuthLifetime, synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { fetchSession, postLogout, type SessionPrincipal } from "./session";
@@ -6,7 +8,7 @@ import { fetchSession, postLogout, type SessionPrincipal } from "./session";
 export const sessionQueryKey = ["session"] as const;
 
 export function sessionIdentity(principal: SessionPrincipal): string {
-  return `${principal.id}\u0000${principal.role}\u0000${principal.csrfToken}`;
+  return toJsonString(SessionPrincipalSchema, principal);
 }
 
 export function sessionQueryOptions() {

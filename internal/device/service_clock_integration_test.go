@@ -83,7 +83,7 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 			attestation.Nonce = work.GetResultNonce()
 			attestation.ActionRevision++
 			result.AttestationEnvelope = f.sign(t, attestation, f.key)
-			if _, err := f.pool.Exec(t.Context(), "UPDATE service_actions SET nonce_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", work.GetActionId()); err != nil {
+			if _, err := f.pool.Exec(t.Context(), "UPDATE resource_actions SET nonce_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", work.GetActionId()); err != nil {
 				t.Fatal(err)
 			}
 			_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(result))

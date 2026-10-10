@@ -20,6 +20,17 @@ message Package {
     min_len: 1
     max_len: 64
   }];
+  // Native source-package identity, including epoch; absent as a pair when
+  // the backend does not report source metadata.
+  string source_name = 5 [(buf.validate.field).string.max_len = 512];
+  string source_version = 6 [(buf.validate.field).string.max_len = 2048];
+  // Absent only on historical package evidence.
+  ModuleObservation module = 7;
+  option (buf.validate.message).cel = {
+    id: "package.source_pair"
+    message: "source name and version must be present together"
+    expression: "(this.source_name == '') == (this.source_version == '')"
+  };
 }
 
 // CollectionStatus describes collection, not compliance or server freshness.
@@ -59,6 +70,7 @@ message HostObservation {
   ObservedString hardware_vendor = 9 [(buf.validate.field).required = true];
   ObservedString hardware_model = 10 [(buf.validate.field).required = true];
   ObservedString hardware_serial = 11 [(buf.validate.field).required = true];
+  NativeDetails details = 12;
   option (buf.validate.message).cel = {
     id: "observation.time_order"
     message: "collection finish must not precede its start"
@@ -106,4 +118,291 @@ enum SnapshotState {
 message NativeObservation {
   HostObservation host = 1 [(buf.validate.field).required = true];
   PackageObservation packages = 2 [(buf.validate.field).required = true];
+}
+
+// Native details are optional only at the historical HostObservation boundary.
+message ObservedUint64 {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint64 value = 2;
+  option (buf.validate.message).cel = {
+    id: "number.failure"
+    message: "failed observations have no value"
+    expression: "this.status == 1 || this.value == 0u"
+  };
+}
+
+message ObservedBool {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  bool value = 2;
+  option (buf.validate.message).cel = {
+    id: "boolean.failure"
+    message: "failed observations have no value"
+    expression: "this.status == 1 || !this.value"
+  };
+}
+
+message ObservedStrings {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated string values = 2 [(buf.validate.field).repeated = {
+    max_items: 64
+    items: {
+      string: {
+        max_len: 256
+        ip_with_prefixlen: true
+      }
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "values.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.values.size() == 0"
+  };
+}
+
+message CpuDetails {
+  ObservedString model = 1 [(buf.validate.field).required = true];
+  ObservedUint64 logical_cores = 2 [(buf.validate.field).required = true];
+  ObservedUint64 physical_cores = 3 [(buf.validate.field).required = true];
+  ObservedString x86_64_level = 4 [(buf.validate.field).required = true];
+}
+
+message MemoryDetails {
+  ObservedUint64 total_bytes = 1 [(buf.validate.field).required = true];
+  ObservedUint64 available_bytes = 2 [(buf.validate.field).required = true];
+  ObservedUint64 swap_total_bytes = 3 [(buf.validate.field).required = true];
+}
+
+message BlockDevice {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  ObservedString type = 2 [(buf.validate.field).required = true];
+  ObservedString parent = 3 [(buf.validate.field).required = true];
+  ObservedUint64 size_bytes = 4 [(buf.validate.field).required = true];
+  ObservedString filesystem = 5 [(buf.validate.field).required = true];
+  ObservedString mountpoint = 6 [(buf.validate.field).required = true];
+  ObservedString encryption = 7 [(buf.validate.field).required = true];
+}
+
+message StorageDetails {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated BlockDevice devices = 2 [(buf.validate.field).repeated.max_items = 256];
+  option (buf.validate.message).cel = {
+    id: "devices.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.devices.size() == 0"
+  };
+}
+
+message NetworkInterface {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  ObservedString mac = 2 [(buf.validate.field).required = true];
+  ObservedString link = 3 [(buf.validate.field).required = true];
+  ObservedStrings addresses = 4 [(buf.validate.field).required = true];
+}
+
+message NetworkDetails {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated NetworkInterface interfaces = 2 [(buf.validate.field).repeated.max_items = 256];
+  option (buf.validate.message).cel = {
+    id: "interfaces.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.interfaces.size() == 0"
+  };
+}
+
+message FirmwareDetails {
+  ObservedString mode = 1 [(buf.validate.field).required = true];
+  ObservedString secure_boot = 2 [(buf.validate.field).required = true];
+}
+
+message TpmDetails {
+  ObservedBool present = 1 [(buf.validate.field).required = true];
+  ObservedString version = 2 [(buf.validate.field).required = true];
+}
+
+message Battery {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  ObservedString status = 2 [(buf.validate.field).required = true];
+  ObservedUint64 capacity_percent = 3 [(buf.validate.field).required = true];
+}
+
+message BatteryDetails {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated Battery items = 2 [(buf.validate.field).repeated.max_items = 32];
+  option (buf.validate.message).cel = {
+    id: "items.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.items.size() == 0"
+  };
+}
+
+message PowerDetails {
+  ObservedString chassis = 1 [(buf.validate.field).required = true];
+  BatteryDetails batteries = 2 [(buf.validate.field).required = true];
+}
+
+message SessionCounts {
+  ObservedUint64 users = 1 [(buf.validate.field).required = true];
+  ObservedUint64 sessions = 2 [(buf.validate.field).required = true];
+}
+
+message LocalUser {
+  uint64 uid = 1 [(buf.validate.field).uint64.lte = 4294967295];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string shell = 3 [(buf.validate.field).string.max_len = 4096];
+}
+
+message LocalUsers {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated LocalUser users = 2 [(buf.validate.field).repeated.max_items = 4096];
+  option (buf.validate.message).cel = {
+    id: "users.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.users.size() == 0"
+  };
+}
+
+message BackendDetails {
+  ObservedBool dpkg = 1 [(buf.validate.field).required = true];
+  ObservedBool rpm = 2 [(buf.validate.field).required = true];
+  ObservedBool pacman = 3 [(buf.validate.field).required = true];
+  ObservedBool zypper = 4 [(buf.validate.field).required = true];
+  ObservedBool rpm_ostree = 5 [(buf.validate.field).required = true];
+  ObservedBool nix = 6 [(buf.validate.field).required = true];
+  ObservedBool flatpak = 7 [(buf.validate.field).required = true];
+  ObservedBool snap = 8 [(buf.validate.field).required = true];
+}
+
+message Application {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+  ObservedString version = 2 [(buf.validate.field).required = true];
+  ObservedString architecture = 3 [(buf.validate.field).required = true];
+  ObservedString scope = 4 [(buf.validate.field).required = true];
+}
+
+message ApplicationDetails {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated Application applications = 2 [(buf.validate.field).repeated.max_items = 2048];
+  option (buf.validate.message).cel = {
+    id: "applications.failure"
+    message: "failed collections have no partial rows"
+    expression: "this.status == 1 || this.applications.size() == 0"
+  };
+}
+
+message NativeDetails {
+  CpuDetails cpu = 1 [(buf.validate.field).required = true];
+  MemoryDetails memory = 2 [(buf.validate.field).required = true];
+  StorageDetails storage = 3 [(buf.validate.field).required = true];
+  NetworkDetails network = 4 [(buf.validate.field).required = true];
+  FirmwareDetails firmware = 5 [(buf.validate.field).required = true];
+  TpmDetails tpm = 6 [(buf.validate.field).required = true];
+  PowerDetails power = 7 [(buf.validate.field).required = true];
+  SessionCounts sessions = 8 [(buf.validate.field).required = true];
+  LocalUsers local_users = 9 [(buf.validate.field).required = true];
+  ObservedUint64 kernel_module_count = 10 [(buf.validate.field).required = true];
+  ObservedUint64 uptime_seconds = 11 [(buf.validate.field).required = true];
+  ObservedUint64 boot_time_unix_seconds = 12 [(buf.validate.field).required = true];
+  BackendDetails backends = 13 [(buf.validate.field).required = true];
+  ApplicationDetails flatpak = 14 [(buf.validate.field).required = true];
+  ApplicationDetails snap = 15 [(buf.validate.field).required = true];
+  // Absent only on historical host evidence.
+  PlatformDetails platform = 16;
+}
+
+// Module identity is native RPM MODULARITYLABEL evidence, not a guessed stream.
+message ModuleObservation {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  bool modular = 2;
+  string name = 3 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^([A-Za-z0-9][A-Za-z0-9+_.-]*)?$"
+  }];
+  string stream = 4 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^([A-Za-z0-9][A-Za-z0-9+_.-]*)?$"
+  }];
+  string version = 5 [(buf.validate.field).string = {
+    max_len: 32
+    pattern: "^[0-9]*$"
+  }];
+  string context = 6 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^([A-Za-z0-9][A-Za-z0-9+_.-]*)?$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "module.identity_shape"
+    message: "only a successful modular observation carries a complete native identity"
+    expression: "(this.status == 1 && this.modular) ? (this.name != '' && this.stream != '' && this.version != '' && this.context != '') : (!this.modular && this.name == '' && this.stream == '' && this.version == '' && this.context == '')"
+  };
+}
+
+message RepositoryObservation {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated string ids = 2 [(buf.validate.field).repeated = {
+    max_items: 256
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 256
+      }
+    }
+  }];
+  string backend = 3 [(buf.validate.field).string.max_len = 64];
+  option (buf.validate.message).cel = {
+    id: "repositories.failure"
+    message: "successful repositories identify their native backend; failures carry no partial evidence"
+    expression: "this.status == 1 ? this.backend != '' : (this.ids.size() == 0 && this.backend == '')"
+  };
+}
+
+message PlatformDetails {
+  ObservedString cpe = 1 [(buf.validate.field).required = true];
+  ObservedString releasever_lock = 2 [(buf.validate.field).required = true];
+  RepositoryObservation repositories = 3 [(buf.validate.field).required = true];
 }

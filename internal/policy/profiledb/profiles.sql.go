@@ -13,7 +13,7 @@ import (
 )
 
 const advanceProfileHead = `-- name: AdvanceProfileHead :execrows
-UPDATE service_profiles SET head_revision_id = $1
+UPDATE profiles SET head_revision_id = $1
 WHERE id = $2 AND head_revision_id = $3
 `
 
@@ -32,7 +32,7 @@ func (q *Queries) AdvanceProfileHead(ctx context.Context, arg AdvanceProfileHead
 }
 
 const createProfile = `-- name: CreateProfile :execrows
-INSERT INTO service_profiles (id, head_revision_id, created_at)
+INSERT INTO profiles (id, head_revision_id, created_at)
 VALUES ($1, $2, clock_timestamp())
 ON CONFLICT (id) DO NOTHING
 `
@@ -52,12 +52,12 @@ func (q *Queries) CreateProfile(ctx context.Context, arg CreateProfileParams) (i
 
 const getProfileRequest = `-- name: GetProfileRequest :one
 SELECT request_id, actor_id, request_digest, profile_id, revision_id, audit_id
-FROM service_profile_requests WHERE request_id = $1
+FROM profile_requests WHERE request_id = $1
 `
 
-func (q *Queries) GetProfileRequest(ctx context.Context, requestID uuid.UUID) (ServiceProfileRequest, error) {
+func (q *Queries) GetProfileRequest(ctx context.Context, requestID uuid.UUID) (ProfileRequest, error) {
 	row := q.db.QueryRow(ctx, getProfileRequest, requestID)
-	var i ServiceProfileRequest
+	var i ProfileRequest
 	err := row.Scan(
 		&i.RequestID,
 		&i.ActorID,
@@ -72,10 +72,10 @@ func (q *Queries) GetProfileRequest(ctx context.Context, requestID uuid.UUID) (S
 const getProfileRevision = `-- name: GetProfileRevision :one
 SELECT id, profile_id, revision_number, name, description, resource_count,
        spec_digest, actor_id, published_at
-FROM service_profile_revisions
+FROM profile_revisions
 WHERE profile_id = $1
   AND id = COALESCE($2::uuid,
-      (SELECT head_revision_id FROM service_profiles WHERE id = $1))
+      (SELECT head_revision_id FROM profiles WHERE id = $1))
 `
 
 type GetProfileRevisionParams struct {
@@ -83,9 +83,32 @@ type GetProfileRevisionParams struct {
 	RevisionID *uuid.UUID
 }
 
-func (q *Queries) GetProfileRevision(ctx context.Context, arg GetProfileRevisionParams) (ServiceProfileRevision, error) {
+func (q *Queries) GetProfileRevision(ctx context.Context, arg GetProfileRevisionParams) (ProfileRevision, error) {
 	row := q.db.QueryRow(ctx, getProfileRevision, arg.ProfileID, arg.RevisionID)
-	var i ServiceProfileRevision
+	var i ProfileRevision
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.RevisionNumber,
+		&i.Name,
+		&i.Description,
+		&i.ResourceCount,
+		&i.SpecDigest,
+		&i.ActorID,
+		&i.PublishedAt,
+	)
+	return i, err
+}
+
+const getRetainedProfileRevision = `-- name: GetRetainedProfileRevision :one
+SELECT id, profile_id, revision_number, name, description, resource_count,
+       spec_digest, actor_id, published_at
+FROM profile_revisions WHERE id = $1
+`
+
+func (q *Queries) GetRetainedProfileRevision(ctx context.Context, id uuid.UUID) (ProfileRevision, error) {
+	row := q.db.QueryRow(ctx, getRetainedProfileRevision, id)
+	var i ProfileRevision
 	err := row.Scan(
 		&i.ID,
 		&i.ProfileID,
@@ -102,7 +125,7 @@ func (q *Queries) GetProfileRevision(ctx context.Context, arg GetProfileRevision
 
 const insertProfileAudit = `-- name: InsertProfileAudit :exec
 INSERT INTO audit_events (id, occurred_at, actor_id, action, resource_id, reason)
-VALUES ($1, $2, $3, 'service_profile.publish', $4, $5)
+VALUES ($1, $2, $3, 'profile.publish', $4, $5)
 `
 
 type InsertProfileAuditParams struct {
@@ -125,21 +148,23 @@ func (q *Queries) InsertProfileAudit(ctx context.Context, arg InsertProfileAudit
 }
 
 type InsertProfileDependenciesParams struct {
-	RevisionID   uuid.UUID
-	ResourceID   uuid.UUID
-	DependencyID uuid.UUID
+	RevisionID     uuid.UUID
+	ResourceID     uuid.UUID
+	DependencyKind int16
+	DependencyKey  string
+	Condition      int16
 }
 
 type InsertProfileResourcesParams struct {
-	RevisionID      uuid.UUID
-	ResourceID      uuid.UUID
-	UnitName        string
-	RuntimeState    int16
-	EnablementState int16
+	RevisionID    uuid.UUID
+	ResourceID    uuid.UUID
+	ResourceKind  int16
+	CanonicalKey  string
+	ResourceProto []byte
 }
 
 const insertProfileRevision = `-- name: InsertProfileRevision :exec
-INSERT INTO service_profile_revisions (id, profile_id, revision_number, name, description,
+INSERT INTO profile_revisions (id, profile_id, revision_number, name, description,
     resource_count, spec_digest, actor_id, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
@@ -172,13 +197,15 @@ func (q *Queries) InsertProfileRevision(ctx context.Context, arg InsertProfileRe
 }
 
 const listProfileDependencies = `-- name: ListProfileDependencies :many
-SELECT resource_id, dependency_id FROM service_profile_dependencies
-WHERE revision_id = $1 ORDER BY resource_id, dependency_id LIMIT 4033
+SELECT resource_id, dependency_kind, dependency_key, condition FROM profile_dependencies
+WHERE revision_id = $1 ORDER BY resource_id, dependency_kind, dependency_key LIMIT 4033
 `
 
 type ListProfileDependenciesRow struct {
-	ResourceID   uuid.UUID
-	DependencyID uuid.UUID
+	ResourceID     uuid.UUID
+	DependencyKind int16
+	DependencyKey  string
+	Condition      int16
 }
 
 func (q *Queries) ListProfileDependencies(ctx context.Context, revisionID uuid.UUID) ([]ListProfileDependenciesRow, error) {
@@ -190,7 +217,12 @@ func (q *Queries) ListProfileDependencies(ctx context.Context, revisionID uuid.U
 	items := []ListProfileDependenciesRow{}
 	for rows.Next() {
 		var i ListProfileDependenciesRow
-		if err := rows.Scan(&i.ResourceID, &i.DependencyID); err != nil {
+		if err := rows.Scan(
+			&i.ResourceID,
+			&i.DependencyKind,
+			&i.DependencyKey,
+			&i.Condition,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -204,7 +236,7 @@ func (q *Queries) ListProfileDependencies(ctx context.Context, revisionID uuid.U
 const listProfileHeads = `-- name: ListProfileHeads :many
 SELECT r.id, r.profile_id, r.revision_number, r.name, r.description,
        r.resource_count, r.spec_digest, r.actor_id, r.published_at
-FROM service_profiles p JOIN service_profile_revisions r ON r.id = p.head_revision_id AND r.profile_id = p.id
+FROM profiles p JOIN profile_revisions r ON r.id = p.head_revision_id AND r.profile_id = p.id
 WHERE p.id > $1::uuid
 ORDER BY p.id LIMIT $2::integer
 `
@@ -214,15 +246,15 @@ type ListProfileHeadsParams struct {
 	PageLimit int32
 }
 
-func (q *Queries) ListProfileHeads(ctx context.Context, arg ListProfileHeadsParams) ([]ServiceProfileRevision, error) {
+func (q *Queries) ListProfileHeads(ctx context.Context, arg ListProfileHeadsParams) ([]ProfileRevision, error) {
 	rows, err := q.db.Query(ctx, listProfileHeads, arg.AfterID, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ServiceProfileRevision{}
+	items := []ProfileRevision{}
 	for rows.Next() {
-		var i ServiceProfileRevision
+		var i ProfileRevision
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProfileID,
@@ -245,15 +277,15 @@ func (q *Queries) ListProfileHeads(ctx context.Context, arg ListProfileHeadsPara
 }
 
 const listProfileResources = `-- name: ListProfileResources :many
-SELECT resource_id, unit_name, runtime_state, enablement_state
-FROM service_profile_resources WHERE revision_id = $1 ORDER BY resource_id LIMIT 65
+SELECT resource_id, resource_kind, canonical_key, resource_proto
+FROM profile_resources WHERE revision_id = $1 ORDER BY resource_id LIMIT 65
 `
 
 type ListProfileResourcesRow struct {
-	ResourceID      uuid.UUID
-	UnitName        string
-	RuntimeState    int16
-	EnablementState int16
+	ResourceID    uuid.UUID
+	ResourceKind  int16
+	CanonicalKey  string
+	ResourceProto []byte
 }
 
 func (q *Queries) ListProfileResources(ctx context.Context, revisionID uuid.UUID) ([]ListProfileResourcesRow, error) {
@@ -267,9 +299,9 @@ func (q *Queries) ListProfileResources(ctx context.Context, revisionID uuid.UUID
 		var i ListProfileResourcesRow
 		if err := rows.Scan(
 			&i.ResourceID,
-			&i.UnitName,
-			&i.RuntimeState,
-			&i.EnablementState,
+			&i.ResourceKind,
+			&i.CanonicalKey,
+			&i.ResourceProto,
 		); err != nil {
 			return nil, err
 		}
@@ -282,12 +314,12 @@ func (q *Queries) ListProfileResources(ctx context.Context, revisionID uuid.UUID
 }
 
 const lockProfile = `-- name: LockProfile :one
-SELECT id, head_revision_id, created_at FROM service_profiles WHERE id = $1 FOR UPDATE
+SELECT id, head_revision_id, created_at FROM profiles WHERE id = $1 FOR UPDATE
 `
 
-func (q *Queries) LockProfile(ctx context.Context, id uuid.UUID) (ServiceProfile, error) {
+func (q *Queries) LockProfile(ctx context.Context, id uuid.UUID) (Profile, error) {
 	row := q.db.QueryRow(ctx, lockProfile, id)
-	var i ServiceProfile
+	var i Profile
 	err := row.Scan(&i.ID, &i.HeadRevisionID, &i.CreatedAt)
 	return i, err
 }
@@ -304,7 +336,7 @@ func (q *Queries) ProfileClock(ctx context.Context) (pgtype.Timestamptz, error) 
 }
 
 const reserveProfileRequest = `-- name: ReserveProfileRequest :execrows
-INSERT INTO service_profile_requests (request_id, actor_id, request_digest, profile_id, revision_id, audit_id)
+INSERT INTO profile_requests (request_id, actor_id, request_digest, profile_id, revision_id, audit_id)
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (request_id) DO NOTHING
 `

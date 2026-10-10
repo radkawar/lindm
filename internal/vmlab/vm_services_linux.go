@@ -83,8 +83,8 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if (manifest.Distribution != "ubuntu" && manifest.Distribution != "fedora") || (manifest.Architecture != "amd64" && manifest.Architecture != "x86_64") {
-		return nil, errors.New("vm services requires an Ubuntu or Fedora amd64/x86_64 manifest")
+	if (manifest.Distribution != "ubuntu" && manifest.Distribution != "fedora" && manifest.Distribution != "rhel") || (manifest.Architecture != "amd64" && manifest.Architecture != "x86_64") {
+		return nil, errors.New("vm services requires an Ubuntu, Fedora or RHEL amd64/x86_64 manifest")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()
@@ -130,7 +130,7 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 		return nil, errors.New("service guest OS identity differs from manifest")
 	}
 	result = &VMServicesResult{Distribution: manifest.Distribution, Version: manifest.Version, ImageID: manifest.Id, ImageSHA256: verified.SHA256, LabSHA256: digest, Runtime: runtimeEvidence}
-	if manifest.Distribution == "fedora" {
+	if manifest.Distribution == "fedora" || manifest.Distribution == "rhel" {
 		result.SELinuxBefore, err = serviceGuestEnforcing(ctx, vm)
 		if err != nil {
 			return nil, err
@@ -155,7 +155,7 @@ func ServicesVM(ctx context.Context, manifest *labv1.ImageManifest, options VMSe
 		return nil, err
 	}
 	result.Services = evidence
-	if manifest.Distribution == "fedora" {
+	if manifest.Distribution == "fedora" || manifest.Distribution == "rhel" {
 		result.SELinuxAfter, err = serviceGuestEnforcing(ctx, vm)
 		if err != nil {
 			return nil, err

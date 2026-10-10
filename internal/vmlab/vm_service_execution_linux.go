@@ -43,7 +43,8 @@ type vmServiceExecutionEvidence struct {
 	RunningCrashReconciled    bool                              `json:"running_crash_reconciled"`
 	// These signatures authenticate terminal history, not a fresh observation
 	// or a current authorization/compliance decision.
-	Attestations []vmServiceAttestationPhase `json:"authenticated_history_attestations"`
+	Attestations []vmServiceAttestationPhase   `json:"authenticated_history_attestations"`
+	ClockChecks  []*labv1.ServiceClockEvidence `json:"clock_checks"`
 
 	packages *nativeGuestPackages
 	verifier *devlab.ExecutionTrustExercise
@@ -72,6 +73,7 @@ type vmPreparedService struct {
 	envelope []byte
 	prepared *agentv1.PrepareServiceExecutionResponse
 	start    *agentv1.StartServiceExecutionRequest
+	clock    *labv1.ServiceClockEvidence
 }
 
 const signedServiceDefinition = `[Unit]
@@ -88,6 +90,7 @@ WantedBy=multi-user.target
 // setup/independent drift/cleanup use administrator systemctl commands.
 func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages, signer *devlab.ExecutionTrustExercise, identity *labv1.ConnectionIdentityEvidence) (_ *vmServiceExecutionEvidence, err error) {
 	vm := packages.vm
+	defer func() { err = serviceFailureWithJournal(ctx, vm, err) }()
 	unit := devlab.ServiceExecutionProbeUnit
 	path := "/etc/systemd/system/" + unit
 	if err := lifecycleCommand(ctx, vm, "reserve signed service fixture", "test ! -e "+nativeQuote(path)+" && test ! -L "+nativeQuote(path)); err != nil {
@@ -140,6 +143,9 @@ func exerciseVMSignedServices(ctx context.Context, packages *nativeGuestPackages
 		result.bindings[action.intent.GetActionId()] = trust.ServiceAttestationBinding{
 			DeploymentID: deployment, DeviceID: device, EnrollmentGeneration: generation,
 			ActionID: id, IntentSHA256: sha256.Sum256(action.envelope),
+		}
+		if action.clock != nil {
+			result.ClockChecks = append(result.ClockChecks, action.clock)
 		}
 		return action, nil
 	}
@@ -379,7 +385,7 @@ func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer
 	intent := &agentv1.ServiceExecutionIntent{
 		DeploymentId: identity.GetDeploymentId(), DeviceId: identity.GetDeviceId(), EnrollmentGeneration: identity.GetEnrollmentGeneration(), ActionId: uuid.NewString(), DesiredRevision: uuid.NewString(), ActorId: uuid.NewString(),
 		ResourceSequence: sequence, RecoveryEpoch: 1, RootVersion: 2, DelegationVersion: 2, AuthorizationVersion: 1,
-		NotBefore: timestamppb.New(now.Add(-5 * time.Second)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)),
+		NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)),
 		Desired: &agentv1.ServiceDesiredState{Unit: devlab.ServiceExecutionProbeUnit, Runtime: runtime, Enablement: enablement},
 	}
 	envelope, err := signer.SignServiceIntent(ctx, intent)
@@ -398,10 +404,13 @@ func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer
 	if err != nil {
 		return nil, err
 	}
-	_, grant, err := signer.SignServiceStart(ctx, intent, envelope, certificate, prepared)
+	hostBefore := time.Now().UTC()
+	start, grant, err := signer.SignServiceStart(ctx, intent, envelope, certificate, prepared)
+	hostAfter := time.Now().UTC()
 	if err != nil {
 		return nil, err
 	}
+	result.clock = &labv1.ServiceClockEvidence{HostBefore: timestamppb.New(hostBefore), HostAfter: timestamppb.New(hostAfter), Challenge: proto.CloneOf(start.GetChallenge())}
 	result.start = &agentv1.StartServiceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}
 	return result, nil
 }
@@ -488,7 +497,7 @@ func vmStartService(ctx context.Context, packages *nativeGuestPackages, prepared
 }
 func vmServiceSucceeded(status *agentv1.ServiceExecutionStatus, started bool) error {
 	if status.GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || status.GetFailure() != agentv1.ServiceExecutionFailure_SERVICE_EXECUTION_FAILURE_NONE || !status.GetVerification().GetConverged() || (status.GetStartedAt() != nil) != started || status.GetCompletedAt() == nil {
-		return errors.New("signed service execution did not retain verified success with expected start evidence")
+		return newServiceStatusFailure(status, started)
 	}
 	return nil
 }

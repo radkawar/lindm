@@ -141,38 +141,64 @@ func closeLifecycleForwards(forwards []*guestForward) error {
 }
 
 func rebootLifecycleGuest(ctx context.Context, vm *guestVM, previousBoot string) error {
-	if _, err := uuid.Parse(previousBoot); err != nil {
+	previous, err := uuid.Parse(previousBoot)
+	if err != nil || previous == uuid.Nil {
 		return errors.New("previous protected boot ID is invalid")
+	}
+	if vm.client == nil {
+		return errors.New("guest reboot requires the old pinned SSH connection")
 	}
 	if err := lifecycleCommand(ctx, vm, "schedule real guest reboot", "systemd-run --quiet --on-active=2s --unit=lindm-lab-reboot /usr/bin/systemctl reboot"); err != nil {
 		return err
 	}
-	if vm.client != nil {
-		_ = vm.client.Close()
-		vm.client = nil
-	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
-	for {
-		if err := vm.connect(ctx); err != nil {
-			return err
-		}
-		boot, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id", nil, 128, 10*time.Second)
-		if err == nil {
-			id, parseErr := uuid.Parse(strings.TrimSpace(string(boot)))
-			if parseErr == nil && id != uuid.Nil && id.String() != previousBoot {
-				if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
-					return err
-				}
-				return nil
-			}
-		}
+	if err := waitGuestBootChange(ctx, previous, func(probe context.Context) (string, error) {
+		// QEMU/slirp can retain the old host TCP connection after the guest
+		// has rebooted. A FIN is neither necessary nor sufficient boot proof.
 		if vm.client != nil {
 			_ = vm.client.Close()
 			vm.client = nil
 		}
-		if err := lifecycleDelay(ctx, time.Second); err != nil {
-			return err
+		if err := vm.connect(probe); err != nil {
+			return "", err
+		}
+		boot, err := vm.run(probe, "cat /proc/sys/kernel/random/boot_id", nil, 128, 10*time.Second)
+		return strings.TrimSpace(string(boot)), err
+	}); err != nil {
+		return err
+	}
+	_, err = vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute)
+	return err
+}
+
+// Only a fresh pinned connection reporting a changed boot ID establishes the
+// reboot boundary. Polls are read-only; the reboot command is never replayed.
+func waitGuestBootChange(ctx context.Context, previous uuid.UUID, probe func(context.Context) (string, error)) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("wait for changed guest boot ID: %w", err)
+		}
+		boot, err := probe(ctx)
+		if err != nil {
+			if !sshBootNotReady(err) {
+				return fmt.Errorf("probe reconnected guest boot ID: %w", err)
+			}
+		} else {
+			id, err := uuid.Parse(boot)
+			if err != nil || id == uuid.Nil {
+				return errors.New("reconnected guest boot ID is invalid")
+			}
+			if id != previous {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait for changed guest boot ID: %w", ctx.Err())
+		case <-ticker.C:
 		}
 	}
 }
@@ -243,7 +269,7 @@ func saveLifecycleFailure(ctx context.Context, vm *guestVM, directory string) er
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	previous := vm.lastOperation
-	result, err := vm.runResult(ctx, "sudo -n sh -c 'systemctl status --no-pager --full lindm-executor.service lindm-agent.service; journalctl --no-pager -n 120 -u lindm-executor.service -u lindm-agent.service; systemctl show lindm-agent.service -p MainPID -p RestrictAddressFamilies -p SystemCallFilter -p SystemCallErrorNumber -p IPAddressDeny; ls -ldZ "+packaging.BinaryPath+" /var/lib/lindm/agent; ps -eo pid,label,comm; journalctl --no-pager -k -n 120; journalctl --no-pager -n 80 _TRANSPORT=audit'", nil, 2<<20, 8*time.Second)
+	result, err := vm.runResult(ctx, "sudo -n sh -c 'systemctl status --no-pager --full lindm-executor.service lindm-agent.service; journalctl --no-pager -n 120 -u lindm-executor.service -u lindm-agent.service; systemctl show lindm-agent.service -p MainPID -p RestrictAddressFamilies -p SystemCallFilter -p SystemCallErrorNumber -p IPAddressDeny; ls -ldZ / /etc /etc/lindm /etc/lindm/agent.json /etc/lindm/executor.json /var /var/lib /var/lib/lindm "+packaging.BinaryPath+" /var/lib/lindm/agent; namei -l /etc/lindm/agent.json /etc/lindm/executor.json; ps -eo pid,label,comm; journalctl --no-pager -k -n 120; journalctl --no-pager -n 80 _TRANSPORT=audit'", nil, 2<<20, 8*time.Second)
 	if err != nil {
 		return fmt.Errorf("collect private lifecycle diagnostics: %w", err)
 	}

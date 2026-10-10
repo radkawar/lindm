@@ -31,9 +31,11 @@ var nativeFingerprint = regexp.MustCompile(`^(?:[A-F0-9]{40}|[A-F0-9]{64})$`)
 // It owns no VM and must be closed before its VM is removed.
 type nativeGuestPackages struct {
 	vm        *guestVM
+	family    nativeFamily
 	first     packaging.Artifact
 	second    packaging.Artifact
 	apt       *packaging.APTRepository
+	arch      []*packaging.ArchRepository
 	keyPath   string
 	server    *aptPublicServer
 	forward   *guestForward
@@ -44,7 +46,7 @@ type nativeGuestPackages struct {
 func nativeQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
 
 func nativeArtifactFile(a packaging.Artifact) (*os.File, error) {
-	if !nativeVersion.MatchString(a.Version) || (a.Format != packaging.FormatDEB && a.Format != packaging.FormatRPM) || a.Size <= 0 || a.Size > 1<<30 {
+	if !nativeVersion.MatchString(a.Version) || (a.Format != packaging.FormatDEB && a.Format != packaging.FormatRPM && a.Format != packaging.FormatArch) || a.Size <= 0 || a.Size > 1<<30 {
 		return nil, errors.New("invalid native build artifact metadata")
 	}
 	if len(a.SHA256) != 64 {
@@ -82,9 +84,25 @@ func nativeArtifactFile(a packaging.Artifact) (*os.File, error) {
 	return file, nil
 }
 
-func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second packaging.Artifact, apt *packaging.APTRepository, publicKeyPath, signerFingerprint string) (_ *nativeGuestPackages, err error) {
+func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second packaging.Artifact, apt *packaging.APTRepository, publicKeyPath, signerFingerprint string, arch ...*packaging.ArchRepository) (_ *nativeGuestPackages, err error) {
 	if first.Format != second.Format || !nativeFingerprint.MatchString(signerFingerprint) {
 		return nil, errors.New("native packages require matching formats and a pinned signing fingerprint")
+	}
+	release, err := vm.run(ctx, "if [ -r /etc/os-release ]; then . /etc/os-release; else . /usr/lib/os-release; fi; printf '%s\\n' \"$ID\"", nil, 4096, 15*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("read native package distribution: %w", err)
+	}
+	distribution := strings.TrimSpace(string(release))
+	family, err := nativeDistributionFamily(distribution)
+	if err != nil {
+		return nil, err
+	}
+	format, err := NativePackageFormat(distribution)
+	if err != nil {
+		return nil, err
+	}
+	if first.Format != format {
+		return nil, errors.New("native package format differs from guest distribution")
 	}
 	for _, artifact := range []packaging.Artifact{first, second} {
 		file, err := nativeArtifactFile(artifact)
@@ -104,7 +122,7 @@ func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second pack
 			return nil, errors.New("positive APT lifecycle requires InRelease")
 		}
 	}
-	p := &nativeGuestPackages{vm: vm, first: first, second: second, apt: apt}
+	p := &nativeGuestPackages{vm: vm, family: family, first: first, second: second, apt: apt, arch: arch}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, p.Close())
@@ -178,11 +196,24 @@ func newNativeGuestPackages(ctx context.Context, vm *guestVM, first, second pack
 	if err := p.uploadBytes(ctx, p.keyPath, keyBytes); err != nil {
 		return nil, err
 	}
-	if first.Format == packaging.FormatRPM {
+	switch first.Format {
+	case packaging.FormatRPM:
 		if err := p.command(ctx, "import pinned RPM key", "rpmkeys --dbpath "+nativeGuestDir+"/rpmkeys --import "+p.keyPath+"; rpmkeys --import "+p.keyPath, nil); err != nil {
 			return nil, err
 		}
-	} else {
+		if family == familyZypper {
+			// Local RPM transactions have no repository metadata. Require the
+			// package signature itself, including in negative-authentication cases.
+			config := "[main]\ngpgcheck = true\nrepo_gpgcheck = true\npkg_gpgcheck = true\n"
+			if err := p.uploadBytes(ctx, nativeGuestDir+"/zypp.conf", []byte(config)); err != nil {
+				return nil, err
+			}
+		}
+	case packaging.FormatArch:
+		if err := p.prepareArch(ctx, signerFingerprint); err != nil {
+			return nil, err
+		}
+	default:
 		if err := p.startAPT(ctx, apt, []packaging.Artifact{first, second}); err != nil {
 			return nil, err
 		}
@@ -307,8 +338,27 @@ func (p *nativeGuestPackages) dnfCommand(action string) string {
 	return "dnf -y --setopt=reposdir=" + nativeGuestDir + "/empty --setopt=gpgcheck=1 --setopt=localpkg_gpgcheck=1 --setopt=install_weak_deps=False --setopt=keepcache=False " + action
 }
 
+func (p *nativeGuestPackages) zypperCommand(action string) string {
+	// Only explicitly uploaded local packages and the installed system participate.
+	// No vendor repository or unsigned, synthetic repository is introduced.
+	return "env ZYPP_CONF=" + nativeGuestDir + "/zypp.conf zypper --non-interactive --no-remote --reposd-dir " + nativeGuestDir + "/empty " + action
+}
+
+func (p *nativeGuestPackages) rpmInstallCommand(destination string, upgrade bool) string {
+	if p.family == familyZypper {
+		// Zypper install accepts a local RPM for both installation and upgrade.
+		return p.zypperCommand("install --no-recommends " + nativeQuote(destination))
+	}
+	action := "install "
+	if upgrade {
+		action = "upgrade "
+	}
+	return p.dnfCommand(action + nativeQuote(destination))
+}
+
 func (p *nativeGuestPackages) install(ctx context.Context, artifact packaging.Artifact, upgrade bool) error {
-	if artifact.Format == packaging.FormatDEB {
+	switch artifact.Format {
+	case packaging.FormatDEB:
 		if err := p.command(ctx, "authenticate APT metadata", p.aptCommand("update"), nil); err != nil {
 			return err
 		}
@@ -319,7 +369,11 @@ func (p *nativeGuestPackages) install(ctx context.Context, artifact packaging.Ar
 		if err := p.command(ctx, "install authenticated DEB", p.aptCommand(action+nativeQuote(packaging.PackageName+"="+artifact.Version)), nil); err != nil {
 			return err
 		}
-	} else {
+	case packaging.FormatArch:
+		if err := p.installArch(ctx, artifact); err != nil {
+			return err
+		}
+	default:
 		destination := nativeGuestDir + "/install.rpm"
 		if err := p.uploadArtifact(ctx, artifact, destination); err != nil {
 			return err
@@ -337,11 +391,7 @@ func (p *nativeGuestPackages) install(ctx context.Context, artifact packaging.Ar
 		if signature.ExitCode != 0 || !signed {
 			return errors.New("RPM did not authenticate against the pinned package key")
 		}
-		action := "install "
-		if upgrade {
-			action = "upgrade "
-		}
-		if err := p.command(ctx, "install authenticated RPM", p.dnfCommand(action+destination), nil); err != nil {
+		if err := p.command(ctx, "install authenticated RPM", p.rpmInstallCommand(destination, upgrade), nil); err != nil {
 			return err
 		}
 	}
@@ -367,10 +417,14 @@ func (p *nativeGuestPackages) ReinstallSecond(ctx context.Context) error {
 
 func (p *nativeGuestPackages) assertVersion(ctx context.Context, artifact packaging.Artifact) error {
 	var query, expected string
-	if artifact.Format == packaging.FormatDEB {
+	switch artifact.Format {
+	case packaging.FormatDEB:
 		query = "dpkg-query -W -f='${db:Status-Status}\\t${Version}\\t${Architecture}\\n' lindm-agent"
 		expected = "installed\t" + artifact.Version + "\t" + artifact.Architecture.Debian
-	} else {
+	case packaging.FormatArch:
+		query = "pacman -Qi lindm-agent | /bin/grep -Eq '^Architecture[[:space:]]*:[[:space:]]*" + artifact.Architecture.Arch + "$'; pacman -Q lindm-agent"
+		expected = "lindm-agent " + artifact.Version + "-1"
+	default:
 		query = "rpm -q --qf '%{VERSION}-%{RELEASE}\\t%{ARCH}\\n' lindm-agent"
 		expected = artifact.Version + "-" + packaging.RPMRelease + "\t" + artifact.Architecture.RPM
 	}
@@ -461,7 +515,7 @@ done
 test -d /run/lindm; check /run/lindm "0:$gid:750"
 test -S /run/lindm/executor.sock; check /run/lindm/executor.sock "0:$gid:660"
 `
-		if p.first.Format == packaging.FormatRPM {
+		if p.family == familyDNF {
 			command += `
 test "$(getenforce)" = Enforcing
 matchpathcon -V ` + packaging.BinaryPath + `
@@ -505,7 +559,8 @@ func (p *nativeGuestPackages) Remove(ctx context.Context, purge bool) error {
 	if before.ExitCode != 0 {
 		return errors.New("cannot snapshot retained state directories")
 	}
-	if p.first.Format == packaging.FormatDEB {
+	switch p.first.Format {
+	case packaging.FormatDEB:
 		action := "remove lindm-agent"
 		if purge {
 			action = "purge lindm-agent"
@@ -513,25 +568,37 @@ func (p *nativeGuestPackages) Remove(ctx context.Context, purge bool) error {
 		if err := p.command(ctx, "remove native DEB", p.aptCommand(action), nil); err != nil {
 			return err
 		}
-	} else {
-		// RPM has no distinct purge operation. Its erase must retain account and
+	case packaging.FormatArch:
+		if p.installed {
+			if err := p.command(ctx, "remove native Arch package", p.pacmanCommand("-R lindm-agent"), nil); err != nil {
+				return err
+			}
+		}
+	default: // RPM has no distinct purge operation. Its erase must retain account and
 		// protected state in both requested lifecycle lanes.
 		if p.installed {
-			if err := p.command(ctx, "erase native RPM", p.dnfCommand("remove lindm-agent"), nil); err != nil {
+			command := p.dnfCommand("remove lindm-agent")
+			if p.family == familyZypper {
+				command = p.zypperCommand("remove lindm-agent")
+			}
+			if err := p.command(ctx, "erase native RPM", command, nil); err != nil {
 				return err
 			}
 		}
 	}
 	p.installed = false
 	absent := "test ! -e " + packaging.BinaryPath + "; "
-	if p.first.Format == packaging.FormatDEB {
+	switch p.first.Format {
+	case packaging.FormatDEB:
 		absent += "status=$(dpkg-query -W -f='${db:Status-Status}' lindm-agent 2>/dev/null) || status=missing; test \"$status\" != installed"
 		if purge {
 			absent += "; test ! -e /etc/lindm/executor.json; test ! -e /etc/lindm/agent.json"
 		} else {
 			absent += "; test -f /etc/lindm/executor.json; test -f /etc/lindm/agent.json"
 		}
-	} else {
+	case packaging.FormatArch:
+		absent += "if pacman -Q lindm-agent >/dev/null 2>&1; then exit 1; fi"
+	default:
 		absent += "if rpm -q lindm-agent >/dev/null 2>&1; then exit 1; fi"
 	}
 	if err := p.command(ctx, "assert native package removal", absent, nil); err != nil {
@@ -568,9 +635,12 @@ for target in ` + packaging.BinaryPath + ` /usr/libexec/lindm/lifecycle /etc/lin
  test ! -e "$target"; test ! -L "$target"
 done
 `
-	if p.first.Format == packaging.FormatDEB {
+	switch p.first.Format {
+	case packaging.FormatDEB:
 		command += "if dpkg-query -W -f='${db:Status-Status}' lindm-agent 2>/dev/null | /bin/grep -qx installed; then exit 1; fi\n"
-	} else {
+	case packaging.FormatArch:
+		command += "if pacman -Q lindm-agent >/dev/null 2>&1; then exit 1; fi\n"
+	default:
 		command += "if rpm -q lindm-agent >/dev/null 2>&1; then exit 1; fi\n"
 	}
 	return p.command(ctx, "assert no rejected-package maintainer effects", command, nil)
@@ -594,7 +664,8 @@ func (p *nativeGuestPackages) RejectArtifact(ctx context.Context, artifact packa
 		return err
 	}
 	var result guestCommandResult
-	if artifact.Format == packaging.FormatDEB {
+	switch artifact.Format {
+	case packaging.FormatDEB:
 		defer func() {
 			if restore := p.startAPT(ctx, p.apt, []packaging.Artifact{p.first, p.second}); restore != nil {
 				err = errors.Join(errors.New("restore signed APT source after rejection"), restore)
@@ -604,12 +675,14 @@ func (p *nativeGuestPackages) RejectArtifact(ctx context.Context, artifact packa
 			return err
 		}
 		result, err = p.result(ctx, p.aptCommand("update")+"; "+p.aptCommand("install --no-install-recommends "+nativeQuote(packaging.PackageName+"="+artifact.Version)), nil)
-	} else {
+	case packaging.FormatArch:
+		result, err = p.rejectArch(ctx, artifact)
+	default:
 		destination := nativeGuestDir + "/rejected.rpm"
 		if err := p.uploadArtifact(ctx, artifact, destination); err != nil {
 			return err
 		}
-		result, err = p.result(ctx, p.dnfCommand("install "+destination), nil)
+		result, err = p.result(ctx, p.rpmInstallCommand(destination, false), nil)
 	}
 	if err != nil {
 		return err
@@ -617,14 +690,27 @@ func (p *nativeGuestPackages) RejectArtifact(ctx context.Context, artifact packa
 	if result.ExitCode == 0 {
 		return errors.New("native manager accepted negative authentication artifact")
 	}
-	if (artifact.Format == packaging.FormatDEB && result.ExitCode != 100) || (artifact.Format == packaging.FormatRPM && result.ExitCode != 1) {
+	expectedExit := 100
+	if artifact.Format == packaging.FormatArch {
+		expectedExit = 1
+	}
+	if artifact.Format == packaging.FormatRPM {
+		expectedExit = 1
+		if p.family == familyZypper {
+			expectedExit = 8 // ZYPPER_EXIT_ERR_COMMIT: package authentication failed.
+		}
+	}
+	if result.ExitCode != expectedExit {
 		return fmt.Errorf("unexpected native authentication exit status %d", result.ExitCode)
 	}
 	text := strings.ToLower(string(result.Stdout) + "\n" + string(result.Stderr))
 	known := false
 	diagnostics := []string{"is not signed", "no_pubkey", "badsig", "signatures couldn't be verified", "hash sum mismatch"}
+	if artifact.Format == packaging.FormatArch {
+		diagnostics = []string{"missing required signature", "invalid or corrupted package (pgp signature)", "signature from", "unknown public key", "required key missing from keyring"}
+	}
 	if artifact.Format == packaging.FormatRPM {
-		diagnostics = []string{"is not signed", "not signed", "signature verification failed", "gpg check failed", "public key for", "package signature verification failed"}
+		diagnostics = []string{"is not signed", "not signed", "signature verification failed", "gpg check failed", "public key for", "package signature verification failed", "signature does not verify", "signature is not trusted"}
 	}
 	for _, diagnostic := range diagnostics {
 		if strings.Contains(text, diagnostic) {

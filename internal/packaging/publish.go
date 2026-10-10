@@ -95,11 +95,7 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 		return nil, err
 	}
 	repo := filepath.Join(work, "apt")
-	pool := filepath.Join(repo, "pool", "main", "l", PackageName)
 	dist := filepath.Join(repo, "dists", APTDistribution, "main", "binary-amd64")
-	if err := mkdir(pool, epoch); err != nil {
-		return nil, err
-	}
 	if err := mkdir(dist, epoch); err != nil {
 		return nil, err
 	}
@@ -115,10 +111,6 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 			return nil, err
 		}
 		name := info.Name()
-		if !strings.HasPrefix(name, PackageName+"_") || !strings.HasSuffix(name, ".deb") {
-			_ = file.Close()
-			return nil, fmt.Errorf("%w: unexpected deb name", ErrArtifact)
-		}
 		shown, _, err := runTool(ctx, work, toolCmd{
 			Name: "dpkg-deb",
 			Args: []string{"--show", "--showformat", "${Package}\t${Architecture}\n", file.Name()},
@@ -128,15 +120,20 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 			return nil, err
 		}
 		fields := strings.Split(strings.TrimSpace(string(shown)), "\t")
-		if len(fields) != 2 || fields[0] != PackageName {
+		if len(fields) != 2 || !supportedProduct(fields[0]) || !strings.HasPrefix(name, fields[0]+"_") || !strings.HasSuffix(name, ".deb") {
 			_ = file.Close()
-			return nil, fmt.Errorf("%w: deb is not %s", ErrArtifact, PackageName)
+			return nil, fmt.Errorf("%w: unexpected deb product or filename", ErrArtifact)
 		}
 		if arch == "" {
 			arch = fields[1]
 		} else if arch != fields[1] {
 			_ = file.Close()
 			return nil, fmt.Errorf("%w: mixed deb architectures", ErrArtifact)
+		}
+		pool := filepath.Join(repo, "pool", "main", "l", fields[0])
+		if err := mkdir(pool, epoch); err != nil {
+			_ = file.Close()
+			return nil, err
 		}
 		if err := copyFile(filepath.Join(pool, name), file, 0o644, epoch); err != nil {
 			_ = file.Close()
@@ -317,7 +314,7 @@ func verifyPackageIndex(repo, packagesPath string) error {
 				fields[key] = value
 			}
 		}
-		if fields["Package"] != PackageName || fields["Filename"] == "" || fields["SHA256"] == "" {
+		if !supportedProduct(fields["Package"]) || fields["Filename"] == "" || fields["SHA256"] == "" {
 			return fmt.Errorf("%w: Packages record is incomplete", ErrArtifact)
 		}
 		path := filepath.Join(repo, fields["Filename"])
@@ -446,15 +443,26 @@ func PublishRPM(ctx context.Context, req RPMRequest) (result *RPMRepository, err
 			_ = file.Close()
 			return nil, err
 		}
-		if !strings.HasPrefix(info.Name(), PackageName+"-") || !strings.HasSuffix(info.Name(), ".rpm") {
+		if (!strings.HasPrefix(info.Name(), PackageName+"-") && !strings.HasPrefix(info.Name(), ServerPackageName+"-") && !strings.HasPrefix(info.Name(), CLIPackageName+"-")) || !strings.HasSuffix(info.Name(), ".rpm") {
 			_ = file.Close()
 			return nil, fmt.Errorf("%w: unexpected rpm name", ErrArtifact)
 		}
-		if err := copyFile(filepath.Join(repo, info.Name()), file, 0o644, DefaultSourceDateEpoch); err != nil {
+		copied := filepath.Join(repo, info.Name())
+		if err := copyFile(copied, file, 0o644, DefaultSourceDateEpoch); err != nil {
 			_ = file.Close()
 			return nil, err
 		}
 		_ = file.Close()
+		identity, _, err := runTool(ctx, work, toolCmd{Name: "rpm", Args: []string{"--query", "--package", "--queryformat", "%{NAME}", copied}})
+		if err != nil {
+			return nil, err
+		}
+		if !supportedProduct(string(identity)) {
+			return nil, fmt.Errorf("%w: unsupported RPM product", ErrArtifact)
+		}
+		if err := verifyRPMSignature(ctx, work, copied, key); err != nil {
+			return nil, err
+		}
 	}
 	if _, _, err := runTool(ctx, work, toolCmd{
 		Name: "createrepo_c",

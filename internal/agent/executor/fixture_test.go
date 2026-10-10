@@ -124,11 +124,15 @@ func testCA(t *testing.T, key ed25519.PrivateKey, now time.Time, usage x509.ExtK
 func testReleaseRoot(t *testing.T, key ed25519.PrivateKey, expires time.Time) []byte {
 	t.Helper()
 	root := metadata.Root(expires)
-	public, err := metadata.KeyFromPublicKey(key.Public())
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
+		roleKey := key
+		if role != "root" {
+			roleKey = testKey(t)
+		}
+		public, err := metadata.KeyFromPublicKey(roleKey.Public())
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := root.Signed.AddKey(public, role); err != nil {
 			t.Fatal(err)
 		}

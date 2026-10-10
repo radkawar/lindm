@@ -13,11 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"lindm/internal/agent/config"
 )
 
-func buildDEB(ctx context.Context, work, payload, version string, arch Architecture, epoch int64, staged []stagedFile, payloadSHA string) (Artifact, error) {
+func buildDEB(ctx context.Context, work, payload, version string, arch Architecture, epoch int64, staged []stagedFile, payloadSHA string, p product) (Artifact, error) {
 	root := filepath.Join(work, "deb")
 	if err := os.Mkdir(root, 0o755); err != nil {
 		return Artifact{}, err
@@ -33,24 +31,40 @@ func buildDEB(ctx context.Context, work, payload, version string, arch Architect
 	if err != nil {
 		return Artifact{}, err
 	}
-	text := fmt.Sprintf("Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: Lindm Packaging <packaging@lindm.invalid>\nSection: admin\nPriority: optional\nDepends: systemd\nInstalled-Size: %d\nDescription: Lindm protected agent\n Versioned agent binary with a root executor and an unprivileged\n network service. Remove and purge retain identity and spool state.\n This package does not grant a root shell.\n", PackageName, version, arch.Debian, size)
+	dependencies := ""
+	if len(p.units) != 0 {
+		dependencies = "Depends: systemd\n"
+	}
+	text := fmt.Sprintf("Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: Lindm Packaging <packaging@lindm.invalid>\nSection: admin\nPriority: optional\n%sInstalled-Size: %d\nDescription: %s\n %s\n", p.name, version, arch.Debian, dependencies, size, p.summary, strings.ReplaceAll(p.description, "\n", "\n "))
 	if err := writeFile(filepath.Join(control, "control"), []byte(text), 0o644, epoch); err != nil {
 		return Artifact{}, err
 	}
-	script, err := asset("lifecycle.sh")
-	if err != nil {
-		return Artifact{}, err
+	if p.lifecycleAsset != "" {
+		script, err := asset(p.lifecycleAsset)
+		if err != nil {
+			return Artifact{}, err
+		}
+		for _, name := range []string{"postinst", "prerm", "postrm"} {
+			if err := writeFile(filepath.Join(control, name), script, 0o755, epoch); err != nil {
+				return Artifact{}, err
+			}
+		}
 	}
-	for _, name := range []string{"postinst", "prerm", "postrm"} {
-		if err := writeFile(filepath.Join(control, name), script, 0o755, epoch); err != nil {
+	var conffiles strings.Builder
+	for _, file := range staged {
+		if file.Conf {
+			fmt.Fprintf(&conffiles, "/%s\n", file.Rel)
+		}
+	}
+	if conffiles.Len() != 0 {
+		if err := writeFile(filepath.Join(control, "conffiles"), []byte(conffiles.String()), 0o644, epoch); err != nil {
 			return Artifact{}, err
 		}
 	}
-	conffiles := config.ExecutorConfigPath + "\n" + config.NetworkConfigPath + "\n"
-	if err := writeFile(filepath.Join(control, "conffiles"), []byte(conffiles), 0o644, epoch); err != nil {
+	if err := stampDirectories(root, epoch); err != nil {
 		return Artifact{}, err
 	}
-	out := filepath.Join(work, fmt.Sprintf("%s_%s_%s.deb", PackageName, version, arch.Debian))
+	out := filepath.Join(work, fmt.Sprintf("%s_%s_%s.deb", p.name, version, arch.Debian))
 	if _, _, err := runTool(ctx, work, toolCmd{
 		Name:     "dpkg-deb",
 		Args:     []string{"--root-owner-group", "--uniform-compression", "-Zgzip", "-z9", "--build", root, out},
@@ -58,7 +72,7 @@ func buildDEB(ctx context.Context, work, payload, version string, arch Architect
 	}); err != nil {
 		return Artifact{}, err
 	}
-	if err := verifyDEB(ctx, work, out, version, arch, payloadSHA, staged); err != nil {
+	if err := verifyDEB(ctx, work, out, version, arch, payloadSHA, staged, p); err != nil {
 		return Artifact{}, err
 	}
 	sum, sizeBytes, err := hashFile(out)
@@ -66,18 +80,20 @@ func buildDEB(ctx context.Context, work, payload, version string, arch Architect
 		return Artifact{}, err
 	}
 	return Artifact{
-		Format:        FormatDEB,
-		Path:          out,
-		SHA256:        sum,
-		Size:          sizeBytes,
-		Architecture:  arch,
-		Version:       version,
-		PayloadSHA256: payloadSHA,
-		Signed:        false,
+		Product:        p.name,
+		Format:         FormatDEB,
+		Path:           out,
+		SHA256:         sum,
+		UnsignedSHA256: sum,
+		Size:           sizeBytes,
+		Architecture:   arch,
+		Version:        version,
+		PayloadSHA256:  payloadSHA,
+		Signed:         false,
 	}, nil
 }
 
-func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture, payloadSHA string, staged []stagedFile) error {
+func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture, payloadSHA string, staged []stagedFile, p product) error {
 	stdout, _, err := runTool(ctx, work, toolCmd{
 		Name: "dpkg-deb",
 		Args: []string{"--show", "--showformat", "${Package}\t${Version}\t${Architecture}\n", deb},
@@ -85,7 +101,7 @@ func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture
 	if err != nil {
 		return err
 	}
-	want := fmt.Sprintf("%s\t%s\t%s\n", PackageName, version, arch.Debian)
+	want := fmt.Sprintf("%s\t%s\t%s\n", p.name, version, arch.Debian)
 	if string(stdout) != want {
 		return fmt.Errorf("%w: deb control fields do not match the request", ErrArtifact)
 	}
@@ -110,6 +126,10 @@ func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture
 	defer func() { _ = file.Close() }()
 	reader := tar.NewReader(file)
 	found := map[string]bool{}
+	expected := make(map[string]stagedFile, len(staged))
+	for _, item := range staged {
+		expected[item.Rel] = item
+	}
 	var payload string
 	for {
 		header, err := reader.Next()
@@ -130,8 +150,16 @@ func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture
 		if strings.Contains(name, "..") {
 			return fmt.Errorf("%w: deb member escapes the archive", ErrArtifact)
 		}
+		if header.Uid != 0 || header.Gid != 0 {
+			return fmt.Errorf("%w: deb member is not root-owned", ErrArtifact)
+		}
+		if item, ok := expected[name]; ok {
+			if header.Typeflag != tar.TypeReg || header.Mode != int64(item.Mode.Perm()) {
+				return fmt.Errorf("%w: deb member mode differs from layout", ErrArtifact)
+			}
+		}
 		found[name] = true
-		if name == BinaryPath[1:] {
+		if name == p.binary[1:] {
 			hash := sha256.New()
 			if _, err := io.Copy(hash, reader); err != nil {
 				return err
@@ -151,7 +179,7 @@ func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture
 }
 
 func copyTree(src, dst string, epoch int64) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -176,4 +204,8 @@ func copyTree(src, dst string, epoch int64) error {
 		copyErr := copyFile(target, in, info.Mode().Perm(), epoch)
 		return errors.Join(copyErr, in.Close())
 	})
+	if err != nil {
+		return err
+	}
+	return stampDirectories(dst, epoch)
 }

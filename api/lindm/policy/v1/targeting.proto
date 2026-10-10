@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package lindm.policy.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/policy/v1/profile.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/policy/v1;policyv1";
+
+// Static group IDs refer to the existing authorization group catalog. Dynamic
+// groups are separate and never implicitly grant RBAC membership.
+message TargetRef {
+  oneof target {
+    option (buf.validate.oneof).required = true;
+    string device_id = 1 [(buf.validate.field).string.uuid = true];
+    string static_group_id = 2 [(buf.validate.field).string.uuid = true];
+    string dynamic_group_id = 3 [(buf.validate.field).string.uuid = true];
+  }
+}
+
+message TargetAssignment {
+  option (buf.validate.message).cel = {
+    id: "target_assignment.window"
+    message: "expiry must follow activation"
+    expression: "!has(this.expires_at) || !has(this.activates_at) || this.expires_at > this.activates_at"
+  };
+  string assignment_id = 1 [(buf.validate.field).string.uuid = true];
+  string profile_revision_id = 2 [(buf.validate.field).string.uuid = true];
+  TargetRef target = 3 [(buf.validate.field).required = true];
+  sint32 priority = 4;
+  repeated TargetRef exclusions = 5 [(buf.validate.field).repeated.max_items = 64];
+  optional string rollout_id = 6 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp activates_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  // Disabling creates a retained tombstone; it never erases execution history.
+  bool disabled = 9;
+}
+
+message RolloutRing {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+  TargetRef cohort = 2 [(buf.validate.field).required = true];
+  uint32 cumulative_basis_points = 3 [(buf.validate.field).uint32.lte = 10000];
+  uint32 minimum_canaries = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 10000
+  }];
+  uint32 minimum_observed = 5 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 10000
+  }];
+  uint32 soak_seconds = 6 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 2592000
+  }];
+  uint32 failure_basis_points = 7 [(buf.validate.field).uint32.lte = 10000];
+  uint32 unknown_basis_points = 8 [(buf.validate.field).uint32.lte = 10000];
+  uint32 unavailable_basis_points = 9 [(buf.validate.field).uint32.lte = 10000];
+  bool manual_promotion = 10;
+  uint32 health_max_age_seconds = 11 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 86400
+  }];
+}
+message RolloutSpec {
+  option (buf.validate.message).cel = {
+    id: "rollout.rings"
+    message: "ring names must be unique and percentages cumulative"
+    expression: "this.rings.all(r, this.rings.filter(s, s.name == r.name).size() == 1)"
+  };
+  string rollout_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes salt = 2 [(buf.validate.field).bytes.len = 32];
+  repeated RolloutRing rings = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+}
+
+enum TargetMatch {
+  TARGET_MATCH_UNSPECIFIED = 0;
+  TARGET_MATCH_INCLUDED = 1;
+  TARGET_MATCH_EXCLUDED = 2;
+  TARGET_MATCH_UNKNOWN = 3;
+}
+
+enum RolloutHealth {
+  ROLLOUT_HEALTH_UNSPECIFIED = 0;
+  ROLLOUT_HEALTH_HEALTHY = 1;
+  ROLLOUT_HEALTH_FAILED = 2;
+  ROLLOUT_HEALTH_UNKNOWN = 3;
+  ROLLOUT_HEALTH_UNAVAILABLE = 4;
+}
+
+message TargetCandidate {
+  TargetAssignment assignment = 1;
+  uint64 revision = 2;
+  string actor_id = 3;
+  TargetMatch match = 4;
+}
+
+enum ResourceResolutionDisposition {
+  RESOURCE_RESOLUTION_DISPOSITION_UNSPECIFIED = 0;
+  RESOURCE_RESOLUTION_DISPOSITION_READY = 1;
+  RESOURCE_RESOLUTION_DISPOSITION_CONFLICT = 2;
+  RESOURCE_RESOLUTION_DISPOSITION_BLOCKED = 3;
+}
+
+message ResolvedResource {
+  lindm.resource.v1.ResourceRef ref = 1 [(buf.validate.field).required = true];
+  ProfileResource resource = 2;
+  ResourceResolutionDisposition disposition = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 4 [(buf.validate.field).string.max_len = 128];
+  string capability_id = 5 [(buf.validate.field).string.max_len = 128];
+  bool dispatch_supported = 6;
+  repeated string contributing_revision_ids = 7 [(buf.validate.field).repeated.max_items = 128];
+  repeated string overridden_revision_ids = 8 [(buf.validate.field).repeated.max_items = 128];
+}
+
+message TargetResolution {
+  repeated ResolvedResource resources = 1 [(buf.validate.field).repeated.max_items = 8192];
+}
+
+// Resolution preview, not an executor native plan. Its exact bytes are retained.
+message TargetPreview {
+  string preview_id = 1;
+  string device_id = 2;
+  string generation_id = 3;
+  bytes input_sha256 = 4;
+  bytes preview_sha256 = 5;
+  repeated TargetCandidate candidates = 6;
+  google.protobuf.Timestamp evaluated_at = 7;
+  google.protobuf.Timestamp valid_until = 8;
+  bytes resolution_sha256 = 9;
+  optional string previous_preview_id = 10;
+  TargetResolution resolution = 11;
+}

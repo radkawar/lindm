@@ -22,12 +22,14 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 )
 
 const dispatchUnit = "labdispatch.service"
 const dispatchWitness = "/var/lib/labdispatch.starts"
+const dispatchReconcileIntervalSeconds = 300
 
 // A slow, inert native start makes the open action observable across a real
 // server restart. This fixture is installed before enrollment, never as policy.
@@ -44,44 +46,53 @@ WantedBy=multi-user.target
 
 type VMDispatchOptions struct {
 	Repository, CacheDir, WorkDir, DiagnosticsDir, LabBinary, LindmdBinary string
+	RedHatTokenFile                                                        string
+	Hardware                                                               *VMHardwareOptions
 	Hold                                                                   time.Duration
 	Progress                                                               io.Writer
 }
 
 type VMDispatchScenario struct {
-	Name             string                        `json:"name"`
-	StartedAt        time.Time                     `json:"started_at"`
-	FinishedAt       time.Time                     `json:"finished_at"`
-	Action           *adminv1.ServiceActionSummary `json:"action,omitempty"`
-	NativeActive     string                        `json:"native_active,omitempty"`
-	NativeEnablement string                        `json:"native_enablement,omitempty"`
-	StartWitness     string                        `json:"start_witness,omitempty"`
-	Coverage         string                        `json:"coverage"`
+	Name                   string                        `json:"name"`
+	StartedAt              time.Time                     `json:"started_at"`
+	FinishedAt             time.Time                     `json:"finished_at"`
+	Action                 *adminv1.ServiceActionSummary `json:"action,omitempty"`
+	Assignment             *adminv1.ResourceAssignment   `json:"assignment,omitempty"`
+	Resource               *adminv1.ResourceState        `json:"resource,omitempty"`
+	RevocationApproval     *adminv1.Approval             `json:"revocation_approval,omitempty"`
+	NativeBeforeActive     string                        `json:"native_before_active,omitempty"`
+	NativeBeforeEnablement string                        `json:"native_before_enablement,omitempty"`
+	NativeActive           string                        `json:"native_active,omitempty"`
+	NativeEnablement       string                        `json:"native_enablement,omitempty"`
+	StartWitness           string                        `json:"start_witness,omitempty"`
+	Coverage               string                        `json:"coverage"`
 }
 
 type VMDispatchResult struct {
-	Distribution      string                         `json:"distribution"`
-	Version           string                         `json:"version"`
-	ImageID           string                         `json:"image_id"`
-	ImageSHA256       string                         `json:"image_sha256"`
-	PackageSHA256     string                         `json:"package_sha256"`
-	LabSHA256         string                         `json:"lab_sha256"`
-	LindmdSHA256      string                         `json:"lindmd_sha256"`
-	SignerFingerprint string                         `json:"signer_fingerprint"`
-	DeviceID          string                         `json:"device_id"`
-	Generation        string                         `json:"generation"`
-	Database          string                         `json:"database"`
-	Runtime           *vmRuntimeEvidence             `json:"runtime,omitempty"`
-	SELinux           string                         `json:"selinux"`
-	Baseline          string                         `json:"baseline"`
-	Scenarios         []VMDispatchScenario           `json:"scenarios"`
-	RecentActions     []*adminv1.DeviceServiceAction `json:"recent_actions,omitempty"`
-	StartedAt         time.Time                      `json:"started_at"`
-	FinishedAt        time.Time                      `json:"finished_at"`
-	Passed            bool                           `json:"passed"`
-	Failure           string                         `json:"failure,omitempty"`
-	ClockSkew         []*VMDispatchClockEvidence     `json:"clock_skew,omitempty"`
-	Hold              *VMDispatchHoldEvidence        `json:"hold,omitempty"`
+	Distribution           string                          `json:"distribution"`
+	Version                string                          `json:"version"`
+	RepositorySnapshotDate string                          `json:"repository_snapshot_date,omitempty"`
+	ImageID                string                          `json:"image_id"`
+	ImageSHA256            string                          `json:"image_sha256"`
+	PackageSHA256          string                          `json:"package_sha256"`
+	LabSHA256              string                          `json:"lab_sha256"`
+	LindmdSHA256           string                          `json:"lindmd_sha256"`
+	SignerFingerprint      string                          `json:"signer_fingerprint"`
+	DeviceID               string                          `json:"device_id"`
+	Generation             string                          `json:"generation"`
+	Database               string                          `json:"database"`
+	Runtime                *vmRuntimeEvidence              `json:"runtime,omitempty"`
+	RedHat                 *VMRedHatEvidence               `json:"redhat,omitempty"`
+	SELinux                string                          `json:"selinux"`
+	Baseline               string                          `json:"baseline"`
+	Scenarios              []VMDispatchScenario            `json:"scenarios"`
+	RecentActions          []*adminv1.DeviceResourceAction `json:"recent_actions,omitempty"`
+	StartedAt              time.Time                       `json:"started_at"`
+	FinishedAt             time.Time                       `json:"finished_at"`
+	Passed                 bool                            `json:"passed"`
+	Failure                string                          `json:"failure,omitempty"`
+	ClockSkew              []*VMDispatchClockEvidence      `json:"clock_skew,omitempty"`
+	Hold                   *VMDispatchHoldEvidence         `json:"hold,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -91,13 +102,18 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
-	if manifest.GetDistribution() != "ubuntu" && manifest.GetDistribution() != "fedora" {
-		return nil, errors.New("dispatch requires Ubuntu or Fedora")
+	format, err := NativePackageFormat(manifest.GetDistribution())
+	if err != nil {
+		return nil, err
+	}
+	if err := validateVMRedHatToken(manifest.GetDistribution(), options.RedHatTokenFile); err != nil {
+		return nil, err
 	}
 	if options.Hold < 0 || options.Hold > time.Hour || (options.Hold > 0 && options.Progress == nil) {
 		return nil, errors.New("dispatch hold requires a progress writer and a duration between zero and one hour")
 	}
 	result = &VMDispatchResult{Distribution: manifest.GetDistribution(), Version: manifest.GetVersion(), ImageID: manifest.GetId(), StartedAt: time.Now().UTC()}
+	result.RepositorySnapshotDate = manifest.GetRepositorySnapshotDate()
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.Passed = err == nil
@@ -106,7 +122,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 	}()
 	parent := ctx
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 35*time.Minute+options.Hold)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 50*time.Minute+options.Hold)
 	defer cancel()
 	stopParentCancellation := context.AfterFunc(parent, cancel)
 	defer stopParentCancellation()
@@ -127,11 +143,16 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if err != nil {
 		return result, err
 	}
-	format := packaging.FormatDEB
-	if manifest.GetDistribution() == "fedora" {
-		format = packaging.FormatRPM
+	var architecture string
+	switch manifest.GetArchitecture() {
+	case "amd64", "x86_64":
+		architecture = "amd64"
+	case "arm64", "aarch64":
+		architecture = "arm64"
+	default:
+		return result, errors.New("dispatch packages require a supported guest architecture")
 	}
-	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: options.Repository, Revision: "connected-dispatch-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
+	built, err := packaging.BuildSource(ctx, packaging.SourceRequest{Repository: options.Repository, Revision: "connected-dispatch-lab", BuildRequest: packaging.BuildRequest{Version: "0.1.0", TargetArchitecture: architecture, OutputDir: work, Formats: []packaging.Format{format}, Signer: *signer}})
 	if err != nil {
 		return result, err
 	}
@@ -139,6 +160,19 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	result.PackageSHA256, result.SignerFingerprint = artifact.SHA256, signer.Fingerprint
 	publicKey := built.PublicKey
 	var apt *packaging.APTRepository
+	var arch []*packaging.ArchRepository
+	if format == packaging.FormatArch {
+		output := filepath.Join(work, "arch-repo")
+		if err := os.Mkdir(output, 0700); err != nil {
+			return result, err
+		}
+		repo, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: output, Packages: []string{artifact.Path}, Signer: *signer})
+		if err != nil {
+			return result, err
+		}
+		arch = []*packaging.ArchRepository{repo}
+		publicKey = repo.PublicKeyArmor
+	}
 	if format == packaging.FormatDEB {
 		output := filepath.Join(work, "apt")
 		if err := os.Mkdir(output, 0700); err != nil {
@@ -150,7 +184,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 		publicKey = apt.PublicKeyArmor
 	}
-	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, true)
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, options.Hardware)
 	if err != nil {
 		return result, err
 	}
@@ -172,27 +206,42 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if _, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute); err != nil {
 		return result, err
 	}
-	if format == packaging.FormatRPM {
+	if err := pinArchRepositories(ctx, vm, manifest); err != nil {
+		return result, err
+	}
+	family, err := nativeDistributionFamily(manifest.GetDistribution())
+	if err != nil {
+		return result, err
+	}
+	if family == familyDNF {
 		mode, err := vm.run(ctx, "getenforce", nil, 128, 10*time.Second)
 		if err != nil {
 			return result, err
 		}
 		result.SELinux = strings.TrimSpace(string(mode))
 		if result.SELinux != "Enforcing" {
-			return result, errors.New("dispatch on Fedora requires SELinux Enforcing")
+			return result, errors.New("dispatch on the DNF family requires SELinux Enforcing")
 		}
 	} else {
 		result.SELinux = "not applicable"
 	}
-	packages, err := newNativeGuestPackages(ctx, vm, artifact, artifact, apt, publicKey, signer.Fingerprint)
+	packages, err := newNativeGuestPackages(ctx, vm, artifact, artifact, apt, publicKey, signer.Fingerprint, arch...)
 	if err != nil {
 		return result, err
 	}
 	defer func() { err = errors.Join(err, packages.Close()) }()
-	if err := packages.InstallFirst(ctx); err != nil {
+	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
 		return result, err
 	}
-	if err := uploadLifecycleProbe(ctx, vm, options.LabBinary); err != nil {
+	if options.RedHatTokenFile != "" {
+		result.RedHat = new(VMRedHatEvidence)
+	}
+	registration, err := registerVMRedHat(ctx, vm, options.RedHatTokenFile, result.RedHat)
+	if err != nil {
+		return result, err
+	}
+	defer func() { err = errors.Join(err, registration.Close()) }()
+	if err := packages.InstallFirst(ctx); err != nil {
 		return result, err
 	}
 	if err := packages.uploadBytes(ctx, nativeGuestDir+"/dispatch.service", []byte(dispatchUnitDefinition)); err != nil {
@@ -289,20 +338,20 @@ func dispatchWitnessValue(ctx context.Context, vm *guestVM) (string, error) {
 	return string(value), err
 }
 
-func (c *vmControlPlane) dispatchState(ctx context.Context, deviceID string) (*adminv1.GetDeviceServiceStateResponse, error) {
-	response, err := c.session.Admin.GetDeviceServiceState(ctx, connect.NewRequest(&adminv1.GetDeviceServiceStateRequest{DeviceId: deviceID}))
+func (c *vmControlPlane) dispatchState(ctx context.Context, deviceID string) (*adminv1.GetDeviceResourceStateResponse, error) {
+	response, err := c.session.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: deviceID}))
 	if err != nil {
 		return nil, fmt.Errorf("read dispatch state: %w", err)
 	}
 	return response.Msg, nil
 }
 
-func (c *vmControlPlane) assignDispatch(ctx context.Context, deviceID, head string, revision *adminv1.ServiceProfileRevision) (*adminv1.ServiceAssignment, error) {
-	request := &adminv1.SetServiceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: deviceID, Target: &adminv1.ServiceAssignmentTarget{ProfileId: revision.GetProfileId(), RevisionId: revision.GetRevisionId()}, Reason: "disposable connected native dispatch qualification"}
+func (c *vmControlPlane) assignDispatch(ctx context.Context, deviceID, head string, revision *adminv1.ProfileRevision) (*adminv1.ResourceAssignment, error) {
+	request := &adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: deviceID, Target: &adminv1.ResourceAssignmentTarget{ProfileId: revision.GetProfileId(), RevisionId: revision.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(dispatchReconcileIntervalSeconds), Reason: "disposable connected native dispatch qualification"}
 	if head != "" {
 		request.ExpectedAssignmentId = proto.String(head)
 	}
-	response, err := c.session.Admin.SetServiceAssignment(ctx, connect.NewRequest(request))
+	response, err := c.session.Admin.SetResourceAssignment(ctx, connect.NewRequest(request))
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +361,7 @@ func (c *vmControlPlane) assignDispatch(ctx context.Context, deviceID, head stri
 func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, head string, open bool) (*adminv1.ServiceActionSummary, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	var last *adminv1.GetDeviceServiceStateResponse
+	var last *adminv1.GetDeviceResourceStateResponse
 	for {
 		state, err := control.dispatchState(ctx, deviceID)
 		if err != nil {
@@ -327,13 +376,13 @@ func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, 
 		if open && action != nil && action.GetClosedAt() == nil && action.GetStartAuthorizedAt() != nil {
 			return action, nil
 		}
-		if !open && resource.GetDisposition() == adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_SUCCEEDED {
+		if !open && resource.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_SUCCEEDED {
 			if action == nil || action.GetStatus().GetState() != agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_SUCCEEDED || action.GetAttestedAt() == nil || action.GetReceivedAt() == nil || action.GetActionRevision() == 0 || action.GetClosedReason() != "result" {
 				return nil, errors.New("SUCCEEDED lacks verified device history and server closure")
 			}
 			return action, nil
 		}
-		if resource.GetDisposition() == adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_ATTENTION || resource.GetDisposition() == adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_BLOCKED {
+		if resource.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || resource.GetDisposition() == adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED {
 			return nil, fmt.Errorf("dispatch cannot converge: %s", state)
 		}
 		if err := lifecycleDelay(ctx, 250*time.Millisecond); err != nil {
@@ -343,20 +392,24 @@ func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, 
 }
 
 func exerciseConnectedDispatch(ctx context.Context, vm *guestVM, control *vmControlPlane, fixture *devlab.AuthorityFixture, result *VMDispatchResult, hold func() error) error {
-	request := &adminv1.PublishServiceProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "publish connected native dispatch fixture", Spec: &policyv1.ServiceProfileSpec{Name: "Connected native dispatch", Resources: []*policyv1.ServiceProfileResource{{ResourceId: uuid.NewString(), Desired: &agentv1.ServiceDesiredState{Unit: dispatchUnit, Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}}}}
-	published, err := control.session.Admin.PublishServiceProfileRevision(ctx, connect.NewRequest(request))
+	request := &adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "publish connected native dispatch fixture", Spec: &policyv1.ResourceProfile{Name: "Connected native dispatch", Resources: []*policyv1.ProfileResource{{ResourceId: uuid.NewString(), Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: dispatchUnit}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: dispatchUnit, Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}}}}}
+	published, err := control.session.Admin.PublishProfileRevision(ctx, connect.NewRequest(request))
 	if err != nil {
 		return err
 	}
 	active := published.Msg.GetRevision()
 	var head string
 	var sequence uint64
-	run := func(name string, revision *adminv1.ServiceProfileRevision, nativeActive, nativeEnablement string, start, restart bool, witness string) error {
+	run := func(name string, revision *adminv1.ProfileRevision, nativeActive, nativeEnablement string, start, restart bool, witness string) error {
 		scenario := VMDispatchScenario{Name: name, StartedAt: time.Now().UTC(), Coverage: "native automatic dispatch"}
 		assignment, err := control.assignDispatch(ctx, result.DeviceID, head, revision)
 		if err != nil {
 			return err
 		}
+		if assignment.GetReconcileIntervalSeconds() != dispatchReconcileIntervalSeconds {
+			return errors.New("dispatch assignment did not retain the requested reconcile interval")
+		}
+		scenario.Assignment = assignment
 		head = assignment.GetAssignmentId()
 		var opened *adminv1.ServiceActionSummary
 		if restart {
@@ -402,34 +455,38 @@ func exerciseConnectedDispatch(ctx context.Context, vm *guestVM, control *vmCont
 	if err := run("1 active and enabled", active, "active", "enabled", true, false, "started\n"); err != nil {
 		return err
 	}
+	sequence, err = exerciseDispatchRechecks(ctx, vm, control, result, head, sequence)
+	if err != nil {
+		return err
+	}
 	next := proto.CloneOf(request)
 	next.RequestId, next.ExpectedRevisionId = uuid.NewString(), proto.String(active.GetRevisionId())
-	next.Spec.Resources[0].Desired.Runtime = agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE
-	next.Spec.Resources[0].Desired.Enablement = agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED
-	published, err = control.session.Admin.PublishServiceProfileRevision(ctx, connect.NewRequest(next))
+	next.Spec.Resources[0].Desired.GetSystemdService().Runtime = resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE
+	next.Spec.Resources[0].Desired.GetSystemdService().Enablement = resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED
+	published, err = control.session.Admin.PublishProfileRevision(ctx, connect.NewRequest(next))
 	if err != nil {
 		return err
 	}
 	inactive := published.Msg.GetRevision()
-	if err := run("2 inactive and disabled", inactive, "inactive", "disabled", true, false, "started\n"); err != nil {
+	if err := run("2 inactive and disabled", inactive, "inactive", "disabled", true, false, "started\nstarted\n"); err != nil {
 		return err
 	}
 	result.Scenarios = append(result.Scenarios, VMDispatchScenario{Name: "3 unstarted supersession", Coverage: "covered by integration test, not natively exercised: minting is acquisition-driven and the executor holds the mTLS signer; no deterministic native interleaving without a fault seam"})
-	if err := run("4 server restart with open action", active, "active", "enabled", true, true, "started\nstarted\n"); err != nil {
+	if err := run("4 server restart with open action", active, "active", "enabled", true, true, "started\nstarted\nstarted\n"); err != nil {
 		return err
 	}
-	if err := run("5 no drift without start grant", active, "active", "enabled", false, false, "started\nstarted\n"); err != nil {
+	if err := run("5 no drift without start grant", active, "active", "enabled", false, false, "started\nstarted\nstarted\n"); err != nil {
 		return err
 	}
 	clock, err := vmDispatchClockOffset(ctx, vm, 90, func() error {
-		return run("7 guest clock 90 seconds ahead", inactive, "inactive", "disabled", true, false, "started\nstarted\n")
+		return run("7 guest clock 90 seconds ahead", inactive, "inactive", "disabled", true, false, "started\nstarted\nstarted\n")
 	})
 	result.ClockSkew = append(result.ClockSkew, clock)
 	if err != nil {
 		return err
 	}
 	clock, err = vmDispatchClockOffset(ctx, vm, -90, func() error {
-		return run("8 guest clock 90 seconds behind", active, "active", "enabled", true, false, "started\nstarted\nstarted\n")
+		return run("8 guest clock 90 seconds behind", active, "active", "enabled", true, false, "started\nstarted\nstarted\nstarted\n")
 	})
 	result.ClockSkew = append(result.ClockSkew, clock)
 	if err != nil {
@@ -461,6 +518,7 @@ func exerciseConnectedDispatch(ctx context.Context, vm *guestVM, control *vmCont
 	if err := control.RevokeDevice(ctx, result.DeviceID); err != nil {
 		return err
 	}
+	scenario.RevocationApproval = control.devices[result.DeviceID].approval
 	if _, err := control.assignDispatch(ctx, result.DeviceID, head, inactive); connect.CodeOf(err) != connect.CodeFailedPrecondition && connect.CodeOf(err) != connect.CodePermissionDenied {
 		return fmt.Errorf("revoked device assignment was not denied: %w", err)
 	}
@@ -505,7 +563,7 @@ func exerciseConnectedDispatch(ctx context.Context, vm *guestVM, control *vmCont
 // Browser inspection can leave successful or attention history. Wait only for
 // live work to settle, then use native state (not the old desired revision) as
 // the revocation baseline.
-func waitDispatchSettled(ctx context.Context, control *vmControlPlane, deviceID string) (*adminv1.GetDeviceServiceStateResponse, error) {
+func waitDispatchSettled(ctx context.Context, control *vmControlPlane, deviceID string) (*adminv1.GetDeviceResourceStateResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	for {
@@ -516,7 +574,7 @@ func waitDispatchSettled(ctx context.Context, control *vmControlPlane, deviceID 
 		pending := false
 		for _, resource := range state.GetResources() {
 			switch resource.GetDisposition() {
-			case adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_PENDING, adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_IN_PROGRESS:
+			case adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING, adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS:
 				pending = true
 			}
 		}

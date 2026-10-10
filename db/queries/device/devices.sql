@@ -11,6 +11,15 @@ UPDATE devices
 SET current_generation_id = sqlc.arg('current_generation_id')
 WHERE id = sqlc.arg('id');
 
+-- Read-only authority callers must use a coherent transaction snapshot.
+-- name: GetDeviceAuthority :one
+SELECT
+    id,
+    state,
+    current_generation_id
+FROM devices
+WHERE id = sqlc.arg('id');
+
 -- name: GetDeviceForUpdate :one
 SELECT
     id,
@@ -123,51 +132,6 @@ UPDATE enrollment_generations
 SET state = 'active'
 WHERE id = sqlc.arg('id')
   AND state = 'pending';
-
--- name: ListDevicesFirst :many
-SELECT
-    d.id,
-    d.current_generation_id,
-    d.hostname,
-    d.os_id,
-    d.os_version,
-    d.architecture,
-    d.state,
-    d.enrolled_at,
-    d.last_seen_at,
-    d.published_sequence,
-    coalesce(g.host_sequence, 0) AS host_sequence,
-    coalesce(g.package_sequence, 0) AS package_sequence,
-    d.host_received_at,
-    d.package_attempt_received_at,
-    d.snapshot_received_at
-FROM devices d
-LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
-ORDER BY d.enrolled_at DESC, d.id DESC
-LIMIT sqlc.arg('row_limit')::int;
-
--- name: ListDevicesAfter :many
-SELECT
-    d.id,
-    d.current_generation_id,
-    d.hostname,
-    d.os_id,
-    d.os_version,
-    d.architecture,
-    d.state,
-    d.enrolled_at,
-    d.last_seen_at,
-    d.published_sequence,
-    coalesce(g.host_sequence, 0) AS host_sequence,
-    coalesce(g.package_sequence, 0) AS package_sequence,
-    d.host_received_at,
-    d.package_attempt_received_at,
-    d.snapshot_received_at
-FROM devices d
-LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
-WHERE (d.enrolled_at, d.id) < (sqlc.arg('cursor_enrolled_at')::timestamptz, sqlc.arg('cursor_id')::uuid)
-ORDER BY d.enrolled_at DESC, d.id DESC
-LIMIT sqlc.arg('row_limit')::int;
 
 -- name: GetDeviceDetail :one
 SELECT

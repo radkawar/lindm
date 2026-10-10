@@ -118,7 +118,7 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ServiceExecutionRecord{}), protovalidate.WithDisableLazy())
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.ExecutorJournalState{}, &agentv1.ExecutionTrustState{}, &agentv1.ExecutionRoot{}, &agentv1.ExecutionKey{}, &agentv1.ServiceExecutionRecord{}, &agentv1.DeviceActionRecord{}, &agentv1.AccountLockLedger{}), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile executor journal schema: %w", err)
 	}
@@ -196,6 +196,12 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if err := s.queries.WithTx(tx).InitializeServiceActionUsage(ctx); err != nil {
 			return nil, errors.New("initialize service action accounting failed")
 		}
+		if err := s.queries.WithTx(tx).InitializeDeviceActionUsage(ctx); err != nil {
+			return nil, errors.New("initialize device action accounting failed")
+		}
+		if err := s.queries.WithTx(tx).InitializeAccountLockUsage(ctx); err != nil {
+			return nil, errors.New("initialize account lock accounting failed")
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, errors.New("commit executor initialization failed")
 		}
@@ -227,6 +233,12 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		return nil, err
 	}
 	if err := s.validateServiceActions(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.validateDeviceActions(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.validateAccountLocks(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil

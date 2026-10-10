@@ -13,15 +13,37 @@ import (
 	"time"
 )
 
-// Build creates DEB and/or RPM artifacts for one agent binary. RPM artifacts
-// are signed and checked in a private rpmdb. DEB authentication is PublishAPT,
-// not this function.
+// Build creates DEB, RPM and/or Arch agent artifacts. RPM and Arch signatures
+// are verified before publication. DEB authentication is PublishAPT.
 func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err error) {
+	return build(ctx, req, agentProduct())
+}
+
+// BuildServer packages a prebuilt lindmd, including its embedded console.
+// AgentBinary carries the server executable. RPM is signed here; DEBs are
+// authenticated by PublishAPT. No host service or database is modified.
+func BuildServer(ctx context.Context, req BuildRequest) (*BuildResult, error) {
+	return build(ctx, req, serverProduct())
+}
+
+// BuildCLI packages lindmctl without service units or lifecycle scripts.
+func BuildCLI(ctx context.Context, req BuildRequest) (*BuildResult, error) {
+	return build(ctx, req, cliProduct())
+}
+
+func build(ctx context.Context, req BuildRequest, p product) (result *BuildResult, err error) {
 	version, err := parseVersion(req.Version)
 	if err != nil {
 		return nil, err
 	}
 	formats, err := normalizeFormats(req.Formats)
+	if err != nil {
+		return nil, err
+	}
+	if wants(formats, FormatArch) && p.name != PackageName {
+		return nil, fmt.Errorf("%w: Arch packaging supports the agent only", ErrArtifact)
+	}
+	target, err := targetArchitecture(req.TargetArchitecture)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +70,12 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 	if err != nil {
 		return nil, err
 	}
-	goVersion, err := confirmModule(binary)
+	if arch.GOARCH != target {
+		return nil, fmt.Errorf("%w: binary %s does not match requested %s", ErrArchitecture, arch.GOARCH, target)
+	}
+	goVersion, err := confirmModule(binary, p, arch, version)
 	if err != nil {
 		return nil, err
-	}
-	if !arch.hostMatch() {
-		return nil, fmt.Errorf("%w: binary is %s and was not executed on this host", ErrVersion, arch.GOARCH)
 	}
 	epoch, err := epochOf(req.SourceDateEpoch)
 	if err != nil {
@@ -64,17 +86,21 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 		return nil, err
 	}
 	defer func() { _ = cleanup() }()
-	stdout, stderr, err := runTool(ctx, work, toolCmd{
-		Path:    binary.Name(),
-		Args:    []string{"version"},
-		Dir:     "/",
-		Timeout: 10 * time.Second,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrVersion, err)
-	}
-	if err := parseVersionOutput(stdout, stderr, version); err != nil {
-		return nil, err
+	versionValidation := "embedded-build-metadata"
+	if arch.hostMatch() {
+		stdout, stderr, err := runTool(ctx, work, toolCmd{
+			Path:    binary.Name(),
+			Args:    []string{"version"},
+			Dir:     "/",
+			Timeout: 10 * time.Second,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrVersion, err)
+		}
+		if err := parseVersionOutput(stdout, stderr, version); err != nil {
+			return nil, err
+		}
+		versionValidation = "native-execution"
 	}
 	if _, err := binary.Seek(0, 0); err != nil {
 		return nil, err
@@ -85,7 +111,7 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 	}
 	var signer SigningKey
 	var guard *signerGuard
-	if wants(formats, FormatRPM) {
+	if wants(formats, FormatRPM) || wants(formats, FormatArch) {
 		signer, guard, err = validateSigner(ctx, work, req.Signer)
 		if err != nil {
 			return nil, err
@@ -97,11 +123,11 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 			}
 		}()
 	}
-	syntaxOK, executableChecked, err := verifyUnits(ctx, work)
+	syntaxOK, executableChecked, err := verifyUnits(ctx, work, p)
 	if err != nil {
 		return nil, err
 	}
-	payload, staged, payloadSHA, err := stagePayload(work, binary, epoch)
+	payload, staged, payloadSHA, err := stagePayload(work, binary, epoch, p)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +139,11 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 		var artifact Artifact
 		switch format {
 		case FormatDEB:
-			artifact, err = buildDEB(ctx, work, payload, version, arch, epoch, staged, payloadSHA)
+			artifact, err = buildDEB(ctx, work, payload, version, arch, epoch, staged, payloadSHA, p)
 		case FormatRPM:
-			artifact, err = buildRPM(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged)
+			artifact, err = buildRPM(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged, p)
+		case FormatArch:
+			artifact, err = buildArch(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged)
 		default:
 			err = fmt.Errorf("%w: unknown format", ErrArtifact)
 		}
@@ -125,11 +153,13 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 		artifacts = append(artifacts, artifact)
 	}
 	result = &BuildResult{
+		Product:                   p.name,
 		Artifacts:                 artifacts,
 		BinarySHA256:              binarySHA,
 		Architecture:              arch,
 		Version:                   version,
 		GoVersion:                 goVersion,
+		VersionValidation:         versionValidation,
 		UnitSyntaxOK:              syntaxOK,
 		ExecutablePresenceChecked: executableChecked,
 		CreaterepoC:               createrepoStatus(ctx, work),
@@ -139,6 +169,9 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 			toolVersion(ctx, work, "gpg", "--version"),
 			toolVersion(ctx, work, "systemd-analyze", "--version"),
 		},
+	}
+	if wants(formats, FormatArch) {
+		result.Tools = append(result.Tools, archBuildToolVersion(), toolVersion(ctx, work, "gpgv", "--version"))
 	}
 	var binaryKey, armorKey string
 	if signer.Fingerprint != "" {
@@ -172,6 +205,13 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 			return nil, err
 		}
 		result.Artifacts[i].Path = final
+		if result.Artifacts[i].SignaturePath != "" {
+			signature, err := moveArtifact(result.Artifacts[i].SignaturePath, req.OutputDir)
+			if err != nil {
+				return nil, err
+			}
+			result.Artifacts[i].SignaturePath = signature
+		}
 	}
 	if err := writeManifest(req.OutputDir, version, result); err != nil {
 		return nil, err
@@ -186,7 +226,7 @@ func normalizeFormats(formats []Format) ([]Format, error) {
 	var out []Format
 	seen := map[Format]bool{}
 	for _, format := range formats {
-		if format != FormatDEB && format != FormatRPM {
+		if format != FormatDEB && format != FormatRPM && format != FormatArch {
 			return nil, fmt.Errorf("%w: unknown package format", ErrArtifact)
 		}
 		if !seen[format] {
@@ -217,7 +257,7 @@ func writeManifest(dir, version string, result *BuildResult) error {
 		return err
 	}
 	data = append(data, '\n')
-	path := filepath.Join(dir, fmt.Sprintf("%s_%s_manifest.json", PackageName, version))
+	path := filepath.Join(dir, fmt.Sprintf("%s_%s_manifest.json", result.Product, version))
 	return writeFile(path, data, 0o644, DefaultSourceDateEpoch)
 }
 
@@ -229,26 +269,25 @@ func createrepoStatus(ctx context.Context, work string) string {
 	return "installed-unused: " + found.Version
 }
 
-func verifyUnits(ctx context.Context, work string) (bool, bool, error) {
-	executor, err := asset("lindm-executor.service")
-	if err != nil {
-		return false, false, err
+func verifyUnits(ctx context.Context, work string, p product) (bool, bool, error) {
+	if len(p.units) == 0 {
+		return true, false, nil
 	}
-	network, err := asset("lindm-agent.service")
-	if err != nil {
-		return false, false, err
-	}
-	execPath := filepath.Join(work, executorUnit)
-	netPath := filepath.Join(work, agentUnit)
-	if err := writeFile(execPath, executor, 0o644, DefaultSourceDateEpoch); err != nil {
-		return false, false, err
-	}
-	if err := writeFile(netPath, network, 0o644, DefaultSourceDateEpoch); err != nil {
-		return false, false, err
+	args := []string{"verify"}
+	for _, name := range p.units {
+		data, err := asset(name)
+		if err != nil {
+			return false, false, err
+		}
+		path := filepath.Join(work, name)
+		if err := writeFile(path, data, 0o644, DefaultSourceDateEpoch); err != nil {
+			return false, false, err
+		}
+		args = append(args, path)
 	}
 	stdout, stderr, runErr := runTool(ctx, work, toolCmd{
 		Name:    "systemd-analyze",
-		Args:    []string{"verify", execPath, netPath},
+		Args:    args,
 		Timeout: 30 * time.Second,
 	})
 	missing, classErr := classifyUnitOutput(string(stdout) + "\n" + string(stderr))
@@ -271,7 +310,7 @@ func classifyUnitOutput(output string) (bool, error) {
 		if strings.Contains(line, "Accepting user/group name") && !strings.Contains(line, "lindm") {
 			continue
 		}
-		if strings.Contains(line, "Command "+BinaryPath+" is not executable") {
+		if strings.Contains(line, "Command "+BinaryPath+" is not executable") || strings.Contains(line, "Command "+ServerBinaryPath+" is not executable") {
 			missing = true
 			continue
 		}

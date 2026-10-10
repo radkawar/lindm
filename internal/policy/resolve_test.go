@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 const (
@@ -57,11 +57,11 @@ func TestResolveOrderIndependentMergeAndOverride(t *testing.T) {
 		t.Fatal("resolve mutated input assignments")
 	}
 
-	if len(got) != 4 || got[0].Unit != "alpha.service" || got[1].Unit != "dep.service" || got[2].Unit != "mid.service" || got[3].Unit != "zebra.service" {
+	if len(got) != 4 || got[0].Ref.GetCanonicalKey() != "alpha.service" || got[1].Ref.GetCanonicalKey() != "dep.service" || got[2].Ref.GetCanonicalKey() != "mid.service" || got[3].Ref.GetCanonicalKey() != "zebra.service" {
 		t.Fatalf("units = %#v", unitsOf(got))
 	}
 	alpha := got[0]
-	if alpha.State != ResolutionReady || alpha.Reason != ReasonNone || alpha.Desired.GetRuntime() != runtimeActive() || alpha.Desired.GetEnablement() != enablementUnmanaged() {
+	if alpha.State != ResolutionReady || alpha.Reason != ReasonNone || alpha.Desired.GetSystemdService().GetRuntime() != runtimeActive() || alpha.Desired.GetSystemdService().GetEnablement() != enablementUnmanaged() {
 		t.Fatalf("higher priority did not fully override lower unit: %#v", alpha)
 	}
 	if len(alpha.Contributors) != 1 || alpha.Contributors[0].ResourceID != resourceD || len(alpha.Overridden) != 1 || alpha.Overridden[0].ResourceID != resourceB {
@@ -72,22 +72,22 @@ func TestResolveOrderIndependentMergeAndOverride(t *testing.T) {
 	}
 
 	mid := got[2]
-	if mid.State != ResolutionReady || mid.Desired.GetRuntime() != runtimeActive() || mid.Desired.GetEnablement() != enablementEnabled() {
+	if mid.State != ResolutionReady || mid.Desired.GetSystemdService().GetRuntime() != runtimeActive() || mid.Desired.GetSystemdService().GetEnablement() != enablementEnabled() {
 		t.Fatalf("complementary merge = %#v desired=%v", mid, mid.Desired)
 	}
 	if mid.Contributors[0].ProfileID != profileMid || mid.Contributors[1].ProfileID != id(7) {
 		t.Fatalf("contributor order = %#v", mid.Contributors)
 	}
-	if len(mid.Dependencies) != 1 || mid.Dependencies[0] != "dep.service" {
+	if len(mid.Dependencies) != 1 || mid.Dependencies[0].GetRef().GetCanonicalKey() != "dep.service" {
 		t.Fatalf("merged dependencies = %v", mid.Dependencies)
 	}
-	mid.Desired.Unit = "mutated.service"
-	if forward[2].Spec.GetResources()[0].GetDesired().GetUnit() != "mid.service" {
+	mid.Desired.GetSystemdService().Unit = "mutated.service"
+	if forward[2].Spec.GetResources()[0].GetDesired().GetSystemdService().GetUnit() != "mid.service" {
 		t.Fatal("result desired aliased input")
 	}
 
 	zebra := got[3]
-	if zebra.Desired.GetRuntime() != runtimeUnmanaged() || zebra.Desired.GetEnablement() != enablementEnabled() || zebra.Dependencies[0] != "alpha.service" {
+	if zebra.Desired.GetSystemdService().GetRuntime() != runtimeUnmanaged() || zebra.Desired.GetSystemdService().GetEnablement() != enablementEnabled() || zebra.Dependencies[0].GetRef().GetCanonicalKey() != "alpha.service" {
 		t.Fatalf("partial higher-priority winner = %#v deps %v", zebra.Desired, zebra.Dependencies)
 	}
 	if zebra.Overridden[0].ProfileID != profileLow {
@@ -118,7 +118,7 @@ func TestResolveEqualPriorityDisagreement(t *testing.T) {
 	if len(app.Contributors) != 2 || len(app.Overridden) != 1 || app.Overridden[0].ProfileID != profileLow {
 		t.Fatalf("conflict provenance contributors %#v overridden %#v", app.Contributors, app.Overridden)
 	}
-	if len(app.Dependencies) != 1 || app.Dependencies[0] != "db.service" {
+	if len(app.Dependencies) != 1 || app.Dependencies[0].GetRef().GetCanonicalKey() != "db.service" {
 		t.Fatalf("conflict dependencies = %v", app.Dependencies)
 	}
 	db := byUnit(t, got, "db.service")
@@ -126,7 +126,7 @@ func TestResolveEqualPriorityDisagreement(t *testing.T) {
 		t.Fatalf("conflicted dependent blocked its prerequisite: %#v", db)
 	}
 	worker := byUnit(t, got, "worker.service")
-	if worker.State != ResolutionBlocked || worker.Reason != ReasonDependencyConflict || worker.Desired.GetRuntime() != runtimeActive() {
+	if worker.State != ResolutionBlocked || worker.Reason != ReasonDependencyConflict || worker.Desired.GetSystemdService().GetRuntime() != runtimeActive() {
 		t.Fatalf("dependent of conflict = %#v", worker)
 	}
 }
@@ -168,7 +168,7 @@ func TestResolveCrossProfileCycleAndTransitiveBlock(t *testing.T) {
 	if b.State != ResolutionConflict || b.Reason != ReasonDependencyCycle || b.Desired != nil {
 		t.Fatalf("cycle member b = %#v", b)
 	}
-	if len(a.Dependencies) != 1 || a.Dependencies[0] != "b.service" || len(b.Dependencies) != 1 || b.Dependencies[0] != "a.service" {
+	if len(a.Dependencies) != 1 || a.Dependencies[0].GetRef().GetCanonicalKey() != "b.service" || len(b.Dependencies) != 1 || b.Dependencies[0].GetRef().GetCanonicalKey() != "a.service" {
 		t.Fatalf("cycle edges a %v b %v", a.Dependencies, b.Dependencies)
 	}
 	if c.State != ResolutionBlocked || c.Reason != ReasonDependencyConflict {
@@ -182,7 +182,7 @@ func TestResolveCrossProfileCycleAndTransitiveBlock(t *testing.T) {
 	}
 	edge := byUnit(t, got, "edge.service")
 	baseUnit := byUnit(t, got, "base.service")
-	if edge.State != ResolutionReady || len(edge.Dependencies) != 1 || edge.Dependencies[0] != "base.service" {
+	if edge.State != ResolutionReady || len(edge.Dependencies) != 1 || edge.Dependencies[0].GetRef().GetCanonicalKey() != "base.service" {
 		t.Fatalf("dependency on higher-priority unit = %#v", edge)
 	}
 	if baseUnit.State != ResolutionReady || baseUnit.Contributors[0].ProfileID != id(21) || baseUnit.Overridden[0].ProfileID != id(18) {
@@ -235,13 +235,13 @@ func TestResolveAgreesOnExplicitValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := byUnit(t, got, "app.service")
-	if app.State != ResolutionReady || app.Desired.GetRuntime() != runtimeActive() || app.Desired.GetEnablement() != enablementEnabled() || len(app.Contributors) != 2 {
+	if app.State != ResolutionReady || app.Desired.GetSystemdService().GetRuntime() != runtimeActive() || app.Desired.GetSystemdService().GetEnablement() != enablementEnabled() || len(app.Contributors) != 2 {
 		t.Fatalf("equal explicit values = %#v", app)
 	}
 	if app.Contributors[0].ProfileID != profileLow || app.Contributors[1].ProfileID != profileHigh {
 		t.Fatalf("provenance sort = %#v", app.Contributors)
 	}
-	if len(app.Dependencies) != 3 || app.Dependencies[0] != "a.service" || app.Dependencies[1] != "m.service" || app.Dependencies[2] != "z.service" {
+	if len(app.Dependencies) != 3 || app.Dependencies[0].GetRef().GetCanonicalKey() != "a.service" || app.Dependencies[1].GetRef().GetCanonicalKey() != "m.service" || app.Dependencies[2].GetRef().GetCanonicalKey() != "z.service" {
 		t.Fatalf("dependency order = %v", app.Dependencies)
 	}
 }
@@ -250,9 +250,9 @@ func TestResolveRejectsInvalidAssignments(t *testing.T) {
 	valid := spec("ok", resource(resourceA, "app.service", runtimeActive(), enablementUnmanaged(), nil))
 	base := Assignment{ProfileID: profileLow, RevisionID: revisionLow, Priority: 1, Spec: valid}
 	cases := map[string][]Assignment{
-		"duplicate profile": {
+		"inconsistent duplicate": {
 			base,
-			{ProfileID: profileLow, RevisionID: revisionHi, Priority: 2, Spec: valid},
+			{ProfileID: profileLow, RevisionID: revisionLow, Priority: 1, Spec: spec("other", resource(resourceA, "app.service", runtimeInactive(), enablementUnmanaged(), nil))},
 		},
 		"malformed profile": {{ProfileID: "not-a-uuid", RevisionID: revisionLow, Priority: 1, Spec: valid}},
 		"nonzero profile":   {{ProfileID: uuid.Nil.String(), RevisionID: revisionLow, Priority: 1, Spec: valid}},
@@ -286,7 +286,7 @@ func TestValidateProfileSchemaAndCycles(t *testing.T) {
 	if err := Validate(context.Background(), ok); err != nil {
 		t.Fatal(err)
 	}
-	cases := map[string]*policyv1.ServiceProfileSpec{
+	cases := map[string]*policyv1.ResourceProfile{
 		"nil":               nil,
 		"empty name":        spec("", resource(resourceA, "app.service", runtimeActive(), enablementUnmanaged(), nil)),
 		"nul name":          spec("bad\x00name", resource(resourceA, "app.service", runtimeActive(), enablementUnmanaged(), nil)),
@@ -297,7 +297,7 @@ func TestValidateProfileSchemaAndCycles(t *testing.T) {
 		"self dependency":   spec("ok", resource(resourceA, "app.service", runtimeActive(), enablementUnmanaged(), []string{resourceA})),
 		"absent dependency": spec("ok", resource(resourceA, "app.service", runtimeActive(), enablementUnmanaged(), []string{resourceB})),
 		"zero resource":     spec("ok", resource(uuid.Nil.String(), "app.service", runtimeActive(), enablementUnmanaged(), nil)),
-		"both unmanaged":    spec("ok", resource(resourceA, "app.service", agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED, agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED, nil)),
+		"both unmanaged":    spec("ok", resource(resourceA, "app.service", resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED, resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED, nil)),
 		"protected unit":    spec("ok", resource(resourceA, "lindm.service", runtimeActive(), enablementUnmanaged(), nil)),
 		"cycle": spec("ok",
 			resource(resourceA, "a.service", runtimeActive(), enablementUnmanaged(), []string{resourceB}),
@@ -341,44 +341,64 @@ func TestResolveHonorsCancellation(t *testing.T) {
 	}
 }
 
-func spec(name string, resources ...*policyv1.ServiceProfileResource) *policyv1.ServiceProfileSpec {
-	return &policyv1.ServiceProfileSpec{Name: name, Description: "preview", Resources: resources}
+func spec(name string, resources ...*policyv1.ProfileResource) *policyv1.ResourceProfile {
+	// Fixtures accept local UUID edges for readability, then construct the wire
+	// contract's canonical references before invoking production validation.
+	byID := make(map[string]*resourcev1.ResourceRef, len(resources))
+	for _, item := range resources {
+		byID[item.GetResourceId()] = item.GetDesired().GetRef()
+	}
+	for _, item := range resources {
+		for _, dep := range item.DependsOn {
+			if ref := byID[dep.GetRef().GetCanonicalKey()]; ref != nil {
+				dep.Ref = proto.CloneOf(ref)
+			}
+		}
+	}
+	return &policyv1.ResourceProfile{Name: name, Description: "preview", Resources: resources}
 }
 
-func withDescription(spec *policyv1.ServiceProfileSpec, description string) *policyv1.ServiceProfileSpec {
+func withDescription(spec *policyv1.ResourceProfile, description string) *policyv1.ResourceProfile {
 	spec.Description = description
 	return spec
 }
 
-func resource(id, unit string, runtime agentv1.ServiceRuntimeState, enablement agentv1.ServiceEnablement, deps []string) *policyv1.ServiceProfileResource {
-	return &policyv1.ServiceProfileResource{
+func resource(id, unit string, runtime resourcev1.ServiceRuntimeState, enablement resourcev1.ServiceEnablement, deps []string) *policyv1.ProfileResource {
+	item := &policyv1.ProfileResource{
 		ResourceId: id,
-		Desired: &agentv1.ServiceDesiredState{
-			Unit:       unit,
-			Runtime:    runtime,
-			Enablement: enablement,
+		Desired: &resourcev1.ResourceDesiredState{
+			Ref:   &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: unit},
+			State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: unit, Runtime: runtime, Enablement: enablement}},
 		},
-		DependsOn: deps,
+		Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED},
+		Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 300, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
 	}
+	for _, dep := range deps {
+		item.DependsOn = append(item.DependsOn, &policyv1.ResourceDependency{
+			Ref:       &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: dep},
+			Condition: policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_CONFIGURED,
+		})
+	}
+	return item
 }
 
-func runtimeActive() agentv1.ServiceRuntimeState {
-	return agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE
+func runtimeActive() resourcev1.ServiceRuntimeState {
+	return resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE
 }
-func runtimeInactive() agentv1.ServiceRuntimeState {
-	return agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE
+func runtimeInactive() resourcev1.ServiceRuntimeState {
+	return resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_INACTIVE
 }
-func runtimeUnmanaged() agentv1.ServiceRuntimeState {
-	return agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED
+func runtimeUnmanaged() resourcev1.ServiceRuntimeState {
+	return resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED
 }
-func enablementEnabled() agentv1.ServiceEnablement {
-	return agentv1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED
+func enablementEnabled() resourcev1.ServiceEnablement {
+	return resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_ENABLED
 }
-func enablementDisabled() agentv1.ServiceEnablement {
-	return agentv1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED
+func enablementDisabled() resourcev1.ServiceEnablement {
+	return resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_DISABLED
 }
-func enablementUnmanaged() agentv1.ServiceEnablement {
-	return agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
+func enablementUnmanaged() resourcev1.ServiceEnablement {
+	return resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED
 }
 
 func id(n byte) string {
@@ -396,7 +416,7 @@ func rewrite(id string, mark byte) string {
 	return strings.Replace(id, "dddddddd", strings.Repeat(string(mark), 8), 1)
 }
 
-func tooMany(spec *policyv1.ServiceProfileSpec) []Assignment {
+func tooMany(spec *policyv1.ResourceProfile) []Assignment {
 	out := make([]Assignment, maxAssignments+1)
 	for i := range out {
 		out[i] = Assignment{ProfileID: profileLow, RevisionID: revisionLow, Priority: 1, Spec: spec}
@@ -430,7 +450,7 @@ func sameResolutions(a, b []Resolution) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Unit != b[i].Unit || a[i].State != b[i].State || a[i].Reason != b[i].Reason || !sameContributors(a[i].Contributors, b[i].Contributors) || !sameContributors(a[i].Overridden, b[i].Overridden) || !slicesEqual(a[i].Dependencies, b[i].Dependencies) || !proto.Equal(a[i].Desired, b[i].Desired) {
+		if !proto.Equal(a[i].Ref, b[i].Ref) || a[i].State != b[i].State || a[i].Reason != b[i].Reason || !sameContributors(a[i].Contributors, b[i].Contributors) || !sameContributors(a[i].Overridden, b[i].Overridden) || !slicesEqual(a[i].Dependencies, b[i].Dependencies) || !proto.Equal(a[i].Resource, b[i].Resource) || !proto.Equal(a[i].Desired, b[i].Desired) {
 			return false
 		}
 	}
@@ -449,12 +469,12 @@ func sameContributors(a, b []Contributor) bool {
 	return true
 }
 
-func slicesEqual(a, b []string) bool {
+func slicesEqual(a, b []*policyv1.ResourceDependency) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if a[i] != b[i] {
+		if !proto.Equal(a[i], b[i]) {
 			return false
 		}
 	}
@@ -464,7 +484,7 @@ func slicesEqual(a, b []string) bool {
 func unitsOf(items []Resolution) []string {
 	out := make([]string, len(items))
 	for i := range items {
-		out[i] = items[i].Unit
+		out[i] = items[i].Ref.GetCanonicalKey()
 	}
 	return out
 }
@@ -472,7 +492,7 @@ func unitsOf(items []Resolution) []string {
 func byUnit(t *testing.T, items []Resolution, unit string) Resolution {
 	t.Helper()
 	for _, item := range items {
-		if item.Unit == unit {
+		if item.Ref.GetCanonicalKey() == unit {
 			return item
 		}
 	}

@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/advisory/v1/feed.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// UNKNOWN means the inventory, source coverage or advisory feed cannot establish
+// current exposure. ACCEPTED is time-limited risk acceptance, never a fix.
+enum AdvisoryFindingState {
+  ADVISORY_FINDING_STATE_UNSPECIFIED = 0;
+  ADVISORY_FINDING_STATE_AFFECTED = 1;
+  ADVISORY_FINDING_STATE_ACCEPTED = 2;
+  ADVISORY_FINDING_STATE_UNKNOWN = 3;
+  ADVISORY_FINDING_STATE_CLEAR = 4;
+}
+
+message AdvisoryException {
+  string actor_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp accepted_at = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message AdvisoryFinding {
+  string id = 1;
+  string advisory_id = 2;
+  repeated string cves = 3;
+  string package_name = 4;
+  string installed_version = 5;
+  string fixed_version = 6;
+  string architecture = 7;
+  string severity = 8;
+  google.protobuf.Timestamp published_at = 9;
+  AdvisoryFindingState state = 10;
+  AdvisoryException exception = 11;
+  string feed_id = 12;
+  string source_url = 13;
+}
+
+message AdvisoryFreshness {
+  AdvisoryFindingState state = 1;
+  string reason = 2;
+  string snapshot_id = 3;
+  google.protobuf.Timestamp inventory_at = 4;
+  google.protobuf.Timestamp inventory_expires_at = 5;
+  google.protobuf.Timestamp feed_checked_at = 6;
+  google.protobuf.Timestamp feed_expires_at = 7;
+  string feed_id = 8;
+  string source_sha256 = 9;
+}
+
+message ListDeviceFindingsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 3 [(buf.validate.field).string.max_len = 1024];
+}
+message ListDeviceFindingsResponse {
+  repeated AdvisoryFinding findings = 1;
+  string next_page_token = 2;
+  AdvisoryFreshness freshness = 3;
+}
+
+message ListAdvisorySummaryRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 2 [(buf.validate.field).string.max_len = 1024];
+}
+message AdvisorySummary {
+  string advisory_id = 1;
+  string severity = 2;
+  uint64 affected_devices = 3;
+  uint64 accepted_devices = 4;
+  uint64 unknown_devices = 5;
+  repeated string cves = 6;
+}
+message ListAdvisorySummaryResponse {
+  repeated AdvisorySummary advisories = 1;
+  string next_page_token = 2;
+  uint64 unknown_devices = 3;
+  uint64 evaluated_devices = 4;
+}
+
+message ListAdvisoryFeedsRequest {}
+message AdvisoryFeedStatus {
+  string id = 1;
+  string distro = 2;
+  string release = 3;
+  string source_url = 4;
+  string source_sha256 = 5;
+  google.protobuf.Timestamp checked_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp attempted_at = 8;
+  string error = 9;
+  bool fresh = 10;
+  uint64 advisory_count = 11;
+  string platform_stream = 12;
+  repeated lindm.advisory.v1.FeedArtifact artifacts = 13;
+  google.protobuf.Timestamp snapshot_at = 14;
+}
+message ListAdvisoryFeedsResponse {
+  repeated AdvisoryFeedStatus feeds = 1;
+}
+
+message AcceptAdvisoryFindingRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string finding_id = 3 [(buf.validate.field).string.uuid = true];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).required = true];
+}
+message AcceptAdvisoryFindingResponse {
+  AdvisoryException exception = 1;
+}

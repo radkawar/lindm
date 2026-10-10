@@ -1,13 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import type { ServiceProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
-import { ServiceEnablement, ServiceRuntimeState } from "../../../gen/lindm/agent/v1/service_pb";
+import { toast } from "sonner";
+import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
+import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ProtobufFields } from "@/components/ui/protobuf-fields";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
@@ -25,31 +27,23 @@ import {
 import {
   CATALOG_SEMANTICS,
   DESCRIPTION_MAX,
-  ENABLEMENT_OPTIONS,
   MAX_RESOURCES,
   NAME_MAX,
-  RUNTIME_OPTIONS,
-  UNIT_MAX,
   capturePayload,
   classifyPublishError,
   publishErrors,
   draftFromPayload,
   draftFromSpec,
   emptyDraft,
-  enablementLabel,
   formatRevisionNumber,
   newResource,
   publishFailureTitle,
   removeResource,
-  resourceLabel,
-  runtimeLabel,
   type DraftResource,
   type DraftSpec,
   type PublishPayload,
 } from "./model";
 import { profileRevisionQueryOptions } from "./queries";
-
-const controlClass = "h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-sm";
 
 export function ProfileEditor({
   mode,
@@ -90,7 +84,7 @@ export function ProfileEditor({
     gcTime: 0,
     meta: { authGeneration: lifetime.generation },
     mutationFn: async (payload: PublishPayload) => {
-      const response = await adminClient.publishServiceProfileRevision(payload, {
+      const response = await adminClient.publishProfileRevision(payload, {
         signal: lifetime.signal,
       });
       lifetime.signal.throwIfAborted();
@@ -107,7 +101,11 @@ export function ProfileEditor({
         failure: null,
         conflict: false,
       });
+      toast.success("Profile revision published");
       void queryClient.invalidateQueries({ queryKey: ["profiles", lifetime.generation] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resource-profile-heads", lifetime.generation],
+      });
       void queryClient.invalidateQueries({
         queryKey: ["profile-revision", lifetime.generation, payload.profileId],
       });
@@ -124,6 +122,12 @@ export function ProfileEditor({
         failure: classified.failure,
         conflict: classified.conflict,
       });
+      toast.error(
+        classified.failure.ambiguous ? "Publish outcome unknown" : "Profile publish rejected",
+        {
+          description: "Review the inline result and captured request before continuing.",
+        },
+      );
     },
     onSettled: () => {
       inFlight.current = false;
@@ -160,14 +164,18 @@ export function ProfileEditor({
   }
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>{creating ? "Publish a profile" : "Publish a new revision"}</CardTitle>
-        <CardDescription>{CATALOG_SEMANTICS}</CardDescription>
+        <CardDescription>Publish an immutable catalog revision.</CardDescription>
+        <details className="text-xs text-muted-foreground">
+          <summary className="w-fit cursor-pointer py-1">Publishing scope</summary>
+          <p className="mt-2">{CATALOG_SEMANTICS}</p>
+        </details>
       </CardHeader>
       <CardContent>
         <form
-          className="grid gap-4"
+          className="grid min-w-0 gap-4"
           aria-describedby="profile-publish-note"
           onSubmit={(event) => {
             event.preventDefault();
@@ -183,20 +191,26 @@ export function ProfileEditor({
               ]);
               return;
             }
-            const payload = capturePayload({
-              requestId,
-              profileId,
-              expectedRevisionId,
-              reason,
-              draft,
-            });
-            const errors = publishErrors(payload);
-            if (errors.length > 0) {
-              setFieldErrors(errors);
-              return;
+            try {
+              const payload = capturePayload({
+                requestId,
+                profileId,
+                expectedRevisionId,
+                reason,
+                draft,
+              });
+              const errors = publishErrors(payload);
+              if (errors.length > 0) {
+                setFieldErrors(errors);
+                return;
+              }
+              setFieldErrors([]);
+              send(payload);
+            } catch (error) {
+              setFieldErrors([
+                error instanceof Error ? error.message : "Invalid resource document",
+              ]);
             }
-            setFieldErrors([]);
-            send(payload);
           }}
         >
           <p id="profile-publish-note" className="text-sm text-muted-foreground">
@@ -246,7 +260,6 @@ export function ProfileEditor({
                 key={resource.resourceId}
                 index={index}
                 resource={resource}
-                others={shown.resources.filter((item) => item.resourceId !== resource.resourceId)}
                 locked={locked}
                 onChange={(next) =>
                   setDraft({
@@ -270,8 +283,8 @@ export function ProfileEditor({
               Add resource
             </Button>
             <p className="text-sm text-muted-foreground">
-              {shown.resources.length} of {MAX_RESOURCES} resources. Removing a resource also
-              removes dependencies on it.
+              {shown.resources.length} of {MAX_RESOURCES} resources. After removing a resource,
+              update typed dependency references before publishing.
             </p>
           </div>
           <div className="grid gap-1.5">
@@ -285,7 +298,11 @@ export function ProfileEditor({
             />
           </div>
           {fieldErrors.length > 0 ? (
-            <ul id="profile-draft-errors" className="grid gap-1 text-sm text-destructive">
+            <ul
+              id="profile-draft-errors"
+              role="alert"
+              className="grid gap-1 border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+            >
               {fieldErrors.map((error) => (
                 <li key={error}>{error}</li>
               ))}
@@ -459,7 +476,11 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
     );
   }
   if (attempt.status === "inflight") {
-    return <p role="status">Publishing the captured request…</p>;
+    return (
+      <p role="status" className="border bg-muted/30 p-3 text-sm">
+        Publishing the captured request…
+      </p>
+    );
   }
   if (!attempt.failure) return null;
   return (
@@ -494,7 +515,7 @@ function RefreshedHead({
   head,
   expected,
 }: {
-  head: ServiceProfileRevision;
+  head: ProfileRevision;
   expected: string | undefined;
 }) {
   const published = formatTimestamp(head.publishedAt);
@@ -533,141 +554,44 @@ function RefreshedHead({
 function ResourceFields({
   index,
   resource,
-  others,
   locked,
   onChange,
   onRemove,
 }: {
   index: number;
   resource: DraftResource;
-  others: DraftResource[];
   locked: boolean;
   onChange: (next: DraftResource) => void;
   onRemove: () => void;
 }) {
-  const unitId = `resource-unit-${resource.resourceId}`;
-  const runtimeId = `resource-runtime-${resource.resourceId}`;
-  const enablementId = `resource-enablement-${resource.resourceId}`;
+  const documentId = `resource-document-${resource.resourceId}`;
   return (
-    <fieldset className="grid min-w-0 gap-3 rounded-lg border p-3">
+    <fieldset className="grid min-w-0 gap-3 border bg-muted/20 p-4">
       <legend className="px-1 text-sm font-medium">Resource {index + 1}</legend>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 break-all font-mono text-xs text-muted-foreground">
-          Resource ID {resource.resourceId}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={locked}
-          aria-label={`Remove ${resourceLabel(resource)}`}
-          onClick={onRemove}
-        >
-          Remove resource
+        <Label htmlFor={documentId}>Typed resource document (protobuf JSON)</Label>
+        <Button type="button" variant="outline" size="sm" disabled={locked} onClick={onRemove}>
+          Remove resource {index + 1}
         </Button>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor={unitId}>Unit</Label>
-        <Input
-          id={unitId}
-          required
-          maxLength={UNIT_MAX}
-          autoComplete="off"
-          spellCheck={false}
-          value={resource.unit}
-          readOnly={locked}
-          placeholder="nginx.service"
-          onChange={(event) => onChange({ ...resource, unit: event.target.value })}
-        />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor={runtimeId}>Runtime</Label>
-          <select
-            id={runtimeId}
-            className={controlClass}
-            value={resource.runtime === "" ? "" : String(resource.runtime)}
-            disabled={locked}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (
-                value === ServiceRuntimeState.UNMANAGED ||
-                value === ServiceRuntimeState.ACTIVE ||
-                value === ServiceRuntimeState.INACTIVE
-              ) {
-                onChange({ ...resource, runtime: value });
-              }
-            }}
-          >
-            <option value="">Choose runtime</option>
-            {RUNTIME_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor={enablementId}>Enablement</Label>
-          <select
-            id={enablementId}
-            className={controlClass}
-            value={resource.enablement === "" ? "" : String(resource.enablement)}
-            disabled={locked}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (
-                value === ServiceEnablement.UNMANAGED ||
-                value === ServiceEnablement.ENABLED ||
-                value === ServiceEnablement.DISABLED
-              ) {
-                onChange({ ...resource, enablement: value });
-              }
-            }}
-          >
-            <option value="">Choose enablement</option>
-            {ENABLEMENT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <fieldset className="grid gap-2">
-        <legend className="text-sm font-medium">Dependencies</legend>
-        {others.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No other resources to depend on.</p>
-        ) : (
-          others.map((other) => {
-            const id = `dep-${resource.resourceId}-${other.resourceId}`;
-            const checked = resource.dependsOn.includes(other.resourceId);
-            return (
-              <label key={other.resourceId} htmlFor={id} className="flex items-start gap-2 text-sm">
-                <input
-                  id={id}
-                  type="checkbox"
-                  className="mt-0.5 size-4 shrink-0"
-                  checked={checked}
-                  disabled={locked}
-                  onChange={(event) => {
-                    const dependsOn = event.target.checked
-                      ? [...resource.dependsOn, other.resourceId]
-                      : resource.dependsOn.filter((item) => item !== other.resourceId);
-                    onChange({ ...resource, dependsOn });
-                  }}
-                />
-                <span className="min-w-0 break-all">
-                  {resourceLabel(other)}
-                  {other.unit.trim() === ""
-                    ? ""
-                    : ` — ${runtimeLabel(other.runtime)}, ${enablementLabel(other.enablement)}`}
-                </span>
-              </label>
-            );
-          })
-        )}
-      </fieldset>
+      <p className="text-sm text-muted-foreground">
+        Set resourceId, desired.ref and exactly one typed desired state, ownership, verification and
+        any typed dependencies or applicability. All declared resource kinds are accepted by their
+        generated schema; unknown fields and invalid enum values are rejected. Use immutable secret
+        references only, never passwords or private keys. Native capability support is evaluated
+        separately for each target and is not implied by publication.
+      </p>
+      <Textarea
+        id={documentId}
+        required
+        rows={14}
+        spellCheck={false}
+        className="font-mono text-xs"
+        value={resource.document}
+        readOnly={locked}
+        onChange={(event) => onChange({ ...resource, document: event.target.value })}
+      />
+      <ProtobufFields schema={ProfileResourceSchema} />
     </fieldset>
   );
 }

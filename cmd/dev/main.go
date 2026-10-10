@@ -15,7 +15,7 @@ import (
 	"lindm/internal/devlab"
 )
 
-const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset> [options]
+const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|down|reset|recreate-database> [options]
 
   init   Atomically generate .cache/dev; validate, never overwrite, on reuse.
   up     Start pinned PostgreSQL and optional Keycloak, await TLS readiness,
@@ -27,12 +27,14 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires
          -confirm-delete. Stop the separately supervised lindmd first.
+  recreate-database  DESTROY only lindm, terminate its connections, reprovision,
+         migrate and bootstrap. Requires -confirm-delete; preserves other databases.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m).
 Init/up accept -authentication local|keycloak (default keycloak). A fixture's mode
 is immutable. Local mode does not start or contact an IdP.
-Only reset accepts -confirm-delete. Requires Linux, Go, Docker with Compose v2,
-and a local Docker daemon. Ports 15432, 18443, 18444 and 18445 are loopback-only.
+Reset and recreate-database accept -confirm-delete. Requires Linux, Go, Docker
+with Compose v2 and a local daemon. Ports 15432, 18443, 18444 and 18445 are loopback-only.
 Run the app separately after up: go run ./cmd/lindmd serve -config .cache/dev/server.json
 Trust .cache/dev/transport-ca.crt in your development browser for HTTPS login.
 
@@ -56,7 +58,7 @@ func run() error {
 		fmt.Print(usage)
 		return nil
 	}
-	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" {
+	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" {
 		return fmt.Errorf("unknown command %q; use help", verb)
 	}
 	flags := flag.NewFlagSet(verb, flag.ContinueOnError)
@@ -67,8 +69,8 @@ func run() error {
 	if verb == "init" || verb == "up" {
 		flags.StringVar(&authentication, "authentication", "keycloak", "primary authentication: local or keycloak")
 	}
-	if verb == "reset" {
-		flags.BoolVar(&confirm, "confirm-delete", false, "destroy this checkout's fixture and volumes")
+	if verb == "reset" || verb == "recreate-database" {
+		flags.BoolVar(&confirm, "confirm-delete", false, "confirm destructive deletion for the selected operation")
 	}
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), usage) }
@@ -86,6 +88,9 @@ func run() error {
 	}
 	if verb == "reset" && !confirm {
 		return fmt.Errorf("reset requires -confirm-delete; this destroys lab data and login credentials")
+	}
+	if verb == "recreate-database" && !confirm {
+		return fmt.Errorf("recreate-database requires -confirm-delete; this destroys lindm data and terminates its connections")
 	}
 	absolute, err := filepath.Abs(*root)
 	if err != nil {
@@ -106,6 +111,9 @@ func run() error {
 		"down":  devlab.Down, "reset": devlab.Reset,
 		"test-integration": devlab.TestIntegration,
 		"trust":            devlab.Trust,
+		"recreate-database": func(ctx context.Context, root string) error {
+			return devlab.RecreateDatabase(ctx, root, confirm)
+		},
 	}
 	fmt.Printf("Compose project: %s\nFixture: %s\n", devlab.ProjectName(absolute), devlab.FixturePath(absolute))
 	if err := operations[verb](ctx, absolute); err != nil {

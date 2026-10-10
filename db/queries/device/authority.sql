@@ -1,4 +1,5 @@
--- All authority reads/writes below are performed after GetDeviceForUpdate.
+-- Authority writes serialize after GetDeviceForUpdate. Read-only polling may
+-- read authority in a REPEATABLE READ, READ ONLY transaction instead.
 -- name: GetGenerationAuthority :one
 SELECT
     id,

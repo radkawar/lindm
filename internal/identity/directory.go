@@ -82,11 +82,12 @@ type kcFederated struct {
 	UserID           string `json:"userId"`
 }
 
-func (s *keycloakSource) Observe(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
-	if subject == uuid.Nil {
+func (s *keycloakSource) Observe(ctx context.Context, subject string) (directoryObservation, error) {
+	expected, err := uuid.Parse(subject)
+	if err != nil || expected == uuid.Nil || expected.String() != subject {
 		return directoryObservation{}, errDirectoryResponse
 	}
-	body, status, err := s.adminGet(ctx, "/users/"+url.PathEscape(subject.String()))
+	body, status, err := s.adminGet(ctx, "/users/"+url.PathEscape(subject))
 	if err != nil {
 		return directoryObservation{}, err
 	}
@@ -101,12 +102,12 @@ func (s *keycloakSource) Observe(ctx context.Context, subject uuid.UUID) (direct
 		return directoryObservation{}, errDirectoryResponse
 	}
 	id, err := uuid.Parse(user.ID)
-	if err != nil || id != subject {
+	if err != nil || id != expected {
 		return directoryObservation{}, errDirectoryResponse
 	}
 	obs := directoryObservation{
 		Found:       true,
-		UserID:      id,
+		UserID:      subject,
 		DisplayName: directoryDisplayName(user.Username, user.FirstName, user.LastName),
 		Enabled:     user.Enabled,
 		Direct:      user.FederationLink == "",

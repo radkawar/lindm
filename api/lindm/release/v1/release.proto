@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package lindm.release.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/release/v1;releasev1";
+
+// ReleaseManifest records observed local builds, not a certified SLSA level.
+message ReleaseManifest {
+  string version = 1 [(buf.validate.field).string.pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"];
+  string revision = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string source_sha256 = 3 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  int64 source_date_epoch = 4 [(buf.validate.field).int64.gt = 0];
+  repeated ReleaseArtifact artifacts = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  string attestation_key_id = 6 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string custody = 7 [(buf.validate.field).string = {
+    in: [
+      "development",
+      "production"
+    ]
+  }];
+  repeated BuildObservation builds = 8 [(buf.validate.field).repeated = {
+    min_items: 2
+    max_items: 2
+  }];
+}
+
+message ReleaseArtifact {
+  string path = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string product = 2 [(buf.validate.field).string = {
+    in: [
+      "lindmd",
+      "lindm-agent",
+      "lindmctl"
+    ]
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    in: [
+      "amd64",
+      "arm64"
+    ]
+  }];
+  string format = 4 [(buf.validate.field).string = {
+    in: [
+      "deb",
+      "rpm",
+      "oci"
+    ]
+  }];
+  string sha256 = 5 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  int64 size = 6 [(buf.validate.field).int64.gt = 0];
+  string unsigned_sha256 = 7 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string second_unsigned_sha256 = 8 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string sbom_path = 9 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string provenance_path = 10 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string signature_path = 11 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+}
+
+message BuildObservation {
+  string source_sha256 = 1 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  string started_at = 2 [(buf.validate.field).string.min_len = 1];
+  string finished_at = 3 [(buf.validate.field).string.min_len = 1];
+  map<string, string> tool_versions = 4;
+  map<string, string> unsigned_sha256 = 5;
+  map<string, string> binary_sha256 = 6;
+  map<string, string> console_sha256 = 7;
+  string console_tree_sha256 = 8;
+}
+
+// Failure observations are diagnostics, never successful release attestations.
+message ReleaseBuildFailure {
+  string reason = 1;
+  string retained_work_directory = 2;
+  repeated BuildObservation builds = 3;
+}
+
+// SigningTrustInventory is authenticated out of band by its independently
+// supplied SHA-256. Include every deployment execution and TLS public key and
+// the entire trusted TUF root and its authenticated top-level targets metadata,
+// including delegated and retired exclusion keys, not TUF key-ID strings.
+message SigningTrustInventory {
+  repeated string execution_public_keys_pem = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  repeated string tls_public_keys_or_certificates_pem = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 128
+  }];
+  bytes tuf_root_json = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1048576
+  }];
+  repeated string native_reject_fingerprints = 4 [(buf.validate.field).repeated.max_items = 128];
+  repeated string native_reject_home_prefixes = 5 [(buf.validate.field).repeated.max_items = 128];
+  // Must be signed by the supplied root's targets authority. Expiry does not
+  // remove keys from this exclusion inventory.
+  bytes tuf_targets_json = 6 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1048576
+  }];
+}

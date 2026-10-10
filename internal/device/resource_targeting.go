@@ -1,0 +1,161 @@
+package device
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
+
+	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	adminv1 "lindm/gen/lindm/admin/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/device/devicedb"
+	"lindm/internal/policy"
+	"lindm/internal/resource"
+)
+
+func (s *Service) resolveTargetCandidates(ctx context.Context, tx pgx.Tx, candidates []*policyv1.TargetCandidate) (*policyv1.TargetResolution, error) {
+	assignments := make([]policy.Assignment, 0, len(candidates))
+	revisions := make(map[uuid.UUID]*adminv1.ProfileRevision, len(candidates))
+	retainedBytes := 0
+	for _, candidate := range candidates {
+		if candidate.GetMatch() != policyv1.TargetMatch_TARGET_MATCH_INCLUDED {
+			continue
+		}
+		id, err := uuid.Parse(candidate.GetAssignment().GetProfileRevisionId())
+		if err != nil {
+			return nil, err
+		}
+		revision := revisions[id]
+		if revision == nil {
+			revision, err = s.profiles.GetRevisionInTransaction(ctx, tx, id)
+			if err != nil {
+				return nil, err
+			}
+			retainedBytes += proto.Size(revision.GetSpec())
+			if retainedBytes > maxMessageBytes {
+				return nil, rpcError(connect.CodeResourceExhausted, "target_resolution_capacity")
+			}
+			revisions[id] = revision
+		}
+		assignments = append(assignments, policy.Assignment{ProfileID: revision.GetProfileId(), RevisionID: revision.GetRevisionId(), Priority: candidate.GetAssignment().GetPriority(), Spec: revision.GetSpec()})
+	}
+	resolved, err := policy.Resolve(ctx, assignments)
+	if err != nil {
+		return nil, err
+	}
+	out := &policyv1.TargetResolution{}
+	for _, item := range resolved {
+		capability, err := resource.Capability(item.Ref.GetKind())
+		if err != nil {
+			return nil, err
+		}
+		if item.Resource != nil {
+			refDigest, err := resource.RefDigest(item.Ref)
+			if err != nil {
+				return nil, err
+			}
+			// Source resource UUIDs are profile-local. Effective identities are derived
+			// from canonical refs so heterogeneous contributors cannot collide in a head.
+			item.Resource.ResourceId = uuid.NewSHA1(uuid.NameSpaceOID, refDigest[:]).String()
+		}
+		unsupported := resourceDispatchUnsupported(item.Resource)
+		result := &policyv1.ResolvedResource{Ref: item.Ref, Resource: item.Resource, Disposition: policyv1.ResourceResolutionDisposition(item.State), CapabilityId: capability, DispatchSupported: unsupported == ""}
+		if item.Reason != policy.ReasonNone {
+			result.Reason = fmt.Sprintf("resolution_reason_%d", item.Reason)
+		}
+		if !result.DispatchSupported && result.Reason == "" {
+			result.Reason = unsupported
+		}
+		for _, contributor := range item.Contributors {
+			result.ContributingRevisionIds = append(result.ContributingRevisionIds, contributor.RevisionID)
+		}
+		for _, overridden := range item.Overridden {
+			result.OverriddenRevisionIds = append(result.OverriddenRevisionIds, overridden.RevisionID)
+		}
+		out.Resources = append(out.Resources, result)
+	}
+	return out, nil
+}
+
+func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, authorizationVersion uint64) error {
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(preview.GetResolution())
+	if err != nil {
+		return err
+	}
+	hash := sha256.New()
+	hash.Write([]byte("lindm.targeting.resolution.v1\x00"))
+	hash.Write(encoded)
+	if !bytes.Equal(hash.Sum(nil), preview.GetResolutionSha256()) {
+		return errInternalState
+	}
+	resources := make([]*policyv1.ProfileResource, 0, len(preview.GetResolution().GetResources()))
+	for _, item := range preview.GetResolution().GetResources() {
+		if item.GetDisposition() != policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_READY || item.GetResource() == nil {
+			return rpcError(connect.CodeFailedPrecondition, "resource_resolution_conflict")
+		}
+		resources = append(resources, proto.CloneOf(item.GetResource()))
+	}
+	ordered, err := orderedServiceResources(resources)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(preview.GetPreviewId())
+	if err != nil {
+		return err
+	}
+	deviceID, err := uuid.Parse(preview.GetDeviceId())
+	if err != nil {
+		return err
+	}
+	generation, err := uuid.Parse(preview.GetGenerationId())
+	if err != nil {
+		return err
+	}
+	q := devicedb.New(tx)
+	head, headErr := q.LockServiceAssignment(ctx, generation)
+	if headErr != nil && !errors.Is(headErr, pgx.ErrNoRows) {
+		return headErr
+	}
+	if headErr == nil && head.ID == id {
+		return nil
+	}
+	now, err := dispatchClock(ctx, q)
+	if err != nil {
+		return err
+	}
+	assignment := &adminv1.ResourceAssignment{AssignmentId: id.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generation.String(), ActorId: actor.String(), AssignedAt: timestamppb.New(now), Reason: "target_preview_activation", ReconcileIntervalSeconds: 900}
+	document, err := proto.Marshal(assignment)
+	if err != nil {
+		return err
+	}
+	if err := q.InsertServiceAssignment(ctx, devicedb.InsertServiceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generation, RequestID: id, RequestDigest: preview.GetPreviewSha256(), ActorID: actor, AuthorizationVersion: int64(authorizationVersion), Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
+		return err
+	}
+	if err := insertResourceRows(ctx, q, id, ordered); err != nil {
+		return err
+	}
+	if headErr == nil {
+		if err := q.RecordResourceReleases(ctx, devicedb.RecordResourceReleasesParams{NewAssignmentID: id, OldAssignmentID: head.ID, RequestedAt: timestamptz(now)}); err != nil {
+			return err
+		}
+	}
+	if err := q.SetServiceAssignmentHead(ctx, devicedb.SetServiceAssignmentHeadParams{GenerationID: generation, AssignmentID: id}); err != nil {
+		return err
+	}
+	action, err := q.GetOpenServiceAction(ctx, deviceID)
+	if err == nil && len(action.StartGrantEnvelope) == 0 {
+		if err := closeUnstartedServiceAction(ctx, q, action, "assignment_changed", now); err != nil {
+			return err
+		}
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	return dispatchAudit(ctx, q, &actor, "service_assignment.assign", id, "target_preview_activation")
+}

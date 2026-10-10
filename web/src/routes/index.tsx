@@ -26,6 +26,6 @@ function HomeRoute() {
       </main>
     );
   }
-  if (session.data) return <Navigate to="/devices" />;
+  if (session.data) return <Navigate to="/dashboard" />;
   return <SignIn notice="" />;
 }

@@ -29,6 +29,7 @@ func signedSessionRequest(t *testing.T, svc *Service, principal devicePrincipal,
 	proof, err := svc.authority.Sign(t.Context(), &agentv1.SessionAcquisition{
 		DeploymentId: svc.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(),
 		RequestId: uuid.NewString(), PredecessorEpoch: predecessor, Incarnation: uuid.NewString(), BootId: uuid.NewString(),
+		InstallationId: principal.DeviceID.String(),
 	}, key)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	if err != nil || len(listed.Msg.Devices) != 1 || listed.Msg.Devices[0].GetLifecycleState() != adminv1.DeviceState_DEVICE_STATE_RECOVERY_HOLD {
 		t.Fatalf("held identity not visible in API: %v", err)
 	}
-	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire ambiguous identity"})); err != nil {
+	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: principal.DeviceID.String(), Reason: "retire ambiguous identity"})); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.GetSyncState(deviceCtx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: 2})); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -136,7 +137,7 @@ func TestSessionEnvelopeReencodingCannotCreateCloneHold(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}

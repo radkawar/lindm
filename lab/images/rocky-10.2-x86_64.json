@@ -1,0 +1,19 @@
+{
+  "id": "rocky-10.2-20260525.0-x86-64",
+  "distribution": "rocky",
+  "version": "10.2",
+  "architecture": "x86_64",
+  "edition": "genericcloud",
+  "release": "10.2-20260525.0",
+  "imageFilename": "Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2",
+  "imageUrl": "https://download.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2",
+  "checksumUrl": "https://download.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2.CHECKSUM",
+  "signatureUrl": "https://download.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2.CHECKSUM.asc",
+  "keyUrl": "https://dl.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-10",
+  "sha256": "9fc9e9ff16888bb68ac39b0392e25c9c92684d50c85f1cce6ab549363bbc4b48",
+  "signerFingerprint": "FC226859C0860BF0DDB95B085B106C736FEDFC85",
+  "imageSizeBytes": "544997376",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://rockylinux.org/resources/gpg-key-info",
+  "releaseProvenanceUrl": "https://download.rockylinux.org/pub/rocky/10/images/x86_64/"
+}

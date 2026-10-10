@@ -41,13 +41,14 @@ const (
 	unitDir       = "/usr/lib/systemd/system"
 	executorUnit  = "lindm-executor.service"
 	agentUnit     = "lindm-agent.service"
+	poweroffUnit  = "lindm-live-root-poweroff.service"
 	sysusersPath  = "/usr/lib/sysusers.d/lindm.conf"
 	tmpfilesPath  = "/usr/lib/tmpfiles.d/lindm.conf"
 	copyrightPath = "/usr/share/doc/lindm-agent/copyright"
 	purposeText   = "development-package-signing\n"
 )
 
-//go:embed assets/lifecycle.sh assets/lindm-executor.service assets/lindm-agent.service assets/tmpfiles.conf assets/sysusers.conf assets/copyright
+//go:embed assets/*
 var assetFS embed.FS
 
 // AgentConfigJSON is the document written to both packaged configuration files.

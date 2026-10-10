@@ -1,0 +1,103 @@
+SUSE CSAF adapter fixtures
+==========================
+
+Acquired over HTTPS on 2026-10-10 from SUSE's security automation publication.
+All retained JSON, checksum, signature, and key files contain the original
+response bytes without trimming, reformatting, field projection, or fabricated
+records. Local basenames add "suse-" to identify this adapter's ownership.
+
+Vendor: SUSE Product Security Team, https://www.suse.com/
+License: CC-BY-4.0, https://creativecommons.org/licenses/by/4.0/
+Published license: https://ftp.suse.com/pub/projects/security/csaf/LICENSE
+Each JSON document also carries SUSE's CC-BY-4.0 legal_disclaimer note and
+copyright notice. Attribution and original notices are retained unchanged.
+
+Fixture: suse-suse-su-2024_2275-1.json
+URL: https://ftp.suse.com/pub/projects/security/csaf/suse-su-2024_2275-1.json
+Bytes: 127413
+SHA256: 066aadd6f0472b23a2025c3f69ebfe4c0ba8dac9c550905ad029cbd929cff71c
+Published checksum URL: https://ftp.suse.com/pub/projects/security/csaf/suse-su-2024_2275-1.json.sha256
+Local checksum: suse-suse-su-2024_2275-1.json.sha256
+Checksum bytes: 91
+Checksum-file SHA256: 3ba706a678e8b0435012a96744d176ae7db47cb027fdb65b5c0fe56f22429214
+Signature URL: https://ftp.suse.com/pub/projects/security/csaf/suse-su-2024_2275-1.json.asc
+Local signature: suse-suse-su-2024_2275-1.json.asc
+Signature bytes: 819
+Signature-file SHA256: 542b96c2e4552c79d815ec00270c5e7ad35c2097e458b384f700700faadc5424
+
+This is SUSE-SU-2024:2275-1, the CVE-2024-6387 OpenSSH security update.
+The vendor initial_release_date is 2024-07-03T21:59:21Z; its later CSAF
+current_release_date is not substituted for that publication date. The binary
+openssh-server fixed package is 0:9.6p1-150600.6.3.1. Native RPM comparison
+retains the SUSE backported revision rather than replacing it with an upstream
+OpenSSH release. Tests' preceding/succeeding EVRs are comparison inputs, not
+claims that SUSE published those particular builds.
+
+Products are explicit CSAF default_component_of relationships to platform
+products. The same document independently identifies SLES 15 SP6, SLES for SAP,
+Desktop, modules, and openSUSE Leap 15.6. Only exact base-SLES or Leap CPEs are
+selected. The Leap i586 relationship exists while base SLES i586 does not.
+No binary-to-source mapping is inferred from the PURL upstream qualifier.
+
+Fixture: suse-opensuse-su-2024_11460-1.json
+URL: https://ftp.suse.com/pub/projects/security/csaf/opensuse-su-2024_11460-1.json
+Bytes: 6164
+SHA256: 0de87daf06b54274658b2dfafb20f8e42066a6fbc67eaa1eeef0d2fde4b28166
+Published checksum URL: https://ftp.suse.com/pub/projects/security/csaf/opensuse-su-2024_11460-1.json.sha256
+Local checksum: suse-opensuse-su-2024_11460-1.json.sha256
+Checksum bytes: 96
+Checksum-file SHA256: 5b7ffcdd1a1e4001e4c54afa7918c4f7cb24b16e4603f4219123d32c99ced73f
+Signature URL: https://ftp.suse.com/pub/projects/security/csaf/opensuse-su-2024_11460-1.json.asc
+Local signature: suse-opensuse-su-2024_11460-1.json.asc
+Signature bytes: 819
+Signature-file SHA256: 8a9ccee86e3d2729b784e53ebaab38c073833e0f824a2210d558702280d9de6b
+
+This genuine Tumbleweed notice describes accumulated fixes on GA media, not a
+first-fixed EVR. It lists thttpd 2.29-3.9 although its CVE description says
+CVE-2017-17663 affected thttpd before 2.28. The adapter refuses GA-media notices:
+it must not label every older package vulnerable merely because a newer GA
+package is recommended. Such refusal leaves coverage unknown. Tumbleweed's
+platform CPE has no snapshot date; only an explicit rolling source scope can
+select it. No release date is manufactured from the document or download time.
+
+Fixture: suse-security-automation.asc
+URL: https://ftp.suse.com/pub/projects/security/keys/security-automation.asc
+Bytes: 3161
+SHA256: b00811fa6b54922d852839fef56e68e6059af33bc5f77483d4305db2e904ef1e
+Primary/signing key fingerprint: 6B62473BD771517D41E684DFD4439E7EC133994D
+UID: SUSE Security Automation Key (only for automation data) <security@suse.de>
+Encryption-only subkey fingerprint: 119CE90B0CD0B33E4BB055B841E4D7BD1E7242C1
+Fingerprint inspected with gpg --batch --no-options --with-colons --show-keys.
+The key is public verification material, not a credential. Its purpose and UID
+remain intact. Public-key and detached-signature publication is not itself a
+claim that cryptographic verification has run in these parser tests.
+
+Authentication boundary
+-----------------------
+The published SHA256 values matched the acquired JSON byte digests. SUSE also
+publishes the retained detached OpenPGP signatures. Online acquisition must
+check the companion checksum and verify signatures against an explicitly
+trusted/pinned automation key before parsing. An HTTPS-fetched key must not
+silently become its own trust anchor. Shared acquisition/signature orchestration
+is outside suse.go. Offline callers retain responsibility for authenticated
+custody and pinning; parseSUSE does not claim to verify signatures.
+
+Normalization and limitations
+-----------------------------
+Only finalized CSAF 2.0 security advisories with explicit platform relationships
+and vendor_fix remediation are normalized. Native criteria not represented by
+the normalized contract (version-range branches, groups, unresolved references,
+unknown/affected statuses without a supported boundary) fail closed. Single
+advisory documents always remain partial, never a clean-coverage assertion.
+SLES release 15.6 selects cpe:/o:suse:sles:15:sp6, not sles_sap, sled, LTSS,
+modules, Package Hub, or extensions. Leap 15.6 selects cpe:/o:opensuse:leap:15.6.
+
+OVAL was considered, using the vendor description at
+https://ftp.suse.com/pub/projects/security/oval/README. Those feeds include
+multi-product criteria and (in patch form) records still in QA; the CSAF adapter
+instead requires final publication plus explicit native-package relationships.
+
+Tests also mutate decoded copies in memory to exercise refusal paths. Those
+copies are deliberately invalid test inputs, not retained vendor documents.
+No acquisition time, release timestamp, synthetic architecture mapping, or
+source-package mapping is used to create authoritative records.

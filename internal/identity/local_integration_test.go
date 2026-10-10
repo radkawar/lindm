@@ -4,9 +4,6 @@ package identity
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -49,14 +45,6 @@ func localIntegrationService(t *testing.T) (*Service, context.Context, *pgxpool.
 		}
 	})
 	return s, ctx, pool
-}
-func localAuthenticator(t *testing.T) localSoftwareAuthenticator {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return localSoftwareAuthenticator{key: key, id: []byte(uuid.NewString())}
 }
 func localChallenge(t *testing.T, challenge *authv1.WebAuthnChallenge) string {
 	t.Helper()
@@ -154,7 +142,7 @@ func TestLocalAuthenticationLifecycle(t *testing.T) {
 		if _, err := q.GetPrincipalForUpdate(ctx, principal.ID); err != nil {
 			return err
 		}
-		if err := q.UpdateLocalAccount(ctx, identitydb.UpdateLocalAccountParams{ID: principal.ID, Role: RoleOwner, Enabled: false}); err != nil {
+		if err := q.UpdateLocalAccount(ctx, identitydb.UpdateLocalAccountParams{ID: principal.ID, Role: RoleOwner, Enabled: false, ScopeBinding: []byte("{}")}); err != nil {
 			return err
 		}
 		return s.invalidateLocalAccount(ctx, q, principal.ID, "")

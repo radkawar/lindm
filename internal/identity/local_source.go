@@ -7,7 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/protobuf/encoding/protojson"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -15,15 +17,19 @@ type localSource struct{ pool *pgxpool.Pool }
 
 var _ DirectorySource = (*localSource)(nil)
 
-func (l *localSource) Observe(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
-	account, err := identitydb.New(l.pool).GetLocalAccount(ctx, subject)
+func (l *localSource) Observe(ctx context.Context, subject string) (directoryObservation, error) {
+	id, err := uuid.Parse(subject)
+	if err != nil || id == uuid.Nil || id.String() != subject {
+		return directoryObservation{}, errDirectoryResponse
+	}
+	account, err := identitydb.New(l.pool).GetLocalAccount(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return directoryObservation{}, nil
 	}
 	if err != nil {
 		return directoryObservation{}, errStore
 	}
-	return directoryObservation{Found: true, UserID: account.ID, DisplayName: account.Username, Enabled: account.Enabled, Direct: true}, nil
+	return directoryObservation{Found: true, UserID: subject, DisplayName: account.Username, Enabled: account.Enabled, Direct: true}, nil
 }
 
 func deploymentLocalIssuer(ctx context.Context, pool *pgxpool.Pool) (string, error) {
@@ -43,11 +49,15 @@ func (s *Service) readLocalSnapshot(ctx context.Context, q *identitydb.Queries, 
 	if err != nil {
 		return directorySnapshot{}, err
 	}
+	scopes := &authv1.RoleBinding{}
+	if err := protojson.Unmarshal(account.ScopeBinding, scopes); err != nil {
+		return directorySnapshot{}, errStore
+	}
 	enabled := account.Enabled && (s.localPrimary || (account.BreakGlass && account.Role == RoleOwner && s.breakGlass != nil))
 	return directorySnapshot{PrincipalID: row.ID, Issuer: row.Issuer, Subject: row.Subject,
 		DisplayName: account.Username, Enabled: enabled, Observed: true, ObservedAt: now,
 		Qualified: row.Subject == row.ID.String(), AuthorizationVersion: row.AuthorizationVersion,
-		AuthorizationRole: account.Role, Local: true, BreakGlass: !s.localPrimary}, nil
+		AuthorizationRole: account.Role, Local: true, BreakGlass: !s.localPrimary, Scopes: scopes.GetScopes(), ServiceAccount: row.ServiceAccount}, nil
 }
 
 func (s *Service) accessIssuer(snapshot directorySnapshot) string {
@@ -59,14 +69,22 @@ func (s *Service) accessIssuer(snapshot directorySnapshot) string {
 
 func (s *Service) snapshotPrincipal(snapshot directorySnapshot, role string) Principal {
 	p := Principal{ID: snapshot.PrincipalID, Issuer: snapshot.Issuer, Subject: snapshot.Subject,
-		DisplayName: snapshot.DisplayName, Role: role, BreakGlass: snapshot.BreakGlass}
+		DisplayName: snapshot.DisplayName, Role: role, BreakGlass: snapshot.BreakGlass, ServiceAccount: snapshot.ServiceAccount}
+	p.Bindings = make([]*authv1.RoleBinding, 0)
+	if snapshot.Local {
+		if binding := s.policy.role(role); binding != nil {
+			p.Bindings = append(p.Bindings, &authv1.RoleBinding{Role: role, Permissions: binding.GetPermissions(), Scopes: snapshot.Scopes})
+		}
+	} else {
+		p.Bindings = s.policy.bindings(snapshot.PinnedRole, snapshot.Groups)
+	}
 	if p.BreakGlass {
 		p.AllowedPermissions = s.breakGlass.GetAllowedPermissions()
 	}
 	return p
 }
 
-func (s *Service) observePrincipal(ctx context.Context, issuer string, subject uuid.UUID) (directoryObservation, error) {
+func (s *Service) observePrincipal(ctx context.Context, issuer, subject string) (directoryObservation, error) {
 	if issuer != s.localIssuer {
 		return s.observeDirectory(ctx, subject)
 	}

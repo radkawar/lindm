@@ -18,6 +18,133 @@ type AuditEvent struct {
 	Reason     string
 }
 
+type DeviceAction struct {
+	ID                     uuid.UUID
+	DeviceID               uuid.UUID
+	GenerationID           uuid.UUID
+	Capability             string
+	LuksUuids              []uuid.UUID
+	RequestID              uuid.UUID
+	RequestDigest          []byte
+	RequestDocument        []byte
+	ActorID                uuid.UUID
+	AuthorizationVersion   int64
+	ApprovalID             *uuid.UUID
+	IntentEnvelope         []byte
+	IntentDocument         []byte
+	IssuedAt               pgtype.Timestamptz
+	ExpiresAt              pgtype.Timestamptz
+	ChallengeProof         []byte
+	ChallengeDocument      []byte
+	StartGrantEnvelope     []byte
+	StartAuthorizedAt      pgtype.Timestamptz
+	OutcomeUnknown         bool
+	ClosedAt               pgtype.Timestamptz
+	ClosedReason           string
+	ResultNonce            []byte
+	NonceExpiresAt         pgtype.Timestamptz
+	ActionRevision         pgtype.Numeric
+	AttestationEnvelope    []byte
+	AttestationCertificate []byte
+	StatusDocument         []byte
+	ReceivedAt             pgtype.Timestamptz
+	EscrowReceiptEnvelope  []byte
+}
+
+type DeviceActionEscrow struct {
+	ActionID        uuid.UUID
+	BindingDocument []byte
+	KeyID           string
+	WrappedKey      []byte
+	Ciphertext      []byte
+	SecretSha256    []byte
+	CommittedAt     pgtype.Timestamptz
+}
+
+type DeviceActionRecovery struct {
+	ActionID                  uuid.UUID
+	CredentialID              uuid.UUID
+	CertificateID             uuid.UUID
+	SessionEpoch              int64
+	PublicKey                 []byte
+	HandoffProof              []byte
+	HandoffDocument           []byte
+	CredentialEnvelope        []byte
+	CredentialSha256          []byte
+	CredentialDocument        []byte
+	BootGrantEnvelope         []byte
+	RootJson                  []byte
+	DelegationEnvelope        []byte
+	ExpiresAt                 pgtype.Timestamptz
+	ChallengeDocument         []byte
+	StartGrantEnvelope        []byte
+	StartAuthorizedAt         pgtype.Timestamptz
+	CheckpointDocument        []byte
+	CheckpointSha256          []byte
+	CheckpointSequence        int64
+	CheckpointReceiptEnvelope []byte
+	JournalDocument           []byte
+	EffectCommittedAt         pgtype.Timestamptz
+	ResultNonce               []byte
+	NonceExpiresAt            pgtype.Timestamptz
+	ResultRequestID           *uuid.UUID
+	ResultProof               []byte
+	ResultDocument            []byte
+}
+
+type DeviceActionRecoveryRequest struct {
+	CredentialID     uuid.UUID
+	RequestID        uuid.UUID
+	Nonce            []byte
+	RequestSha256    []byte
+	ResponseDocument []byte
+}
+
+type DeviceActionRestriction struct {
+	DeviceID        uuid.UUID
+	SessionsLocked  bool
+	LockActionID    *uuid.UUID
+	Quarantined     bool
+	QuarantineUntil pgtype.Timestamptz
+	ActionID        uuid.UUID
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type DeviceGroup struct {
+	ID   uuid.UUID
+	Name string
+}
+
+type DeviceReleaseReport struct {
+	GenerationID    uuid.UUID
+	SessionEpoch    int64
+	AgentRelease    string
+	ProtocolVersion int32
+	ReportedAt      pgtype.Timestamptz
+}
+
+type DeviceSearchCursor struct {
+	ID              uuid.UUID
+	ActorID         uuid.UUID
+	FilterDigest    []byte
+	UpperEnrolledAt pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+}
+
+type InventoryAttributeDefinition struct {
+	Key        string
+	Definition []byte
+}
+
+type OfflineEnrollmentAuthorization struct {
+	ID                    uuid.UUID
+	TokenID               uuid.UUID
+	ActorID               uuid.UUID
+	RequestSha256         []byte
+	AuthorizationEnvelope []byte
+	ExpiresAt             pgtype.Timestamptz
+}
+
 type PackagePageCursor struct {
 	ID           uuid.UUID
 	ActorID      uuid.UUID
@@ -31,7 +158,61 @@ type PackagePageCursor struct {
 	ExpiresAt    pgtype.Timestamptz
 }
 
-type ServiceAction struct {
+type ProvisioningEnrollment struct {
+	TransactionID  uuid.UUID
+	TokenID        uuid.UUID
+	InstallationID uuid.UUID
+	DeviceID       uuid.UUID
+	GenerationID   uuid.UUID
+	CsrPem         []byte
+	CsrSha256      []byte
+	State          string
+	ApprovalID     *uuid.UUID
+	CertificateID  *uuid.UUID
+	CreatedAt      pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+}
+
+type ProvisioningToken struct {
+	ID                   uuid.UUID
+	TokenHash            []byte
+	CreatedBy            uuid.UUID
+	AuthorizationVersion int64
+	CreatedAt            pgtype.Timestamptz
+	ExpiresAt            pgtype.Timestamptz
+	MaxUses              int32
+	UsedCount            int32
+	ApprovalRequired     bool
+	Assignment           []byte
+	Reason               string
+	RevokedAt            pgtype.Timestamptz
+	RevokedBy            *uuid.UUID
+	RevokeReason         string
+}
+
+type ReleaseRolloutRequest struct {
+	RequestID          uuid.UUID
+	ActorID            uuid.UUID
+	RequestDigest      []byte
+	Ring               string
+	ExpectedGeneration int64
+	Paused             bool
+	EligiblePercentage int32
+	Reason             string
+	RequestedAt        pgtype.Timestamptz
+	PublishedChannel   []byte
+}
+
+type ReleasedAgentSeries struct {
+	Major           int32
+	Minor           int32
+	ReleasedAt      pgtype.Timestamptz
+	SupportUntil    pgtype.Timestamptz
+	MinimumProtocol int32
+	MaximumProtocol int32
+}
+
+type ResourceAction struct {
 	ID                     uuid.UUID
 	DeviceID               uuid.UUID
 	GenerationID           uuid.UUID
@@ -55,28 +236,50 @@ type ServiceAction struct {
 	StatusDocument         []byte
 	AttestedAt             pgtype.Timestamptz
 	ReceivedAt             pgtype.Timestamptz
+	ReadOnlySuccess        bool
 }
 
-type ServiceAssignment struct {
-	ID                   uuid.UUID
-	DeviceID             uuid.UUID
-	GenerationID         uuid.UUID
-	RequestID            uuid.UUID
-	RequestDigest        []byte
-	ActorID              uuid.UUID
-	AuthorizationVersion int64
-	RevisionID           *uuid.UUID
-	Document             []byte
-	AssignedAt           pgtype.Timestamptz
-	BlockedReason        string
+type ResourceAssignment struct {
+	ID                       uuid.UUID
+	DeviceID                 uuid.UUID
+	GenerationID             uuid.UUID
+	RequestID                uuid.UUID
+	RequestDigest            []byte
+	ActorID                  uuid.UUID
+	AuthorizationVersion     int64
+	RevisionID               *uuid.UUID
+	Document                 []byte
+	AssignedAt               pgtype.Timestamptz
+	ReconcileIntervalSeconds int32
+	BlockedReason            string
 }
 
-type ServiceAssignmentResource struct {
-	AssignmentID uuid.UUID
-	ResourceID   uuid.UUID
-	UnitName     string
-	Position     int32
-	Document     []byte
-	Disposition  int16
-	Reason       string
+type ResourceAssignmentResource struct {
+	AssignmentID              uuid.UUID
+	ResourceID                uuid.UUID
+	ResourceKind              int16
+	CanonicalKey              string
+	Position                  int32
+	Document                  []byte
+	DependsOn                 []uuid.UUID
+	Disposition               int16
+	Reason                    string
+	LastVerifiedAt            pgtype.Timestamptz
+	ObservedAt                pgtype.Timestamptz
+	DriftRemediated           bool
+	VerificationMaxAgeSeconds int32
+}
+
+type ResourceRelease struct {
+	ID                      uuid.UUID
+	GenerationID            uuid.UUID
+	SourceAssignmentID      uuid.UUID
+	ResourceID              uuid.UUID
+	ResourceKind            int16
+	CanonicalKey            string
+	SupersedingAssignmentID uuid.UUID
+	State                   string
+	Reason                  string
+	RequestedAt             pgtype.Timestamptz
+	CompletedAt             pgtype.Timestamptz
 }

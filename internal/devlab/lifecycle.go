@@ -44,19 +44,24 @@ func Up(ctx context.Context, repoRoot, authentication string) error {
 		if err := awaitReady(ctx, dir); err != nil {
 			return err
 		}
-		config := filepath.Join(dir, "server.json")
-		if err := command(ctx, root, nil, "go", "run", "./cmd/lindmd", "migrate", "-config", config); err != nil {
-			return err
-		}
-		if err := restrictMigrationMetadata(ctx, dir); err != nil {
-			return fmt.Errorf("restrict runtime migration metadata access: %w", err)
-		}
-		if authentication == "local" {
-			_, err := fmt.Fprintf(os.Stdout, "Claim the local owner once: go run ./cmd/lindmd bootstrap-owner -config %s -username owner\n", config)
-			return err
-		}
-		return command(ctx, root, nil, "go", "run", "./cmd/lindmd", "bootstrap-owner", "-config", config, "-issuer", issuer, "-subject", ownerSubject)
+		return migrateAndBootstrap(ctx, root, authentication == "local")
 	})
+}
+
+func migrateAndBootstrap(ctx context.Context, root string, local bool) error {
+	dir := FixturePath(root)
+	config := filepath.Join(dir, "server.json")
+	if err := command(ctx, root, nil, "go", "run", "./cmd/lindmd", "migrate", "-config", config); err != nil {
+		return err
+	}
+	if err := restrictMigrationMetadata(ctx, dir); err != nil {
+		return fmt.Errorf("restrict runtime migration metadata access: %w", err)
+	}
+	if local {
+		_, err := fmt.Fprintf(os.Stdout, "Claim the local owner once: go run ./cmd/lindmd bootstrap-owner -config %s -username owner\n", config)
+		return err
+	}
+	return command(ctx, root, nil, "go", "run", "./cmd/lindmd", "bootstrap-owner", "-config", config, "-issuer", issuer, "-subject", ownerSubject)
 }
 
 // Check inspects existing services using actual runtime and directory logins;

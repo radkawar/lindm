@@ -1,0 +1,18 @@
+{
+  "id": "fedora-cloud-43-1.6-x86-64",
+  "distribution": "fedora",
+  "version": "43",
+  "architecture": "x86_64",
+  "edition": "Cloud-Base-Generic",
+  "release": "43-1.6",
+  "imageFilename": "Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2",
+  "imageUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2",
+  "checksumUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-43-1.6-x86_64-CHECKSUM",
+  "keyUrl": "https://fedoraproject.org/fedora.gpg",
+  "sha256": "846574c8a97cd2d8dc1f231062d73107cc85cbbbda56335e264a46e3a6c8ab2f",
+  "signerFingerprint": "C6E7F081CF80E13146676E88829B606631645531",
+  "imageSizeBytes": "583335936",
+  "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+  "signerProvenanceUrl": "https://fedoraproject.org/security/",
+  "releaseProvenanceUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/"
+}

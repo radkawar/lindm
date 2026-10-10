@@ -2,11 +2,13 @@
 // @generated from file lindm/agent/v1/journal.proto (package lindm.agent.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { OfflineEnrollmentAuthorizationFile } from "./offline_enrollment_pb.js";
+import { file_lindm_agent_v1_offline_enrollment } from "./offline_enrollment_pb.js";
 import type { SessionAcquisition } from "./trust_pb.js";
 import { file_lindm_agent_v1_trust } from "./trust_pb.js";
 import type { Message } from "@bufbuild/protobuf";
@@ -15,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/agent/v1/journal.proto.
  */
 export const file_lindm_agent_v1_journal: GenFile = /*@__PURE__*/
-  fileDesc("ChxsaW5kbS9hZ2VudC92MS9qb3VybmFsLnByb3RvEg5saW5kbS5hZ2VudC52MSLFEgoURXhlY3V0b3JKb3VybmFsU3RhdGUSHwoOZm9ybWF0X3ZlcnNpb24YASABKA1CB7pIBCoCCAESIQoPaW5zdGFsbGF0aW9uX2lkGAIgASgJQgi6SAVyA7ABARIoChNleGVjdXRpb25fcm9vdF9qc29uGAMgASgMQgu6SAh6BhABGICABBInChJib290c3RyYXBfZW52ZWxvcGUYBCABKAxCC7pICHoGEAEYgIAgEkEKFWJvb3RzdHJhcF92ZXJpZmllZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARIrChllbnJvbGxtZW50X3RyYW5zYWN0aW9uX2lkGAYgASgJQgi6SAVyA7ABARIlChRpZGVudGl0eV9wcml2YXRlX2tleRgHIAEoDEIHukgEegJoQBInChJlbnJvbGxtZW50X2Nzcl9wZW0YCCABKAxCC7pICHoGEEAYgIABEh8KDXBlbmRpbmdfZ3JhbnQYCSABKAlCCLpIBXIDGIACEiIKD2NlcnRpZmljYXRlX3BlbRgKIAEoDEIJukgGegQYgIABEiAKCWRldmljZV9pZBgLIAEoCUIIukgFcgOwAQFIAIgBARIsChVlbnJvbGxtZW50X2dlbmVyYXRpb24YDCABKAlCCLpIBXIDsAEBSAGIAQESJgoNc2Vzc2lvbl9lcG9jaBgNIAEoBEIPukgMMgoY//////////9/EiYKD3Nlc3Npb25fYm9vdF9pZBgOIAEoCUIIukgFcgOwAQFIAogBARI7Cg9wZW5kaW5nX3Nlc3Npb24YDyABKAsyIi5saW5kbS5hZ2VudC52MS5TZXNzaW9uQWNxdWlzaXRpb24SKAoVcGVuZGluZ19zZXNzaW9uX3Byb29mGBAgASgMQgm6SAZ6BBiAgAESPwoPcGVuZGluZ19yZW5ld2FsGBEgASgLMiYubGluZG0uYWdlbnQudjEuUGVuZGluZ0lkZW50aXR5UmVuZXdhbBJBChBwcmlvcl9jcmVkZW50aWFsGBIgASgLMicubGluZG0uYWdlbnQudjEuUHJpb3JJZGVudGl0eUNyZWRlbnRpYWwSLwoLcmVuZXdfYWZ0ZXIYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj0KD3JlbmV3YWxfcmVjZWlwdBgUIAEoCzIkLmxpbmRtLmFnZW50LnYxLlJlbmV3YWxDb21taXRSZWNlaXB0Ej0KD3Nlc3Npb25fcmVjZWlwdBgVIAEoCzIkLmxpbmRtLmFnZW50LnYxLlNlc3Npb25Db21taXRSZWNlaXB0OpoKukiWChqPBQohZXhlY3V0b3Jfam91cm5hbC5lbnJvbGxtZW50X3NoYXBlEmVwZW5kaW5nIGVucm9sbG1lbnQgcmV0YWlucyBpdHMgZ3JhbnQ7IGluc3RhbGxlZCBpZGVudGl0eSBwaW5zIGRldmljZS9nZW5lcmF0aW9uIGFuZCByZW1vdmVzIHRoZSBncmFudBqCBCh0aGlzLmNlcnRpZmljYXRlX3BlbS5zaXplKCkgPT0gMCAmJiB0aGlzLnBlbmRpbmdfZ3JhbnQuc2l6ZSgpID49IDMyICYmICFoYXModGhpcy5kZXZpY2VfaWQpICYmICFoYXModGhpcy5lbnJvbGxtZW50X2dlbmVyYXRpb24pICYmIHRoaXMuc2Vzc2lvbl9lcG9jaCA9PSAwdSAmJiAhaGFzKHRoaXMuc2Vzc2lvbl9ib290X2lkKSAmJiAhaGFzKHRoaXMucGVuZGluZ19zZXNzaW9uKSAmJiAhaGFzKHRoaXMucGVuZGluZ19yZW5ld2FsKSAmJiAhaGFzKHRoaXMucHJpb3JfY3JlZGVudGlhbCkgJiYgIWhhcyh0aGlzLnJlbmV3X2FmdGVyKSAmJiAhaGFzKHRoaXMucmVuZXdhbF9yZWNlaXB0KSAmJiAhaGFzKHRoaXMuc2Vzc2lvbl9yZWNlaXB0KSkgfHwgKHRoaXMuY2VydGlmaWNhdGVfcGVtLnNpemUoKSA+PSA2NCAmJiB0aGlzLnBlbmRpbmdfZ3JhbnQgPT0gJycgJiYgaGFzKHRoaXMuZGV2aWNlX2lkKSAmJiBoYXModGhpcy5lbnJvbGxtZW50X2dlbmVyYXRpb24pICYmIGhhcyh0aGlzLnJlbmV3X2FmdGVyKSkaigMKHmV4ZWN1dG9yX2pvdXJuYWwuc2Vzc2lvbl9zaGFwZRJjYWNjZXB0ZWQgc2Vzc2lvbnMgaGF2ZSBhIGJvb3QgaWRlbnRpdHkgYW5kIHBlbmRpbmcgYWNxdWlzaXRpb24gcmVtYWlucyBhdCB0aGUgcHJvdGVjdGVkIHByZWRlY2Vzc29yGoICKHRoaXMuc2Vzc2lvbl9lcG9jaCA9PSAwdSkgPT0gIWhhcyh0aGlzLnNlc3Npb25fYm9vdF9pZCkgJiYgKGhhcyh0aGlzLnBlbmRpbmdfc2Vzc2lvbikgPT0gKHRoaXMucGVuZGluZ19zZXNzaW9uX3Byb29mLnNpemUoKSA+IDApKSAmJiAoIWhhcyh0aGlzLnBlbmRpbmdfc2Vzc2lvbikgfHwgKHRoaXMucGVuZGluZ19zZXNzaW9uLnByZWRlY2Vzc29yX2Vwb2NoID09IHRoaXMuc2Vzc2lvbl9lcG9jaCAmJiAhaGFzKHRoaXMucGVuZGluZ19yZW5ld2FsKSkpGvQBCiBleGVjdXRvcl9qb3VybmFsLnNlc3Npb25fcmVjZWlwdBI9dGhlIHJldGFpbmVkIGFja25vd2xlZGdtZW50IGJpbmRzIHRoZSBjb21taXR0ZWQgc2Vzc2lvbiBlcG9jaBqQASFoYXModGhpcy5zZXNzaW9uX3JlY2VpcHQpIHx8ICh0aGlzLnNlc3Npb25fZXBvY2ggPiAwdSAmJiBoYXModGhpcy5zZXNzaW9uX2Jvb3RfaWQpICYmIHRoaXMuc2Vzc2lvbl9yZWNlaXB0LnNlc3Npb25fZXBvY2ggPT0gdGhpcy5zZXNzaW9uX2Vwb2NoKUIMCgpfZGV2aWNlX2lkQhgKFl9lbnJvbGxtZW50X2dlbmVyYXRpb25CEgoQX3Nlc3Npb25fYm9vdF9pZCLxAQoWUGVuZGluZ0lkZW50aXR5UmVuZXdhbBIlChNpc3N1YW5jZV9yZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIcCgtwcml2YXRlX2tleRgCIAEoDEIHukgEegJoQBIcCgdjc3JfcGVtGAMgASgMQgu6SAh6BhBAGICAARIkCg9hdXRob3JpdHlfcHJvb2YYBCABKAxCC7pICHoGEAEYgIABEiQKD3JldHJpZXZhbF9wcm9vZhgFIAEoDEILukgIegYQARiAgAESKAoNc2Vzc2lvbl9lcG9jaBgGIAEoBEIRukgOMgwY//////////9/IAAilwEKF1ByaW9ySWRlbnRpdHlDcmVkZW50aWFsEhwKC3ByaXZhdGVfa2V5GAEgASgMQge6SAR6AmhAEiQKD2NlcnRpZmljYXRlX3BlbRgCIAEoDEILukgIegYQQBiAgAESOAoMcmV0YWluX3VudGlsGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBImIKFFJlbmV3YWxDb21taXRSZWNlaXB0EiUKE2lzc3VhbmNlX3JlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEiMKEmNlcnRpZmljYXRlX3NoYTI1NhgCIAEoDEIHukgEegJoICJeChRTZXNzaW9uQ29tbWl0UmVjZWlwdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIoCg1zZXNzaW9uX2Vwb2NoGAIgASgEQhG6SA4yDBj//////////38gAEIiWiBsaW5kbS9nZW4vbGluZG0vYWdlbnQvdjE7YWdlbnR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_trust]);
+  fileDesc("ChxsaW5kbS9hZ2VudC92MS9qb3VybmFsLnByb3RvEg5saW5kbS5hZ2VudC52MSKeFQoURXhlY3V0b3JKb3VybmFsU3RhdGUSHwoOZm9ybWF0X3ZlcnNpb24YASABKA1CB7pIBCoCCAESIQoPaW5zdGFsbGF0aW9uX2lkGAIgASgJQgi6SAVyA7ABARIoChNleGVjdXRpb25fcm9vdF9qc29uGAMgASgMQgu6SAh6BhABGICABBInChJib290c3RyYXBfZW52ZWxvcGUYBCABKAxCC7pICHoGEAEYgIAgEkEKFWJvb3RzdHJhcF92ZXJpZmllZF9hdBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARIrChllbnJvbGxtZW50X3RyYW5zYWN0aW9uX2lkGAYgASgJQgi6SAVyA7ABARIlChRpZGVudGl0eV9wcml2YXRlX2tleRgHIAEoDEIHukgEegJoQBInChJlbnJvbGxtZW50X2Nzcl9wZW0YCCABKAxCC7pICHoGEEAYgIABEh8KDXBlbmRpbmdfZ3JhbnQYCSABKAlCCLpIBXIDGIACEiIKD2NlcnRpZmljYXRlX3BlbRgKIAEoDEIJukgGegQYgIABEiAKCWRldmljZV9pZBgLIAEoCUIIukgFcgOwAQFIAIgBARIsChVlbnJvbGxtZW50X2dlbmVyYXRpb24YDCABKAlCCLpIBXIDsAEBSAGIAQESJgoNc2Vzc2lvbl9lcG9jaBgNIAEoBEIPukgMMgoY//////////9/EiYKD3Nlc3Npb25fYm9vdF9pZBgOIAEoCUIIukgFcgOwAQFIAogBARI7Cg9wZW5kaW5nX3Nlc3Npb24YDyABKAsyIi5saW5kbS5hZ2VudC52MS5TZXNzaW9uQWNxdWlzaXRpb24SKAoVcGVuZGluZ19zZXNzaW9uX3Byb29mGBAgASgMQgm6SAZ6BBiAgAESPwoPcGVuZGluZ19yZW5ld2FsGBEgASgLMiYubGluZG0uYWdlbnQudjEuUGVuZGluZ0lkZW50aXR5UmVuZXdhbBJBChBwcmlvcl9jcmVkZW50aWFsGBIgASgLMicubGluZG0uYWdlbnQudjEuUHJpb3JJZGVudGl0eUNyZWRlbnRpYWwSLwoLcmVuZXdfYWZ0ZXIYEyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEj0KD3JlbmV3YWxfcmVjZWlwdBgUIAEoCzIkLmxpbmRtLmFnZW50LnYxLlJlbmV3YWxDb21taXRSZWNlaXB0Ej0KD3Nlc3Npb25fcmVjZWlwdBgVIAEoCzIkLmxpbmRtLmFnZW50LnYxLlNlc3Npb25Db21taXRSZWNlaXB0EhoKEnByb3Zpc2lvbmluZ190b2tlbhgWIAEoCBJRChVvZmZsaW5lX2F1dGhvcml6YXRpb24YFyABKAsyMi5saW5kbS5hZ2VudC52MS5PZmZsaW5lRW5yb2xsbWVudEF1dGhvcml6YXRpb25GaWxlOoQMukiADBq0BQohZXhlY3V0b3Jfam91cm5hbC5lbnJvbGxtZW50X3NoYXBlEmVwZW5kaW5nIGVucm9sbG1lbnQgcmV0YWlucyBpdHMgZ3JhbnQ7IGluc3RhbGxlZCBpZGVudGl0eSBwaW5zIGRldmljZS9nZW5lcmF0aW9uIGFuZCByZW1vdmVzIHRoZSBncmFudBqnBCh0aGlzLmNlcnRpZmljYXRlX3BlbS5zaXplKCkgPT0gMCAmJiAodGhpcy5wZW5kaW5nX2dyYW50LnNpemUoKSA+PSAzMiB8fCBoYXModGhpcy5vZmZsaW5lX2F1dGhvcml6YXRpb24pKSAmJiAhaGFzKHRoaXMuZGV2aWNlX2lkKSAmJiAhaGFzKHRoaXMuZW5yb2xsbWVudF9nZW5lcmF0aW9uKSAmJiB0aGlzLnNlc3Npb25fZXBvY2ggPT0gMHUgJiYgIWhhcyh0aGlzLnNlc3Npb25fYm9vdF9pZCkgJiYgIWhhcyh0aGlzLnBlbmRpbmdfc2Vzc2lvbikgJiYgIWhhcyh0aGlzLnBlbmRpbmdfcmVuZXdhbCkgJiYgIWhhcyh0aGlzLnByaW9yX2NyZWRlbnRpYWwpICYmICFoYXModGhpcy5yZW5ld19hZnRlcikgJiYgIWhhcyh0aGlzLnJlbmV3YWxfcmVjZWlwdCkgJiYgIWhhcyh0aGlzLnNlc3Npb25fcmVjZWlwdCkpIHx8ICh0aGlzLmNlcnRpZmljYXRlX3BlbS5zaXplKCkgPj0gNjQgJiYgdGhpcy5wZW5kaW5nX2dyYW50ID09ICcnICYmIGhhcyh0aGlzLmRldmljZV9pZCkgJiYgaGFzKHRoaXMuZW5yb2xsbWVudF9nZW5lcmF0aW9uKSAmJiBoYXModGhpcy5yZW5ld19hZnRlcikpGsIBCiJleGVjdXRvcl9qb3VybmFsLm9mZmxpbmVfYXV0aG9yaXR5EkBvZmZsaW5lIGF1dGhvcml6YXRpb24gaXMgc2VwYXJhdGUgZnJvbSBvbmxpbmUgYmVhcmVyIGNyZWRlbnRpYWxzGlohaGFzKHRoaXMub2ZmbGluZV9hdXRob3JpemF0aW9uKSB8fCAoIXRoaXMucHJvdmlzaW9uaW5nX3Rva2VuICYmIHRoaXMucGVuZGluZ19ncmFudCA9PSAnJykaigMKHmV4ZWN1dG9yX2pvdXJuYWwuc2Vzc2lvbl9zaGFwZRJjYWNjZXB0ZWQgc2Vzc2lvbnMgaGF2ZSBhIGJvb3QgaWRlbnRpdHkgYW5kIHBlbmRpbmcgYWNxdWlzaXRpb24gcmVtYWlucyBhdCB0aGUgcHJvdGVjdGVkIHByZWRlY2Vzc29yGoICKHRoaXMuc2Vzc2lvbl9lcG9jaCA9PSAwdSkgPT0gIWhhcyh0aGlzLnNlc3Npb25fYm9vdF9pZCkgJiYgKGhhcyh0aGlzLnBlbmRpbmdfc2Vzc2lvbikgPT0gKHRoaXMucGVuZGluZ19zZXNzaW9uX3Byb29mLnNpemUoKSA+IDApKSAmJiAoIWhhcyh0aGlzLnBlbmRpbmdfc2Vzc2lvbikgfHwgKHRoaXMucGVuZGluZ19zZXNzaW9uLnByZWRlY2Vzc29yX2Vwb2NoID09IHRoaXMuc2Vzc2lvbl9lcG9jaCAmJiAhaGFzKHRoaXMucGVuZGluZ19yZW5ld2FsKSkpGvQBCiBleGVjdXRvcl9qb3VybmFsLnNlc3Npb25fcmVjZWlwdBI9dGhlIHJldGFpbmVkIGFja25vd2xlZGdtZW50IGJpbmRzIHRoZSBjb21taXR0ZWQgc2Vzc2lvbiBlcG9jaBqQASFoYXModGhpcy5zZXNzaW9uX3JlY2VpcHQpIHx8ICh0aGlzLnNlc3Npb25fZXBvY2ggPiAwdSAmJiBoYXModGhpcy5zZXNzaW9uX2Jvb3RfaWQpICYmIHRoaXMuc2Vzc2lvbl9yZWNlaXB0LnNlc3Npb25fZXBvY2ggPT0gdGhpcy5zZXNzaW9uX2Vwb2NoKUIMCgpfZGV2aWNlX2lkQhgKFl9lbnJvbGxtZW50X2dlbmVyYXRpb25CEgoQX3Nlc3Npb25fYm9vdF9pZCLxAQoWUGVuZGluZ0lkZW50aXR5UmVuZXdhbBIlChNpc3N1YW5jZV9yZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIcCgtwcml2YXRlX2tleRgCIAEoDEIHukgEegJoQBIcCgdjc3JfcGVtGAMgASgMQgu6SAh6BhBAGICAARIkCg9hdXRob3JpdHlfcHJvb2YYBCABKAxCC7pICHoGEAEYgIABEiQKD3JldHJpZXZhbF9wcm9vZhgFIAEoDEILukgIegYQARiAgAESKAoNc2Vzc2lvbl9lcG9jaBgGIAEoBEIRukgOMgwY//////////9/IAAilwEKF1ByaW9ySWRlbnRpdHlDcmVkZW50aWFsEhwKC3ByaXZhdGVfa2V5GAEgASgMQge6SAR6AmhAEiQKD2NlcnRpZmljYXRlX3BlbRgCIAEoDEILukgIegYQQBiAgAESOAoMcmV0YWluX3VudGlsGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBImIKFFJlbmV3YWxDb21taXRSZWNlaXB0EiUKE2lzc3VhbmNlX3JlcXVlc3RfaWQYASABKAlCCLpIBXIDsAEBEiMKEmNlcnRpZmljYXRlX3NoYTI1NhgCIAEoDEIHukgEegJoICKsAQoUU2Vzc2lvbkNvbW1pdFJlY2VpcHQSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESKAoNc2Vzc2lvbl9lcG9jaBgCIAEoBEIRukgOMgwY//////////9/IAASHwoNYWdlbnRfcmVsZWFzZRgDIAEoCUIIukgFcgMYgAESKwoWYWdlbnRfcHJvdG9jb2xfdmVyc2lvbhgEIAEoDUILukgIKgYY/////wciqQEKE0FjY291bnRMb2NrU25hcHNob3QSOAoIdXNlcm5hbWUYASABKAlCJrpII3IhMh9eW2EtekEtWl9dW2EtekEtWjAtOV8uLV17MCwzMX0kEhQKA3VpZBgCIAEoDUIHukgEKgIgABIgCgxwYXNzd2RfZW50cnkYAyABKAlCCrpIB3IFEAEYgCASIAoMc2hhZG93X2VudHJ5GAQgASgJQgq6SAdyBRABGIAgIvIBChBBY2NvdW50TG9ja0VudHJ5EjoKBXByaW9yGAEgASgLMiMubGluZG0uYWdlbnQudjEuQWNjb3VudExvY2tTbmFwc2hvdEIGukgDyAEBEj0KCGV4cGVjdGVkGAIgASgLMiMubGluZG0uYWdlbnQudjEuQWNjb3VudExvY2tTbmFwc2hvdEIGukgDyAEBEjsKBXBoYXNlGAMgASgOMiAubGluZG0uYWdlbnQudjEuQWNjb3VudExvY2tQaGFzZUIKukgHggEEEAEgABImChFyZWxlYXNlX2FjdGlvbl9pZBgEIAEoCUILukgI2AEBcgOwAQEipAMKEUFjY291bnRMb2NrTGVkZ2VyEiAKDmxvY2tfYWN0aW9uX2lkGAEgASgJQgi6SAVyA7ABARI9CghhY2NvdW50cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFjY291bnRMb2NrRW50cnlCCbpIBpIBAxCAATqtArpIqQIapgIKF2FjY291bnRfbG9jay5pZGVudGl0aWVzEj9hY2NvdW50IG5hbWVzIGFuZCBVSURzIGFyZSB1bmlxdWUgYW5kIGltbXV0YWJsZSBhY3Jvc3MgdGhlIGxvY2sayQF0aGlzLmFjY291bnRzLmFsbChhLCBhLnByaW9yLnVzZXJuYW1lID09IGEuZXhwZWN0ZWQudXNlcm5hbWUgJiYgYS5wcmlvci51aWQgPT0gYS5leHBlY3RlZC51aWQgJiYgdGhpcy5hY2NvdW50cy5maWx0ZXIoYiwgYS5wcmlvci51c2VybmFtZSA9PSBiLnByaW9yLnVzZXJuYW1lIHx8IGEucHJpb3IudWlkID09IGIucHJpb3IudWlkKS5zaXplKCkgPT0gMSkq6gEKEEFjY291bnRMb2NrUGhhc2USIgoeQUNDT1VOVF9MT0NLX1BIQVNFX1VOU1BFQ0lGSUVEEAASJgoiQUNDT1VOVF9MT0NLX1BIQVNFX0RJU0FCTEVfUEVORElORxABEh8KG0FDQ09VTlRfTE9DS19QSEFTRV9ESVNBQkxFRBACEiYKIkFDQ09VTlRfTE9DS19QSEFTRV9SRUxFQVNFX1BFTkRJTkcQAxIfChtBQ0NPVU5UX0xPQ0tfUEhBU0VfUkVMRUFTRUQQBBIgChxBQ0NPVU5UX0xPQ0tfUEhBU0VfUFJFU0VSVkVEEAVCIlogbGluZG0vZ2VuL2xpbmRtL2FnZW50L3YxO2FnZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_offline_enrollment, file_lindm_agent_v1_trust]);
 
 /**
  * Protected local persistence only. Never return this message from an RPC,
@@ -128,6 +130,16 @@ export type ExecutorJournalState = Message<"lindm.agent.v1.ExecutorJournalState"
    * @generated from field: lindm.agent.v1.SessionCommitReceipt session_receipt = 21;
    */
   sessionReceipt?: SessionCommitReceipt | undefined;
+
+  /**
+   * @generated from field: bool provisioning_token = 22;
+   */
+  provisioningToken: boolean;
+
+  /**
+   * @generated from field: lindm.agent.v1.OfflineEnrollmentAuthorizationFile offline_authorization = 23;
+   */
+  offlineAuthorization?: OfflineEnrollmentAuthorizationFile | undefined;
 };
 
 /**
@@ -244,6 +256,19 @@ export type SessionCommitReceipt = Message<"lindm.agent.v1.SessionCommitReceipt"
    * @generated from field: uint64 session_epoch = 2;
    */
   sessionEpoch: bigint;
+
+  /**
+   * Build identity from the exact executor-signed acquisition acknowledged by
+   * the server. A changed build reacquires even when the boot ID is unchanged.
+   *
+   * @generated from field: string agent_release = 3;
+   */
+  agentRelease: string;
+
+  /**
+   * @generated from field: uint32 agent_protocol_version = 4;
+   */
+  agentProtocolVersion: number;
 };
 
 /**
@@ -252,4 +277,137 @@ export type SessionCommitReceipt = Message<"lindm.agent.v1.SessionCommitReceipt"
  */
 export const SessionCommitReceiptSchema: GenMessage<SessionCommitReceipt> = /*@__PURE__*/
   messageDesc(file_lindm_agent_v1_journal, 4);
+
+/**
+ * Executor-only shadow ownership. These messages contain password hashes and
+ * MUST NOT enter public plans, observations, errors, logs, or the network spool.
+ *
+ * @generated from message lindm.agent.v1.AccountLockSnapshot
+ */
+export type AccountLockSnapshot = Message<"lindm.agent.v1.AccountLockSnapshot"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: uint32 uid = 2;
+   */
+  uid: number;
+
+  /**
+   * @generated from field: string passwd_entry = 3;
+   */
+  passwdEntry: string;
+
+  /**
+   * @generated from field: string shadow_entry = 4;
+   */
+  shadowEntry: string;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AccountLockSnapshot.
+ * Use `create(AccountLockSnapshotSchema)` to create a new message.
+ */
+export const AccountLockSnapshotSchema: GenMessage<AccountLockSnapshot> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_journal, 5);
+
+/**
+ * @generated from message lindm.agent.v1.AccountLockEntry
+ */
+export type AccountLockEntry = Message<"lindm.agent.v1.AccountLockEntry"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AccountLockSnapshot prior = 1;
+   */
+  prior?: AccountLockSnapshot | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AccountLockSnapshot expected = 2;
+   */
+  expected?: AccountLockSnapshot | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AccountLockPhase phase = 3;
+   */
+  phase: AccountLockPhase;
+
+  /**
+   * An interrupted release can only attempt restoration under a NEW explicitly
+   * authorized release action; the same action never replays a native effect.
+   *
+   * @generated from field: string release_action_id = 4;
+   */
+  releaseActionId: string;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AccountLockEntry.
+ * Use `create(AccountLockEntrySchema)` to create a new message.
+ */
+export const AccountLockEntrySchema: GenMessage<AccountLockEntry> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_journal, 6);
+
+/**
+ * @generated from message lindm.agent.v1.AccountLockLedger
+ */
+export type AccountLockLedger = Message<"lindm.agent.v1.AccountLockLedger"> & {
+  /**
+   * @generated from field: string lock_action_id = 1;
+   */
+  lockActionId: string;
+
+  /**
+   * @generated from field: repeated lindm.agent.v1.AccountLockEntry accounts = 2;
+   */
+  accounts: AccountLockEntry[];
+};
+
+/**
+ * Describes the message lindm.agent.v1.AccountLockLedger.
+ * Use `create(AccountLockLedgerSchema)` to create a new message.
+ */
+export const AccountLockLedgerSchema: GenMessage<AccountLockLedger> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_journal, 7);
+
+/**
+ * @generated from enum lindm.agent.v1.AccountLockPhase
+ */
+export enum AccountLockPhase {
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_DISABLE_PENDING = 1;
+   */
+  DISABLE_PENDING = 1,
+
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_DISABLED = 2;
+   */
+  DISABLED = 2,
+
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_RELEASE_PENDING = 3;
+   */
+  RELEASE_PENDING = 3,
+
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_RELEASED = 4;
+   */
+  RELEASED = 4,
+
+  /**
+   * @generated from enum value: ACCOUNT_LOCK_PHASE_PRESERVED = 5;
+   */
+  PRESERVED = 5,
+}
+
+/**
+ * Describes the enum lindm.agent.v1.AccountLockPhase.
+ */
+export const AccountLockPhaseSchema: GenEnum<AccountLockPhase> = /*@__PURE__*/
+  enumDesc(file_lindm_agent_v1_journal, 0);
 

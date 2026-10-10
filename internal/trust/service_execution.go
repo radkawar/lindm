@@ -85,6 +85,10 @@ func (v *ExecutionVerifier) serviceIntentBinding(root *agentv1.ExecutionRoot, de
 }
 
 func (v *ExecutionVerifier) serviceKeys(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, role agentv1.ExecutionSignerRole, now time.Time) ([]ed25519.PublicKey, error) {
+	return v.capabilityKeys(root, delegation, role, "systemd.service.v1", now)
+}
+
+func (v *ExecutionVerifier) capabilityKeys(root *agentv1.ExecutionRoot, delegation *agentv1.ExecutionDelegation, role agentv1.ExecutionSignerRole, capability string, now time.Time) ([]ed25519.PublicKey, error) {
 	if _, err := v.rootKeys(root, now); err != nil {
 		return nil, err
 	}
@@ -96,7 +100,7 @@ func (v *ExecutionVerifier) serviceKeys(root *agentv1.ExecutionRoot, delegation 
 	}
 	keys := make([]ed25519.PublicKey, 0, len(delegation.GetDelegates()))
 	for _, delegate := range delegation.GetDelegates() {
-		if delegate.GetRole() != role || !slices.Contains(delegate.GetCapabilities(), "systemd.service.v1") {
+		if delegate.GetRole() != role || !slices.Contains(delegate.GetCapabilities(), capability) {
 			continue
 		}
 		key, err := v.executionKey(delegate.GetKey())

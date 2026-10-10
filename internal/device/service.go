@@ -24,11 +24,18 @@ import (
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
+	recoveryv1 "lindm/gen/lindm/recovery/v1"
+	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
+	"lindm/internal/advisory"
 	"lindm/internal/config"
 	"lindm/internal/device/devicedb"
+	"lindm/internal/escrow"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/policy"
+	"lindm/internal/releaseupdate"
+	"lindm/internal/resource"
+	"lindm/internal/targeting"
 	"lindm/internal/trust"
 )
 
@@ -65,31 +72,48 @@ const (
 // Config holds resolved control-plane resources. It is not a serialized
 // configuration document; lindm.config.v1.ServerConfig is that contract.
 type Config struct {
-	DeploymentID         string
-	CACertificate        *x509.Certificate
-	CAKey                crypto.Signer
-	InventoryBudgetBytes int64
-	ExecutionAuthority   *executionauthority.Store
-	Identity             *identity.Service
-	ExecutionSigning     *config.ExecutionSigning
+	DeploymentID                 string
+	CACertificate                *x509.Certificate
+	CAKey                        crypto.Signer
+	InventoryBudgetBytes         int64
+	ExecutionAuthority           *executionauthority.Store
+	Identity                     *identity.Service
+	ExecutionSigning             *config.ExecutionSigning
+	Advisories                   *advisory.Service
+	Escrow                       *escrow.Custody
+	EscrowRevealApprovalRequired bool
+	ReleasePublisher             *releaseupdate.Publisher
+	// Production composition always enables the release gate. Direct service
+	// fixtures must explicitly supply real build identity to exercise it.
+	RequireReleaseCompatibility bool
+	ServerRelease               string
+	ServerProtocol              uint32
 }
 
 // Service implements the admin, enrollment, and device RPC surfaces.
 type Service struct {
-	pool            *pgxpool.Pool
-	deploymentID    uuid.UUID
-	ca              *x509.Certificate
-	caKey           crypto.Signer
-	validator       *validate.Interceptor
-	rules           protovalidate.Validator
-	slots           chan struct{}
-	clock           func() time.Time
-	authority       *trust.Authority
-	inventoryBudget int64
-	execution       *executionauthority.Store
-	identity        *identity.Service
-	profiles        *policy.Store
-	signing         *config.ExecutionSigning
+	pool                 *pgxpool.Pool
+	deploymentID         uuid.UUID
+	ca                   *x509.Certificate
+	caKey                crypto.Signer
+	validator            *validate.Interceptor
+	rules                protovalidate.Validator
+	slots                chan struct{}
+	clock                func() time.Time
+	authority            *trust.Authority
+	inventoryBudget      int64
+	execution            *executionauthority.Store
+	identity             *identity.Service
+	profiles             *policy.Store
+	targeting            *targeting.Store
+	signing              *config.ExecutionSigning
+	advisories           *advisory.Service
+	escrow               *escrow.Custody
+	revealApproval       bool
+	releasePublisher     *releaseupdate.Publisher
+	requireCompatibility bool
+	serverRelease        string
+	serverProtocol       uint32
 }
 
 var (
@@ -129,25 +153,74 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	}
 	compiled, err := protovalidate.New(
 		protovalidate.WithMessages(
+			&releasemanagementv1.GetRolloutRequest{},
+			&releasemanagementv1.SetRolloutRequest{},
+			&releasemanagementv1.RegisterReleaseSeriesRequest{},
+			&releasemanagementv1.GetCompatibilityRequest{},
 			&adminv1.ListDevicesRequest{},
+			&adminv1.GetFleetSummaryRequest{},
 			&adminv1.GetDeviceRequest{},
 			&adminv1.ListDevicePackagesRequest{},
+			&adminv1.SetDeviceMetadataRequest{},
+			&adminv1.SetAttributeDefinitionRequest{},
+			&adminv1.ListAttributeDefinitionsRequest{},
+			&adminv1.ExportDevicesRequest{},
 			&adminv1.CreateEnrollmentGrantRequest{},
 			&adminv1.RevokeEnrollmentGrantRequest{},
+			&adminv1.CreateProvisioningTokenRequest{}, &adminv1.ListProvisioningTokensRequest{},
+			&adminv1.RevokeProvisioningTokenRequest{}, &adminv1.GetPendingEnrollmentsRequest{},
+			&adminv1.ApprovePendingEnrollmentRequest{}, &adminv1.CreateRecoveryEnrollmentGrantRequest{},
+			&adminv1.CreateOfflineEnrollmentAuthorizationRequest{}, &adminv1.ImportOfflineEnrollmentRequestRequest{},
+			&adminv1.ExportOfflineEnrollmentResponseRequest{},
 			&adminv1.RevokeDeviceRequest{},
 			&adminv1.ListAuditEventsRequest{},
 			&adminv1.GetExecutionAuthorityRequest{},
 			&adminv1.UpdateExecutionAuthorityRequest{},
-			&adminv1.PublishServiceProfileRevisionRequest{},
-			&adminv1.GetServiceProfileRevisionRequest{},
-			&adminv1.ListServiceProfilesRequest{},
-			&adminv1.SetServiceAssignmentRequest{},
-			&adminv1.GetDeviceServiceStateRequest{},
+			&adminv1.PublishProfileRevisionRequest{},
+			&adminv1.GetProfileRevisionRequest{},
+			&adminv1.ListProfilesRequest{},
+			&adminv1.SetResourceAssignmentRequest{},
+			&adminv1.GetDeviceResourceStateRequest{},
+			&adminv1.PutDynamicGroupRequest{},
+			&adminv1.GetDynamicGroupRequest{},
+			&adminv1.ListDynamicGroupsRequest{},
+			&adminv1.PutTargetAssignmentRequest{},
+			&adminv1.ListTargetAssignmentsRequest{},
+			&adminv1.PreviewTargetAssignmentsRequest{},
+			&adminv1.ActivateTargetPreviewRequest{},
+			&adminv1.PutRolloutRequest{},
+			&adminv1.ControlRolloutRequest{},
+			&adminv1.ListRolloutsRequest{},
+			&adminv1.ListDeviceFindingsRequest{},
+			&adminv1.ListAdvisorySummaryRequest{},
+			&adminv1.ListAdvisoryFeedsRequest{},
+			&adminv1.AcceptAdvisoryFindingRequest{},
+			&adminv1.CreateApprovalRequest{},
+			&adminv1.ListApprovalsRequest{},
+			&adminv1.ApproveApprovalRequest{},
+			&adminv1.RejectApprovalRequest{},
+			&adminv1.ListDeviceGroupsRequest{},
+			&adminv1.SetDeviceGroupRequest{},
+			&adminv1.DeleteDeviceGroupRequest{},
+			&adminv1.CreateDeviceActionRequest{},
+			&adminv1.GetDeviceActionsRequest{},
+			&adminv1.GetDeviceActionRequest{},
+			&adminv1.GetDeviceEncryptionRequest{},
+			&adminv1.RevealRecoveryKeyRequest{},
+			&devicev1.GetDeviceActionWorkRequest{},
+			&devicev1.AuthorizeDeviceActionStartRequest{},
+			&devicev1.ReportDeviceActionResultRequest{},
+			&devicev1.RegisterDeviceActionRecoveryRequest{},
+			&recoveryv1.AcquireRecoveryWorkRequest{},
+			&recoveryv1.AuthorizeRecoveryStartRequest{},
+			&recoveryv1.CheckpointRecoveryActionRequest{},
+			&recoveryv1.ReportRecoveryResultRequest{},
 			&devicev1.GetServiceWorkRequest{},
 			&devicev1.AuthorizeServiceStartRequest{},
 			&devicev1.ReportServiceResultRequest{},
 			&enrollmentv1.EnrollRequest{},
 			&enrollmentv1.RetrieveIssuanceRequest{},
+			&enrollmentv1.ProvisionRequest{}, &enrollmentv1.RetrieveProvisioningIssuanceRequest{},
 			&devicev1.AcquireSessionRequest{},
 			&devicev1.GetSyncStateRequest{},
 			&devicev1.GetExecutionTrustRequest{},
@@ -164,6 +237,9 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := resource.Initialize(); err != nil {
+		return nil, err
+	}
 	authority, err := trust.New()
 	if err != nil {
 		return nil, err
@@ -172,21 +248,33 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	targetingStore, err := targeting.New()
+	if err != nil {
+		return nil, err
+	}
 	return &Service{
-		pool:            pool,
-		deploymentID:    deploymentID,
-		ca:              cfg.CACertificate,
-		caKey:           cfg.CAKey,
-		validator:       validate.NewInterceptor(validate.WithValidator(compiled)),
-		rules:           compiled,
-		slots:           make(chan struct{}, maxInFlight),
-		clock:           time.Now,
-		authority:       authority,
-		inventoryBudget: budget,
-		execution:       cfg.ExecutionAuthority,
-		identity:        cfg.Identity,
-		profiles:        profiles,
-		signing:         cfg.ExecutionSigning,
+		pool:                 pool,
+		deploymentID:         deploymentID,
+		ca:                   cfg.CACertificate,
+		caKey:                cfg.CAKey,
+		validator:            validate.NewInterceptor(validate.WithValidator(compiled)),
+		rules:                compiled,
+		slots:                make(chan struct{}, maxInFlight),
+		clock:                time.Now,
+		authority:            authority,
+		inventoryBudget:      budget,
+		execution:            cfg.ExecutionAuthority,
+		identity:             cfg.Identity,
+		escrow:               cfg.Escrow,
+		revealApproval:       cfg.EscrowRevealApprovalRequired,
+		profiles:             profiles,
+		targeting:            targetingStore,
+		signing:              cfg.ExecutionSigning,
+		advisories:           cfg.Advisories,
+		releasePublisher:     cfg.ReleasePublisher,
+		requireCompatibility: cfg.RequireReleaseCompatibility,
+		serverRelease:        cfg.ServerRelease,
+		serverProtocol:       cfg.ServerProtocol,
 	}, nil
 }
 

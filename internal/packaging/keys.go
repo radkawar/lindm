@@ -166,12 +166,18 @@ func (guard *signerGuard) validate(ctx context.Context, work string, key Signing
 	}
 	key.Home = home
 	key.Fingerprint = fingerprint
+	if err := validatePublicExclusions(ctx, work, key); err != nil {
+		return SigningKey{}, err
+	}
 	return key, nil
 }
 
 func checkPassphrase(path string) error {
 	cleaned, err := cleanAbsolute(path)
 	if err != nil {
+		return err
+	}
+	if err := rejectMacroUnsafe(cleaned); err != nil {
 		return err
 	}
 	if err := rejectReservedHome(cleaned, nil); err != nil {

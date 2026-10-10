@@ -4,6 +4,8 @@ package lindm.config.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "lindm/advisory/v1/feed.proto";
+import "lindm/auth/v1/authorization.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/config/v1;configv1";
@@ -17,6 +19,11 @@ message ServerConfig {
     expression: "!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener"
   };
   option (buf.validate.message).cel = {
+    id: "profiling.distinct_listener"
+    message: "profiling must use a separate listener"
+    expression: "!has(this.profiling) || ((!has(this.admin_listener) || this.profiling.listener != this.admin_listener) && (!has(this.device_listener) || this.profiling.listener != this.device_listener))"
+  };
+  option (buf.validate.message).cel = {
     id: "execution_signing.bootstrap"
     message: "execution signing requires an execution bootstrap"
     expression: "!has(this.execution_signing) || has(this.execution_bootstrap)"
@@ -25,6 +32,11 @@ message ServerConfig {
     id: "execution_bootstrap.device_origin"
     message: "execution bootstrap requires an explicit public device origin"
     expression: "!has(this.execution_bootstrap) || has(this.device_public_url)"
+  };
+  option (buf.validate.message).cel = {
+    id: "authorization.source"
+    message: "directory mappings must match the selected authority source"
+    expression: "!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)"
   };
 
   string deployment_id = 1 [
@@ -62,6 +74,65 @@ message ServerConfig {
   ExecutionSigningConfig execution_signing = 13;
   // Independent emergency local-owner policy; never unions external grants.
   BreakGlassPolicy break_glass = 14;
+  // No network requests occur unless refresh_enabled is explicitly true.
+  AdvisoryConfig advisories = 15;
+  // Enables integrations and report workers on this replica.
+  IntegrationsConfig integrations = 16;
+  lindm.auth.v1.AuthorizationPolicy authorization = 17;
+  // Separate recovery transport and at-rest custody; absent disables escrow.
+  EscrowConfig escrow = 18;
+  // Operator-only diagnostics. Absent means no listener or runtime sampling.
+  ProfilingConfig profiling = 19;
+  // Public signed repository; private signing keys are outside this directory.
+  ReleaseRepositoryConfig release_repository = 20;
+}
+
+message ReleaseRepositoryConfig {
+  string directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Absent signing disables mutation but still permits verified update retrieval.
+  ReleaseRepositorySigning signing = 2;
+}
+message ReleaseRepositorySigning {
+  // Protected directory with rollout.pem, snapshot.pem and timestamp.pem only.
+  // Offline root.pem and targets.pem must not be present or exposed to lindmd.
+  string directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message AdvisoryConfig {
+  repeated lindm.advisory.v1.FeedSource feeds = 1 [(buf.validate.field).repeated.max_items = 32];
+  bool refresh_enabled = 2;
+  optional uint32 refresh_interval_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 3600
+    lte: 604800
+  }];
+  optional uint32 inventory_max_age_seconds = 4 [(buf.validate.field).uint32 = {
+    gte: 300
+    lte: 604800
+  }];
+  option (buf.validate.message).cel = {
+    id: "advisories.unique"
+    message: "feed IDs and distro/release/stream combinations must be unique"
+    expression: "this.feeds.all(f, this.feeds.filter(x, x.id == f.id).size() == 1 && this.feeds.filter(x, x.distro == f.distro && x.release == f.release && x.platform_stream == f.platform_stream).size() == 1)"
+  };
+}
+
+message IntegrationsConfig {
+  // Exactly 32 raw bytes, loaded through the protected secret-file boundary.
+  // All replicas must use the same key; retain it with encrypted database backups.
+  string encryption_key_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message EscrowConfig {
+  // One protected PKCS#8 RSA private key, at least 3072 bits.
+  string transport_key_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Exactly 32 random raw bytes. Never reuse another domain's encryption key.
+  string wrapping_key_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  bool reveal_approval_required = 3;
+  option (buf.validate.message).cel = {
+    id: "escrow.distinct_files"
+    message: "escrow transport and wrapping keys must use distinct files"
+    expression: "this.transport_key_file != this.wrapping_key_file"
+  };
 }
 
 message ExecutionBootstrapConfig {
@@ -92,6 +163,32 @@ message ListenerConfig {
   }];
 }
 
+// ProfilingConfig enables a private plaintext HTTP listener, never a public RPC
+// surface. Only literal loopback addresses are admitted; do not proxy this port.
+// Sampling is process-wide for this server lifetime. The server exclusively owns
+// block sampling and restores its disabled baseline on shutdown.
+message ProfilingConfig {
+  option (buf.validate.message).cel = {
+    id: "profiling.loopback"
+    message: "profiling requires literal 127.0.0.1 or ::1"
+    expression: "has(this.listener) && this.listener.address in ['127.0.0.1', '::1']"
+  };
+  ListenerConfig listener = 1 [(buf.validate.field).required = true];
+  // Fixed duration of each CPU capture; request parameters cannot extend it.
+  uint32 cpu_profile_seconds = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 60
+  }];
+  uint32 mutex_profile_fraction = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1000000
+  }];
+  uint32 block_profile_rate_ns = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1000000000
+  }];
+}
+
 message DatabaseConfig {
   string url_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   uint32 max_connections = 2 [
@@ -114,12 +211,20 @@ message DeviceCAConfig {
 }
 
 message AuthenticationConfig {
+  option (buf.validate.message).cel = {
+    id: "authentication.scim_external"
+    message: "SCIM supplements an external authority and cannot provision local accounts"
+    expression: "!has(this.scim) || !has(this.local)"
+  };
   oneof primary {
     option (buf.validate.oneof).required = true;
     LocalAuthentication local = 1;
     KeycloakDirectory keycloak = 2;
     EntraDirectory entra = 3;
+    OktaDirectory okta = 4;
+    GoogleDirectory google = 5;
   }
+  SCIMConfig scim = 6;
 }
 
 // Local authentication uses only Postgres, passwords and mandatory WebAuthn.
@@ -130,6 +235,11 @@ message KeycloakDirectory {
     id: "keycloak.separate_clients"
     message: "login and directory access must use separate clients"
     expression: "this.client_id != this.directory_client_id"
+  };
+  option (buf.validate.message).cel = {
+    id: "keycloak.distinct_upstream"
+    message: "broker freshness requires a distinct original directory issuer"
+    expression: "!has(this.upstream) || this.upstream.issuer != this.issuer"
   };
 
   string issuer = 1 [
@@ -146,13 +256,10 @@ message KeycloakDirectory {
     (buf.validate.field).string.max_len = 256
   ];
   string directory_client_secret_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
-  repeated string administrator_groups = 6 [
-    (buf.validate.field).repeated.max_items = 100,
-    (buf.validate.field).repeated.unique = true,
-    (buf.validate.field).repeated.items.string.min_len = 2,
-    (buf.validate.field).repeated.items.string.max_len = 512,
-    (buf.validate.field).repeated.items.string.prefix = "/"
-  ];
+  reserved 6;
+  reserved "administrator_groups";
+  // Broker imports are restrictions only; upstream observations establish freshness.
+  KeycloakBrokerUpstream upstream = 7;
 }
 
 // Microsoft Entra ID public-cloud OIDC and authoritative Microsoft Graph access.
@@ -177,19 +284,141 @@ message EntraDirectory {
     (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
   ];
   string directory_client_secret_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
-  repeated string administrator_group_object_ids = 6 [
-    (buf.validate.field).repeated.max_items = 100,
-    (buf.validate.field).repeated.unique = true,
-    (buf.validate.field).repeated.items.string.uuid = true,
-    (buf.validate.field).repeated.items.string.not_in = "00000000-0000-0000-0000-000000000000"
+  reserved 6;
+  reserved "administrator_group_object_ids";
+}
+
+message OktaDirectory {
+  option (buf.validate.message).cel = {
+    id: "okta.separate_clients"
+    message: "login and directory access must use separate clients"
+    expression: "this.client_id != this.directory_client_id"
+  };
+  string issuer = 1 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
   ];
+  string client_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string client_secret_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string org_url = 4 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  string directory_client_id = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string directory_key_id = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  // Protected PEM RSA key for private_key_jwt, never an API token.
+  string directory_private_key_file = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+message GoogleDirectory {
+  string client_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string client_secret_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string service_account_email = 3 [(buf.validate.field).string = {
+    email: true
+    max_len: 320
+  }];
+  string private_key_id = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  // Protected PEM RSA service-account key; delegation is read-only directory access.
+  string private_key_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string delegated_subject = 6 [(buf.validate.field).string = {
+    email: true
+    max_len: 320
+  }];
+  // Exact Workspace hosted-domain claim required from the signed login identity.
+  string hosted_domain = 7 [(buf.validate.field).string = {
+    hostname: true
+    min_len: 1
+    max_len: 253
+  }];
+}
+
+message KeycloakBrokerUpstream {
+  string alias = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    pattern: "^[A-Za-z0-9_.-]+$"
+  }];
+  string connector_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_-]*$"
+  }];
+  string issuer = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string directory_client_id = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string directory_client_secret_file = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+}
+
+// SCIM is a supplemental deny/revocation channel, never a freshness or grant source.
+message SCIMConfig {
+  option (buf.validate.message).cel = {
+    id: "scim.unique_connectors"
+    message: "SCIM connector IDs must be unique"
+    expression: "this.connectors.all(c, this.connectors.filter(x, x.id == c.id).size() == 1)"
+  };
+  repeated SCIMConnector connectors = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+}
+
+message SCIMConnector {
+  option (buf.validate.message).cel = {
+    id: "scim.unique_correlations"
+    message: "immutable provider and login identities must be unique within a connector"
+    expression: "this.correlations.all(c, this.correlations.filter(x, x.provider_id == c.provider_id || (x.issuer == c.issuer && x.subject == c.subject)).size() == 1)"
+  };
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_-]*$"
+  }];
+  repeated SCIMCorrelation correlations = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 10000
+  }];
+}
+
+message SCIMCorrelation {
+  string provider_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string issuer = 2 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_endpoint) = true
+  ];
+  string subject = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
 }
 
 message BreakGlassPolicy {
   // This allowlist always applies, including when console_only is true.
   repeated string allowed_permissions = 1 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 8,
+    (buf.validate.field).repeated.max_items = 21,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -199,8 +428,21 @@ message BreakGlassPolicy {
         "audit.read",
         "execution_trust.manage",
         "profiles.manage",
-        "services.assign",
-        "accounts.manage"
+        "resources.assign",
+        "accounts.manage",
+        "inventory.manage",
+        "recovery_keys.read",
+        "remote_execution.run",
+        "scripts.run",
+        "destructive.execute",
+        "approvals.manage",
+        "integrations.manage",
+        "release_updates.manage",
+        "advisory_exceptions.manage",
+        "encryption.manage",
+        "actions.lock",
+        "actions.release-lock",
+        "actions.quarantine"
       ]
     }
   ];

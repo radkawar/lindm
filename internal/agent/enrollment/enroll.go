@@ -22,6 +22,9 @@ import (
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 )
 
+// ErrPendingApproval means the immutable reservation exists without usable authority.
+var ErrPendingApproval = errors.New("enrollment awaits administrator approval; run lindm-agent resume")
+
 // Enroll sends the protected pending transaction through pinned TLS. It does
 // not install the certificate or alter the executor's durable pending intent.
 func Enroll(ctx context.Context, pins *agentv1.PrepareBootstrapResponse) (*enrollmentv1.EnrollResponse, error) {
@@ -55,6 +58,12 @@ func Enroll(ctx context.Context, pins *agentv1.PrepareBootstrapResponse) (*enrol
 	}
 	defer httpClient.CloseIdleConnections()
 	client := enrollmentv1connect.NewEnrollmentServiceClient(httpClient, origin.String(), connect.WithReadMaxBytes(64<<10))
+	if pins.GetOfflineRequest() != nil {
+		return nil, errors.New("offline enrollment requires a signed response file")
+	}
+	if pins.GetProvisioningToken() {
+		return provision(ctx, client, pins)
+	}
 	response, err := client.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{
 		GrantSecret: pins.GetPendingGrant(), TransactionId: pins.GetEnrollmentTransactionId(), CsrPem: pins.GetCsrPem(),
 	}))
@@ -62,4 +71,30 @@ func Enroll(ctx context.Context, pins *agentv1.PrepareBootstrapResponse) (*enrol
 		return nil, err
 	}
 	return response.Msg, nil
+}
+
+func provision(ctx context.Context, client enrollmentv1connect.EnrollmentServiceClient, pins *agentv1.PrepareBootstrapResponse) (*enrollmentv1.EnrollResponse, error) {
+	var result *enrollmentv1.ProvisionResponse
+	if pins.GetResumed() {
+		retrieved, err := client.RetrieveProvisioningIssuance(ctx, connect.NewRequest(&enrollmentv1.RetrieveProvisioningIssuanceRequest{AuthorityProof: pins.GetProvisioningRetrievalProof()}))
+		if err == nil {
+			result = retrieved.Msg.GetEnrollment()
+		} else if connect.CodeOf(err) != connect.CodeNotFound {
+			return nil, err
+		}
+	}
+	if result == nil {
+		response, err := client.Provision(ctx, connect.NewRequest(&enrollmentv1.ProvisionRequest{ProvisioningToken: pins.GetPendingGrant(), TransactionId: pins.GetEnrollmentTransactionId(), CsrPem: pins.GetCsrPem(), InstallationId: pins.GetInstallationId()}))
+		if err != nil {
+			return nil, err
+		}
+		result = response.Msg
+	}
+	if result.GetState() == "pending_approval" {
+		return nil, ErrPendingApproval
+	}
+	if result.GetState() != "ready" || len(result.GetCertificatePem()) == 0 {
+		return nil, errors.New("invalid provisioning issuance state")
+	}
+	return &enrollmentv1.EnrollResponse{DeviceId: result.GetDeviceId(), EnrollmentGeneration: result.GetEnrollmentGeneration(), CertificatePem: result.GetCertificatePem(), ExpiresAt: result.GetExpiresAt()}, nil
 }

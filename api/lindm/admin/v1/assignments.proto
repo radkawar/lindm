@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/service_execution.proto";
+import "lindm/policy/v1/profile.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/resource.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// One immutable desired head for a device generation. Unassignment records
+// ownership-safe release work, never synthesized inverse desired state.
+message ResourceAssignment {
+  string assignment_id = 1;
+  string device_id = 2;
+  string enrollment_generation = 3;
+  // Both absent for a cleared head.
+  string profile_id = 4;
+  string revision_id = 5;
+  uint64 revision_number = 6;
+  string profile_name = 7;
+  string actor_id = 8;
+  google.protobuf.Timestamp assigned_at = 9;
+  string reason = 10;
+  uint32 reconcile_interval_seconds = 11;
+}
+
+message SetResourceAssignmentRequest {
+  string request_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string device_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  // Absent requires that the device has never had an assignment; present must
+  // equal its current head. Stale heads are rejected, not merged.
+  optional string expected_assignment_id = 3 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  // Exact retained revision. Absent with clear=true stops management.
+  ResourceAssignmentTarget target = 4;
+  bool clear = 5;
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Absent uses fifteen minutes. New checks never bypass fresh start authority.
+  optional uint32 reconcile_interval_seconds = 7 [(buf.validate.field).uint32 = {
+    gte: 300
+    lte: 86400
+  }];
+  string approval_id = 8 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  option (buf.validate.message).cel = {
+    id: "resource_assignment.target_or_clear"
+    message: "set exactly one of a profile revision target or clear"
+    expression: "has(this.target) != this.clear"
+  };
+}
+
+message ResourceAssignmentTarget {
+  string profile_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string revision_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+
+message SetResourceAssignmentResponse {
+  // Exact retry returns the original head, not a later one.
+  ResourceAssignment assignment = 1 [(buf.validate.field).required = true];
+}
+
+message GetDeviceResourceStateRequest {
+  string device_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+
+enum ResourceDisposition {
+  RESOURCE_DISPOSITION_UNSPECIFIED = 0;
+  RESOURCE_DISPOSITION_PENDING = 1;
+  RESOURCE_DISPOSITION_IN_PROGRESS = 2;
+  RESOURCE_DISPOSITION_SUCCEEDED = 3;
+  RESOURCE_DISPOSITION_ATTENTION = 4;
+  RESOURCE_DISPOSITION_BLOCKED = 5;
+  RESOURCE_DISPOSITION_UNSUPPORTED = 6;
+  RESOURCE_DISPOSITION_RELEASE_PENDING = 7;
+}
+
+enum ResourceCompliance {
+  RESOURCE_COMPLIANCE_UNSPECIFIED = 0;
+  RESOURCE_COMPLIANCE_UNKNOWN = 1;
+  RESOURCE_COMPLIANCE_COMPLIANT = 2;
+  RESOURCE_COMPLIANCE_DRIFT_REMEDIATED = 3;
+  RESOURCE_COMPLIANCE_ATTENTION = 4;
+  RESOURCE_COMPLIANCE_STALE = 5;
+}
+
+message ServiceActionSummary {
+  string action_id = 1;
+  uint64 resource_sequence = 2;
+  google.protobuf.Timestamp issued_at = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  google.protobuf.Timestamp start_authorized_at = 5;
+  // Server-side closure, if any: e.g. "result", "expired_unstarted",
+  // "assignment_changed". Machine-readable snake_case.
+  string closed_reason = 6;
+  google.protobuf.Timestamp closed_at = 7;
+  // Latest verified device-signed history. Absent until a report is accepted.
+  lindm.agent.v1.ServiceExecutionStatus status = 8;
+  uint64 action_revision = 9;
+  google.protobuf.Timestamp attested_at = 10;
+  google.protobuf.Timestamp received_at = 11;
+}
+
+message ResourceState {
+  string resource_id = 1;
+  lindm.resource.v1.ResourceDesiredState desired = 2;
+  repeated lindm.policy.v1.ResourceDependency depends_on = 3;
+  ResourceDisposition disposition = 4;
+  // snake_case reason for PENDING/BLOCKED/ATTENTION; empty otherwise.
+  string reason = 5;
+  // Most recent action for this resource under the current head.
+  ServiceActionSummary latest_action = 6;
+  ResourceCompliance compliance = 7;
+  // Server receive time of the latest successful native verification.
+  google.protobuf.Timestamp last_verified_at = 8;
+  // Device wall clock of that native observation; never used for scheduling.
+  google.protobuf.Timestamp observed_at = 9;
+}
+
+// One recent server action for the device generation, across heads.
+message DeviceResourceAction {
+  string assignment_id = 1;
+  string resource_id = 2;
+  lindm.resource.v1.ResourceRef ref = 3;
+  ServiceActionSummary action = 4;
+}
+
+message GetDeviceResourceStateResponse {
+  // Absent when the device has never been assigned.
+  ResourceAssignment assignment = 1;
+  repeated ResourceState resources = 2;
+  // Newest first, at most 50 actions for the current enrollment generation,
+  // including actions closed by head changes or expiry.
+  repeated DeviceResourceAction recent_actions = 3;
+  repeated ResourceRelease releases = 4;
+}
+
+message ResourceRelease {
+  string release_id = 1;
+  lindm.resource.v1.ResourceRef ref = 2;
+  string source_assignment_id = 3;
+  string superseding_assignment_id = 4;
+  string state = 5;
+  string reason = 6;
+  google.protobuf.Timestamp requested_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+}

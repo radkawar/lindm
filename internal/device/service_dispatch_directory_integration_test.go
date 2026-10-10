@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity"
 )
 
@@ -33,7 +34,7 @@ type dispatchDirectory struct {
 	name, user, group string
 }
 
-func dispatchIdentity(t *testing.T, pool *pgxpool.Pool) (*identity.Service, identity.Principal, *dispatchDirectory) {
+func dispatchIdentity(t *testing.T, pool *pgxpool.Pool, scopes ...*authv1.DeviceScope) (*identity.Service, identity.Principal, *dispatchDirectory) {
 	t.Helper()
 	dir := filepath.Join("..", "..", ".cache", "dev")
 	read := func(name string) []byte {
@@ -138,7 +139,7 @@ func dispatchIdentity(t *testing.T, pool *pgxpool.Pool) (*identity.Service, iden
 		}
 	}
 	fixture.membership(t, true)
-	service, err := identity.New(t.Context(), pool, identity.Config{Issuer: "https://localhost:18443/realms/lindm", ClientID: "lindm-console", ClientSecret: strings.TrimSpace(string(read("console-secret"))), DirectoryClientID: "lindm-directory", DirectoryClientSecret: strings.TrimSpace(string(read("directory-secret"))), PublicURL: "https://localhost:18444", AdminGroups: []string{"/" + fixture.name}, HTTPClient: client})
+	service, err := identity.New(t.Context(), pool, identity.Config{Issuer: "https://localhost:18443/realms/lindm", ClientID: "lindm-console", ClientSecret: strings.TrimSpace(string(read("console-secret"))), DirectoryClientID: "lindm-directory", DirectoryClientSecret: strings.TrimSpace(string(read("directory-secret"))), PublicURL: "https://localhost:18444", Policy: &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: "/" + fixture.name, Role: identity.RoleAdmin, Scopes: scopes}}}, HTTPClient: client})
 	if err != nil {
 		t.Fatal(err)
 	}

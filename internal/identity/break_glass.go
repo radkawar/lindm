@@ -30,7 +30,7 @@ func (s *Service) terminateEmergencySessions(ctx context.Context) error {
 			if count == 0 {
 				return nil
 			}
-			if err = q.BumpLocalAuthorization(ctx, identitydb.BumpLocalAuthorizationParams{ID: id, AuthorizationRole: principal.AuthorizationRole}); err != nil {
+			if err = s.bumpLocalAuthorization(ctx, q, id, principal.AuthorizationRole); err != nil {
 				return s.dbErr(err)
 			}
 			return s.insertAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "authentication service restarted; emergency policy re-established")

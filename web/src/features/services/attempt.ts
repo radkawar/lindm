@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from "react";
-import type { SetServiceAssignmentRequest } from "../../../gen/lindm/admin/v1/service_assignments_pb";
+import type { SetResourceAssignmentRequest } from "../../../gen/lindm/admin/v1/assignments_pb";
 import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";
 import type { RpcFailure } from "@/lib/errors";
 
 export type AssignmentAttempt = {
-  payload: SetServiceAssignmentRequest;
+  payload: SetResourceAssignmentRequest;
   targetLabel: string;
   status: "inflight" | "ambiguous" | "rejected" | "succeeded";
   failure: RpcFailure | null;

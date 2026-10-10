@@ -185,9 +185,11 @@ type PrepareBootstrapRequest struct {
 	// never replaces the stored grant.
 	PendingGrant string `protobuf:"bytes,3,opt,name=pending_grant,json=pendingGrant,proto3" json:"pending_grant,omitempty"`
 	// Explicit resume returns the stored attempt only. It never initializes.
-	Resume        bool `protobuf:"varint,4,opt,name=resume,proto3" json:"resume,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Resume               bool                                `protobuf:"varint,4,opt,name=resume,proto3" json:"resume,omitempty"`
+	ProvisioningToken    bool                                `protobuf:"varint,5,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
+	OfflineAuthorization *OfflineEnrollmentAuthorizationFile `protobuf:"bytes,6,opt,name=offline_authorization,json=offlineAuthorization,proto3" json:"offline_authorization,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PrepareBootstrapRequest) Reset() {
@@ -248,20 +250,37 @@ func (x *PrepareBootstrapRequest) GetResume() bool {
 	return false
 }
 
+func (x *PrepareBootstrapRequest) GetProvisioningToken() bool {
+	if x != nil {
+		return x.ProvisioningToken
+	}
+	return false
+}
+
+func (x *PrepareBootstrapRequest) GetOfflineAuthorization() *OfflineEnrollmentAuthorizationFile {
+	if x != nil {
+		return x.OfflineAuthorization
+	}
+	return nil
+}
+
 type PrepareBootstrapResponse struct {
 	state                   protoimpl.MessageState `protogen:"open.v1"`
 	InstallationId          string                 `protobuf:"bytes,1,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
 	EnrollmentTransactionId string                 `protobuf:"bytes,2,opt,name=enrollment_transaction_id,json=enrollmentTransactionId,proto3" json:"enrollment_transaction_id,omitempty"`
 	CsrPem                  []byte                 `protobuf:"bytes,3,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
 	// Root-only. The network UID cannot call this method.
-	PendingGrant     string `protobuf:"bytes,4,opt,name=pending_grant,json=pendingGrant,proto3" json:"pending_grant,omitempty"`
-	DeploymentId     string `protobuf:"bytes,5,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
-	EnrollmentOrigin string `protobuf:"bytes,6,opt,name=enrollment_origin,json=enrollmentOrigin,proto3" json:"enrollment_origin,omitempty"`
-	DeviceOrigin     string `protobuf:"bytes,7,opt,name=device_origin,json=deviceOrigin,proto3" json:"device_origin,omitempty"`
-	TransportCaPem   []byte `protobuf:"bytes,8,opt,name=transport_ca_pem,json=transportCaPem,proto3" json:"transport_ca_pem,omitempty"`
-	Resumed          bool   `protobuf:"varint,9,opt,name=resumed,proto3" json:"resumed,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	PendingGrant               string                        `protobuf:"bytes,4,opt,name=pending_grant,json=pendingGrant,proto3" json:"pending_grant,omitempty"`
+	DeploymentId               string                        `protobuf:"bytes,5,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	EnrollmentOrigin           string                        `protobuf:"bytes,6,opt,name=enrollment_origin,json=enrollmentOrigin,proto3" json:"enrollment_origin,omitempty"`
+	DeviceOrigin               string                        `protobuf:"bytes,7,opt,name=device_origin,json=deviceOrigin,proto3" json:"device_origin,omitempty"`
+	TransportCaPem             []byte                        `protobuf:"bytes,8,opt,name=transport_ca_pem,json=transportCaPem,proto3" json:"transport_ca_pem,omitempty"`
+	Resumed                    bool                          `protobuf:"varint,9,opt,name=resumed,proto3" json:"resumed,omitempty"`
+	ProvisioningToken          bool                          `protobuf:"varint,10,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
+	ProvisioningRetrievalProof []byte                        `protobuf:"bytes,11,opt,name=provisioning_retrieval_proof,json=provisioningRetrievalProof,proto3" json:"provisioning_retrieval_proof,omitempty"`
+	OfflineRequest             *OfflineEnrollmentRequestFile `protobuf:"bytes,12,opt,name=offline_request,json=offlineRequest,proto3" json:"offline_request,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *PrepareBootstrapResponse) Reset() {
@@ -355,6 +374,27 @@ func (x *PrepareBootstrapResponse) GetResumed() bool {
 		return x.Resumed
 	}
 	return false
+}
+
+func (x *PrepareBootstrapResponse) GetProvisioningToken() bool {
+	if x != nil {
+		return x.ProvisioningToken
+	}
+	return false
+}
+
+func (x *PrepareBootstrapResponse) GetProvisioningRetrievalProof() []byte {
+	if x != nil {
+		return x.ProvisioningRetrievalProof
+	}
+	return nil
+}
+
+func (x *PrepareBootstrapResponse) GetOfflineRequest() *OfflineEnrollmentRequestFile {
+	if x != nil {
+		return x.OfflineRequest
+	}
+	return nil
 }
 
 type InstallEnrollmentRequest struct {
@@ -502,6 +542,50 @@ func (x *InstallEnrollmentResponse) GetReplayed() bool {
 	return false
 }
 
+type ImportOfflineEnrollmentResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Enrollment    *InstallEnrollmentResponse `protobuf:"bytes,1,opt,name=enrollment,proto3" json:"enrollment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportOfflineEnrollmentResponse) Reset() {
+	*x = ImportOfflineEnrollmentResponse{}
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportOfflineEnrollmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportOfflineEnrollmentResponse) ProtoMessage() {}
+
+func (x *ImportOfflineEnrollmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportOfflineEnrollmentResponse.ProtoReflect.Descriptor instead.
+func (*ImportOfflineEnrollmentResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ImportOfflineEnrollmentResponse) GetEnrollment() *InstallEnrollmentResponse {
+	if x != nil {
+		return x.Enrollment
+	}
+	return nil
+}
+
 type GetConnectionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -510,7 +594,7 @@ type GetConnectionRequest struct {
 
 func (x *GetConnectionRequest) Reset() {
 	*x = GetConnectionRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +606,7 @@ func (x *GetConnectionRequest) String() string {
 func (*GetConnectionRequest) ProtoMessage() {}
 
 func (x *GetConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +619,7 @@ func (x *GetConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConnectionRequest.ProtoReflect.Descriptor instead.
 func (*GetConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{5}
 }
 
 type GetConnectionResponse struct {
@@ -565,13 +649,16 @@ type GetConnectionResponse struct {
 	Prior               *PriorTLSCredential    `protobuf:"bytes,18,opt,name=prior,proto3" json:"prior,omitempty"`
 	// Actual /proc boot ID when readable. Not an authority input.
 	ObservedBootId string `protobuf:"bytes,19,opt,name=observed_boot_id,json=observedBootId,proto3" json:"observed_boot_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Protected executor memory has crossed the live-root erase gate. Relays
+	// must only report through the pinned usable session; never renew/acquire.
+	DeviceActionReportOnly bool `protobuf:"varint,20,opt,name=device_action_report_only,json=deviceActionReportOnly,proto3" json:"device_action_report_only,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *GetConnectionResponse) Reset() {
 	*x = GetConnectionResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -583,7 +670,7 @@ func (x *GetConnectionResponse) String() string {
 func (*GetConnectionResponse) ProtoMessage() {}
 
 func (x *GetConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -596,7 +683,7 @@ func (x *GetConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConnectionResponse.ProtoReflect.Descriptor instead.
 func (*GetConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{5}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetConnectionResponse) GetDeploymentId() string {
@@ -732,6 +819,13 @@ func (x *GetConnectionResponse) GetObservedBootId() string {
 	return ""
 }
 
+func (x *GetConnectionResponse) GetDeviceActionReportOnly() bool {
+	if x != nil {
+		return x.DeviceActionReportOnly
+	}
+	return false
+}
+
 type RetrievalPublicData struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	IssuanceRequestId string                 `protobuf:"bytes,1,opt,name=issuance_request_id,json=issuanceRequestId,proto3" json:"issuance_request_id,omitempty"`
@@ -743,7 +837,7 @@ type RetrievalPublicData struct {
 
 func (x *RetrievalPublicData) Reset() {
 	*x = RetrievalPublicData{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -755,7 +849,7 @@ func (x *RetrievalPublicData) String() string {
 func (*RetrievalPublicData) ProtoMessage() {}
 
 func (x *RetrievalPublicData) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -768,7 +862,7 @@ func (x *RetrievalPublicData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetrievalPublicData.ProtoReflect.Descriptor instead.
 func (*RetrievalPublicData) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RetrievalPublicData) GetIssuanceRequestId() string {
@@ -804,7 +898,7 @@ type PriorTLSCredential struct {
 
 func (x *PriorTLSCredential) Reset() {
 	*x = PriorTLSCredential{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -816,7 +910,7 @@ func (x *PriorTLSCredential) String() string {
 func (*PriorTLSCredential) ProtoMessage() {}
 
 func (x *PriorTLSCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +923,7 @@ func (x *PriorTLSCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PriorTLSCredential.ProtoReflect.Descriptor instead.
 func (*PriorTLSCredential) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PriorTLSCredential) GetCertificatePem() []byte {
@@ -873,7 +967,7 @@ type SignTLSClientMessageRequest struct {
 
 func (x *SignTLSClientMessageRequest) Reset() {
 	*x = SignTLSClientMessageRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +979,7 @@ func (x *SignTLSClientMessageRequest) String() string {
 func (*SignTLSClientMessageRequest) ProtoMessage() {}
 
 func (x *SignTLSClientMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +992,7 @@ func (x *SignTLSClientMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignTLSClientMessageRequest.ProtoReflect.Descriptor instead.
 func (*SignTLSClientMessageRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SignTLSClientMessageRequest) GetCertificateSha256() []byte {
@@ -924,7 +1018,7 @@ type SignTLSClientMessageResponse struct {
 
 func (x *SignTLSClientMessageResponse) Reset() {
 	*x = SignTLSClientMessageResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +1030,7 @@ func (x *SignTLSClientMessageResponse) String() string {
 func (*SignTLSClientMessageResponse) ProtoMessage() {}
 
 func (x *SignTLSClientMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +1043,7 @@ func (x *SignTLSClientMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignTLSClientMessageResponse.ProtoReflect.Descriptor instead.
 func (*SignTLSClientMessageResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SignTLSClientMessageResponse) GetSignature() []byte {
@@ -967,7 +1061,7 @@ type PrepareSessionRequest struct {
 
 func (x *PrepareSessionRequest) Reset() {
 	*x = PrepareSessionRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -979,7 +1073,7 @@ func (x *PrepareSessionRequest) String() string {
 func (*PrepareSessionRequest) ProtoMessage() {}
 
 func (x *PrepareSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -992,7 +1086,7 @@ func (x *PrepareSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareSessionRequest.ProtoReflect.Descriptor instead.
 func (*PrepareSessionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{10}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{11}
 }
 
 type PrepareSessionResponse struct {
@@ -1008,7 +1102,7 @@ type PrepareSessionResponse struct {
 
 func (x *PrepareSessionResponse) Reset() {
 	*x = PrepareSessionResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1020,7 +1114,7 @@ func (x *PrepareSessionResponse) String() string {
 func (*PrepareSessionResponse) ProtoMessage() {}
 
 func (x *PrepareSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1033,7 +1127,7 @@ func (x *PrepareSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareSessionResponse.ProtoReflect.Descriptor instead.
 func (*PrepareSessionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{11}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PrepareSessionResponse) GetResult() isPrepareSessionResponse_Result {
@@ -1088,7 +1182,7 @@ type AcceptedSession struct {
 
 func (x *AcceptedSession) Reset() {
 	*x = AcceptedSession{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1100,7 +1194,7 @@ func (x *AcceptedSession) String() string {
 func (*AcceptedSession) ProtoMessage() {}
 
 func (x *AcceptedSession) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1113,7 +1207,7 @@ func (x *AcceptedSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptedSession.ProtoReflect.Descriptor instead.
 func (*AcceptedSession) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{12}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AcceptedSession) GetSessionEpoch() uint64 {
@@ -1147,7 +1241,7 @@ type PendingSessionClaim struct {
 
 func (x *PendingSessionClaim) Reset() {
 	*x = PendingSessionClaim{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1159,7 +1253,7 @@ func (x *PendingSessionClaim) String() string {
 func (*PendingSessionClaim) ProtoMessage() {}
 
 func (x *PendingSessionClaim) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1172,7 +1266,7 @@ func (x *PendingSessionClaim) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PendingSessionClaim.ProtoReflect.Descriptor instead.
 func (*PendingSessionClaim) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{13}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PendingSessionClaim) GetAuthorityProof() []byte {
@@ -1241,7 +1335,7 @@ type CommitSessionRequest struct {
 
 func (x *CommitSessionRequest) Reset() {
 	*x = CommitSessionRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1253,7 +1347,7 @@ func (x *CommitSessionRequest) String() string {
 func (*CommitSessionRequest) ProtoMessage() {}
 
 func (x *CommitSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,7 +1360,7 @@ func (x *CommitSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitSessionRequest.ProtoReflect.Descriptor instead.
 func (*CommitSessionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{14}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CommitSessionRequest) GetRequestId() string {
@@ -1294,7 +1388,7 @@ type CommitSessionResponse struct {
 
 func (x *CommitSessionResponse) Reset() {
 	*x = CommitSessionResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1306,7 +1400,7 @@ func (x *CommitSessionResponse) String() string {
 func (*CommitSessionResponse) ProtoMessage() {}
 
 func (x *CommitSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1319,7 +1413,7 @@ func (x *CommitSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitSessionResponse.ProtoReflect.Descriptor instead.
 func (*CommitSessionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{15}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CommitSessionResponse) GetSessionEpoch() uint64 {
@@ -1351,7 +1445,7 @@ type PrepareRenewalRequest struct {
 
 func (x *PrepareRenewalRequest) Reset() {
 	*x = PrepareRenewalRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1363,7 +1457,7 @@ func (x *PrepareRenewalRequest) String() string {
 func (*PrepareRenewalRequest) ProtoMessage() {}
 
 func (x *PrepareRenewalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1376,7 +1470,7 @@ func (x *PrepareRenewalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareRenewalRequest.ProtoReflect.Descriptor instead.
 func (*PrepareRenewalRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{16}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{17}
 }
 
 type PrepareRenewalResponse struct {
@@ -1398,7 +1492,7 @@ type PrepareRenewalResponse struct {
 
 func (x *PrepareRenewalResponse) Reset() {
 	*x = PrepareRenewalResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1504,7 @@ func (x *PrepareRenewalResponse) String() string {
 func (*PrepareRenewalResponse) ProtoMessage() {}
 
 func (x *PrepareRenewalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1517,7 @@ func (x *PrepareRenewalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareRenewalResponse.ProtoReflect.Descriptor instead.
 func (*PrepareRenewalResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{17}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PrepareRenewalResponse) GetIssuanceRequestId() string {
@@ -1492,7 +1586,7 @@ type CommitRenewalRequest struct {
 
 func (x *CommitRenewalRequest) Reset() {
 	*x = CommitRenewalRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1504,7 +1598,7 @@ func (x *CommitRenewalRequest) String() string {
 func (*CommitRenewalRequest) ProtoMessage() {}
 
 func (x *CommitRenewalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1517,7 +1611,7 @@ func (x *CommitRenewalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitRenewalRequest.ProtoReflect.Descriptor instead.
 func (*CommitRenewalRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{18}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CommitRenewalRequest) GetIssuanceRequestId() string {
@@ -1548,7 +1642,7 @@ type CommitRenewalResponse struct {
 
 func (x *CommitRenewalResponse) Reset() {
 	*x = CommitRenewalResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1560,7 +1654,7 @@ func (x *CommitRenewalResponse) String() string {
 func (*CommitRenewalResponse) ProtoMessage() {}
 
 func (x *CommitRenewalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1573,7 +1667,7 @@ func (x *CommitRenewalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitRenewalResponse.ProtoReflect.Descriptor instead.
 func (*CommitRenewalResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{19}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CommitRenewalResponse) GetIssuanceRequestId() string {
@@ -1626,7 +1720,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1638,7 +1732,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1651,7 +1745,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{20}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{21}
 }
 
 type StatusResponse struct {
@@ -1683,7 +1777,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1695,7 +1789,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_executor_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1708,7 +1802,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{21}
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *StatusResponse) GetLifecycle() Lifecycle {
@@ -1844,29 +1938,79 @@ func (x *StatusResponse) GetTransportReachabilityKnown() bool {
 	return false
 }
 
+// Local privileged CLI policy; no new daemon credential or network authority.
+type EnrollmentResumeOptions struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WaitSeconds   uint64                 `protobuf:"varint,1,opt,name=wait_seconds,json=waitSeconds,proto3" json:"wait_seconds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnrollmentResumeOptions) Reset() {
+	*x = EnrollmentResumeOptions{}
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnrollmentResumeOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnrollmentResumeOptions) ProtoMessage() {}
+
+func (x *EnrollmentResumeOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_executor_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnrollmentResumeOptions.ProtoReflect.Descriptor instead.
+func (*EnrollmentResumeOptions) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_executor_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *EnrollmentResumeOptions) GetWaitSeconds() uint64 {
+	if x != nil {
+		return x.WaitSeconds
+	}
+	return 0
+}
+
 var File_lindm_agent_v1_executor_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\n" +
-	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/agent/v1/service_execution.proto\"\x82\x06\n" +
+	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a&lindm/agent/v1/service_execution.proto\x1a\x1blindm/agent/v1/update.proto\"\x8f\b\n" +
 	"\x17PrepareBootstrapRequest\x129\n" +
 	"\x13execution_root_json\x18\x01 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x11executionRootJson\x128\n" +
 	"\x12bootstrap_envelope\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80 R\x11bootstrapEnvelope\x12-\n" +
 	"\rpending_grant\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\fpendingGrant\x12\x16\n" +
-	"\x06resume\x18\x04 \x01(\bR\x06resume:\xaa\x04\xbaH\xa6\x04\x1a\xf8\x01\n" +
-	"\x1aprepare_bootstrap.material\x12Pnew provisioning requires both trust documents; resume may omit both but not one\x1a\x87\x01(this.execution_root_json.size() == 0) == (this.bootstrap_envelope.size() == 0) && (this.resume || this.execution_root_json.size() > 0)\x1a\xa8\x02\n" +
-	"\x17prepare_bootstrap.grant\x127fresh provisioning requires a grant; resume may omit it\x1a\xd3\x01(!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256)))\"\xbc\x03\n" +
+	"\x06resume\x18\x04 \x01(\bR\x06resume\x12-\n" +
+	"\x12provisioning_token\x18\x05 \x01(\bR\x11provisioningToken\x12g\n" +
+	"\x15offline_authorization\x18\x06 \x01(\v22.lindm.agent.v1.OfflineEnrollmentAuthorizationFileR\x14offlineAuthorization:\x9f\x05\xbaH\x9b\x05\x1a\xf8\x01\n" +
+	"\x1aprepare_bootstrap.material\x12Pnew provisioning requires both trust documents; resume may omit both but not one\x1a\x87\x01(this.execution_root_json.size() == 0) == (this.bootstrap_envelope.size() == 0) && (this.resume || this.execution_root_json.size() > 0)\x1a\x9d\x03\n" +
+	"\x17prepare_bootstrap.grant\x12Ofresh provisioning requires either a credential or signed offline authorization\x1a\xb0\x02has(this.offline_authorization) ? (!this.provisioning_token && this.pending_grant == '') : ((!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256))))\"\x8d\x05\n" +
 	"\x18PrepareBootstrapResponse\x121\n" +
 	"\x0finstallation_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12D\n" +
 	"\x19enrollment_transaction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x17enrollmentTransactionId\x12$\n" +
-	"\acsr_pem\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\x12/\n" +
-	"\rpending_grant\x18\x04 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10 \x18\x80\x02R\fpendingGrant\x12-\n" +
+	"\acsr_pem\x18\x03 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x01R\x06csrPem\x12-\n" +
+	"\rpending_grant\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\fpendingGrant\x12-\n" +
 	"\rdeployment_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\x11enrollment_origin\x18\x06 \x01(\tR\x10enrollmentOrigin\x12#\n" +
 	"\rdevice_origin\x18\a \x01(\tR\fdeviceOrigin\x125\n" +
 	"\x10transport_ca_pem\x18\b \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x04R\x0etransportCaPem\x12\x18\n" +
-	"\aresumed\x18\t \x01(\bR\aresumed\"\x82\x02\n" +
+	"\aresumed\x18\t \x01(\bR\aresumed\x12-\n" +
+	"\x12provisioning_token\x18\n" +
+	" \x01(\bR\x11provisioningToken\x12K\n" +
+	"\x1cprovisioning_retrieval_proof\x18\v \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x1aprovisioningRetrievalProof\x12U\n" +
+	"\x0foffline_request\x18\f \x01(\v2,.lindm.agent.v1.OfflineEnrollmentRequestFileR\x0eofflineRequest\"\x82\x02\n" +
 	"\x18InstallEnrollmentRequest\x12K\n" +
 	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\x12c\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x14enrollmentGeneration\x124\n" +
@@ -1878,8 +2022,12 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\tnot_after\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bnotAfter\x12;\n" +
 	"\vrenew_after\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"renewAfter\x12\x1a\n" +
-	"\breplayed\x18\x06 \x01(\bR\breplayed\"\x16\n" +
-	"\x14GetConnectionRequest\"\xa4\a\n" +
+	"\breplayed\x18\x06 \x01(\bR\breplayed\"t\n" +
+	"\x1fImportOfflineEnrollmentResponse\x12Q\n" +
+	"\n" +
+	"enrollment\x18\x01 \x01(\v2).lindm.agent.v1.InstallEnrollmentResponseB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"enrollment\"\x16\n" +
+	"\x14GetConnectionRequest\"\xdf\a\n" +
 	"\x15GetConnectionResponse\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1901,7 +2049,8 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"renewAfter\x12A\n" +
 	"\tretrieval\x18\x11 \x01(\v2#.lindm.agent.v1.RetrievalPublicDataR\tretrieval\x128\n" +
 	"\x05prior\x18\x12 \x01(\v2\".lindm.agent.v1.PriorTLSCredentialR\x05prior\x12(\n" +
-	"\x10observed_boot_id\x18\x13 \x01(\tR\x0eobservedBootId\"\x8e\x01\n" +
+	"\x10observed_boot_id\x18\x13 \x01(\tR\x0eobservedBootId\x129\n" +
+	"\x19device_action_report_only\x18\x14 \x01(\bR\x16deviceActionReportOnly\"\x8e\x01\n" +
 	"\x13RetrievalPublicData\x12.\n" +
 	"\x13issuance_request_id\x18\x01 \x01(\tR\x11issuanceRequestId\x12'\n" +
 	"\x0fretrieval_proof\x18\x02 \x01(\fR\x0eretrievalProof\x12\x1e\n" +
@@ -1988,7 +2137,9 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"tls_usable\x18\x10 \x01(\bR\ttlsUsable\x12H\n" +
 	"\x12prior_retain_until\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\x10priorRetainUntil\x12N\n" +
 	"\x15bootstrap_verified_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\x13bootstrapVerifiedAt\x12@\n" +
-	"\x1ctransport_reachability_known\x18\x13 \x01(\bR\x1atransportReachabilityKnown*Y\n" +
+	"\x1ctransport_reachability_known\x18\x13 \x01(\bR\x1atransportReachabilityKnown\"G\n" +
+	"\x17EnrollmentResumeOptions\x12,\n" +
+	"\fwait_seconds\x18\x01 \x01(\x04B\t\xbaH\x062\x04\x18\x80\xa3\x05R\vwaitSeconds*Y\n" +
 	"\x11TLSCredentialKind\x12#\n" +
 	"\x1fTLS_CREDENTIAL_KIND_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bTLS_CREDENTIAL_KIND_ED25519\x10\x01*\x9a\x01\n" +
@@ -2003,10 +2154,11 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x17HOLD_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10HOLD_REASON_NONE\x10\x01\x12%\n" +
 	"!HOLD_REASON_INCOMPLETE_OR_CORRUPT\x10\x02\x12 \n" +
-	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xb2\f\n" +
+	"\x1cHOLD_REASON_IDENTITY_BINDING\x10\x032\xc8\x16\n" +
 	"\x0fExecutorService\x12e\n" +
 	"\x10PrepareBootstrap\x12'.lindm.agent.v1.PrepareBootstrapRequest\x1a(.lindm.agent.v1.PrepareBootstrapResponse\x12h\n" +
-	"\x11InstallEnrollment\x12(.lindm.agent.v1.InstallEnrollmentRequest\x1a).lindm.agent.v1.InstallEnrollmentResponse\x12\\\n" +
+	"\x11InstallEnrollment\x12(.lindm.agent.v1.InstallEnrollmentRequest\x1a).lindm.agent.v1.InstallEnrollmentResponse\x12z\n" +
+	"\x17ImportOfflineEnrollment\x12..lindm.agent.v1.ImportOfflineEnrollmentRequest\x1a/.lindm.agent.v1.ImportOfflineEnrollmentResponse\x12\\\n" +
 	"\rGetConnection\x12$.lindm.agent.v1.GetConnectionRequest\x1a%.lindm.agent.v1.GetConnectionResponse\x12q\n" +
 	"\x14SignTLSClientMessage\x12+.lindm.agent.v1.SignTLSClientMessageRequest\x1a,.lindm.agent.v1.SignTLSClientMessageResponse\x12_\n" +
 	"\x0ePrepareSession\x12%.lindm.agent.v1.PrepareSessionRequest\x1a&.lindm.agent.v1.PrepareSessionResponse\x12\\\n" +
@@ -2018,7 +2170,17 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x17PrepareServiceExecution\x12..lindm.agent.v1.PrepareServiceExecutionRequest\x1a/.lindm.agent.v1.PrepareServiceExecutionResponse\x12t\n" +
 	"\x15StartServiceExecution\x12,.lindm.agent.v1.StartServiceExecutionRequest\x1a-.lindm.agent.v1.StartServiceExecutionResponse\x12n\n" +
 	"\x13GetServiceExecution\x12*.lindm.agent.v1.GetServiceExecutionRequest\x1a+.lindm.agent.v1.GetServiceExecutionResponse\x12w\n" +
-	"\x16AttestServiceExecution\x12-.lindm.agent.v1.AttestServiceExecutionRequest\x1a..lindm.agent.v1.AttestServiceExecutionResponse\x12G\n" +
+	"\x16AttestServiceExecution\x12-.lindm.agent.v1.AttestServiceExecutionRequest\x1a..lindm.agent.v1.AttestServiceExecutionResponse\x12n\n" +
+	"\x13PrepareDeviceAction\x12*.lindm.agent.v1.PrepareDeviceActionRequest\x1a+.lindm.agent.v1.PrepareDeviceActionResponse\x12h\n" +
+	"\x11StartDeviceAction\x12(.lindm.agent.v1.StartDeviceActionRequest\x1a).lindm.agent.v1.StartDeviceActionResponse\x12b\n" +
+	"\x0fGetDeviceAction\x12&.lindm.agent.v1.GetDeviceActionRequest\x1a'.lindm.agent.v1.GetDeviceActionResponse\x12k\n" +
+	"\x12AttestDeviceAction\x12).lindm.agent.v1.AttestDeviceActionRequest\x1a*.lindm.agent.v1.AttestDeviceActionResponse\x12\x80\x01\n" +
+	"\x19ConfirmDeviceActionEscrow\x120.lindm.agent.v1.ConfirmDeviceActionEscrowRequest\x1a1.lindm.agent.v1.ConfirmDeviceActionEscrowResponse\x12\x86\x01\n" +
+	"\x1bPrepareDeviceActionRecovery\x122.lindm.agent.v1.PrepareDeviceActionRecoveryRequest\x1a3.lindm.agent.v1.PrepareDeviceActionRecoveryResponse\x12\x83\x01\n" +
+	"\x1aCommitDeviceActionRecovery\x121.lindm.agent.v1.CommitDeviceActionRecoveryRequest\x1a2.lindm.agent.v1.CommitDeviceActionRecoveryResponse\x12\x89\x01\n" +
+	"\x1cSupplyDeviceActionCredential\x123.lindm.agent.v1.SupplyDeviceActionCredentialRequest\x1a4.lindm.agent.v1.SupplyDeviceActionCredentialResponse\x12n\n" +
+	"\x13ExchangeAgentUpdate\x12*.lindm.agent.v1.ExchangeAgentUpdateRequest\x1a+.lindm.agent.v1.ExchangeAgentUpdateResponse\x12_\n" +
+	"\x0eGetAgentUpdate\x12%.lindm.agent.v1.GetAgentUpdateRequest\x1a&.lindm.agent.v1.GetAgentUpdateResponse\x12G\n" +
 	"\x06Status\x12\x1d.lindm.agent.v1.StatusRequest\x1a\x1e.lindm.agent.v1.StatusResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
@@ -2034,102 +2196,152 @@ func file_lindm_agent_v1_executor_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_executor_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lindm_agent_v1_executor_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_lindm_agent_v1_executor_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_lindm_agent_v1_executor_proto_goTypes = []any{
-	(TLSCredentialKind)(0),                  // 0: lindm.agent.v1.TLSCredentialKind
-	(Lifecycle)(0),                          // 1: lindm.agent.v1.Lifecycle
-	(HoldReason)(0),                         // 2: lindm.agent.v1.HoldReason
-	(*PrepareBootstrapRequest)(nil),         // 3: lindm.agent.v1.PrepareBootstrapRequest
-	(*PrepareBootstrapResponse)(nil),        // 4: lindm.agent.v1.PrepareBootstrapResponse
-	(*InstallEnrollmentRequest)(nil),        // 5: lindm.agent.v1.InstallEnrollmentRequest
-	(*InstallEnrollmentResponse)(nil),       // 6: lindm.agent.v1.InstallEnrollmentResponse
-	(*GetConnectionRequest)(nil),            // 7: lindm.agent.v1.GetConnectionRequest
-	(*GetConnectionResponse)(nil),           // 8: lindm.agent.v1.GetConnectionResponse
-	(*RetrievalPublicData)(nil),             // 9: lindm.agent.v1.RetrievalPublicData
-	(*PriorTLSCredential)(nil),              // 10: lindm.agent.v1.PriorTLSCredential
-	(*SignTLSClientMessageRequest)(nil),     // 11: lindm.agent.v1.SignTLSClientMessageRequest
-	(*SignTLSClientMessageResponse)(nil),    // 12: lindm.agent.v1.SignTLSClientMessageResponse
-	(*PrepareSessionRequest)(nil),           // 13: lindm.agent.v1.PrepareSessionRequest
-	(*PrepareSessionResponse)(nil),          // 14: lindm.agent.v1.PrepareSessionResponse
-	(*AcceptedSession)(nil),                 // 15: lindm.agent.v1.AcceptedSession
-	(*PendingSessionClaim)(nil),             // 16: lindm.agent.v1.PendingSessionClaim
-	(*CommitSessionRequest)(nil),            // 17: lindm.agent.v1.CommitSessionRequest
-	(*CommitSessionResponse)(nil),           // 18: lindm.agent.v1.CommitSessionResponse
-	(*PrepareRenewalRequest)(nil),           // 19: lindm.agent.v1.PrepareRenewalRequest
-	(*PrepareRenewalResponse)(nil),          // 20: lindm.agent.v1.PrepareRenewalResponse
-	(*CommitRenewalRequest)(nil),            // 21: lindm.agent.v1.CommitRenewalRequest
-	(*CommitRenewalResponse)(nil),           // 22: lindm.agent.v1.CommitRenewalResponse
-	(*StatusRequest)(nil),                   // 23: lindm.agent.v1.StatusRequest
-	(*StatusResponse)(nil),                  // 24: lindm.agent.v1.StatusResponse
-	(*timestamppb.Timestamp)(nil),           // 25: google.protobuf.Timestamp
-	(*UpdateExecutionTrustRequest)(nil),     // 26: lindm.agent.v1.UpdateExecutionTrustRequest
-	(*GetExecutionTrustRequest)(nil),        // 27: lindm.agent.v1.GetExecutionTrustRequest
-	(*PrepareServiceExecutionRequest)(nil),  // 28: lindm.agent.v1.PrepareServiceExecutionRequest
-	(*StartServiceExecutionRequest)(nil),    // 29: lindm.agent.v1.StartServiceExecutionRequest
-	(*GetServiceExecutionRequest)(nil),      // 30: lindm.agent.v1.GetServiceExecutionRequest
-	(*AttestServiceExecutionRequest)(nil),   // 31: lindm.agent.v1.AttestServiceExecutionRequest
-	(*UpdateExecutionTrustResponse)(nil),    // 32: lindm.agent.v1.UpdateExecutionTrustResponse
-	(*GetExecutionTrustResponse)(nil),       // 33: lindm.agent.v1.GetExecutionTrustResponse
-	(*PrepareServiceExecutionResponse)(nil), // 34: lindm.agent.v1.PrepareServiceExecutionResponse
-	(*StartServiceExecutionResponse)(nil),   // 35: lindm.agent.v1.StartServiceExecutionResponse
-	(*GetServiceExecutionResponse)(nil),     // 36: lindm.agent.v1.GetServiceExecutionResponse
-	(*AttestServiceExecutionResponse)(nil),  // 37: lindm.agent.v1.AttestServiceExecutionResponse
+	(TLSCredentialKind)(0),                       // 0: lindm.agent.v1.TLSCredentialKind
+	(Lifecycle)(0),                               // 1: lindm.agent.v1.Lifecycle
+	(HoldReason)(0),                              // 2: lindm.agent.v1.HoldReason
+	(*PrepareBootstrapRequest)(nil),              // 3: lindm.agent.v1.PrepareBootstrapRequest
+	(*PrepareBootstrapResponse)(nil),             // 4: lindm.agent.v1.PrepareBootstrapResponse
+	(*InstallEnrollmentRequest)(nil),             // 5: lindm.agent.v1.InstallEnrollmentRequest
+	(*InstallEnrollmentResponse)(nil),            // 6: lindm.agent.v1.InstallEnrollmentResponse
+	(*ImportOfflineEnrollmentResponse)(nil),      // 7: lindm.agent.v1.ImportOfflineEnrollmentResponse
+	(*GetConnectionRequest)(nil),                 // 8: lindm.agent.v1.GetConnectionRequest
+	(*GetConnectionResponse)(nil),                // 9: lindm.agent.v1.GetConnectionResponse
+	(*RetrievalPublicData)(nil),                  // 10: lindm.agent.v1.RetrievalPublicData
+	(*PriorTLSCredential)(nil),                   // 11: lindm.agent.v1.PriorTLSCredential
+	(*SignTLSClientMessageRequest)(nil),          // 12: lindm.agent.v1.SignTLSClientMessageRequest
+	(*SignTLSClientMessageResponse)(nil),         // 13: lindm.agent.v1.SignTLSClientMessageResponse
+	(*PrepareSessionRequest)(nil),                // 14: lindm.agent.v1.PrepareSessionRequest
+	(*PrepareSessionResponse)(nil),               // 15: lindm.agent.v1.PrepareSessionResponse
+	(*AcceptedSession)(nil),                      // 16: lindm.agent.v1.AcceptedSession
+	(*PendingSessionClaim)(nil),                  // 17: lindm.agent.v1.PendingSessionClaim
+	(*CommitSessionRequest)(nil),                 // 18: lindm.agent.v1.CommitSessionRequest
+	(*CommitSessionResponse)(nil),                // 19: lindm.agent.v1.CommitSessionResponse
+	(*PrepareRenewalRequest)(nil),                // 20: lindm.agent.v1.PrepareRenewalRequest
+	(*PrepareRenewalResponse)(nil),               // 21: lindm.agent.v1.PrepareRenewalResponse
+	(*CommitRenewalRequest)(nil),                 // 22: lindm.agent.v1.CommitRenewalRequest
+	(*CommitRenewalResponse)(nil),                // 23: lindm.agent.v1.CommitRenewalResponse
+	(*StatusRequest)(nil),                        // 24: lindm.agent.v1.StatusRequest
+	(*StatusResponse)(nil),                       // 25: lindm.agent.v1.StatusResponse
+	(*EnrollmentResumeOptions)(nil),              // 26: lindm.agent.v1.EnrollmentResumeOptions
+	(*OfflineEnrollmentAuthorizationFile)(nil),   // 27: lindm.agent.v1.OfflineEnrollmentAuthorizationFile
+	(*OfflineEnrollmentRequestFile)(nil),         // 28: lindm.agent.v1.OfflineEnrollmentRequestFile
+	(*timestamppb.Timestamp)(nil),                // 29: google.protobuf.Timestamp
+	(*ImportOfflineEnrollmentRequest)(nil),       // 30: lindm.agent.v1.ImportOfflineEnrollmentRequest
+	(*UpdateExecutionTrustRequest)(nil),          // 31: lindm.agent.v1.UpdateExecutionTrustRequest
+	(*GetExecutionTrustRequest)(nil),             // 32: lindm.agent.v1.GetExecutionTrustRequest
+	(*PrepareServiceExecutionRequest)(nil),       // 33: lindm.agent.v1.PrepareServiceExecutionRequest
+	(*StartServiceExecutionRequest)(nil),         // 34: lindm.agent.v1.StartServiceExecutionRequest
+	(*GetServiceExecutionRequest)(nil),           // 35: lindm.agent.v1.GetServiceExecutionRequest
+	(*AttestServiceExecutionRequest)(nil),        // 36: lindm.agent.v1.AttestServiceExecutionRequest
+	(*PrepareDeviceActionRequest)(nil),           // 37: lindm.agent.v1.PrepareDeviceActionRequest
+	(*StartDeviceActionRequest)(nil),             // 38: lindm.agent.v1.StartDeviceActionRequest
+	(*GetDeviceActionRequest)(nil),               // 39: lindm.agent.v1.GetDeviceActionRequest
+	(*AttestDeviceActionRequest)(nil),            // 40: lindm.agent.v1.AttestDeviceActionRequest
+	(*ConfirmDeviceActionEscrowRequest)(nil),     // 41: lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	(*PrepareDeviceActionRecoveryRequest)(nil),   // 42: lindm.agent.v1.PrepareDeviceActionRecoveryRequest
+	(*CommitDeviceActionRecoveryRequest)(nil),    // 43: lindm.agent.v1.CommitDeviceActionRecoveryRequest
+	(*SupplyDeviceActionCredentialRequest)(nil),  // 44: lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	(*ExchangeAgentUpdateRequest)(nil),           // 45: lindm.agent.v1.ExchangeAgentUpdateRequest
+	(*GetAgentUpdateRequest)(nil),                // 46: lindm.agent.v1.GetAgentUpdateRequest
+	(*UpdateExecutionTrustResponse)(nil),         // 47: lindm.agent.v1.UpdateExecutionTrustResponse
+	(*GetExecutionTrustResponse)(nil),            // 48: lindm.agent.v1.GetExecutionTrustResponse
+	(*PrepareServiceExecutionResponse)(nil),      // 49: lindm.agent.v1.PrepareServiceExecutionResponse
+	(*StartServiceExecutionResponse)(nil),        // 50: lindm.agent.v1.StartServiceExecutionResponse
+	(*GetServiceExecutionResponse)(nil),          // 51: lindm.agent.v1.GetServiceExecutionResponse
+	(*AttestServiceExecutionResponse)(nil),       // 52: lindm.agent.v1.AttestServiceExecutionResponse
+	(*PrepareDeviceActionResponse)(nil),          // 53: lindm.agent.v1.PrepareDeviceActionResponse
+	(*StartDeviceActionResponse)(nil),            // 54: lindm.agent.v1.StartDeviceActionResponse
+	(*GetDeviceActionResponse)(nil),              // 55: lindm.agent.v1.GetDeviceActionResponse
+	(*AttestDeviceActionResponse)(nil),           // 56: lindm.agent.v1.AttestDeviceActionResponse
+	(*ConfirmDeviceActionEscrowResponse)(nil),    // 57: lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	(*PrepareDeviceActionRecoveryResponse)(nil),  // 58: lindm.agent.v1.PrepareDeviceActionRecoveryResponse
+	(*CommitDeviceActionRecoveryResponse)(nil),   // 59: lindm.agent.v1.CommitDeviceActionRecoveryResponse
+	(*SupplyDeviceActionCredentialResponse)(nil), // 60: lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	(*ExchangeAgentUpdateResponse)(nil),          // 61: lindm.agent.v1.ExchangeAgentUpdateResponse
+	(*GetAgentUpdateResponse)(nil),               // 62: lindm.agent.v1.GetAgentUpdateResponse
 }
 var file_lindm_agent_v1_executor_proto_depIdxs = []int32{
-	25, // 0: lindm.agent.v1.InstallEnrollmentResponse.not_after:type_name -> google.protobuf.Timestamp
-	25, // 1: lindm.agent.v1.InstallEnrollmentResponse.renew_after:type_name -> google.protobuf.Timestamp
-	0,  // 2: lindm.agent.v1.GetConnectionResponse.credential_kind:type_name -> lindm.agent.v1.TLSCredentialKind
-	25, // 3: lindm.agent.v1.GetConnectionResponse.certificate_not_after:type_name -> google.protobuf.Timestamp
-	25, // 4: lindm.agent.v1.GetConnectionResponse.renew_after:type_name -> google.protobuf.Timestamp
-	9,  // 5: lindm.agent.v1.GetConnectionResponse.retrieval:type_name -> lindm.agent.v1.RetrievalPublicData
-	10, // 6: lindm.agent.v1.GetConnectionResponse.prior:type_name -> lindm.agent.v1.PriorTLSCredential
-	25, // 7: lindm.agent.v1.PriorTLSCredential.retain_until:type_name -> google.protobuf.Timestamp
-	15, // 8: lindm.agent.v1.PrepareSessionResponse.accepted:type_name -> lindm.agent.v1.AcceptedSession
-	16, // 9: lindm.agent.v1.PrepareSessionResponse.pending:type_name -> lindm.agent.v1.PendingSessionClaim
-	25, // 10: lindm.agent.v1.CommitRenewalResponse.not_after:type_name -> google.protobuf.Timestamp
-	25, // 11: lindm.agent.v1.CommitRenewalResponse.renew_after:type_name -> google.protobuf.Timestamp
-	25, // 12: lindm.agent.v1.CommitRenewalResponse.prior_retain_until:type_name -> google.protobuf.Timestamp
-	1,  // 13: lindm.agent.v1.StatusResponse.lifecycle:type_name -> lindm.agent.v1.Lifecycle
-	2,  // 14: lindm.agent.v1.StatusResponse.hold_reason:type_name -> lindm.agent.v1.HoldReason
-	25, // 15: lindm.agent.v1.StatusResponse.certificate_not_after:type_name -> google.protobuf.Timestamp
-	25, // 16: lindm.agent.v1.StatusResponse.renew_after:type_name -> google.protobuf.Timestamp
-	25, // 17: lindm.agent.v1.StatusResponse.prior_retain_until:type_name -> google.protobuf.Timestamp
-	25, // 18: lindm.agent.v1.StatusResponse.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	3,  // 19: lindm.agent.v1.ExecutorService.PrepareBootstrap:input_type -> lindm.agent.v1.PrepareBootstrapRequest
-	5,  // 20: lindm.agent.v1.ExecutorService.InstallEnrollment:input_type -> lindm.agent.v1.InstallEnrollmentRequest
-	7,  // 21: lindm.agent.v1.ExecutorService.GetConnection:input_type -> lindm.agent.v1.GetConnectionRequest
-	11, // 22: lindm.agent.v1.ExecutorService.SignTLSClientMessage:input_type -> lindm.agent.v1.SignTLSClientMessageRequest
-	13, // 23: lindm.agent.v1.ExecutorService.PrepareSession:input_type -> lindm.agent.v1.PrepareSessionRequest
-	17, // 24: lindm.agent.v1.ExecutorService.CommitSession:input_type -> lindm.agent.v1.CommitSessionRequest
-	19, // 25: lindm.agent.v1.ExecutorService.PrepareRenewal:input_type -> lindm.agent.v1.PrepareRenewalRequest
-	21, // 26: lindm.agent.v1.ExecutorService.CommitRenewal:input_type -> lindm.agent.v1.CommitRenewalRequest
-	26, // 27: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:input_type -> lindm.agent.v1.UpdateExecutionTrustRequest
-	27, // 28: lindm.agent.v1.ExecutorService.GetExecutionTrust:input_type -> lindm.agent.v1.GetExecutionTrustRequest
-	28, // 29: lindm.agent.v1.ExecutorService.PrepareServiceExecution:input_type -> lindm.agent.v1.PrepareServiceExecutionRequest
-	29, // 30: lindm.agent.v1.ExecutorService.StartServiceExecution:input_type -> lindm.agent.v1.StartServiceExecutionRequest
-	30, // 31: lindm.agent.v1.ExecutorService.GetServiceExecution:input_type -> lindm.agent.v1.GetServiceExecutionRequest
-	31, // 32: lindm.agent.v1.ExecutorService.AttestServiceExecution:input_type -> lindm.agent.v1.AttestServiceExecutionRequest
-	23, // 33: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
-	4,  // 34: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
-	6,  // 35: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
-	8,  // 36: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
-	12, // 37: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
-	14, // 38: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
-	18, // 39: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
-	20, // 40: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
-	22, // 41: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
-	32, // 42: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
-	33, // 43: lindm.agent.v1.ExecutorService.GetExecutionTrust:output_type -> lindm.agent.v1.GetExecutionTrustResponse
-	34, // 44: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
-	35, // 45: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
-	36, // 46: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
-	37, // 47: lindm.agent.v1.ExecutorService.AttestServiceExecution:output_type -> lindm.agent.v1.AttestServiceExecutionResponse
-	24, // 48: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
-	34, // [34:49] is the sub-list for method output_type
-	19, // [19:34] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	27, // 0: lindm.agent.v1.PrepareBootstrapRequest.offline_authorization:type_name -> lindm.agent.v1.OfflineEnrollmentAuthorizationFile
+	28, // 1: lindm.agent.v1.PrepareBootstrapResponse.offline_request:type_name -> lindm.agent.v1.OfflineEnrollmentRequestFile
+	29, // 2: lindm.agent.v1.InstallEnrollmentResponse.not_after:type_name -> google.protobuf.Timestamp
+	29, // 3: lindm.agent.v1.InstallEnrollmentResponse.renew_after:type_name -> google.protobuf.Timestamp
+	6,  // 4: lindm.agent.v1.ImportOfflineEnrollmentResponse.enrollment:type_name -> lindm.agent.v1.InstallEnrollmentResponse
+	0,  // 5: lindm.agent.v1.GetConnectionResponse.credential_kind:type_name -> lindm.agent.v1.TLSCredentialKind
+	29, // 6: lindm.agent.v1.GetConnectionResponse.certificate_not_after:type_name -> google.protobuf.Timestamp
+	29, // 7: lindm.agent.v1.GetConnectionResponse.renew_after:type_name -> google.protobuf.Timestamp
+	10, // 8: lindm.agent.v1.GetConnectionResponse.retrieval:type_name -> lindm.agent.v1.RetrievalPublicData
+	11, // 9: lindm.agent.v1.GetConnectionResponse.prior:type_name -> lindm.agent.v1.PriorTLSCredential
+	29, // 10: lindm.agent.v1.PriorTLSCredential.retain_until:type_name -> google.protobuf.Timestamp
+	16, // 11: lindm.agent.v1.PrepareSessionResponse.accepted:type_name -> lindm.agent.v1.AcceptedSession
+	17, // 12: lindm.agent.v1.PrepareSessionResponse.pending:type_name -> lindm.agent.v1.PendingSessionClaim
+	29, // 13: lindm.agent.v1.CommitRenewalResponse.not_after:type_name -> google.protobuf.Timestamp
+	29, // 14: lindm.agent.v1.CommitRenewalResponse.renew_after:type_name -> google.protobuf.Timestamp
+	29, // 15: lindm.agent.v1.CommitRenewalResponse.prior_retain_until:type_name -> google.protobuf.Timestamp
+	1,  // 16: lindm.agent.v1.StatusResponse.lifecycle:type_name -> lindm.agent.v1.Lifecycle
+	2,  // 17: lindm.agent.v1.StatusResponse.hold_reason:type_name -> lindm.agent.v1.HoldReason
+	29, // 18: lindm.agent.v1.StatusResponse.certificate_not_after:type_name -> google.protobuf.Timestamp
+	29, // 19: lindm.agent.v1.StatusResponse.renew_after:type_name -> google.protobuf.Timestamp
+	29, // 20: lindm.agent.v1.StatusResponse.prior_retain_until:type_name -> google.protobuf.Timestamp
+	29, // 21: lindm.agent.v1.StatusResponse.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	3,  // 22: lindm.agent.v1.ExecutorService.PrepareBootstrap:input_type -> lindm.agent.v1.PrepareBootstrapRequest
+	5,  // 23: lindm.agent.v1.ExecutorService.InstallEnrollment:input_type -> lindm.agent.v1.InstallEnrollmentRequest
+	30, // 24: lindm.agent.v1.ExecutorService.ImportOfflineEnrollment:input_type -> lindm.agent.v1.ImportOfflineEnrollmentRequest
+	8,  // 25: lindm.agent.v1.ExecutorService.GetConnection:input_type -> lindm.agent.v1.GetConnectionRequest
+	12, // 26: lindm.agent.v1.ExecutorService.SignTLSClientMessage:input_type -> lindm.agent.v1.SignTLSClientMessageRequest
+	14, // 27: lindm.agent.v1.ExecutorService.PrepareSession:input_type -> lindm.agent.v1.PrepareSessionRequest
+	18, // 28: lindm.agent.v1.ExecutorService.CommitSession:input_type -> lindm.agent.v1.CommitSessionRequest
+	20, // 29: lindm.agent.v1.ExecutorService.PrepareRenewal:input_type -> lindm.agent.v1.PrepareRenewalRequest
+	22, // 30: lindm.agent.v1.ExecutorService.CommitRenewal:input_type -> lindm.agent.v1.CommitRenewalRequest
+	31, // 31: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:input_type -> lindm.agent.v1.UpdateExecutionTrustRequest
+	32, // 32: lindm.agent.v1.ExecutorService.GetExecutionTrust:input_type -> lindm.agent.v1.GetExecutionTrustRequest
+	33, // 33: lindm.agent.v1.ExecutorService.PrepareServiceExecution:input_type -> lindm.agent.v1.PrepareServiceExecutionRequest
+	34, // 34: lindm.agent.v1.ExecutorService.StartServiceExecution:input_type -> lindm.agent.v1.StartServiceExecutionRequest
+	35, // 35: lindm.agent.v1.ExecutorService.GetServiceExecution:input_type -> lindm.agent.v1.GetServiceExecutionRequest
+	36, // 36: lindm.agent.v1.ExecutorService.AttestServiceExecution:input_type -> lindm.agent.v1.AttestServiceExecutionRequest
+	37, // 37: lindm.agent.v1.ExecutorService.PrepareDeviceAction:input_type -> lindm.agent.v1.PrepareDeviceActionRequest
+	38, // 38: lindm.agent.v1.ExecutorService.StartDeviceAction:input_type -> lindm.agent.v1.StartDeviceActionRequest
+	39, // 39: lindm.agent.v1.ExecutorService.GetDeviceAction:input_type -> lindm.agent.v1.GetDeviceActionRequest
+	40, // 40: lindm.agent.v1.ExecutorService.AttestDeviceAction:input_type -> lindm.agent.v1.AttestDeviceActionRequest
+	41, // 41: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:input_type -> lindm.agent.v1.ConfirmDeviceActionEscrowRequest
+	42, // 42: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:input_type -> lindm.agent.v1.PrepareDeviceActionRecoveryRequest
+	43, // 43: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:input_type -> lindm.agent.v1.CommitDeviceActionRecoveryRequest
+	44, // 44: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:input_type -> lindm.agent.v1.SupplyDeviceActionCredentialRequest
+	45, // 45: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:input_type -> lindm.agent.v1.ExchangeAgentUpdateRequest
+	46, // 46: lindm.agent.v1.ExecutorService.GetAgentUpdate:input_type -> lindm.agent.v1.GetAgentUpdateRequest
+	24, // 47: lindm.agent.v1.ExecutorService.Status:input_type -> lindm.agent.v1.StatusRequest
+	4,  // 48: lindm.agent.v1.ExecutorService.PrepareBootstrap:output_type -> lindm.agent.v1.PrepareBootstrapResponse
+	6,  // 49: lindm.agent.v1.ExecutorService.InstallEnrollment:output_type -> lindm.agent.v1.InstallEnrollmentResponse
+	7,  // 50: lindm.agent.v1.ExecutorService.ImportOfflineEnrollment:output_type -> lindm.agent.v1.ImportOfflineEnrollmentResponse
+	9,  // 51: lindm.agent.v1.ExecutorService.GetConnection:output_type -> lindm.agent.v1.GetConnectionResponse
+	13, // 52: lindm.agent.v1.ExecutorService.SignTLSClientMessage:output_type -> lindm.agent.v1.SignTLSClientMessageResponse
+	15, // 53: lindm.agent.v1.ExecutorService.PrepareSession:output_type -> lindm.agent.v1.PrepareSessionResponse
+	19, // 54: lindm.agent.v1.ExecutorService.CommitSession:output_type -> lindm.agent.v1.CommitSessionResponse
+	21, // 55: lindm.agent.v1.ExecutorService.PrepareRenewal:output_type -> lindm.agent.v1.PrepareRenewalResponse
+	23, // 56: lindm.agent.v1.ExecutorService.CommitRenewal:output_type -> lindm.agent.v1.CommitRenewalResponse
+	47, // 57: lindm.agent.v1.ExecutorService.UpdateExecutionTrust:output_type -> lindm.agent.v1.UpdateExecutionTrustResponse
+	48, // 58: lindm.agent.v1.ExecutorService.GetExecutionTrust:output_type -> lindm.agent.v1.GetExecutionTrustResponse
+	49, // 59: lindm.agent.v1.ExecutorService.PrepareServiceExecution:output_type -> lindm.agent.v1.PrepareServiceExecutionResponse
+	50, // 60: lindm.agent.v1.ExecutorService.StartServiceExecution:output_type -> lindm.agent.v1.StartServiceExecutionResponse
+	51, // 61: lindm.agent.v1.ExecutorService.GetServiceExecution:output_type -> lindm.agent.v1.GetServiceExecutionResponse
+	52, // 62: lindm.agent.v1.ExecutorService.AttestServiceExecution:output_type -> lindm.agent.v1.AttestServiceExecutionResponse
+	53, // 63: lindm.agent.v1.ExecutorService.PrepareDeviceAction:output_type -> lindm.agent.v1.PrepareDeviceActionResponse
+	54, // 64: lindm.agent.v1.ExecutorService.StartDeviceAction:output_type -> lindm.agent.v1.StartDeviceActionResponse
+	55, // 65: lindm.agent.v1.ExecutorService.GetDeviceAction:output_type -> lindm.agent.v1.GetDeviceActionResponse
+	56, // 66: lindm.agent.v1.ExecutorService.AttestDeviceAction:output_type -> lindm.agent.v1.AttestDeviceActionResponse
+	57, // 67: lindm.agent.v1.ExecutorService.ConfirmDeviceActionEscrow:output_type -> lindm.agent.v1.ConfirmDeviceActionEscrowResponse
+	58, // 68: lindm.agent.v1.ExecutorService.PrepareDeviceActionRecovery:output_type -> lindm.agent.v1.PrepareDeviceActionRecoveryResponse
+	59, // 69: lindm.agent.v1.ExecutorService.CommitDeviceActionRecovery:output_type -> lindm.agent.v1.CommitDeviceActionRecoveryResponse
+	60, // 70: lindm.agent.v1.ExecutorService.SupplyDeviceActionCredential:output_type -> lindm.agent.v1.SupplyDeviceActionCredentialResponse
+	61, // 71: lindm.agent.v1.ExecutorService.ExchangeAgentUpdate:output_type -> lindm.agent.v1.ExchangeAgentUpdateResponse
+	62, // 72: lindm.agent.v1.ExecutorService.GetAgentUpdate:output_type -> lindm.agent.v1.GetAgentUpdateResponse
+	25, // 73: lindm.agent.v1.ExecutorService.Status:output_type -> lindm.agent.v1.StatusResponse
+	48, // [48:74] is the sub-list for method output_type
+	22, // [22:48] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_executor_proto_init() }
@@ -2137,9 +2349,13 @@ func file_lindm_agent_v1_executor_proto_init() {
 	if File_lindm_agent_v1_executor_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_device_action_recovery_proto_init()
+	file_lindm_agent_v1_device_actions_proto_init()
 	file_lindm_agent_v1_execution_trust_proto_init()
+	file_lindm_agent_v1_offline_enrollment_proto_init()
 	file_lindm_agent_v1_service_execution_proto_init()
-	file_lindm_agent_v1_executor_proto_msgTypes[11].OneofWrappers = []any{
+	file_lindm_agent_v1_update_proto_init()
+	file_lindm_agent_v1_executor_proto_msgTypes[12].OneofWrappers = []any{
 		(*PrepareSessionResponse_Accepted)(nil),
 		(*PrepareSessionResponse_Pending)(nil),
 	}
@@ -2149,7 +2365,7 @@ func file_lindm_agent_v1_executor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_executor_proto_rawDesc), len(file_lindm_agent_v1_executor_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

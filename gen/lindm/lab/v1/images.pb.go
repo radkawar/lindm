@@ -27,10 +27,17 @@ type ChecksumMode int32
 
 const (
 	ChecksumMode_CHECKSUM_MODE_UNSPECIFIED ChecksumMode = 0
-	// Ubuntu SHA256SUMS plus separate OpenPGP SHA256SUMS.gpg.
+	// Ubuntu/Arch SHA256SUMS or Rocky BSD-format SHA256 plus detached OpenPGP.
 	ChecksumMode_CHECKSUM_MODE_DETACHED ChecksumMode = 1
 	// Fedora OpenPGP clearsigned CHECKSUM, parsed only from gpgv's verified output.
 	ChecksumMode_CHECKSUM_MODE_CLEARSIGNED ChecksumMode = 2
+	// RHEL published checksum acquired through authenticated vendor HTTPS.
+	// Offline checks bind exact bytes to the pinned manifest and acquisition
+	// receipt; they do not reauthenticate the API or claim an OpenPGP signature.
+	ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED ChecksumMode = 3
+	// Debian SHA512SUMS plus detached OpenPGP signature. Authenticate SHA-512
+	// against signed metadata while retaining the required SHA-256 pin/cache key.
+	ChecksumMode_CHECKSUM_MODE_DETACHED_SHA512 ChecksumMode = 4
 )
 
 // Enum value maps for ChecksumMode.
@@ -39,11 +46,15 @@ var (
 		0: "CHECKSUM_MODE_UNSPECIFIED",
 		1: "CHECKSUM_MODE_DETACHED",
 		2: "CHECKSUM_MODE_CLEARSIGNED",
+		3: "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+		4: "CHECKSUM_MODE_DETACHED_SHA512",
 	}
 	ChecksumMode_value = map[string]int32{
-		"CHECKSUM_MODE_UNSPECIFIED": 0,
-		"CHECKSUM_MODE_DETACHED":    1,
-		"CHECKSUM_MODE_CLEARSIGNED": 2,
+		"CHECKSUM_MODE_UNSPECIFIED":          0,
+		"CHECKSUM_MODE_DETACHED":             1,
+		"CHECKSUM_MODE_CLEARSIGNED":          2,
+		"CHECKSUM_MODE_VENDOR_AUTHENTICATED": 3,
+		"CHECKSUM_MODE_DETACHED_SHA512":      4,
 	}
 )
 
@@ -98,12 +109,15 @@ type ImageManifest struct {
 	SignerFingerprint string       `protobuf:"bytes,13,opt,name=signer_fingerprint,json=signerFingerprint,proto3" json:"signer_fingerprint,omitempty"`
 	ImageSizeBytes    uint64       `protobuf:"varint,14,opt,name=image_size_bytes,json=imageSizeBytes,proto3" json:"image_size_bytes,omitempty"`
 	ChecksumMode      ChecksumMode `protobuf:"varint,15,opt,name=checksum_mode,json=checksumMode,proto3,enum=lindm.lab.v1.ChecksumMode" json:"checksum_mode,omitempty"`
-	// Independent vendor publication of the trusted full fingerprint, not merely
-	// the key download or an unauthenticated key-ID lookup.
+	// Independent vendor publication of the trusted full fingerprint or public
+	// key, not merely the keyserver download or an unauthenticated key-ID lookup.
 	SignerProvenanceUrl  string `protobuf:"bytes,16,opt,name=signer_provenance_url,json=signerProvenanceUrl,proto3" json:"signer_provenance_url,omitempty"`
 	ReleaseProvenanceUrl string `protobuf:"bytes,17,opt,name=release_provenance_url,json=releaseProvenanceUrl,proto3" json:"release_provenance_url,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Guest package repositories use this immutable YYYY-MM-DD snapshot.
+	// Required for Arch Linux Archive; the image build date is a separate pin.
+	RepositorySnapshotDate *string `protobuf:"bytes,18,opt,name=repository_snapshot_date,json=repositorySnapshotDate,proto3,oneof" json:"repository_snapshot_date,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ImageManifest) Reset() {
@@ -255,11 +269,18 @@ func (x *ImageManifest) GetReleaseProvenanceUrl() string {
 	return ""
 }
 
+func (x *ImageManifest) GetRepositorySnapshotDate() string {
+	if x != nil && x.RepositorySnapshotDate != nil {
+		return *x.RepositorySnapshotDate
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_images_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xce\t\n" +
+	"\x19lindm/lab/v1/images.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc9\x10\n" +
 	"\rImageManifest\x120\n" +
 	"\x02id\x18\x01 \x01(\tB \xbaH\x1dr\x1b\x10\x01\x18d2\x15^[a-z0-9][a-z0-9.-]*$R\x02id\x12-\n" +
 	"\fdistribution\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\fdistribution\x12#\n" +
@@ -271,22 +292,27 @@ const file_lindm_lab_v1_images_proto_rawDesc = "" +
 	"\timage_url\x18\b \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\bimageUrl\x12/\n" +
 	"\fchecksum_url\x18\t \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\vchecksumUrl\x126\n" +
 	"\rsignature_url\x18\n" +
-	" \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01H\x00R\fsignatureUrl\x88\x01\x01\x12A\n" +
-	"\akey_url\x18\v \x01(\tB(\xbaH%r#\x18\x80\x102\x1b^https://[^/@?#]+(/[^#]*)?$\x88\x01\x01R\x06keyUrl\x12-\n" +
-	"\x06sha256\x18\f \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x06sha256\x12S\n" +
-	"\x12signer_fingerprint\x18\r \x01(\tB$\xbaH!r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x11signerFingerprint\x127\n" +
+	" \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01H\x00R\fsignatureUrl\x88\x01\x01\x12D\n" +
+	"\akey_url\x18\v \x01(\tB+\xbaH(\xd8\x01\x01r#\x18\x80\x102\x1b^https://[^/@?#]+(/[^#]*)?$\x88\x01\x01R\x06keyUrl\x12-\n" +
+	"\x06sha256\x18\f \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x06sha256\x12V\n" +
+	"\x12signer_fingerprint\x18\r \x01(\tB'\xbaH$\xd8\x01\x01r\x1f2\x1d^([0-9A-F]{40}|[0-9A-F]{64})$R\x11signerFingerprint\x127\n" +
 	"\x10image_size_bytes\x18\x0e \x01(\x04B\r\xbaH\n" +
 	"2\b\x18\x80\x80\x80\x80@ \x00R\x0eimageSizeBytes\x12K\n" +
 	"\rchecksum_mode\x18\x0f \x01(\x0e2\x1a.lindm.lab.v1.ChecksumModeB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\fchecksumMode\x12@\n" +
-	"\x15signer_provenance_url\x18\x10 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x13signerProvenanceUrl\x12B\n" +
-	"\x16release_provenance_url\x18\x11 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x14releaseProvenanceUrl:\xe4\x01\xbaH\xe0\x01\x1a\xdd\x01\n" +
-	"\x14image.signature_mode\x12Vdetached checksums require a signature URL; clearsigned checksums must not specify one\x1am(this.checksum_mode == 1 && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))B\x10\n" +
-	"\x0e_signature_url*h\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\fchecksumMode\x12C\n" +
+	"\x15signer_provenance_url\x18\x10 \x01(\tB\x0f\xbaH\f\xd8\x01\x01r\a\x88\xb5\x18\x01\x88\x01\x01R\x13signerProvenanceUrl\x12B\n" +
+	"\x16release_provenance_url\x18\x11 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x14releaseProvenanceUrl\x12y\n" +
+	"\x18repository_snapshot_date\x18\x12 \x01(\tB:\xbaH7r523^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$H\x01R\x16repositorySnapshotDate\x88\x01\x01:\xbe\a\xbaH\xba\a\x1a\x94\x06\n" +
+	"\x14image.signature_mode\x12|signed checksums require pinned keys; authenticated vendor checksums are an explicit RHEL-only mode without signature claims\x1a\xfd\x04this.checksum_mode == 3 ? (this.distribution == 'rhel' && !has(this.signature_url) && this.key_url == '' && this.signer_fingerprint == '' && this.signer_provenance_url == '' && this.image_url == 'https://api.access.redhat.com/management/v1/images/' + this.sha256 + '/download' && this.checksum_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture) : (this.key_url != '' && this.signer_fingerprint != '' && this.signer_provenance_url != '' && (((this.checksum_mode == 1 || this.checksum_mode == 4) && has(this.signature_url)) || (this.checksum_mode == 2 && !has(this.signature_url))))\x1a\xa0\x01\n" +
+	"\x1eimage.arch_repository_snapshot\x12;Arch Linux images require a pinned repository snapshot date\x1aAthis.distribution != 'arch' || has(this.repository_snapshot_date)B\x10\n" +
+	"\x0e_signature_urlB\x1b\n" +
+	"\x19_repository_snapshot_date*\xb3\x01\n" +
 	"\fChecksumMode\x12\x1d\n" +
 	"\x19CHECKSUM_MODE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16CHECKSUM_MODE_DETACHED\x10\x01\x12\x1d\n" +
-	"\x19CHECKSUM_MODE_CLEARSIGNED\x10\x02B\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
+	"\x19CHECKSUM_MODE_CLEARSIGNED\x10\x02\x12&\n" +
+	"\"CHECKSUM_MODE_VENDOR_AUTHENTICATED\x10\x03\x12!\n" +
+	"\x1dCHECKSUM_MODE_DETACHED_SHA512\x10\x04B\x1eZ\x1clindm/gen/lindm/lab/v1;labv1b\x06proto3"
 
 var (
 	file_lindm_lab_v1_images_proto_rawDescOnce sync.Once

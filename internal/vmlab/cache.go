@@ -24,6 +24,13 @@ func (f Fetcher) Fetch(ctx context.Context, m *labv1.ImageManifest, cacheDir str
 	if err := validateManifest(m); err != nil {
 		return nil, err
 	}
+	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED {
+		verified, err := VerifyCache(ctx, m, cacheDir)
+		if err != nil {
+			return nil, fmt.Errorf("authenticated vendor cache unavailable; acquire with lab images redhat fetch: %w", err)
+		}
+		return verified, nil
+	}
 	root, err := openCache(ctx, cacheDir, true)
 	if err != nil {
 		return nil, err
@@ -61,7 +68,7 @@ func (f Fetcher) Fetch(ctx context.Context, m *labv1.ImageManifest, cacheDir str
 		}
 	}
 	var signature []byte
-	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
+	if detachedChecksum(m.ChecksumMode) {
 		if err := download(ctx, client, root, partial+"/signature", m.GetSignatureUrl(), maxMetadataBytes, 2*time.Minute); err != nil {
 			return nil, err
 		}
@@ -78,52 +85,30 @@ func (f Fetcher) Fetch(ctx context.Context, m *labv1.ImageManifest, cacheDir str
 	if err != nil {
 		return nil, err
 	}
-	signing, primary, err := verifyMetadata(ctx, m, checksum, signature, key)
+	metadata, err := verifyMetadata(ctx, m, checksum, signature, key)
 	if err != nil {
 		return nil, err
 	}
 	if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), 30*time.Minute); err != nil {
 		return nil, err
 	}
-	result, err := verifyImage(ctx, m, filepath.Join(root.Name(), partial, "image"), signing, primary)
+	result, err := verifyImage(ctx, m, filepath.Join(root.Name(), partial, "image"), metadata)
 	if err != nil {
 		return nil, err
 	}
 	files := []string{"image", "checksums", "key"}
-	if m.ChecksumMode == labv1.ChecksumMode_CHECKSUM_MODE_DETACHED {
+	if detachedChecksum(m.ChecksumMode) {
 		files = append(files, "signature")
 	}
-	for _, name := range files {
-		file, err := root.OpenFile(partial+"/"+name, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
-		if err != nil {
-			return nil, err
-		}
-		chmodErr := file.Chmod(0444)
-		syncErr := file.Sync()
-		if err := errors.Join(chmodErr, syncErr, file.Close()); err != nil {
-			return nil, err
-		}
-	}
-	if err := syncDirectory(root, partial); err != nil {
-		return nil, err
-	}
-	// Cache ownership, permissions and flock protect the absence check through
-	// rename. Never replace an existing entry, including a symlink or directory.
-	if _, err := root.Lstat(entry); !errors.Is(err, fs.ErrNotExist) {
-		return nil, errors.New("cache destination appeared during acquisition; refusing to replace it")
-	}
-	if err := root.Rename(partial, entry); err != nil {
-		return nil, err
-	}
-	if err := syncDirectory(root, "."); err != nil {
+	if err := publishImageCache(root, partial, entry, files); err != nil {
 		return nil, err
 	}
 	result.Path = filepath.Join(root.Name(), entry, "image")
 	return result, nil
 }
 
-// VerifyCache is offline: it rechecks the cached signature, signer, checksum,
-// exact size and every image byte without relying on the entry's digest name.
+// VerifyCache is offline: it rechecks signatures for signed manifests, or the
+// local vendor receipt for authenticated acquisitions, then exact size and bytes.
 func VerifyCache(ctx context.Context, m *labv1.ImageManifest, cacheDir string) (_ *VerifiedImage, err error) {
 	if err := validateManifest(m); err != nil {
 		return nil, err

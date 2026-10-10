@@ -212,7 +212,12 @@ func TestRejectedUpdatesDoNotChangeRootHistoryOrAudit(t *testing.T) {
 	// Move all recorded acceptance evidence together to model a wall clock
 	// rollback independently of partial-state corruption. The future time stays
 	// inside the signed validity window, so only the admission clock floor fails.
-	if _, err := f.pool.Exec(f.ctx, `WITH updated AS (
+	// Audit rows are append-only for the application; only a privileged table
+	// owner can rewrite them, so the fixture lifts that guard inside the same
+	// transaction to model such an operator-level rollback.
+	if _, err := f.pool.Exec(f.ctx, `BEGIN;
+	ALTER TABLE audit_events DISABLE TRIGGER report_audit_source_immutable;
+	WITH updated AS (
 		UPDATE execution_authority SET accepted_at=accepted_at+interval '1 hour'
 		RETURNING revision, accepted_at
 	), admissions AS (
@@ -220,7 +225,9 @@ func TestRejectedUpdatesDoNotChangeRootHistoryOrAudit(t *testing.T) {
 		FROM updated e WHERE u.revision=e.revision RETURNING u.audit_id, u.accepted_at
 	)
 	UPDATE audit_events a SET occurred_at=u.accepted_at
-	FROM admissions u WHERE a.id=u.audit_id`); err != nil {
+	FROM admissions u WHERE a.id=u.audit_id;
+	ALTER TABLE audit_events ENABLE TRIGGER report_audit_source_immutable;
+	COMMIT;`); err != nil {
 		t.Fatal(err)
 	}
 	before = f.state(t)

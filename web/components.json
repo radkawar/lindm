@@ -11,7 +11,10 @@
     "prefix": ""
   },
   "iconLibrary": "lucide",
+  "menuColor": "default",
+  "menuAccent": "subtle",
   "aliases": {
+    "utils": "cn",
     "components": "@/components",
     "ui": "@/components/ui",
     "lib": "@/lib",

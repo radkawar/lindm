@@ -19,22 +19,37 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	"lindm/internal/protodata"
 )
 
 const (
-	BootstrapType          = "application/vnd.lindm.bootstrap.v1+protobuf"
-	RenewalType            = "application/vnd.lindm.renewal-intent.v1+protobuf"
-	RetrievalType          = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
-	SessionType            = "application/vnd.lindm.session-acquisition.v1+protobuf"
-	ExecutionRootType      = "application/vnd.lindm.execution-root.v1+protobuf"
-	DelegationType         = "application/vnd.lindm.execution-delegation.v1+protobuf"
-	ServiceIntentType      = "application/vnd.lindm.service-intent.v1+protobuf"
-	ServiceChallengeType   = "application/vnd.lindm.service-challenge.v1+protobuf"
-	ServiceStartType       = "application/vnd.lindm.service-start.v1+protobuf"
-	ServiceAttestationType = "application/vnd.lindm.service-attestation.v1+protobuf"
-	maxEnvelopeBytes       = 512 << 10
-	maxSignatures          = 16
+	BootstrapType                      = "application/vnd.lindm.bootstrap.v1+protobuf"
+	RenewalType                        = "application/vnd.lindm.renewal-intent.v1+protobuf"
+	RetrievalType                      = "application/vnd.lindm.issuance-retrieval.v1+protobuf"
+	SessionType                        = "application/vnd.lindm.session-acquisition.v1+protobuf"
+	ExecutionRootType                  = "application/vnd.lindm.execution-root.v1+protobuf"
+	DelegationType                     = "application/vnd.lindm.execution-delegation.v1+protobuf"
+	ServiceIntentType                  = "application/vnd.lindm.service-intent.v1+protobuf"
+	ServiceChallengeType               = "application/vnd.lindm.service-challenge.v1+protobuf"
+	ServiceStartType                   = "application/vnd.lindm.service-start.v1+protobuf"
+	ServiceAttestationType             = "application/vnd.lindm.service-attestation.v1+protobuf"
+	DeviceActionIntentType             = "application/vnd.lindm.device-action-intent.v1+protobuf"
+	DeviceActionChallengeType          = "application/vnd.lindm.device-action-challenge.v1+protobuf"
+	DeviceActionStartType              = "application/vnd.lindm.device-action-start.v1+protobuf"
+	DeviceActionAttestationType        = "application/vnd.lindm.device-action-attestation.v1+protobuf"
+	DeviceActionEscrowReceiptType      = "application/vnd.lindm.device-action-escrow-receipt.v1+protobuf"
+	DeviceActionRecoveryHandoffType    = "application/vnd.lindm.device-action-recovery-handoff.v1+protobuf"
+	DeviceActionRecoveryCredentialType = "application/vnd.lindm.device-action-recovery-credential.v1+protobuf"
+	DeviceActionRecoveryBootType       = "application/vnd.lindm.device-action-recovery-boot.v1+protobuf"
+	RecoveryRequestProofType           = "application/vnd.lindm.recovery-request-proof.v1+protobuf"
+	RecoveryCheckpointReceiptType      = "application/vnd.lindm.recovery-checkpoint-receipt.v1+protobuf"
+	ProvisioningRetrievalType          = "application/vnd.lindm.provisioning-retrieval.v1+protobuf"
+	OfflineAuthorizationType           = "application/vnd.lindm.offline-enrollment-authorization.v1+protobuf"
+	OfflineRequestType                 = "application/vnd.lindm.offline-enrollment-request.v1+protobuf"
+	OfflineResponseType                = "application/vnd.lindm.offline-enrollment-response.v1+protobuf"
+	maxEnvelopeBytes                   = 512 << 10
+	maxSignatures                      = 16
 )
 
 // Authority compiles the finite set of signed payload schemas before use.
@@ -48,6 +63,12 @@ func New() (*Authority, error) {
 		&agentv1.ExecutionRootTransition{}, &agentv1.ExecutionDelegation{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{}, &agentv1.ServiceExecutionStartGrant{},
 		&agentv1.ServiceExecutionAttestation{},
+		&agentv1.DeviceActionIntent{}, &agentv1.DeviceActionChallenge{}, &agentv1.DeviceActionStartGrant{},
+		&agentv1.DeviceActionAttestation{}, &agentv1.DeviceActionEscrowReceipt{},
+		&agentv1.DeviceActionRecoveryHandoff{}, &agentv1.DeviceActionRecoveryCredential{}, &agentv1.DeviceActionRecoveryBootGrant{},
+		&agentv1.RecoveryRequestProof{}, &agentv1.RecoveryCheckpointReceipt{}, &agentv1.RecoveryCheckpoint{},
+		&enrollmentv1.ProvisioningRetrieval{},
+		&agentv1.OfflineEnrollmentAuthorization{}, &agentv1.OfflineEnrollmentRequestProof{}, &agentv1.OfflineEnrollmentResponse{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, fmt.Errorf("compile agent authority schema: %w", err)
@@ -93,6 +114,34 @@ func payloadType(message proto.Message) (string, error) {
 		return ServiceStartType, nil
 	case *agentv1.ServiceExecutionAttestation:
 		return ServiceAttestationType, nil
+	case *agentv1.DeviceActionIntent:
+		return DeviceActionIntentType, nil
+	case *agentv1.DeviceActionChallenge:
+		return DeviceActionChallengeType, nil
+	case *agentv1.DeviceActionStartGrant:
+		return DeviceActionStartType, nil
+	case *agentv1.DeviceActionAttestation:
+		return DeviceActionAttestationType, nil
+	case *agentv1.DeviceActionEscrowReceipt:
+		return DeviceActionEscrowReceiptType, nil
+	case *agentv1.DeviceActionRecoveryHandoff:
+		return DeviceActionRecoveryHandoffType, nil
+	case *agentv1.DeviceActionRecoveryCredential:
+		return DeviceActionRecoveryCredentialType, nil
+	case *agentv1.DeviceActionRecoveryBootGrant:
+		return DeviceActionRecoveryBootType, nil
+	case *agentv1.RecoveryRequestProof:
+		return RecoveryRequestProofType, nil
+	case *agentv1.RecoveryCheckpointReceipt:
+		return RecoveryCheckpointReceiptType, nil
+	case *enrollmentv1.ProvisioningRetrieval:
+		return ProvisioningRetrievalType, nil
+	case *agentv1.OfflineEnrollmentAuthorization:
+		return OfflineAuthorizationType, nil
+	case *agentv1.OfflineEnrollmentRequestProof:
+		return OfflineRequestType, nil
+	case *agentv1.OfflineEnrollmentResponse:
+		return OfflineResponseType, nil
 	default:
 		return "", errors.New("unsupported signed authority payload")
 	}

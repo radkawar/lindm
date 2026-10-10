@@ -1,14 +1,21 @@
+import { toJsonString } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import type { ServiceProfileResource } from "../../../gen/lindm/policy/v1/service_profile_pb";
+import {
+  ProfileResourceSchema,
+  type ProfileResource,
+} from "../../../gen/lindm/policy/v1/profile_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import { usePublishAttempt } from "./attempt";
@@ -17,10 +24,8 @@ import {
   CATALOG_SEMANTICS,
   draftFromPayload,
   draftFromSpec,
-  enablementLabel,
   formatRevisionNumber,
   formatSha256,
-  runtimeLabel,
   usableUuid,
   type DraftSpec,
 } from "./model";
@@ -43,6 +48,7 @@ export function ProfileDetailView({
   onSearch: (next: ProfileDetailSearch) => void;
 }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const displayed = useQuery(profileRevisionQueryOptions(lifetime, profileId, revision));
   const headQuery = useQuery({
     ...profileRevisionQueryOptions(lifetime, profileId, ""),
@@ -95,18 +101,18 @@ export function ProfileDetailView({
   }
 
   return (
-    <section className="flex min-w-0 flex-col gap-4" aria-busy={displayed.isFetching}>
+    <section className="flex min-w-0 flex-col gap-6" aria-busy={displayed.isFetching}>
       <Link
         to="/profiles"
         search={{ pageSize: 50, pageToken: "" }}
         className="w-fit text-sm underline underline-offset-4"
       >
-        Back to service profiles
+        Back to profiles
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold">
-            {record?.spec?.name.trim() || "Service profile"}
+        <div className="min-w-0 space-y-2">
+          <h1 className="break-words text-2xl font-semibold tracking-tight">
+            {record?.spec?.name.trim() || "Resource profile"}
           </h1>
           <p className="break-all font-mono text-xs text-muted-foreground">{profileId}</p>
         </div>
@@ -171,7 +177,9 @@ export function ProfileDetailView({
             </Button>
           </form>
           {lookupError !== "" ? (
-            <p className="mt-2 text-sm text-destructive">{lookupError}</p>
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {lookupError}
+            </p>
           ) : null}
         </CardContent>
       </Card>
@@ -185,7 +193,12 @@ export function ProfileDetailView({
           </AlertDescription>
         </Alert>
       ) : null}
-      {displayed.isPending ? <p role="status">Loading profile revision…</p> : null}
+      {displayed.isPending ? (
+        <div role="status" className="grid gap-3">
+          <span className="text-sm text-muted-foreground">Loading profile revision…</span>
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : null}
       {record?.spec ? (
         <>
           <Card>
@@ -232,17 +245,13 @@ export function ProfileDetailView({
             <CardHeader>
               <CardTitle>Resources</CardTitle>
               <CardDescription>
-                Desired runtime and enablement are catalog values. They are not a native
-                observation.
+                Typed desired state, dependencies and ownership are catalog values, not native
+                observations or proof of capability support.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
               {record.spec.resources.map((resource) => (
-                <ResourceFacts
-                  key={resource.resourceId}
-                  resource={resource}
-                  all={record.spec?.resources ?? []}
-                />
+                <ResourceFacts key={resource.resourceId} resource={resource} />
               ))}
             </CardContent>
           </Card>
@@ -259,9 +268,11 @@ export function ProfileDetailView({
         </Alert>
       ) : null}
       {revision !== "" && headQuery.isPending ? (
-        <p role="status">Loading catalog head for compare-and-swap…</p>
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading catalog head for compare-and-swap…
+        </p>
       ) : null}
-      {editorSource ? (
+      {editorSource && canPermission(principal, "profiles.manage") ? (
         <div className="grid gap-3">
           <div className="flex flex-wrap gap-2">
             <Button
@@ -307,35 +318,32 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function ResourceFacts({
-  resource,
-  all,
-}: {
-  resource: ServiceProfileResource;
-  all: ServiceProfileResource[];
-}) {
-  const desired = resource.desired;
+function ResourceFacts({ resource }: { resource: ProfileResource }) {
   return (
-    <article className="grid min-w-0 gap-2 rounded-lg border p-3">
-      <h2 className="break-all text-sm font-medium">{desired?.unit || "Unit not recorded"}</h2>
+    <article className="grid min-w-0 gap-3 border bg-muted/20 p-4">
+      <h2 className="break-all text-sm font-medium">
+        {resource.desired?.ref?.canonicalKey || "Resource reference not recorded"}
+      </h2>
       <dl className="grid gap-3 sm:grid-cols-2">
         <Fact label="Resource ID">{resource.resourceId}</Fact>
-        <Fact label="Runtime">{desired ? runtimeLabel(desired.runtime) : "Not recorded"}</Fact>
-        <Fact label="Enablement">
-          {desired ? enablementLabel(desired.enablement) : "Not recorded"}
-        </Fact>
+        <Fact label="Kind">{resource.desired?.state.case ?? "Not recorded"}</Fact>
         <Fact label="Dependencies">
           {resource.dependsOn.length === 0
             ? "None"
             : resource.dependsOn
-                .map((id) => {
-                  const match = all.find((item) => item.resourceId === id);
-                  const unit = match?.desired?.unit.trim();
-                  return unit ? `${unit} (${id})` : id;
-                })
+                .map(
+                  (dependency) =>
+                    `${dependency.ref?.kind ?? "Unknown"} / ${dependency.ref?.canonicalKey ?? "Unknown"} (condition ${dependency.condition})`,
+                )
                 .join(", ")}
         </Fact>
       </dl>
+      <details>
+        <summary className="cursor-pointer text-sm">Complete typed resource specification</summary>
+        <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all text-xs">
+          {toJsonString(ProfileResourceSchema, resource, { prettySpaces: 2 })}
+        </pre>
+      </details>
     </article>
   );
 }

@@ -18,7 +18,7 @@ import (
 func (s *Service) GetExecutionAuthority(ctx context.Context, _ *connect.Request[adminv1.GetExecutionAuthorityRequest]) (*connect.Response[adminv1.GetExecutionAuthorityResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadFleet); err != nil {
+	if _, err := s.requireUnrestricted(ctx, identity.PermissionReadFleet); err != nil {
 		return nil, err
 	}
 	if err := s.acquire(ctx); err != nil {
@@ -41,7 +41,7 @@ func (s *Service) GetExecutionAuthority(ctx context.Context, _ *connect.Request[
 func (s *Service) UpdateExecutionAuthority(ctx context.Context, req *connect.Request[adminv1.UpdateExecutionAuthorityRequest]) (*connect.Response[adminv1.UpdateExecutionAuthorityResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	actor, err := s.require(ctx, identity.PermissionManageExecutionTrust)
+	actor, err := s.requireUnrestricted(ctx, identity.PermissionManageExecutionTrust)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +62,13 @@ func (s *Service) UpdateExecutionAuthority(ctx context.Context, req *connect.Req
 	if err != nil {
 		return nil, executionError(err)
 	}
+	if err := requireUnrestrictedPrincipal(approval.Principal(), identity.PermissionManageExecutionTrust); err != nil {
+		return nil, err
+	}
+	consumption, err := s.prepareActionApproval(ctx, actor, identity.PermissionManageExecutionTrust, req.Msg.GetApprovalId(), req.Msg)
+	if err != nil {
+		return nil, err
+	}
 	// No transaction spans the authoritative directory read. Principal first,
 	// then authority: revocation and the audited public update serialize together.
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
@@ -69,8 +76,8 @@ func (s *Service) UpdateExecutionAuthority(ctx context.Context, req *connect.Req
 		return nil, mapErr(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionManageExecutionTrust); err != nil {
-		return nil, executionError(err)
+	if err := s.lockActionApproval(ctx, tx, consumption, approval, identity.PermissionManageExecutionTrust); err != nil {
+		return nil, approvalError(err)
 	}
 	receipt, err := s.execution.Apply(ctx, tx, req.Msg.GetUpdate(), actor.ID, req.Msg.GetReason())
 	if err != nil {
@@ -78,8 +85,8 @@ func (s *Service) UpdateExecutionAuthority(ctx context.Context, req *connect.Req
 	}
 	// Waiting for authority serialization or verification must not outlive the
 	// approval. An expired fence rolls back the update, its receipt and its audit.
-	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionManageExecutionTrust); err != nil {
-		return nil, executionError(err)
+	if err := s.lockActionApproval(ctx, tx, consumption, approval, identity.PermissionManageExecutionTrust); err != nil {
+		return nil, approvalError(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)
@@ -100,13 +107,16 @@ func (s *Service) GetExecutionTrust(ctx context.Context, req *connect.Request[de
 	if err := s.rules.Validate(req.Msg); err != nil {
 		return nil, invalid("invalid_execution_trust_cursor")
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	// Public trust delivery has no durable side effect. One snapshot preserves
+	// the device/generation/certificate/session fence without a WAL-producing
+	// row lock; GetSyncState remains the durable polling heartbeat.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := devicedb.New(tx)
-	device, err := s.lockAuthority(ctx, q, principal)
+	device, err := s.readAuthority(ctx, q, principal)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -126,9 +136,6 @@ func (s *Service) GetExecutionTrust(ctx context.Context, req *connect.Request[de
 		response.RootVersion = state.Root.GetVersion()
 		response.DelegationVersion = state.Delegation.GetVersion()
 		response.MinimumRecoveryEpoch = state.Delegation.GetMinimumRecoveryEpoch()
-	}
-	if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{LastSeenAt: timestamptz(device.now), ID: principal.DeviceID}); err != nil {
-		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)

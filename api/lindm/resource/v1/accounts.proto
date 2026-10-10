@@ -1,0 +1,365 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+// Semantic copy of the existing service contract; the old signed wire remains
+// authoritative until the separately reviewed executor cutover.
+message SystemdServiceDesired {
+  string unit = 1 [(buf.validate.field).string = {
+    max_len: 255
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*(@[a-zA-Z0-9][a-zA-Z0-9_.-]*)?\\.service$"
+  }];
+  ServiceRuntimeState runtime = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ServiceEnablement enablement = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "systemd_service.managed_dimension"
+    message: "at least one service state dimension must be managed"
+    expression: "this.runtime != 1 || this.enablement != 1"
+  };
+  option (buf.validate.message).cel = {
+    id: "systemd_service.protected_agent"
+    message: "agent authority services cannot manage themselves"
+    expression: "!this.unit.startsWith('lindm-') && this.unit != 'lindm.service'"
+  };
+}
+enum ServiceRuntimeState {
+  SERVICE_RUNTIME_STATE_UNSPECIFIED = 0;
+  SERVICE_RUNTIME_STATE_UNMANAGED = 1;
+  SERVICE_RUNTIME_STATE_ACTIVE = 2;
+  SERVICE_RUNTIME_STATE_INACTIVE = 3;
+}
+enum ServiceEnablement {
+  SERVICE_ENABLEMENT_UNSPECIFIED = 0;
+  SERVICE_ENABLEMENT_UNMANAGED = 1;
+  SERVICE_ENABLEMENT_ENABLED = 2;
+  SERVICE_ENABLEMENT_DISABLED = 3;
+}
+enum SetMode {
+  SET_MODE_UNSPECIFIED = 0;
+  SET_MODE_ADDITIVE = 1;
+  SET_MODE_EXACT = 2;
+}
+message MemberSet {
+  repeated string local_user_names = 1 [(buf.validate.field).repeated = {
+    max_items: 1024
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 32
+        pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+      }
+    }
+  }];
+  SetMode mode = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+message LocalGroupDesired {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint32 gid = 3;
+  MemberSet members = 4;
+  option (buf.validate.message).cel = {
+    id: "local_group.absent"
+    message: "absent groups cannot manage fields"
+    expression: "this.presence == 1 || (!has(this.gid) && !has(this.members))"
+  };
+}
+message LoginShell {
+  string installed_shell = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^/[^\\x00\\r\\n]+$"
+  }];
+}
+enum PasswordHashAlgorithm {
+  PASSWORD_HASH_ALGORITHM_UNSPECIFIED = 0;
+  PASSWORD_HASH_ALGORITHM_YESCRYPT = 1;
+  PASSWORD_HASH_ALGORITHM_SHA512_CRYPT = 2;
+  PASSWORD_HASH_ALGORITHM_BCRYPT = 3;
+}
+message LockedPassword {}
+message HashedPasswordPolicy {
+  SecretRef hash = 1 [(buf.validate.field).required = true];
+  PasswordHashAlgorithm algorithm = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  option (buf.validate.message).cel = {
+    id: "hashed_password.purpose"
+    message: "only password-hash secrets are allowed"
+    expression: "this.hash.purpose == 1"
+  };
+}
+message PasswordState {
+  oneof state {
+    option (buf.validate.oneof).required = true;
+    LockedPassword locked = 1;
+    HashedPasswordPolicy hashed = 2;
+  }
+}
+message PasswordAging {
+  optional uint32 min_days = 1 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 max_days = 2 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 warn_days = 3 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 inactive_days = 4 [(buf.validate.field).uint32.lte = 99999];
+  optional bool account_locked = 5;
+  google.protobuf.Timestamp account_expires_at = 6;
+  optional bool account_never_expires = 7;
+  option (buf.validate.message).cel = {
+    id: "password_aging.dimension"
+    message: "manage at least one aging dimension"
+    expression: "has(this.min_days) || has(this.max_days) || has(this.warn_days) || has(this.inactive_days) || has(this.account_locked) || has(this.account_expires_at) || has(this.account_never_expires)"
+  };
+  option (buf.validate.message).cel = {
+    id: "password_aging.bounds"
+    message: "aging range and expiry are consistent"
+    expression: "(!has(this.min_days) || !has(this.max_days) || this.min_days <= this.max_days) && !(has(this.account_expires_at) && has(this.account_never_expires))"
+  };
+}
+enum HomeCreation {
+  HOME_CREATION_UNSPECIFIED = 0;
+  HOME_CREATION_PRESERVE = 1;
+  HOME_CREATION_CREATE_IF_ABSENT = 2;
+}
+message HomePolicy {
+  HomeCreation creation = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint32 mode = 2 [(buf.validate.field).uint32.lte = 511];
+  // Creation never authorizes recursive chown or deletion of existing data.
+  string approved_root_id = 3 [(buf.validate.field).string.uuid = true];
+}
+message LocalUserDesired {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint32 uid = 3;
+  optional string primary_group = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  MemberSet supplementary_groups = 5;
+  optional string home_directory = 6 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^/[^\\x00\\r\\n]+$"
+  }];
+  optional LoginShell shell = 7;
+  PasswordState password = 8;
+  PasswordAging aging = 9;
+  HomePolicy home = 10;
+  option (buf.validate.message).cel = {
+    id: "local_user.absent"
+    message: "absent users cannot manage fields or home data"
+    expression: "this.presence == 1 || (!has(this.uid) && !has(this.primary_group) && !has(this.supplementary_groups) && !has(this.home_directory) && !has(this.shell) && !has(this.password) && !has(this.aging) && !has(this.home))"
+  };
+}
+message SudoPrincipal {
+  oneof principal {
+    option (buf.validate.oneof).required = true;
+    string user = 1 [(buf.validate.field).string = {
+      max_len: 32
+      pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+    }];
+    string group = 2 [(buf.validate.field).string = {
+      max_len: 32
+      pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+    }];
+  }
+}
+message NoArguments {}
+message AnyArguments {}
+message ExactTokens {
+  repeated string tokens = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+    items: {
+      string: {
+        max_bytes: 1024
+        pattern: "^[^\\x00\\r\\n]*$"
+      }
+    }
+  }];
+}
+message ArgumentPolicy {
+  oneof policy {
+    option (buf.validate.oneof).required = true;
+    NoArguments no_arguments = 1;
+    ExactTokens exact_tokens = 2;
+    AnyArguments any_arguments = 3;
+  }
+}
+message SudoCommand {
+  string executable = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^/[^*?\\[\\]\\x00\\r\\n]+$"
+  }];
+  optional bytes sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  ArgumentPolicy arguments = 3 [(buf.validate.field).required = true];
+}
+message SudoRuleDesired {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  Presence presence = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated SudoPrincipal subjects = 3 [(buf.validate.field).repeated.max_items = 64];
+  repeated SudoPrincipal run_as = 4 [(buf.validate.field).repeated.max_items = 64];
+  repeated SudoCommand commands = 5 [(buf.validate.field).repeated.max_items = 64];
+  bool require_password = 6;
+  optional uint32 authentication_timeout_minutes = 7 [(buf.validate.field).uint32.lte = 1440];
+  option (buf.validate.message).cel = {
+    id: "sudo_rule.dimension"
+    message: "present rules require explicit subjects, run-as and commands"
+    expression: "this.presence == 2 || (this.subjects.size() > 0 && this.run_as.size() > 0 && this.commands.size() > 0)"
+  };
+}
+enum RootLoginPolicy {
+  ROOT_LOGIN_POLICY_UNSPECIFIED = 0;
+  ROOT_LOGIN_POLICY_DENY = 1;
+  ROOT_LOGIN_POLICY_PROHIBIT_PASSWORD = 2;
+  ROOT_LOGIN_POLICY_FORCED_COMMANDS_ONLY = 3;
+  ROOT_LOGIN_POLICY_ALLOW = 4;
+}
+message SSHAccessList {
+  repeated string names = 1 [(buf.validate.field).repeated = {
+    max_items: 256
+    unique: true
+    items: {
+      string: {
+        max_len: 32
+        pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+      }
+    }
+  }];
+}
+message SSHMatchSelector {
+  oneof selector {
+    option (buf.validate.oneof).required = true;
+    CIDR address = 1;
+    uint32 local_port = 2 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 65535
+    }];
+    SudoPrincipal principal = 3;
+  }
+}
+message SSHMatch {
+  repeated SSHMatchSelector selectors = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  optional RootLoginPolicy root_login = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional bool password_authentication = 3;
+  optional bool keyboard_interactive_authentication = 4;
+  optional bool public_key_authentication = 5;
+  optional bool permit_empty_passwords = 6;
+  optional bool allow_tcp_forwarding = 7;
+  optional bool x11_forwarding = 8;
+  option (buf.validate.message).cel = {
+    id: "ssh_match.dimension"
+    message: "match block must manage a directive"
+    expression: "has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding)"
+  };
+}
+message SSHServerDesired {
+  optional uint32 port = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  optional RootLoginPolicy root_login = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional bool password_authentication = 3;
+  optional bool keyboard_interactive_authentication = 4;
+  optional bool public_key_authentication = 5;
+  optional bool permit_empty_passwords = 6;
+  optional uint32 max_auth_tries = 7 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100
+  }];
+  optional uint32 client_alive_interval_seconds = 8 [(buf.validate.field).uint32.lte = 86400];
+  optional uint32 client_alive_count_max = 9 [(buf.validate.field).uint32.lte = 100];
+  optional bool allow_tcp_forwarding = 10;
+  optional bool x11_forwarding = 11;
+  SSHAccessList allow_users = 12;
+  SSHAccessList allow_groups = 13;
+  repeated SSHMatch match = 14 [(buf.validate.field).repeated.max_items = 64];
+  option (buf.validate.message).cel = {
+    id: "ssh_server.dimension"
+    message: "manage at least one SSH directive"
+    expression: "has(this.port) || has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.max_auth_tries) || has(this.client_alive_interval_seconds) || has(this.client_alive_count_max) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding) || has(this.allow_users) || has(this.allow_groups) || this.match.size() > 0"
+  };
+}
+message SessionPolicyDesired {
+  SessionScope scope = 1 [(buf.validate.field).required = true];
+  optional uint32 idle_lock_seconds = 2 [(buf.validate.field).uint32.lte = 604800];
+  optional bool lock_on_suspend = 3;
+  optional uint32 idle_terminate_seconds = 4 [(buf.validate.field).uint32.lte = 604800];
+  optional uint32 concurrent_session_limit = 5 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1024
+  }];
+  option (buf.validate.message).cel = {
+    id: "session_policy.dimension"
+    message: "manage at least one session control"
+    expression: "has(this.idle_lock_seconds) || has(this.lock_on_suspend) || has(this.idle_terminate_seconds) || has(this.concurrent_session_limit)"
+  };
+}
+message PasswordPolicyDesired {
+  optional uint32 min_length = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 1024
+  }];
+  optional uint32 min_classes = 2 [(buf.validate.field).uint32.lte = 4];
+  optional uint32 history_count = 3 [(buf.validate.field).uint32.lte = 1024];
+  optional uint32 max_age_days = 4 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 min_age_days = 5 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 warn_days = 6 [(buf.validate.field).uint32.lte = 99999];
+  optional uint32 failure_limit = 7 [(buf.validate.field).uint32.lte = 1024];
+  optional uint32 unlock_after_seconds = 8 [(buf.validate.field).uint32.lte = 604800];
+  optional bool enforce_for_root = 9;
+  option (buf.validate.message).cel = {
+    id: "password_policy.dimension"
+    message: "manage at least one password control"
+    expression: "has(this.min_length) || has(this.min_classes) || has(this.history_count) || has(this.max_age_days) || has(this.min_age_days) || has(this.warn_days) || has(this.failure_limit) || has(this.unlock_after_seconds) || has(this.enforce_for_root)"
+  };
+  option (buf.validate.message).cel = {
+    id: "password_policy.age"
+    message: "minimum age cannot exceed maximum age"
+    expression: "!has(this.min_age_days) || !has(this.max_age_days) || this.min_age_days <= this.max_age_days"
+  };
+}

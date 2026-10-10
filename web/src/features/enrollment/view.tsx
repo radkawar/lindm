@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +12,11 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { reasonError } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
-import { setIssuedGrant, useIssuedGrant, type IssuedGrant } from "./issued";
+import type { IssuedGrant } from "./issued";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { ProvisioningTokens } from "./provisioning";
+import { PendingEnrollments } from "./pending";
+import { OfflineEnrollment } from "./offline";
 
 const LIFETIME_MIN = 60;
 const LIFETIME_MAX = 900;
@@ -25,13 +29,13 @@ type GrantPayload = {
 
 export function EnrollmentView() {
   const lifetime = useAuthLifetime();
-  const issued = useIssuedGrant();
+  const [issued, setIssued] = useState<IssuedGrant | null>(null);
   const [revokeGrantId, setRevokeGrantId] = useState(issued?.grantId ?? "");
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Enrollment grants</h1>
+    <section className="flex min-w-0 max-w-4xl flex-col gap-6">
+      <div className="space-y-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Enrollment</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           A grant is one-use and short-lived. It is not a reusable fleet password and must not be
           baked into a golden image. The server stores only a hash.
@@ -39,7 +43,7 @@ export function EnrollmentView() {
       </div>
       <IssueGrant
         onIssued={(grant) => {
-          setIssuedGrant(grant, lifetime);
+          if (!lifetime.signal.aborted) setIssued(grant);
           setRevokeGrantId(grant.grantId);
         }}
       />
@@ -47,10 +51,13 @@ export function EnrollmentView() {
         <GrantResult
           key={issued.requestId}
           grant={issued}
-          onHide={() => setIssuedGrant({ ...issued, secret: null, hidden: true }, lifetime)}
+          onHide={() => setIssued({ ...issued, secret: null, hidden: true })}
         />
       ) : null}
       <RevokeGrant grantId={revokeGrantId} onGrantId={setRevokeGrantId} />
+      <ProvisioningTokens />
+      <PendingEnrollments />
+      <OfflineEnrollment />
     </section>
   );
 }
@@ -94,13 +101,28 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
       });
       return { grantId: response.grantId, deliveryUnknown };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       submitted.current = null;
       setArmed(false);
       setRequestId(newRequestId());
       setFailure(null);
+      if (!authLifetime.signal.aborted) {
+        toast.success("Enrollment grant issued", {
+          description: result.deliveryUnknown
+            ? "The secret was not delivered. Review the grant before continuing."
+            : "Secure the one-time secret shown on this page.",
+        });
+      }
     },
-    onError: (error) => setFailure(toRpcFailure(error)),
+    onError: (error) => {
+      const next = toRpcFailure(error);
+      setFailure(next);
+      if (!authLifetime.signal.aborted) {
+        toast.error(next.ambiguous ? "Grant request outcome unknown" : "Grant request failed", {
+          description: "Review the inline result before continuing.",
+        });
+      }
+    },
     onSettled: () => {
       inFlight.current = false;
     },
@@ -141,7 +163,7 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
             issue.mutate(submitted.current);
           }}
         >
-          <div className="grid gap-1.5">
+          <div className="grid max-w-xs gap-1.5">
             <Label htmlFor="grant-lifetime">Lifetime in seconds</Label>
             <Input
               id="grant-lifetime"
@@ -164,8 +186,14 @@ function IssueGrant({ onIssued }: { onIssued: (grant: IssuedGrant) => void }) {
               onChange={(event) => setReason(event.target.value)}
             />
           </div>
-          <p className="font-mono text-xs text-muted-foreground">Request ID {requestId}</p>
-          {fieldError !== "" ? <p className="text-sm text-destructive">{fieldError}</p> : null}
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            Request ID {requestId}
+          </p>
+          {fieldError !== "" ? (
+            <p role="alert" className="text-sm text-destructive">
+              {fieldError}
+            </p>
+          ) : null}
           {failure ? (
             <Alert variant="destructive">
               <AlertTitle>{failure.denied ? "Not authorized" : "Grant request failed"}</AlertTitle>
@@ -221,10 +249,10 @@ function GrantResult({ grant, onHide }: { grant: IssuedGrant; onHide: () => void
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-mono text-base">Grant {grant.grantId}</CardTitle>
+        <CardTitle className="break-all font-mono text-base">Grant {grant.grantId}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <p className="text-sm">
+        <p className="break-words text-sm">
           Expires {expires.local}. Request ID {grant.requestId}.
         </p>
         {grant.hidden ? (
@@ -323,8 +351,17 @@ function RevokeGrant({
       setReason("");
       setConfirmation("");
       setFailure(null);
+      if (!lifetime.signal.aborted) toast.success("Grant revocation request accepted");
     },
-    onError: (error) => setFailure(toRpcFailure(error)),
+    onError: (error) => {
+      const next = toRpcFailure(error);
+      setFailure(next);
+      if (!lifetime.signal.aborted) {
+        toast.error(next.ambiguous ? "Revocation outcome unknown" : "Grant revocation failed", {
+          description: "Review the inline result before continuing.",
+        });
+      }
+    },
     onSettled: () => {
       inFlight.current = false;
     },
@@ -396,8 +433,14 @@ function RevokeGrant({
               onChange={(event) => setConfirmation(event.target.value)}
             />
           </div>
-          <p className="font-mono text-xs text-muted-foreground">Request ID {requestId}</p>
-          {fieldError !== "" ? <p className="text-sm text-destructive">{fieldError}</p> : null}
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            Request ID {requestId}
+          </p>
+          {fieldError !== "" ? (
+            <p role="alert" className="text-sm text-destructive">
+              {fieldError}
+            </p>
+          ) : null}
           {accepted !== "" ? (
             <Alert>
               <AlertDescription>{accepted}</AlertDescription>

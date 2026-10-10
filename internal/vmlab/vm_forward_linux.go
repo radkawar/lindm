@@ -178,7 +178,7 @@ type aptPublicServer struct {
 	closeErr error
 }
 
-var aptPublicPath = regexp.MustCompile(`^(dists/stable/(InRelease|Release|Release\.gpg|main/binary-(amd64|arm64)/Packages(\.gz)?)|pool/main/l/lindm-agent/lindm-agent_[0-9]+\.[0-9]+\.[0-9]+_(amd64|arm64)\.deb)$`)
+var aptPublicPath = regexp.MustCompile(`^(dists/stable/(InRelease|Release|Release\.gpg|main/binary-(amd64|arm64)/Packages(\.gz)?)|pool/main/l/(lindm-agent/lindm-agent|lindmd/lindmd)_[0-9]+\.[0-9]+\.[0-9]+_(amd64|arm64)\.deb)$`)
 
 func newAPTPublicServer(root string, names []string) (_ *aptPublicServer, err error) {
 	r, err := os.OpenRoot(root)

@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -35,7 +36,7 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))
 	deployment := uuid.New()
-	svc, err := New(pool, Config{DeploymentID: deployment.String(), CACertificate: ca, CAKey: signer})
+	svc, err := New(pool, Config{DeploymentID: deployment.String(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	if old.Msg.GetAcceptedSequence() != 2 || deviceHostname(t, ctx, conn, deviceID) != "beta" {
 		t.Fatal("old sequence overwrote newer facts")
 	}
-	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{
+	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{
 		RequestId: uuid.NewString(), DeviceId: deviceID, Reason: "stolen",
 	})); err != nil {
 		t.Fatal(err)
@@ -194,16 +195,33 @@ func hostObservation(generation string, seq uint64, host string) *devicev1.Repor
 func insertPrincipal(t *testing.T, ctx context.Context, conn *pgx.Conn, role string) identity.Principal {
 	t.Helper()
 	id := uuid.New()
-	issuer := "https://idp.example"
-	subject := "subject-" + id.String()
-	pinned := ""
-	if role == identity.RoleOwner {
-		pinned = identity.RoleOwner
+	var deployment uuid.UUID
+	if err := conn.QueryRow(ctx, `SELECT deployment_id FROM deployment_identity WHERE id`).Scan(&deployment); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO principals (id, issuer, subject, pinned_role) VALUES ($1, $2, $3, $4)`, id, issuer, subject, pinned); err != nil {
+	issuer := "urn:lindm:local:" + deployment.String()
+	subject := id.String()
+	if _, err := conn.Exec(ctx, `INSERT INTO principals (id, issuer, subject, authorization_role, directory_enabled) VALUES ($1, $2, $3, $4, true)`, id, issuer, subject, role); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO local_accounts (id, username, role) VALUES ($1, $2, $3)`, id, "test-"+id.String(), role); err != nil {
 		t.Fatal(err)
 	}
 	return identity.Principal{ID: id, Issuer: issuer, Subject: subject, Role: role}
+}
+
+func localIdentity(t *testing.T, pool *pgxpool.Pool) *identity.Service {
+	t.Helper()
+	service, err := identity.New(t.Context(), pool, identity.Config{Local: true, PublicURL: "https://admin.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := service.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	return service
 }
 
 func assertSecretAbsent(t *testing.T, ctx context.Context, conn *pgx.Conn, secret string) {
@@ -354,7 +372,7 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				pool, conn := testdb.Open(t)
 				start := time.Now().UTC().Truncate(time.Second)
 				ca, signer := testCA(t, start.Add(90*24*time.Hour))
-				svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer})
+				svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -539,7 +557,7 @@ func TestEnrollmentReplayAfterRenewal(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -635,7 +653,7 @@ func assertRetiredEnrollmentReplayRejected(t *testing.T, ctx context.Context, co
 func assertRevokedDeviceEnrollmentReplayRejected(t *testing.T, ctx context.Context, svc *Service, ownerCtx context.Context) {
 	t.Helper()
 	secret, txID, csr, enrolled := enrollDevice(t, ctx, svc, ownerCtx, ed25519Key(t))
-	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(&adminv1.RevokeDeviceRequest{
+	if _, err := svc.RevokeDevice(ownerCtx, approvedRevocation(t, svc, ownerCtx, &adminv1.RevokeDeviceRequest{
 		RequestId: uuid.NewString(), DeviceId: enrolled.Msg.GetDeviceId(), Reason: "stolen",
 	})); err != nil {
 		t.Fatal(err)

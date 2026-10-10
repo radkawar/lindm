@@ -56,23 +56,7 @@ func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, cert
 	if len(certificatePEM) == 0 || len(certificatePEM) > 16384 || deviceCA == nil {
 		return nil, errors.New("invalid service attestation certificate input")
 	}
-	encoded := bytes.TrimSpace(certificatePEM)
-	if !bytes.HasPrefix(encoded, []byte("-----BEGIN CERTIFICATE-----")) || bytes.Count(encoded, []byte("-----BEGIN ")) != 1 {
-		return nil, errors.New("expected one service attestation certificate")
-	}
-	block, rest := pem.Decode(encoded)
-	if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
-		return nil, errors.New("expected one service attestation certificate")
-	}
-	leaf, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, errors.New("invalid service attestation certificate")
-	}
-	public, ok := leaf.PublicKey.(ed25519.PublicKey)
-	if !ok {
-		return nil, errors.New("service attestation requires an Ed25519 certificate")
-	}
-	cert, err := pki.VerifyDeviceCertificatePEM(encoded, public, deviceCA, expected.DeploymentID, expected.DeviceID, expected.EnrollmentGeneration, now)
+	cert, public, err := verifyDeviceProofCertificate(certificatePEM, deviceCA, expected.DeploymentID, expected.DeviceID, expected.EnrollmentGeneration, now)
 	if err != nil {
 		return nil, err
 	}
@@ -92,4 +76,31 @@ func (a *Authority) VerifyServiceAttestation(ctx context.Context, envelope, cert
 		return nil, errors.New("service attestation validity rejected")
 	}
 	return attestation, nil
+}
+
+func verifyDeviceProofCertificate(certificatePEM []byte, deviceCA *x509.Certificate, deploymentID, deviceID, generation uuid.UUID, now time.Time) (*x509.Certificate, ed25519.PublicKey, error) {
+	if len(certificatePEM) == 0 || len(certificatePEM) > 16384 || deviceCA == nil {
+		return nil, nil, errors.New("invalid device proof certificate input")
+	}
+	encoded := bytes.TrimSpace(certificatePEM)
+	if !bytes.HasPrefix(encoded, []byte("-----BEGIN CERTIFICATE-----")) || bytes.Count(encoded, []byte("-----BEGIN ")) != 1 {
+		return nil, nil, errors.New("expected one device proof certificate")
+	}
+	block, rest := pem.Decode(encoded)
+	if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
+		return nil, nil, errors.New("expected one device proof certificate")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, nil, errors.New("invalid device proof certificate")
+	}
+	public, ok := leaf.PublicKey.(ed25519.PublicKey)
+	if !ok {
+		return nil, nil, errors.New("device proof requires an Ed25519 certificate")
+	}
+	cert, err := pki.VerifyDeviceCertificatePEM(encoded, public, deviceCA, deploymentID, deviceID, generation, now)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cert, public, nil
 }

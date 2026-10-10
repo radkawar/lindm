@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/inventory/v1/observation.proto.
  */
 export const file_lindm_inventory_v1_observation: GenFile = /*@__PURE__*/
-  fileDesc("CiRsaW5kbS9pbnZlbnRvcnkvdjEvb2JzZXJ2YXRpb24ucHJvdG8SEmxpbmRtLmludmVudG9yeS52MSJ7CgdQYWNrYWdlEhgKBG5hbWUYASABKAlCCrpIB3IFEAEYgAQSGwoHdmVyc2lvbhgCIAEoCUIKukgHcgUQARiAEBIdCgxhcmNoaXRlY3R1cmUYAyABKAlCB7pIBHICGEASGgoHbWFuYWdlchgEIAEoCUIJukgGcgQQARhAIusBCg5PYnNlcnZlZFN0cmluZxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABIXCgV2YWx1ZRgCIAEoCUIIukgFcgMYgCA6frpIexp5ChhvYnNlcnZhdGlvbi52YWx1ZV9zdGF0dXMSM29ubHkgc3VjY2Vzc2Z1bCBvYnNlcnZhdGlvbnMgY2FycnkgYSBub25lbXB0eSB2YWx1ZRooKHRoaXMuc3RhdHVzID09IDEpID09ICh0aGlzLnZhbHVlICE9ICcnKSK+BgoPSG9zdE9ic2VydmF0aW9uEjYKCnN0YXJ0ZWRfYXQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESNwoLZmluaXNoZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESOwoHYm9vdF9pZBgDIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEjwKCGhvc3RuYW1lGAQgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESOQoFb3NfaWQYBSABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARI+Cgpvc192ZXJzaW9uGAYgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQAoMYXJjaGl0ZWN0dXJlGAcgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQgoOa2VybmVsX3JlbGVhc2UYCCABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARJDCg9oYXJkd2FyZV92ZW5kb3IYCSABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARJCCg5oYXJkd2FyZV9tb2RlbBgKIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEkMKD2hhcmR3YXJlX3NlcmlhbBgLIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBOnC6SG0aawoWb2JzZXJ2YXRpb24udGltZV9vcmRlchIsY29sbGVjdGlvbiBmaW5pc2ggbXVzdCBub3QgcHJlY2VkZSBpdHMgc3RhcnQaI3RoaXMuZmluaXNoZWRfYXQgPj0gdGhpcy5zdGFydGVkX2F0IowEChJQYWNrYWdlT2JzZXJ2YXRpb24SNgoKc3RhcnRlZF9hdBgBIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARI3CgtmaW5pc2hlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJACgZzdGF0dXMYAyABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABIYCgdiYWNrZW5kGAQgASgJQge6SARyAhhAEjkKCHBhY2thZ2VzGAUgAygLMhsubGluZG0uaW52ZW50b3J5LnYxLlBhY2thZ2VCCrpIB5IBBBCgjQY67QG6SOkBGn0KFnBhY2thZ2VzLnN1Y2Nlc3Nfc2hhcGUSNGZhaWxlZCBjb2xsZWN0aW9ucyBtdXN0IG5vdCBwdWJsaXNoIHBhcnRpYWwgcGFja2FnZXMaLXRoaXMuc3RhdHVzID09IDEgfHwgdGhpcy5wYWNrYWdlcy5zaXplKCkgPT0gMBpoChNwYWNrYWdlcy50aW1lX29yZGVyEixjb2xsZWN0aW9uIGZpbmlzaCBtdXN0IG5vdCBwcmVjZWRlIGl0cyBzdGFydBojdGhpcy5maW5pc2hlZF9hdCA+PSB0aGlzLnN0YXJ0ZWRfYXQiSAoMUGFja2FnZUJhdGNoEjgKCHBhY2thZ2VzGAEgAygLMhsubGluZG0uaW52ZW50b3J5LnYxLlBhY2thZ2VCCbpIBpIBAxD0AyKQAQoRTmF0aXZlT2JzZXJ2YXRpb24SOQoEaG9zdBgBIAEoCzIjLmxpbmRtLmludmVudG9yeS52MS5Ib3N0T2JzZXJ2YXRpb25CBrpIA8gBARJACghwYWNrYWdlcxgCIAEoCzImLmxpbmRtLmludmVudG9yeS52MS5QYWNrYWdlT2JzZXJ2YXRpb25CBrpIA8gBASq8AgoQQ29sbGVjdGlvblN0YXR1cxIhCh1DT0xMRUNUSU9OX1NUQVRVU19VTlNQRUNJRklFRBAAEh0KGUNPTExFQ1RJT05fU1RBVFVTX1NVQ0NFU1MQARIhCh1DT0xMRUNUSU9OX1NUQVRVU19VTkFWQUlMQUJMRRACEicKI0NPTExFQ1RJT05fU1RBVFVTX1BFUk1JU1NJT05fREVOSUVEEAMSHQoZQ09MTEVDVElPTl9TVEFUVVNfVElNRU9VVBAEEiQKIENPTExFQ1RJT05fU1RBVFVTX0lOVkFMSURfT1VUUFVUEAUSJwojQ09MTEVDVElPTl9TVEFUVVNfQ0FQQUNJVFlfRVhDRUVERUQQBhIsCihDT0xMRUNUSU9OX1NUQVRVU19OQVRJVkVfQ09NTUFORF9GQUlMVVJFEAcqpAEKDVNuYXBzaG90U3RhdGUSHgoaU05BUFNIT1RfU1RBVEVfVU5TUEVDSUZJRUQQABIaChZTTkFQU0hPVF9TVEFURV9TVEFHSU5HEAESHAoYU05BUFNIT1RfU1RBVEVfQ09NTUlUVEVEEAISHQoZU05BUFNIT1RfU1RBVEVfU1VQRVJTRURFRBADEhoKFlNOQVBTSE9UX1NUQVRFX0VYUElSRUQQBEIqWihsaW5kbS9nZW4vbGluZG0vaW52ZW50b3J5L3YxO2ludmVudG9yeXYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiRsaW5kbS9pbnZlbnRvcnkvdjEvb2JzZXJ2YXRpb24ucHJvdG8SEmxpbmRtLmludmVudG9yeS52MSL9AgoHUGFja2FnZRIYCgRuYW1lGAEgASgJQgq6SAdyBRABGIAEEhsKB3ZlcnNpb24YAiABKAlCCrpIB3IFEAEYgBASHQoMYXJjaGl0ZWN0dXJlGAMgASgJQge6SARyAhhAEhoKB21hbmFnZXIYBCABKAlCCbpIBnIEEAEYQBIdCgtzb3VyY2VfbmFtZRgFIAEoCUIIukgFcgMYgAQSIAoOc291cmNlX3ZlcnNpb24YBiABKAlCCLpIBXIDGIAQEjUKBm1vZHVsZRgHIAEoCzIlLmxpbmRtLmludmVudG9yeS52MS5Nb2R1bGVPYnNlcnZhdGlvbjqHAbpIgwEagAEKE3BhY2thZ2Uuc291cmNlX3BhaXISMHNvdXJjZSBuYW1lIGFuZCB2ZXJzaW9uIG11c3QgYmUgcHJlc2VudCB0b2dldGhlcho3KHRoaXMuc291cmNlX25hbWUgPT0gJycpID09ICh0aGlzLnNvdXJjZV92ZXJzaW9uID09ICcnKSLrAQoOT2JzZXJ2ZWRTdHJpbmcSQAoGc3RhdHVzGAEgASgOMiQubGluZG0uaW52ZW50b3J5LnYxLkNvbGxlY3Rpb25TdGF0dXNCCrpIB4IBBBABIAASFwoFdmFsdWUYAiABKAlCCLpIBXIDGIAgOn66SHsaeQoYb2JzZXJ2YXRpb24udmFsdWVfc3RhdHVzEjNvbmx5IHN1Y2Nlc3NmdWwgb2JzZXJ2YXRpb25zIGNhcnJ5IGEgbm9uZW1wdHkgdmFsdWUaKCh0aGlzLnN0YXR1cyA9PSAxKSA9PSAodGhpcy52YWx1ZSAhPSAnJyki8gYKD0hvc3RPYnNlcnZhdGlvbhI2CgpzdGFydGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjcKC2ZpbmlzaGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjsKB2Jvb3RfaWQYAyABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARI8Cghob3N0bmFtZRgEIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEjkKBW9zX2lkGAUgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESPgoKb3NfdmVyc2lvbhgGIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEkAKDGFyY2hpdGVjdHVyZRgHIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEkIKDmtlcm5lbF9yZWxlYXNlGAggASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQwoPaGFyZHdhcmVfdmVuZG9yGAkgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQgoOaGFyZHdhcmVfbW9kZWwYCiABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARJDCg9oYXJkd2FyZV9zZXJpYWwYCyABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARIyCgdkZXRhaWxzGAwgASgLMiEubGluZG0uaW52ZW50b3J5LnYxLk5hdGl2ZURldGFpbHM6cLpIbRprChZvYnNlcnZhdGlvbi50aW1lX29yZGVyEixjb2xsZWN0aW9uIGZpbmlzaCBtdXN0IG5vdCBwcmVjZWRlIGl0cyBzdGFydBojdGhpcy5maW5pc2hlZF9hdCA+PSB0aGlzLnN0YXJ0ZWRfYXQijAQKElBhY2thZ2VPYnNlcnZhdGlvbhI2CgpzdGFydGVkX2F0GAEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjcKC2ZpbmlzaGVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEkAKBnN0YXR1cxgDIAEoDjIkLmxpbmRtLmludmVudG9yeS52MS5Db2xsZWN0aW9uU3RhdHVzQgq6SAeCAQQQASAAEhgKB2JhY2tlbmQYBCABKAlCB7pIBHICGEASOQoIcGFja2FnZXMYBSADKAsyGy5saW5kbS5pbnZlbnRvcnkudjEuUGFja2FnZUIKukgHkgEEEKCNBjrtAbpI6QEafQoWcGFja2FnZXMuc3VjY2Vzc19zaGFwZRI0ZmFpbGVkIGNvbGxlY3Rpb25zIG11c3Qgbm90IHB1Ymxpc2ggcGFydGlhbCBwYWNrYWdlcxotdGhpcy5zdGF0dXMgPT0gMSB8fCB0aGlzLnBhY2thZ2VzLnNpemUoKSA9PSAwGmgKE3BhY2thZ2VzLnRpbWVfb3JkZXISLGNvbGxlY3Rpb24gZmluaXNoIG11c3Qgbm90IHByZWNlZGUgaXRzIHN0YXJ0GiN0aGlzLmZpbmlzaGVkX2F0ID49IHRoaXMuc3RhcnRlZF9hdCJICgxQYWNrYWdlQmF0Y2gSOAoIcGFja2FnZXMYASADKAsyGy5saW5kbS5pbnZlbnRvcnkudjEuUGFja2FnZUIJukgGkgEDEPQDIpABChFOYXRpdmVPYnNlcnZhdGlvbhI5CgRob3N0GAEgASgLMiMubGluZG0uaW52ZW50b3J5LnYxLkhvc3RPYnNlcnZhdGlvbkIGukgDyAEBEkAKCHBhY2thZ2VzGAIgASgLMiYubGluZG0uaW52ZW50b3J5LnYxLlBhY2thZ2VPYnNlcnZhdGlvbkIGukgDyAEBIsEBCg5PYnNlcnZlZFVpbnQ2NBJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABINCgV2YWx1ZRgCIAEoBDpeukhbGlkKDm51bWJlci5mYWlsdXJlEiFmYWlsZWQgb2JzZXJ2YXRpb25zIGhhdmUgbm8gdmFsdWUaJHRoaXMuc3RhdHVzID09IDEgfHwgdGhpcy52YWx1ZSA9PSAwdSK7AQoMT2JzZXJ2ZWRCb29sEkAKBnN0YXR1cxgBIAEoDjIkLmxpbmRtLmludmVudG9yeS52MS5Db2xsZWN0aW9uU3RhdHVzQgq6SAeCAQQQASAAEg0KBXZhbHVlGAIgASgIOlq6SFcaVQoPYm9vbGVhbi5mYWlsdXJlEiFmYWlsZWQgb2JzZXJ2YXRpb25zIGhhdmUgbm8gdmFsdWUaH3RoaXMuc3RhdHVzID09IDEgfHwgIXRoaXMudmFsdWUi5AEKD09ic2VydmVkU3RyaW5ncxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABIiCgZ2YWx1ZXMYAiADKAlCErpID5IBDBBAIghyBhiAAtABATprukhoGmYKDnZhbHVlcy5mYWlsdXJlEidmYWlsZWQgY29sbGVjdGlvbnMgaGF2ZSBubyBwYXJ0aWFsIHJvd3MaK3RoaXMuc3RhdHVzID09IDEgfHwgdGhpcy52YWx1ZXMuc2l6ZSgpID09IDAikAIKCkNwdURldGFpbHMSOQoFbW9kZWwYASABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARJBCg1sb2dpY2FsX2NvcmVzGAIgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkVWludDY0Qga6SAPIAQESQgoOcGh5c2ljYWxfY29yZXMYAyABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRVaW50NjRCBrpIA8gBARJACgx4ODZfNjRfbGV2ZWwYBCABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBASLbAQoNTWVtb3J5RGV0YWlscxI/Cgt0b3RhbF9ieXRlcxgBIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBEkMKD2F2YWlsYWJsZV9ieXRlcxgCIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBEkQKEHN3YXBfdG90YWxfYnl0ZXMYAyABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRVaW50NjRCBrpIA8gBASKdAwoLQmxvY2tEZXZpY2USGAoEbmFtZRgBIAEoCUIKukgHcgUQARiAAhI4CgR0eXBlGAIgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESOgoGcGFyZW50GAMgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESPgoKc2l6ZV9ieXRlcxgEIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBEj4KCmZpbGVzeXN0ZW0YBSABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARI+Cgptb3VudHBvaW50GAYgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESPgoKZW5jcnlwdGlvbhgHIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBIv4BCg5TdG9yYWdlRGV0YWlscxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABI7CgdkZXZpY2VzGAIgAygLMh8ubGluZG0uaW52ZW50b3J5LnYxLkJsb2NrRGV2aWNlQgm6SAaSAQMQgAI6bbpIahpoCg9kZXZpY2VzLmZhaWx1cmUSJ2ZhaWxlZCBjb2xsZWN0aW9ucyBoYXZlIG5vIHBhcnRpYWwgcm93cxosdGhpcy5zdGF0dXMgPT0gMSB8fCB0aGlzLmRldmljZXMuc2l6ZSgpID09IDAi3wEKEE5ldHdvcmtJbnRlcmZhY2USGAoEbmFtZRgBIAEoCUIKukgHcgUQARiAAhI3CgNtYWMYAiABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARI4CgRsaW5rGAMgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESPgoJYWRkcmVzc2VzGAQgASgLMiMubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nc0IGukgDyAEBIowCCg5OZXR3b3JrRGV0YWlscxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABJDCgppbnRlcmZhY2VzGAIgAygLMiQubGluZG0uaW52ZW50b3J5LnYxLk5ldHdvcmtJbnRlcmZhY2VCCbpIBpIBAxCAAjpzukhwGm4KEmludGVyZmFjZXMuZmFpbHVyZRInZmFpbGVkIGNvbGxlY3Rpb25zIGhhdmUgbm8gcGFydGlhbCByb3dzGi90aGlzLnN0YXR1cyA9PSAxIHx8IHRoaXMuaW50ZXJmYWNlcy5zaXplKCkgPT0gMCKMAQoPRmlybXdhcmVEZXRhaWxzEjgKBG1vZGUYASABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBARI/CgtzZWN1cmVfYm9vdBgCIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBIoQBCgpUcG1EZXRhaWxzEjkKB3ByZXNlbnQYASABKAsyIC5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRCb29sQga6SAPIAQESOwoHdmVyc2lvbhgCIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBIqUBCgdCYXR0ZXJ5EhgKBG5hbWUYASABKAlCCrpIB3IFEAEYgAISOgoGc3RhdHVzGAIgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESRAoQY2FwYWNpdHlfcGVyY2VudBgDIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBIvMBCg5CYXR0ZXJ5RGV0YWlscxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABI0CgVpdGVtcxgCIAMoCzIbLmxpbmRtLmludmVudG9yeS52MS5CYXR0ZXJ5Qgi6SAWSAQIQIDppukhmGmQKDWl0ZW1zLmZhaWx1cmUSJ2ZhaWxlZCBjb2xsZWN0aW9ucyBoYXZlIG5vIHBhcnRpYWwgcm93cxoqdGhpcy5zdGF0dXMgPT0gMSB8fCB0aGlzLml0ZW1zLnNpemUoKSA9PSAwIooBCgxQb3dlckRldGFpbHMSOwoHY2hhc3NpcxgBIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFN0cmluZ0IGukgDyAEBEj0KCWJhdHRlcmllcxgCIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5CYXR0ZXJ5RGV0YWlsc0IGukgDyAEBIogBCg1TZXNzaW9uQ291bnRzEjkKBXVzZXJzGAEgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkVWludDY0Qga6SAPIAQESPAoIc2Vzc2lvbnMYAiABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRVaW50NjRCBrpIA8gBASJYCglMb2NhbFVzZXISGAoDdWlkGAEgASgEQgu6SAgyBhj/////DxIYCgRuYW1lGAIgASgJQgq6SAdyBRABGIACEhcKBXNoZWxsGAMgASgJQgi6SAVyAxiAICLyAQoKTG9jYWxVc2VycxJACgZzdGF0dXMYASABKA4yJC5saW5kbS5pbnZlbnRvcnkudjEuQ29sbGVjdGlvblN0YXR1c0IKukgHggEEEAEgABI3CgV1c2VycxgCIAMoCzIdLmxpbmRtLmludmVudG9yeS52MS5Mb2NhbFVzZXJCCbpIBpIBAxCAIDppukhmGmQKDXVzZXJzLmZhaWx1cmUSJ2ZhaWxlZCBjb2xsZWN0aW9ucyBoYXZlIG5vIHBhcnRpYWwgcm93cxoqdGhpcy5zdGF0dXMgPT0gMSB8fCB0aGlzLnVzZXJzLnNpemUoKSA9PSAwItsDCg5CYWNrZW5kRGV0YWlscxI2CgRkcGtnGAEgASgLMiAubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkQm9vbEIGukgDyAEBEjUKA3JwbRgCIAEoCzIgLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZEJvb2xCBrpIA8gBARI4CgZwYWNtYW4YAyABKAsyIC5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRCb29sQga6SAPIAQESOAoGenlwcGVyGAQgASgLMiAubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkQm9vbEIGukgDyAEBEjwKCnJwbV9vc3RyZWUYBSABKAsyIC5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRCb29sQga6SAPIAQESNQoDbml4GAYgASgLMiAubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkQm9vbEIGukgDyAEBEjkKB2ZsYXRwYWsYByABKAsyIC5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRCb29sQga6SAPIAQESNgoEc25hcBgIIAEoCzIgLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZEJvb2xCBrpIA8gBASLhAQoLQXBwbGljYXRpb24SGAoEbmFtZRgBIAEoCUIKukgHcgUQARiABBI7Cgd2ZXJzaW9uGAIgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQAoMYXJjaGl0ZWN0dXJlGAMgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESOQoFc2NvcGUYBCABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuT2JzZXJ2ZWRTdHJpbmdCBrpIA8gBASKRAgoSQXBwbGljYXRpb25EZXRhaWxzEkAKBnN0YXR1cxgBIAEoDjIkLmxpbmRtLmludmVudG9yeS52MS5Db2xsZWN0aW9uU3RhdHVzQgq6SAeCAQQQASAAEkAKDGFwcGxpY2F0aW9ucxgCIAMoCzIfLmxpbmRtLmludmVudG9yeS52MS5BcHBsaWNhdGlvbkIJukgGkgEDEIAQOne6SHQacgoUYXBwbGljYXRpb25zLmZhaWx1cmUSJ2ZhaWxlZCBjb2xsZWN0aW9ucyBoYXZlIG5vIHBhcnRpYWwgcm93cxoxdGhpcy5zdGF0dXMgPT0gMSB8fCB0aGlzLmFwcGxpY2F0aW9ucy5zaXplKCkgPT0gMCLtBwoNTmF0aXZlRGV0YWlscxIzCgNjcHUYASABKAsyHi5saW5kbS5pbnZlbnRvcnkudjEuQ3B1RGV0YWlsc0IGukgDyAEBEjkKBm1lbW9yeRgCIAEoCzIhLmxpbmRtLmludmVudG9yeS52MS5NZW1vcnlEZXRhaWxzQga6SAPIAQESOwoHc3RvcmFnZRgDIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5TdG9yYWdlRGV0YWlsc0IGukgDyAEBEjsKB25ldHdvcmsYBCABKAsyIi5saW5kbS5pbnZlbnRvcnkudjEuTmV0d29ya0RldGFpbHNCBrpIA8gBARI9CghmaXJtd2FyZRgFIAEoCzIjLmxpbmRtLmludmVudG9yeS52MS5GaXJtd2FyZURldGFpbHNCBrpIA8gBARIzCgN0cG0YBiABKAsyHi5saW5kbS5pbnZlbnRvcnkudjEuVHBtRGV0YWlsc0IGukgDyAEBEjcKBXBvd2VyGAcgASgLMiAubGluZG0uaW52ZW50b3J5LnYxLlBvd2VyRGV0YWlsc0IGukgDyAEBEjsKCHNlc3Npb25zGAggASgLMiEubGluZG0uaW52ZW50b3J5LnYxLlNlc3Npb25Db3VudHNCBrpIA8gBARI7Cgtsb2NhbF91c2VycxgJIAEoCzIeLmxpbmRtLmludmVudG9yeS52MS5Mb2NhbFVzZXJzQga6SAPIAQESRwoTa2VybmVsX21vZHVsZV9jb3VudBgKIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBEkIKDnVwdGltZV9zZWNvbmRzGAsgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkVWludDY0Qga6SAPIAQESSgoWYm9vdF90aW1lX3VuaXhfc2Vjb25kcxgMIAEoCzIiLmxpbmRtLmludmVudG9yeS52MS5PYnNlcnZlZFVpbnQ2NEIGukgDyAEBEjwKCGJhY2tlbmRzGA0gASgLMiIubGluZG0uaW52ZW50b3J5LnYxLkJhY2tlbmREZXRhaWxzQga6SAPIAQESPwoHZmxhdHBhaxgOIAEoCzImLmxpbmRtLmludmVudG9yeS52MS5BcHBsaWNhdGlvbkRldGFpbHNCBrpIA8gBARI8CgRzbmFwGA8gASgLMiYubGluZG0uaW52ZW50b3J5LnYxLkFwcGxpY2F0aW9uRGV0YWlsc0IGukgDyAEBEjUKCHBsYXRmb3JtGBAgASgLMiMubGluZG0uaW52ZW50b3J5LnYxLlBsYXRmb3JtRGV0YWlscyKIBQoRTW9kdWxlT2JzZXJ2YXRpb24SQAoGc3RhdHVzGAEgASgOMiQubGluZG0uaW52ZW50b3J5LnYxLkNvbGxlY3Rpb25TdGF0dXNCCrpIB4IBBBABIAASDwoHbW9kdWxhchgCIAEoCBI4CgRuYW1lGAMgASgJQiq6SCdyJRiAAjIgXihbQS1aYS16MC05XVtBLVphLXowLTkrXy4tXSopPyQSOgoGc3RyZWFtGAQgASgJQiq6SCdyJRiAAjIgXihbQS1aYS16MC05XVtBLVphLXowLTkrXy4tXSopPyQSIgoHdmVyc2lvbhgFIAEoCUIRukgOcgwYIDIIXlswLTldKiQSOwoHY29udGV4dBgGIAEoCUIqukgnciUYgAIyIF4oW0EtWmEtejAtOV1bQS1aYS16MC05K18uLV0qKT8kOsgCukjEAhrBAgoVbW9kdWxlLmlkZW50aXR5X3NoYXBlEkhvbmx5IGEgc3VjY2Vzc2Z1bCBtb2R1bGFyIG9ic2VydmF0aW9uIGNhcnJpZXMgYSBjb21wbGV0ZSBuYXRpdmUgaWRlbnRpdHka3QEodGhpcy5zdGF0dXMgPT0gMSAmJiB0aGlzLm1vZHVsYXIpID8gKHRoaXMubmFtZSAhPSAnJyAmJiB0aGlzLnN0cmVhbSAhPSAnJyAmJiB0aGlzLnZlcnNpb24gIT0gJycgJiYgdGhpcy5jb250ZXh0ICE9ICcnKSA6ICghdGhpcy5tb2R1bGFyICYmIHRoaXMubmFtZSA9PSAnJyAmJiB0aGlzLnN0cmVhbSA9PSAnJyAmJiB0aGlzLnZlcnNpb24gPT0gJycgJiYgdGhpcy5jb250ZXh0ID09ICcnKSLnAgoVUmVwb3NpdG9yeU9ic2VydmF0aW9uEkAKBnN0YXR1cxgBIAEoDjIkLmxpbmRtLmludmVudG9yeS52MS5Db2xsZWN0aW9uU3RhdHVzQgq6SAeCAQQQASAAEiEKA2lkcxgCIAMoCUIUukgRkgEOEIACGAEiB3IFEAEYgAISGAoHYmFja2VuZBgDIAEoCUIHukgEcgIYQDrOAbpIygEaxwEKFHJlcG9zaXRvcmllcy5mYWlsdXJlEllzdWNjZXNzZnVsIHJlcG9zaXRvcmllcyBpZGVudGlmeSB0aGVpciBuYXRpdmUgYmFja2VuZDsgZmFpbHVyZXMgY2Fycnkgbm8gcGFydGlhbCBldmlkZW5jZRpUdGhpcy5zdGF0dXMgPT0gMSA/IHRoaXMuYmFja2VuZCAhPSAnJyA6ICh0aGlzLmlkcy5zaXplKCkgPT0gMCAmJiB0aGlzLmJhY2tlbmQgPT0gJycpItgBCg9QbGF0Zm9ybURldGFpbHMSNwoDY3BlGAEgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESQwoPcmVsZWFzZXZlcl9sb2NrGAIgASgLMiIubGluZG0uaW52ZW50b3J5LnYxLk9ic2VydmVkU3RyaW5nQga6SAPIAQESRwoMcmVwb3NpdG9yaWVzGAMgASgLMikubGluZG0uaW52ZW50b3J5LnYxLlJlcG9zaXRvcnlPYnNlcnZhdGlvbkIGukgDyAEBKrwCChBDb2xsZWN0aW9uU3RhdHVzEiEKHUNPTExFQ1RJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHQoZQ09MTEVDVElPTl9TVEFUVVNfU1VDQ0VTUxABEiEKHUNPTExFQ1RJT05fU1RBVFVTX1VOQVZBSUxBQkxFEAISJwojQ09MTEVDVElPTl9TVEFUVVNfUEVSTUlTU0lPTl9ERU5JRUQQAxIdChlDT0xMRUNUSU9OX1NUQVRVU19USU1FT1VUEAQSJAogQ09MTEVDVElPTl9TVEFUVVNfSU5WQUxJRF9PVVRQVVQQBRInCiNDT0xMRUNUSU9OX1NUQVRVU19DQVBBQ0lUWV9FWENFRURFRBAGEiwKKENPTExFQ1RJT05fU1RBVFVTX05BVElWRV9DT01NQU5EX0ZBSUxVUkUQByqkAQoNU25hcHNob3RTdGF0ZRIeChpTTkFQU0hPVF9TVEFURV9VTlNQRUNJRklFRBAAEhoKFlNOQVBTSE9UX1NUQVRFX1NUQUdJTkcQARIcChhTTkFQU0hPVF9TVEFURV9DT01NSVRURUQQAhIdChlTTkFQU0hPVF9TVEFURV9TVVBFUlNFREVEEAMSGgoWU05BUFNIT1RfU1RBVEVfRVhQSVJFRBAEQipaKGxpbmRtL2dlbi9saW5kbS9pbnZlbnRvcnkvdjE7aW52ZW50b3J5djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message lindm.inventory.v1.Package
@@ -38,6 +38,26 @@ export type Package = Message<"lindm.inventory.v1.Package"> & {
    * @generated from field: string manager = 4;
    */
   manager: string;
+
+  /**
+   * Native source-package identity, including epoch; absent as a pair when
+   * the backend does not report source metadata.
+   *
+   * @generated from field: string source_name = 5;
+   */
+  sourceName: string;
+
+  /**
+   * @generated from field: string source_version = 6;
+   */
+  sourceVersion: string;
+
+  /**
+   * Absent only on historical package evidence.
+   *
+   * @generated from field: lindm.inventory.v1.ModuleObservation module = 7;
+   */
+  module?: ModuleObservation | undefined;
 };
 
 /**
@@ -127,6 +147,11 @@ export type HostObservation = Message<"lindm.inventory.v1.HostObservation"> & {
    * @generated from field: lindm.inventory.v1.ObservedString hardware_serial = 11;
    */
   hardwareSerial?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.NativeDetails details = 12;
+   */
+  details?: NativeDetails | undefined;
 };
 
 /**
@@ -216,6 +241,740 @@ export type NativeObservation = Message<"lindm.inventory.v1.NativeObservation"> 
  */
 export const NativeObservationSchema: GenMessage<NativeObservation> = /*@__PURE__*/
   messageDesc(file_lindm_inventory_v1_observation, 5);
+
+/**
+ * Native details are optional only at the historical HostObservation boundary.
+ *
+ * @generated from message lindm.inventory.v1.ObservedUint64
+ */
+export type ObservedUint64 = Message<"lindm.inventory.v1.ObservedUint64"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: uint64 value = 2;
+   */
+  value: bigint;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.ObservedUint64.
+ * Use `create(ObservedUint64Schema)` to create a new message.
+ */
+export const ObservedUint64Schema: GenMessage<ObservedUint64> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 6);
+
+/**
+ * @generated from message lindm.inventory.v1.ObservedBool
+ */
+export type ObservedBool = Message<"lindm.inventory.v1.ObservedBool"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: bool value = 2;
+   */
+  value: boolean;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.ObservedBool.
+ * Use `create(ObservedBoolSchema)` to create a new message.
+ */
+export const ObservedBoolSchema: GenMessage<ObservedBool> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 7);
+
+/**
+ * @generated from message lindm.inventory.v1.ObservedStrings
+ */
+export type ObservedStrings = Message<"lindm.inventory.v1.ObservedStrings"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated string values = 2;
+   */
+  values: string[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.ObservedStrings.
+ * Use `create(ObservedStringsSchema)` to create a new message.
+ */
+export const ObservedStringsSchema: GenMessage<ObservedStrings> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 8);
+
+/**
+ * @generated from message lindm.inventory.v1.CpuDetails
+ */
+export type CpuDetails = Message<"lindm.inventory.v1.CpuDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString model = 1;
+   */
+  model?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 logical_cores = 2;
+   */
+  logicalCores?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 physical_cores = 3;
+   */
+  physicalCores?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString x86_64_level = 4;
+   */
+  x8664Level?: ObservedString | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.CpuDetails.
+ * Use `create(CpuDetailsSchema)` to create a new message.
+ */
+export const CpuDetailsSchema: GenMessage<CpuDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 9);
+
+/**
+ * @generated from message lindm.inventory.v1.MemoryDetails
+ */
+export type MemoryDetails = Message<"lindm.inventory.v1.MemoryDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 total_bytes = 1;
+   */
+  totalBytes?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 available_bytes = 2;
+   */
+  availableBytes?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 swap_total_bytes = 3;
+   */
+  swapTotalBytes?: ObservedUint64 | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.MemoryDetails.
+ * Use `create(MemoryDetailsSchema)` to create a new message.
+ */
+export const MemoryDetailsSchema: GenMessage<MemoryDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 10);
+
+/**
+ * @generated from message lindm.inventory.v1.BlockDevice
+ */
+export type BlockDevice = Message<"lindm.inventory.v1.BlockDevice"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString type = 2;
+   */
+  type?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString parent = 3;
+   */
+  parent?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 size_bytes = 4;
+   */
+  sizeBytes?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString filesystem = 5;
+   */
+  filesystem?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString mountpoint = 6;
+   */
+  mountpoint?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString encryption = 7;
+   */
+  encryption?: ObservedString | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.BlockDevice.
+ * Use `create(BlockDeviceSchema)` to create a new message.
+ */
+export const BlockDeviceSchema: GenMessage<BlockDevice> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 11);
+
+/**
+ * @generated from message lindm.inventory.v1.StorageDetails
+ */
+export type StorageDetails = Message<"lindm.inventory.v1.StorageDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated lindm.inventory.v1.BlockDevice devices = 2;
+   */
+  devices: BlockDevice[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.StorageDetails.
+ * Use `create(StorageDetailsSchema)` to create a new message.
+ */
+export const StorageDetailsSchema: GenMessage<StorageDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 12);
+
+/**
+ * @generated from message lindm.inventory.v1.NetworkInterface
+ */
+export type NetworkInterface = Message<"lindm.inventory.v1.NetworkInterface"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString mac = 2;
+   */
+  mac?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString link = 3;
+   */
+  link?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedStrings addresses = 4;
+   */
+  addresses?: ObservedStrings | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.NetworkInterface.
+ * Use `create(NetworkInterfaceSchema)` to create a new message.
+ */
+export const NetworkInterfaceSchema: GenMessage<NetworkInterface> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 13);
+
+/**
+ * @generated from message lindm.inventory.v1.NetworkDetails
+ */
+export type NetworkDetails = Message<"lindm.inventory.v1.NetworkDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated lindm.inventory.v1.NetworkInterface interfaces = 2;
+   */
+  interfaces: NetworkInterface[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.NetworkDetails.
+ * Use `create(NetworkDetailsSchema)` to create a new message.
+ */
+export const NetworkDetailsSchema: GenMessage<NetworkDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 14);
+
+/**
+ * @generated from message lindm.inventory.v1.FirmwareDetails
+ */
+export type FirmwareDetails = Message<"lindm.inventory.v1.FirmwareDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString mode = 1;
+   */
+  mode?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString secure_boot = 2;
+   */
+  secureBoot?: ObservedString | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.FirmwareDetails.
+ * Use `create(FirmwareDetailsSchema)` to create a new message.
+ */
+export const FirmwareDetailsSchema: GenMessage<FirmwareDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 15);
+
+/**
+ * @generated from message lindm.inventory.v1.TpmDetails
+ */
+export type TpmDetails = Message<"lindm.inventory.v1.TpmDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool present = 1;
+   */
+  present?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString version = 2;
+   */
+  version?: ObservedString | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.TpmDetails.
+ * Use `create(TpmDetailsSchema)` to create a new message.
+ */
+export const TpmDetailsSchema: GenMessage<TpmDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 16);
+
+/**
+ * @generated from message lindm.inventory.v1.Battery
+ */
+export type Battery = Message<"lindm.inventory.v1.Battery"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString status = 2;
+   */
+  status?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 capacity_percent = 3;
+   */
+  capacityPercent?: ObservedUint64 | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.Battery.
+ * Use `create(BatterySchema)` to create a new message.
+ */
+export const BatterySchema: GenMessage<Battery> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 17);
+
+/**
+ * @generated from message lindm.inventory.v1.BatteryDetails
+ */
+export type BatteryDetails = Message<"lindm.inventory.v1.BatteryDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated lindm.inventory.v1.Battery items = 2;
+   */
+  items: Battery[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.BatteryDetails.
+ * Use `create(BatteryDetailsSchema)` to create a new message.
+ */
+export const BatteryDetailsSchema: GenMessage<BatteryDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 18);
+
+/**
+ * @generated from message lindm.inventory.v1.PowerDetails
+ */
+export type PowerDetails = Message<"lindm.inventory.v1.PowerDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString chassis = 1;
+   */
+  chassis?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.BatteryDetails batteries = 2;
+   */
+  batteries?: BatteryDetails | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.PowerDetails.
+ * Use `create(PowerDetailsSchema)` to create a new message.
+ */
+export const PowerDetailsSchema: GenMessage<PowerDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 19);
+
+/**
+ * @generated from message lindm.inventory.v1.SessionCounts
+ */
+export type SessionCounts = Message<"lindm.inventory.v1.SessionCounts"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 users = 1;
+   */
+  users?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 sessions = 2;
+   */
+  sessions?: ObservedUint64 | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.SessionCounts.
+ * Use `create(SessionCountsSchema)` to create a new message.
+ */
+export const SessionCountsSchema: GenMessage<SessionCounts> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 20);
+
+/**
+ * @generated from message lindm.inventory.v1.LocalUser
+ */
+export type LocalUser = Message<"lindm.inventory.v1.LocalUser"> & {
+  /**
+   * @generated from field: uint64 uid = 1;
+   */
+  uid: bigint;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string shell = 3;
+   */
+  shell: string;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.LocalUser.
+ * Use `create(LocalUserSchema)` to create a new message.
+ */
+export const LocalUserSchema: GenMessage<LocalUser> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 21);
+
+/**
+ * @generated from message lindm.inventory.v1.LocalUsers
+ */
+export type LocalUsers = Message<"lindm.inventory.v1.LocalUsers"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated lindm.inventory.v1.LocalUser users = 2;
+   */
+  users: LocalUser[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.LocalUsers.
+ * Use `create(LocalUsersSchema)` to create a new message.
+ */
+export const LocalUsersSchema: GenMessage<LocalUsers> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 22);
+
+/**
+ * @generated from message lindm.inventory.v1.BackendDetails
+ */
+export type BackendDetails = Message<"lindm.inventory.v1.BackendDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool dpkg = 1;
+   */
+  dpkg?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool rpm = 2;
+   */
+  rpm?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool pacman = 3;
+   */
+  pacman?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool zypper = 4;
+   */
+  zypper?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool rpm_ostree = 5;
+   */
+  rpmOstree?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool nix = 6;
+   */
+  nix?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool flatpak = 7;
+   */
+  flatpak?: ObservedBool | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedBool snap = 8;
+   */
+  snap?: ObservedBool | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.BackendDetails.
+ * Use `create(BackendDetailsSchema)` to create a new message.
+ */
+export const BackendDetailsSchema: GenMessage<BackendDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 23);
+
+/**
+ * @generated from message lindm.inventory.v1.Application
+ */
+export type Application = Message<"lindm.inventory.v1.Application"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString version = 2;
+   */
+  version?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString architecture = 3;
+   */
+  architecture?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString scope = 4;
+   */
+  scope?: ObservedString | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.Application.
+ * Use `create(ApplicationSchema)` to create a new message.
+ */
+export const ApplicationSchema: GenMessage<Application> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 24);
+
+/**
+ * @generated from message lindm.inventory.v1.ApplicationDetails
+ */
+export type ApplicationDetails = Message<"lindm.inventory.v1.ApplicationDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated lindm.inventory.v1.Application applications = 2;
+   */
+  applications: Application[];
+};
+
+/**
+ * Describes the message lindm.inventory.v1.ApplicationDetails.
+ * Use `create(ApplicationDetailsSchema)` to create a new message.
+ */
+export const ApplicationDetailsSchema: GenMessage<ApplicationDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 25);
+
+/**
+ * @generated from message lindm.inventory.v1.NativeDetails
+ */
+export type NativeDetails = Message<"lindm.inventory.v1.NativeDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CpuDetails cpu = 1;
+   */
+  cpu?: CpuDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.MemoryDetails memory = 2;
+   */
+  memory?: MemoryDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.StorageDetails storage = 3;
+   */
+  storage?: StorageDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.NetworkDetails network = 4;
+   */
+  network?: NetworkDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.FirmwareDetails firmware = 5;
+   */
+  firmware?: FirmwareDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.TpmDetails tpm = 6;
+   */
+  tpm?: TpmDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.PowerDetails power = 7;
+   */
+  power?: PowerDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.SessionCounts sessions = 8;
+   */
+  sessions?: SessionCounts | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.LocalUsers local_users = 9;
+   */
+  localUsers?: LocalUsers | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 kernel_module_count = 10;
+   */
+  kernelModuleCount?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 uptime_seconds = 11;
+   */
+  uptimeSeconds?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedUint64 boot_time_unix_seconds = 12;
+   */
+  bootTimeUnixSeconds?: ObservedUint64 | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.BackendDetails backends = 13;
+   */
+  backends?: BackendDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ApplicationDetails flatpak = 14;
+   */
+  flatpak?: ApplicationDetails | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ApplicationDetails snap = 15;
+   */
+  snap?: ApplicationDetails | undefined;
+
+  /**
+   * Absent only on historical host evidence.
+   *
+   * @generated from field: lindm.inventory.v1.PlatformDetails platform = 16;
+   */
+  platform?: PlatformDetails | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.NativeDetails.
+ * Use `create(NativeDetailsSchema)` to create a new message.
+ */
+export const NativeDetailsSchema: GenMessage<NativeDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 26);
+
+/**
+ * Module identity is native RPM MODULARITYLABEL evidence, not a guessed stream.
+ *
+ * @generated from message lindm.inventory.v1.ModuleObservation
+ */
+export type ModuleObservation = Message<"lindm.inventory.v1.ModuleObservation"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: bool modular = 2;
+   */
+  modular: boolean;
+
+  /**
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string stream = 4;
+   */
+  stream: string;
+
+  /**
+   * @generated from field: string version = 5;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string context = 6;
+   */
+  context: string;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.ModuleObservation.
+ * Use `create(ModuleObservationSchema)` to create a new message.
+ */
+export const ModuleObservationSchema: GenMessage<ModuleObservation> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 27);
+
+/**
+ * @generated from message lindm.inventory.v1.RepositoryObservation
+ */
+export type RepositoryObservation = Message<"lindm.inventory.v1.RepositoryObservation"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.CollectionStatus status = 1;
+   */
+  status: CollectionStatus;
+
+  /**
+   * @generated from field: repeated string ids = 2;
+   */
+  ids: string[];
+
+  /**
+   * @generated from field: string backend = 3;
+   */
+  backend: string;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.RepositoryObservation.
+ * Use `create(RepositoryObservationSchema)` to create a new message.
+ */
+export const RepositoryObservationSchema: GenMessage<RepositoryObservation> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 28);
+
+/**
+ * @generated from message lindm.inventory.v1.PlatformDetails
+ */
+export type PlatformDetails = Message<"lindm.inventory.v1.PlatformDetails"> & {
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString cpe = 1;
+   */
+  cpe?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.ObservedString releasever_lock = 2;
+   */
+  releaseverLock?: ObservedString | undefined;
+
+  /**
+   * @generated from field: lindm.inventory.v1.RepositoryObservation repositories = 3;
+   */
+  repositories?: RepositoryObservation | undefined;
+};
+
+/**
+ * Describes the message lindm.inventory.v1.PlatformDetails.
+ * Use `create(PlatformDetailsSchema)` to create a new message.
+ */
+export const PlatformDetailsSchema: GenMessage<PlatformDetails> = /*@__PURE__*/
+  messageDesc(file_lindm_inventory_v1_observation, 29);
 
 /**
  * CollectionStatus describes collection, not compliance or server freshness.

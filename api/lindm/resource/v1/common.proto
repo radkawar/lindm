@@ -1,0 +1,359 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/identity.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+enum SecretPurpose {
+  SECRET_PURPOSE_UNSPECIFIED = 0;
+  SECRET_PURPOSE_PASSWORD_HASH = 1;
+  SECRET_PURPOSE_WIFI_PSK = 2;
+  SECRET_PURPOSE_EAP_PASSWORD = 3;
+  SECRET_PURPOSE_VPN_AUTHENTICATION = 4;
+  SECRET_PURPOSE_WIREGUARD_PRIVATE_KEY = 5;
+  SECRET_PURPOSE_WIREGUARD_PRESHARED_KEY = 6;
+  SECRET_PURPOSE_PROXY_AUTHENTICATION = 7;
+  SECRET_PURPOSE_REPOSITORY_AUTHENTICATION = 8;
+  SECRET_PURPOSE_DIRECTORY_JOIN = 9;
+}
+message SecretRef {
+  string secret_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 version = 2 [(buf.validate.field).uint64.gt = 0];
+  SecretPurpose purpose = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string subject_binding_id = 4 [(buf.validate.field).string.uuid = true];
+}
+message ArtifactRef {
+  bytes sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  uint64 size_bytes = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 1099511627776
+  }];
+  string artifact_id = 3 [(buf.validate.field).string.uuid = true];
+}
+message SystemScope {}
+message ConnectionScope {
+  string connection_uuid = 1 [(buf.validate.field).string.uuid = true];
+}
+message DeviceBinding {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 2 [(buf.validate.field).string.uuid = true];
+}
+message NativeAccountBinding {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+    pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]*[$]?$"
+  }];
+  uint32 uid = 2;
+  string uid_generation = 3 [(buf.validate.field).string.uuid = true];
+}
+message PersonBinding {
+  DeviceBinding device = 1 [(buf.validate.field).required = true];
+  string assignment_id = 2 [(buf.validate.field).string.uuid = true];
+  NativeAccountBinding account = 3 [(buf.validate.field).required = true];
+}
+enum Desktop {
+  DESKTOP_UNSPECIFIED = 0;
+  DESKTOP_GNOME = 1;
+  DESKTOP_KDE = 2;
+}
+message PersonDesktopBinding {
+  PersonBinding person = 1 [(buf.validate.field).required = true];
+  Desktop desktop = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+message InstallationBinding {
+  oneof binding {
+    option (buf.validate.oneof).required = true;
+    DeviceBinding system = 1;
+    PersonBinding person = 2;
+  }
+}
+message CredentialSubjectBinding {
+  oneof binding {
+    option (buf.validate.oneof).required = true;
+    DeviceBinding device = 1;
+    PersonBinding person = 2;
+  }
+}
+message SessionScope {
+  oneof binding {
+    option (buf.validate.oneof).required = true;
+    DeviceBinding system_login = 1;
+    PersonDesktopBinding person_desktop = 2;
+  }
+}
+message CIDR {
+  string network_address = 1 [(buf.validate.field).string.ip = true];
+  uint32 prefix_length = 2 [(buf.validate.field).uint32.lte = 128];
+  option (buf.validate.message).cel = {
+    id: "cidr.family"
+    message: "IPv4 prefix must be at most 32 bits"
+    expression: "this.network_address.contains(':') || this.prefix_length <= 32"
+  };
+}
+message PortRange {
+  uint32 first = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  uint32 last = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+  option (buf.validate.message).cel = {
+    id: "port_range.order"
+    message: "port range is inclusive and ordered"
+    expression: "this.first <= this.last"
+  };
+}
+message InterfaceSelector {
+  oneof identity {
+    option (buf.validate.oneof).required = true;
+    string permanent_mac = 1 [(buf.validate.field).string.pattern = "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"];
+    string hardware_id = 2 [(buf.validate.field).string = {
+      min_len: 1
+      max_len: 256
+    }];
+  }
+  optional string ifname = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 15
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+}
+message Host {
+  oneof address {
+    option (buf.validate.oneof).required = true;
+    string ip = 1 [(buf.validate.field).string.ip = true];
+    // UTS #46 non-transitional IDNA ASCII, lowercase, with no trailing dot.
+    string dns = 2 [(buf.validate.field).string = {
+      hostname: true
+      max_len: 253
+    }];
+  }
+}
+message Endpoint {
+  Host host = 1 [(buf.validate.field).required = true];
+  uint32 port = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 65535
+  }];
+}
+message DomainList {
+  repeated string names = 1 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {
+        hostname: true
+        max_len: 253
+      }
+    }
+  }];
+}
+enum CertificatePurpose {
+  CERTIFICATE_PURPOSE_UNSPECIFIED = 0;
+  CERTIFICATE_PURPOSE_SERVER_AUTH = 1;
+  CERTIFICATE_PURPOSE_CLIENT_AUTH = 2;
+  CERTIFICATE_PURPOSE_CODE_SIGNING = 3;
+  CERTIFICATE_PURPOSE_EMAIL_PROTECTION = 4;
+}
+message CertificateTrustRefs {
+  repeated ResourceRef certificates = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  option (buf.validate.message).cel = {
+    id: "certificate_trust_refs.kind"
+    message: "trust references must identify CA resources"
+    expression: "this.certificates.all(r, r.kind == 7)"
+  };
+}
+enum OwnershipMode {
+  OWNERSHIP_MODE_UNSPECIFIED = 0;
+  OWNERSHIP_MODE_CREATE_ONLY = 1;
+  OWNERSHIP_MODE_APPROVED_ADOPTION = 2;
+}
+enum ReleaseBehavior {
+  RELEASE_BEHAVIOR_UNSPECIFIED = 0;
+  RELEASE_BEHAVIOR_RESTORE_OWNED = 1;
+  RELEASE_BEHAVIOR_RETAIN = 2;
+}
+message OwnershipPolicy {
+  OwnershipMode mode = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  ReleaseBehavior release = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional string adoption_approval_id = 3 [(buf.validate.field).string.uuid = true];
+  bool complete_membership_dimension = 4;
+  option (buf.validate.message).cel = {
+    id: "ownership_policy.approval"
+    message: "adoption requires an approval binding"
+    expression: "(this.mode == 2) == has(this.adoption_approval_id)"
+  };
+}
+enum HealthCheck {
+  HEALTH_CHECK_UNSPECIFIED = 0;
+  HEALTH_CHECK_NATIVE_STATE = 1;
+  HEALTH_CHECK_CONNECTIVITY = 2;
+  HEALTH_CHECK_AUTHENTICATION = 3;
+  HEALTH_CHECK_APPLICATION_READY = 4;
+  HEALTH_CHECK_NEW_BOOT = 5;
+  HEALTH_CHECK_VISIBLE_SESSION = 6;
+}
+message VerificationPolicy {
+  uint32 max_age_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 30
+    lte: 604800
+  }];
+  repeated HealthCheck checks = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+}
+message PlatformProduct {
+  string os_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z0-9_.-]+$"
+  }];
+  string product = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string version = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string architecture = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-zA-Z0-9_.-]+$"
+  }];
+}
+enum ResourceFeature {
+  RESOURCE_FEATURE_UNSPECIFIED = 0;
+  RESOURCE_FEATURE_SAFE_RELEASE = 1;
+  RESOURCE_FEATURE_NETWORK_TIME_SECURITY = 2;
+  RESOURCE_FEATURE_FIREWALL_FORWARD = 3;
+  RESOURCE_FEATURE_FIREWALL_DEFAULT_EGRESS = 4;
+  RESOURCE_FEATURE_FIREWALL_ZONE_BINDING = 5;
+  RESOURCE_FEATURE_DNSSEC = 6;
+  RESOURCE_FEATURE_DNS_OVER_TLS = 7;
+  RESOURCE_FEATURE_WIFI_EAP = 8;
+  RESOURCE_FEATURE_VPN_OPENVPN = 9;
+  RESOURCE_FEATURE_VPN_WIREGUARD = 10;
+  RESOURCE_FEATURE_VPN_IPSEC = 11;
+  RESOURCE_FEATURE_VISIBLE_LOCK = 12;
+  RESOURCE_FEATURE_PAM_PASSWORD_QUALITY = 13;
+  RESOURCE_FEATURE_PAM_HISTORY = 14;
+  RESOURCE_FEATURE_PAM_LOCKOUT = 15;
+  RESOURCE_FEATURE_SECURITY_ADVISORIES = 16;
+  RESOURCE_FEATURE_TPM_KEY = 17;
+  RESOURCE_FEATURE_PKCS11_KEY = 18;
+}
+message Applicability {
+  repeated PlatformProduct products = 1 [(buf.validate.field).repeated.max_items = 64];
+  repeated ResourceFeature features = 2 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+}
+enum Backend {
+  BACKEND_UNSPECIFIED = 0;
+  BACKEND_SYSTEMD = 1;
+  BACKEND_SHADOW = 2;
+  BACKEND_SUDO = 3;
+  BACKEND_OPENSSH = 4;
+  BACKEND_CHRONY = 5;
+  BACKEND_TIMESYNCD = 6;
+  BACKEND_DEBIAN_TRUST = 7;
+  BACKEND_P11_KIT = 8;
+  BACKEND_FIREWALLD = 9;
+  BACKEND_NFTABLES = 10;
+  BACKEND_UFW = 11;
+  BACKEND_NETWORK_MANAGER = 12;
+  BACKEND_RESOLVED = 13;
+  BACKEND_SYSTEM_ENVIRONMENT = 14;
+  BACKEND_APT = 15;
+  BACKEND_DNF4 = 16;
+  BACKEND_DNF5 = 17;
+  BACKEND_ZYPPER = 18;
+  BACKEND_ALPM = 19;
+  BACKEND_RPM_OSTREE = 20;
+  BACKEND_NIXOS = 21;
+  BACKEND_FLATPAK = 22;
+  BACKEND_SNAP = 23;
+  BACKEND_GNOME = 24;
+  BACKEND_KDE = 25;
+  BACKEND_LOGIND = 26;
+  BACKEND_AUTHSELECT = 27;
+  BACKEND_PAM_AUTH_UPDATE = 28;
+  BACKEND_PAM_CONFIG = 29;
+  BACKEND_NATIVE_PAM = 30;
+  BACKEND_CERTIFICATE_ISSUER = 31;
+  BACKEND_REALMD_SSSD = 32;
+  BACKEND_SSSD = 33;
+  BACKEND_NSS_TRUST = 34;
+  BACKEND_JAVA_TRUST = 35;
+}
+message BackendSelection {
+  Backend backend = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string native_version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string provider_version = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  PlatformProduct product = 4 [(buf.validate.field).required = true];
+  repeated ResourceFeature features = 5 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+}
+// These receipts describe observed facts, not a replacement for native evidence.
+message ProbeReceipt {
+  string probe_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp observed_at = 2 [(buf.validate.field).required = true];
+  bool passed = 3;
+  bytes evidence_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  string reason = 5 [(buf.validate.field).string.max_len = 512];
+}

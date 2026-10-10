@@ -14,28 +14,24 @@ import (
 
 // canonicalSpec preserves semantic values while making resource/dependency order
 // and UUID spelling irrelevant to immutable revision and request identities.
-func canonicalSpec(ctx context.Context, input *policyv1.ServiceProfileSpec) (*policyv1.ServiceProfileSpec, [sha256.Size]byte, error) {
+func canonicalSpec(ctx context.Context, input *policyv1.ResourceProfile) (*policyv1.ResourceProfile, [sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
 	if err := Validate(ctx, input); err != nil {
 		return nil, zero, err
 	}
 	spec := proto.CloneOf(input)
+	if _, err := canonicalizeSets(spec.ProtoReflect(), true); err != nil {
+		return nil, zero, err
+	}
 	for _, resource := range spec.GetResources() {
 		id, err := uuid.Parse(resource.GetResourceId())
 		if err != nil {
 			return nil, zero, err
 		}
 		resource.ResourceId = id.String()
-		for i, value := range resource.GetDependsOn() {
-			dependency, err := uuid.Parse(value)
-			if err != nil {
-				return nil, zero, err
-			}
-			resource.DependsOn[i] = dependency.String()
-		}
-		slices.Sort(resource.DependsOn)
+		slices.SortFunc(resource.DependsOn, compareDependency)
 	}
-	slices.SortFunc(spec.Resources, func(a, b *policyv1.ServiceProfileResource) int {
+	slices.SortFunc(spec.Resources, func(a, b *policyv1.ProfileResource) int {
 		return strings.Compare(a.GetResourceId(), b.GetResourceId())
 	})
 	// UUID aliases must not collapse two resources or dependencies after encoding.
@@ -46,5 +42,14 @@ func canonicalSpec(ctx context.Context, input *policyv1.ServiceProfileSpec) (*po
 	if err != nil {
 		return nil, zero, err
 	}
-	return spec, sha256.Sum256(encoded), nil
+	return spec, profileDigest(encoded), nil
+}
+
+func profileDigest(encoded []byte) [sha256.Size]byte {
+	hash := sha256.New()
+	_, _ = hash.Write([]byte("lindm.resource-profile.spec.v1\x00"))
+	_, _ = hash.Write(encoded)
+	var digest [sha256.Size]byte
+	hash.Sum(digest[:0])
+	return digest
 }

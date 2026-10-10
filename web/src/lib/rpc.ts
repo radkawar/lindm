@@ -1,6 +1,8 @@
 import { createClient, type Interceptor } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AdminService } from "../../gen/lindm/admin/v1/admin_pb";
+import { IntegrationService } from "../../gen/lindm/integrations/v1/delivery_pb";
+import { ReportService } from "../../gen/lindm/integrations/v1/reports_pb";
 
 let csrfToken = "";
 
@@ -27,4 +29,8 @@ const transport = createConnectTransport({
   fetch: (input, init) => fetch(input, { ...init, credentials: "same-origin", cache: "no-store" }),
 });
 
-export const adminClient = createClient(AdminService, transport);
+export const adminClient = Object.assign(
+  createClient(AdminService, transport),
+  createClient(IntegrationService, transport),
+  createClient(ReportService, transport),
+);

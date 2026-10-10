@@ -1,0 +1,189 @@
+import {
+  createRegistry,
+  fromJsonString,
+  toJsonString,
+  type DescMessage,
+  type MessageShape,
+} from "@bufbuild/protobuf";
+import { createValidator } from "@bufbuild/protovalidate";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useId, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { ProtobufFields } from "@/components/ui/protobuf-fields";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
+import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+
+const validator = createValidator({ registry: createRegistry(audit_reason) });
+type Attempt = {
+  document: string;
+  status: "pending" | "accepted" | "ambiguous" | "rejected";
+  failure?: RpcFailure;
+};
+const attempts = new Map<string, Attempt>();
+const listeners = new Set<() => void>();
+function notify() {
+  for (const listener of listeners) listener();
+}
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+subscribeAuthLifetime(() => {
+  attempts.clear();
+  notify();
+});
+
+// Frozen requests survive route navigation in this principal's tab memory only.
+export function TargetMutation<S extends DescMessage>({
+  title,
+  formKey,
+  schema,
+  initial,
+  send,
+  onAccepted,
+}: {
+  title: string;
+  formKey: string;
+  schema: S;
+  initial: () => MessageShape<S>;
+  send: (request: MessageShape<S>, signal: AbortSignal) => Promise<unknown>;
+  onAccepted?: () => void;
+}) {
+  const lifetime = useAuthLifetime();
+  const client = useQueryClient();
+  const id = useId();
+  const attempt = useSyncExternalStore(subscribe, () => attempts.get(formKey));
+  const [document, setDocument] = useState(() =>
+    toJsonString(schema, initial(), { prettySpaces: 2 }),
+  );
+  const [error, setError] = useState("");
+  const mutation = useMutation({
+    retry: false,
+    gcTime: 0,
+    meta: { authGeneration: lifetime.generation },
+    mutationFn: async (request: MessageShape<S>) => {
+      const result = await send(request, lifetime.signal);
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+    onSuccess: () => {
+      if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
+      const current = attempts.get(formKey);
+      if (current) attempts.set(formKey, { ...current, status: "accepted" });
+      notify();
+      toast.success(`${title} accepted`);
+      void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
+      onAccepted?.();
+    },
+    onError: (cause) => {
+      if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
+      const failure = toRpcFailure(cause);
+      const current = attempts.get(formKey);
+      if (current)
+        attempts.set(formKey, {
+          ...current,
+          status: failure.ambiguous ? "ambiguous" : "rejected",
+          failure,
+        });
+      notify();
+    },
+  });
+  return (
+    <form
+      className="grid min-w-0 gap-3 border p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const current = attempts.get(formKey);
+        if (current && current.status !== "ambiguous") return;
+        try {
+          const request = fromJsonString(schema, current?.document ?? document);
+          const validation = validator.validate(schema, request);
+          if (validation.kind !== "valid") {
+            setError(
+              validation.kind === "invalid"
+                ? validation.violations.map((item) => item.toString()).join("; ")
+                : validation.error.message,
+            );
+            return;
+          }
+          attempts.set(formKey, {
+            document: toJsonString(schema, request, { prettySpaces: 2 }),
+            status: "pending",
+          });
+          notify();
+          setError("");
+          mutation.mutate(request);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Invalid protobuf JSON");
+        }
+      }}
+    >
+      <Label htmlFor={id}>{title} — typed request (protobuf JSON)</Label>
+      <p className="text-sm text-muted-foreground">
+        Specify an audit reason and exact expected revision where required. Unknown fields are
+        rejected. Sending captures the complete request, including its request ID. Requests are
+        never retried automatically.
+      </p>
+      <Textarea
+        id={id}
+        rows={12}
+        className="font-mono text-xs"
+        spellCheck={false}
+        value={attempt?.document ?? document}
+        readOnly={!!attempt}
+        onChange={(event) => setDocument(event.target.value)}
+      />
+      <ProtobufFields schema={schema} />
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      {attempt?.failure ? (
+        <Alert variant="destructive">
+          <AlertTitle>
+            {attempt.status === "ambiguous" ? "Outcome unknown" : "Request rejected"}
+          </AlertTitle>
+          <AlertDescription>
+            {attempt.failure.codeName}: {attempt.failure.message}
+            {attempt.status === "ambiguous"
+              ? " Retry only the exact captured request. Starting another request does not cancel this one."
+              : " Refresh server state before preparing a new request; no automatic rebase occurs."}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {attempt?.status === "accepted" ? (
+        <p role="status" className="text-sm">
+          Request accepted. This is not evidence of native execution or compliance.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {!attempt || attempt.status === "ambiguous" ? (
+          <Button type="submit">{attempt ? "Retry same request" : title}</Button>
+        ) : null}
+        {attempt?.status === "pending" ? <Button disabled>Sending…</Button> : null}
+        {attempt && attempt.status !== "pending" ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              // A new attempt must have a distinct request ID, never silently reuse the frozen identity.
+              setDocument(toJsonString(schema, initial(), { prettySpaces: 2 }));
+              attempts.delete(formKey);
+              notify();
+              setError("");
+            }}
+          >
+            Prepare a different request
+          </Button>
+        ) : null}
+      </div>
+    </form>
+  );
+}

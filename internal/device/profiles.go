@@ -14,10 +14,10 @@ import (
 	"lindm/internal/policy"
 )
 
-func (s *Service) PublishServiceProfileRevision(ctx context.Context, req *connect.Request[adminv1.PublishServiceProfileRevisionRequest]) (*connect.Response[adminv1.PublishServiceProfileRevisionResponse], error) {
+func (s *Service) PublishProfileRevision(ctx context.Context, req *connect.Request[adminv1.PublishProfileRevisionRequest]) (*connect.Response[adminv1.PublishProfileRevisionResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	actor, err := s.require(ctx, identity.PermissionManageProfiles)
+	actor, err := s.requireUnrestricted(ctx, identity.PermissionManageProfiles)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,9 @@ func (s *Service) PublishServiceProfileRevision(ctx context.Context, req *connec
 	if err != nil {
 		return nil, executionError(err)
 	}
+	if err := requireUnrestrictedPrincipal(approval.Principal(), identity.PermissionManageProfiles); err != nil {
+		return nil, err
+	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, mapErr(err)
@@ -56,13 +59,13 @@ func (s *Service) PublishServiceProfileRevision(ctx context.Context, req *connec
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)
 	}
-	return noStore(&adminv1.PublishServiceProfileRevisionResponse{Revision: revision}), nil
+	return noStore(&adminv1.PublishProfileRevisionResponse{Revision: revision}), nil
 }
 
-func (s *Service) GetServiceProfileRevision(ctx context.Context, req *connect.Request[adminv1.GetServiceProfileRevisionRequest]) (*connect.Response[adminv1.GetServiceProfileRevisionResponse], error) {
+func (s *Service) GetProfileRevision(ctx context.Context, req *connect.Request[adminv1.GetProfileRevisionRequest]) (*connect.Response[adminv1.GetProfileRevisionResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadFleet); err != nil {
+	if _, err := s.requireUnrestricted(ctx, identity.PermissionReadFleet); err != nil {
 		return nil, err
 	}
 	if err := s.acquire(ctx); err != nil {
@@ -91,13 +94,13 @@ func (s *Service) GetServiceProfileRevision(ctx context.Context, req *connect.Re
 	if err != nil {
 		return nil, profileError(err)
 	}
-	return noStore(&adminv1.GetServiceProfileRevisionResponse{Revision: revision}), nil
+	return noStore(&adminv1.GetProfileRevisionResponse{Revision: revision}), nil
 }
 
-func (s *Service) ListServiceProfiles(ctx context.Context, req *connect.Request[adminv1.ListServiceProfilesRequest]) (*connect.Response[adminv1.ListServiceProfilesResponse], error) {
+func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1.ListProfilesRequest]) (*connect.Response[adminv1.ListProfilesResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadFleet); err != nil {
+	if _, err := s.requireUnrestricted(ctx, identity.PermissionReadFleet); err != nil {
 		return nil, err
 	}
 	if err := s.acquire(ctx); err != nil {
@@ -140,7 +143,7 @@ func (s *Service) ListServiceProfiles(ctx context.Context, req *connect.Request[
 			break
 		}
 	}
-	return noStore(&adminv1.ListServiceProfilesResponse{Profiles: rows, NextPageToken: encodeProfileCursor(next)}), nil
+	return noStore(&adminv1.ListProfilesResponse{Profiles: rows, NextPageToken: encodeProfileCursor(next)}), nil
 }
 
 func encodeProfileCursor(id uuid.UUID) string {

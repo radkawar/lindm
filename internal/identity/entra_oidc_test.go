@@ -104,8 +104,12 @@ func TestEntraOIDCClaimCorrelation(t *testing.T) {
 				test.change(claims)
 			}
 			signed.Store(signEntraFixture(t, key, claims))
-			got, err := service.exchangeAndVerify(ctx, "fixture-code", verifier, nonceHash(nonce))
-			if got != test.want || (err == nil) != (test.want != uuid.Nil) {
+			got, lineage, err := service.exchangeAndVerify(ctx, "fixture-code", verifier, nonceHash(nonce))
+			want := ""
+			if test.want != uuid.Nil {
+				want = test.want.String()
+			}
+			if got != want || lineage != nil || (err == nil) != (test.want != uuid.Nil) {
 				t.Fatalf("principal object = %s, err = %v, want %s", got, err, test.want)
 			}
 		})
@@ -138,15 +142,15 @@ func TestEntraSharedAuthorityFences(t *testing.T) {
 	lineage := identitydb.PrincipalLineage{DirectoryConnector: connectorEntra, UpstreamProvider: issuer, UpstreamSubject: object.String(), UpstreamObservedAt: pgStamp(now, true)}
 	row := identitydb.Principal{Issuer: issuer, Subject: object.String(), DirectoryEnabled: true}
 	snapshot := service.snapshotFrom(row, lineage, []string{group.String()})
-	decision := decideAccess(now, issuer, []string{group.String()}, snapshot)
+	decision := decideAccess(now, issuer, mappedPolicy(t, group.String()), snapshot)
 	if decision.Kind != accessOK || decision.Role != RoleAdmin || needsRefresh(now.Add(29*time.Second), snapshot) || !needsRefresh(now.Add(30*time.Second), snapshot) {
 		t.Fatalf("fresh Entra authority = %+v", decision)
 	}
-	if decideAccess(now.Add(60*time.Second+time.Nanosecond), issuer, []string{group.String()}, snapshot).Kind == accessOK {
+	if decideAccess(now.Add(60*time.Second+time.Nanosecond), issuer, mappedPolicy(t, group.String()), snapshot).Kind == accessOK {
 		t.Fatal("Entra bypassed common 60-second freshness bound")
 	}
 	snapshot.RefreshFailed = true
-	if decideAccess(now, issuer, []string{group.String()}, snapshot).Kind == accessOK {
+	if decideAccess(now, issuer, mappedPolicy(t, group.String()), snapshot).Kind == accessOK {
 		t.Fatal("refresh failure retained access")
 	}
 	lineage.DirectoryConnector = connectorKeycloak
@@ -157,7 +161,7 @@ func TestEntraSharedAuthorityFences(t *testing.T) {
 	if source != connectorEntra {
 		t.Fatalf("Entra disable source = %q", source)
 	}
-	if effectiveRole("", []string{group.String()}, []string{uuid.NewString()}) != "" {
+	if effectiveRole("", []string{group.String()}, mappedPolicy(t, uuid.NewString())) != "" {
 		t.Fatal("unmapped group granted a role")
 	}
 	if effectiveRole(RoleOwner, nil, nil) != RoleOwner {

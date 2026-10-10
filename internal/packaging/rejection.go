@@ -19,13 +19,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// RejectionRequest requires the first positive build and its signed APT archive.
+// RejectionRequest requires a matching DEB/RPM build and signed APT archive,
+// or an Arch build alone. Arch cannot be combined with DEB/RPM inputs.
 // OutputDir must be empty, private 0700, and have trusted ancestry. Only a
 // purpose-marked development package signer is accepted; production is rejected.
 type RejectionRequest struct {
 	DEB       Artifact
 	RPM       Artifact
 	APT       *APTRepository
+	Arch      Artifact
 	Signer    SigningKey
 	OutputDir string
 }
@@ -39,8 +41,8 @@ type RejectionCase struct {
 	APT      *APTRepository `json:"apt,omitempty"`
 }
 
-// RejectionFixtures contains unsigned, tampered and wrong-signer cases for both
-// package managers. WrongSignerFingerprint is public evidence, never guest trust.
+// RejectionFixtures contains unsigned, tampered and wrong-signer cases for the
+// requested managers. WrongSignerFingerprint is public evidence, never guest trust.
 type RejectionFixtures struct {
 	Cases                  []RejectionCase `json:"cases"`
 	WrongSignerFingerprint string          `json:"wrong_signer_fingerprint"`
@@ -52,6 +54,9 @@ type RejectionFixtures struct {
 // Guest rejection and absence of installation side effects must be proved by
 // the caller; this producer makes no claim that a manager rejected a fixture.
 func BuildRejectionFixtures(ctx context.Context, req RejectionRequest) (result *RejectionFixtures, err error) {
+	if req.Arch.Format != "" {
+		return buildArchRejectionFixtures(ctx, req)
+	}
 	if req.Signer.Custody != CustodyDevelopment || req.APT == nil || req.APT.Custody != CustodyDevelopment {
 		return nil, fmt.Errorf("%w: rejection fixtures require development custody", ErrSigner)
 	}
@@ -118,7 +123,7 @@ func BuildRejectionFixtures(ctx context.Context, req RejectionRequest) (result *
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyDEB(ctx, work, deb.Path, deb.Version, deb.Architecture, deb.PayloadSHA256, nil); err != nil {
+	if err := verifyDEB(ctx, work, deb.Path, deb.Version, deb.Architecture, deb.PayloadSHA256, nil, agentProduct()); err != nil {
 		return nil, err
 	}
 	if err := rejectionVerifyPayloadClaim(ctx, work, rpm); err != nil {
@@ -185,7 +190,7 @@ func BuildRejectionFixtures(ctx context.Context, req RejectionRequest) (result *
 						return nil, err
 					}
 				}
-				if err := signRPM(ctx, work, variantRPM.Path, *wrong, wrong.PassphraseFile, gpg); err != nil {
+				if err := signRPM(ctx, work, variantRPM.Path, *wrong, wrong.PassphraseFile, gpg, DefaultSourceDateEpoch); err != nil {
 					return nil, err
 				}
 				variantRPM.SignerFingerprint = wrong.Fingerprint
@@ -243,9 +248,9 @@ func rejectionSnapshotArtifact(ctx context.Context, work, dir string, artifact A
 	if artifact.Architecture.Debian != "amd64" && artifact.Architecture.Debian != "arm64" {
 		return Artifact{}, ErrArchitecture
 	}
-	wantArch := Architecture{ELF: "EM_X86_64", GOARCH: "amd64", Debian: "amd64", RPM: "x86_64"}
+	wantArch := Architecture{ELF: "EM_X86_64", GOARCH: "amd64", Debian: "amd64", RPM: "x86_64", Arch: "x86_64"}
 	if artifact.Architecture.Debian == "arm64" {
-		wantArch = Architecture{ELF: "EM_AARCH64", GOARCH: "arm64", Debian: "arm64", RPM: "aarch64"}
+		wantArch = Architecture{ELF: "EM_AARCH64", GOARCH: "arm64", Debian: "arm64", RPM: "aarch64", Arch: "aarch64"}
 	}
 	if artifact.Architecture != wantArch {
 		return Artifact{}, ErrArchitecture

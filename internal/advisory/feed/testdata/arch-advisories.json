@@ -1,0 +1,9 @@
+[{
+    "name": "ASA-202102-25",
+    "date": "2021-02-12",
+    "group": "AVG-1530",
+    "package": "wpa_supplicant",
+    "severity": "High",
+    "type": "arbitrary code execution",
+    "reference": "https://lists.archlinux.org/pipermail/arch-security/2021-February/001744.html"
+  }]

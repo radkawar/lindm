@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -22,6 +24,7 @@ type sessionRecord struct {
 	Revoked        bool
 	BreakGlass     bool
 	IncidentReason string
+	Kind           string
 }
 
 type authWrite struct {
@@ -50,7 +53,11 @@ func (s *Service) withTx(ctx context.Context, fn func(*identitydb.Queries) error
 		return s.dbErr(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := fn(identitydb.New(tx)); err != nil {
+	q := identitydb.New(tx)
+	if err := s.lockPolicy(ctx, q); err != nil {
+		return err
+	}
+	if err := fn(q); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -92,7 +99,7 @@ func (s *Service) getSession(ctx context.Context, hash []byte) (sessionRecord, e
 		return sessionRecord{}, errUnauthenticated
 	}
 	_, revoked := timeFrom(row.RevokedAt)
-	return sessionRecord{PrincipalID: row.PrincipalID, Idle: idle, Absolute: absolute, Revoked: revoked, BreakGlass: row.BreakGlass, IncidentReason: row.IncidentReason}, nil
+	return sessionRecord{PrincipalID: row.PrincipalID, Idle: idle, Absolute: absolute, Revoked: revoked, BreakGlass: row.BreakGlass, IncidentReason: row.IncidentReason, Kind: row.Kind}, nil
 }
 
 func (s *Service) touch(ctx context.Context, cookie string) error {
@@ -110,6 +117,9 @@ func (s *Service) loadSnapshot(ctx context.Context, id uuid.UUID) (directorySnap
 }
 
 func (s *Service) readSnapshot(ctx context.Context, q *identitydb.Queries, row identitydb.Principal) (directorySnapshot, error) {
+	if err := s.checkPolicy(ctx, q); err != nil {
+		return directorySnapshot{}, err
+	}
 	if row.Issuer == s.localIssuer {
 		return s.readLocalSnapshot(ctx, q, row)
 	}
@@ -136,6 +146,9 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	if row.Issuer == s.localIssuer {
 		return s.readLocalSnapshot(ctx, q, row)
 	}
+	if cutoff, valid := timeFrom(row.LifecycleNotBefore); valid && !obs.AcquiredAt.After(cutoff) {
+		return directorySnapshot{}, errStaleObservation
+	}
 	existing, err := q.GetLineageForUpdate(ctx, principalID)
 	missing := false
 	if err != nil {
@@ -159,7 +172,25 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		deactivated:   prevDeactivated,
 		deactivatedAt: prevAt,
 	}
+	if s.broker != nil {
+		s.copyLineage(&w, existing, missing, row)
+		w.conflict = !obs.Found || !obs.Direct || !s.broker.qualified(obs.Lineage, row.Subject) ||
+			(!missing && !obs.Lineage.matches(existing))
+		if !w.conflict {
+			w.connector = obs.Lineage.Connector
+			w.upstreamProvider = obs.Lineage.UpstreamProvider
+			w.upstreamSubject = obs.Lineage.UpstreamSubject
+			w.brokerIssuer = obs.Lineage.BrokerIssuer
+			w.brokerSubject = obs.Lineage.BrokerSubject
+		}
+	}
 	switch {
+	case w.conflict:
+		w.observed = true
+		w.observedAt = obs.AcquiredAt
+		w.revoke = true
+		w.auditAction = auditLineageDenied
+		w.auditReason = reasonConflict
 	case !obs.Found:
 		w.enabled = false
 		w.observed = true
@@ -169,7 +200,7 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		w.revoke = true
 		w.auditAction = auditDisabled
 		w.auditReason = reasonAbsent
-	case !obs.Direct || obs.UserID.String() != row.Subject:
+	case !obs.Direct || obs.UserID != row.Subject:
 		w.enabled = false
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
@@ -186,13 +217,15 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		w.source, w.deactivatedAt = s.tombstone(row.DeactivationSource, prevAt, prevDeactivated, w.observedAt)
 		w.deactivated = true
 		w.revoke = true
-		s.copyLineage(&w, existing, missing, row)
+		if s.broker == nil {
+			s.copyLineage(&w, existing, missing, row)
+		}
 		if !prevDeactivated {
 			w.auditAction = auditDisabled
 			w.auditReason = reasonDisabled
 		}
 	default:
-		if row.Issuer != s.issuer || row.Subject != obs.UserID.String() || (!missing && s.lineageConflict(existing, s.issuer, obs.UserID.String())) {
+		if row.Issuer != s.issuer || row.Subject != obs.UserID || (!missing && s.lineageConflict(existing, s.issuer, obs.UserID)) {
 			w.conflict = true
 			w.enabled = false
 			w.observed = true
@@ -202,9 +235,11 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 			w.auditReason = reasonConflict
 			break
 		}
-		w.connector = s.connector()
-		w.upstreamProvider = row.Issuer
-		w.upstreamSubject = row.Subject
+		if s.broker == nil {
+			w.connector = s.connector()
+			w.upstreamProvider = row.Issuer
+			w.upstreamSubject = row.Subject
+		}
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
 		if row.DeactivationSource == deactivationSCIM {
@@ -239,6 +274,13 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	}); err != nil {
 		return directorySnapshot{}, s.dbErr(err)
 	}
+	if w.conflict {
+		// Losing qualification clears freshness, not ordering: an older in-flight
+		// authoritative read must not restore grants after this denial.
+		if err := q.AdvancePrincipalObservationFence(ctx, identitydb.AdvancePrincipalObservationFenceParams{ID: row.ID, ObservedAt: pgStamp(obs.AcquiredAt, true)}); err != nil {
+			return directorySnapshot{}, s.dbErr(err)
+		}
+	}
 	if err := s.persistLineage(ctx, q, row.ID, missing, existing, w); err != nil {
 		return directorySnapshot{}, err
 	}
@@ -260,9 +302,17 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	}
 	nextRole := ""
 	if w.enabled && !w.deactivated && qualified {
-		nextRole = effectiveRole(row.PinnedRole, w.groups, s.adminGroups)
+		nextRole = effectiveRole(row.PinnedRole, w.groups, s.policy)
 	}
-	authorizationVersion, err := s.persistAuthorization(ctx, q, row, nextRole)
+	var bindings []*authv1.RoleBinding
+	if nextRole != "" {
+		bindings = s.policy.bindings(row.PinnedRole, w.groups)
+	}
+	digest, err := bindingsDigest(bindings)
+	if err != nil {
+		return directorySnapshot{}, err
+	}
+	authorizationVersion, err := s.persistAuthorization(ctx, q, row, nextRole, digest)
 	if err != nil {
 		return directorySnapshot{}, err
 	}
@@ -297,11 +347,15 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		Groups:               w.groups,
 		AuthorizationVersion: authorizationVersion,
 		AuthorizationRole:    nextRole,
+		ServiceAccount:       row.ServiceAccount,
 	}, nil
 }
 
 func (s *Service) copyLineage(w *authWrite, existing identitydb.PrincipalLineage, missing bool, row identitydb.Principal) {
 	if missing {
+		if s.broker != nil {
+			return
+		}
 		w.connector = s.connector()
 		w.upstreamProvider = row.Issuer
 		w.upstreamSubject = row.Subject
@@ -422,7 +476,7 @@ func (s *Service) revokePrincipal(ctx context.Context, id uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		dec := decideAccess(s.clock(), s.accessIssuer(snap), s.adminGroups, snap)
+		dec := decideAccess(s.clock(), s.accessIssuer(snap), s.policy, snap)
 		if !dec.RevokeSessions {
 			return nil
 		}
@@ -461,7 +515,7 @@ func (s *Service) logout(ctx context.Context, cookie string, principalID uuid.UU
 			if err != nil {
 				return s.dbErr(err)
 			}
-			if err := q.BumpLocalAuthorization(ctx, identitydb.BumpLocalAuthorizationParams{ID: principalID, AuthorizationRole: account.Role}); err != nil {
+			if err := s.bumpLocalAuthorization(ctx, q, principalID, account.Role); err != nil {
 				return s.dbErr(err)
 			}
 			return s.insertAudit(ctx, q, &principalID, "identity.break_glass_terminated", principalResource(principalID), session.IncidentReason)
@@ -505,10 +559,14 @@ func (s *Service) snapshotFrom(row identitydb.Principal, lin identitydb.Principa
 		Groups:               groups,
 		AuthorizationVersion: row.AuthorizationVersion,
 		AuthorizationRole:    row.AuthorizationRole,
+		ServiceAccount:       row.ServiceAccount,
 	}
 }
 
 func (s *Service) lineageConflict(existing identitydb.PrincipalLineage, issuer, subject string) bool {
+	if s.broker != nil {
+		return !s.qualifiedLineage(issuer, subject, existing.DirectoryConnector, existing.UpstreamProvider, existing.UpstreamSubject, existing.BrokerIssuer, existing.BrokerSubject)
+	}
 	if existing.DirectoryConnector == "" && existing.UpstreamSubject == "" && existing.BrokerSubject == "" {
 		return false
 	}
@@ -531,10 +589,16 @@ func (s *Service) tombstone(source string, at time.Time, hasAt bool, now time.Ti
 	if source == deactivationSCIM && hasAt {
 		return deactivationSCIM, at
 	}
-	if source == s.connector() && hasAt {
-		return s.connector(), at
+	connector := s.connector()
+	if s.broker != nil {
+		// Deactivation records the provider family; the immutable connector
+		// instance and original issuer remain separately pinned in lineage.
+		connector = connectorKeycloak
 	}
-	return s.connector(), now
+	if source == connector && hasAt {
+		return connector, at
+	}
+	return connector, now
 }
 
 func principalResource(id uuid.UUID) string {
@@ -586,7 +650,7 @@ func (s *Service) databaseTime(ctx context.Context) (time.Time, error) {
 	return acquired, nil
 }
 
-func (s *Service) observeDirectory(ctx context.Context, subject uuid.UUID) (directoryObservation, error) {
+func (s *Service) observeDirectory(ctx context.Context, subject string) (directoryObservation, error) {
 	acquired, err := s.databaseTime(ctx)
 	if err != nil {
 		return directoryObservation{}, err
@@ -599,12 +663,12 @@ func (s *Service) observeDirectory(ctx context.Context, subject uuid.UUID) (dire
 	return obs, nil
 }
 
-func (s *Service) persistAuthorization(ctx context.Context, q *identitydb.Queries, row identitydb.Principal, nextRole string) (int64, error) {
-	if row.AuthorizationRole == nextRole {
+func (s *Service) persistAuthorization(ctx context.Context, q *identitydb.Queries, row identitydb.Principal, nextRole string, digest []byte) (int64, error) {
+	if row.AuthorizationRole == nextRole && bytes.Equal(row.AuthorizationDigest, digest) {
 		return row.AuthorizationVersion, nil
 	}
 	version, err := q.SetPrincipalAuthorization(ctx, identitydb.SetPrincipalAuthorizationParams{
-		ID: row.ID, ExpectedVersion: row.AuthorizationVersion, AuthorizationRole: nextRole,
+		ID: row.ID, ExpectedVersion: row.AuthorizationVersion, AuthorizationRole: nextRole, AuthorizationDigest: digest,
 	})
 	if err != nil {
 		return 0, s.dbErr(err)

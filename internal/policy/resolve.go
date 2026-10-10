@@ -1,6 +1,6 @@
-// Package policy retains immutable service profile revisions and resolves
-// assigned revisions into deterministic per-unit previews. Catalog publication
-// is separate from assignment activation and native execution.
+// Package policy retains immutable resource profile revisions and resolves
+// assignments into deterministic previews. Catalog publication is separate
+// from assignment activation and native execution.
 package policy
 
 import (
@@ -14,14 +14,15 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/protodata"
+	resourceidentity "lindm/internal/resource"
 )
 
 const maxAssignments = 128
 
-// ResolutionState is the consumer-visible outcome of one canonical unit.
+// ResolutionState is the consumer-visible outcome of one canonical resource.
 type ResolutionState int
 
 const (
@@ -30,7 +31,7 @@ const (
 	ResolutionBlocked
 )
 
-// ResolutionReason explains a non-ready outcome. ReasonNone accompanies a ready unit.
+// ResolutionReason explains a non-ready outcome. ReasonNone accompanies a ready resource.
 type ResolutionReason int
 
 const (
@@ -38,6 +39,7 @@ const (
 	ReasonEqualPriority
 	ReasonDependencyCycle
 	ReasonDependencyConflict
+	ReasonClaimConflict
 )
 
 // Assignment is one immutable profile revision competing at an explicit priority.
@@ -46,63 +48,72 @@ type Assignment struct {
 	ProfileID  string
 	RevisionID string
 	Priority   int32
-	Spec       *policyv1.ServiceProfileSpec
+	Spec       *policyv1.ResourceProfile
 }
 
-// Contributor identifies one resource that participated in a unit outcome.
+// Contributor identifies one resource that participated in a resource outcome.
 type Contributor struct {
 	ProfileID  string
 	RevisionID string
 	ResourceID string
 }
 
-// Resolution is the deterministic preview for one canonical unit. Desired is
+// Resolution is the deterministic preview for one canonical resource. Desired is
 // owned by the result. It is nil when State is ResolutionConflict so a conflict
 // cannot be applied as if a winner existed. A blocked result retains the merged
 // intent for preview and must not be activated.
 type Resolution struct {
-	Unit         string
-	Desired      *agentv1.ServiceDesiredState
+	Ref          *resourcev1.ResourceRef
+	Desired      *resourcev1.ResourceDesiredState
+	Resource     *policyv1.ProfileResource
 	State        ResolutionState
 	Reason       ResolutionReason
 	Contributors []Contributor
 	Overridden   []Contributor
-	Dependencies []string
+	Dependencies []*policyv1.ResourceDependency
 }
 
 var profileValidator = sync.OnceValues(func() (protovalidate.Validator, error) {
 	return protovalidate.New(protovalidate.WithMessages(
-		&policyv1.ServiceProfileSpec{},
-		&policyv1.ServiceProfileResource{},
-		&agentv1.ServiceDesiredState{},
+		&policyv1.ResourceProfile{},
+		&policyv1.ProfileResource{},
+		&resourcev1.ResourceDesiredState{},
 	), protovalidate.WithDisableLazy())
 })
 
 // Validate rejects a profile that violates the closed schema or contains a
 // dependency cycle. The spec is not modified.
-func Validate(ctx context.Context, spec *policyv1.ServiceProfileSpec) error {
+func Validate(ctx context.Context, spec *policyv1.ResourceProfile) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if spec == nil || !spec.ProtoReflect().IsValid() {
-		return errors.New("absent service profile")
+		return errors.New("absent resource profile")
+	}
+	if proto.Size(spec) > 1<<20 {
+		return errors.New("resource profile exceeds storage limit")
 	}
 	if err := protodata.ValidateClosed(spec.ProtoReflect()); err != nil {
-		return fmt.Errorf("service profile: %w", err)
+		return fmt.Errorf("resource profile: %w", err)
 	}
 	validator, err := profileValidator()
 	if err != nil {
-		return fmt.Errorf("compile service profile rules: %w", err)
+		return fmt.Errorf("compile resource profile rules: %w", err)
 	}
 	if err := validator.Validate(spec); err != nil {
-		return fmt.Errorf("service profile: %w", err)
+		return fmt.Errorf("resource profile: %w", err)
+	}
+	for _, item := range spec.GetResources() {
+		if err := resourceidentity.ValidateDesired(item.GetDesired()); err != nil {
+			return fmt.Errorf("profile resource: %w", err)
+		}
 	}
 	cyclic, err := dependencyCycle(ctx, spec)
 	if err != nil {
 		return err
 	}
 	if cyclic {
-		return errors.New("service profile dependency cycle")
+		return errors.New("resource profile dependency cycle")
 	}
 	return nil
 }
@@ -111,11 +122,11 @@ type contender struct {
 	profileID  string
 	revisionID string
 	priority   int32
-	resource   *policyv1.ServiceProfileResource
-	deps       []string
+	resource   *policyv1.ProfileResource
+	deps       []*policyv1.ResourceDependency
 }
 
-// Resolve merges assigned profile revisions into one preview per canonical unit.
+// Resolve merges assigned profile revisions into one preview per canonical resource.
 // Assignment order does not affect the result. Inputs are not modified.
 
 func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error) {
@@ -123,9 +134,14 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 		return nil, err
 	}
 	if len(assignments) > maxAssignments {
-		return nil, fmt.Errorf("service profile assignments exceed %d", maxAssignments)
+		return nil, fmt.Errorf("resource profile assignments exceed %d", maxAssignments)
 	}
-	seen := make(map[string]struct{}, len(assignments))
+	type assignmentKey struct {
+		profileID  string
+		revisionID string
+		priority   int32
+	}
+	seen := make(map[assignmentKey]*policyv1.ResourceProfile, len(assignments))
 	for i := range assignments {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -137,10 +153,6 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 		if err := canonicalID("revision_id", item.RevisionID); err != nil {
 			return nil, err
 		}
-		if _, ok := seen[item.ProfileID]; ok {
-			return nil, errors.New("duplicate service profile assignment")
-		}
-		seen[item.ProfileID] = struct{}{}
 		if err := Validate(ctx, item.Spec); err != nil {
 			return nil, err
 		}
@@ -149,22 +161,33 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 
 	for i := range assignments {
 		item := &assignments[i]
-		byID := make(map[string]*policyv1.ServiceProfileResource, len(item.Spec.GetResources()))
-		for _, resource := range item.Spec.GetResources() {
-			byID[resource.GetResourceId()] = resource
+		spec := item.Spec
+		ordered, err := canonicalizeSets(spec.ProtoReflect(), false)
+		if err != nil {
+			return nil, err
 		}
-		for _, resource := range item.Spec.GetResources() {
-			deps := make([]string, 0, len(resource.GetDependsOn()))
-			for _, depID := range resource.GetDependsOn() {
-				deps = append(deps, byID[depID].GetDesired().GetUnit())
+		if !ordered {
+			spec = proto.CloneOf(spec)
+			if _, err := canonicalizeSets(spec.ProtoReflect(), true); err != nil {
+				return nil, err
 			}
-			unit := resource.GetDesired().GetUnit()
+		}
+		key := assignmentKey{item.ProfileID, item.RevisionID, item.Priority}
+		if previous, exists := seen[key]; exists {
+			if !proto.Equal(previous, spec) {
+				return nil, errors.New("inconsistent immutable profile assignment")
+			}
+			continue
+		}
+		seen[key] = spec
+		for _, resource := range spec.GetResources() {
+			unit := refKey(resource.GetDesired().GetRef())
 			grouped[unit] = append(grouped[unit], contender{
 				profileID:  item.ProfileID,
 				revisionID: item.RevisionID,
 				priority:   item.Priority,
 				resource:   resource,
-				deps:       deps,
+				deps:       resource.GetDependsOn(),
 			})
 		}
 	}
@@ -190,21 +213,26 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 			}
 		}
 		resolution := &Resolution{
-			Unit:         unit,
+			Ref:          proto.CloneOf(winners[0].resource.GetDesired().GetRef()),
 			State:        ResolutionReady,
 			Contributors: contributors(winners),
 			Overridden:   contributors(losers),
-			Dependencies: winnerDependencies(winners),
 		}
-		desired, ok := mergeDesired(winners)
+		merged, ok := mergeResources(winners)
 		if !ok {
 			resolution.State = ResolutionConflict
 			resolution.Reason = ReasonEqualPriority
+			resolution.Dependencies = winnerDependencies(winners)
 		} else {
-			resolution.Desired = desired
+			resolution.Resource = merged
+			resolution.Desired = merged.GetDesired()
+			resolution.Dependencies = merged.GetDependsOn()
 		}
 		resolved[unit] = resolution
-		edges[unit] = resolution.Dependencies
+		edges[unit] = dependencyKeys(resolution.Dependencies)
+	}
+	if err := markClaimConflicts(ctx, resolved); err != nil {
+		return nil, err
 	}
 
 	cycles, err := markCycles(ctx, edges)
@@ -217,6 +245,7 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 			item.State = ResolutionConflict
 			item.Reason = ReasonDependencyCycle
 			item.Desired = nil
+			item.Resource = nil
 		}
 	}
 	if err := blockDependents(ctx, resolved); err != nil {
@@ -238,7 +267,7 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 func canonicalID(name, value string) error {
 	parsed, err := uuid.Parse(value)
 	if err != nil || parsed == uuid.Nil || parsed.String() != value {
-		return fmt.Errorf("malformed service profile %s", name)
+		return fmt.Errorf("malformed resource profile %s", name)
 	}
 	return nil
 }
@@ -275,78 +304,107 @@ func cmpString(a, b string) int {
 	}
 }
 
-func winnerDependencies(winners []contender) []string {
-	var deps []string
-	for _, item := range winners {
-		deps = append(deps, item.deps...)
-	}
-	if len(deps) == 0 {
-		return nil
-	}
-	slices.Sort(deps)
-	return slices.Compact(deps)
+func refKey(ref *resourcev1.ResourceRef) string {
+	// A decimal kind followed by a colon is an unambiguous pair encoding.
+	return fmt.Sprintf("%d:%s", ref.GetKind(), ref.GetCanonicalKey())
 }
 
-func mergeDesired(winners []contender) (*agentv1.ServiceDesiredState, bool) {
-	runtime, runtimeOK := mergeRuntime(winners)
-	enablement, enablementOK := mergeEnablement(winners)
-	if !runtimeOK || !enablementOK {
+func dependencyKeys(deps []*policyv1.ResourceDependency) []string {
+	keys := make([]string, len(deps))
+	for i, dep := range deps {
+		keys[i] = refKey(dep.GetRef())
+	}
+	return keys
+}
+
+func winnerDependencies(winners []contender) []*policyv1.ResourceDependency {
+	var deps []*policyv1.ResourceDependency
+	for _, item := range winners {
+		for _, dep := range item.deps {
+			deps = append(deps, proto.CloneOf(dep))
+		}
+	}
+	slices.SortFunc(deps, compareDependency)
+	return slices.CompactFunc(deps, func(a, b *policyv1.ResourceDependency) bool {
+		return proto.Equal(a, b)
+	})
+}
+
+func compareDependency(a, b *policyv1.ResourceDependency) int {
+	if c := cmpString(refKey(a.GetRef()), refKey(b.GetRef())); c != 0 {
+		return c
+	}
+	return int(a.GetCondition()) - int(b.GetCondition())
+}
+
+func mergeResources(winners []contender) (*policyv1.ProfileResource, bool) {
+	slices.SortFunc(winners, func(a, b contender) int {
+		if c := cmpString(a.profileID, b.profileID); c != 0 {
+			return c
+		}
+		return cmpString(a.resource.GetResourceId(), b.resource.GetResourceId())
+	})
+	merged := proto.CloneOf(winners[0].resource)
+	for _, item := range winners[1:] {
+		source := item.resource
+		// Metadata conveys authority and is never merged as desired dimensions.
+		if !proto.Equal(merged.GetOwnership(), source.GetOwnership()) ||
+			!proto.Equal(merged.GetVerification(), source.GetVerification()) ||
+			!proto.Equal(merged.GetApplicability(), source.GetApplicability()) {
+			return nil, false
+		}
+		if !mergeDesired(merged.Desired, source.GetDesired()) {
+			return nil, false
+		}
+	}
+	merged.DependsOn = winnerDependencies(winners)
+	for i := 1; i < len(merged.DependsOn); i++ {
+		if proto.Equal(merged.DependsOn[i-1].GetRef(), merged.DependsOn[i].GetRef()) {
+			return nil, false
+		}
+	}
+	if err := resourceidentity.ValidateDesired(merged.Desired); err != nil {
 		return nil, false
 	}
-	merged := proto.CloneOf(winners[0].resource.GetDesired())
-	merged.Runtime = runtime
-	merged.Enablement = enablement
 	return merged, true
 }
 
-func mergeRuntime(winners []contender) (agentv1.ServiceRuntimeState, bool) {
-	var (
-		chosen agentv1.ServiceRuntimeState
-		set    bool
-	)
-	for _, item := range winners {
-		value := item.resource.GetDesired().GetRuntime()
-		if value == agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED {
+func markClaimConflicts(ctx context.Context, resolved map[string]*Resolution) error {
+	type claimed struct {
+		item   *Resolution
+		claims []*resourcev1.ResourceClaim
+	}
+	items := make([]claimed, 0, len(resolved))
+	for _, item := range resolved {
+		if item.State != ResolutionReady {
 			continue
 		}
-		if set && value != chosen {
-			return 0, false
+		claims, err := resourceidentity.Claims(item.Desired)
+		if err != nil {
+			return err
 		}
-		chosen = value
-		set = true
+		items = append(items, claimed{item: item, claims: claims})
 	}
-	if !set {
-		return agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED, true
+	for i, left := range items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		for _, right := range items[i+1:] {
+			if resourceidentity.Conflicts(left.claims, right.claims) {
+				for _, item := range []*Resolution{left.item, right.item} {
+					item.State, item.Reason = ResolutionConflict, ReasonClaimConflict
+					item.Desired, item.Resource = nil, nil
+				}
+			}
+		}
 	}
-	return chosen, true
+	return nil
 }
 
-func mergeEnablement(winners []contender) (agentv1.ServiceEnablement, bool) {
-	var (
-		chosen agentv1.ServiceEnablement
-		set    bool
-	)
-	for _, item := range winners {
-		value := item.resource.GetDesired().GetEnablement()
-		if value == agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED {
-			continue
-		}
-		if set && value != chosen {
-			return 0, false
-		}
-		chosen = value
-		set = true
-	}
-	if !set {
-		return agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED, true
-	}
-	return chosen, true
-}
-
-func dependencyCycle(ctx context.Context, spec *policyv1.ServiceProfileSpec) (bool, error) {
+func dependencyCycle(ctx context.Context, spec *policyv1.ResourceProfile) (bool, error) {
 	edges := make(map[string][]string, len(spec.GetResources()))
 	for _, resource := range spec.GetResources() {
-		edges[resource.GetResourceId()] = resource.GetDependsOn()
+		edges[refKey(resource.GetDesired().GetRef())] = dependencyKeys(resource.GetDependsOn())
 	}
 	cycles, err := markCycles(ctx, edges)
 	return len(cycles) != 0, err
@@ -415,7 +473,8 @@ func blockDependents(ctx context.Context, resolved map[string]*Resolution) error
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		for _, dependency := range item.Dependencies {
+		for _, dep := range item.Dependencies {
+			dependency := refKey(dep.GetRef())
 			reverse[dependency] = append(reverse[dependency], unit)
 			if _, exists := resolved[dependency]; !exists && item.State == ResolutionReady {
 				item.State = ResolutionBlocked

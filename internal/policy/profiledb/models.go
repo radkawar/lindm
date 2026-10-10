@@ -9,13 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type ServiceProfile struct {
+type Profile struct {
 	ID             uuid.UUID
 	HeadRevisionID uuid.UUID
 	CreatedAt      pgtype.Timestamptz
 }
 
-type ServiceProfileRequest struct {
+type ProfileRequest struct {
 	RequestID     uuid.UUID
 	ActorID       uuid.UUID
 	RequestDigest []byte
@@ -24,7 +24,7 @@ type ServiceProfileRequest struct {
 	AuditID       uuid.UUID
 }
 
-type ServiceProfileRevision struct {
+type ProfileRevision struct {
 	ID             uuid.UUID
 	ProfileID      uuid.UUID
 	RevisionNumber int64

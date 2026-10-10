@@ -1,7 +1,7 @@
 //go:build linux
 
-// Package transport runs unprivileged observation and signed service-work relays.
-// It cannot enroll, reset protected identity or read device private keys.
+// Package transport runs unprivileged observation and signed action relays.
+// It cannot enroll, reset protected identity or read device private or recovery keys.
 package transport
 
 import (
@@ -60,6 +60,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	management := &managementLoop{executor: executor, gate: r.authorityGate}
 	stopManagement := management.start(ctx)
 	defer stopManagement()
+	stopUpdates := startAgentUpdates(ctx, executor)
+	defer stopUpdates()
 	for {
 		if err := ctx.Err(); err != nil {
 			return r.stopped()

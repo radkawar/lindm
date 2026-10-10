@@ -186,7 +186,8 @@ SELECT
     hardware_model_status,
     hardware_model_value,
     hardware_serial_status,
-    hardware_serial_value
+    hardware_serial_value,
+    details
 FROM host_observations
 WHERE generation_id = $1
 `
@@ -215,6 +216,7 @@ type GetHostObservationRow struct {
 	HardwareModelValue   string
 	HardwareSerialStatus int16
 	HardwareSerialValue  string
+	Details              []byte
 }
 
 func (q *Queries) GetHostObservation(ctx context.Context, generationID uuid.UUID) (GetHostObservationRow, error) {
@@ -244,6 +246,7 @@ func (q *Queries) GetHostObservation(ctx context.Context, generationID uuid.UUID
 		&i.HardwareModelValue,
 		&i.HardwareSerialStatus,
 		&i.HardwareSerialValue,
+		&i.Details,
 	)
 	return i, err
 }
@@ -605,12 +608,19 @@ type InsertSnapshotBatchesParams struct {
 }
 
 type InsertSnapshotPackagesParams struct {
-	SnapshotID   uuid.UUID
-	Position     int32
-	Name         string
-	Version      string
-	Architecture string
-	Manager      string
+	SnapshotID    uuid.UUID
+	Position      int32
+	Name          string
+	Version       string
+	Architecture  string
+	Manager       string
+	SourceName    string
+	SourceVersion string
+	ModuleStatus  int32
+	ModuleName    string
+	ModuleStream  string
+	ModuleVersion string
+	ModuleContext string
 }
 
 const listExpiredOpenSnapshots = `-- name: ListExpiredOpenSnapshots :many
@@ -791,7 +801,8 @@ func (q *Queries) ListReleasableSnapshotBulk(ctx context.Context, arg ListReleas
 }
 
 const listSnapshotPackages = `-- name: ListSnapshotPackages :many
-SELECT position, name, version, architecture, manager
+SELECT position, name, version, architecture, manager, source_name, source_version,
+       module_status, module_name, module_stream, module_version, module_context
 FROM snapshot_packages
 WHERE snapshot_id = $1
   AND position >= $2
@@ -814,11 +825,18 @@ type ListSnapshotPackagesParams struct {
 }
 
 type ListSnapshotPackagesRow struct {
-	Position     int32
-	Name         string
-	Version      string
-	Architecture string
-	Manager      string
+	Position      int32
+	Name          string
+	Version       string
+	Architecture  string
+	Manager       string
+	SourceName    string
+	SourceVersion string
+	ModuleStatus  int32
+	ModuleName    string
+	ModuleStream  string
+	ModuleVersion string
+	ModuleContext string
 }
 
 func (q *Queries) ListSnapshotPackages(ctx context.Context, arg ListSnapshotPackagesParams) ([]ListSnapshotPackagesRow, error) {
@@ -843,6 +861,13 @@ func (q *Queries) ListSnapshotPackages(ctx context.Context, arg ListSnapshotPack
 			&i.Version,
 			&i.Architecture,
 			&i.Manager,
+			&i.SourceName,
+			&i.SourceVersion,
+			&i.ModuleStatus,
+			&i.ModuleName,
+			&i.ModuleStream,
+			&i.ModuleVersion,
+			&i.ModuleContext,
 		); err != nil {
 			return nil, err
 		}
@@ -946,7 +971,8 @@ INSERT INTO host_observations (
     hardware_model_status,
     hardware_model_value,
     hardware_serial_status,
-    hardware_serial_value
+    hardware_serial_value,
+    details
 ) VALUES (
     $1,
     $2,
@@ -971,7 +997,8 @@ INSERT INTO host_observations (
     $21,
     $22,
     $23,
-    $24
+    $24,
+    $25
 )
 ON CONFLICT (generation_id) DO UPDATE SET
     sequence = EXCLUDED.sequence,
@@ -996,7 +1023,8 @@ ON CONFLICT (generation_id) DO UPDATE SET
     hardware_model_status = EXCLUDED.hardware_model_status,
     hardware_model_value = EXCLUDED.hardware_model_value,
     hardware_serial_status = EXCLUDED.hardware_serial_status,
-    hardware_serial_value = EXCLUDED.hardware_serial_value
+    hardware_serial_value = EXCLUDED.hardware_serial_value,
+    details = EXCLUDED.details
 `
 
 type UpsertHostObservationParams struct {
@@ -1024,6 +1052,7 @@ type UpsertHostObservationParams struct {
 	HardwareModelValue   string
 	HardwareSerialStatus int16
 	HardwareSerialValue  string
+	Details              []byte
 }
 
 func (q *Queries) UpsertHostObservation(ctx context.Context, arg UpsertHostObservationParams) error {
@@ -1052,6 +1081,7 @@ func (q *Queries) UpsertHostObservation(ctx context.Context, arg UpsertHostObser
 		arg.HardwareModelValue,
 		arg.HardwareSerialStatus,
 		arg.HardwareSerialValue,
+		arg.Details,
 	)
 	return err
 }

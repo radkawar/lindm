@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/lab/v1/images.proto.
  */
 export const file_lindm_lab_v1_images: GenFile = /*@__PURE__*/
-  fileDesc("ChlsaW5kbS9sYWIvdjEvaW1hZ2VzLnByb3RvEgxsaW5kbS5sYWIudjEi8wcKDUltYWdlTWFuaWZlc3QSLAoCaWQYASABKAlCILpIHXIbEAEYZDIVXlthLXowLTldW2EtejAtOS4tXSokEh8KDGRpc3RyaWJ1dGlvbhgCIAEoCUIJukgGcgQQARhkEhoKB3ZlcnNpb24YAyABKAlCCbpIBnIEEAEYZBIfCgxhcmNoaXRlY3R1cmUYBCABKAlCCbpIBnIEEAEYZBIaCgdlZGl0aW9uGAUgASgJQgm6SAZyBBABGGQSKwoHcmVsZWFzZRgGIAEoCUIaukgXchUQARhkWgZsYXRlc3RaB2N1cnJlbnQSPgoOaW1hZ2VfZmlsZW5hbWUYByABKAlCJrpII3IhGP8BMhxeW2EtekEtWjAtOV1bYS16QS1aMC05Ll8tXSokEh8KCWltYWdlX3VybBgIIAEoCUIMukgJcgeItRgBiAEBEiIKDGNoZWNrc3VtX3VybBgJIAEoCUIMukgJcgeItRgBiAEBEigKDXNpZ25hdHVyZV91cmwYCiABKAlCDLpICXIHiLUYAYgBAUgAiAEBEjkKB2tleV91cmwYCyABKAlCKLpIJXIjGIAQMhteaHR0cHM6Ly9bXi9APyNdKygvW14jXSopPySIAQESJQoGc2hhMjU2GAwgASgJQhW6SBJyEDIOXlswLTlhLWZdezY0fSQSQAoSc2lnbmVyX2ZpbmdlcnByaW50GA0gASgJQiS6SCFyHzIdXihbMC05QS1GXXs0MH18WzAtOUEtRl17NjR9KSQSJwoQaW1hZ2Vfc2l6ZV9ieXRlcxgOIAEoBEINukgKMggYgICAgEAgABI9Cg1jaGVja3N1bV9tb2RlGA8gASgOMhoubGluZG0ubGFiLnYxLkNoZWNrc3VtTW9kZUIKukgHggEEEAEgABIrChVzaWduZXJfcHJvdmVuYW5jZV91cmwYECABKAlCDLpICXIHiLUYAYgBARIsChZyZWxlYXNlX3Byb3ZlbmFuY2VfdXJsGBEgASgJQgy6SAlyB4i1GAGIAQE65AG6SOABGt0BChRpbWFnZS5zaWduYXR1cmVfbW9kZRJWZGV0YWNoZWQgY2hlY2tzdW1zIHJlcXVpcmUgYSBzaWduYXR1cmUgVVJMOyBjbGVhcnNpZ25lZCBjaGVja3N1bXMgbXVzdCBub3Qgc3BlY2lmeSBvbmUabSh0aGlzLmNoZWNrc3VtX21vZGUgPT0gMSAmJiBoYXModGhpcy5zaWduYXR1cmVfdXJsKSkgfHwgKHRoaXMuY2hlY2tzdW1fbW9kZSA9PSAyICYmICFoYXModGhpcy5zaWduYXR1cmVfdXJsKSlCEAoOX3NpZ25hdHVyZV91cmwqaAoMQ2hlY2tzdW1Nb2RlEh0KGUNIRUNLU1VNX01PREVfVU5TUEVDSUZJRUQQABIaChZDSEVDS1NVTV9NT0RFX0RFVEFDSEVEEAESHQoZQ0hFQ0tTVU1fTU9ERV9DTEVBUlNJR05FRBACQh5aHGxpbmRtL2dlbi9saW5kbS9sYWIvdjE7bGFidjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
+  fileDesc("ChlsaW5kbS9sYWIvdjEvaW1hZ2VzLnByb3RvEgxsaW5kbS5sYWIudjEi1g4KDUltYWdlTWFuaWZlc3QSLAoCaWQYASABKAlCILpIHXIbEAEYZDIVXlthLXowLTldW2EtejAtOS4tXSokEh8KDGRpc3RyaWJ1dGlvbhgCIAEoCUIJukgGcgQQARhkEhoKB3ZlcnNpb24YAyABKAlCCbpIBnIEEAEYZBIfCgxhcmNoaXRlY3R1cmUYBCABKAlCCbpIBnIEEAEYZBIaCgdlZGl0aW9uGAUgASgJQgm6SAZyBBABGGQSKwoHcmVsZWFzZRgGIAEoCUIaukgXchUQARhkWgZsYXRlc3RaB2N1cnJlbnQSPgoOaW1hZ2VfZmlsZW5hbWUYByABKAlCJrpII3IhGP8BMhxeW2EtekEtWjAtOV1bYS16QS1aMC05Ll8tXSokEh8KCWltYWdlX3VybBgIIAEoCUIMukgJcgeItRgBiAEBEiIKDGNoZWNrc3VtX3VybBgJIAEoCUIMukgJcgeItRgBiAEBEigKDXNpZ25hdHVyZV91cmwYCiABKAlCDLpICXIHiLUYAYgBAUgAiAEBEjwKB2tleV91cmwYCyABKAlCK7pIKNgBAXIjGIAQMhteaHR0cHM6Ly9bXi9APyNdKygvW14jXSopPySIAQESJQoGc2hhMjU2GAwgASgJQhW6SBJyEDIOXlswLTlhLWZdezY0fSQSQwoSc2lnbmVyX2ZpbmdlcnByaW50GA0gASgJQie6SCTYAQFyHzIdXihbMC05QS1GXXs0MH18WzAtOUEtRl17NjR9KSQSJwoQaW1hZ2Vfc2l6ZV9ieXRlcxgOIAEoBEINukgKMggYgICAgEAgABI9Cg1jaGVja3N1bV9tb2RlGA8gASgOMhoubGluZG0ubGFiLnYxLkNoZWNrc3VtTW9kZUIKukgHggEEEAEgABIuChVzaWduZXJfcHJvdmVuYW5jZV91cmwYECABKAlCD7pIDNgBAXIHiLUYAYgBARIsChZyZWxlYXNlX3Byb3ZlbmFuY2VfdXJsGBEgASgJQgy6SAlyB4i1GAGIAQESYQoYcmVwb3NpdG9yeV9zbmFwc2hvdF9kYXRlGBIgASgJQjq6SDdyNTIzXlswLTldezR9LSgwWzEtOV18MVswLTJdKS0oMFsxLTldfFsxMl1bMC05XXwzWzAxXSkkSAGIAQE6vge6SLoHGpQGChRpbWFnZS5zaWduYXR1cmVfbW9kZRJ8c2lnbmVkIGNoZWNrc3VtcyByZXF1aXJlIHBpbm5lZCBrZXlzOyBhdXRoZW50aWNhdGVkIHZlbmRvciBjaGVja3N1bXMgYXJlIGFuIGV4cGxpY2l0IFJIRUwtb25seSBtb2RlIHdpdGhvdXQgc2lnbmF0dXJlIGNsYWltcxr9BHRoaXMuY2hlY2tzdW1fbW9kZSA9PSAzID8gKHRoaXMuZGlzdHJpYnV0aW9uID09ICdyaGVsJyAmJiAhaGFzKHRoaXMuc2lnbmF0dXJlX3VybCkgJiYgdGhpcy5rZXlfdXJsID09ICcnICYmIHRoaXMuc2lnbmVyX2ZpbmdlcnByaW50ID09ICcnICYmIHRoaXMuc2lnbmVyX3Byb3ZlbmFuY2VfdXJsID09ICcnICYmIHRoaXMuaW1hZ2VfdXJsID09ICdodHRwczovL2FwaS5hY2Nlc3MucmVkaGF0LmNvbS9tYW5hZ2VtZW50L3YxL2ltYWdlcy8nICsgdGhpcy5zaGEyNTYgKyAnL2Rvd25sb2FkJyAmJiB0aGlzLmNoZWNrc3VtX3VybCA9PSAnaHR0cHM6Ly9hcGkuYWNjZXNzLnJlZGhhdC5jb20vbWFuYWdlbWVudC92MS9pbWFnZXMvcmhlbC8nICsgdGhpcy52ZXJzaW9uICsgJy8nICsgdGhpcy5hcmNoaXRlY3R1cmUpIDogKHRoaXMua2V5X3VybCAhPSAnJyAmJiB0aGlzLnNpZ25lcl9maW5nZXJwcmludCAhPSAnJyAmJiB0aGlzLnNpZ25lcl9wcm92ZW5hbmNlX3VybCAhPSAnJyAmJiAoKCh0aGlzLmNoZWNrc3VtX21vZGUgPT0gMSB8fCB0aGlzLmNoZWNrc3VtX21vZGUgPT0gNCkgJiYgaGFzKHRoaXMuc2lnbmF0dXJlX3VybCkpIHx8ICh0aGlzLmNoZWNrc3VtX21vZGUgPT0gMiAmJiAhaGFzKHRoaXMuc2lnbmF0dXJlX3VybCkpKSkaoAEKHmltYWdlLmFyY2hfcmVwb3NpdG9yeV9zbmFwc2hvdBI7QXJjaCBMaW51eCBpbWFnZXMgcmVxdWlyZSBhIHBpbm5lZCByZXBvc2l0b3J5IHNuYXBzaG90IGRhdGUaQXRoaXMuZGlzdHJpYnV0aW9uICE9ICdhcmNoJyB8fCBoYXModGhpcy5yZXBvc2l0b3J5X3NuYXBzaG90X2RhdGUpQhAKDl9zaWduYXR1cmVfdXJsQhsKGV9yZXBvc2l0b3J5X3NuYXBzaG90X2RhdGUqswEKDENoZWNrc3VtTW9kZRIdChlDSEVDS1NVTV9NT0RFX1VOU1BFQ0lGSUVEEAASGgoWQ0hFQ0tTVU1fTU9ERV9ERVRBQ0hFRBABEh0KGUNIRUNLU1VNX01PREVfQ0xFQVJTSUdORUQQAhImCiJDSEVDS1NVTV9NT0RFX1ZFTkRPUl9BVVRIRU5USUNBVEVEEAMSIQodQ0hFQ0tTVU1fTU9ERV9ERVRBQ0hFRF9TSEE1MTIQBEIeWhxsaW5kbS9nZW4vbGluZG0vbGFiL3YxO2xhYnYxYgZwcm90bzM", [file_buf_validate_validate, file_lindm_validation_v1_string_rules]);
 
 /**
  * ImageManifest pins one official image. It is acquisition evidence, not a claim
@@ -105,8 +105,8 @@ export type ImageManifest = Message<"lindm.lab.v1.ImageManifest"> & {
   checksumMode: ChecksumMode;
 
   /**
-   * Independent vendor publication of the trusted full fingerprint, not merely
-   * the key download or an unauthenticated key-ID lookup.
+   * Independent vendor publication of the trusted full fingerprint or public
+   * key, not merely the keyserver download or an unauthenticated key-ID lookup.
    *
    * @generated from field: string signer_provenance_url = 16;
    */
@@ -116,6 +116,14 @@ export type ImageManifest = Message<"lindm.lab.v1.ImageManifest"> & {
    * @generated from field: string release_provenance_url = 17;
    */
   releaseProvenanceUrl: string;
+
+  /**
+   * Guest package repositories use this immutable YYYY-MM-DD snapshot.
+   * Required for Arch Linux Archive; the image build date is a separate pin.
+   *
+   * @generated from field: optional string repository_snapshot_date = 18;
+   */
+  repositorySnapshotDate?: string | undefined;
 };
 
 /**
@@ -135,7 +143,7 @@ export enum ChecksumMode {
   UNSPECIFIED = 0,
 
   /**
-   * Ubuntu SHA256SUMS plus separate OpenPGP SHA256SUMS.gpg.
+   * Ubuntu/Arch SHA256SUMS or Rocky BSD-format SHA256 plus detached OpenPGP.
    *
    * @generated from enum value: CHECKSUM_MODE_DETACHED = 1;
    */
@@ -147,6 +155,23 @@ export enum ChecksumMode {
    * @generated from enum value: CHECKSUM_MODE_CLEARSIGNED = 2;
    */
   CLEARSIGNED = 2,
+
+  /**
+   * RHEL published checksum acquired through authenticated vendor HTTPS.
+   * Offline checks bind exact bytes to the pinned manifest and acquisition
+   * receipt; they do not reauthenticate the API or claim an OpenPGP signature.
+   *
+   * @generated from enum value: CHECKSUM_MODE_VENDOR_AUTHENTICATED = 3;
+   */
+  VENDOR_AUTHENTICATED = 3,
+
+  /**
+   * Debian SHA512SUMS plus detached OpenPGP signature. Authenticate SHA-512
+   * against signed metadata while retaining the required SHA-256 pin/cache key.
+   *
+   * @generated from enum value: CHECKSUM_MODE_DETACHED_SHA512 = 4;
+   */
+  DETACHED_SHA512 = 4,
 }
 
 /**

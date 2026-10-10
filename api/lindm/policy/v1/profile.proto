@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package lindm.policy.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/resource.proto";
+
+option go_package = "lindm/gen/lindm/policy/v1;policyv1";
+
+// ResourceProfile describes one immutable heterogeneous catalog revision.
+// Publishing another revision never rewrites an earlier specification.
+message ResourceProfile {
+  option (buf.validate.message).cel = {
+    id: "profile.unique_resources"
+    message: "profile resources must have distinct identities and canonical references"
+    expression: "this.resources.all(r, this.resources.filter(o, o.resource_id == r.resource_id).size() == 1) && this.resources.all(r, has(r.desired) && has(r.desired.ref) && this.resources.filter(o, has(o.desired) && has(o.desired.ref) && o.desired.ref == r.desired.ref).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "profile.dependencies"
+    message: "dependencies must name another resource in the same profile"
+    expression: "this.resources.all(r, r.depends_on.all(d, d.ref != r.desired.ref && this.resources.exists(o, o.desired.ref == d.ref)))"
+  };
+
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 160
+    pattern: "^[^\\x00]+$"
+  }];
+  string description = 2 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^[^\\x00]*$"
+  }];
+  repeated ProfileResource resources = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+}
+
+// ProfileResource binds typed desired state, ownership and verification policy.
+// Dependency cycles are rejected by the resolver.
+message ProfileResource {
+  option (buf.validate.message).cel = {
+    id: "profile_resource.dependencies"
+    message: "dependency references must be distinct"
+    expression: "this.depends_on.all(d, this.depends_on.filter(o, o.ref == d.ref).size() == 1)"
+  };
+  string resource_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  lindm.resource.v1.ResourceDesiredState desired = 2 [(buf.validate.field).required = true];
+  repeated ResourceDependency depends_on = 3 [(buf.validate.field).repeated.max_items = 63];
+  lindm.resource.v1.Applicability applicability = 4;
+  lindm.resource.v1.OwnershipPolicy ownership = 5 [(buf.validate.field).required = true];
+  lindm.resource.v1.VerificationPolicy verification = 6 [(buf.validate.field).required = true];
+}
+
+message ResourceDependency {
+  option (buf.validate.message).cel = {
+    id: "resource_dependency.credential_kind"
+    message: "credential readiness requires a certificate enrollment resource"
+    expression: "this.condition != 4 || this.ref.kind == 19"
+  };
+  lindm.resource.v1.ResourceRef ref = 1 [(buf.validate.field).required = true];
+  DependencyCondition condition = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+
+enum DependencyCondition {
+  DEPENDENCY_CONDITION_UNSPECIFIED = 0;
+  DEPENDENCY_CONDITION_VERIFIED_PRESENT = 1;
+  DEPENDENCY_CONDITION_VERIFIED_CONFIGURED = 2;
+  DEPENDENCY_CONDITION_VERIFIED_ACTIVE = 3;
+  DEPENDENCY_CONDITION_CREDENTIAL_READY = 4;
+}

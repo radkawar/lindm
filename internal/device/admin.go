@@ -7,127 +7,13 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 )
-
-func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
-	ctx, cancel := bound(ctx)
-	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadFleet); err != nil {
-		return nil, err
-	}
-	if err := s.acquire(ctx); err != nil {
-		return nil, mapErr(err)
-	}
-	defer s.release()
-	if req.Msg == nil {
-		return nil, invalid("invalid_argument")
-	}
-	limit := pageLimit(req.Msg.GetPageSize())
-	q := devicedb.New(s.pool)
-	var (
-		devices []*adminv1.Device
-		next    string
-		err     error
-	)
-	if req.Msg.GetPageToken() == "" {
-		devices, next, err = s.listDevicesFirst(ctx, q, limit)
-	} else {
-		devices, next, err = s.listDevicesAfter(ctx, q, req.Msg.GetPageToken(), limit)
-	}
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	return connect.NewResponse(&adminv1.ListDevicesResponse{Devices: devices, NextPageToken: next}), nil
-}
-
-func (s *Service) listDevicesFirst(ctx context.Context, q *devicedb.Queries, limit int32) ([]*adminv1.Device, string, error) {
-	rows, err := q.ListDevicesFirst(ctx, limit+1)
-	if err != nil {
-		return nil, "", err
-	}
-	return mapDevicePage(rows, limit)
-}
-
-func (s *Service) listDevicesAfter(ctx context.Context, q *devicedb.Queries, token string, limit int32) ([]*adminv1.Device, string, error) {
-	when, id, err := decodeCursor(token)
-	if err != nil {
-		return nil, "", err
-	}
-	rows, err := q.ListDevicesAfter(ctx, devicedb.ListDevicesAfterParams{
-		CursorEnrolledAt: timestamptz(when),
-		CursorID:         id,
-		RowLimit:         limit + 1,
-	})
-	if err != nil {
-		return nil, "", err
-	}
-	out := make([]devicedb.ListDevicesFirstRow, len(rows))
-	for i := range rows {
-		out[i] = devicedb.ListDevicesFirstRow(rows[i])
-	}
-	return mapDevicePage(out, limit)
-}
-
-func mapDevicePage(rows []devicedb.ListDevicesFirstRow, limit int32) ([]*adminv1.Device, string, error) {
-	var budget responsePageBudget
-	devices := make([]*adminv1.Device, 0, min(len(rows), int(limit)))
-	for _, row := range rows {
-		if int32(len(devices)) == limit {
-			break
-		}
-		enrolled, ok := finiteTime(row.EnrolledAt)
-		if !ok || row.PublishedSequence < 0 || row.HostSequence < 0 || row.PackageSequence < 0 {
-			return nil, "", errInternalState
-		}
-		state, err := deviceState(row.State)
-		if err != nil {
-			return nil, "", err
-		}
-		item := &adminv1.Device{
-			Id:                        row.ID.String(),
-			EnrollmentGeneration:      generationString(row.CurrentGenerationID),
-			Hostname:                  row.Hostname,
-			OsId:                      row.OsID,
-			OsVersion:                 row.OsVersion,
-			Architecture:              row.Architecture,
-			LifecycleState:            state,
-			EnrolledAt:                timestamppb.New(enrolled),
-			LastSeenAt:                protoTime(row.LastSeenAt),
-			HostSequence:              uint64(row.HostSequence),
-			PackageSequence:           uint64(row.PackageSequence),
-			HostReceivedAt:            protoTime(row.HostReceivedAt),
-			PackageAttemptReceivedAt:  protoTime(row.PackageAttemptReceivedAt),
-			SnapshotReceivedAt:        protoTime(row.SnapshotReceivedAt),
-			PublishedSnapshotSequence: uint64(row.PublishedSequence),
-		}
-		fits, err := budget.take(item)
-		if err != nil {
-			return nil, "", err
-		}
-		if !fits {
-			if len(devices) == 0 {
-				return nil, "", errInternalState
-			}
-			break
-		}
-		devices = append(devices, item)
-	}
-	next := ""
-	if len(devices) < len(rows) {
-		last := rows[len(devices)-1]
-		var err error
-		next, err = encodeCursor(devices[len(devices)-1].EnrolledAt.AsTime(), last.ID)
-		if err != nil {
-			return nil, "", err
-		}
-	}
-	return devices, next, nil
-}
 
 func deviceState(state string) (adminv1.DeviceState, error) {
 	switch state {
@@ -147,7 +33,7 @@ func deviceState(state string) (adminv1.DeviceState, error) {
 func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Request[adminv1.CreateEnrollmentGrantRequest]) (*connect.Response[adminv1.CreateEnrollmentGrantResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	actor, err := s.require(ctx, identity.PermissionManageEnrollment)
+	actor, err := s.requireUnrestricted(ctx, identity.PermissionManageEnrollment)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +55,7 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 		expiresAt time.Time
 		unknown   bool
 	)
-	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
+	err = s.withinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageEnrollment, func(ctx context.Context, q *devicedb.Queries) error {
 		row, owned, err := s.beginAdminRequest(ctx, q, actor.ID, methodCreateGrant, requestID, digest)
 		if err != nil {
 			return err
@@ -224,7 +110,7 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 func (s *Service) RevokeEnrollmentGrant(ctx context.Context, req *connect.Request[adminv1.RevokeEnrollmentGrantRequest]) (*connect.Response[adminv1.RevokeEnrollmentGrantResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	actor, err := s.require(ctx, identity.PermissionManageEnrollment)
+	actor, err := s.requireUnrestricted(ctx, identity.PermissionManageEnrollment)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +130,7 @@ func (s *Service) RevokeEnrollmentGrant(ctx context.Context, req *connect.Reques
 		return nil, invalid("invalid_id")
 	}
 	digest := mutationDigest(methodRevokeGrant, grantID.String(), req.Msg.GetReason())
-	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
+	err = s.withinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageEnrollment, func(ctx context.Context, q *devicedb.Queries) error {
 		_, owned, err := s.beginAdminRequest(ctx, q, actor.ID, methodRevokeGrant, requestID, digest)
 		if err != nil {
 			return err
@@ -320,23 +206,35 @@ func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1
 		return nil, invalid("invalid_id")
 	}
 	digest := mutationDigest(methodRevokeDevice, deviceID.String(), req.Msg.GetReason())
-	err = s.within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
-		_, owned, err := s.beginAdminRequest(ctx, q, actor.ID, methodRevokeDevice, requestID, digest)
-		if err != nil {
-			return err
-		}
-		if !owned {
-			return nil
-		}
-		if _, err := q.GetDeviceForUpdate(ctx, deviceID); err != nil {
-			return notFoundIfMissing(err)
-		}
-		if _, err := s.revokeLockedDevice(ctx, q, deviceID, actor.ID, req.Msg.GetReason(), s.now()); err != nil {
-			return err
-		}
-		return completeAdmin(ctx, q, actor.ID, methodRevokeDevice, requestID, uuid.Nil, deviceID, time.Unix(0, 0).UTC())
-	})
+	prepared, err := s.prepareRevokeApproval(ctx, actor, req.Msg)
 	if err != nil {
+		return nil, err
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := s.identity.LockAndConsumeApproval(ctx, tx, prepared, s.approvalScope); err != nil {
+		return nil, approvalError(err)
+	}
+	q := devicedb.New(tx)
+	_, owned, err := s.beginAdminRequest(ctx, q, actor.ID, methodRevokeDevice, requestID, digest)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	if owned {
+		if _, err := s.revokeLockedDevice(ctx, q, deviceID, actor.ID, req.Msg.GetReason(), s.now()); err != nil {
+			return nil, mapErr(err)
+		}
+		if err := completeAdmin(ctx, q, actor.ID, methodRevokeDevice, requestID, uuid.Nil, deviceID, time.Unix(0, 0).UTC()); err != nil {
+			return nil, mapErr(err)
+		}
+	}
+	if err := s.identity.LockAndConsumeApproval(ctx, tx, prepared, s.approvalScope); err != nil {
+		return nil, approvalError(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)
 	}
 	return connect.NewResponse(&adminv1.RevokeDeviceResponse{}), nil
@@ -345,7 +243,7 @@ func (s *Service) RevokeDevice(ctx context.Context, req *connect.Request[adminv1
 func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[adminv1.ListAuditEventsRequest]) (*connect.Response[adminv1.ListAuditEventsResponse], error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
-	if _, err := s.require(ctx, identity.PermissionReadAudit); err != nil {
+	if _, err := s.requireUnrestricted(ctx, identity.PermissionReadAudit); err != nil {
 		return nil, err
 	}
 	if err := s.acquire(ctx); err != nil {

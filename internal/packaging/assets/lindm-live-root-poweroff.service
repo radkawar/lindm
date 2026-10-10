@@ -1,0 +1,52 @@
+[Unit]
+Description=Lindm armed live-root erase poweroff deadline
+# Deliberately independent of executor/network service lifetime. No Install
+# section: only the verified root executor may arm this fixed helper.
+DefaultDependencies=no
+
+IgnoreOnIsolate=yes
+RefuseManualStop=yes
+# PID 1 powers off even if the alarm-owning helper exits or is killed.
+FailureAction=poweroff-force
+SuccessAction=poweroff-force
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+Group=root
+ExecStart=/usr/libexec/lindm/lindm-agent live-root-poweroff
+CapabilityBoundingSet=CAP_SYS_BOOT CAP_IPC_LOCK CAP_WAKE_ALARM
+AmbientCapabilities=
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemorySwapMax=0
+LimitMEMLOCK=infinity
+LimitCORE=0
+OOMScoreAdjust=-1000
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service reboot
+SystemCallErrorNumber=EPERM
+Restart=no
+RuntimeMaxSec=120s
+TimeoutStartSec=10s
+TimeoutStopSec=1s
+StandardOutput=null
+StandardError=journal

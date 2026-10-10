@@ -92,6 +92,15 @@ func establishLocked(ctx context.Context, executor agentv1connect.ExecutorServic
 		if err != nil {
 			return nil, err
 		}
+		if connection.GetDeviceActionReportOnly() {
+			// The root has consumed live-root authority and closed its journal.
+			// Only its pinned, already committed session remains usable. Never
+			// attempt renewal, acquisition or any other persistent transition.
+			if servers.device == nil || !connection.GetSessionEpochUsable() || connection.GetSessionEpoch() == 0 || connection.GetSessionEpoch() > math.MaxInt64 || connection.GetRenewalPending() {
+				return nil, errors.New("executor report-only connection has no usable pinned session")
+			}
+			return &authorized{connection: connection, servers: servers, epoch: connection.GetSessionEpoch()}, nil
+		}
 		if connection.GetRenewalPending() {
 			err = finishRenewal(ctx, executor, servers)
 			if err != nil {

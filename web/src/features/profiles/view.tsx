@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -12,6 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { useListPagination } from "@/hooks/use-list-pagination";
 import { toRpcFailure } from "@/lib/errors";
 import type { PageSize } from "@/lib/list-search";
@@ -33,6 +37,7 @@ export function ProfilesView({
   onSearch: (next: { pageSize: PageSize; pageToken: string }) => void;
 }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const list = useQuery(profilesQueryOptions(lifetime, pageSize, pageToken));
   const pagination = useListPagination({ pageSize, pageToken }, onSearch);
   const attempts = usePublishAttempts();
@@ -40,22 +45,26 @@ export function ProfilesView({
   const now = new Date();
 
   return (
-    <section className="flex min-w-0 flex-col gap-4" aria-busy={list.isFetching}>
+    <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold">Service profiles</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            These rows are catalog heads. {CATALOG_SEMANTICS}
-          </p>
+        <div className="min-w-0 space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Resource profiles</h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">These rows are catalog heads.</p>
+          <details className="text-xs text-muted-foreground">
+            <summary className="w-fit cursor-pointer py-1">Catalog scope</summary>
+            <p className="mt-2">{CATALOG_SEMANTICS}</p>
+          </details>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
             Refresh
           </Button>
-          <Button render={<Link to="/profiles/new" />}>Publish a profile</Button>
+          {canPermission(principal, "profiles.manage") ? (
+            <Button render={<Link to="/profiles/new" />}>Publish a profile</Button>
+          ) : null}
         </div>
       </div>
-      {attempts.length > 0 ? (
+      {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
           <AlertTitle>A publish request is still open</AlertTitle>
           <AlertDescription>
@@ -92,30 +101,35 @@ export function ProfilesView({
           </AlertDescription>
         </Alert>
       ) : null}
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
         <Label htmlFor="profile-page-size">Page size</Label>
-        <select
+        <SelectField
           id="profile-page-size"
-          className="h-8 rounded-lg border border-input bg-background px-2"
+          className="h-9"
           value={pageSize}
-          onChange={(event) => {
-            const next = Number(event.target.value);
+          onValueChange={(value) => {
+            const next = Number(value);
             if (next === 50 || next === 100) onSearch({ pageSize: next, pageToken: "" });
           }}
-        >
-          {PAGE_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+          options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
+        />
       </div>
-      {list.isPending ? <p role="status">Loading service profiles…</p> : null}
+      {list.isPending ? (
+        <div role="status" className="grid gap-3 border p-4">
+          <span className="text-sm text-muted-foreground">Loading resource profiles…</span>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : null}
       {list.isSuccess && list.data.profiles.length === 0 ? (
-        <p role="status">
+        <p
+          role="status"
+          className="border border-dashed bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground"
+        >
           {pageToken === ""
-            ? "No service profiles are in the catalog."
-            : "This page has no service profiles."}
+            ? "No resource profiles are in the catalog."
+            : "This page has no resource profiles."}
         </p>
       ) : null}
       {list.data && list.data.profiles.length > 0 ? (

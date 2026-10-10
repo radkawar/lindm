@@ -4,8 +4,12 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_action_recovery.proto";
+import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/agent/v1/offline_enrollment.proto";
 import "lindm/agent/v1/service_execution.proto";
+import "lindm/agent/v1/update.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
@@ -13,8 +17,8 @@ option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 // file, command, or signing service. Private keys are never returned.
 //
 // SO_PEERCRED ACL: UID 0 may call every method. The frozen network UID may
-// call every method except PrepareBootstrap and InstallEnrollment. Every
-// other UID is denied. Transport uses only the network-UID methods.
+// call every method except PrepareBootstrap, InstallEnrollment and
+// SupplyDeviceActionCredential. Every other UID is denied.
 //
 // Mutation epoch: put session_epoch on mutating device requests only when
 // session_epoch_usable is true. That value exists only after CommitSession
@@ -30,6 +34,8 @@ service ExecutorService {
   // pending key and deployment, then commits and removes the grant before
   // acknowledgment. Root only.
   rpc InstallEnrollment(InstallEnrollmentRequest) returns (InstallEnrollmentResponse);
+  // Root-only signed offline response import; rejects already installed attempts.
+  rpc ImportOfflineEnrollment(ImportOfflineEnrollmentRequest) returns (ImportOfflineEnrollmentResponse);
   // GetConnection returns public connection material. An expired active
   // certificate is not a TLS credential. Pending retrieval public data is
   // still returned. session_epoch is usable only after CommitSession and
@@ -70,6 +76,18 @@ service ExecutorService {
   // Signs a nonce-bound snapshot of protected action history using the current
   // device identity/session. Does not observe native state or authorize effects.
   rpc AttestServiceExecution(AttestServiceExecutionRequest) returns (AttestServiceExecutionResponse);
+  rpc PrepareDeviceAction(PrepareDeviceActionRequest) returns (PrepareDeviceActionResponse);
+  rpc StartDeviceAction(StartDeviceActionRequest) returns (StartDeviceActionResponse);
+  rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);
+  rpc AttestDeviceAction(AttestDeviceActionRequest) returns (AttestDeviceActionResponse);
+  rpc ConfirmDeviceActionEscrow(ConfirmDeviceActionEscrowRequest) returns (ConfirmDeviceActionEscrowResponse);
+  rpc PrepareDeviceActionRecovery(PrepareDeviceActionRecoveryRequest) returns (PrepareDeviceActionRecoveryResponse);
+  rpc CommitDeviceActionRecovery(CommitDeviceActionRecoveryRequest) returns (CommitDeviceActionRecoveryResponse);
+  // Root-only one-use owner credential; never persisted or returned.
+  rpc SupplyDeviceActionCredential(SupplyDeviceActionCredentialRequest) returns (SupplyDeviceActionCredentialResponse);
+  // Bounded untrusted transport answers to executor-selected TUF fetches.
+  rpc ExchangeAgentUpdate(ExchangeAgentUpdateRequest) returns (ExchangeAgentUpdateResponse);
+  rpc GetAgentUpdate(GetAgentUpdateRequest) returns (GetAgentUpdateResponse);
   // Status reports durable lifecycle facts. It does not report transport
   // reachability or any secret, grant, private key, or signed envelope.
   rpc Status(StatusRequest) returns (StatusResponse);
@@ -84,6 +102,8 @@ message PrepareBootstrapRequest {
   string pending_grant = 3 [(buf.validate.field).string.max_len = 256];
   // Explicit resume returns the stored attempt only. It never initializes.
   bool resume = 4;
+  bool provisioning_token = 5;
+  OfflineEnrollmentAuthorizationFile offline_authorization = 6;
   option (buf.validate.message).cel = {
     id: "prepare_bootstrap.material"
     message: "new provisioning requires both trust documents; resume may omit both but not one"
@@ -91,8 +111,8 @@ message PrepareBootstrapRequest {
   };
   option (buf.validate.message).cel = {
     id: "prepare_bootstrap.grant"
-    message: "fresh provisioning requires a grant; resume may omit it"
-    expression: "(!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256)))"
+    message: "fresh provisioning requires either a credential or signed offline authorization"
+    expression: "has(this.offline_authorization) ? (!this.provisioning_token && this.pending_grant == '') : ((!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256))))"
   };
 }
 
@@ -104,10 +124,7 @@ message PrepareBootstrapResponse {
     max_len: 16384
   }];
   // Root-only. The network UID cannot call this method.
-  string pending_grant = 4 [(buf.validate.field).string = {
-    min_len: 32
-    max_len: 256
-  }];
+  string pending_grant = 4 [(buf.validate.field).string.max_len = 256];
   string deployment_id = 5 [(buf.validate.field).string.uuid = true];
   string enrollment_origin = 6;
   string device_origin = 7;
@@ -116,6 +133,9 @@ message PrepareBootstrapResponse {
     max_len: 65536
   }];
   bool resumed = 9;
+  bool provisioning_token = 10;
+  bytes provisioning_retrieval_proof = 11 [(buf.validate.field).bytes.max_len = 16384];
+  OfflineEnrollmentRequestFile offline_request = 12;
 }
 
 message InstallEnrollmentRequest {
@@ -141,6 +161,10 @@ message InstallEnrollmentResponse {
   google.protobuf.Timestamp not_after = 4;
   google.protobuf.Timestamp renew_after = 5;
   bool replayed = 6;
+}
+
+message ImportOfflineEnrollmentResponse {
+  InstallEnrollmentResponse enrollment = 1 [(buf.validate.field).required = true];
 }
 
 message GetConnectionRequest {}
@@ -176,6 +200,9 @@ message GetConnectionResponse {
   PriorTLSCredential prior = 18;
   // Actual /proc boot ID when readable. Not an authority input.
   string observed_boot_id = 19;
+  // Protected executor memory has crossed the live-root erase gate. Relays
+  // must only report through the pinned usable session; never renew/acquire.
+  bool device_action_report_only = 20;
 }
 
 message RetrievalPublicData {
@@ -324,4 +351,9 @@ message StatusResponse {
   google.protobuf.Timestamp bootstrap_verified_at = 18;
   // Always false. The executor does not observe transport reachability.
   bool transport_reachability_known = 19;
+}
+
+// Local privileged CLI policy; no new daemon credential or network authority.
+message EnrollmentResumeOptions {
+  uint64 wait_seconds = 1 [(buf.validate.field).uint64.lte = 86400];
 }

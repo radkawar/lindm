@@ -42,7 +42,7 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 	pool, conn := testdb.Open(t)
 	f.conn = conn
 	ca, caKey := testCA(t, f.now.Add(90*24*time.Hour))
-	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget})
+	svc, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}

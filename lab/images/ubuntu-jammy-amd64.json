@@ -1,0 +1,19 @@
+{
+  "id": "ubuntu-jammy-20261004-amd64",
+  "distribution": "ubuntu",
+  "version": "22.04",
+  "architecture": "amd64",
+  "edition": "server-cloudimg",
+  "release": "jammy-release-20261004",
+  "imageFilename": "ubuntu-22.04-server-cloudimg-amd64.img",
+  "imageUrl": "https://cloud-images.ubuntu.com/releases/jammy/release-20261004/ubuntu-22.04-server-cloudimg-amd64.img",
+  "checksumUrl": "https://cloud-images.ubuntu.com/releases/jammy/release-20261004/SHA256SUMS",
+  "signatureUrl": "https://cloud-images.ubuntu.com/releases/jammy/release-20261004/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xD2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81",
+  "sha256": "012d81fade7e8ff4428fc35dfeee711d66d1f47d5ea9c5c8ced96a85b959835c",
+  "signerFingerprint": "D2EB44626FDDC30B513D5BB71A5D6C4C7DB87C81",
+  "imageSizeBytes": "730497536",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://ubuntu.com/docs/public-images/public-images-how-to/verify-image-checksum/",
+  "releaseProvenanceUrl": "https://cloud-images.ubuntu.com/releases/jammy/release-20261004/"
+}

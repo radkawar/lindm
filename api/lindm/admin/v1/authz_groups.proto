@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+message DeviceGroup {
+  string id = 1;
+  string name = 2;
+  repeated string device_ids = 3;
+}
+
+message ListDeviceGroupsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 100];
+  string page_token = 2 [(buf.validate.field).string.max_len = 128];
+}
+message ListDeviceGroupsResponse {
+  repeated DeviceGroup groups = 1;
+  string next_page_token = 2;
+}
+
+// Group membership is authorization policy, not device inventory metadata.
+// All group operations require unrestricted accounts.manage authority.
+message SetDeviceGroupRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string group_id = 2 [(buf.validate.field).string.uuid = true];
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  repeated string device_ids = 4 [(buf.validate.field).repeated = {
+    max_items: 1000
+    unique: true
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message SetDeviceGroupResponse {
+  DeviceGroup group = 1;
+}
+
+message DeleteDeviceGroupRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string group_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message DeleteDeviceGroupResponse {}

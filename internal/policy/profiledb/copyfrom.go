@@ -31,7 +31,9 @@ func (r iteratorForInsertProfileDependencies) Values() ([]interface{}, error) {
 	return []interface{}{
 		r.rows[0].RevisionID,
 		r.rows[0].ResourceID,
-		r.rows[0].DependencyID,
+		r.rows[0].DependencyKind,
+		r.rows[0].DependencyKey,
+		r.rows[0].Condition,
 	}, nil
 }
 
@@ -40,7 +42,7 @@ func (r iteratorForInsertProfileDependencies) Err() error {
 }
 
 func (q *Queries) InsertProfileDependencies(ctx context.Context, arg []InsertProfileDependenciesParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"service_profile_dependencies"}, []string{"revision_id", "resource_id", "dependency_id"}, &iteratorForInsertProfileDependencies{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"profile_dependencies"}, []string{"revision_id", "resource_id", "dependency_kind", "dependency_key", "condition"}, &iteratorForInsertProfileDependencies{rows: arg})
 }
 
 // iteratorForInsertProfileResources implements pgx.CopyFromSource.
@@ -65,9 +67,9 @@ func (r iteratorForInsertProfileResources) Values() ([]interface{}, error) {
 	return []interface{}{
 		r.rows[0].RevisionID,
 		r.rows[0].ResourceID,
-		r.rows[0].UnitName,
-		r.rows[0].RuntimeState,
-		r.rows[0].EnablementState,
+		r.rows[0].ResourceKind,
+		r.rows[0].CanonicalKey,
+		r.rows[0].ResourceProto,
 	}, nil
 }
 
@@ -76,5 +78,5 @@ func (r iteratorForInsertProfileResources) Err() error {
 }
 
 func (q *Queries) InsertProfileResources(ctx context.Context, arg []InsertProfileResourcesParams) (int64, error) {
-	return q.db.CopyFrom(ctx, []string{"service_profile_resources"}, []string{"revision_id", "resource_id", "unit_name", "runtime_state", "enablement_state"}, &iteratorForInsertProfileResources{rows: arg})
+	return q.db.CopyFrom(ctx, []string{"profile_resources"}, []string{"revision_id", "resource_id", "resource_kind", "canonical_key", "resource_proto"}, &iteratorForInsertProfileResources{rows: arg})
 }

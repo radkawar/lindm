@@ -29,16 +29,18 @@ func (q *Queries) ActiveBreakGlassDeadline(ctx context.Context, principalID uuid
 
 const bumpLocalAuthorization = `-- name: BumpLocalAuthorization :exec
 UPDATE principals SET authorization_version = authorization_version + 1,
-  authorization_role = $1 WHERE id = $2
+  authorization_role = $1, authorization_digest = $2
+WHERE id = $3
 `
 
 type BumpLocalAuthorizationParams struct {
-	AuthorizationRole string
-	ID                uuid.UUID
+	AuthorizationRole   string
+	AuthorizationDigest []byte
+	ID                  uuid.UUID
 }
 
 func (q *Queries) BumpLocalAuthorization(ctx context.Context, arg BumpLocalAuthorizationParams) error {
-	_, err := q.db.Exec(ctx, bumpLocalAuthorization, arg.AuthorizationRole, arg.ID)
+	_, err := q.db.Exec(ctx, bumpLocalAuthorization, arg.AuthorizationRole, arg.AuthorizationDigest, arg.ID)
 	return err
 }
 
@@ -140,7 +142,7 @@ func (q *Queries) GetDeploymentID(ctx context.Context) (uuid.UUID, error) {
 }
 
 const getLocalAccount = `-- name: GetLocalAccount :one
-SELECT id, username, role, enabled, break_glass, password_hash, failed_attempts, locked_until FROM local_accounts WHERE id = $1
+SELECT id, username, role, enabled, break_glass, scope_binding, password_hash, failed_attempts, locked_until FROM local_accounts WHERE id = $1
 `
 
 func (q *Queries) GetLocalAccount(ctx context.Context, id uuid.UUID) (LocalAccount, error) {
@@ -152,6 +154,7 @@ func (q *Queries) GetLocalAccount(ctx context.Context, id uuid.UUID) (LocalAccou
 		&i.Role,
 		&i.Enabled,
 		&i.BreakGlass,
+		&i.ScopeBinding,
 		&i.PasswordHash,
 		&i.FailedAttempts,
 		&i.LockedUntil,
@@ -160,7 +163,7 @@ func (q *Queries) GetLocalAccount(ctx context.Context, id uuid.UUID) (LocalAccou
 }
 
 const getLocalAccountByUsername = `-- name: GetLocalAccountByUsername :one
-SELECT id, username, role, enabled, break_glass, password_hash, failed_attempts, locked_until FROM local_accounts WHERE username = $1
+SELECT id, username, role, enabled, break_glass, scope_binding, password_hash, failed_attempts, locked_until FROM local_accounts WHERE username = $1
 `
 
 func (q *Queries) GetLocalAccountByUsername(ctx context.Context, username string) (LocalAccount, error) {
@@ -172,6 +175,7 @@ func (q *Queries) GetLocalAccountByUsername(ctx context.Context, username string
 		&i.Role,
 		&i.Enabled,
 		&i.BreakGlass,
+		&i.ScopeBinding,
 		&i.PasswordHash,
 		&i.FailedAttempts,
 		&i.LockedUntil,
@@ -197,15 +201,16 @@ func (q *Queries) HasEnrolledBreakGlassOwner(ctx context.Context, localIssuer st
 }
 
 const insertLocalAccount = `-- name: InsertLocalAccount :exec
-INSERT INTO local_accounts (id, username, role, break_glass)
-VALUES ($1, $2, $3, $4)
+INSERT INTO local_accounts (id, username, role, break_glass, scope_binding)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertLocalAccountParams struct {
-	ID         uuid.UUID
-	Username   string
-	Role       string
-	BreakGlass bool
+	ID           uuid.UUID
+	Username     string
+	Role         string
+	BreakGlass   bool
+	ScopeBinding []byte
 }
 
 func (q *Queries) InsertLocalAccount(ctx context.Context, arg InsertLocalAccountParams) error {
@@ -214,6 +219,7 @@ func (q *Queries) InsertLocalAccount(ctx context.Context, arg InsertLocalAccount
 		arg.Username,
 		arg.Role,
 		arg.BreakGlass,
+		arg.ScopeBinding,
 	)
 	return err
 }
@@ -334,18 +340,19 @@ func (q *Queries) ListBreakGlassPrincipals(ctx context.Context) ([]uuid.UUID, er
 }
 
 const listLocalAccounts = `-- name: ListLocalAccounts :many
-SELECT id, username, role, enabled, break_glass,
+SELECT id, username, role, enabled, break_glass, scope_binding,
   EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id) AS enrolled
 FROM local_accounts a ORDER BY username LIMIT 1000
 `
 
 type ListLocalAccountsRow struct {
-	ID         uuid.UUID
-	Username   string
-	Role       string
-	Enabled    bool
-	BreakGlass bool
-	Enrolled   bool
+	ID           uuid.UUID
+	Username     string
+	Role         string
+	Enabled      bool
+	BreakGlass   bool
+	ScopeBinding []byte
+	Enrolled     bool
 }
 
 func (q *Queries) ListLocalAccounts(ctx context.Context) ([]ListLocalAccountsRow, error) {
@@ -363,6 +370,7 @@ func (q *Queries) ListLocalAccounts(ctx context.Context) ([]ListLocalAccountsRow
 			&i.Role,
 			&i.Enabled,
 			&i.BreakGlass,
+			&i.ScopeBinding,
 			&i.Enrolled,
 		); err != nil {
 			return nil, err
@@ -459,14 +467,15 @@ func (q *Queries) SetLocalPassword(ctx context.Context, arg SetLocalPasswordPara
 
 const updateLocalAccount = `-- name: UpdateLocalAccount :exec
 UPDATE local_accounts SET role = $1, enabled = $2,
-  break_glass = $3 WHERE id = $4
+  break_glass = $3, scope_binding = $4 WHERE id = $5
 `
 
 type UpdateLocalAccountParams struct {
-	Role       string
-	Enabled    bool
-	BreakGlass bool
-	ID         uuid.UUID
+	Role         string
+	Enabled      bool
+	BreakGlass   bool
+	ScopeBinding []byte
+	ID           uuid.UUID
 }
 
 func (q *Queries) UpdateLocalAccount(ctx context.Context, arg UpdateLocalAccountParams) error {
@@ -474,6 +483,7 @@ func (q *Queries) UpdateLocalAccount(ctx context.Context, arg UpdateLocalAccount
 		arg.Role,
 		arg.Enabled,
 		arg.BreakGlass,
+		arg.ScopeBinding,
 		arg.ID,
 	)
 	return err

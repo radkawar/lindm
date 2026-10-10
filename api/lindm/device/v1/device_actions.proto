@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package lindm.device.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/device/v1;devicev1";
+
+message DeviceActionWork {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes intent_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+  bytes start_grant_envelope = 3 [(buf.validate.field).bytes.max_len = 65536];
+  bytes result_nonce = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp result_nonce_expires_at = 5 [(buf.validate.field).required = true];
+  bytes escrow_receipt_envelope = 6 [(buf.validate.field).bytes.max_len = 16384];
+  // Routing hint only; the executor independently verifies signed intent.
+  bool recovery_handoff = 7;
+  bytes recovery_credential_envelope = 8 [(buf.validate.field).bytes.max_len = 65536];
+  bytes recovery_boot_grant_envelope = 9 [(buf.validate.field).bytes.max_len = 65536];
+}
+message GetDeviceActionWorkRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+}
+message GetDeviceActionWorkResponse {
+  DeviceActionWork work = 1;
+}
+message AuthorizeDeviceActionStartRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes challenge_proof = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+message AuthorizeDeviceActionStartResponse {
+  bytes start_grant_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+message ReportDeviceActionResultRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes attestation_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ReportDeviceActionResultResponse {
+  bool closed = 1;
+  // Only returned after the encrypted recovery material has committed durably.
+  bytes escrow_receipt_envelope = 2 [(buf.validate.field).bytes.max_len = 16384];
+}
+
+message RegisterDeviceActionRecoveryRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes handoff_proof = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message RegisterDeviceActionRecoveryResponse {
+  bytes credential_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes boot_grant_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}

@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/custody"
 	"lindm/internal/protodata"
 )
 
@@ -77,6 +78,12 @@ func load(path string, rootOwner bool) (*Document, error) {
 		return nil, fmt.Errorf("validate configuration: %w", err)
 	}
 	base := filepath.Dir(absolute)
+	if cfg.GetActionProvider().GetAllowRecoveryHandoff() && cfg.GetRecoveryBoot() == nil {
+		return nil, errors.New("recovery handoff requires locally provisioned recovery boot configuration")
+	}
+	if err := resolveRecoveryBoot(base, cfg.GetRecoveryBoot()); err != nil {
+		return nil, err
+	}
 	stateDir, err := canonicalDirectory(resolve(base, cfg.GetStateDirectory()))
 	if err != nil {
 		return nil, fmt.Errorf("state directory: %w", err)
@@ -268,9 +275,9 @@ func trustedConfigAncestor(info unix.Stat_t, rootOwner bool) error {
 		return errors.New("configuration ancestor is not a directory")
 	}
 	if rootOwner {
-		// Root ownership excludes the network account. Group/world write would
-		// let that account replace a later path component.
-		if info.Uid != 0 || info.Mode&0022 != 0 {
+		// Root's group is privileged custody; other groups cannot replace
+		// components even when the vendor image permits group-zero writes.
+		if !custody.TrustedDirectory(&info) {
 			return errors.New("configuration ancestry must be root-owned and not replaceable")
 		}
 		return nil
@@ -306,11 +313,29 @@ func resolveNetworkUser(name string) (uint32, uint32, string, error) {
 	if err != nil || uid == 0 {
 		return 0, 0, "", errors.New("network user must resolve to a nonzero uid")
 	}
-	gid, err := parseFrozenID(account.Gid)
+	groups, err := account.GroupIds()
 	if err != nil {
-		return 0, 0, "", errors.New("network user group is not a stable numeric id")
+		return 0, 0, "", fmt.Errorf("resolve network user groups: %w", err)
+	}
+	gid, err := networkGroups(account.Gid, groups)
+	if err != nil {
+		return 0, 0, "", err
 	}
 	return uid, gid, account.Username, nil
+}
+
+func networkGroups(primary string, groups []string) (uint32, error) {
+	gid, err := parseFrozenID(primary)
+	if err != nil || gid == 0 {
+		return 0, errors.New("network user must have a stable nonzero primary group")
+	}
+	for _, group := range groups {
+		id, err := parseFrozenID(group)
+		if err != nil || id == 0 {
+			return 0, errors.New("network user must not belong to group zero or an invalid group")
+		}
+	}
+	return gid, nil
 }
 
 func parseFrozenID(text string) (uint32, error) {

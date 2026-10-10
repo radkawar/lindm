@@ -13,11 +13,11 @@ import (
 	"lindm/internal/executionauthority/authoritydb"
 )
 
-// ForDevice reads a coherent desired snapshot without taking the global mutation
-// lock after the caller's device lock. The first row fixes the final root and
-// delegation; root history is append-only and all subsequent reads are bounded
-// by that row's root_count, including under READ COMMITTED. Reported counters and
-// hashes select public documents only, never establish a device-applied receipt.
+// ForDevice reads a coherent desired snapshot without a global mutation lock.
+// Callers authenticate the device under its mutation lock or a coherent read-only
+// snapshot. The first row fixes the final root/delegation; append-only history is
+// bounded by that row's root_count, including under READ COMMITTED. Reported
+// counters/hashes select public documents, never establish a device-applied receipt.
 func (s *Store) ForDevice(ctx context.Context, tx pgx.Tx, rootVersion, delegationVersion, minimumEpoch uint64, rootDigest, delegationDigest []byte) (*Snapshot, *agentv1.UpdateExecutionTrustRequest, error) {
 	if tx == nil || rootVersion == 0 || len(rootDigest) != sha256.Size || (delegationVersion == 0 && len(delegationDigest) != 0) || (delegationVersion != 0 && len(delegationDigest) != sha256.Size) {
 		return nil, nil, ErrIncompatible

@@ -6,8 +6,9 @@ package packaging
 type Format string
 
 const (
-	FormatDEB Format = "deb"
-	FormatRPM Format = "rpm"
+	FormatDEB  Format = "deb"
+	FormatRPM  Format = "rpm"
+	FormatArch Format = "arch"
 )
 
 // Custody separates development package-signing keys from production custody.
@@ -35,16 +36,23 @@ type SigningKey struct {
 	RejectFingerprints []string
 	// RejectPathPrefixes are additional homes that must not sign packages.
 	RejectPathPrefixes []string
+	// RejectPublicKeySHA256 contains canonical SPKI digests, not OpenPGP or TUF
+	// key IDs. The opened primary signing key is compared under the home guard.
+	RejectPublicKeySHA256 []string
 }
 
 // BuildRequest builds one upstream version. The VM upgrade proof calls Build
 // twice, with the same signer, and checks UpgradeOrdered.
 type BuildRequest struct {
+	// AgentBinary is the prebuilt executable for Build or BuildServer.
 	AgentBinary string
 	Version     string
+	// TargetArchitecture is amd64 or arm64; empty selects the build host.
+	// The opened ELF and Go build settings must agree with this request.
+	TargetArchitecture string
 	// OutputDir must be a private 0700 directory owned by the current UID.
 	OutputDir string
-	// Formats empty means both DEB and RPM. RPM requires Signer.
+	// Formats empty means both DEB and RPM. RPM and Arch require Signer.
 	Formats []Format
 	Signer  SigningKey
 	// SourceDateEpoch zero selects DefaultSourceDateEpoch, never the wall clock.
@@ -57,20 +65,25 @@ type Architecture struct {
 	GOARCH string `json:"goarch"`
 	Debian string `json:"debian"`
 	RPM    string `json:"rpm"`
+	Arch   string `json:"arch,omitempty"`
 }
 
-// Artifact is one built package. Signed is true only for an RPM whose
-// signature verified in a private rpmdb. A DEB is not signed here.
+// Artifact is one built package. Signed means its native signature was verified.
+// Arch signatures are detached; a DEB is not signed here.
 type Artifact struct {
-	Format            Format       `json:"format"`
-	Path              string       `json:"path"`
-	SHA256            string       `json:"sha256"`
+	Product string `json:"product"`
+	Format  Format `json:"format"`
+	Path    string `json:"path"`
+	SHA256  string `json:"sha256"`
+	// UnsignedSHA256 hashes the complete native archive before signing.
+	UnsignedSHA256    string       `json:"unsigned_sha256"`
 	Size              int64        `json:"size"`
 	Architecture      Architecture `json:"architecture"`
 	Version           string       `json:"version"`
 	PayloadSHA256     string       `json:"payload_sha256"`
 	Signed            bool         `json:"signed"`
 	SignerFingerprint string       `json:"signer_fingerprint,omitempty"`
+	SignaturePath     string       `json:"signature_path,omitempty"`
 }
 
 // ToolVersion records a native tool actually invoked or probed.
@@ -83,11 +96,13 @@ type ToolVersion struct {
 // BuildResult is evidence from one build. CreaterepoC is "not-installed" when
 // the RPM repository tool is absent; that is not a successful repository build.
 type BuildResult struct {
+	Product                   string        `json:"product"`
 	Artifacts                 []Artifact    `json:"artifacts"`
 	BinarySHA256              string        `json:"binary_sha256"`
 	Architecture              Architecture  `json:"architecture"`
 	Version                   string        `json:"version"`
 	GoVersion                 string        `json:"go_version,omitempty"`
+	VersionValidation         string        `json:"version_validation"`
 	Tools                     []ToolVersion `json:"tools"`
 	UnitSyntaxOK              bool          `json:"unit_syntax_ok"`
 	ExecutablePresenceChecked bool          `json:"executable_presence_checked"`

@@ -9,6 +9,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApprovalRequest struct {
+	ID               uuid.UUID
+	RequesterID      uuid.UUID
+	RequesterVersion int64
+	Action           string
+	Permission       string
+	DeviceID         *uuid.UUID
+	MutationID       string
+	Payload          []byte
+	PayloadSha256    []byte
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	State            string
+	ApproverID       *uuid.UUID
+	ApproverVersion  int64
+	DecisionReason   string
+	ConsumedAt       pgtype.Timestamptz
+}
+
+type CliAuthCode struct {
+	CodeHash             []byte
+	BrowserSessionHash   []byte
+	AuthorizationVersion int64
+	RedirectUri          string
+	CodeChallenge        string
+	ExpiresAt            pgtype.Timestamptz
+}
+
+type CliAuthRequest struct {
+	BindingHash   []byte
+	RedirectUri   string
+	CodeChallenge string
+	State         string
+	ExpiresAt     pgtype.Timestamptz
+}
+
 type DeploymentIdentity struct {
 	ID               bool
 	DeploymentID     uuid.UUID
@@ -22,6 +58,7 @@ type LocalAccount struct {
 	Role           string
 	Enabled        bool
 	BreakGlass     bool
+	ScopeBinding   []byte
 	PasswordHash   string
 	FailedAttempts int32
 	LockedUntil    pgtype.Timestamptz
@@ -52,6 +89,9 @@ type Principal struct {
 	DirectoryObservedAt  pgtype.Timestamptz
 	AuthorizationVersion int64
 	AuthorizationRole    string
+	AuthorizationDigest  []byte
+	ServiceAccount       bool
+	LifecycleNotBefore   pgtype.Timestamptz
 }
 
 type PrincipalLineage struct {
@@ -65,6 +105,34 @@ type PrincipalLineage struct {
 	CreatedAt          pgtype.Timestamptz
 }
 
+type ScimConnector struct {
+	ID             string
+	ConfigDigest   []byte
+	CredentialHash []byte
+	Enabled        bool
+}
+
+type ScimCorrelation struct {
+	ConnectorID string
+	ProviderID  string
+	Issuer      string
+	Subject     string
+}
+
+type ScimResource struct {
+	ID           uuid.UUID
+	ConnectorID  string
+	ResourceType string
+	ExternalID   string
+	UserName     string
+	PrincipalID  *uuid.UUID
+	Document     []byte
+	Version      int64
+	CreatedAt    pgtype.Timestamptz
+	ModifiedAt   pgtype.Timestamptz
+	Deleted      bool
+}
+
 type Session struct {
 	TokenHash         []byte
 	PrincipalID       uuid.UUID
@@ -75,4 +143,5 @@ type Session struct {
 	RevokedAt         pgtype.Timestamptz
 	BreakGlass        bool
 	IncidentReason    string
+	Kind              string
 }

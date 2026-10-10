@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/buildinfo"
 	"lindm/internal/agent/journal"
 	"lindm/internal/pki"
 	"lindm/internal/trust"
@@ -67,16 +68,25 @@ func (s *Service) prepareBootstrap(ctx context.Context, req *agentv1.PrepareBoot
 	if req.GetPendingGrant() != "" && !grantsMatch(loaded.state.GetPendingGrant(), req.GetPendingGrant()) {
 		return nil, errGrantMismatch
 	}
-	return bootstrapResponse(loaded, true), nil
+	if (!req.GetResume() && req.GetProvisioningToken() != loaded.state.GetProvisioningToken()) || (req.GetOfflineAuthorization() != nil && !proto.Equal(req.GetOfflineAuthorization(), loaded.state.GetOfflineAuthorization())) {
+		return nil, errGrantMismatch
+	}
+	return s.enrollmentMaterial(ctx, loaded, true)
 }
 
 func (s *Service) createBootstrap(ctx context.Context, req *agentv1.PrepareBootstrapRequest) (*agentv1.PrepareBootstrapResponse, error) {
 	now := s.now()
-	if _, err := s.authority.VerifyBootstrap(ctx, req.GetExecutionRootJson(), req.GetBootstrapEnvelope(), now); err != nil {
+	bootstrap, err := s.authority.VerifyBootstrap(ctx, req.GetExecutionRootJson(), req.GetBootstrapEnvelope(), now)
+	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		return nil, errBootstrapRejected
+	}
+	if req.GetOfflineAuthorization() != nil {
+		if _, err := s.verifyOfflineAuthorization(ctx, bootstrap, req.GetOfflineAuthorization(), now); err != nil {
+			return nil, errBootstrapRejected
+		}
 	}
 	key, csr, err := newSoftwareKey(s.entropy)
 	if err != nil {
@@ -95,6 +105,7 @@ func (s *Service) createBootstrap(ctx context.Context, req *agentv1.PrepareBoots
 		ExecutionRootJson: bytes.Clone(req.GetExecutionRootJson()), BootstrapEnvelope: bytes.Clone(req.GetBootstrapEnvelope()),
 		BootstrapVerifiedAt: protoTimestamp(now), EnrollmentTransactionId: transaction,
 		IdentityPrivateKey: bytes.Clone(key), EnrollmentCsrPem: csr, PendingGrant: req.GetPendingGrant(),
+		ProvisioningToken: req.GetProvisioningToken(), OfflineAuthorization: proto.CloneOf(req.GetOfflineAuthorization()),
 	}
 	store, err := journal.InitializeLocked(ctx, s.directory, s.stateLock, state)
 	if err != nil {
@@ -105,11 +116,16 @@ func (s *Service) createBootstrap(ctx context.Context, req *agentv1.PrepareBoots
 		return nil, err
 	}
 	s.store = store
+	if err := s.initializeActionProvider(); err != nil {
+		s.hold = true
+		s.holdReason = agentv1.HoldReason_HOLD_REASON_INCOMPLETE_OR_CORRUPT
+		return nil, errRecoveryHold
+	}
 	loaded, err := s.load(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return bootstrapResponse(loaded, false), nil
+	return s.enrollmentMaterial(ctx, loaded, false)
 }
 
 func bootstrapResponse(b *bound, resumed bool) *agentv1.PrepareBootstrapResponse {
@@ -147,6 +163,13 @@ func (s *Service) installEnrollment(ctx context.Context, req *agentv1.InstallEnr
 	if err != nil {
 		return nil, err
 	}
+	if loaded.state.GetOfflineAuthorization() != nil {
+		return nil, errCertificateRejected
+	}
+	return s.installEnrollmentLocked(ctx, loaded, req)
+}
+
+func (s *Service) installEnrollmentLocked(ctx context.Context, loaded *bound, req *agentv1.InstallEnrollmentRequest) (*agentv1.InstallEnrollmentResponse, error) {
 	if loaded.cert != nil {
 		if sameInstalled(loaded, req) {
 			return installResponse(loaded, true), nil
@@ -238,7 +261,7 @@ func (s *Service) prepareSession(ctx context.Context, req *agentv1.PrepareSessio
 	if _, err := canonicalUUID(boot); err != nil {
 		return nil, errInternal
 	}
-	if loaded.state.GetSessionEpoch() > 0 && loaded.state.GetSessionBootId() == boot {
+	if loaded.state.GetSessionEpoch() > 0 && loaded.state.GetSessionBootId() == boot && loaded.state.GetSessionReceipt().GetAgentRelease() == buildinfo.Current().Version && loaded.state.GetSessionReceipt().GetAgentProtocolVersion() == buildinfo.ProtocolVersion {
 		return &agentv1.PrepareSessionResponse{Result: &agentv1.PrepareSessionResponse_Accepted{Accepted: &agentv1.AcceptedSession{SessionEpoch: loaded.state.GetSessionEpoch(), BootId: boot}}}, nil
 	}
 	if !certUsable(loaded.cert, s.now()) {
@@ -256,6 +279,8 @@ func (s *Service) prepareSession(ctx context.Context, req *agentv1.PrepareSessio
 		DeploymentId: loaded.bootstrap.Root.GetDeploymentId(), DeviceId: loaded.state.GetDeviceId(),
 		EnrollmentGeneration: loaded.state.GetEnrollmentGeneration(), RequestId: requestID,
 		PredecessorEpoch: loaded.state.GetSessionEpoch(), Incarnation: incarnation, BootId: boot,
+		AgentRelease: buildinfo.Current().Version, AgentProtocolVersion: buildinfo.ProtocolVersion,
+		InstallationId: loaded.state.GetInstallationId(),
 	}
 	proof, err := s.authority.Sign(ctx, claim, loaded.identityKey)
 	if err != nil {
@@ -317,7 +342,7 @@ func (s *Service) commitSession(ctx context.Context, req *agentv1.CommitSessionR
 		next.SessionBootId = proto.String(pending.GetBootId())
 		next.PendingSession = nil
 		next.PendingSessionProof = nil
-		next.SessionReceipt = &agentv1.SessionCommitReceipt{RequestId: req.GetRequestId(), SessionEpoch: req.GetServerEpoch()}
+		next.SessionReceipt = &agentv1.SessionCommitReceipt{RequestId: req.GetRequestId(), SessionEpoch: req.GetServerEpoch(), AgentRelease: pending.GetAgentRelease(), AgentProtocolVersion: pending.GetAgentProtocolVersion()}
 		if err := s.commit(ctx, loaded.revision, next); err != nil {
 			return nil, err
 		}

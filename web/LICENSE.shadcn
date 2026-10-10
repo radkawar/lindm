@@ -1,8 +1,28 @@
 Portions of src/components/ui, src/hooks/use-mobile.ts, src/styles/shadcn.css
 and the block-derived console layout originate from shadcn/ui
 (https://github.com/shadcn-ui/ui), using the official base-nova registry,
-sidebar-07 block and shadcn 4.21.4 stylesheet. The following license applies
-to those portions, not to the remainder of this project.
+sidebar-07 block and shadcn 4.21.4 stylesheet. On 2026-10-10, preset b1Q5GC
+was decoded with shadcn 4.21.4 and applied in an isolated Vite scratch copy:
+Nova / Base UI, neutral base, blue theme, radius none, IBM Plex Sans,
+Lucide, default (solid) menus, subtle menu accent, neutral charts, inherited
+heading font. Theme variables and regenerated font-heading classes were
+ported; existing equivalent primitives retain local formatting and RTL helpers.
+Command, input-group, sonner, chart, select and dropdown-menu sources were
+generated from that registry. Chart rendering uses exact-pinned Recharts;
+SelectField composes the official Select while retaining native form values.
+The command dialog's label is inside its portal for accessibility; the toaster
+uses local CSS tokens instead of next-themes. No shadcn CLI, Next.js dependency
+or remote font service is required by the product.
+Chart color variables use style attributes rather than injected style elements
+to preserve the console's strict Content-Security-Policy.
+
+Preset reference: https://ui.shadcn.com/create?preset=b1Q5GC&template=vite
+CLI reference: https://ui.shadcn.com/docs/cli
+IBM Plex Sans Variable is bundled by the pinned @fontsource-variable package
+under SIL Open Font License 1.1 (see its LICENSE and web/LICENSE.fonts).
+
+The following license applies to the shadcn portions, not to the remainder
+of this project.
 
 MIT License
 

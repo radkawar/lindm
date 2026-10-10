@@ -14,8 +14,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
-	agentv1 "lindm/gen/lindm/agent/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
 )
@@ -24,16 +24,16 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))
-	service, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key})
+	service, err := New(pool, Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
 	ownerCtx := identity.WithPrincipal(ctx, owner)
-	if _, err := service.ListServiceProfiles(ctx, connect.NewRequest(&adminv1.ListServiceProfilesRequest{})); connect.CodeOf(err) != connect.CodeUnauthenticated {
+	if _, err := service.ListProfiles(ctx, connect.NewRequest(&adminv1.ListProfilesRequest{})); connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("unauthenticated catalog read: %v", err)
 	}
-	if _, err := service.ListServiceProfiles(identity.WithPrincipal(ctx, identity.Principal{ID: owner.ID, Role: "auditor"}), connect.NewRequest(&adminv1.ListServiceProfilesRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
+	if _, err := service.ListProfiles(identity.WithPrincipal(ctx, identity.Principal{ID: owner.ID}), connect.NewRequest(&adminv1.ListProfilesRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("ungranted catalog read: %v", err)
 	}
 	description := strings.Repeat("\x01", 4096)
@@ -41,7 +41,23 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 	for i := range expected {
 		profileID := uuid.NewString()
 		expected[i] = profileID
-		request := &adminv1.PublishServiceProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: profileID, Reason: "verify bounded catalog pagination", Spec: &policyv1.ServiceProfileSpec{Name: fmt.Sprintf("Pagination profile %02d", i), Description: description, Resources: []*policyv1.ServiceProfileResource{{ResourceId: uuid.NewString(), Desired: &agentv1.ServiceDesiredState{Unit: "pagination.service", Runtime: agentv1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: agentv1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}}}
+		request := &adminv1.PublishProfileRevisionRequest{
+			RequestId: uuid.NewString(), ProfileId: profileID, Reason: "verify bounded catalog pagination",
+			Spec: &policyv1.ResourceProfile{
+				Name: fmt.Sprintf("Pagination profile %02d", i), Description: description,
+				Resources: []*policyv1.ProfileResource{{
+					ResourceId: uuid.NewString(),
+					Desired: &resourcev1.ResourceDesiredState{
+						Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "pagination.service"},
+						State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{
+							Unit: "pagination.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED,
+						}},
+					},
+					Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN},
+					Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
+				}},
+			},
+		}
 		tx, err := pool.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -60,7 +76,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 	token := ""
 	pages := 0
 	for {
-		response, err := service.ListServiceProfiles(ownerCtx, connect.NewRequest(&adminv1.ListServiceProfilesRequest{PageSize: 100, PageToken: token}))
+		response, err := service.ListProfiles(ownerCtx, connect.NewRequest(&adminv1.ListProfilesRequest{PageSize: 100, PageToken: token}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +106,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 	if pages < 2 || !slices.Equal(got, expected) {
 		t.Fatalf("catalog boundary lost/reordered/duplicated profiles: pages=%d got=%v expected=%v", pages, got, expected)
 	}
-	if _, err := service.ListServiceProfiles(ownerCtx, connect.NewRequest(&adminv1.ListServiceProfilesRequest{PageToken: "invalid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := service.ListProfiles(ownerCtx, connect.NewRequest(&adminv1.ListProfilesRequest{PageToken: "invalid"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("invalid catalog cursor: %v", err)
 	}
 }

@@ -1,0 +1,189 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+enum AttributeType {
+  ATTRIBUTE_TYPE_UNSPECIFIED = 0;
+  ATTRIBUTE_TYPE_STRING = 1;
+  ATTRIBUTE_TYPE_INT = 2;
+  ATTRIBUTE_TYPE_BOOL = 3;
+  ATTRIBUTE_TYPE_ENUM = 4;
+}
+
+message AttributeValue {
+  oneof value {
+    option (buf.validate.oneof).required = true;
+    string string_value = 1 [(buf.validate.field).string = {
+      max_len: 1024
+      not_contains: "\000"
+    }];
+    int64 int_value = 2;
+    bool bool_value = 3;
+    string enum_value = 4 [(buf.validate.field).string = {
+      min_len: 1
+      max_len: 128
+      not_contains: "\000"
+    }];
+  }
+}
+
+message AttributeDefinition {
+  option (buf.validate.message).cel = {
+    id: "attribute_definition.enum_values"
+    message: "Only enum definitions require nonempty enum values"
+    expression: "(this.type == 4) == (size(this.enum_values) > 0)"
+  };
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[a-z][a-z0-9_.-]*$"
+  }];
+  AttributeType type = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  repeated string enum_values = 3 [(buf.validate.field).repeated = {
+    max_items: 64
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 128
+        not_contains: "\000"
+      }
+    }
+  }];
+}
+
+message DeviceMetadata {
+  repeated string labels = 1 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]*$"
+      }
+    }
+  }];
+  // An absent owner clears ownership; the two forms are mutually exclusive.
+  oneof owner {
+    string owner_principal_id = 2 [(buf.validate.field).string.uuid = true];
+    string owner_text = 3 [(buf.validate.field).string = {
+      min_len: 1
+      max_len: 256
+      not_contains: "\000"
+    }];
+  }
+  map<string, AttributeValue> attributes = 4 [(buf.validate.field).map = {
+    max_pairs: 32
+    keys: {
+      string: {
+        min_len: 1
+        max_len: 64
+        pattern: "^[a-z][a-z0-9_.-]*$"
+      }
+    }
+  }];
+}
+
+message DeviceFilter {
+  option (buf.validate.message).cel = {
+    id: "device_filter.seen_range"
+    message: "last_seen_from must not exceed last_seen_until"
+    expression: "!has(this.last_seen_from) || !has(this.last_seen_until) || this.last_seen_from <= this.last_seen_until"
+  };
+  string os_id = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    not_contains: "\000"
+  }];
+  string os_version = 2 [(buf.validate.field).string = {
+    max_len: 4096
+    not_contains: "\000"
+  }];
+  repeated string labels = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 64
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]*$"
+      }
+    }
+  }];
+  // All typed equalities and labels must match. Int and bool zero are values.
+  map<string, AttributeValue> attributes = 4 [(buf.validate.field).map = {
+    max_pairs: 32
+    keys: {
+      string: {
+        min_len: 1
+        max_len: 64
+        pattern: "^[a-z][a-z0-9_.-]*$"
+      }
+    }
+  }];
+  google.protobuf.Timestamp last_seen_from = 5;
+  google.protobuf.Timestamp last_seen_until = 6;
+  // Case-sensitive literal prefix of hostname, the device's displayed name.
+  // Percent, underscore and backslash are ordinary characters, not wildcards.
+  string name_prefix = 7 [(buf.validate.field).string = {
+    max_len: 4096
+    not_contains: "\000"
+  }];
+}
+
+message SetDeviceMetadataRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  DeviceMetadata metadata = 3 [(buf.validate.field).required = true];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message SetDeviceMetadataResponse {}
+
+message SetAttributeDefinitionRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  AttributeDefinition definition = 2 [(buf.validate.field).required = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message SetAttributeDefinitionResponse {}
+
+message ListAttributeDefinitionsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
+  string after_key = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^([a-z][a-z0-9_.-]*)?$"
+  }];
+}
+message ListAttributeDefinitionsResponse {
+  repeated AttributeDefinition definitions = 1;
+  string next_after_key = 2;
+}
+
+enum DeviceExportFormat {
+  DEVICE_EXPORT_FORMAT_UNSPECIFIED = 0;
+  DEVICE_EXPORT_FORMAT_CSV = 1;
+  DEVICE_EXPORT_FORMAT_JSON = 2;
+}
+message ExportDevicesRequest {
+  DeviceFilter filter = 1;
+  DeviceExportFormat format = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint32 page_size = 3 [(buf.validate.field).uint32.lte = 200];
+  string page_token = 4 [(buf.validate.field).string.max_len = 512];
+}
+message ExportDevicesResponse {
+  // Each page is a standalone CSV (including header) or JSON array of Device.
+  bytes content = 1;
+  string media_type = 2;
+  string next_page_token = 3;
+}

@@ -1,0 +1,19 @@
+{
+  "id": "rocky-9.8-20260525.0-x86-64",
+  "distribution": "rocky",
+  "version": "9.8",
+  "architecture": "x86_64",
+  "edition": "genericcloud-base",
+  "release": "9.8-20260525.0",
+  "imageFilename": "Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2",
+  "imageUrl": "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2",
+  "checksumUrl": "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2.CHECKSUM",
+  "signatureUrl": "https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2.CHECKSUM.asc",
+  "keyUrl": "https://dl.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9",
+  "sha256": "92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8",
+  "signerFingerprint": "21CB256AE16FC54C6E652949702D426D350D275D",
+  "imageSizeBytes": "645988352",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://rockylinux.org/resources/gpg-key-info",
+  "releaseProvenanceUrl": "https://download.rockylinux.org/pub/rocky/9/images/x86_64/"
+}

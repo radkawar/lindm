@@ -1,0 +1,80 @@
+Production advisory verification trust roots
+============================================
+
+These public OpenPGP certificates are verification material, not credentials.
+They are embedded in the feed client and parsed at construction. Runtime feed
+responses never add or replace trust roots. Full primary fingerprints are pinned
+in signed.go, independently of configured mirror URLs. Root replacement,
+rotation, expiry extension or newly published revocation requires a reviewed
+update of this material. The maintained ProtonMail/go-crypto v1.5.2 v2 verifier
+checks signatures, certified signing permissions, expiration and revocation in
+these certificates; this is not a claim of live key-server revocation discovery.
+
+Red Hat Product Security
+------------------------
+File: redhat-product-security.asc
+Original URL: https://security.access.redhat.com/data/97f5eac4.txt
+Observed over verified HTTPS: 2026-10-10
+Bytes: 3440 (original response including descriptive prefix)
+SHA256: bbf1e9fb75686377fec9ef675f6435f9d8441a5c8c580fe9f11ff0abf941b59a
+Primary fingerprint: 77E79ABE93673533ED09EBE2DCE3823597F5EAC4
+UID: Red Hat, Inc. (Product Security) <secalert@redhat.com>
+Independent HTTPS publication of the full fingerprint and key URL:
+https://security.access.redhat.com/data/csaf/v2/provider-metadata.json
+That provider metadata names both advisories/ and vex/ distributions. Its
+publisher is Red Hat Product Security, https://www.redhat.com. Original identity
+and public-certificate notices are retained unchanged.
+
+SUSE Security Automation
+-----------------------
+File: suse-security-automation.asc
+Original URL: https://ftp.suse.com/pub/projects/security/keys/security-automation.asc
+Observed over verified HTTPS: 2026-10-10
+Bytes: 3161 (original response)
+SHA256: b00811fa6b54922d852839fef56e68e6059af33bc5f77483d4305db2e904ef1e
+Primary fingerprint: 6B62473BD771517D41E684DFD4439E7EC133994D
+UID: SUSE Security Automation Key (only for automation data) <security@suse.de>
+Official CSAF publication information:
+https://www.suse.com/support/security/csaf/
+The full fingerprint was derived from this vendor-HTTPS certificate and supplied
+as the explicit build-time trust pin. Unlike Red Hat, an independent HTTPS
+provider-metadata fingerprint publication was not found; do not claim one.
+This is an explicit pinned vendor-origin trust decision, not runtime trust on
+first use or a detached-signature proof of the certificate's own provenance.
+Original identity and public-certificate notices are retained unchanged.
+SUSE advisory content is published by SUSE Product Security under CC-BY-4.0:
+https://ftp.suse.com/pub/projects/security/csaf/LICENSE
+https://creativecommons.org/licenses/by/4.0/
+Retained advisory fixture attribution is in ../testdata/suse-provenance.txt.
+
+Acquisition and freshness boundary
+----------------------------------
+Online individual CSAF sources require original payload, the published SHA256
+record naming its exact basename, and a binary detached signature by the pinned
+publisher. Changing distro/format cannot select an unrelated publisher's key.
+HTTP without verified TLS, proof files above 64 KiB, individual JSON above
+32 MiB, corrupt/missing proofs, invalid/revoked/expired keys and future signature
+times are refused. SHA256 artifacts describe exact original vendor bytes;
+signer fingerprints identify the actual authorized signing key.
+
+Red Hat weekly source URLs identify the provider root. The client reads only
+advisories/archive_latest.txt and vex/archive_latest.txt, each naming the strict
+csaf_<distribution>_YYYY-MM-DD.tar.zst basename. It requires both snapshots;
+requests do not crawl a directory or discover arbitrary URLs. Each compressed
+archive is streamed to one private owned temporary file of at most 512 MiB,
+verified before parsing, rewound for the parser, then closed and removed even
+on errors or cancellation. Memory is not proportional to compressed archive
+size. Two artifacts mean at most 1 GiB payload, two one-byte overflow probes,
+and bounded pointers/proofs; eight logical requests, at most forty including
+checked HTTPS redirects. Acquisition and parsing share a five-minute deadline,
+with two-minute per-request HTTP timeouts. Decompression and record bounds
+belong to the archive parser. The oldest valid detached-signature creation time
+bounds source freshness: refetching an old signed archive cannot renew it.
+
+The signed acquisition tests retain real Red Hat/SUSE payloads and signatures.
+TLS orchestration tests serve those unchanged signed bytes under controlled
+paths; JSON bytes transported under archive-shaped names test acquisition and
+cleanup only, not a claim that those bytes are a vendor tar.zst archive. A
+separate ephemeral key in the revocation policy test is not a vendor fixture or
+a production trust root. No synthetic vendor record is used as evidence of
+vendor advisory coverage.

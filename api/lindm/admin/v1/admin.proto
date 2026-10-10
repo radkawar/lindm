@@ -4,8 +4,18 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/advisories.proto";
+import "lindm/admin/v1/approvals.proto";
+import "lindm/admin/v1/assignments.proto";
+import "lindm/admin/v1/authz_groups.proto";
+import "lindm/admin/v1/device_actions.proto";
+import "lindm/admin/v1/enrollment_recovery.proto";
+import "lindm/admin/v1/fleet_summary.proto";
+import "lindm/admin/v1/inventory_management.proto";
+import "lindm/admin/v1/offline_enrollment.proto";
 import "lindm/admin/v1/profiles.proto";
-import "lindm/admin/v1/service_assignments.proto";
+import "lindm/admin/v1/provisioning.proto";
+import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
 import "lindm/inventory/v1/observation.proto";
@@ -15,19 +25,59 @@ option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 service AdminService {
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc GetFleetSummary(GetFleetSummaryRequest) returns (GetFleetSummaryResponse);
   rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse);
   rpc ListDevicePackages(ListDevicePackagesRequest) returns (ListDevicePackagesResponse);
+  rpc SetDeviceMetadata(SetDeviceMetadataRequest) returns (SetDeviceMetadataResponse);
+  rpc SetAttributeDefinition(SetAttributeDefinitionRequest) returns (SetAttributeDefinitionResponse);
+  rpc ListAttributeDefinitions(ListAttributeDefinitionsRequest) returns (ListAttributeDefinitionsResponse);
+  rpc ExportDevices(ExportDevicesRequest) returns (ExportDevicesResponse);
   rpc CreateEnrollmentGrant(CreateEnrollmentGrantRequest) returns (CreateEnrollmentGrantResponse);
   rpc RevokeEnrollmentGrant(RevokeEnrollmentGrantRequest) returns (RevokeEnrollmentGrantResponse);
+  rpc CreateProvisioningToken(CreateProvisioningTokenRequest) returns (CreateProvisioningTokenResponse);
+  rpc ListProvisioningTokens(ListProvisioningTokensRequest) returns (ListProvisioningTokensResponse);
+  rpc RevokeProvisioningToken(RevokeProvisioningTokenRequest) returns (RevokeProvisioningTokenResponse);
+  rpc GetPendingEnrollments(GetPendingEnrollmentsRequest) returns (GetPendingEnrollmentsResponse);
+  rpc ApprovePendingEnrollment(ApprovePendingEnrollmentRequest) returns (ApprovePendingEnrollmentResponse);
+  rpc CreateRecoveryEnrollmentGrant(CreateRecoveryEnrollmentGrantRequest) returns (CreateRecoveryEnrollmentGrantResponse);
+  rpc CreateOfflineEnrollmentAuthorization(CreateOfflineEnrollmentAuthorizationRequest) returns (CreateOfflineEnrollmentAuthorizationResponse);
+  rpc ImportOfflineEnrollmentRequest(ImportOfflineEnrollmentRequestRequest) returns (ImportOfflineEnrollmentRequestResponse);
+  rpc ExportOfflineEnrollmentResponse(ExportOfflineEnrollmentResponseRequest) returns (ExportOfflineEnrollmentResponseResponse);
   rpc RevokeDevice(RevokeDeviceRequest) returns (RevokeDeviceResponse);
+  rpc CreateApproval(CreateApprovalRequest) returns (CreateApprovalResponse);
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  rpc ApproveApproval(ApproveApprovalRequest) returns (ApproveApprovalResponse);
+  rpc RejectApproval(RejectApprovalRequest) returns (RejectApprovalResponse);
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
   rpc GetExecutionAuthority(GetExecutionAuthorityRequest) returns (GetExecutionAuthorityResponse);
   rpc UpdateExecutionAuthority(UpdateExecutionAuthorityRequest) returns (UpdateExecutionAuthorityResponse);
-  rpc PublishServiceProfileRevision(PublishServiceProfileRevisionRequest) returns (PublishServiceProfileRevisionResponse);
-  rpc GetServiceProfileRevision(GetServiceProfileRevisionRequest) returns (GetServiceProfileRevisionResponse);
-  rpc ListServiceProfiles(ListServiceProfilesRequest) returns (ListServiceProfilesResponse);
-  rpc SetServiceAssignment(SetServiceAssignmentRequest) returns (SetServiceAssignmentResponse);
-  rpc GetDeviceServiceState(GetDeviceServiceStateRequest) returns (GetDeviceServiceStateResponse);
+  rpc PublishProfileRevision(PublishProfileRevisionRequest) returns (PublishProfileRevisionResponse);
+  rpc GetProfileRevision(GetProfileRevisionRequest) returns (GetProfileRevisionResponse);
+  rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc SetResourceAssignment(SetResourceAssignmentRequest) returns (SetResourceAssignmentResponse);
+  rpc GetDeviceResourceState(GetDeviceResourceStateRequest) returns (GetDeviceResourceStateResponse);
+  rpc PutDynamicGroup(PutDynamicGroupRequest) returns (PutDynamicGroupResponse);
+  rpc GetDynamicGroup(GetDynamicGroupRequest) returns (GetDynamicGroupResponse);
+  rpc ListDynamicGroups(ListDynamicGroupsRequest) returns (ListDynamicGroupsResponse);
+  rpc PutTargetAssignment(PutTargetAssignmentRequest) returns (PutTargetAssignmentResponse);
+  rpc ListTargetAssignments(ListTargetAssignmentsRequest) returns (ListTargetAssignmentsResponse);
+  rpc PreviewTargetAssignments(PreviewTargetAssignmentsRequest) returns (PreviewTargetAssignmentsResponse);
+  rpc ActivateTargetPreview(ActivateTargetPreviewRequest) returns (ActivateTargetPreviewResponse);
+  rpc PutRollout(PutRolloutRequest) returns (PutRolloutResponse);
+  rpc ControlRollout(ControlRolloutRequest) returns (ControlRolloutResponse);
+  rpc ListRollouts(ListRolloutsRequest) returns (ListRolloutsResponse);
+  rpc CreateDeviceAction(CreateDeviceActionRequest) returns (CreateDeviceActionResponse);
+  rpc GetDeviceActions(GetDeviceActionsRequest) returns (GetDeviceActionsResponse);
+  rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);
+  rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);
+  rpc RevealRecoveryKey(RevealRecoveryKeyRequest) returns (RevealRecoveryKeyResponse);
+  rpc ListDeviceGroups(ListDeviceGroupsRequest) returns (ListDeviceGroupsResponse);
+  rpc SetDeviceGroup(SetDeviceGroupRequest) returns (SetDeviceGroupResponse);
+  rpc DeleteDeviceGroup(DeleteDeviceGroupRequest) returns (DeleteDeviceGroupResponse);
+  rpc ListDeviceFindings(ListDeviceFindingsRequest) returns (ListDeviceFindingsResponse);
+  rpc ListAdvisorySummary(ListAdvisorySummaryRequest) returns (ListAdvisorySummaryResponse);
+  rpc ListAdvisoryFeeds(ListAdvisoryFeedsRequest) returns (ListAdvisoryFeedsResponse);
+  rpc AcceptAdvisoryFinding(AcceptAdvisoryFindingRequest) returns (AcceptAdvisoryFindingResponse);
 }
 
 enum DeviceState {
@@ -36,6 +86,19 @@ enum DeviceState {
   DEVICE_STATE_ACTIVE = 2;
   DEVICE_STATE_REVOKED = 3;
   DEVICE_STATE_RECOVERY_HOLD = 4;
+}
+
+// List/export projection over current enrollment-generation assignment heads.
+// Worst-first precedence is ATTENTION, UNKNOWN, STALE, DRIFT_REMEDIATED,
+// COMPLIANT. No current-head resources is UNASSIGNED, never COMPLIANT.
+enum DeviceCompliance {
+  DEVICE_COMPLIANCE_UNSPECIFIED = 0;
+  DEVICE_COMPLIANCE_UNASSIGNED = 1;
+  DEVICE_COMPLIANCE_COMPLIANT = 2;
+  DEVICE_COMPLIANCE_DRIFT_REMEDIATED = 3;
+  DEVICE_COMPLIANCE_STALE = 4;
+  DEVICE_COMPLIANCE_UNKNOWN = 5;
+  DEVICE_COMPLIANCE_ATTENTION = 6;
 }
 
 message Device {
@@ -58,15 +121,27 @@ message Device {
   google.protobuf.Timestamp snapshot_received_at = 16;
   // Sequence of the current published snapshot. Zero means none has been published.
   uint64 published_snapshot_sequence = 17;
+  DeviceMetadata metadata = 18;
+  // Populated by ListDevices and ExportDevices; live rather than cursor-frozen.
+  DeviceCompliance compliance = 19;
+  // Oldest successful server-received verification across all current-head
+  // resources. Absent if unassigned or any resource has never been verified.
+  // This is historical evidence, not a claim that compliance is currently fresh.
+  google.protobuf.Timestamp last_verified_at = 20;
 }
 
 message ListDevicesRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
+  DeviceFilter filter = 3;
 }
 message ListDevicesResponse {
   repeated Device devices = 1;
   string next_page_token = 2;
+  // Echo to revisit this keyset range with the original cutoff and expiry.
+  // Host projections and metadata remain live, not a frozen fleet snapshot.
+  string page_token = 3;
+  google.protobuf.Timestamp cursor_expires_at = 4;
 }
 
 message GetDeviceRequest {
@@ -136,6 +211,10 @@ message DevicePackage {
   string version = 3;
   string architecture = 4;
   string manager = 5;
+  string source_name = 6;
+  string source_version = 7;
+  // Absent only on historical snapshots predating native module evidence.
+  lindm.inventory.v1.ModuleObservation module = 8;
 }
 
 message ListDevicePackagesResponse {
@@ -169,11 +248,6 @@ message RevokeEnrollmentGrantRequest {
   string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
 }
 message RevokeEnrollmentGrantResponse {}
-message RevokeDeviceRequest {
-  string request_id = 1 [(buf.validate.field).string.uuid = true];
-  string device_id = 2 [(buf.validate.field).string.uuid = true];
-  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
-}
 message RevokeDeviceResponse {}
 message AuditEvent {
   string id = 1;
@@ -201,11 +275,6 @@ message GetExecutionAuthorityResponse {
   uint64 revision = 4;
 }
 
-message UpdateExecutionAuthorityRequest {
-  // Exact signed-document digest is the natural, durable idempotency key.
-  lindm.agent.v1.UpdateExecutionTrustRequest update = 1 [(buf.validate.field).required = true];
-  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
-}
 message UpdateExecutionAuthorityResponse {
   // Exact retries return original acceptance, not a new authority lifetime.
   lindm.agent.v1.UpdateExecutionTrustResponse receipt = 1 [(buf.validate.field).required = true];

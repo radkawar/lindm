@@ -37,6 +37,9 @@ func (s *Service) ReportServiceResult(ctx context.Context, req *connect.Request[
 		return nil, mapErr(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if err := s.targeting.Lock(ctx, tx); err != nil {
+		return nil, mapErr(err)
+	}
 	q := devicedb.New(tx)
 	device, err := s.lockAuthority(ctx, q, principal)
 	if err != nil {
@@ -59,6 +62,9 @@ func (s *Service) ReportServiceResult(ctx context.Context, req *connect.Request[
 	}
 	if !enrollmentIssuanceResumable(device.certificate, now) {
 		return nil, mapErr(errCertificateRejected)
+	}
+	if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{ID: principal.DeviceID, LastSeenAt: timestamptz(now)}); err != nil {
+		return nil, mapErr(err)
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
 		return nil, rpcError(connect.CodePermissionDenied, "service_action_binding_rejected")
@@ -156,6 +162,22 @@ func (s *Service) ReportServiceResult(ctx context.Context, req *connect.Request[
 	}
 	if latest.ID == action.ID {
 		if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
+			return nil, mapErr(err)
+		}
+		if disposition == 3 {
+			if err := q.SetServiceResourceVerification(ctx, devicedb.SetServiceResourceVerificationParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, LastVerifiedAt: timestamptz(now), ObservedAt: timestamptz(status.GetVerification().GetObservation().GetObservedAt().AsTime()), DriftRemediated: len(action.StartGrantEnvelope) != 0}); err != nil {
+				return nil, mapErr(err)
+			}
+		}
+	}
+	if err := s.targeting.RecordExecutionHealth(ctx, tx, principal.DeviceID, principal.GenerationID, action.AssignmentID); err != nil {
+		return nil, mapErr(err)
+	}
+	if disposition == 3 && len(action.StartGrantEnvelope) == 0 && status.GetStartedAt() == nil {
+		if err := q.MarkServiceReadOnlySuccess(ctx, id); err != nil {
+			return nil, mapErr(err)
+		}
+		if err := q.PruneServiceReadOnlySuccesses(ctx, principal.GenerationID); err != nil {
 			return nil, mapErr(err)
 		}
 	}

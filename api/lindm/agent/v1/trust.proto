@@ -111,4 +111,12 @@ message SessionAcquisition {
   uint64 predecessor_epoch = 5;
   string incarnation = 6 [(buf.validate.field).string.uuid = true];
   string boot_id = 7 [(buf.validate.field).string.uuid = true];
+  // Executor-signed build identity. Empty legacy/development claims cannot
+  // establish support; update retrieval and inventory remain available.
+  string agent_release = 8 [(buf.validate.field).string.max_len = 128];
+  uint32 agent_protocol_version = 9 [(buf.validate.field).uint32.lte = 2147483647];
+  string installation_id = 10 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
 }

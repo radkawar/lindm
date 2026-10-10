@@ -94,13 +94,13 @@ func TestEntraSourceCurrentAuthority(t *testing.T) {
 		writeGraphJSON(t, w, fmt.Sprintf(`{"value":[{"id":%q}],"@odata.nextLink":%q}`, admin, "https://"+r.Host+r.URL.Path+"?$skiptoken=page2"))
 	})
 	var directory DirectorySource = source
-	obs, err := directory.Observe(context.Background(), user)
-	if err != nil || !obs.Found || !obs.Enabled || !obs.Direct || obs.UserID != user || obs.DisplayName != "AdaLovelace" || len(obs.Groups) != 1 || obs.Groups[0] != admin.String() || !obs.AcquiredAt.IsZero() {
+	obs, err := directory.Observe(context.Background(), user.String())
+	if err != nil || !obs.Found || !obs.Enabled || !obs.Direct || obs.UserID != user.String() || obs.DisplayName != "AdaLovelace" || len(obs.Groups) != 1 || obs.Groups[0] != admin.String() || !obs.AcquiredAt.IsZero() {
 		t.Fatalf("observation = %+v, %v", obs, err)
 	}
 	for _, current := range []int32{1, 2, 3, 4} {
 		state.Store(current)
-		obs, err = directory.Observe(context.Background(), user)
+		obs, err = directory.Observe(context.Background(), user.String())
 		if len(obs.Groups) != 0 || obs.Found != (current < 3) || obs.Enabled != (current == 1) || (err != nil) != (current == 4) {
 			t.Fatalf("state %d retained authority: %+v, %v", current, obs, err)
 		}
@@ -163,7 +163,7 @@ func TestEntraRejectsMalformedAndUnboundedResponses(t *testing.T) {
 				}
 				writeGraphJSON(t, w, test.page(r, pages.Add(1)))
 			})
-			obs, err := source.Observe(context.Background(), user)
+			obs, err := source.Observe(context.Background(), user.String())
 			if err == nil || obs.Found || len(obs.Groups) != 0 || pages.Load() > maxGroupPaths/groupPageSize {
 				t.Fatalf("malformed response granted authority: %+v, %v, pages %d", obs, err, pages.Load())
 			}
@@ -187,7 +187,7 @@ func TestEntraConcurrentTokenRefresh(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 24 {
 		wg.Go(func() {
-			obs, err := source.Observe(context.Background(), user)
+			obs, err := source.Observe(context.Background(), user.String())
 			if err != nil || !obs.Enabled {
 				t.Errorf("concurrent observation: %+v, %v", obs, err)
 			}
@@ -236,7 +236,7 @@ func TestEntraThrottlingAndTimeouts(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			started := time.Now()
-			obs, err := source.Observe(ctx, user)
+			obs, err := source.Observe(ctx, user.String())
 			if (err == nil) != test.allowed || (!test.allowed && obs.Found) || calls.Load() != test.wantCalls {
 				t.Fatalf("observation %+v, error %v, requests %d", obs, err, calls.Load())
 			}
@@ -249,7 +249,7 @@ func TestEntraThrottlingAndTimeouts(t *testing.T) {
 		source, _ := entraFixture(t, func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() })
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 		defer cancel()
-		obs, err := source.Observe(ctx, user)
+		obs, err := source.Observe(ctx, user.String())
 		if err == nil || obs.Found {
 			t.Fatalf("timeout retained authority: %+v, %v", obs, err)
 		}

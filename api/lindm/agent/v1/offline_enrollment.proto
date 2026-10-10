@@ -1,0 +1,100 @@
+syntax = "proto3";
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/execution_trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Signed by the enrollment.offline.v1 PLAN delegate; not a device identity.
+message OfflineEnrollmentAuthorization {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string authorization_id = 2 [(buf.validate.field).string.uuid = true];
+  string token_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 root_version = 4 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 5 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp not_before = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 7 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "offline_authorization.validity"
+    message: "authorization validity is positive and bounded to seven days"
+    expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('604800s')"
+  };
+}
+
+message OfflineEnrollmentAuthorizationFile {
+  bytes authorization_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  bytes delegation_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  repeated ExecutionRootTransition root_transitions = 3 [(buf.validate.field).repeated.max_items = 8];
+}
+
+// Device-key proof; the executor constructs every field from protected state.
+message OfflineEnrollmentRequestProof {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string transaction_id = 2 [(buf.validate.field).string.uuid = true];
+  string installation_id = 3 [(buf.validate.field).string.uuid = true];
+  bytes authorization_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  bytes csr_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp not_before = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 7 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "offline_request.validity"
+    message: "request validity is positive and bounded"
+    expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('604800s')"
+  };
+}
+
+message OfflineEnrollmentRequestFile {
+  OfflineEnrollmentAuthorizationFile authorization = 1 [(buf.validate.field).required = true];
+  bytes csr_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  bytes request_proof = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+
+// Signed by the enrollment.offline.v1 START delegate. No private key is carried.
+message OfflineEnrollmentResponse {
+  OfflineEnrollmentRequestProof request = 1 [(buf.validate.field).required = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  bytes certificate_pem = 4 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 16384
+  }];
+  uint64 root_version = 5 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 6 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp not_before = 7 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 8 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "offline_response.validity"
+    message: "response validity is positive and bounded"
+    expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('604800s')"
+  };
+}
+
+message OfflineEnrollmentResponseFile {
+  bytes response_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes delegation_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  repeated ExecutionRootTransition root_transitions = 3 [(buf.validate.field).repeated.max_items = 8];
+}
+
+message ImportOfflineEnrollmentRequest {
+  OfflineEnrollmentResponseFile response = 1 [(buf.validate.field).required = true];
+}

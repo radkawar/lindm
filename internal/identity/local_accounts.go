@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity/identitydb"
@@ -22,49 +23,47 @@ var errOwnerAuthenticationMode = errors.New("identity: owner_authentication_mode
 
 // checkOwnerAuthenticationMode rejects a configuration cutover that would strand
 // the initialized owner. Uninitialized deployments must remain bootstrappable.
-func (s *Service) checkOwnerAuthenticationMode(ctx context.Context) error {
-	return s.withTx(ctx, func(q *identitydb.Queries) error {
-		deployment, err := q.LockDeploymentIdentity(ctx)
-		if err != nil {
-			return s.dbErr(err)
+func (s *Service) checkOwnerAuthenticationMode(ctx context.Context, q *identitydb.Queries) error {
+	deployment, err := q.LockDeploymentIdentity(ctx)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	if deployment.OwnerPrincipalID == nil && !deployment.InitializedAt.Valid {
+		return nil
+	}
+	if deployment.OwnerPrincipalID == nil || !deployment.InitializedAt.Valid {
+		return errStore
+	}
+	owner, err := q.GetPrincipalByID(ctx, *deployment.OwnerPrincipalID)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	if s.localPrimary {
+		if owner.Issuer != s.localIssuer || owner.Subject != owner.ID.String() {
+			return errOwnerAuthenticationMode
 		}
-		if deployment.OwnerPrincipalID == nil && !deployment.InitializedAt.Valid {
-			return nil
-		}
-		if deployment.OwnerPrincipalID == nil || !deployment.InitializedAt.Valid {
-			return errStore
-		}
-		owner, err := q.GetPrincipalByID(ctx, *deployment.OwnerPrincipalID)
-		if err != nil {
-			return s.dbErr(err)
-		}
-		if s.localPrimary {
-			if owner.Issuer != s.localIssuer || owner.Subject != owner.ID.String() {
+		if _, err := q.GetLocalAccount(ctx, owner.ID); err != nil {
+			if errors.Is(s.dbErr(err), errNotFound) {
 				return errOwnerAuthenticationMode
 			}
-			if _, err := q.GetLocalAccount(ctx, owner.ID); err != nil {
-				if errors.Is(s.dbErr(err), errNotFound) {
-					return errOwnerAuthenticationMode
-				}
-				return s.dbErr(err)
-			}
-			return nil
-		}
-		if owner.Issuer == s.issuer {
-			return nil
-		}
-		if s.breakGlass == nil {
-			return errOwnerAuthenticationMode
-		}
-		available, err := q.HasEnrolledBreakGlassOwner(ctx, s.localIssuer)
-		if err != nil {
 			return s.dbErr(err)
 		}
-		if !available {
-			return errOwnerAuthenticationMode
-		}
 		return nil
-	})
+	}
+	if owner.Issuer == s.issuer {
+		return nil
+	}
+	if s.breakGlass == nil {
+		return errOwnerAuthenticationMode
+	}
+	available, err := q.HasEnrolledBreakGlassOwner(ctx, s.localIssuer)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	if !available {
+		return errOwnerAuthenticationMode
+	}
+	return nil
 }
 
 // BootstrapLocalOwner claims an uninitialized deployment exactly once.
@@ -81,7 +80,7 @@ func (s *Service) BootstrapLocalOwner(ctx context.Context, username string) (Enr
 		if deployment.InitializedAt.Valid || deployment.OwnerPrincipalID != nil {
 			return ErrOwnerInitialized
 		}
-		enrollment, err = s.createLocalAccount(ctx, q, username, RoleOwner, false)
+		enrollment, err = s.createLocalAccount(ctx, q, &authv1.CreateAccountRequest{Username: username, Role: RoleOwner})
 		if err != nil {
 			return err
 		}
@@ -93,8 +92,16 @@ func (s *Service) BootstrapLocalOwner(ctx context.Context, username string) (Enr
 	return enrollment, err
 }
 
-func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries, username, role string, breakGlass bool) (Enrollment, error) {
-	if err := s.rules.Validate(&authv1.CreateAccountRequest{Username: username, Role: role, BreakGlass: breakGlass}); err != nil {
+func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries, request *authv1.CreateAccountRequest) (Enrollment, error) {
+	if err := s.rules.Validate(request); err != nil {
+		return Enrollment{}, err
+	}
+	username, role, breakGlass := request.GetUsername(), request.GetRole(), request.GetBreakGlass()
+	if s.policy.role(role) == nil {
+		return Enrollment{}, ErrAuthorizationDenied
+	}
+	scopeBinding, err := protojson.Marshal(&authv1.RoleBinding{Scopes: request.GetScopes()})
+	if err != nil {
 		return Enrollment{}, err
 	}
 	id, err := uuid.NewRandom()
@@ -105,10 +112,10 @@ func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries,
 	if err != nil {
 		return Enrollment{}, s.dbErr(err)
 	}
-	if err = q.InsertLocalAccount(ctx, identitydb.InsertLocalAccountParams{ID: id, Username: username, Role: role, BreakGlass: breakGlass}); err != nil {
+	if err = q.InsertLocalAccount(ctx, identitydb.InsertLocalAccountParams{ID: id, Username: username, Role: role, BreakGlass: breakGlass, ScopeBinding: scopeBinding}); err != nil {
 		return Enrollment{}, s.dbErr(err)
 	}
-	if err = q.BumpLocalAuthorization(ctx, identitydb.BumpLocalAuthorizationParams{ID: id, AuthorizationRole: role}); err != nil {
+	if err = s.bumpLocalAuthorization(ctx, q, id, role); err != nil {
 		return Enrollment{}, s.dbErr(err)
 	}
 	return s.issueEnrollment(ctx, q, id)
@@ -127,7 +134,7 @@ func (s *Service) issueEnrollment(ctx context.Context, q *identitydb.Queries, id
 }
 
 func (s *Service) invalidateLocalAccount(ctx context.Context, q *identitydb.Queries, id uuid.UUID, role string) error {
-	if err := q.BumpLocalAuthorization(ctx, identitydb.BumpLocalAuthorizationParams{ID: id, AuthorizationRole: role}); err != nil {
+	if err := s.bumpLocalAuthorization(ctx, q, id, role); err != nil {
 		return s.dbErr(err)
 	}
 	revoked, err := q.RevokeBreakGlassSessions(ctx, id)
@@ -166,4 +173,25 @@ func (s *Service) resetLocalCredentials(ctx context.Context, q *identitydb.Queri
 		return Enrollment{}, s.dbErr(err)
 	}
 	return s.issueEnrollment(ctx, q, id)
+}
+
+func (s *Service) bumpLocalAuthorization(ctx context.Context, q *identitydb.Queries, id uuid.UUID, role string) error {
+	account, err := q.GetLocalAccount(ctx, id)
+	if err != nil {
+		return s.dbErr(err)
+	}
+	binding := &authv1.RoleBinding{}
+	if err := protojson.Unmarshal(account.ScopeBinding, binding); err != nil {
+		return errStore
+	}
+	var bindings []*authv1.RoleBinding
+	if definition := s.policy.role(role); definition != nil {
+		binding.Role, binding.Permissions = role, definition.GetPermissions()
+		bindings = []*authv1.RoleBinding{binding}
+	}
+	digest, err := bindingsDigest(bindings)
+	if err != nil {
+		return err
+	}
+	return s.dbErr(q.BumpLocalAuthorization(ctx, identitydb.BumpLocalAuthorizationParams{ID: id, AuthorizationRole: role, AuthorizationDigest: digest}))
 }

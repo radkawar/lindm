@@ -3,6 +3,10 @@ syntax = "proto3";
 package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_action_recovery.proto";
+import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/update.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
@@ -40,4 +44,132 @@ message AgentConfig {
   // The executor does not open it. It must be canonical and distinct from the
   // state and runtime directories.
   string spool_directory = 5 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Native imperative actions are opt-in; absent configuration refuses them.
+  DeviceActionProviderConfig action_provider = 6;
+  RecoveryBootConfig recovery_boot = 7;
+  // Only the executor's copy grants update authority. Absent means disabled.
+  AgentUpdateConfig updates = 8;
+}
+
+// Root-owned local qualification, never remotely supplied execution authority.
+message DeviceActionProviderConfig {
+  repeated QualifiedActionTarget targets = 1 [(buf.validate.field).repeated.max_items = 32];
+  bool allow_session_lock = 2;
+  bool allow_quarantine = 3;
+  repeated string management_endpoints = 4 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {ip: true}
+    }
+  }];
+  repeated string dns_servers = 5 [(buf.validate.field).repeated = {
+    max_items: 8
+    items: {
+      string: {ip: true}
+    }
+  }];
+  uint32 quarantine_seconds = 6 [(buf.validate.field).uint32 = {lte: 300}];
+  // Existing protected off-target mount containing executor journal and identity.
+  string protected_state_directory = 7;
+  // Provisioned only by a qualified signed recovery environment.
+  bool recovery_environment = 8;
+  // Separate local opt-in for the encrypted live-root, forced-poweroff mode.
+  bool allow_live_root_crypto_erase = 9;
+  bool allow_recovery_handoff = 10;
+  bool allow_account_lock = 11;
+  // Root is always protected, even when omitted here. Keep break-glass and
+  // administrator login paths in this root-owned list.
+  repeated string protected_accounts = 12 [(buf.validate.field).repeated = {
+    max_items: 128
+    unique: true
+    items: {
+      string: {pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"}
+    }
+  }];
+}
+
+message QualifiedActionTarget {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  // An independent owner credential must remain usable throughout rotation.
+  uint32 owner_recovery_keyslot = 2 [(buf.validate.field).uint32.lte = 31];
+  bool allow_recovery_rotation = 3;
+  bool allow_tpm2_binding = 4;
+  bool allow_crypto_erase = 5;
+  bool allow_overwrite = 6;
+  bool allow_discard = 7;
+  // An attributable hardware/method qualification reference, not evidence generated
+  // by the running action. Empty qualification refuses destructive operations.
+  string qualification_id = 8 [(buf.validate.field).string.max_len = 256];
+  repeated SanitizeMethod native_sanitize_methods = 9 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        in: [
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    }
+  }];
+}
+
+// Authenticated recovery-image configuration. Every path is resolved locally
+// from protected provisioning, never from a remote action request.
+message RecoveryRuntimeConfig {
+  string state_directory = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string key_file = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.(lindm.validation.v1.file_reference) = true
+  ];
+  string server_url = 3 [
+    (buf.validate.field).string.uri = true,
+    (buf.validate.field).string.(lindm.validation.v1.https_origin) = true
+  ];
+  string server_ca_file = 4 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  reserved 5;
+  reserved "recovery_image_sha256";
+  DeviceActionProviderConfig provider = 6 [(buf.validate.field).required = true];
+  string root_file = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string bootstrap_file = 8 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Embedded signer pin avoids an impossible self-hash of the signed UKI.
+  bytes certificate_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  RecoveryCustody custody = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Authenticated image-provisioning admission time for the static bootstrap.
+  // Historical bootstrap restoration never relaxes current execution authority.
+  google.protobuf.Timestamp bootstrap_verified_at = 11 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "recovery_runtime.custody"
+    message: "off-target custody requires its key file; TPM custody cannot select a key file"
+    expression: "(this.custody == 1 && this.key_file != '') || (this.custody == 2 && this.key_file == '')"
+  };
+}
+
+message RecoveryBootConfig {
+  string image_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  bytes image_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  uint64 image_size = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 1073741824
+  }];
+  string signer_certificate_file = 4 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  bytes signer_certificate_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  string esp_directory = 6 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  string state_directory = 7 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  RecoveryCustody custody = 8 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bytes expected_pcr11_sha256 = 9 [(buf.validate.field).bytes.max_len = 32];
+  option (buf.validate.message).cel = {
+    id: "recovery_boot.custody"
+    message: "TPM custody requires the exact qualified recovery PCR11"
+    expression: "(this.custody == 2 ? this.expected_pcr11_sha256.size() == 32 : this.expected_pcr11_sha256.size() == 0)"
+  };
 }

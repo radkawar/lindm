@@ -467,6 +467,11 @@ func (s *dispatchServer) GetExecutionTrust(ctx context.Context, req *connect.Req
 	return connect.NewResponse(&devicev1.GetExecutionTrustResponse{}), nil
 }
 
+// Service-loop fixtures have no imperative device actions.
+func (*dispatchServer) GetDeviceActionWork(context.Context, *connect.Request[devicev1.GetDeviceActionWorkRequest]) (*connect.Response[devicev1.GetDeviceActionWorkResponse], error) {
+	return connect.NewResponse(&devicev1.GetDeviceActionWorkResponse{}), nil
+}
+
 func (s *dispatchServer) GetServiceWork(ctx context.Context, req *connect.Request[devicev1.GetServiceWorkRequest]) (*connect.Response[devicev1.GetServiceWorkResponse], error) {
 	f := s.f
 	f.remote(req.Msg.GetSessionEpoch())

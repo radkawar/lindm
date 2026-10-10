@@ -31,7 +31,8 @@ func TestFixtureAuthenticationModes(t *testing.T) {
 			if mode == "keycloak" && document.Proto.GetAuthentication().GetKeycloak().GetIssuer() != issuer {
 				t.Fatal("Keycloak fixture lost its pinned issuer")
 			}
-			for _, name := range []string{"realm.json", "owner-password", "console-secret", "directory-secret", "lab-admin-secret"} {
+			for _, name := range []string{"realm.json", "owner-password", "console-secret", "directory-secret", "lab-admin-secret",
+				"broker-realm.json", "broker-upstream-realm.json", "broker-directory-secret", "broker-admin-secret", "broker-upstream-directory-secret", "broker-upstream-admin-secret"} {
 				_, err := os.Stat(filepath.Join(dir, name))
 				if local && !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("local fixture unexpectedly provisioned %s: %v", name, err)

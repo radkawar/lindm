@@ -36,6 +36,7 @@ const maxGuestOutput = 64 << 20
 type guestVM struct {
 	dir                string
 	cmd                *exec.Cmd
+	base               *os.File
 	done               chan struct{}
 	waitErr            error
 	log                *vmLog
@@ -44,36 +45,12 @@ type guestVM struct {
 	client             *ssh.Client
 	captureDiagnostics bool
 	lastOperation      *guestOperationDiagnostic
-}
-
-type vmRuntimeEvidence struct {
-	Accelerator     string `json:"accelerator"`
-	QEMUVersion     string `json:"qemu_version"`
-	FirmwareVendor  string `json:"firmware_vendor"`
-	FirmwareVersion string `json:"firmware_version"`
-}
-
-func (v *guestVM) runtimeEvidence(ctx context.Context) (*vmRuntimeEvidence, error) {
-	if err := v.processError(); err != nil {
-		return nil, err
-	}
-	// Query the running executable, not a PATH entry which could have changed
-	// after launch. Firmware is observed inside this guest.
-	version, err := hostCommand(ctx, v.dir, fmt.Sprintf("/proc/%d/exe", v.cmd.Process.Pid), nil, "--version")
-	if err != nil {
-		return nil, err
-	}
-	qemu, _, _ := strings.Cut(string(version), "\n")
-	firmware, err := v.run(ctx, "cat /sys/class/dmi/id/bios_vendor /sys/class/dmi/id/bios_version", nil, 4096, 10*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("read guest firmware evidence: %w", err)
-	}
-	fields := strings.Split(strings.TrimSuffix(string(firmware), "\n"), "\n")
-	if strings.TrimSpace(qemu) == "" || len(fields) != 2 || strings.TrimSpace(fields[0]) == "" || strings.TrimSpace(fields[1]) == "" {
-		return nil, errors.New("incomplete hypervisor or guest firmware evidence")
-	}
-	// The launch requires accel=kvm and has no emulation fallback.
-	return &vmRuntimeEvidence{Accelerator: "kvm", QEMUVersion: qemu, FirmwareVendor: fields[0], FirmwareVersion: fields[1]}, nil
+	hardware           VMHardwareOptions
+	firmware           *EncryptedFirmwareEvidence
+	tpm                *encryptedProcess
+	// Only configured UEFI guests defer a requested no-reboot policy until SSH.
+	// Manually assembled encrypted guests retain their existing reboot policy.
+	stopRebootAfterConnect bool
 }
 
 // vmLog retains only bounded process diagnostics, never guest serial output.
@@ -142,15 +119,25 @@ func hostCommand(ctx context.Context, dir, name string, files []*os.File, args .
 	return out.data, nil
 }
 
-func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool) (_ *guestVM, err error) {
-	kvm, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+func newConfiguredGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions) (_ *guestVM, err error) {
+	return newSeededGuestVM(ctx, base, workDir, allowReboot, hardware, nil)
+}
+
+// newSeededGuestVM accepts only internally constructed, root-only enrollment
+// material. The seed and overlay remain owned by the disposable VM lifecycle.
+func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot bool, hardware *VMHardwareOptions, enrollment *unattendedSeed) (_ *guestVM, err error) {
+	h, err := defaultVMHardware(hardware)
 	if err != nil {
-		return nil, fmt.Errorf("KVM access is required (no software fallback): %w", err)
-	}
-	if err := kvm.Close(); err != nil {
 		return nil, err
 	}
-	for _, tool := range []string{"qemu-system-x86_64", "qemu-img", "cloud-localds"} {
+	if err := checkVMAcceleration(h); err != nil {
+		return nil, err
+	}
+	tools := []string{"qemu-system-" + h.Architecture, "qemu-img", "cloud-localds"}
+	if h.TPM {
+		tools = append(tools, "swtpm")
+	}
+	for _, tool := range tools {
 		if _, err := exec.LookPath(tool); err != nil {
 			return nil, fmt.Errorf("required host tool %s: %w", tool, err)
 		}
@@ -166,12 +153,21 @@ func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot 
 	if err != nil {
 		return nil, fmt.Errorf("create private run directory: %w", err)
 	}
-	vm := &guestVM{dir: dir, log: new(vmLog)}
+	vm := &guestVM{dir: dir, log: new(vmLog), hardware: h, stopRebootAfterConnect: !allowReboot && h.Firmware != nil}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, vm.close())
 		}
 	}()
+	// Retain the exact verified base for independent stopped-disk oracles;
+	// the caller's borrowed descriptor closes after QEMU inherits its copy.
+	vm.base, err = os.Open(fmt.Sprintf("/proc/self/fd/%d", base.Fd()))
+	if err != nil {
+		return nil, fmt.Errorf("retain verified VM base: %w", err)
+	}
+	if err := vm.prepareHardware(ctx); err != nil {
+		return nil, err
+	}
 
 	infoBytes, err := hostCommand(ctx, dir, "qemu-img", []*os.File{base}, "info", "--output=json", "-f", "qcow2", "/proc/self/fd/3")
 	if err != nil {
@@ -225,6 +221,9 @@ func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot 
 		// This changes the disposable guest only; it installs nothing.
 		"runcmd": []any{[]string{"sh", "-c", "for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat \"$unit\" >/dev/null 2>&1; then systemctl mask --now \"$unit\" || exit; fi; done"}},
 	}
+	if enrollment != nil {
+		enrollment.apply(config)
+	}
 	userData, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
@@ -260,34 +259,11 @@ func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot 
 	if err := listener.Close(); err != nil {
 		return nil, err
 	}
-	args := []string{
-		"-no-user-config", "-nodefaults", "-display", "none", "-serial", "none", "-monitor", "none",
-		"-machine", "q35,accel=kvm", "-cpu", "host", "-m", "2048", "-smp", "2",
+	args, err := configuredVMArguments(h, dir, port, allowReboot)
+	if err != nil {
+		return nil, err
 	}
-	if !allowReboot {
-		args = append(args, "-no-reboot")
-	}
-	for _, block := range []map[string]any{
-		{"driver": "file", "node-name": "base-file", "filename": "/proc/self/fd/3", "read-only": true},
-		{"driver": "qcow2", "node-name": "base", "file": "base-file", "read-only": true, "backing": nil},
-		{"driver": "file", "node-name": "overlay-file", "filename": filepath.Join(dir, "overlay.qcow2")},
-		{"driver": "qcow2", "node-name": "overlay", "file": "overlay-file", "backing": "base"},
-		{"driver": "file", "node-name": "seed-file", "filename": filepath.Join(dir, "seed.img"), "read-only": true},
-		{"driver": "raw", "node-name": "seed", "file": "seed-file", "read-only": true},
-	} {
-		encoded, err := json.Marshal(block)
-		if err != nil {
-			return nil, fmt.Errorf("encode QEMU block device: %w", err)
-		}
-		args = append(args, "-blockdev", string(encoded))
-	}
-	args = append(args,
-		"-device", "virtio-blk-pci,drive=overlay,bootindex=0",
-		"-device", "virtio-blk-pci,drive=seed", "-device", "virtio-rng-pci",
-		"-netdev", fmt.Sprintf("user,id=net0,restrict=on,hostfwd=tcp:127.0.0.1:%s-:22", port),
-		"-device", "virtio-net-pci,netdev=net0",
-	)
-	vm.cmd = exec.CommandContext(ctx, "qemu-system-x86_64", args...)
+	vm.cmd = exec.CommandContext(ctx, "qemu-system-"+h.Architecture, args...)
 	vm.cmd.Dir = dir
 	vm.cmd.ExtraFiles = []*os.File{base}
 	vm.cmd.Stdout, vm.cmd.Stderr = vm.log, vm.log
@@ -316,6 +292,13 @@ func newGuestVM(ctx context.Context, base *os.File, workDir string, allowReboot 
 }
 
 func (v *guestVM) processError() error {
+	if v.tpm != nil {
+		select {
+		case <-v.tpm.done:
+			return fmt.Errorf("swtpm exited unexpectedly (%v); %s; QEMU diagnostics: %s", v.tpm.err, v.tpm.log.diagnostic(v.dir), v.log.diagnostic(v.dir))
+		default:
+		}
+	}
 	select {
 	case <-v.done:
 		return fmt.Errorf("QEMU exited unexpectedly (%v); %s", v.waitErr, v.log.diagnostic(v.dir))
@@ -342,10 +325,31 @@ func (v *guestVM) connect(ctx context.Context) error {
 				_ = conn.SetDeadline(time.Time{})
 				v.client = ssh.NewClient(sshConn, channels, requests)
 				stop()
-				return v.processError()
+				if err := v.finishStartup(ctx); err != nil {
+					return err
+				}
+				// Authentication precedes sshd's PAM/session startup. Only
+				// transient transport loss or explicit channel unavailability
+				// may retry this side-effect-free readiness command.
+				if _, err := v.run(ctx, "true", nil, 128, 15*time.Second); err != nil {
+					_ = v.client.Close()
+					v.client = nil
+					if !sshBootNotReady(err) {
+						return fmt.Errorf("SSH session readiness: %w", err)
+					}
+				} else {
+					return v.processError()
+				}
 			}
 			cancelConn()
 			_ = conn.Close()
+			if handshakeErr != nil && !sshBootNotReady(handshakeErr) {
+				stop()
+				return fmt.Errorf("pinned SSH handshake: %w", handshakeErr)
+			}
+		} else if !errors.Is(err, syscall.ECONNREFUSED) && !sshBootNotReady(err) {
+			stop()
+			return fmt.Errorf("dial guest SSH: %w", err)
 		}
 		stop()
 		select {
@@ -358,9 +362,47 @@ func (v *guestVM) connect(ctx context.Context) error {
 	}
 }
 
+// sshBootNotReady admits only transport startup failures and explicit temporary
+// channel rejection. Authentication, host-key, protocol and command failures are
+// terminal; polling readiness must never hide a changed security boundary.
+func sshBootNotReady(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
+		return true
+	}
+	var network net.Error
+	if errors.As(err, &network) && network.Timeout() {
+		return true
+	}
+	var channel *ssh.OpenChannelError
+	return errors.As(err, &channel) &&
+		(channel.Reason == ssh.ConnectionFailed || channel.Reason == ssh.ResourceShortage)
+}
+
 // close kills and reaps QEMU before removing every secret-bearing artifact.
 // A requested SIGKILL is expected; an already exited guest is always a failure.
 func (v *guestVM) close() error {
+	return v.closeWithExpectedExit(false)
+}
+
+// closeAfterExpectedExit cleans a successfully reaped process only. Callers must
+// independently prove the intended guest outcome before discarding its state.
+func (v *guestVM) closeAfterExpectedExit() error {
+	if v.done == nil || v.cmd == nil {
+		return errors.New("expected-exit cleanup requires an owned stopped process")
+	}
+	select {
+	case <-v.done:
+		if v.waitErr != nil || v.cmd.ProcessState == nil || !v.cmd.ProcessState.Success() {
+			return fmt.Errorf("expected-exit cleanup rejected unsuccessful process: %v", v.waitErr)
+		}
+	default:
+		return errors.New("expected-exit cleanup requires a reaped process")
+	}
+	return v.closeWithExpectedExit(true)
+}
+
+func (v *guestVM) closeWithExpectedExit(expected bool) error {
 	var err error
 	if v.client != nil {
 		_ = v.client.Close()
@@ -368,7 +410,9 @@ func (v *guestVM) close() error {
 	if v.done != nil {
 		select {
 		case <-v.done:
-			err = v.processError()
+			if !expected {
+				err = v.processError()
+			}
 		default:
 			killErr := v.cmd.Process.Kill()
 			if killErr != nil {
@@ -388,9 +432,17 @@ func (v *guestVM) close() error {
 					}
 				}
 			case <-time.After(10 * time.Second):
-				err = errors.Join(err, errors.New("QEMU did not exit within cleanup deadline"))
+				return errors.Join(err, errors.New("QEMU did not exit within cleanup deadline; private state retained"))
 			}
 		}
+	}
+	if stopErr := v.tpm.stop(); stopErr != nil {
+		return errors.Join(err, stopErr)
+	}
+	v.tpm = nil
+	if v.base != nil {
+		err = errors.Join(err, v.base.Close())
+		v.base = nil
 	}
 	return errors.Join(err, os.RemoveAll(v.dir))
 }
@@ -453,12 +505,26 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 		return result, err
 	}
 	// Closing the transport interrupts channel creation, requests and stream I/O.
-	// A timeout ends the scenario; a possibly ambiguous session is never reused.
-	stop := context.AfterFunc(ctx, func() { _ = v.client.Close() })
+	// A timed-out session is never reused; only connect's no-effect readiness
+	// probe may poll again on a fresh authenticated transport.
+	client := v.client
+	stop := context.AfterFunc(ctx, func() { _ = client.Close() })
 	defer stop()
 	session, err := v.client.NewSession()
 	if err != nil {
-		return result, fmt.Errorf("open pinned SSH session: %w", err)
+		// x/crypto reports a closed channel response as unexpected packet(nil).
+		// Preserve explicit channel rejection, otherwise classify the actual
+		// terminal transport error, not that synthetic protocol diagnostic.
+		_ = client.Close()
+		transportErr := client.Wait()
+		if ctx.Err() != nil {
+			return result, fmt.Errorf("open pinned SSH session deadline: %w (transport closure: %v)", ctx.Err(), transportErr)
+		}
+		var rejected *ssh.OpenChannelError
+		if errors.As(err, &rejected) {
+			return result, fmt.Errorf("open pinned SSH session: %w (transport closure: %v)", err, transportErr)
+		}
+		return result, fmt.Errorf("open pinned SSH session: %v (transport closure: %w)", err, transportErr)
 	}
 	defer func() { _ = session.Close() }() // Run already checked remote completion.
 	stdout := &limitedOutput{limit: limit}
@@ -495,7 +561,7 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 			result.ExitCode = exit.ExitStatus()
 			return result, nil
 		}
-		return result, errors.New("guest operation transport failed")
+		return result, fmt.Errorf("guest operation transport failed: %w", err)
 	}
 	return result, nil
 }

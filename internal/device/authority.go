@@ -19,21 +19,43 @@ const (
 	maxRenewalReceipts = 4096
 )
 
-// All device authority transitions serialize on the device row first. Certificate
-// validity and generation/session state are sampled only after acquiring it.
-type lockedAuthority struct {
-	device      devicedb.GetDeviceForUpdateRow
+// Device mutations hold the device row throughout authority checks and writes.
+type deviceAuthority struct {
+	device devicedb.GetDeviceForUpdateRow
+	deviceCredentials
+}
+
+type deviceCredentials struct {
 	generation  devicedb.GetGenerationAuthorityRow
 	certificate devicedb.GetCertificateByIDRow
 	now         time.Time
 }
 
-func (s *Service) lockAuthority(ctx context.Context, q *devicedb.Queries, principal devicePrincipal) (lockedAuthority, error) {
-	var authority lockedAuthority
+func (s *Service) lockAuthority(ctx context.Context, q *devicedb.Queries, principal devicePrincipal) (deviceAuthority, error) {
 	row, err := q.GetDeviceForUpdate(ctx, principal.DeviceID)
 	if err != nil {
-		return authority, err
+		return deviceAuthority{}, err
 	}
+	credentials, err := s.checkAuthority(ctx, q, principal, devicedb.GetDeviceAuthorityRow{ID: row.ID, State: row.State, CurrentGenerationID: row.CurrentGenerationID})
+	if err != nil {
+		return deviceAuthority{}, err
+	}
+	return deviceAuthority{device: row, deviceCredentials: credentials}, nil
+}
+
+// readAuthority requires REPEATABLE READ, READ ONLY: the device, generation and
+// certificate must describe one committed state, never mixed statement snapshots.
+// It authorizes public trust delivery or an empty poll, not execution or a write.
+func (s *Service) readAuthority(ctx context.Context, q *devicedb.Queries, principal devicePrincipal) (deviceCredentials, error) {
+	row, err := q.GetDeviceAuthority(ctx, principal.DeviceID)
+	if err != nil {
+		return deviceCredentials{}, err
+	}
+	return s.checkAuthority(ctx, q, principal, row)
+}
+
+func (s *Service) checkAuthority(ctx context.Context, q *devicedb.Queries, principal devicePrincipal, row devicedb.GetDeviceAuthorityRow) (deviceCredentials, error) {
+	var authority deviceCredentials
 	if row.State == stateRecoveryHold {
 		return authority, errRecoveryHold
 	}
@@ -58,7 +80,7 @@ func (s *Service) lockAuthority(ctx context.Context, q *devicedb.Queries, princi
 	if certificate.DeviceID != row.ID || certificate.GenerationID != principal.GenerationID || !digestEqual(certificate.Fingerprint, principal.Fingerprint) || !enrollmentIssuanceResumable(certificate, now) {
 		return authority, errCertificateRejected
 	}
-	return lockedAuthority{device: row, generation: generation, certificate: certificate, now: now}, nil
+	return deviceCredentials{generation: generation, certificate: certificate, now: now}, nil
 }
 
 func validSessionEpoch(epoch uint64) bool {

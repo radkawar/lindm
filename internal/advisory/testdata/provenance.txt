@@ -1,0 +1,73 @@
+Recorded native package fixtures for L11
+=======================================
+
+The JSON files encode lindm.inventory.v1.PackageBatch, selected unchanged from
+NativeObservation packages emitted by the maintained lab vm inspect command.
+Only package records are retained; local accounts, network addresses, hardware
+serials and other unrelated host details are deliberately excluded. Formatting
+and the PackageBatch envelope are the only transformations. These are selected
+inventory subsets, not claims to represent every package on the source guest.
+
+ubuntu-noble-packages.json
+  Retained PackageBatch SHA256: 529f706837ea1d4d1adabce51b66c255def8aad158f05a0388a170f4d7c24248
+  Maintained lane: lab vm inspect with -inventory-record
+  Manifest: lab/images/ubuntu-noble-amd64.json
+  Observation: artifacts/inventory-ubuntu24-observation-20261009.json
+  Run: artifacts/inventory-ubuntu24-run-20261009.json
+  Image ID: ubuntu-noble-20260926-amd64
+  Image SHA256: 6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2
+  Agent SHA256: c47571c57fc39b1d43e1ee87ed1c827f75e84aba8ca46e44f73acc062b9ed5f6
+  Full observation SHA256: d07821f1a23003704b8196ea6f21f3dff9e7198c419a3de25f43a4ddf8e77709
+  Package collection: 2026-10-09T22:50:11.254163316Z through 2026-10-09T22:50:11.258545658Z
+  Native oracle independently matched all 664 dpkg package records, including
+  source package identity. Retained openssh-client and openssh-server are both
+  1:9.6p1-3ubuntu13.19, source openssh at the same version. USN-6859-1 fixes the
+  earlier distro backport 1:9.6p1-3ubuntu13.3, so neither recorded package is
+  affected even though its upstream OpenSSH version remains 9.6p1.
+  VM: x86_64 KVM, QEMU 8.2.2, SeaBIOS 1.16.3, virtio-blk, TPM absent. This is
+  emulator/VM inventory evidence, not physical or graphical certification.
+
+fedora44-packages.json
+  Retained PackageBatch SHA256: 4748213c95a0da8b071f5603adba4c4582466247aa44d75c49c59818f68b927d
+  Maintained lane: lab vm inspect with -inventory-record
+  Observation: artifacts/inventory-fedora44-observation-20261009.json
+  Run: artifacts/inventory-fedora44-run-20261009.json
+  Image ID: fedora-cloud-44-1.7-x86-64
+  Image SHA256: 28680fe5b371a5a82ebf43a31926e086a168e59949d03969c5093e7071f90b7f
+  Agent SHA256: c47571c57fc39b1d43e1ee87ed1c827f75e84aba8ca46e44f73acc062b9ed5f6
+  Full observation SHA256: b1f784f1c16de0fd9acfcdd762bf3e1b43ef079a07c7e4c26ca473a8addce3c8
+  Package collection: 2026-10-09T22:55:22.975840845Z through 2026-10-09T22:55:23.040673326Z
+  Native oracle independently matched all 427 RPM package records. Retained
+  sudo is 0:1.9.17-7.p2.fc44. FEDORA-2026-7d4732cbab fixes the distro backport
+  0:1.9.17-10.p2.fc44 (CVE-2026-96512), so this actual installed package remains
+  affected without treating the unchanged upstream 1.9.17 version as proof.
+  VM: x86_64 KVM, QEMU 8.2.2, SeaBIOS 1.16.3. This is emulator/VM inventory
+  evidence, not physical or graphical certification.
+
+The deterministic database replay controls receipt/collection timestamps to
+exercise freshness independently of the retained package versions. Vendor feed
+subsets remain explicitly partial, so absence of a finding is never promoted to
+a whole-device clean claim. Vendor fixture provenance and native comparator test
+sources are recorded separately in ../feed/testdata/provenance.txt.
+
+rhel98-packages.json and rhel98-platform.json
+  Retained PackageBatch SHA256: 2e98b89d9b2cf4d4911c81a1bb2680fcc93daac3cee90dc9e03478077668648b
+  Retained PlatformDetails SHA256: 97a325bd4ff0f436b57dcbcc4ab370cc1a4c193b04da81f98707d5b32ce6947b
+  Maintained lane: lab vm inspect with -inventory-record (PlatformLanes)
+  Full observation: /home/r/.cache/lindm-platformlanes-20261009/rhel98-native-observation.json
+  Full observation SHA256: 31d8897f2c71163279bd6ff2e66c9fdf1288450b3f8dc58839a2b0c28a733a1a
+  Vendor RHEL 9.8 image SHA256: b99091f1b4489111004d449398d9cc6aa024cb48b02c72fa99e6ca1fc48a7e4e
+  Agent SHA256: e2239c4e0f7c00e0e20b703bf9fcddb175e072d6840a0b5822fa204035af76f6
+  Package collection: 2026-10-09T23:27:20.043428496Z through 2026-10-09T23:27:20.092113607Z
+  Native oracle independently matched all 490 RPM records, including module and
+  platform observations. The retained actual openssl-libs 1:3.5.5-2.el9_8 is
+  non-modular and newer than RHSA-2024:6783's fixed 1:3.0.7-28.el9_4.
+  This guest was unregistered: CPE identified RHEL 9, the release lock was
+  unavailable, and successful native dnf4 discovery returned no enabled repos.
+  The replay therefore MUST report rhel_platform_stream_unavailable, not invent
+  standard/EUS/E4S entitlement or infer whole-device coverage from version alone.
+  Host details outside the retained platform subset are explicitly unavailable
+  in the replay envelope. No synthetic enabled repository is attributed to this
+  VM. Controlled standard/EUS/E4S database fixtures are separately labeled tests.
+  This x86_64 KVM guest is emulated/virtual inventory evidence, not physical
+  qualification, entitlement verification, or a graphical-session claim.

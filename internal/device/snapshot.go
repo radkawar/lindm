@@ -153,7 +153,7 @@ func (s *Service) BeginPackageSnapshot(ctx context.Context, req *connect.Request
 	return connect.NewResponse(response), nil
 }
 
-func (s *Service) replayBegin(ctx context.Context, q *devicedb.Queries, authority lockedAuthority, manifest boundManifest, row devicedb.GetPackageSnapshotRow) (*devicev1.BeginPackageSnapshotResponse, error) {
+func (s *Service) replayBegin(ctx context.Context, q *devicedb.Queries, authority deviceAuthority, manifest boundManifest, row devicedb.GetPackageSnapshotRow) (*devicev1.BeginPackageSnapshotResponse, error) {
 	if row.GenerationID != authority.generation.ID || row.DeviceID != authority.device.ID {
 		return nil, errInventoryConflict
 	}
@@ -169,7 +169,7 @@ func (s *Service) replayBegin(ctx context.Context, q *devicedb.Queries, authorit
 	return beginResponse(row, authority.generation.PackageSequence, authority.now)
 }
 
-func (s *Service) admitBegin(ctx context.Context, q *devicedb.Queries, authority lockedAuthority, manifest boundManifest) (*devicev1.BeginPackageSnapshotResponse, error) {
+func (s *Service) admitBegin(ctx context.Context, q *devicedb.Queries, authority deviceAuthority, manifest boundManifest) (*devicev1.BeginPackageSnapshotResponse, error) {
 	if manifest.sequence <= authority.generation.PackageSequence {
 		return nil, errSnapshotExpired
 	}
@@ -303,6 +303,10 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 				rows[i] = devicedb.InsertSnapshotPackagesParams{
 					SnapshotID: snapshotID, Position: position, Name: pkg.GetName(), Version: pkg.GetVersion(),
 					Architecture: pkg.GetArchitecture(), Manager: pkg.GetManager(),
+					SourceName: pkg.GetSourceName(), SourceVersion: pkg.GetSourceVersion(),
+					ModuleStatus: int32(pkg.GetModule().GetStatus()), ModuleName: pkg.GetModule().GetName(),
+					ModuleStream: pkg.GetModule().GetStream(), ModuleVersion: pkg.GetModule().GetVersion(),
+					ModuleContext: pkg.GetModule().GetContext(),
 				}
 			}
 			if len(rows) > 0 {
@@ -430,7 +434,7 @@ func (s *Service) CommitPackageSnapshot(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(response), nil
 }
 
-func (s *Service) publishSnapshot(ctx context.Context, q *devicedb.Queries, authority lockedAuthority, row devicedb.GetPackageSnapshotRow, response **devicev1.CommitPackageSnapshotResponse) error {
+func (s *Service) publishSnapshot(ctx context.Context, q *devicedb.Queries, authority deviceAuthority, row devicedb.GetPackageSnapshotRow, response **devicev1.CommitPackageSnapshotResponse) error {
 	if authority.generation.CurrentSnapshotID != nil && *authority.generation.CurrentSnapshotID != row.ID {
 		if err := s.supersedeSnapshot(ctx, q, authority.device, *authority.generation.CurrentSnapshotID, authority.now); err != nil {
 			return err
@@ -633,7 +637,10 @@ func decodeBatch(rules protovalidate.Validator, payload []byte, count int) ([]*i
 		return nil, errInventoryConflict
 	}
 	for _, pkg := range batch.GetPackages() {
-		if pkg == nil || hasNUL(pkg.GetName(), pkg.GetVersion(), pkg.GetArchitecture(), pkg.GetManager()) {
+		if pkg == nil || hasNUL(
+			pkg.GetName(), pkg.GetVersion(), pkg.GetArchitecture(), pkg.GetManager(), pkg.GetSourceName(), pkg.GetSourceVersion(),
+			pkg.GetModule().GetName(), pkg.GetModule().GetStream(), pkg.GetModule().GetVersion(), pkg.GetModule().GetContext(),
+		) {
 			return nil, invalid("invalid_text")
 		}
 	}

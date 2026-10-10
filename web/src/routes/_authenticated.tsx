@@ -5,7 +5,11 @@ import { ConsoleShell } from "@/components/layout/console-shell";
 import { accountLabel } from "@/features/auth/session";
 import { logout, sessionIdentity, sessionQueryOptions } from "@/features/auth/queries";
 import { AuthLifetimeContext } from "@/hooks/use-auth-lifetime";
+import { PrincipalContext } from "@/hooks/use-permissions";
 import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
+import { CommandPalette } from "@/app/command-palette";
+import { Toaster } from "@/components/ui/sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ context }) => {
@@ -32,14 +36,24 @@ function AuthenticatedLayout() {
   }, [router, session.data, session.isSuccess]);
 
   if (!principal || !lifetime || lifetime.identity !== sessionIdentity(principal)) {
-    return <p role="status">Checking session…</p>;
+    return (
+      <div className="grid gap-4 p-6" role="status" aria-label="Checking session">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-48 w-full" />
+        <span className="sr-only">Checking session…</span>
+      </div>
+    );
   }
 
   return (
     <ConsoleShell
       userLabel={accountLabel(principal)}
       role={principal.role}
+      principal={principal}
       loggingOut={loggingOut}
+      commandPalette={
+        <CommandPalette key={lifetime.generation} principal={principal} lifetime={lifetime} />
+      }
       onLogout={() => {
         setLoggingOut(true);
         setLogoutError("");
@@ -65,9 +79,12 @@ function AuthenticatedLayout() {
       ) : null}
       {logoutError !== "" ? <p role="alert">{logoutError}</p> : null}
       <AuthLifetimeContext key={lifetime.generation} value={lifetime}>
-        <div id="main">
-          <Outlet />
-        </div>
+        <PrincipalContext value={principal}>
+          <main id="main" tabIndex={-1} className="min-w-0 outline-none">
+            <Outlet />
+          </main>
+          <Toaster />
+        </PrincipalContext>
       </AuthLifetimeContext>
     </ConsoleShell>
   );

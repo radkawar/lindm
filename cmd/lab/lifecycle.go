@@ -19,7 +19,9 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	manifestPath := flags.String("manifest", "", "verified image protobuf JSON manifest")
 	firstPath := flags.String("first-build", "", "first version's native BuildResult JSON record")
 	secondPath := flags.String("second-build", "", "upgrade version's native BuildResult JSON record")
-	aptPath := flags.String("apt-repository", "", "signed APTRepository JSON record (Ubuntu)")
+	aptPath := flags.String("apt-repository", "", "signed APTRepository JSON record (Ubuntu/Debian)")
+	archFirstPath := flags.String("arch-first-repository", "", "signed ArchRepository JSON for the initial version")
+	archSecondPath := flags.String("arch-second-repository", "", "signed ArchRepository JSON for the upgrade version")
 	rejectionPath := flags.String("rejections", "", "actual RejectionFixtures JSON record")
 	publicKey := flags.String("public-key", "", "separately pinned ASCII-armored package signing key")
 	fingerprint := flags.String("fingerprint", "", "expected package signer fingerprint")
@@ -28,12 +30,14 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	workDir := flags.String("work-dir", "", "parent for owned disposable VM state")
 	diagnostics := flags.String("diagnostics", "", "existing directory for opt-in private failure diagnostics")
 	probe := flags.String("lab", "", "built lab probe binary (defaults to this executable)")
+	redhatToken := flags.String("redhat-token-file", "", "protected Red Hat offline-token file; optional for offline RPM installs, required for RHEL repository access")
 	observe := flags.Duration("observe-for", 0, "optional console inspection interval after first two publications (at most ten minutes)")
 	executionTrust := flags.Bool("execution-trust", false, "exercise signed execution trust rotation, revocation and retained rollback fences after upgrade")
 	serviceExecution := flags.Bool("service-execution", false, "exercise packaged signed service execution and retained journal evidence; implies execution-trust")
 	controlPlaneTrust := flags.Bool("control-plane-trust", false, "exercise isolated real control-plane authority and automatic installed agent trust synchronization")
 	lindmd := flags.String("lindmd", "", "prebuilt current lindmd binary (required with -control-plane-trust)")
 	record := flags.String("record", "", "write successful lifecycle evidence to a new private file")
+	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -50,9 +54,9 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
-	format := packaging.FormatDEB
-	if manifest.GetDistribution() == "fedora" {
-		format = packaging.FormatRPM
+	format, err := vmlab.NativePackageFormat(manifest.GetDistribution())
+	if err != nil {
+		return err
 	}
 	first, err := readNativeBuildArtifact(*firstPath, format)
 	if err != nil {
@@ -69,6 +73,17 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
+	var arch []*packaging.ArchRepository
+	for _, path := range []string{*archFirstPath, *archSecondPath} {
+		if path == "" {
+			continue
+		}
+		repo := new(packaging.ArchRepository)
+		if err := readLabEvidence(path, repo); err != nil {
+			return err
+		}
+		arch = append(arch, repo)
+	}
 	var rejections packaging.RejectionFixtures
 	if err := readLabEvidence(*rejectionPath, &rejections); err != nil {
 		return err
@@ -79,7 +94,7 @@ func runVMLifecycle(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, LabBinary: *probe, First: first, Second: second, APT: apt, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution, ControlPlaneTrust: *controlPlaneTrust, LindmdBinary: *lindmd})
+	result, err := vmlab.LifecycleVM(ctx, manifest, vmlab.VMLifecycleOptions{Repository: *repository, CacheDir: *cache, WorkDir: *workDir, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: *probe, RedHatTokenFile: *redhatToken, First: first, Second: second, APT: apt, Arch: arch, PublicKey: *publicKey, SignerFingerprint: *fingerprint, Rejections: rejections.Cases, ObserveFor: *observe, Progress: stderr, ExecutionTrust: *executionTrust, ServiceExecution: *serviceExecution, ControlPlaneTrust: *controlPlaneTrust, LindmdBinary: *lindmd})
 	if err != nil {
 		return err
 	}
@@ -91,6 +106,7 @@ func runRejectionFixtures(ctx context.Context, args []string, stdout, stderr io.
 	flags.SetOutput(stderr)
 	buildPath := flags.String("build", "", "positive first-version BuildResult JSON record with DEB and RPM")
 	aptPath := flags.String("apt-repository", "", "positive signed APTRepository JSON record")
+	archOnly := flags.Bool("arch", false, "build Arch detached-signature rejection cases instead of DEB/RPM")
 	output := flags.String("output", "", "new or empty private fixture directory")
 	home := flags.String("signer-home", "", "explicit development package-signing home")
 	fingerprint := flags.String("fingerprint", "", "pinned development signer fingerprint")
@@ -98,20 +114,30 @@ func runRejectionFixtures(ctx context.Context, args []string, stdout, stderr io.
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *buildPath == "" || *aptPath == "" || *output == "" || *home == "" || *fingerprint == "" {
-		return errors.New("rejection-fixtures requires -build, -apt-repository, -output, -signer-home and -fingerprint; no positional arguments")
+	if flags.NArg() != 0 || *buildPath == "" || (!*archOnly && *aptPath == "") || *output == "" || *home == "" || *fingerprint == "" {
+		return errors.New("rejection-fixtures requires -build, -output, -signer-home, -fingerprint and either -arch or -apt-repository; no positional arguments")
 	}
-	deb, err := readNativeBuildArtifact(*buildPath, packaging.FormatDEB)
-	if err != nil {
-		return err
-	}
-	rpm, err := readNativeBuildArtifact(*buildPath, packaging.FormatRPM)
-	if err != nil {
-		return err
-	}
-	var apt packaging.APTRepository
-	if err := readLabEvidence(*aptPath, &apt); err != nil {
-		return err
+	request := packaging.RejectionRequest{}
+	if *archOnly {
+		artifact, err := readNativeBuildArtifact(*buildPath, packaging.FormatArch)
+		if err != nil {
+			return err
+		}
+		request.Arch = artifact
+	} else {
+		deb, err := readNativeBuildArtifact(*buildPath, packaging.FormatDEB)
+		if err != nil {
+			return err
+		}
+		rpm, err := readNativeBuildArtifact(*buildPath, packaging.FormatRPM)
+		if err != nil {
+			return err
+		}
+		apt := new(packaging.APTRepository)
+		if err := readLabEvidence(*aptPath, apt); err != nil {
+			return err
+		}
+		request.DEB, request.RPM, request.APT = deb, rpm, apt
 	}
 	if err := resolvePackagePaths(output, home, record); err != nil {
 		return err
@@ -119,7 +145,9 @@ func runRejectionFixtures(ctx context.Context, args []string, stdout, stderr io.
 	if err := createPackageOutput(*output); err != nil {
 		return err
 	}
-	result, err := packaging.BuildRejectionFixtures(ctx, packaging.RejectionRequest{DEB: deb, RPM: rpm, APT: &apt, Signer: packaging.SigningKey{Home: *home, Fingerprint: *fingerprint, Custody: packaging.CustodyDevelopment}, OutputDir: *output})
+	request.Signer = packaging.SigningKey{Home: *home, Fingerprint: *fingerprint, Custody: packaging.CustodyDevelopment}
+	request.OutputDir = *output
+	result, err := packaging.BuildRejectionFixtures(ctx, request)
 	if err != nil {
 		return err
 	}

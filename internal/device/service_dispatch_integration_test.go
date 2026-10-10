@@ -21,26 +21,41 @@ import (
 	"lindm/internal/identity"
 )
 
+func TestServiceFreshDelegationIntentWindow(t *testing.T) {
+	f := newDispatchFixtureWithDelegationAge(t, time.Second)
+	f.assign(t, nil)
+	intent := f.intent(t, f.work(t))
+	if !intent.GetNotBefore().AsTime().Equal(f.delegation.GetNotBefore().AsTime()) {
+		t.Fatal("fresh delegation did not bound intent not-before")
+	}
+	if !intent.GetExpiresAt().AsTime().Equal(intent.GetNotBefore().AsTime().Add(12 * time.Minute)) {
+		t.Fatal("fresh delegation changed the bounded intent lifetime")
+	}
+	if !intent.GetExpiresAt().AsTime().After(time.Now()) || intent.GetExpiresAt().AsTime().After(f.delegation.GetExpiresAt().AsTime()) {
+		t.Fatal("minted unusable or out-of-delegation execution window")
+	}
+}
+
 func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 	f := newDispatchFixture(t)
 	request := f.assignmentRequest(nil)
-	first, err := f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(request))
+	first, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
 	}
-	replay, err := f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(request))
+	replay, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(request))
 	if err != nil || !proto.Equal(first.Msg, replay.Msg) {
 		t.Fatalf("exact assignment retry: %v", err)
 	}
 	changed := proto.CloneOf(request)
 	changed.Reason = "different request content"
-	_, err = f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(changed))
+	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(changed))
 	dispatchError(t, err, connect.CodeAlreadyExists, "idempotency_conflict")
-	_, err = f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(nil)))
+	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(nil)))
 	dispatchError(t, err, connect.CodeAborted, "service_assignment_conflict")
 	unknown := f.assignmentRequest(nil)
 	unknown.DeviceId = uuid.NewString()
-	_, err = f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(unknown))
+	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(unknown))
 	dispatchError(t, err, connect.CodeNotFound, "not_found")
 	work := f.work(t)
 	intent := f.intent(t, work)
@@ -52,7 +67,7 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 		t.Fatal("replay did not retain exact intent and rotate nonce")
 	}
 	var count int
-	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM service_actions WHERE device_id=$1", f.principal.DeviceID).Scan(&count); err != nil || count != 1 {
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM resource_actions WHERE device_id=$1", f.principal.DeviceID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("minted more than once: %d %v", count, err)
 	}
 	oldHead := first.Msg.GetAssignment().GetAssignmentId()
@@ -63,18 +78,18 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 		t.Fatal("assignment replacement reused action/sequence")
 	}
 	assertDispatchClosure(t, f, work.GetActionId(), "assignment_changed")
-	state, err := f.service.GetDeviceServiceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceServiceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(state.Msg.GetRecentActions()) != 2 || state.Msg.GetRecentActions()[0].GetAction().GetActionId() != next.GetActionId() || state.Msg.GetRecentActions()[1].GetAction().GetClosedReason() != "assignment_changed" || state.Msg.GetRecentActions()[1].GetAssignmentId() != oldHead {
 		t.Fatal("recent action history lost prior-head closure")
 	}
-	historical, err := f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(request))
+	historical, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(request))
 	if err != nil || !proto.Equal(historical.Msg, first.Msg) {
 		t.Fatalf("historical receipt changed after reassignment: %v", err)
 	}
-	if _, err := f.pool.Exec(t.Context(), "UPDATE service_actions SET issued_at=clock_timestamp()-interval '11 minutes', expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1", next.GetActionId()); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "UPDATE resource_actions SET issued_at=clock_timestamp()-interval '11 minutes', expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1", next.GetActionId()); err != nil {
 		t.Fatal(err)
 	}
 	expiredReplacement := f.work(t)
@@ -83,8 +98,8 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 	}
 	assertDispatchClosure(t, f, next.GetActionId(), "expired_unstarted")
 	head := second.GetAssignmentId()
-	clearRequest := &adminv1.SetServiceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: f.principal.DeviceID.String(), ExpectedAssignmentId: &head, Clear: true, Reason: "stop management without restoring native state"}
-	cleared, err := f.service.SetServiceAssignment(f.adminCtx, connect.NewRequest(clearRequest))
+	clearRequest := &adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: f.principal.DeviceID.String(), ExpectedAssignmentId: &head, Clear: true, Reason: "stop management without restoring native state"}
+	cleared, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(clearRequest))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,11 +146,11 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	consumed := f.result(t, work, 3, agentv1.ServiceExecutionState_SERVICE_EXECUTION_STATE_RUNNING, true)
 	_, err = f.service.ReportServiceResult(f.deviceCtx, connect.NewRequest(consumed))
 	dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
-	state, err := f.service.GetDeviceServiceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceServiceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Msg.GetResources()[0].GetDisposition() != adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_IN_PROGRESS || state.Msg.GetResources()[1].GetReason() != "dependency_pending" {
+	if state.Msg.GetResources()[0].GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS || state.Msg.GetResources()[1].GetReason() != "dependency_pending" {
 		t.Fatal("running history or dependency disposition is wrong")
 	}
 	work = f.work(t)
@@ -160,7 +175,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	// A changed head and expired signed lease cannot replace a granted action.
 	old := head.GetAssignmentId()
 	replacement := f.assign(t, &old)
-	if _, err := f.pool.Exec(t.Context(), "UPDATE service_actions SET issued_at=clock_timestamp()-interval '11 minutes', expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1", dependent.GetActionId()); err != nil {
+	if _, err := f.pool.Exec(t.Context(), "UPDATE resource_actions SET issued_at=clock_timestamp()-interval '11 minutes', expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1", dependent.GetActionId()); err != nil {
 		t.Fatal(err)
 	}
 	held := f.work(t)
@@ -184,7 +199,7 @@ func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
 	if f.work(t) != nil {
 		t.Fatal("revoked assigning actor minted work")
 	}
-	state, err := f.service.GetDeviceServiceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceServiceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +212,7 @@ func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
 	// Removing then restoring the role changes its version even when the next
 	// fetch observes the original role. Reauthorization never revives that head.
 	f.directory.membership(t, false)
-	if _, err := f.service.identity.AuthorizeFresh(t.Context(), f.actor.ID, identity.PermissionAssignServices); err == nil {
+	if _, err := f.service.identity.AuthorizeFresh(t.Context(), f.actor.ID, identity.PermissionAssignResources); err == nil {
 		t.Fatal("removed membership still authorized")
 	}
 	f.directory.membership(t, true)
@@ -266,11 +281,11 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	if f.work(t) != nil {
 		t.Fatal("failed resource automatically retried or released dependent")
 	}
-	state, err := f.service.GetDeviceServiceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceServiceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Msg.GetResources()[0].GetDisposition() != adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_ATTENTION || state.Msg.GetResources()[1].GetDisposition() != adminv1.ServiceResourceDisposition_SERVICE_RESOURCE_DISPOSITION_BLOCKED {
+	if state.Msg.GetResources()[0].GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_ATTENTION || state.Msg.GetResources()[1].GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED {
 		t.Fatal("failure did not retain attention and dependency block")
 	}
 }
@@ -288,7 +303,7 @@ func dispatchError(t *testing.T, err error, code connect.Code, reason string) {
 func assertDispatchClosure(t *testing.T, f *dispatchFixture, id, expected string) {
 	t.Helper()
 	var reason string
-	if err := f.pool.QueryRow(t.Context(), "SELECT closed_reason FROM service_actions WHERE id=$1", id).Scan(&reason); err != nil || reason != expected {
+	if err := f.pool.QueryRow(t.Context(), "SELECT closed_reason FROM resource_actions WHERE id=$1", id).Scan(&reason); err != nil || reason != expected {
 		t.Fatalf("closure=%s want=%s err=%v", reason, expected, err)
 	}
 }

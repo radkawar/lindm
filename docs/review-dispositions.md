@@ -67,6 +67,16 @@ The owner also selected greenfield persistence: changed decisions rewrite existi
 migrations instead of accumulating upgrade debt before the first shipped release.
 The earlier clarifications above remain roadmap commitments, not R1 requirements.
 
+### Owner scope restoration (2026-10-10)
+
+The owner superseded the 2026-10-09 narrowing above and restored the full commercial
+launch contract: P01–P21, every named distro family, encryption escrow,
+lock/quarantine/wipe, air-gap, remote assistance, all named IdPs with SCIM, and HA.
+R1 describes build order only, not a sellable or production-ready release boundary.
+G4–G8, rolling platforms, Atomic Linux and NixOS are launch-required gates; no
+capability is deferred roadmap. Existing evidence and unpassed qualification gates
+remain unchanged; physical-hardware gates do not excuse leaving behavior unbuilt.
+
 ## Initial control-plane implementation reviews
 
 Independent read-only reviews covered identity/device authority, configuration and
@@ -747,7 +757,7 @@ crash recovery or G3. Protected destination ancestry is still the caller's
 precondition; root-TCB mutation and atomic/ABA guarantees remain outside this
 snapshot contract.
 
-### R1 pivot: dispatch, greenfield schema and admin authentication
+### R1 pivot (2026-10-09): dispatch, greenfield schema and admin authentication
 
 Four independent read-only security reviews covered the server dispatch path
 (including clock-skew handling), the agent relay/console/lab/squash, local

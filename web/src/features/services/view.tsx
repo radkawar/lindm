@@ -1,21 +1,24 @@
+import { toJsonString } from "@bufbuild/protobuf";
+import { ResourceDesiredStateSchema } from "../../../gen/lindm/resource/v1/resource_pb";
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { Layers } from "lucide-react";
 import {
-  ServiceResourceDisposition,
+  ResourceCompliance,
+  ResourceDisposition,
   type ServiceActionSummary,
-} from "../../../gen/lindm/admin/v1/service_assignments_pb";
+} from "../../../gen/lindm/admin/v1/assignments_pb";
 import {
   ServiceExecutionFailure,
   ServiceExecutionState,
 } from "../../../gen/lindm/agent/v1/service_execution_pb";
-import {
-  ServiceEnablement,
-  ServiceRuntimeState,
-  type ServiceObservation,
-} from "../../../gen/lindm/agent/v1/service_pb";
+import { type ServiceObservation } from "../../../gen/lindm/agent/v1/service_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -25,46 +28,68 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
+import { canPermission } from "@/lib/permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
-import { ServiceAssignmentForm } from "./assignment-form";
-import { serviceStateQueryOptions } from "./queries";
+import { ResourceAssignmentForm } from "./assignment-form";
+import { resourceStateQueryOptions } from "./queries";
 
 function enumLabel(value: string | undefined): string {
   return value?.toLowerCase().replaceAll("_", " ") ?? "Unknown";
 }
 
-export function DeviceServices({ deviceId }: { deviceId: string }) {
+export function DeviceResources({
+  deviceId,
+  emptyAction,
+}: {
+  deviceId: string;
+  emptyAction?: ReactNode;
+}) {
   const lifetime = useAuthLifetime();
-  const state = useQuery(serviceStateQueryOptions(lifetime, deviceId));
+  const principal = usePrincipal();
+  const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
   const failure = state.error ? toRpcFailure(state.error) : null;
   const assignment = state.data?.assignment;
   return (
-    <Card>
+    <Card className="min-w-0" aria-busy={state.isFetching}>
       <CardHeader>
         <CardTitle>
-          <h2>Services</h2>
+          <h2>Resources</h2>
         </CardTitle>
         <CardDescription>
-          Results are device-signed history, not live compliance. A successful result describes a
-          past execution, not the service state now. Clearing an assignment does not revert
-          services.
+          Review the assigned profile, resource disposition and latest verified native results.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
+        <details className="text-xs text-muted-foreground">
+          <summary className="w-fit cursor-pointer">How resource compliance is measured</summary>
+          <p className="mt-2">
+            Compliance reflects the latest verified result and its server-received age, not a live
+            probe. Checks retain the last verification while running. Clearing an assignment records
+            ownership-safe release work; pending, unsupported or conflicting cleanup remains
+            visible.
+          </p>
+        </details>
         <Button
           className="w-fit"
           variant="outline"
           disabled={state.isFetching}
           onClick={() => void state.refetch()}
         >
-          Refresh service state
+          Refresh resource state
         </Button>
-        {state.isPending ? <p role="status">Loading service state…</p> : null}
+        {state.isPending ? (
+          <div role="status" className="grid gap-3">
+            <span className="text-sm text-muted-foreground">Loading resource state…</span>
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        ) : null}
         {failure ? (
           <Alert variant="destructive">
             <AlertTitle>
-              {failure.denied ? "Not authorized to read services" : "Service state unavailable"}
+              {failure.denied ? "Not authorized to read resources" : "Resource state unavailable"}
             </AlertTitle>
             <AlertDescription>
               {failure.codeName}: {failure.message}
@@ -74,34 +99,38 @@ export function DeviceServices({ deviceId }: { deviceId: string }) {
         ) : null}
         {state.data ? (
           <>
-            <div className="grid gap-2 text-sm">
+            <div className="grid gap-2 border bg-muted/30 p-4 text-sm">
               <h3 className="font-semibold">Current assignment</h3>
               {assignment ? (
                 <>
                   <p>
                     {assignment.profileId
                       ? `${assignment.profileName} · revision ${assignment.revisionNumber.toString()}`
-                      : "None — management stopped"}
+                      : "None — release state is recorded below"}
                   </p>
                   <p className="break-all">
                     Assigned by {assignment.actorId} at{" "}
                     {formatTimestamp(assignment.assignedAt).local}
                   </p>
                   <p className="whitespace-pre-wrap break-words">Reason: {assignment.reason}</p>
+                  {assignment.profileId ? (
+                    <p>Reconciliation interval: {assignment.reconcileIntervalSeconds} seconds</p>
+                  ) : null}
                   <p className="break-all font-mono text-xs text-muted-foreground">
                     Assignment {assignment.assignmentId}
                   </p>
                 </>
               ) : (
-                <p>None — this device has never been assigned a service profile.</p>
+                <p>None — this device has never been assigned a resource profile.</p>
               )}
             </div>
             {state.data.resources.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Unit</TableHead>
+                    <TableHead>Resource</TableHead>
                     <TableHead>Desired state</TableHead>
+                    <TableHead>Compliance / verification</TableHead>
                     <TableHead>Disposition / reason</TableHead>
                     <TableHead>Latest action (history)</TableHead>
                   </TableRow>
@@ -110,32 +139,76 @@ export function DeviceServices({ deviceId }: { deviceId: string }) {
                   {state.data.resources.map((resource) => (
                     <TableRow key={resource.resourceId}>
                       <TableCell className="align-top font-mono">
-                        {resource.desired?.unit ?? "Not reported"}
+                        {resource.desired?.state.case ?? "Unknown kind"} /{" "}
+                        {resource.desired?.ref?.canonicalKey ?? "Not reported"}
                       </TableCell>
                       <TableCell className="align-top">
-                        <p>
-                          Runtime: {enumLabel(ServiceRuntimeState[resource.desired?.runtime ?? 0])}
+                        {resource.desired ? (
+                          <details>
+                            <summary className="cursor-pointer">Typed desired state</summary>
+                            <pre className="mt-2 max-w-lg overflow-auto whitespace-pre-wrap break-all text-xs">
+                              {toJsonString(ResourceDesiredStateSchema, resource.desired, {
+                                prettySpaces: 2,
+                              })}
+                            </pre>
+                          </details>
+                        ) : (
+                          "Not reported"
+                        )}
+                        <p className="mt-2 whitespace-normal">
+                          Dependencies:{" "}
+                          {resource.dependsOn.length === 0
+                            ? "None"
+                            : resource.dependsOn
+                                .map(
+                                  (dependency) =>
+                                    `${dependency.ref?.kind ?? "Unknown"}/${dependency.ref?.canonicalKey ?? "Unknown"} (condition ${dependency.condition})`,
+                                )
+                                .join(", ")}
                         </p>
-                        <p>
-                          Enablement:{" "}
-                          {enumLabel(ServiceEnablement[resource.desired?.enablement ?? 0])}
+                      </TableCell>
+                      <TableCell className="min-w-64 align-top">
+                        <Badge
+                          variant={
+                            resource.compliance === ResourceCompliance.ATTENTION ||
+                            resource.compliance === ResourceCompliance.STALE
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {resource.compliance === ResourceCompliance.UNSPECIFIED
+                            ? "unknown"
+                            : enumLabel(ResourceCompliance[resource.compliance])}
+                        </Badge>
+                        <p className="mt-2 whitespace-normal">
+                          Last verified (server received):{" "}
+                          {resource.lastVerifiedAt
+                            ? formatTimestamp(resource.lastVerifiedAt).local
+                            : "Not verified"}
+                        </p>
+                        <p className="mt-1 whitespace-normal">
+                          Observed (device clock):{" "}
+                          {resource.observedAt
+                            ? formatTimestamp(resource.observedAt).local
+                            : "Not reported"}
                         </p>
                       </TableCell>
                       <TableCell className="align-top">
                         <Badge
                           variant={
-                            resource.disposition === ServiceResourceDisposition.ATTENTION ||
-                            resource.disposition === ServiceResourceDisposition.BLOCKED
+                            resource.disposition === ResourceDisposition.ATTENTION ||
+                            resource.disposition === ResourceDisposition.BLOCKED ||
+                            resource.disposition === ResourceDisposition.UNSUPPORTED
                               ? "destructive"
                               : "secondary"
                           }
                         >
-                          {enumLabel(ServiceResourceDisposition[resource.disposition])}
+                          {enumLabel(ResourceDisposition[resource.disposition])}
                         </Badge>
                         <p className="mt-2 whitespace-normal break-words">
                           {resource.reason || "—"}
                         </p>
-                        {resource.disposition === ServiceResourceDisposition.ATTENTION ? (
+                        {resource.disposition === ResourceDisposition.ATTENTION ? (
                           <p className="mt-2 whitespace-normal">
                             No automatic retry. Review the result and explicitly reassign to retry.
                           </p>
@@ -149,22 +222,86 @@ export function DeviceServices({ deviceId }: { deviceId: string }) {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No resources under the current assignment.
-              </p>
+              <div className="flex flex-col items-center gap-3 border border-dashed px-4 py-10 text-center">
+                <span className="rounded-full bg-muted p-3 text-muted-foreground">
+                  <Layers className="size-6" aria-hidden="true" />
+                </span>
+                <div className="space-y-1">
+                  <p className="font-medium">No managed resources</p>
+                  <p className="text-sm text-muted-foreground">
+                    Assign a resource profile to define this device’s desired state.
+                  </p>
+                </div>
+                {canPermission(principal, "resources.assign") ? emptyAction : null}
+              </div>
             )}
+            <div className="grid gap-2">
+              <h3 className="font-semibold">Ownership-safe releases</h3>
+              <p className="text-sm text-muted-foreground">
+                Release is not an inverse desired state. Only owned changes may be restored;
+                unsupported or conflicting cleanup must remain visible.
+              </p>
+              {state.data.releases.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recorded release work.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>State / reason</TableHead>
+                      <TableHead>Assignment transition</TableHead>
+                      <TableHead>Requested / completed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {state.data.releases.map((release) => (
+                      <TableRow key={release.releaseId}>
+                        <TableCell className="font-mono">
+                          {release.ref?.kind ?? "Unknown"} /{" "}
+                          {release.ref?.canonicalKey ?? "Unknown"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{release.state || "Unknown"}</Badge>
+                          <p className="mt-1 whitespace-normal">
+                            {release.reason || "No reason reported"}
+                          </p>
+                        </TableCell>
+                        <TableCell className="whitespace-normal break-all text-xs">
+                          {release.sourceAssignmentId} → {release.supersedingAssignmentId}
+                          <p>Release {release.releaseId}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p>{formatTimestamp(release.requestedAt).local}</p>
+                          <p>
+                            {release.completedAt
+                              ? formatTimestamp(release.completedAt).local
+                              : "Not completed"}
+                          </p>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
             <div className="grid gap-2">
               <h3 className="font-semibold">Recent actions</h3>
               <p className="text-sm text-muted-foreground">
-                Up to 50 recent actions, newest first, including previous assignment heads. Signed
-                results are device-signed history, not live compliance. Issuance, authorization, and
-                closure are server records, not proof of a native effect.
+                Latest service actions across assignment heads.
               </p>
+              <details className="text-xs text-muted-foreground">
+                <summary className="w-fit cursor-pointer">Action history scope</summary>
+                <p className="mt-2">
+                  Up to 50 recent actions, newest first, including previous assignment heads. Signed
+                  results are device-signed history, not live compliance. Issuance, authorization,
+                  and closure are server records, not proof of a native effect.
+                </p>
+              </details>
               {state.data.recentActions.length ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Unit</TableHead>
+                      <TableHead>Resource</TableHead>
                       <TableHead>Sequence</TableHead>
                       <TableHead>Assignment</TableHead>
                       <TableHead>Issued</TableHead>
@@ -180,7 +317,10 @@ export function DeviceServices({ deviceId }: { deviceId: string }) {
                           recent.action?.actionId ?? `${recent.assignmentId}:${recent.resourceId}`
                         }
                       >
-                        <TableCell className="font-mono">{recent.unit}</TableCell>
+                        <TableCell className="font-mono">
+                          {recent.ref?.kind ?? "Unknown"} /{" "}
+                          {recent.ref?.canonicalKey ?? "Not reported"}
+                        </TableCell>
                         <TableCell>{recent.action?.resourceSequence.toString() ?? "—"}</TableCell>
                         <TableCell>
                           <span className="font-mono" title={recent.assignmentId}>
@@ -215,16 +355,20 @@ export function DeviceServices({ deviceId }: { deviceId: string }) {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-sm text-muted-foreground">No recent actions.</p>
+                <p className="border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                  No recent actions.
+                </p>
               )}
             </div>
           </>
         ) : null}
-        <ServiceAssignmentForm
-          deviceId={deviceId}
-          expectedAssignmentId={assignment?.assignmentId}
-          stateReady={state.isSuccess && !failure}
-        />
+        {canPermission(principal, "resources.assign") ? (
+          <ResourceAssignmentForm
+            deviceId={deviceId}
+            expectedAssignmentId={assignment?.assignmentId}
+            stateReady={state.isSuccess && !failure}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -313,5 +457,79 @@ function Observation({
         <p>Not reported.</p>
       )}
     </div>
+  );
+}
+
+export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }) {
+  const lifetime = useAuthLifetime();
+  const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
+  const data = state.error ? undefined : state.data;
+  const resources = data?.resources ?? [];
+  const pendingReleases = data?.releases.some((release) => !release.completedAt) ?? false;
+  const attention = resources.some(
+    (resource) => resource.compliance === ResourceCompliance.ATTENTION,
+  );
+  const unknown = resources.some(
+    (resource) =>
+      resource.compliance !== ResourceCompliance.COMPLIANT &&
+      resource.compliance !== ResourceCompliance.DRIFT_REMEDIATED &&
+      resource.compliance !== ResourceCompliance.ATTENTION &&
+      resource.compliance !== ResourceCompliance.STALE,
+  );
+  const stale = resources.some((resource) => resource.compliance === ResourceCompliance.STALE);
+  const compliant =
+    resources.length > 0 &&
+    resources.every(
+      (resource) =>
+        resource.compliance === ResourceCompliance.COMPLIANT ||
+        resource.compliance === ResourceCompliance.DRIFT_REMEDIATED,
+    );
+  const remediated = resources.some(
+    (resource) => resource.compliance === ResourceCompliance.DRIFT_REMEDIATED,
+  );
+  const label = attention
+    ? "Resources need attention"
+    : unknown
+      ? "Compliance unknown"
+      : stale
+        ? "Resources stale"
+        : compliant
+          ? remediated
+            ? "Resource drift remediated"
+            : "Resources compliant"
+          : data && resources.length === 0
+            ? "Resources unassigned"
+            : "Compliance unknown";
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Badge
+            variant={
+              pendingReleases
+                ? "warning"
+                : attention
+                  ? "destructive"
+                  : unknown
+                    ? "outline"
+                    : stale
+                      ? "warning"
+                      : compliant
+                        ? "success"
+                        : "outline"
+            }
+            tabIndex={0}
+          />
+        }
+      >
+        <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+        {pendingReleases ? "Resource release pending" : label}
+      </TooltipTrigger>
+      <TooltipContent>
+        Current assigned resources only, based on the latest verified results and server-received
+        age, not a live probe or whole-device compliance. Pending releases are separate from
+        compliance. Checks retain the last verification while running.
+      </TooltipContent>
+    </Tooltip>
   );
 }

@@ -105,3 +105,34 @@ func TestTemporaryParentOwnershipBoundary(t *testing.T) {
 		})
 	}
 }
+
+func TestDirectoryRejectsSymlinkComponents(t *testing.T) {
+	for _, final := range []bool{false, true} {
+		t.Run(map[bool]string{false: "ancestor", true: "final"}[final], func(t *testing.T) {
+			root := t.TempDir()
+			real := filepath.Join(root, "real")
+			if err := os.MkdirAll(filepath.Join(real, "state"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			link := filepath.Join(root, "link")
+			target := real
+			if final {
+				target = filepath.Join(real, "state")
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Fatal(err)
+			}
+			path := link
+			if !final {
+				path = filepath.Join(link, "state")
+			}
+			fd, err := OpenDirectory(path)
+			if fd >= 0 {
+				_ = unix.Close(fd)
+			}
+			if err == nil {
+				t.Fatal("accepted symlink directory component")
+			}
+		})
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	authv1 "lindm/gen/lindm/auth/v1"
 )
 
 const (
@@ -49,6 +51,8 @@ type directorySnapshot struct {
 	AuthorizationRole    string
 	Local                bool
 	BreakGlass           bool
+	Scopes               []*authv1.DeviceScope
+	ServiceAccount       bool
 }
 
 func needsRefresh(now time.Time, snap directorySnapshot) bool {
@@ -61,7 +65,7 @@ func needsRefresh(now time.Time, snap directorySnapshot) bool {
 	return now.Sub(snap.ObservedAt) >= directoryRefreshInterval
 }
 
-func decideAccess(now time.Time, configuredIssuer string, adminGroups []string, snap directorySnapshot) accessDecision {
+func decideAccess(now time.Time, configuredIssuer string, policy *authorizationPolicy, snap directorySnapshot) accessDecision {
 	if !snap.Local && (snap.RefreshFailed || !fresh(now, snap)) {
 		return accessDecision{Kind: accessForbidden}
 	}
@@ -82,9 +86,12 @@ func decideAccess(now time.Time, configuredIssuer string, adminGroups []string, 
 		}
 	}
 	if snap.Local {
+		if policy.role(snap.AuthorizationRole) == nil {
+			return accessDecision{Kind: accessOK}
+		}
 		return accessDecision{Kind: accessOK, Role: snap.AuthorizationRole}
 	}
-	return accessDecision{Kind: accessOK, Role: effectiveRole(snap.PinnedRole, snap.Groups, adminGroups)}
+	return accessDecision{Kind: accessOK, Role: effectiveRole(snap.PinnedRole, snap.Groups, policy)}
 }
 
 func fresh(now time.Time, snap directorySnapshot) bool {
@@ -97,29 +104,13 @@ func fresh(now time.Time, snap directorySnapshot) bool {
 	return now.Sub(snap.ObservedAt) <= directoryFreshnessLimit
 }
 
-func effectiveRole(pinned string, groups, adminGroups []string) string {
-	if pinned == RoleOwner {
-		return RoleOwner
-	}
-	if pinned != "" {
-		return ""
-	}
-	have := make(map[string]struct{}, len(groups))
-	for _, g := range groups {
-		have[g] = struct{}{}
-	}
-	for _, want := range adminGroups {
-		if want == "" {
-			continue
-		}
-		if _, ok := have[want]; ok {
-			return RoleAdmin
-		}
-	}
-	return ""
-}
-
 func (s *Service) qualifiedLineage(issuer, subject, connector, upstreamProvider, upstreamSubject, brokerIssuer, brokerSubject string) bool {
+	if s.broker != nil {
+		return issuer == s.issuer && s.broker.qualified(&brokerLineage{
+			BrokerIssuer: brokerIssuer, BrokerSubject: brokerSubject, UpstreamProvider: upstreamProvider,
+			UpstreamSubject: upstreamSubject, Connector: connector,
+		}, subject)
+	}
 	return connector == s.connector() &&
 		brokerIssuer == "" &&
 		brokerSubject == "" &&
@@ -130,6 +121,15 @@ func (s *Service) qualifiedLineage(issuer, subject, connector, upstreamProvider,
 }
 
 func (s *Service) connector() string {
+	if s.broker != nil {
+		return s.broker.connector
+	}
+	if s.okta != nil {
+		return "okta"
+	}
+	if s.google != nil {
+		return "google"
+	}
 	if s.entraTenant != uuid.Nil {
 		return connectorEntra
 	}

@@ -27,12 +27,12 @@ const (
 
 // A published revision is immutable. Publishing changes the catalog head, not
 // an assignment: devices remain pinned to explicitly activated revisions.
-type ServiceProfileRevision struct {
+type ProfileRevision struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId      string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
 	RevisionId     string                 `protobuf:"bytes,2,opt,name=revision_id,json=revisionId,proto3" json:"revision_id,omitempty"`
 	RevisionNumber uint64                 `protobuf:"varint,3,opt,name=revision_number,json=revisionNumber,proto3" json:"revision_number,omitempty"`
-	Spec           *v1.ServiceProfileSpec `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
+	Spec           *v1.ResourceProfile    `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
 	ActorId        string                 `protobuf:"bytes,5,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
 	PublishedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
 	SpecSha256     []byte                 `protobuf:"bytes,7,opt,name=spec_sha256,json=specSha256,proto3" json:"spec_sha256,omitempty"`
@@ -40,20 +40,20 @@ type ServiceProfileRevision struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *ServiceProfileRevision) Reset() {
-	*x = ServiceProfileRevision{}
+func (x *ProfileRevision) Reset() {
+	*x = ProfileRevision{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceProfileRevision) String() string {
+func (x *ProfileRevision) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceProfileRevision) ProtoMessage() {}
+func (*ProfileRevision) ProtoMessage() {}
 
-func (x *ServiceProfileRevision) ProtoReflect() protoreflect.Message {
+func (x *ProfileRevision) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -65,87 +65,87 @@ func (x *ServiceProfileRevision) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceProfileRevision.ProtoReflect.Descriptor instead.
-func (*ServiceProfileRevision) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProfileRevision.ProtoReflect.Descriptor instead.
+func (*ProfileRevision) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ServiceProfileRevision) GetProfileId() string {
+func (x *ProfileRevision) GetProfileId() string {
 	if x != nil {
 		return x.ProfileId
 	}
 	return ""
 }
 
-func (x *ServiceProfileRevision) GetRevisionId() string {
+func (x *ProfileRevision) GetRevisionId() string {
 	if x != nil {
 		return x.RevisionId
 	}
 	return ""
 }
 
-func (x *ServiceProfileRevision) GetRevisionNumber() uint64 {
+func (x *ProfileRevision) GetRevisionNumber() uint64 {
 	if x != nil {
 		return x.RevisionNumber
 	}
 	return 0
 }
 
-func (x *ServiceProfileRevision) GetSpec() *v1.ServiceProfileSpec {
+func (x *ProfileRevision) GetSpec() *v1.ResourceProfile {
 	if x != nil {
 		return x.Spec
 	}
 	return nil
 }
 
-func (x *ServiceProfileRevision) GetActorId() string {
+func (x *ProfileRevision) GetActorId() string {
 	if x != nil {
 		return x.ActorId
 	}
 	return ""
 }
 
-func (x *ServiceProfileRevision) GetPublishedAt() *timestamppb.Timestamp {
+func (x *ProfileRevision) GetPublishedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.PublishedAt
 	}
 	return nil
 }
 
-func (x *ServiceProfileRevision) GetSpecSha256() []byte {
+func (x *ProfileRevision) GetSpecSha256() []byte {
 	if x != nil {
 		return x.SpecSha256
 	}
 	return nil
 }
 
-type PublishServiceProfileRevisionRequest struct {
+type PublishProfileRevisionRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// The caller reserves a stable profile UUID, including for the first revision.
 	ProfileId string `protobuf:"bytes,2,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
 	// Absent creates a new profile; present must equal its current catalog head.
-	ExpectedRevisionId *string                `protobuf:"bytes,3,opt,name=expected_revision_id,json=expectedRevisionId,proto3,oneof" json:"expected_revision_id,omitempty"`
-	Spec               *v1.ServiceProfileSpec `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
-	Reason             string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	ExpectedRevisionId *string             `protobuf:"bytes,3,opt,name=expected_revision_id,json=expectedRevisionId,proto3,oneof" json:"expected_revision_id,omitempty"`
+	Spec               *v1.ResourceProfile `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
+	Reason             string              `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
-func (x *PublishServiceProfileRevisionRequest) Reset() {
-	*x = PublishServiceProfileRevisionRequest{}
+func (x *PublishProfileRevisionRequest) Reset() {
+	*x = PublishProfileRevisionRequest{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishServiceProfileRevisionRequest) String() string {
+func (x *PublishProfileRevisionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishServiceProfileRevisionRequest) ProtoMessage() {}
+func (*PublishProfileRevisionRequest) ProtoMessage() {}
 
-func (x *PublishServiceProfileRevisionRequest) ProtoReflect() protoreflect.Message {
+func (x *PublishProfileRevisionRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -157,68 +157,68 @@ func (x *PublishServiceProfileRevisionRequest) ProtoReflect() protoreflect.Messa
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishServiceProfileRevisionRequest.ProtoReflect.Descriptor instead.
-func (*PublishServiceProfileRevisionRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use PublishProfileRevisionRequest.ProtoReflect.Descriptor instead.
+func (*PublishProfileRevisionRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *PublishServiceProfileRevisionRequest) GetRequestId() string {
+func (x *PublishProfileRevisionRequest) GetRequestId() string {
 	if x != nil {
 		return x.RequestId
 	}
 	return ""
 }
 
-func (x *PublishServiceProfileRevisionRequest) GetProfileId() string {
+func (x *PublishProfileRevisionRequest) GetProfileId() string {
 	if x != nil {
 		return x.ProfileId
 	}
 	return ""
 }
 
-func (x *PublishServiceProfileRevisionRequest) GetExpectedRevisionId() string {
+func (x *PublishProfileRevisionRequest) GetExpectedRevisionId() string {
 	if x != nil && x.ExpectedRevisionId != nil {
 		return *x.ExpectedRevisionId
 	}
 	return ""
 }
 
-func (x *PublishServiceProfileRevisionRequest) GetSpec() *v1.ServiceProfileSpec {
+func (x *PublishProfileRevisionRequest) GetSpec() *v1.ResourceProfile {
 	if x != nil {
 		return x.Spec
 	}
 	return nil
 }
 
-func (x *PublishServiceProfileRevisionRequest) GetReason() string {
+func (x *PublishProfileRevisionRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
 	}
 	return ""
 }
 
-type PublishServiceProfileRevisionResponse struct {
+type PublishProfileRevisionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// An exact retry returns the originally published revision, not a later head.
-	Revision      *ServiceProfileRevision `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Revision      *ProfileRevision `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PublishServiceProfileRevisionResponse) Reset() {
-	*x = PublishServiceProfileRevisionResponse{}
+func (x *PublishProfileRevisionResponse) Reset() {
+	*x = PublishProfileRevisionResponse{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishServiceProfileRevisionResponse) String() string {
+func (x *PublishProfileRevisionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishServiceProfileRevisionResponse) ProtoMessage() {}
+func (*PublishProfileRevisionResponse) ProtoMessage() {}
 
-func (x *PublishServiceProfileRevisionResponse) ProtoReflect() protoreflect.Message {
+func (x *PublishProfileRevisionResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -230,19 +230,19 @@ func (x *PublishServiceProfileRevisionResponse) ProtoReflect() protoreflect.Mess
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishServiceProfileRevisionResponse.ProtoReflect.Descriptor instead.
-func (*PublishServiceProfileRevisionResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use PublishProfileRevisionResponse.ProtoReflect.Descriptor instead.
+func (*PublishProfileRevisionResponse) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *PublishServiceProfileRevisionResponse) GetRevision() *ServiceProfileRevision {
+func (x *PublishProfileRevisionResponse) GetRevision() *ProfileRevision {
 	if x != nil {
 		return x.Revision
 	}
 	return nil
 }
 
-type GetServiceProfileRevisionRequest struct {
+type GetProfileRevisionRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
 	// Absent selects the catalog head; present reads that exact retained revision.
@@ -251,20 +251,20 @@ type GetServiceProfileRevisionRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceProfileRevisionRequest) Reset() {
-	*x = GetServiceProfileRevisionRequest{}
+func (x *GetProfileRevisionRequest) Reset() {
+	*x = GetProfileRevisionRequest{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceProfileRevisionRequest) String() string {
+func (x *GetProfileRevisionRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceProfileRevisionRequest) ProtoMessage() {}
+func (*GetProfileRevisionRequest) ProtoMessage() {}
 
-func (x *GetServiceProfileRevisionRequest) ProtoReflect() protoreflect.Message {
+func (x *GetProfileRevisionRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -276,46 +276,46 @@ func (x *GetServiceProfileRevisionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceProfileRevisionRequest.ProtoReflect.Descriptor instead.
-func (*GetServiceProfileRevisionRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetProfileRevisionRequest.ProtoReflect.Descriptor instead.
+func (*GetProfileRevisionRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetServiceProfileRevisionRequest) GetProfileId() string {
+func (x *GetProfileRevisionRequest) GetProfileId() string {
 	if x != nil {
 		return x.ProfileId
 	}
 	return ""
 }
 
-func (x *GetServiceProfileRevisionRequest) GetRevisionId() string {
+func (x *GetProfileRevisionRequest) GetRevisionId() string {
 	if x != nil && x.RevisionId != nil {
 		return *x.RevisionId
 	}
 	return ""
 }
 
-type GetServiceProfileRevisionResponse struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Revision      *ServiceProfileRevision `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
+type GetProfileRevisionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revision      *ProfileRevision       `protobuf:"bytes,1,opt,name=revision,proto3" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetServiceProfileRevisionResponse) Reset() {
-	*x = GetServiceProfileRevisionResponse{}
+func (x *GetProfileRevisionResponse) Reset() {
+	*x = GetProfileRevisionResponse{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetServiceProfileRevisionResponse) String() string {
+func (x *GetProfileRevisionResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetServiceProfileRevisionResponse) ProtoMessage() {}
+func (*GetProfileRevisionResponse) ProtoMessage() {}
 
-func (x *GetServiceProfileRevisionResponse) ProtoReflect() protoreflect.Message {
+func (x *GetProfileRevisionResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -327,19 +327,19 @@ func (x *GetServiceProfileRevisionResponse) ProtoReflect() protoreflect.Message 
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetServiceProfileRevisionResponse.ProtoReflect.Descriptor instead.
-func (*GetServiceProfileRevisionResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetProfileRevisionResponse.ProtoReflect.Descriptor instead.
+func (*GetProfileRevisionResponse) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetServiceProfileRevisionResponse) GetRevision() *ServiceProfileRevision {
+func (x *GetProfileRevisionResponse) GetRevision() *ProfileRevision {
 	if x != nil {
 		return x.Revision
 	}
 	return nil
 }
 
-type ListServiceProfilesRequest struct {
+type ListProfilesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
@@ -347,20 +347,20 @@ type ListServiceProfilesRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListServiceProfilesRequest) Reset() {
-	*x = ListServiceProfilesRequest{}
+func (x *ListProfilesRequest) Reset() {
+	*x = ListProfilesRequest{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListServiceProfilesRequest) String() string {
+func (x *ListProfilesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListServiceProfilesRequest) ProtoMessage() {}
+func (*ListProfilesRequest) ProtoMessage() {}
 
-func (x *ListServiceProfilesRequest) ProtoReflect() protoreflect.Message {
+func (x *ListProfilesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -372,26 +372,26 @@ func (x *ListServiceProfilesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListServiceProfilesRequest.ProtoReflect.Descriptor instead.
-func (*ListServiceProfilesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListProfilesRequest.ProtoReflect.Descriptor instead.
+func (*ListProfilesRequest) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ListServiceProfilesRequest) GetPageSize() uint32 {
+func (x *ListProfilesRequest) GetPageSize() uint32 {
 	if x != nil {
 		return x.PageSize
 	}
 	return 0
 }
 
-func (x *ListServiceProfilesRequest) GetPageToken() string {
+func (x *ListProfilesRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
 	}
 	return ""
 }
 
-type ServiceProfileSummary struct {
+type ProfileSummary struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ProfileId      string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
 	RevisionId     string                 `protobuf:"bytes,2,opt,name=revision_id,json=revisionId,proto3" json:"revision_id,omitempty"`
@@ -406,20 +406,20 @@ type ServiceProfileSummary struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *ServiceProfileSummary) Reset() {
-	*x = ServiceProfileSummary{}
+func (x *ProfileSummary) Reset() {
+	*x = ProfileSummary{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceProfileSummary) String() string {
+func (x *ProfileSummary) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceProfileSummary) ProtoMessage() {}
+func (*ProfileSummary) ProtoMessage() {}
 
-func (x *ServiceProfileSummary) ProtoReflect() protoreflect.Message {
+func (x *ProfileSummary) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -431,97 +431,97 @@ func (x *ServiceProfileSummary) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceProfileSummary.ProtoReflect.Descriptor instead.
-func (*ServiceProfileSummary) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProfileSummary.ProtoReflect.Descriptor instead.
+func (*ProfileSummary) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ServiceProfileSummary) GetProfileId() string {
+func (x *ProfileSummary) GetProfileId() string {
 	if x != nil {
 		return x.ProfileId
 	}
 	return ""
 }
 
-func (x *ServiceProfileSummary) GetRevisionId() string {
+func (x *ProfileSummary) GetRevisionId() string {
 	if x != nil {
 		return x.RevisionId
 	}
 	return ""
 }
 
-func (x *ServiceProfileSummary) GetRevisionNumber() uint64 {
+func (x *ProfileSummary) GetRevisionNumber() uint64 {
 	if x != nil {
 		return x.RevisionNumber
 	}
 	return 0
 }
 
-func (x *ServiceProfileSummary) GetName() string {
+func (x *ProfileSummary) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *ServiceProfileSummary) GetDescription() string {
+func (x *ProfileSummary) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *ServiceProfileSummary) GetResourceCount() uint32 {
+func (x *ProfileSummary) GetResourceCount() uint32 {
 	if x != nil {
 		return x.ResourceCount
 	}
 	return 0
 }
 
-func (x *ServiceProfileSummary) GetActorId() string {
+func (x *ProfileSummary) GetActorId() string {
 	if x != nil {
 		return x.ActorId
 	}
 	return ""
 }
 
-func (x *ServiceProfileSummary) GetPublishedAt() *timestamppb.Timestamp {
+func (x *ProfileSummary) GetPublishedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.PublishedAt
 	}
 	return nil
 }
 
-func (x *ServiceProfileSummary) GetSpecSha256() []byte {
+func (x *ProfileSummary) GetSpecSha256() []byte {
 	if x != nil {
 		return x.SpecSha256
 	}
 	return nil
 }
 
-type ListServiceProfilesResponse struct {
+type ListProfilesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// These are catalog heads, not evidence of deployment or native compliance.
-	Profiles      []*ServiceProfileSummary `protobuf:"bytes,1,rep,name=profiles,proto3" json:"profiles,omitempty"`
-	NextPageToken string                   `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	Profiles      []*ProfileSummary `protobuf:"bytes,1,rep,name=profiles,proto3" json:"profiles,omitempty"`
+	NextPageToken string            `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListServiceProfilesResponse) Reset() {
-	*x = ListServiceProfilesResponse{}
+func (x *ListProfilesResponse) Reset() {
+	*x = ListProfilesResponse{}
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListServiceProfilesResponse) String() string {
+func (x *ListProfilesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListServiceProfilesResponse) ProtoMessage() {}
+func (*ListProfilesResponse) ProtoMessage() {}
 
-func (x *ListServiceProfilesResponse) ProtoReflect() protoreflect.Message {
+func (x *ListProfilesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_profiles_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -533,19 +533,19 @@ func (x *ListServiceProfilesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListServiceProfilesResponse.ProtoReflect.Descriptor instead.
-func (*ListServiceProfilesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListProfilesResponse.ProtoReflect.Descriptor instead.
+func (*ListProfilesResponse) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_profiles_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ListServiceProfilesResponse) GetProfiles() []*ServiceProfileSummary {
+func (x *ListProfilesResponse) GetProfiles() []*ProfileSummary {
 	if x != nil {
 		return x.Profiles
 	}
 	return nil
 }
 
-func (x *ListServiceProfilesResponse) GetNextPageToken() string {
+func (x *ListProfilesResponse) GetNextPageToken() string {
 	if x != nil {
 		return x.NextPageToken
 	}
@@ -556,42 +556,42 @@ var File_lindm_admin_v1_profiles_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_profiles_proto_rawDesc = "" +
 	"\n" +
-	"\x1dlindm/admin/v1/profiles.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%lindm/policy/v1/service_profile.proto\x1a&lindm/validation/v1/string_rules.proto\"\xf5\x02\n" +
-	"\x16ServiceProfileRevision\x12'\n" +
+	"\x1dlindm/admin/v1/profiles.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a&lindm/validation/v1/string_rules.proto\"\xeb\x02\n" +
+	"\x0fProfileRevision\x12'\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tprofileId\x12)\n" +
 	"\vrevision_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
 	"revisionId\x120\n" +
-	"\x0frevision_number\x18\x03 \x01(\x04B\a\xbaH\x042\x02 \x00R\x0erevisionNumber\x12?\n" +
-	"\x04spec\x18\x04 \x01(\v2#.lindm.policy.v1.ServiceProfileSpecB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12#\n" +
+	"\x0frevision_number\x18\x03 \x01(\x04B\a\xbaH\x042\x02 \x00R\x0erevisionNumber\x12<\n" +
+	"\x04spec\x18\x04 \x01(\v2 .lindm.policy.v1.ResourceProfileB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12#\n" +
 	"\bactor_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\aactorId\x12E\n" +
 	"\fpublished_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vpublishedAt\x12(\n" +
 	"\vspec_sha256\x18\a \x01(\fB\a\xbaH\x04z\x02h R\n" +
-	"specSha256\"\xa8\x03\n" +
-	"$PublishServiceProfileRevisionRequest\x12M\n" +
+	"specSha256\"\x9e\x03\n" +
+	"\x1dPublishProfileRevisionRequest\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12M\n" +
 	"\n" +
 	"profile_id\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\tprofileId\x12e\n" +
-	"\x14expected_revision_id\x18\x03 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01H\x00R\x12expectedRevisionId\x88\x01\x01\x12?\n" +
-	"\x04spec\x18\x04 \x01(\v2#.lindm.policy.v1.ServiceProfileSpecB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12!\n" +
+	"\x14expected_revision_id\x18\x03 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01H\x00R\x12expectedRevisionId\x88\x01\x01\x12<\n" +
+	"\x04spec\x18\x04 \x01(\v2 .lindm.policy.v1.ResourceProfileB\x06\xbaH\x03\xc8\x01\x01R\x04spec\x12!\n" +
 	"\x06reason\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reasonB\x17\n" +
-	"\x15_expected_revision_id\"s\n" +
-	"%PublishServiceProfileRevisionResponse\x12J\n" +
-	"\brevision\x18\x01 \x01(\v2&.lindm.admin.v1.ServiceProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"\xd7\x01\n" +
-	" GetServiceProfileRevisionRequest\x12M\n" +
+	"\x15_expected_revision_id\"e\n" +
+	"\x1ePublishProfileRevisionResponse\x12C\n" +
+	"\brevision\x18\x01 \x01(\v2\x1f.lindm.admin.v1.ProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"\xd0\x01\n" +
+	"\x19GetProfileRevisionRequest\x12M\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\tprofileId\x12T\n" +
 	"\vrevision_id\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01H\x00R\n" +
 	"revisionId\x88\x01\x01B\x0e\n" +
-	"\f_revision_id\"o\n" +
-	"!GetServiceProfileRevisionResponse\x12J\n" +
-	"\brevision\x18\x01 \x01(\v2&.lindm.admin.v1.ServiceProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"k\n" +
-	"\x1aListServiceProfilesRequest\x12$\n" +
+	"\f_revision_id\"a\n" +
+	"\x1aGetProfileRevisionResponse\x12C\n" +
+	"\brevision\x18\x01 \x01(\v2\x1f.lindm.admin.v1.ProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"d\n" +
+	"\x13ListProfilesRequest\x12$\n" +
 	"\tpage_size\x18\x01 \x01(\rB\a\xbaH\x04*\x02\x18dR\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\xd8\x02\n" +
-	"\x15ServiceProfileSummary\x12\x1d\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\xd1\x02\n" +
+	"\x0eProfileSummary\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x1f\n" +
 	"\vrevision_id\x18\x02 \x01(\tR\n" +
@@ -603,9 +603,9 @@ const file_lindm_admin_v1_profiles_proto_rawDesc = "" +
 	"\bactor_id\x18\a \x01(\tR\aactorId\x12=\n" +
 	"\fpublished_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\x12\x1f\n" +
 	"\vspec_sha256\x18\t \x01(\fR\n" +
-	"specSha256\"\x88\x01\n" +
-	"\x1bListServiceProfilesResponse\x12A\n" +
-	"\bprofiles\x18\x01 \x03(\v2%.lindm.admin.v1.ServiceProfileSummaryR\bprofiles\x12&\n" +
+	"specSha256\"z\n" +
+	"\x14ListProfilesResponse\x12:\n" +
+	"\bprofiles\x18\x01 \x03(\v2\x1e.lindm.admin.v1.ProfileSummaryR\bprofiles\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageTokenB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
@@ -622,25 +622,25 @@ func file_lindm_admin_v1_profiles_proto_rawDescGZIP() []byte {
 
 var file_lindm_admin_v1_profiles_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_admin_v1_profiles_proto_goTypes = []any{
-	(*ServiceProfileRevision)(nil),                // 0: lindm.admin.v1.ServiceProfileRevision
-	(*PublishServiceProfileRevisionRequest)(nil),  // 1: lindm.admin.v1.PublishServiceProfileRevisionRequest
-	(*PublishServiceProfileRevisionResponse)(nil), // 2: lindm.admin.v1.PublishServiceProfileRevisionResponse
-	(*GetServiceProfileRevisionRequest)(nil),      // 3: lindm.admin.v1.GetServiceProfileRevisionRequest
-	(*GetServiceProfileRevisionResponse)(nil),     // 4: lindm.admin.v1.GetServiceProfileRevisionResponse
-	(*ListServiceProfilesRequest)(nil),            // 5: lindm.admin.v1.ListServiceProfilesRequest
-	(*ServiceProfileSummary)(nil),                 // 6: lindm.admin.v1.ServiceProfileSummary
-	(*ListServiceProfilesResponse)(nil),           // 7: lindm.admin.v1.ListServiceProfilesResponse
-	(*v1.ServiceProfileSpec)(nil),                 // 8: lindm.policy.v1.ServiceProfileSpec
-	(*timestamppb.Timestamp)(nil),                 // 9: google.protobuf.Timestamp
+	(*ProfileRevision)(nil),                // 0: lindm.admin.v1.ProfileRevision
+	(*PublishProfileRevisionRequest)(nil),  // 1: lindm.admin.v1.PublishProfileRevisionRequest
+	(*PublishProfileRevisionResponse)(nil), // 2: lindm.admin.v1.PublishProfileRevisionResponse
+	(*GetProfileRevisionRequest)(nil),      // 3: lindm.admin.v1.GetProfileRevisionRequest
+	(*GetProfileRevisionResponse)(nil),     // 4: lindm.admin.v1.GetProfileRevisionResponse
+	(*ListProfilesRequest)(nil),            // 5: lindm.admin.v1.ListProfilesRequest
+	(*ProfileSummary)(nil),                 // 6: lindm.admin.v1.ProfileSummary
+	(*ListProfilesResponse)(nil),           // 7: lindm.admin.v1.ListProfilesResponse
+	(*v1.ResourceProfile)(nil),             // 8: lindm.policy.v1.ResourceProfile
+	(*timestamppb.Timestamp)(nil),          // 9: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_profiles_proto_depIdxs = []int32{
-	8, // 0: lindm.admin.v1.ServiceProfileRevision.spec:type_name -> lindm.policy.v1.ServiceProfileSpec
-	9, // 1: lindm.admin.v1.ServiceProfileRevision.published_at:type_name -> google.protobuf.Timestamp
-	8, // 2: lindm.admin.v1.PublishServiceProfileRevisionRequest.spec:type_name -> lindm.policy.v1.ServiceProfileSpec
-	0, // 3: lindm.admin.v1.PublishServiceProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ServiceProfileRevision
-	0, // 4: lindm.admin.v1.GetServiceProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ServiceProfileRevision
-	9, // 5: lindm.admin.v1.ServiceProfileSummary.published_at:type_name -> google.protobuf.Timestamp
-	6, // 6: lindm.admin.v1.ListServiceProfilesResponse.profiles:type_name -> lindm.admin.v1.ServiceProfileSummary
+	8, // 0: lindm.admin.v1.ProfileRevision.spec:type_name -> lindm.policy.v1.ResourceProfile
+	9, // 1: lindm.admin.v1.ProfileRevision.published_at:type_name -> google.protobuf.Timestamp
+	8, // 2: lindm.admin.v1.PublishProfileRevisionRequest.spec:type_name -> lindm.policy.v1.ResourceProfile
+	0, // 3: lindm.admin.v1.PublishProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
+	0, // 4: lindm.admin.v1.GetProfileRevisionResponse.revision:type_name -> lindm.admin.v1.ProfileRevision
+	9, // 5: lindm.admin.v1.ProfileSummary.published_at:type_name -> google.protobuf.Timestamp
+	6, // 6: lindm.admin.v1.ListProfilesResponse.profiles:type_name -> lindm.admin.v1.ProfileSummary
 	7, // [7:7] is the sub-list for method output_type
 	7, // [7:7] is the sub-list for method input_type
 	7, // [7:7] is the sub-list for extension type_name

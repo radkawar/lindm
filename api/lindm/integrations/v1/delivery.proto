@@ -1,0 +1,186 @@
+syntax = "proto3";
+
+package lindm.integrations.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/integrations/v1;integrationsv1";
+
+service IntegrationService {
+  rpc CreateDestination(CreateDestinationRequest) returns (CreateDestinationResponse);
+  rpc UpdateDestination(UpdateDestinationRequest) returns (UpdateDestinationResponse);
+  rpc DeleteDestination(DeleteDestinationRequest) returns (DeleteDestinationResponse);
+  rpc RotateDestinationSecret(RotateDestinationSecretRequest) returns (RotateDestinationSecretResponse);
+  rpc ListDestinations(ListDestinationsRequest) returns (ListDestinationsResponse);
+  rpc ListDeliveries(ListDeliveriesRequest) returns (ListDeliveriesResponse);
+  rpc ReplayDelivery(ReplayDeliveryRequest) returns (ReplayDeliveryResponse);
+}
+
+enum DestinationKind {
+  DESTINATION_KIND_UNSPECIFIED = 0;
+  DESTINATION_KIND_WEBHOOK = 1;
+  DESTINATION_KIND_SYSLOG_TLS = 2;
+}
+
+enum DeliveryStatus {
+  DELIVERY_STATUS_UNSPECIFIED = 0;
+  DELIVERY_STATUS_PENDING = 1;
+  DELIVERY_STATUS_LEASED = 2;
+  DELIVERY_STATUS_DELIVERED = 3;
+  DELIVERY_STATUS_DEAD_LETTER = 4;
+  DELIVERY_STATUS_CANCELLED = 5;
+}
+
+message DestinationConfig {
+  option (buf.validate.message).cel = {
+    id: "destination.endpoint"
+    message: "webhooks require HTTPS; syslog requires tls://host:port and pinned CA PEM"
+    expression: "this.kind == 1 ? this.endpoint.matches('^https://[^/@?#]+(/[^?#]*)?$') : (this.endpoint.matches('^tls://[^/@?#]+:[0-9]+$') && this.pinned_ca_pem.size() > 0)"
+  };
+  string display_name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  DestinationKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string endpoint = 3 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+  }];
+  string pinned_ca_pem = 4 [(buf.validate.field).string.max_bytes = 65536];
+  bool enabled = 5;
+}
+
+// Signing keys are write-only, encrypted at rest, and never returned or cached.
+message Destination {
+  string id = 1;
+  DestinationConfig config = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  uint64 version = 5;
+  google.protobuf.Timestamp previous_secret_expires_at = 6;
+}
+
+message CreateDestinationRequest {
+  option (buf.validate.message).cel = {
+    id: "destination.secret"
+    message: "webhooks require a 32-64 byte signing secret; syslog has no signing secret"
+    expression: "this.config.kind == 1 ? this.signing_secret.size() >= 32 : this.signing_secret.size() == 0"
+  };
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  DestinationConfig config = 2 [(buf.validate.field).required = true];
+  bytes signing_secret = 3 [(buf.validate.field).bytes.max_len = 64];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message CreateDestinationResponse {
+  Destination destination = 1;
+}
+
+message UpdateDestinationRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string destination_id = 2 [(buf.validate.field).string.uuid = true];
+  DestinationConfig config = 3 [(buf.validate.field).required = true];
+  uint64 expected_version = 4 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message UpdateDestinationResponse {
+  Destination destination = 1;
+}
+
+message DeleteDestinationRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string destination_id = 2 [(buf.validate.field).string.uuid = true];
+  uint64 expected_version = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message DeleteDestinationResponse {}
+
+message RotateDestinationSecretRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string destination_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes signing_secret = 3 [(buf.validate.field).bytes = {
+    min_len: 32
+    max_len: 64
+  }];
+  uint32 overlap_seconds = 4 [(buf.validate.field).uint32.lte = 86400];
+  uint64 expected_version = 5 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RotateDestinationSecretResponse {
+  Destination destination = 1;
+}
+
+message ListDestinationsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32.lte = 100];
+  string page_token = 2 [(buf.validate.field).string.max_len = 1024];
+}
+message ListDestinationsResponse {
+  repeated Destination destinations = 1;
+  string next_page_token = 2;
+}
+
+message Delivery {
+  string id = 1;
+  string event_id = 2;
+  string destination_id = 3;
+  string resource_id = 4;
+  uint64 sequence = 5;
+  DeliveryStatus status = 6;
+  uint32 attempts = 7;
+  uint32 replay_count = 8;
+  google.protobuf.Timestamp next_attempt_at = 9;
+  google.protobuf.Timestamp delivered_at = 10;
+  // Bounded machine reason only; remote response bodies and secrets are omitted.
+  string last_error = 11;
+}
+message ListDeliveriesRequest {
+  optional string destination_id = 1 [(buf.validate.field).string.uuid = true];
+  DeliveryStatus status = 2 [(buf.validate.field).enum.defined_only = true];
+  uint32 page_size = 3 [(buf.validate.field).uint32.lte = 100];
+  string page_token = 4 [(buf.validate.field).string.max_len = 1024];
+}
+message ListDeliveriesResponse {
+  repeated Delivery deliveries = 1;
+  string next_page_token = 2;
+}
+message ReplayDeliveryRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string delivery_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message ReplayDeliveryResponse {
+  Delivery delivery = 1;
+}
+
+// Opaque server-authenticated pagination state; not a separate public RPC.
+message IntegrationPageCursor {
+  google.protobuf.Timestamp before_time = 1;
+  int64 before_sequence = 2;
+  string before_id = 3;
+  bytes filter_hash = 4;
+}
+
+// Exact JSON body schema for webhooks and syslog MSG. PostgreSQL emits snake-case
+// JSON names and may emit null for an absent actor. Verify the original bytes,
+// not a reserialization. Only event_id is an authenticated deduplication key;
+// delivery-ID and replay-count headers are informational.
+message IntegrationEvent {
+  string event_id = 1 [json_name = "event_id"];
+  google.protobuf.Timestamp occurred_at = 2 [json_name = "occurred_at"];
+  string actor_id = 3 [json_name = "actor_id"];
+  string action = 4;
+  string resource_id = 5 [json_name = "resource_id"];
+}

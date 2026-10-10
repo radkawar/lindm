@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"time"
@@ -8,6 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"google.golang.org/protobuf/proto"
+
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -34,6 +38,8 @@ type Authorization struct {
 	expiresAt         time.Time
 	monotonicDeadline time.Time
 	breakGlass        bool
+	principal         Principal
+	bindingsDigest    []byte
 }
 
 func (a *Authorization) ActorID() uuid.UUID {
@@ -48,6 +54,27 @@ func (a *Authorization) Version() uint64 {
 		return 0
 	}
 	return uint64(a.version)
+}
+
+// Principal returns a detached copy of the authority captured by AuthorizeFresh.
+// Target scope checks must use this principal and the fenced permission.
+func (a *Authorization) Principal() Principal {
+	if a == nil {
+		return Principal{}
+	}
+	return clonePrincipal(a.principal)
+}
+
+func clonePrincipal(p Principal) Principal {
+	p.AllowedPermissions = append([]string(nil), p.AllowedPermissions...)
+	if p.Bindings != nil {
+		bindings := make([]*authv1.RoleBinding, len(p.Bindings))
+		for i, binding := range p.Bindings {
+			bindings[i] = proto.CloneOf(binding)
+		}
+		p.Bindings = bindings
+	}
+	return p
 }
 
 // ExpiresAt also clips to remaining process-monotonic lifetime. A wall-clock
@@ -71,7 +98,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 	if s == nil || s.pool == nil {
 		return nil, errUnavailable
 	}
-	if actorID == uuid.Nil || !Authorize(Principal{Role: RoleOwner}, permission) {
+	if actorID == uuid.Nil || !knownPermission(permission) {
 		return nil, ErrAuthorizationDenied
 	}
 	ctx, cancel := context.WithTimeout(ctx, directoryFetchTimeout)
@@ -80,8 +107,8 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 	if err != nil {
 		return nil, s.authorizationStoreError(err)
 	}
-	subject, err := uuid.Parse(row.Subject)
-	if err != nil || subject == uuid.Nil || subject.String() != row.Subject || (row.Issuer != s.issuer && row.Issuer != s.localIssuer) {
+	subject := row.Subject
+	if subject == "" || (row.Issuer != s.issuer && row.Issuer != s.localIssuer) {
 		return nil, ErrAuthorizationDenied
 	}
 	monotonicDeadline := time.Now().Add(dispatchAuthorizationWindow)
@@ -115,8 +142,9 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 		if err != nil {
 			return err
 		}
-		decision := decideAccess(now, s.accessIssuer(snapshot), s.adminGroups, snapshot)
-		if decision.Kind != accessOK || !Authorize(s.snapshotPrincipal(snapshot, decision.Role), permission) {
+		decision := decideAccess(now, s.accessIssuer(snapshot), s.policy, snapshot)
+		principal := s.snapshotPrincipal(snapshot, decision.Role)
+		if decision.Kind != accessOK || !Authorize(principal, permission) {
 			denied = ErrAuthorizationDenied
 			if snapshot.BreakGlass {
 				return s.insertAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "permission denied: "+string(permission))
@@ -142,11 +170,17 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 			denied = ErrAuthorizationExpired
 			return nil
 		}
+		digest, err := bindingsDigest(principal.Bindings)
+		if err != nil {
+			return err
+		}
 		authorization = &Authorization{
 			service: s, actorID: actorID, role: decision.Role, permission: permission,
 			version: snapshot.AuthorizationVersion, observedAt: snapshot.ObservedAt, expiresAt: expires,
 			monotonicDeadline: monotonicDeadline,
 			breakGlass:        snapshot.BreakGlass,
+			principal:         clonePrincipal(principal),
+			bindingsDigest:    digest,
 		}
 		return nil
 	})
@@ -160,7 +194,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 }
 
 // LockAuthorization fences a privileged mutation inside its caller-owned
-// transaction. Lock order is principal, then device, then action. No external
+// transaction. Lock order is policy, principal, then device, then action. No external
 // call belongs in that transaction; commit or roll back promptly. This checks
 // actor authority only: device, desired-head, recovery and lease fences remain
 // the domain caller's responsibility. The required operation permission must
@@ -172,10 +206,13 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "worker authorization fence denied: "+string(permission)))
 		}
 	}()
-	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(Principal{Role: authorization.role}, permission) {
+	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(authorization.principal, permission) {
 		return ErrAuthorizationDenied
 	}
 	q := identitydb.New(tx)
+	if err := s.lockPolicy(ctx, q); err != nil {
+		return err
+	}
 	row, err := q.GetPrincipalForUpdate(ctx, authorization.actorID)
 	if err != nil {
 		return s.authorizationStoreError(err)
@@ -200,8 +237,9 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 	if authorization.observedAt.IsZero() || now.Before(authorization.observedAt) || now.Before(snapshot.ObservedAt) || !now.Before(authorization.expiresAt) || authorization.expiresAt.After(authorization.observedAt.Add(dispatchAuthorizationWindow)) || !authorization.expiresAt.After(authorization.observedAt) {
 		return ErrAuthorizationExpired
 	}
-	decision := decideAccess(now, s.accessIssuer(snapshot), s.adminGroups, snapshot)
-	if decision.Kind != accessOK || !Authorize(s.snapshotPrincipal(snapshot, decision.Role), authorization.permission) {
+	decision := decideAccess(now, s.accessIssuer(snapshot), s.policy, snapshot)
+	principal := s.snapshotPrincipal(snapshot, decision.Role)
+	if decision.Kind != accessOK || !Authorize(principal, authorization.permission) {
 		return ErrAuthorizationDenied
 	}
 	if snapshot.BreakGlass {
@@ -210,7 +248,14 @@ func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorizatio
 			return ErrAuthorizationDenied
 		}
 	}
-	if decision.Role != authorization.role || snapshot.AuthorizationRole != authorization.role || snapshot.ObservedAt.Before(authorization.observedAt) {
+	if decision.Role != authorization.role || snapshot.AuthorizationRole != authorization.role || snapshot.ObservedAt.Before(authorization.observedAt) || principal.ServiceAccount != authorization.principal.ServiceAccount {
+		return ErrAuthorizationChanged
+	}
+	digest, err := bindingsDigest(principal.Bindings)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(digest, authorization.bindingsDigest) {
 		return ErrAuthorizationChanged
 	}
 	return nil

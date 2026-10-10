@@ -7,8 +7,13 @@ import {
 } from "@/features/profiles/attempt";
 import { CATALOG_SEMANTICS } from "@/features/profiles/model";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { canPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/profiles_/new")({
+  beforeLoad: ({ context }) => {
+    if (!canPermission(context.principal, "profiles.manage"))
+      throw new Error("Profile publishing is not authorized.");
+  },
   component: ProfileCreateRoute,
 });
 
@@ -22,10 +27,10 @@ function ProfileCreateRoute() {
         search={{ pageSize: 50, pageToken: "" }}
         className="w-fit text-sm underline underline-offset-4"
       >
-        Back to service profiles
+        Back to profiles
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold">Publish a service profile</h1>
+        <h1 className="text-2xl font-semibold">Publish a resource profile</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Creation reserves profile ID {profileId}. {CATALOG_SEMANTICS}
         </p>

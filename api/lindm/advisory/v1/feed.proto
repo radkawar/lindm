@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+package lindm.advisory.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/advisory/v1;advisoryv1";
+
+// OSV_JSON is one vendor record, not an ecosystem coverage assertion.
+enum FeedFormat {
+  FEED_FORMAT_UNSPECIFIED = 0;
+  FEED_FORMAT_OSV_JSON = 1;
+  FEED_FORMAT_OSV_ZIP = 2;
+  FEED_FORMAT_RPM_UPDATEINFO = 3;
+  FEED_FORMAT_RPM_REPOMD = 4;
+  FEED_FORMAT_REDHAT_CSAF = 5;
+  FEED_FORMAT_SUSE_CSAF = 6;
+  FEED_FORMAT_ARCH_JSON = 7;
+  FEED_FORMAT_DEBIAN_TRACKER_JSON = 8;
+  FEED_FORMAT_REDHAT_CSAF_ARCHIVES = 9;
+}
+
+message FeedSource {
+  option (buf.validate.message).cel = {
+    id: "feed_source.release"
+    message: "release must identify a numeric distro release, Ubuntu noble, or an explicitly rolling distro"
+    expression: "(this.distro == 'ubuntu' && this.release == 'noble') || (this.distro in ['arch', 'opensuse-tumbleweed'] && this.release == 'rolling') || (!(this.distro in ['arch', 'opensuse-tumbleweed']) && this.release.matches('^[0-9]+(\\\\.[0-9]+)?$') && (this.distro != 'fedora' || this.release.matches('^[1-9][0-9]{1,2}$')))"
+  };
+  option (buf.validate.message).cel = {
+    id: "feed_source.format"
+    message: "format must belong to the selected vendor ecosystem"
+    expression: "(this.format in [1,2] && this.distro in ['ubuntu','debian','rocky','almalinux']) || (this.format in [3,4] && this.distro == 'fedora') || (this.format in [5,9] && this.distro == 'rhel') || (this.format == 6 && this.distro in ['sles','opensuse-leap','opensuse-tumbleweed']) || (this.format == 7 && this.distro == 'arch') || (this.format == 8 && this.distro == 'debian')"
+  };
+  option (buf.validate.message).cel = {
+    id: "feed_source.platform_stream"
+    message: "RHEL requires standard, eus or e4s; extended streams require an exact minor release"
+    expression: "this.distro == 'rhel' ? (this.platform_stream in ['standard','eus','e4s'] && (this.platform_stream == 'standard' || this.release.contains('.'))) : this.platform_stream == ''"
+  };
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string distro = 2 [(buf.validate.field).string = {
+    in: [
+      "ubuntu",
+      "debian",
+      "fedora",
+      "rocky",
+      "almalinux",
+      "rhel",
+      "sles",
+      "opensuse-leap",
+      "opensuse-tumbleweed",
+      "arch"
+    ]
+  }];
+  // Exact release, or rolling only for Arch/openSUSE Tumbleweed.
+  string release = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  string url = 4 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^/@?#]+(/[^#]*)?$"
+  }];
+  FeedFormat format = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint64 max_age_seconds = 6 [(buf.validate.field).uint64 = {
+    gte: 60
+    lte: 604800
+  }];
+  // Required for repository metadata. OSV architecture comes from package URLs.
+  string architecture = 7 [(buf.validate.field).string.max_len = 64];
+  // Optional pin of raw primary bytes; REDHAT_CSAF_ARCHIVES instead pins the
+  // deterministic FeedManifest digest covering both verified archives.
+  bytes expected_sha256 = 8 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  // Exact product servicing stream, never inferred from RPM compatibility.
+  string platform_stream = 9 [(buf.validate.field).string.max_len = 128];
+}
+
+message Advisory {
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  repeated string cves = 2 [(buf.validate.field).repeated = {
+    max_items: 1000
+    unique: true
+    items: {
+      string: {
+        max_len: 64
+        pattern: "^CVE-[0-9]{4}-[0-9]{4,}$"
+      }
+    }
+  }];
+  string package_name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+    pattern: "^[^\\s/]+$"
+  }];
+  bool source_package = 4;
+  // Empty means the vendor did not constrain architecture, not an inferred map.
+  string architecture = 5 [(buf.validate.field).string.max_len = 64];
+  string fixed_version = 6 [(buf.validate.field).string.max_len = 2048];
+  string introduced_version = 7 [(buf.validate.field).string.max_len = 2048];
+  string last_affected_version = 8 [(buf.validate.field).string.max_len = 2048];
+  string severity = 9 [(buf.validate.field).string.max_len = 32];
+  // Absent when the authoritative export supplies no publication date.
+  google.protobuf.Timestamp published_at = 10;
+  string source_url = 11 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^/@?#]+(/[^#]*)?$"
+  }];
+  // Vendor uncertainty is not equivalent to a known vulnerable version range.
+  bool assessment_unknown = 12;
+  bool not_affected = 13;
+  string platform_release = 14 [(buf.validate.field).string.max_len = 64];
+  string platform_stream = 15 [(buf.validate.field).string.max_len = 128];
+  string module_name = 16 [(buf.validate.field).string.max_len = 128];
+  string module_stream = 17 [(buf.validate.field).string.max_len = 128];
+  option (buf.validate.message).cel = {
+    id: "advisory.assessment"
+    message: "an advisory cannot be both unknown and explicitly not affected"
+    expression: "!(this.assessment_unknown && this.not_affected)"
+  };
+}
+
+message FeedDocument {
+  repeated Advisory advisories = 1;
+  // Raw single-source SHA-256, or deterministic FeedManifest SHA-256 for composites.
+  bytes source_sha256 = 2;
+  // Complete only within the configured release/architecture and vendor coverage.
+  // False for single OSV documents; absence must then remain UNKNOWN.
+  bool complete_snapshot = 3;
+  repeated FeedArtifact artifacts = 4;
+  // Verified vendor snapshot signing time, where available; bounds freshness.
+  google.protobuf.Timestamp snapshot_at = 5;
+}
+
+message FeedArtifact {
+  string url = 1 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+  }];
+  bytes sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  string signer_fingerprint = 3 [(buf.validate.field).string.max_len = 64];
+}
+
+message FeedManifest {
+  repeated FeedArtifact artifacts = 1 [(buf.validate.field).repeated.max_items = 16];
+}

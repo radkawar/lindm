@@ -38,6 +38,10 @@ type ExecutionTrustExercise struct {
 }
 
 func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result *ExecutionTrustExercise, err error) {
+	return createExecutionTrustExercise(ctx, repoRoot, []string{"systemd.service.v1"})
+}
+
+func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabilities []string) (result *ExecutionTrustExercise, err error) {
 	var onlineKeys []ed25519.PrivateKey
 	defer func() {
 		if err != nil {
@@ -48,7 +52,7 @@ func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result 
 	}()
 	err = locked(ctx, repoRoot, func(root string) error {
 		fixture := FixturePath(root)
-		if err := validateFixture(fixture); err != nil {
+		if err := validateAuthorityFixture(fixture); err != nil {
 			return err
 		}
 		authority, err := trust.New()
@@ -107,13 +111,13 @@ func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result 
 		now := time.Now().UTC().Truncate(time.Second)
 		// QEMU's guest clock may lag the publishing host slightly. Publish a
 		// deliberate overlap; never relax the executor's signed time checks.
-		notBefore := now.Add(-time.Minute)
+		notBefore := now.Add(-trust.MaxDeviceClockSkew)
 		if notBefore.Before(current.GetNotBefore().AsTime()) {
 			notBefore = current.GetNotBefore().AsTime()
 		}
-		expires := now.Add(2 * time.Hour)
+		expires := now.Add(4 * time.Hour)
 		if expires.After(current.GetExpiresAt().AsTime()) {
-			return errors.New("development execution root has less than two hours remaining")
+			return errors.New("development execution root has less than four hours remaining")
 		}
 		var delegates []*agentv1.ExecutionDelegate
 		for _, role := range []agentv1.ExecutionSignerRole{agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START} {
@@ -126,7 +130,7 @@ func CreateExecutionTrustExercise(ctx context.Context, repoRoot string) (result 
 			if err != nil {
 				return err
 			}
-			delegates = append(delegates, &agentv1.ExecutionDelegate{Key: &agentv1.ExecutionKey{KeyId: id, PublicKey: public}, Role: role, Capabilities: []string{"systemd.service.v1"}})
+			delegates = append(delegates, &agentv1.ExecutionDelegate{Key: &agentv1.ExecutionKey{KeyId: id, PublicKey: public}, Role: role, Capabilities: capabilities})
 		}
 		delegation := &agentv1.ExecutionDelegation{
 			DeploymentId: current.GetDeploymentId(), RootVersion: 1, Version: 1,

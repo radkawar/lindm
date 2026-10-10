@@ -24,6 +24,9 @@ CREATE TABLE devices (
     revoked_at timestamptz,
     revoked_by uuid REFERENCES principals (id) ON DELETE RESTRICT,
     revoke_reason text NOT NULL DEFAULT '',
+    metadata jsonb NOT NULL DEFAULT '{}',
+    owner_principal_id uuid REFERENCES principals (id) ON DELETE RESTRICT,
+    CONSTRAINT devices_metadata_object CHECK (jsonb_typeof(metadata) = 'object' AND octet_length(metadata::text) <= 262144),
     CONSTRAINT devices_state_check CHECK (state IN ('pending', 'active', 'recovery_hold', 'revoked')),
     CONSTRAINT devices_hostname_len CHECK (char_length(hostname) <= 4096),
     CONSTRAINT devices_os_id_len CHECK (char_length(os_id) <= 4096),
@@ -37,6 +40,36 @@ CREATE TABLE devices (
         OR (state = 'revoked' AND revoked_at IS NOT NULL AND revoked_by IS NOT NULL AND revoke_reason ~ '\S')
     )
 );
+
+CREATE TABLE device_labels (
+    device_id uuid NOT NULL REFERENCES devices (id) ON DELETE RESTRICT,
+    label text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 64),
+    PRIMARY KEY (device_id, label)
+);
+CREATE INDEX device_labels_search_idx ON device_labels (label, device_id);
+CREATE INDEX devices_metadata_search_idx ON devices USING gin (metadata jsonb_path_ops);
+CREATE INDEX devices_os_search_idx ON devices (os_id, os_version, enrolled_at DESC, id DESC);
+CREATE INDEX devices_seen_search_idx ON devices (last_seen_at);
+
+-- Serializes definition changes with metadata writes, including new keys.
+CREATE TABLE inventory_metadata_lock (
+    singleton boolean PRIMARY KEY CHECK (singleton)
+);
+INSERT INTO inventory_metadata_lock VALUES (true);
+
+CREATE TABLE inventory_attribute_definitions (
+    key text PRIMARY KEY CHECK (char_length(key) BETWEEN 1 AND 64),
+    definition bytea NOT NULL CHECK (octet_length(definition) <= 65536)
+);
+
+CREATE TABLE device_search_cursors (
+    id uuid PRIMARY KEY,
+    actor_id uuid NOT NULL REFERENCES principals (id) ON DELETE RESTRICT,
+    filter_digest bytea NOT NULL CHECK (octet_length(filter_digest) = 32),
+    upper_enrolled_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL
+);
+CREATE INDEX device_search_cursors_expiry_idx ON device_search_cursors (expires_at);
 
 CREATE TABLE enrollment_generations (
     id uuid PRIMARY KEY,
@@ -103,6 +136,9 @@ CREATE UNIQUE INDEX device_certificates_one_overlapping
     ON device_certificates (generation_id)
     WHERE status = 'overlapping';
 
+CREATE INDEX device_certificates_identity_keys
+    ON device_certificates (device_id, public_key_fingerprint);
+
 CREATE TABLE enrollment_grants (
     id uuid PRIMARY KEY,
     token_hash bytea NOT NULL,
@@ -148,6 +184,67 @@ CREATE TABLE enrollment_grants (
     )
 );
 
+CREATE TABLE enrollment_recovery_grants (
+    grant_id uuid PRIMARY KEY REFERENCES enrollment_grants (id) ON DELETE RESTRICT,
+    device_id uuid NOT NULL REFERENCES devices (id) ON DELETE RESTRICT,
+    expected_generation_id uuid NOT NULL REFERENCES enrollment_generations (id) ON DELETE RESTRICT,
+    expected_revoked_at timestamptz CHECK (expected_revoked_at IS NULL OR isfinite(expected_revoked_at))
+);
+
+CREATE TABLE enrollment_installations (
+    generation_id uuid PRIMARY KEY REFERENCES enrollment_generations (id) ON DELETE RESTRICT,
+    installation_id uuid NOT NULL CHECK (installation_id <> '00000000-0000-0000-0000-000000000000'),
+    boot_id uuid
+);
+
+-- Only a SHA-256 credential digest is retained. Assignment bytes are immutable.
+CREATE TABLE provisioning_tokens (
+    id uuid PRIMARY KEY,
+    token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32),
+    created_by uuid NOT NULL REFERENCES principals (id) ON DELETE RESTRICT,
+    authorization_version bigint NOT NULL,
+    created_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL,
+    max_uses integer NOT NULL CHECK (max_uses BETWEEN 1 AND 10000),
+    used_count integer NOT NULL DEFAULT 0 CHECK (used_count BETWEEN 0 AND max_uses),
+    approval_required boolean NOT NULL,
+    assignment bytea NOT NULL CHECK (octet_length(assignment) <= 262144),
+    reason text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 512 AND reason ~ '\S'),
+    revoked_at timestamptz,
+    revoked_by uuid REFERENCES principals (id) ON DELETE RESTRICT,
+    revoke_reason text NOT NULL DEFAULT '',
+    CHECK (expires_at BETWEEN created_at + interval '60 seconds' AND created_at + interval '24 hours'),
+    CHECK ((revoked_at IS NULL AND revoked_by IS NULL AND revoke_reason = '')
+        OR (revoked_at IS NOT NULL AND revoked_by IS NOT NULL AND revoke_reason ~ '\S' AND char_length(revoke_reason) <= 512))
+);
+
+CREATE TABLE provisioning_enrollments (
+    transaction_id uuid PRIMARY KEY,
+    token_id uuid NOT NULL REFERENCES provisioning_tokens (id) ON DELETE RESTRICT,
+    installation_id uuid NOT NULL UNIQUE,
+    device_id uuid NOT NULL UNIQUE REFERENCES devices (id) ON DELETE RESTRICT,
+    generation_id uuid NOT NULL UNIQUE REFERENCES enrollment_generations (id) ON DELETE RESTRICT,
+    csr_pem bytea NOT NULL CHECK (octet_length(csr_pem) BETWEEN 64 AND 16384),
+    csr_sha256 bytea NOT NULL CHECK (octet_length(csr_sha256) = 32),
+    state text NOT NULL CHECK (state IN ('pending_approval', 'ready', 'rejected', 'revoked')),
+    approval_id uuid,
+    certificate_id uuid REFERENCES device_certificates (id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL,
+    CHECK ((state = 'ready') = (certificate_id IS NOT NULL)),
+    CHECK (state <> 'pending_approval' OR approval_id IS NOT NULL)
+);
+CREATE INDEX provisioning_enrollments_token_idx ON provisioning_enrollments (token_id, transaction_id);
+
+CREATE TABLE offline_enrollment_authorizations (
+    id uuid PRIMARY KEY,
+    token_id uuid NOT NULL REFERENCES provisioning_tokens (id) ON DELETE RESTRICT,
+    actor_id uuid NOT NULL REFERENCES principals (id) ON DELETE RESTRICT,
+    request_sha256 bytea NOT NULL CHECK (octet_length(request_sha256) = 32),
+    authorization_envelope bytea NOT NULL CHECK (octet_length(authorization_envelope) <= 524288),
+    expires_at timestamptz NOT NULL
+);
+
 -- Zero UUIDs and epoch mean "unset". Completed grant issuance always replaces them.
 -- The plaintext grant secret is never stored.
 CREATE TABLE device_admin_requests (
@@ -164,7 +261,7 @@ CREATE TABLE device_admin_requests (
     CONSTRAINT device_admin_requests_digest_len CHECK (octet_length(request_digest) = 32),
     CONSTRAINT device_admin_requests_method_len CHECK (char_length(method) BETWEEN 1 AND 128),
     CONSTRAINT device_admin_requests_completed_grant CHECK (
-        method <> 'CreateEnrollmentGrant'
+        method NOT IN ('CreateEnrollmentGrant', 'CreateRecoveryEnrollmentGrant', 'CreateProvisioningToken')
         OR NOT completed
         OR (
             grant_id <> '00000000-0000-0000-0000-000000000000'
@@ -289,12 +386,33 @@ CREATE TABLE snapshot_packages (
     version text NOT NULL,
     architecture text NOT NULL,
     manager text NOT NULL,
+    source_name text NOT NULL DEFAULT '',
+    source_version text NOT NULL DEFAULT '',
+    module_status integer NOT NULL DEFAULT 0,
+    module_name text NOT NULL DEFAULT '',
+    module_stream text NOT NULL DEFAULT '',
+    module_version text NOT NULL DEFAULT '',
+    module_context text NOT NULL DEFAULT '',
     PRIMARY KEY (snapshot_id, position),
     CONSTRAINT snapshot_packages_position_check CHECK (position BETWEEN 0 AND 99999),
     CONSTRAINT snapshot_packages_name_len CHECK (char_length(name) BETWEEN 1 AND 512),
     CONSTRAINT snapshot_packages_version_len CHECK (char_length(version) BETWEEN 1 AND 2048),
     CONSTRAINT snapshot_packages_architecture_len CHECK (char_length(architecture) <= 64),
-    CONSTRAINT snapshot_packages_manager_len CHECK (char_length(manager) BETWEEN 1 AND 64)
+    CONSTRAINT snapshot_packages_manager_len CHECK (char_length(manager) BETWEEN 1 AND 64),
+    CONSTRAINT snapshot_packages_source_name_len CHECK (char_length(source_name) <= 512),
+    CONSTRAINT snapshot_packages_source_version_len CHECK (char_length(source_version) <= 2048),
+    CONSTRAINT snapshot_packages_source_shape CHECK ((source_name = '') = (source_version = '')),
+    CONSTRAINT snapshot_packages_module_status CHECK (module_status BETWEEN 0 AND 7),
+    CONSTRAINT snapshot_packages_module_name_len CHECK (char_length(module_name) <= 256),
+    CONSTRAINT snapshot_packages_module_stream_len CHECK (char_length(module_stream) <= 256),
+    CONSTRAINT snapshot_packages_module_version_shape CHECK (
+        char_length(module_version) <= 32 AND module_version ~ '^[0-9]*$'
+    ),
+    CONSTRAINT snapshot_packages_module_context_len CHECK (char_length(module_context) <= 256),
+    CONSTRAINT snapshot_packages_module_shape CHECK (
+        (module_name = '' AND module_stream = '' AND module_version = '' AND module_context = '')
+        OR (module_status = 1 AND module_name <> '' AND module_stream <> '' AND module_version <> '' AND module_context <> '')
+    )
 );
 
 CREATE TABLE host_observations (
@@ -322,6 +440,8 @@ CREATE TABLE host_observations (
     hardware_model_value text NOT NULL,
     hardware_serial_status smallint NOT NULL,
     hardware_serial_value text NOT NULL,
+    details bytea NOT NULL DEFAULT '',
+    CONSTRAINT host_observations_details_len CHECK (octet_length(details) <= 786432),
     CONSTRAINT host_observations_sequence_check CHECK (sequence BETWEEN 1 AND 9223372036854775807),
     CONSTRAINT host_observations_digest_len CHECK (octet_length(digest) = 32),
     CONSTRAINT host_observations_time_order CHECK (finished_at >= started_at),
@@ -386,9 +506,54 @@ ALTER TABLE devices
     ADD CONSTRAINT devices_open_snapshot_fk
     FOREIGN KEY (open_snapshot_id) REFERENCES package_snapshots (id) ON DELETE RESTRICT;
 
+CREATE TABLE device_groups (
+    id uuid PRIMARY KEY,
+    name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 128)
+);
+
+CREATE TABLE device_group_memberships (
+    group_id uuid NOT NULL REFERENCES device_groups (id) ON DELETE CASCADE,
+    device_id uuid NOT NULL REFERENCES devices (id) ON DELETE RESTRICT,
+    PRIMARY KEY (group_id, device_id)
+);
+
+CREATE INDEX device_group_memberships_device_idx ON device_group_memberships (device_id, group_id);
+
+-- Scope dimensions intersect; separate scopes are alternatives. A scoped grant
+-- never gains access to global resources through this device-only predicate.
+-- +goose StatementBegin
+CREATE FUNCTION device_scope_matches(target uuid, unrestricted boolean, scopes jsonb)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT unrestricted OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(scopes) AS scope
+        WHERE jsonb_typeof(scope) = 'object' AND
+            (coalesce(jsonb_array_length(scope->'device_ids'), 0) = 0
+                OR (scope->'device_ids') ? target::text)
+            AND NOT EXISTS (
+                SELECT 1 FROM jsonb_array_elements_text(coalesce(scope->'labels', '[]'::jsonb)) AS required(label)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM device_labels l
+                    WHERE l.device_id = target AND l.label = required.label
+                )
+            )
+            AND (coalesce(jsonb_array_length(scope->'group_ids'), 0) = 0
+                OR EXISTS (
+                    SELECT 1 FROM device_group_memberships m
+                    WHERE m.device_id = target AND (scope->'group_ids') ? m.group_id::text
+                ))
+    );
+$$;
+-- +goose StatementEnd
+
 -- +goose Down
 
-DROP TABLE IF EXISTS package_page_cursors, package_attempts, host_observations,
+DROP FUNCTION IF EXISTS device_scope_matches(uuid, boolean, jsonb);
+DROP TABLE IF EXISTS offline_enrollment_authorizations, provisioning_enrollments, provisioning_tokens,
+    enrollment_recovery_grants, enrollment_installations;
+DROP TABLE IF EXISTS device_group_memberships, device_groups;
+
+DROP TABLE IF EXISTS device_search_cursors, inventory_attribute_definitions, inventory_metadata_lock, device_labels,
+    package_page_cursors, package_attempts, host_observations,
     snapshot_packages, snapshot_batches, package_snapshots, inventory_reservation,
     device_renewal_receipts, device_session_receipts, enrollment_grants,
     device_certificates, device_admin_requests, enrollment_generations, devices;

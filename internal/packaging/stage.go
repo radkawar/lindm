@@ -36,43 +36,20 @@ func hashFile(path string) (string, int64, error) {
 	return hashReader(file)
 }
 
-func stagePayload(work string, binary *os.File, epoch int64) (string, []stagedFile, string, error) {
+func stagePayload(work string, binary *os.File, epoch int64, p product) (string, []stagedFile, string, error) {
 	root := filepath.Join(work, "payload")
 	if err := os.Mkdir(root, 0o755); err != nil {
 		return "", nil, "", err
 	}
-	dirs := []string{
-		"usr/libexec/lindm",
-		"usr/lib/systemd/system",
-		"usr/lib/tmpfiles.d",
-		"usr/lib/sysusers.d",
-		"usr/share/doc/lindm-agent",
-		"etc/lindm",
-	}
+	dirs := append([]string{"usr/bin", "usr/lib/systemd/system", "usr/lib/tmpfiles.d", "usr/lib/sysusers.d"}, p.dirs...)
 	for _, dir := range dirs {
 		if err := mkdir(filepath.Join(root, dir), epoch); err != nil {
 			return "", nil, "", err
 		}
 	}
-	config, err := AgentConfigJSON()
+	files, err := p.payloadFiles()
 	if err != nil {
 		return "", nil, "", err
-	}
-	files := []struct {
-		rel  string
-		mode os.FileMode
-		conf bool
-		body []byte
-		name string
-	}{
-		{rel: "usr/lib/systemd/system/" + executorUnit, mode: 0o644, name: "lindm-executor.service"},
-		{rel: "usr/lib/systemd/system/" + agentUnit, mode: 0o644, name: "lindm-agent.service"},
-		{rel: "usr/lib/tmpfiles.d/lindm.conf", mode: 0o644, name: "tmpfiles.conf"},
-		{rel: "usr/lib/sysusers.d/lindm.conf", mode: 0o644, name: "sysusers.conf"},
-		{rel: lifecyclePath[1:], mode: 0o755, name: "lifecycle.sh"},
-		{rel: "usr/share/doc/lindm-agent/copyright", mode: 0o644, name: "copyright"},
-		{rel: "etc/lindm/executor.json", mode: 0o640, conf: true, body: config},
-		{rel: "etc/lindm/agent.json", mode: 0o644, conf: true, body: config},
 	}
 	var staged []stagedFile
 	for _, file := range files {
@@ -89,7 +66,7 @@ func stagePayload(work string, binary *os.File, epoch int64) (string, []stagedFi
 		}
 		staged = append(staged, stagedFile{Rel: file.rel, Mode: file.mode, Conf: file.conf})
 	}
-	binaryRel := BinaryPath[1:]
+	binaryRel := p.binary[1:]
 	binaryPath := filepath.Join(root, binaryRel)
 	if err := copyFile(binaryPath, binary, 0o755, epoch); err != nil {
 		return "", nil, "", err
@@ -109,11 +86,29 @@ func stagePayload(work string, binary *os.File, epoch int64) (string, []stagedFi
 		return "", nil, "", fmt.Errorf("%w: staged binary digest changed", ErrArtifact)
 	}
 	staged = append(staged, stagedFile{Rel: binaryRel, Mode: 0o755})
-	stamp := time.Unix(epoch, 0)
-	if err := os.Chtimes(root, stamp, stamp); err != nil {
+	if err := stampDirectories(root, epoch); err != nil {
 		return "", nil, "", err
 	}
 	return root, staged, want, nil
+}
+
+// Creating a child changes its parent's mtime after mkdir stamped it. Native
+// SOURCE_DATE_EPOCH options only clamp timestamps from above, so normalize every
+// directory after the complete tree is assembled, including implicit parents.
+func stampDirectories(root string, epoch int64) error {
+	stamp := time.Unix(epoch, 0)
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%w: symlink in native staging tree", ErrArtifact)
+		}
+		if info.IsDir() {
+			return os.Chtimes(path, stamp, stamp)
+		}
+		return nil
+	})
 }
 
 func installedSize(root string) (int64, error) {

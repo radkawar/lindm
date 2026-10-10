@@ -60,7 +60,7 @@ func TestRPMPayloadPathIsLiteral(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(payload, rel), data, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := writeSpec(work, payload, "0.2.0", Architecture{RPM: "x86_64"}, DefaultSourceDateEpoch, []stagedFile{{Rel: rel, Mode: 0o755}})
+	spec, err := writeSpec(work, payload, "0.2.0", Architecture{RPM: "x86_64"}, DefaultSourceDateEpoch, []stagedFile{{Rel: rel, Mode: 0o755}}, agentProduct())
 	if err != nil {
 		t.Fatal(err)
 	}

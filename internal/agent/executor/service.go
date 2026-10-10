@@ -21,10 +21,12 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
+	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/statefs"
+	"lindm/internal/agent/update"
 	"lindm/internal/protodata"
 	"lindm/internal/trust"
 )
@@ -93,40 +95,57 @@ func WithEntropy(r io.Reader) Option {
 // Service is the protected executor state machine. It implements the local
 // ExecutorService handler. Private keys never leave its methods.
 type Service struct {
-	mu            sync.Mutex
-	directory     string
-	stateLock     *os.File
-	store         *journal.Store
-	authority     *trust.Authority
-	validator     protovalidate.Validator
-	clock         func() time.Time
-	bootID        func() (string, error)
-	entropy       io.Reader
-	hold          bool
-	holdReason    agentv1.HoldReason
-	closed        bool
-	closeDone     chan struct{}
-	closeErr      error
-	operations    sync.WaitGroup
-	worker        sync.WaitGroup
-	workerContext context.Context
-	workerCancel  context.CancelFunc
-	workerWake    chan struct{}
-	incarnation   string
-	boottime      func() (uint64, error)
-	openService   func(context.Context) (nativeService, error)
+	mu                    sync.Mutex
+	directory             string
+	stateLock             *os.File
+	store                 *journal.Store
+	authority             *trust.Authority
+	validator             protovalidate.Validator
+	clock                 func() time.Time
+	bootID                func() (string, error)
+	entropy               io.Reader
+	hold                  bool
+	holdReason            agentv1.HoldReason
+	closed                bool
+	closeDone             chan struct{}
+	closeErr              error
+	operations            sync.WaitGroup
+	worker                sync.WaitGroup
+	workerContext         context.Context
+	workerCancel          context.CancelFunc
+	workerWake            chan struct{}
+	incarnation           string
+	boottime              func() (uint64, error)
+	openService           func(context.Context) (nativeService, error)
+	actionProvider        DeviceActionProvider
+	actionProviderFactory func(*journal.Store) (DeviceActionProvider, error)
+	actionMu              sync.Mutex
+	actionCredential      deviceActionCredential
+	liveRoot              *liveRootAction
+	pinLiveRoot           func() error
+	recoveryConfig        *RecoveryBootConfig
+	recoveryBoot          recoveryBootPlatform
+	recoveryPending       *recoveryPendingAction
+	recoveryTPM           func() (recoveryTPMPending, error)
+	updateConfig          *agentv1.AgentUpdateConfig
+	updates               *update.Engine
+	updateHold            bool
 }
 
 var _ agentv1connect.ExecutorServiceHandler = (*Service)(nil)
 
 // Config is resolved runtime configuration, not a serialized document.
 type Config struct {
-	StateDirectory   string
-	RuntimeDirectory string
-	SocketName       string
-	NetworkUID       uint32
-	NetworkGID       uint32
-	RequireRoot      bool
+	StateDirectory        string
+	RuntimeDirectory      string
+	SocketName            string
+	NetworkUID            uint32
+	NetworkGID            uint32
+	RequireRoot           bool
+	ActionProvider        DeviceActionProvider
+	ActionProviderFactory func(*journal.Store) (DeviceActionProvider, error)
+	RecoveryBoot          *RecoveryBootConfig
+	Updates               *agentv1.AgentUpdateConfig
 }
 
 // Run serves the executor until ctx is canceled. Cancellation exits without
@@ -135,7 +154,7 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.RequireRoot && os.Geteuid() != 0 {
 		return errors.New("executor requires root")
 	}
-	svc, err := New(ctx, cfg.StateDirectory)
+	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates))
 	if err != nil {
 		return err
 	}
@@ -157,6 +176,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(
 		&agentv1.PrepareBootstrapRequest{}, &agentv1.InstallEnrollmentRequest{},
+		&agentv1.ImportOfflineEnrollmentRequest{},
 		&agentv1.GetConnectionRequest{}, &agentv1.SignTLSClientMessageRequest{},
 		&agentv1.PrepareSessionRequest{}, &agentv1.CommitSessionRequest{},
 		&agentv1.PrepareRenewalRequest{}, &agentv1.CommitRenewalRequest{},
@@ -165,6 +185,16 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		&agentv1.GetServiceExecutionRequest{}, &agentv1.ServiceExecutionRecord{},
 		&agentv1.ServiceExecutionIntent{}, &agentv1.ServiceExecutionChallenge{},
 		&agentv1.AttestServiceExecutionRequest{},
+		&agentv1.PrepareDeviceActionRequest{}, &agentv1.StartDeviceActionRequest{},
+		&agentv1.GetDeviceActionRequest{}, &agentv1.AttestDeviceActionRequest{},
+		&agentv1.ConfirmDeviceActionEscrowRequest{}, &agentv1.SupplyDeviceActionCredentialRequest{},
+		&agentv1.DeviceActionRecord{}, &agentv1.DeviceActionIntent{}, &agentv1.DeviceActionChallenge{},
+		&agentv1.PrepareDeviceActionRecoveryRequest{}, &agentv1.CommitDeviceActionRecoveryRequest{},
+		&agentv1.DeviceActionRecoveryHandoff{}, &agentv1.DeviceActionRecoveryCredential{},
+		&agentv1.DeviceActionRecoveryBootGrant{}, &agentv1.RecoveryJournal{},
+		&agentv1.RecoveryBootConfig{},
+		&agentv1.ExchangeAgentUpdateRequest{}, &agentv1.GetAgentUpdateRequest{}, &agentv1.AgentUpdateConfig{},
+		&agentv1.AgentUpdateJournal{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return nil, err
@@ -221,7 +251,19 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		_ = svc.Close()
 		return nil, err
 	}
+	if err := svc.initializeActionProvider(); err != nil {
+		_ = svc.Close()
+		return nil, err
+	}
 	if err := svc.recoverServiceActions(ctx); err != nil && !errors.Is(err, errRecoveryHold) {
+		_ = svc.Close()
+		return nil, err
+	}
+	if err := svc.recoverDeviceActions(ctx); err != nil && !errors.Is(err, errRecoveryHold) {
+		_ = svc.Close()
+		return nil, err
+	}
+	if err := svc.initializeAgentUpdates(ctx); err != nil {
 		_ = svc.Close()
 		return nil, err
 	}
@@ -241,16 +283,24 @@ func (s *Service) Close() error {
 		return s.closeErr
 	}
 	s.closed = true
+	s.clearActionCredential()
 	if s.workerCancel != nil {
 		s.workerCancel()
 	}
 	s.mu.Unlock()
 	s.operations.Wait()
 	s.worker.Wait()
+	if s.updates != nil {
+		s.closeErr = errors.Join(s.closeErr, s.updates.Close())
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.store != nil {
-		s.closeErr = s.store.Close()
+	if s.recoveryPending != nil {
+		s.closeErr = errors.Join(s.closeErr, s.recoveryPending.key.Close())
+		s.recoveryPending = nil
+	}
+	if s.store != nil && s.liveRoot == nil {
+		s.closeErr = errors.Join(s.closeErr, s.store.Close())
 		s.store = nil
 	}
 	if s.stateLock != nil {
@@ -304,6 +354,9 @@ func (s *Service) load(ctx context.Context) (*bound, error) {
 // loadBound authenticates the protected records without retiring credentials or
 // otherwise mutating the journal. Read-only public trust views use this path.
 func (s *Service) loadBound(ctx context.Context) (*bound, error) {
+	if s.liveRoot != nil {
+		return nil, errServiceRejected
+	}
 	if s.hold {
 		return nil, errRecoveryHold
 	}
@@ -457,6 +510,18 @@ func mapError(err error) error {
 		code, reason = connect.CodePermissionDenied, "service_execution_rejected"
 	case errors.Is(err, errServiceExpired):
 		code, reason = connect.CodeFailedPrecondition, "service_execution_expired"
+	case errors.Is(err, journal.ErrDeviceActionNotFound):
+		code, reason = connect.CodeNotFound, "device_action_not_found"
+	case errors.Is(err, journal.ErrDeviceActionCapacity):
+		code, reason = connect.CodeResourceExhausted, "device_action_capacity"
+	case errors.Is(err, journal.ErrDeviceActionRejected):
+		code, reason = connect.CodeFailedPrecondition, "device_action_conflict"
+	case errors.Is(err, actionprovider.ErrCredential):
+		code, reason = connect.CodeFailedPrecondition, "device_action_credential_required"
+	case errors.Is(err, actionprovider.ErrUnsupported):
+		code, reason = connect.CodeFailedPrecondition, "device_action_unsupported"
+	case errors.Is(err, actionprovider.ErrConflict), errors.Is(err, actionprovider.ErrNotVerified):
+		code, reason = connect.CodeFailedPrecondition, "device_action_precondition"
 	case errors.Is(err, journal.ErrServiceActionNotFound):
 		code, reason = connect.CodeNotFound, "service_execution_not_found"
 	case errors.Is(err, journal.ErrServiceActionCapacity):

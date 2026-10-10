@@ -1,0 +1,45 @@
+syntax = "proto3";
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/offline_enrollment.proto";
+import "lindm/enrollment/v1/enrollment.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+message CreateOfflineEnrollmentAuthorizationRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  // A boot-delivered token is supplied only for authorization issuance; neither
+  // exported authorization nor database receipt contains this credential.
+  string provisioning_token = 2 [(buf.validate.field).string = {
+    min_len: 32
+    max_len: 256
+  }];
+  uint32 lifetime_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 604800
+  }];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  uint64 bootstrap_root_version = 5 [(buf.validate.field).uint64.gt = 0];
+  bytes bootstrap_root_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+}
+message CreateOfflineEnrollmentAuthorizationResponse {
+  lindm.agent.v1.OfflineEnrollmentAuthorizationFile authorization = 1;
+}
+message ImportOfflineEnrollmentRequestRequest {
+  // Import audit retains the provisioning token's immutable issuance reason.
+  lindm.agent.v1.OfflineEnrollmentRequestFile request = 1 [(buf.validate.field).required = true];
+}
+message ImportOfflineEnrollmentRequestResponse {
+  lindm.enrollment.v1.ProvisionResponse enrollment = 1;
+}
+message ExportOfflineEnrollmentResponseRequest {
+  // Resubmit the same device-signed request after approval. This cannot choose
+  // a replacement key, transaction, or identity and does not consume another use.
+  lindm.agent.v1.OfflineEnrollmentRequestFile request = 1 [(buf.validate.field).required = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message ExportOfflineEnrollmentResponseResponse {
+  lindm.agent.v1.OfflineEnrollmentResponseFile response = 1;
+}

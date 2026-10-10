@@ -1,10 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import {
+  CollectionStatus,
+  type ModuleObservation,
+} from "../../../gen/lindm/inventory/v1/observation_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import {
   Table,
   TableBody,
@@ -20,6 +25,7 @@ import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
 import { formatTimestamp } from "@/lib/time";
 import type { PackageSearch } from "./package-search";
 import { devicePackagesQueryOptions } from "./queries";
+import { collectionLabels, Fact } from "./observations";
 
 export function DevicePackages({
   deviceId,
@@ -68,7 +74,8 @@ export function DevicePackages({
         <CardTitle>Package records</CardTitle>
         <CardDescription>
           Every page is pinned to one complete snapshot. A view expires after 15 minutes; refreshing
-          a page does not extend it.
+          a page does not extend it. Module identity is native package evidence, never inferred from
+          repository IDs.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
@@ -119,20 +126,14 @@ export function DevicePackages({
             Latest snapshot
           </Button>
           <Label htmlFor="package-page-size">Page size</Label>
-          <select
+          <SelectField
             id="package-page-size"
             value={search.pageSize}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            onChange={(event) => {
-              onSearch({ ...search, pageSize: Number(event.target.value) as PageSize });
+            onValueChange={(value) => {
+              onSearch({ ...search, pageSize: Number(value) as PageSize });
             }}
-          >
-            {PAGE_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+            options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
+          />
         </div>
         {failure ? (
           <Alert variant="destructive">
@@ -187,6 +188,8 @@ export function DevicePackages({
                     <TableHead>Version (including epoch)</TableHead>
                     <TableHead>Architecture</TableHead>
                     <TableHead>Manager</TableHead>
+                    <TableHead>Native source package</TableHead>
+                    <TableHead>Native module evidence</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -198,6 +201,14 @@ export function DevicePackages({
                         {record.architecture || "Not recorded by native metadata"}
                       </TableCell>
                       <TableCell>{record.manager}</TableCell>
+                      <TableCell>
+                        {record.sourceName
+                          ? `${record.sourceName} ${record.sourceVersion}`
+                          : "Not recorded by native metadata"}
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        <PackageModuleEvidence module={record.module} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -223,5 +234,25 @@ export function DevicePackages({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function PackageModuleEvidence({ module }: { module: ModuleObservation | undefined }) {
+  if (!module) return <span className="text-muted-foreground">Unknown — not reported</span>;
+  if (module.status !== CollectionStatus.SUCCESS) {
+    return (
+      <span className="text-muted-foreground">
+        {collectionLabels[module.status] ?? "Unknown collection status"}
+      </span>
+    );
+  }
+  if (!module.modular) return <span>Not modular (native observation)</span>;
+  return (
+    <dl className="grid gap-2">
+      <Fact label="Module name">{module.name}</Fact>
+      <Fact label="Stream">{module.stream}</Fact>
+      <Fact label="Module version">{module.version}</Fact>
+      <Fact label="Context">{module.context}</Fact>
+    </dl>
   );
 }

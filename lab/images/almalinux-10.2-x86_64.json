@@ -1,0 +1,19 @@
+{
+  "id": "almalinux-10.2-20260817.0-x86-64",
+  "distribution": "almalinux",
+  "version": "10.2",
+  "architecture": "x86_64",
+  "edition": "genericcloud",
+  "release": "10.2-20260817.0",
+  "imageFilename": "AlmaLinux-10-GenericCloud-10.2-20260817.0.x86_64.qcow2",
+  "imageUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-10.2-20260817.0.x86_64.qcow2",
+  "checksumUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/CHECKSUM",
+  "signatureUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/CHECKSUM.asc",
+  "keyUrl": "https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-10",
+  "sha256": "bc59485c4828861a15887e30ff1bb913f0f16202fd7286208518f4814da1e10a",
+  "signerFingerprint": "EE6DB7B98F5BF5EDD9DA0DE5DEE5C11CC2A1E572",
+  "imageSizeBytes": "496631808",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://wiki.almalinux.org/release-notes/10.2.html",
+  "releaseProvenanceUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/"
+}

@@ -138,11 +138,12 @@ func localStartupExternalConfig(t *testing.T) Config {
 	t.Helper()
 	var server *httptest.Server
 	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/realms/test/.well-known/openid-configuration" {
+		switch r.URL.Path {
+		case "/realms/test/.well-known/openid-configuration":
 			writeJSON(w, http.StatusOK, map[string]any{"issuer": server.URL + "/realms/test", "authorization_endpoint": server.URL + "/authorize", "token_endpoint": server.URL + "/token", "jwks_uri": server.URL + "/keys"})
-		} else if r.URL.Path == "/token" {
+		case "/token":
 			writeJSON(w, http.StatusOK, map[string]any{"access_token": "constructor-test-token", "token_type": "Bearer", "expires_in": 3600})
-		} else {
+		default:
 			http.NotFound(w, r)
 		}
 	}))
@@ -159,10 +160,14 @@ func TestAuthenticationModeStartupPreservesOwnerLogin(t *testing.T) {
 			if _, err := q.UpsertPrincipal(ctx, identitydb.UpsertPrincipalParams{ID: id, Issuer: external.Issuer, Subject: id.String()}); err != nil {
 				return err
 			}
-			if _, err := q.PinOwnerRole(ctx, id); err != nil {
+			digest, err := bindingsDigest(s.policy.bindings(RoleOwner, nil))
+			if err != nil {
 				return err
 			}
-			_, err := q.MarkDeploymentInitialized(ctx, &id)
+			if _, err := q.PinOwnerRole(ctx, identitydb.PinOwnerRoleParams{ID: id, AuthorizationDigest: digest}); err != nil {
+				return err
+			}
+			_, err = q.MarkDeploymentInitialized(ctx, &id)
 			return err
 		}); err != nil {
 			t.Fatal(err)

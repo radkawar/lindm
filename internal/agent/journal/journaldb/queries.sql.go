@@ -9,6 +9,129 @@ import (
 	"context"
 )
 
+const accountLockCount = `-- name: AccountLockCount :one
+SELECT count(*) FROM account_locks
+`
+
+func (q *Queries) AccountLockCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, accountLockCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const accountLockOwnerCount = `-- name: AccountLockOwnerCount :one
+SELECT count(*) FROM account_lock_owners
+`
+
+func (q *Queries) AccountLockOwnerCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, accountLockOwnerCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteAccountLockOwner = `-- name: DeleteAccountLockOwner :execrows
+DELETE FROM account_lock_owners WHERE username = ? AND lock_action_id = ?
+`
+
+type DeleteAccountLockOwnerParams struct {
+	Username     string
+	LockActionID string
+}
+
+func (q *Queries) DeleteAccountLockOwner(ctx context.Context, arg DeleteAccountLockOwnerParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAccountLockOwner, arg.Username, arg.LockActionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteReadOnlyServiceAction = `-- name: DeleteReadOnlyServiceAction :execrows
+DELETE FROM service_actions WHERE service_actions.action_id = ? AND service_actions.read_only_success = 1
+AND NOT EXISTS (SELECT 1 FROM service_resource_floors f WHERE f.action_id = service_actions.action_id)
+`
+
+func (q *Queries) DeleteReadOnlyServiceAction(ctx context.Context, actionID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteReadOnlyServiceAction, actionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deviceActionCount = `-- name: DeviceActionCount :one
+SELECT count(*) FROM device_actions
+`
+
+func (q *Queries) DeviceActionCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deviceActionCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deviceActionSequenceFloor = `-- name: DeviceActionSequenceFloor :one
+SELECT CAST(coalesce(max(action_sequence), 0) AS INTEGER) FROM device_actions
+WHERE deployment_id = ? AND device_id = ? AND enrollment_generation = ?
+`
+
+type DeviceActionSequenceFloorParams struct {
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+}
+
+func (q *Queries) DeviceActionSequenceFloor(ctx context.Context, arg DeviceActionSequenceFloorParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deviceActionSequenceFloor, arg.DeploymentID, arg.DeviceID, arg.EnrollmentGeneration)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const incrementAccountLockUsage = `-- name: IncrementAccountLockUsage :execrows
+UPDATE account_lock_usage SET record_count = record_count + 1 WHERE id = 1 AND record_count = ?
+`
+
+func (q *Queries) IncrementAccountLockUsage(ctx context.Context, recordCount int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, incrementAccountLockUsage, recordCount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const incrementDeviceActionUsage = `-- name: IncrementDeviceActionUsage :execrows
+UPDATE device_action_usage SET record_count = record_count + 1 WHERE id = 1 AND record_count = ?
+`
+
+func (q *Queries) IncrementDeviceActionUsage(ctx context.Context, recordCount int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, incrementDeviceActionUsage, recordCount)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const initializeAccountLockUsage = `-- name: InitializeAccountLockUsage :exec
+INSERT INTO account_lock_usage (id, record_count) VALUES (1, 0)
+`
+
+func (q *Queries) InitializeAccountLockUsage(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, initializeAccountLockUsage)
+	return err
+}
+
+const initializeDeviceActionUsage = `-- name: InitializeDeviceActionUsage :exec
+INSERT INTO device_action_usage (id, record_count) VALUES (1, 0)
+`
+
+func (q *Queries) InitializeDeviceActionUsage(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, initializeDeviceActionUsage)
+	return err
+}
+
 const initializeExecutionTrust = `-- name: InitializeExecutionTrust :exec
 INSERT INTO execution_trust (id, revision, state) VALUES (1, 1, ?)
 `
@@ -36,9 +159,66 @@ func (q *Queries) InitializeState(ctx context.Context, state []byte) error {
 	return err
 }
 
+const insertAccountLock = `-- name: InsertAccountLock :exec
+INSERT INTO account_locks (lock_action_id, revision, record) VALUES (?, 1, ?)
+`
+
+type InsertAccountLockParams struct {
+	LockActionID string
+	Record       []byte
+}
+
+func (q *Queries) InsertAccountLock(ctx context.Context, arg InsertAccountLockParams) error {
+	_, err := q.db.ExecContext(ctx, insertAccountLock, arg.LockActionID, arg.Record)
+	return err
+}
+
+const insertAccountLockOwner = `-- name: InsertAccountLockOwner :exec
+INSERT INTO account_lock_owners (username, uid, lock_action_id) VALUES (?, ?, ?)
+`
+
+type InsertAccountLockOwnerParams struct {
+	Username     string
+	Uid          int64
+	LockActionID string
+}
+
+func (q *Queries) InsertAccountLockOwner(ctx context.Context, arg InsertAccountLockOwnerParams) error {
+	_, err := q.db.ExecContext(ctx, insertAccountLockOwner, arg.Username, arg.Uid, arg.LockActionID)
+	return err
+}
+
+const insertDeviceAction = `-- name: InsertDeviceAction :exec
+INSERT INTO device_actions (action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record)
+VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+`
+
+type InsertDeviceActionParams struct {
+	ActionID             string
+	DeploymentID         string
+	DeviceID             string
+	EnrollmentGeneration string
+	ActionSequence       int64
+	State                int64
+	Record               []byte
+}
+
+func (q *Queries) InsertDeviceAction(ctx context.Context, arg InsertDeviceActionParams) error {
+	_, err := q.db.ExecContext(ctx, insertDeviceAction,
+		arg.ActionID,
+		arg.DeploymentID,
+		arg.DeviceID,
+		arg.EnrollmentGeneration,
+		arg.ActionSequence,
+		arg.State,
+		arg.Record,
+	)
+	return err
+}
+
 const insertServiceAction = `-- name: InsertServiceAction :exec
-INSERT INTO service_actions (action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record)
-VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+INSERT INTO service_actions (action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success)
+VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
 `
 
 type InsertServiceActionParams struct {
@@ -50,6 +230,7 @@ type InsertServiceActionParams struct {
 	ResourceSequence     int64
 	State                int64
 	Record               []byte
+	ReadOnlySuccess      int64
 }
 
 func (q *Queries) InsertServiceAction(ctx context.Context, arg InsertServiceActionParams) error {
@@ -62,6 +243,7 @@ func (q *Queries) InsertServiceAction(ctx context.Context, arg InsertServiceActi
 		arg.ResourceSequence,
 		arg.State,
 		arg.Record,
+		arg.ReadOnlySuccess,
 	)
 	return err
 }
@@ -80,8 +262,39 @@ func (q *Queries) InvalidServiceResourceFloorCount(ctx context.Context) (int64, 
 	return count, err
 }
 
+const nextAccountLock = `-- name: NextAccountLock :one
+SELECT lock_action_id, revision, record FROM account_locks WHERE lock_action_id > ? ORDER BY lock_action_id LIMIT 1
+`
+
+func (q *Queries) NextAccountLock(ctx context.Context, lockActionID string) (AccountLock, error) {
+	row := q.db.QueryRowContext(ctx, nextAccountLock, lockActionID)
+	var i AccountLock
+	err := row.Scan(&i.LockActionID, &i.Revision, &i.Record)
+	return i, err
+}
+
+const nextDeviceAction = `-- name: NextDeviceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id > ? ORDER BY action_id LIMIT 1
+`
+
+func (q *Queries) NextDeviceAction(ctx context.Context, actionID string) (DeviceAction, error) {
+	row := q.db.QueryRowContext(ctx, nextDeviceAction, actionID)
+	var i DeviceAction
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.ActionSequence,
+		&i.Revision,
+		&i.State,
+		&i.Record,
+	)
+	return i, err
+}
+
 const nextServiceAction = `-- name: NextServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record FROM service_actions WHERE action_id > ? ORDER BY action_id LIMIT 1
+SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id > ? ORDER BY action_id LIMIT 1
 `
 
 func (q *Queries) NextServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
@@ -97,12 +310,33 @@ func (q *Queries) NextServiceAction(ctx context.Context, actionID string) (Servi
 		&i.Revision,
 		&i.State,
 		&i.Record,
+		&i.ReadOnlySuccess,
+	)
+	return i, err
+}
+
+const nextUnfinishedDeviceAction = `-- name: NextUnfinishedDeviceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id > ? AND state IN (1, 2, 3, 8, 9) ORDER BY action_id LIMIT 1
+`
+
+func (q *Queries) NextUnfinishedDeviceAction(ctx context.Context, actionID string) (DeviceAction, error) {
+	row := q.db.QueryRowContext(ctx, nextUnfinishedDeviceAction, actionID)
+	var i DeviceAction
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.ActionSequence,
+		&i.Revision,
+		&i.State,
+		&i.Record,
 	)
 	return i, err
 }
 
 const nextUnfinishedServiceAction = `-- name: NextUnfinishedServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record FROM service_actions WHERE action_id > ? AND state IN (1, 2, 3) ORDER BY action_id LIMIT 1
+SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id > ? AND state IN (1, 2, 3) ORDER BY action_id LIMIT 1
 `
 
 func (q *Queries) NextUnfinishedServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
@@ -118,6 +352,51 @@ func (q *Queries) NextUnfinishedServiceAction(ctx context.Context, actionID stri
 		&i.Revision,
 		&i.State,
 		&i.Record,
+		&i.ReadOnlySuccess,
+	)
+	return i, err
+}
+
+const nextUpdateInterlockDeviceAction = `-- name: NextUpdateInterlockDeviceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id > ? AND state IN (2, 3, 6, 8, 9) ORDER BY action_id LIMIT 1
+`
+
+func (q *Queries) NextUpdateInterlockDeviceAction(ctx context.Context, actionID string) (DeviceAction, error) {
+	row := q.db.QueryRowContext(ctx, nextUpdateInterlockDeviceAction, actionID)
+	var i DeviceAction
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.ActionSequence,
+		&i.Revision,
+		&i.State,
+		&i.Record,
+	)
+	return i, err
+}
+
+const oldReadOnlyServiceAction = `-- name: OldReadOnlyServiceAction :one
+SELECT a.action_id, a.deployment_id, a.device_id, a.enrollment_generation, a.unit, a.resource_sequence, a.revision, a.state, a.record, a.read_only_success FROM service_actions a
+WHERE a.read_only_success = 1 AND NOT EXISTS (SELECT 1 FROM service_resource_floors f WHERE f.action_id = a.action_id)
+ORDER BY a.rowid DESC LIMIT 1 OFFSET 256
+`
+
+func (q *Queries) OldReadOnlyServiceAction(ctx context.Context) (ServiceAction, error) {
+	row := q.db.QueryRowContext(ctx, oldReadOnlyServiceAction)
+	var i ServiceAction
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.Unit,
+		&i.ResourceSequence,
+		&i.Revision,
+		&i.State,
+		&i.Record,
+		&i.ReadOnlySuccess,
 	)
 	return i, err
 }
@@ -150,6 +429,91 @@ func (q *Queries) RaiseServiceResourceFloor(ctx context.Context, arg RaiseServic
 	return err
 }
 
+const readAccountLock = `-- name: ReadAccountLock :one
+SELECT lock_action_id, revision, record FROM account_locks WHERE lock_action_id = ?
+`
+
+func (q *Queries) ReadAccountLock(ctx context.Context, lockActionID string) (AccountLock, error) {
+	row := q.db.QueryRowContext(ctx, readAccountLock, lockActionID)
+	var i AccountLock
+	err := row.Scan(&i.LockActionID, &i.Revision, &i.Record)
+	return i, err
+}
+
+const readAccountLockOwner = `-- name: ReadAccountLockOwner :many
+SELECT username, uid, lock_action_id FROM account_lock_owners WHERE username = ? OR uid = ?
+`
+
+type ReadAccountLockOwnerParams struct {
+	Username string
+	Uid      int64
+}
+
+func (q *Queries) ReadAccountLockOwner(ctx context.Context, arg ReadAccountLockOwnerParams) ([]AccountLockOwner, error) {
+	rows, err := q.db.QueryContext(ctx, readAccountLockOwner, arg.Username, arg.Uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AccountLockOwner{}
+	for rows.Next() {
+		var i AccountLockOwner
+		if err := rows.Scan(&i.Username, &i.Uid, &i.LockActionID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readAccountLockUsage = `-- name: ReadAccountLockUsage :one
+SELECT record_count FROM account_lock_usage WHERE id = 1
+`
+
+func (q *Queries) ReadAccountLockUsage(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, readAccountLockUsage)
+	var record_count int64
+	err := row.Scan(&record_count)
+	return record_count, err
+}
+
+const readDeviceAction = `-- name: ReadDeviceAction :one
+SELECT action_id, deployment_id, device_id, enrollment_generation, action_sequence, revision, state, record FROM device_actions WHERE action_id = ?
+`
+
+func (q *Queries) ReadDeviceAction(ctx context.Context, actionID string) (DeviceAction, error) {
+	row := q.db.QueryRowContext(ctx, readDeviceAction, actionID)
+	var i DeviceAction
+	err := row.Scan(
+		&i.ActionID,
+		&i.DeploymentID,
+		&i.DeviceID,
+		&i.EnrollmentGeneration,
+		&i.ActionSequence,
+		&i.Revision,
+		&i.State,
+		&i.Record,
+	)
+	return i, err
+}
+
+const readDeviceActionUsage = `-- name: ReadDeviceActionUsage :one
+SELECT record_count FROM device_action_usage WHERE id = 1
+`
+
+func (q *Queries) ReadDeviceActionUsage(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, readDeviceActionUsage)
+	var record_count int64
+	err := row.Scan(&record_count)
+	return record_count, err
+}
+
 const readExecutionTrust = `-- name: ReadExecutionTrust :one
 SELECT revision, state FROM execution_trust WHERE id = 1
 `
@@ -167,7 +531,7 @@ func (q *Queries) ReadExecutionTrust(ctx context.Context) (ReadExecutionTrustRow
 }
 
 const readServiceAction = `-- name: ReadServiceAction :one
-SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record FROM service_actions WHERE action_id = ?
+SELECT action_id, deployment_id, device_id, enrollment_generation, unit, resource_sequence, revision, state, record, read_only_success FROM service_actions WHERE action_id = ?
 `
 
 func (q *Queries) ReadServiceAction(ctx context.Context, actionID string) (ServiceAction, error) {
@@ -183,6 +547,7 @@ func (q *Queries) ReadServiceAction(ctx context.Context, actionID string) (Servi
 		&i.Revision,
 		&i.State,
 		&i.Record,
+		&i.ReadOnlySuccess,
 	)
 	return i, err
 }
@@ -248,6 +613,48 @@ func (q *Queries) ReadState(ctx context.Context) (ReadStateRow, error) {
 	var i ReadStateRow
 	err := row.Scan(&i.Revision, &i.State)
 	return i, err
+}
+
+const replaceAccountLock = `-- name: ReplaceAccountLock :execrows
+UPDATE account_locks SET revision = revision + 1, record = ? WHERE lock_action_id = ? AND revision = ?
+`
+
+type ReplaceAccountLockParams struct {
+	Record       []byte
+	LockActionID string
+	Revision     int64
+}
+
+func (q *Queries) ReplaceAccountLock(ctx context.Context, arg ReplaceAccountLockParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceAccountLock, arg.Record, arg.LockActionID, arg.Revision)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const replaceDeviceAction = `-- name: ReplaceDeviceAction :execrows
+UPDATE device_actions SET revision = revision + 1, state = ?, record = ? WHERE action_id = ? AND revision = ?
+`
+
+type ReplaceDeviceActionParams struct {
+	State    int64
+	Record   []byte
+	ActionID string
+	Revision int64
+}
+
+func (q *Queries) ReplaceDeviceAction(ctx context.Context, arg ReplaceDeviceActionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, replaceDeviceAction,
+		arg.State,
+		arg.Record,
+		arg.ActionID,
+		arg.Revision,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const replaceExecutionTrust = `-- name: ReplaceExecutionTrust :execrows

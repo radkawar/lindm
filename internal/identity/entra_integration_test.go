@@ -20,7 +20,10 @@ func TestEntraPersistedRevocationAndWorkerFences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.issuer, svc.entraTenant, svc.adminGroups = issuer, tenant, []string{group.String()}
+	svc.issuer, svc.entraTenant, svc.policy = issuer, tenant, mappedPolicy(t, group.String())
+	if err := svc.activatePolicy(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	var state atomic.Int32
 	source, _ := entraFixture(t, func(w http.ResponseWriter, r *http.Request) {
 		if state.Load() == 4 {

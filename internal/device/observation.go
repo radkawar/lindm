@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -39,6 +40,18 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 	observation := req.Msg.GetObservation()
 	if observation == nil || protodata.ValidateClosed(observation.ProtoReflect()) != nil {
 		return nil, invalid("observation")
+	}
+	if err := s.rules.Validate(observation); err != nil {
+		return nil, invalid("observation")
+	}
+	// Device detail also carries list projections and bounded administrator
+	// metadata. Reserve half the response envelope for those independent rows.
+	if proto.Size(observation) > maxMessageBytes/2 {
+		return nil, invalid("observation_capacity")
+	}
+	encoded, err := (protojson.MarshalOptions{Multiline: true}).Marshal(observation)
+	if err != nil || len(encoded) > maxMessageBytes/2 {
+		return nil, invalid("observation_capacity")
 	}
 	if err := observationText(observation); err != nil {
 		return nil, err
@@ -286,7 +299,13 @@ func hostFields(observation *inventoryv1.HostObservation) (devicedb.UpsertHostOb
 	if params.HardwareModelStatus, params.HardwareModelValue, err = observedParts(observation.GetHardwareModel()); err != nil {
 		return params, err
 	}
-	params.HardwareSerialStatus, params.HardwareSerialValue, err = observedParts(observation.GetHardwareSerial())
+	if params.HardwareSerialStatus, params.HardwareSerialValue, err = observedParts(observation.GetHardwareSerial()); err != nil {
+		return params, err
+	}
+	params.Details = []byte{}
+	if observation.GetDetails() != nil {
+		params.Details, err = proto.MarshalOptions{Deterministic: true}.Marshal(observation.GetDetails())
+	}
 	return params, err
 }
 

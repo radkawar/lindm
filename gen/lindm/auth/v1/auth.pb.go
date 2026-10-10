@@ -36,6 +36,9 @@ type SessionPrincipal struct {
 	CsrfToken      string                 `protobuf:"bytes,6,opt,name=csrf_token,json=csrfToken,proto3" json:"csrf_token,omitempty"`
 	BreakGlass     bool                   `protobuf:"varint,7,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
 	IncidentReason string                 `protobuf:"bytes,8,opt,name=incident_reason,json=incidentReason,proto3" json:"incident_reason,omitempty"`
+	Permissions    []string               `protobuf:"bytes,9,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	ServiceAccount bool                   `protobuf:"varint,10,opt,name=service_account,json=serviceAccount,proto3" json:"service_account,omitempty"`
+	Bindings       []*RoleBinding         `protobuf:"bytes,11,rep,name=bindings,proto3" json:"bindings,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -124,6 +127,27 @@ func (x *SessionPrincipal) GetIncidentReason() string {
 		return x.IncidentReason
 	}
 	return ""
+}
+
+func (x *SessionPrincipal) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *SessionPrincipal) GetServiceAccount() bool {
+	if x != nil {
+		return x.ServiceAccount
+	}
+	return false
+}
+
+func (x *SessionPrincipal) GetBindings() []*RoleBinding {
+	if x != nil {
+		return x.Bindings
+	}
+	return nil
 }
 
 // All authentication endpoints use protobuf JSON and no-store responses.
@@ -413,6 +437,7 @@ type LocalAccount struct {
 	Enabled       bool                   `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	BreakGlass    bool                   `protobuf:"varint,5,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
 	Enrolled      bool                   `protobuf:"varint,6,opt,name=enrolled,proto3" json:"enrolled,omitempty"`
+	Scopes        []*DeviceScope         `protobuf:"bytes,7,rep,name=scopes,proto3" json:"scopes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -489,9 +514,17 @@ func (x *LocalAccount) GetEnrolled() bool {
 	return false
 }
 
+func (x *LocalAccount) GetScopes() []*DeviceScope {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
 type ListAccountsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Accounts      []*LocalAccount        `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	Roles         []string               `protobuf:"bytes,2,rep,name=roles,proto3" json:"roles,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -533,11 +566,19 @@ func (x *ListAccountsResponse) GetAccounts() []*LocalAccount {
 	return nil
 }
 
+func (x *ListAccountsResponse) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
 type CreateAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
 	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
 	BreakGlass    bool                   `protobuf:"varint,3,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	Scopes        []*DeviceScope         `protobuf:"bytes,4,rep,name=scopes,proto3" json:"scopes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -593,12 +634,20 @@ func (x *CreateAccountRequest) GetBreakGlass() bool {
 	return false
 }
 
+func (x *CreateAccountRequest) GetScopes() []*DeviceScope {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
 type UpdateAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
 	BreakGlass    bool                   `protobuf:"varint,4,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
+	Scopes        []*DeviceScope         `protobuf:"bytes,5,rep,name=scopes,proto3" json:"scopes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -659,6 +708,13 @@ func (x *UpdateAccountRequest) GetBreakGlass() bool {
 		return x.BreakGlass
 	}
 	return false
+}
+
+func (x *UpdateAccountRequest) GetScopes() []*DeviceScope {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
 }
 
 type ResetAccountRequest struct {
@@ -766,11 +822,234 @@ func (x *AccountEnrollment) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// GET /auth/settings is read-only and requires unrestricted accounts.manage.
+// Observations describe only the signed-in principal, never tenant-wide health.
+type IdentitySettings struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PrimarySource          string                 `protobuf:"bytes,1,opt,name=primary_source,json=primarySource,proto3" json:"primary_source,omitempty"`
+	Issuer                 string                 `protobuf:"bytes,2,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	RefreshIntervalSeconds uint32                 `protobuf:"varint,3,opt,name=refresh_interval_seconds,json=refreshIntervalSeconds,proto3" json:"refresh_interval_seconds,omitempty"`
+	MaxSnapshotAgeSeconds  uint32                 `protobuf:"varint,4,opt,name=max_snapshot_age_seconds,json=maxSnapshotAgeSeconds,proto3" json:"max_snapshot_age_seconds,omitempty"`
+	ScimEnabled            bool                   `protobuf:"varint,5,opt,name=scim_enabled,json=scimEnabled,proto3" json:"scim_enabled,omitempty"`
+	BrokerEnabled          bool                   `protobuf:"varint,6,opt,name=broker_enabled,json=brokerEnabled,proto3" json:"broker_enabled,omitempty"`
+	BreakGlassEnabled      bool                   `protobuf:"varint,7,opt,name=break_glass_enabled,json=breakGlassEnabled,proto3" json:"break_glass_enabled,omitempty"`
+	UpstreamSource         string                 `protobuf:"bytes,8,opt,name=upstream_source,json=upstreamSource,proto3" json:"upstream_source,omitempty"`
+	ObservedAt             *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	Current                bool                   `protobuf:"varint,10,opt,name=current,proto3" json:"current,omitempty"`
+	LocalAuthority         bool                   `protobuf:"varint,11,opt,name=local_authority,json=localAuthority,proto3" json:"local_authority,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *IdentitySettings) Reset() {
+	*x = IdentitySettings{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdentitySettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdentitySettings) ProtoMessage() {}
+
+func (x *IdentitySettings) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdentitySettings.ProtoReflect.Descriptor instead.
+func (*IdentitySettings) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *IdentitySettings) GetPrimarySource() string {
+	if x != nil {
+		return x.PrimarySource
+	}
+	return ""
+}
+
+func (x *IdentitySettings) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *IdentitySettings) GetRefreshIntervalSeconds() uint32 {
+	if x != nil {
+		return x.RefreshIntervalSeconds
+	}
+	return 0
+}
+
+func (x *IdentitySettings) GetMaxSnapshotAgeSeconds() uint32 {
+	if x != nil {
+		return x.MaxSnapshotAgeSeconds
+	}
+	return 0
+}
+
+func (x *IdentitySettings) GetScimEnabled() bool {
+	if x != nil {
+		return x.ScimEnabled
+	}
+	return false
+}
+
+func (x *IdentitySettings) GetBrokerEnabled() bool {
+	if x != nil {
+		return x.BrokerEnabled
+	}
+	return false
+}
+
+func (x *IdentitySettings) GetBreakGlassEnabled() bool {
+	if x != nil {
+		return x.BreakGlassEnabled
+	}
+	return false
+}
+
+func (x *IdentitySettings) GetUpstreamSource() string {
+	if x != nil {
+		return x.UpstreamSource
+	}
+	return ""
+}
+
+func (x *IdentitySettings) GetObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *IdentitySettings) GetCurrent() bool {
+	if x != nil {
+		return x.Current
+	}
+	return false
+}
+
+func (x *IdentitySettings) GetLocalAuthority() bool {
+	if x != nil {
+		return x.LocalAuthority
+	}
+	return false
+}
+
+type RotateSCIMCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectorId   string                 `protobuf:"bytes,1,opt,name=connector_id,json=connectorId,proto3" json:"connector_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateSCIMCredentialRequest) Reset() {
+	*x = RotateSCIMCredentialRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateSCIMCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateSCIMCredentialRequest) ProtoMessage() {}
+
+func (x *RotateSCIMCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateSCIMCredentialRequest.ProtoReflect.Descriptor instead.
+func (*RotateSCIMCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RotateSCIMCredentialRequest) GetConnectorId() string {
+	if x != nil {
+		return x.ConnectorId
+	}
+	return ""
+}
+
+// Returned once, no-store; the bearer token must never enter logs or query caches.
+type SCIMCredential struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectorId   string                 `protobuf:"bytes,1,opt,name=connector_id,json=connectorId,proto3" json:"connector_id,omitempty"`
+	BearerToken   string                 `protobuf:"bytes,2,opt,name=bearer_token,json=bearerToken,proto3" json:"bearer_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SCIMCredential) Reset() {
+	*x = SCIMCredential{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SCIMCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SCIMCredential) ProtoMessage() {}
+
+func (x *SCIMCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SCIMCredential.ProtoReflect.Descriptor instead.
+func (*SCIMCredential) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SCIMCredential) GetConnectorId() string {
+	if x != nil {
+		return x.ConnectorId
+	}
+	return ""
+}
+
+func (x *SCIMCredential) GetBearerToken() string {
+	if x != nil {
+		return x.BearerToken
+	}
+	return ""
+}
+
 var File_lindm_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf4\x01\n" +
+	"\x18lindm/auth/v1/auth.proto\x12\rlindm.auth.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!lindm/auth/v1/authorization.proto\"\xf7\x02\n" +
 	"\x10SessionPrincipal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x12\x18\n" +
@@ -781,7 +1060,11 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"csrf_token\x18\x06 \x01(\tR\tcsrfToken\x12\x1f\n" +
 	"\vbreak_glass\x18\a \x01(\bR\n" +
 	"breakGlass\x12'\n" +
-	"\x0fincident_reason\x18\b \x01(\tR\x0eincidentReason\"\x80\x01\n" +
+	"\x0fincident_reason\x18\b \x01(\tR\x0eincidentReason\x12 \n" +
+	"\vpermissions\x18\t \x03(\tR\vpermissions\x12'\n" +
+	"\x0fservice_account\x18\n" +
+	" \x01(\bR\x0eserviceAccount\x126\n" +
+	"\bbindings\x18\v \x03(\v2\x1a.lindm.auth.v1.RoleBindingR\bbindings\"\x80\x01\n" +
 	"\x15AuthenticationOptions\x12%\n" +
 	"\x0eexternal_login\x18\x01 \x01(\bR\rexternalLogin\x12\x1f\n" +
 	"\vlocal_login\x18\x02 \x01(\bR\n" +
@@ -805,7 +1088,7 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\x15WebAuthnFinishRequest\x12 \n" +
 	"\x05token\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\bR\x05token\x124\n" +
-	"\x0fcredential_json\x18\x02 \x01(\tB\v\xbaH\br\x06 \x01(\x80\x80\x04R\x0ecredentialJson\"\xa5\x01\n" +
+	"\x0fcredential_json\x18\x02 \x01(\tB\v\xbaH\br\x06 \x01(\x80\x80\x04R\x0ecredentialJson\"\xd9\x01\n" +
 	"\fLocalAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x12\n" +
@@ -813,22 +1096,26 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\aenabled\x18\x04 \x01(\bR\aenabled\x12\x1f\n" +
 	"\vbreak_glass\x18\x05 \x01(\bR\n" +
 	"breakGlass\x12\x1a\n" +
-	"\benrolled\x18\x06 \x01(\bR\benrolled\"O\n" +
+	"\benrolled\x18\x06 \x01(\bR\benrolled\x122\n" +
+	"\x06scopes\x18\a \x03(\v2\x1a.lindm.auth.v1.DeviceScopeR\x06scopes\"e\n" +
 	"\x14ListAccountsResponse\x127\n" +
-	"\baccounts\x18\x01 \x03(\v2\x1b.lindm.auth.v1.LocalAccountR\baccounts\"\x9e\x02\n" +
+	"\baccounts\x18\x01 \x03(\v2\x1b.lindm.auth.v1.LocalAccountR\baccounts\x12\x14\n" +
+	"\x05roles\x18\x02 \x03(\tR\x05roles\"\xe7\x02\n" +
 	"\x14CreateAccountRequest\x12C\n" +
-	"\busername\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x12'\n" +
-	"\x04role\x18\x02 \x01(\tB\x13\xbaH\x10r\x0eR\x05ownerR\x05adminR\x04role\x12\x1f\n" +
+	"\busername\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x122\n" +
+	"\x04role\x18\x02 \x01(\tB\x1e\xbaH\x1br\x19\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$R\x04role\x12\x1f\n" +
 	"\vbreak_glass\x18\x03 \x01(\bR\n" +
-	"breakGlass:w\xbaHt\x1ar\n" +
-	" create_account.break_glass_owner\x12#break-glass accounts must be owners\x1a)!this.break_glass || this.role == 'owner'\"\x9c\x02\n" +
+	"breakGlass\x12<\n" +
+	"\x06scopes\x18\x04 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes:w\xbaHt\x1ar\n" +
+	" create_account.break_glass_owner\x12#break-glass accounts must be owners\x1a)!this.break_glass || this.role == 'owner'\"\xe5\x02\n" +
 	"\x14UpdateAccountRequest\x12'\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\taccountId\x12\x18\n" +
-	"\aenabled\x18\x02 \x01(\bR\aenabled\x12'\n" +
-	"\x04role\x18\x03 \x01(\tB\x13\xbaH\x10r\x0eR\x05ownerR\x05adminR\x04role\x12\x1f\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x122\n" +
+	"\x04role\x18\x03 \x01(\tB\x1e\xbaH\x1br\x19\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$R\x04role\x12\x1f\n" +
 	"\vbreak_glass\x18\x04 \x01(\bR\n" +
-	"breakGlass:w\xbaHt\x1ar\n" +
+	"breakGlass\x12<\n" +
+	"\x06scopes\x18\x05 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeB\b\xbaH\x05\x92\x01\x02\x10dR\x06scopes:w\xbaHt\x1ar\n" +
 	" update_account.break_glass_owner\x12#break-glass accounts must be owners\x1a)!this.break_glass || this.role == 'owner'\">\n" +
 	"\x13ResetAccountRequest\x12'\n" +
 	"\n" +
@@ -838,7 +1125,26 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAtB Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xe7\x03\n" +
+	"\x10IdentitySettings\x12%\n" +
+	"\x0eprimary_source\x18\x01 \x01(\tR\rprimarySource\x12\x16\n" +
+	"\x06issuer\x18\x02 \x01(\tR\x06issuer\x128\n" +
+	"\x18refresh_interval_seconds\x18\x03 \x01(\rR\x16refreshIntervalSeconds\x127\n" +
+	"\x18max_snapshot_age_seconds\x18\x04 \x01(\rR\x15maxSnapshotAgeSeconds\x12!\n" +
+	"\fscim_enabled\x18\x05 \x01(\bR\vscimEnabled\x12%\n" +
+	"\x0ebroker_enabled\x18\x06 \x01(\bR\rbrokerEnabled\x12.\n" +
+	"\x13break_glass_enabled\x18\a \x01(\bR\x11breakGlassEnabled\x12'\n" +
+	"\x0fupstream_source\x18\b \x01(\tR\x0eupstreamSource\x12;\n" +
+	"\vobserved_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"observedAt\x12\x18\n" +
+	"\acurrent\x18\n" +
+	" \x01(\bR\acurrent\x12'\n" +
+	"\x0flocal_authority\x18\v \x01(\bR\x0elocalAuthority\"_\n" +
+	"\x1bRotateSCIMCredentialRequest\x12@\n" +
+	"\fconnector_id\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x18@2\x12^[a-z][a-z0-9_-]*$R\vconnectorId\"V\n" +
+	"\x0eSCIMCredential\x12!\n" +
+	"\fconnector_id\x18\x01 \x01(\tR\vconnectorId\x12!\n" +
+	"\fbearer_token\x18\x02 \x01(\tR\vbearerTokenB Z\x1elindm/gen/lindm/auth/v1;authv1b\x06proto3"
 
 var (
 	file_lindm_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -852,30 +1158,40 @@ func file_lindm_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_lindm_auth_v1_auth_proto_rawDescData
 }
 
-var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lindm_auth_v1_auth_proto_goTypes = []any{
-	(*SessionPrincipal)(nil),       // 0: lindm.auth.v1.SessionPrincipal
-	(*AuthenticationOptions)(nil),  // 1: lindm.auth.v1.AuthenticationOptions
-	(*LocalLoginRequest)(nil),      // 2: lindm.auth.v1.LocalLoginRequest
-	(*LocalEnrollmentRequest)(nil), // 3: lindm.auth.v1.LocalEnrollmentRequest
-	(*WebAuthnChallenge)(nil),      // 4: lindm.auth.v1.WebAuthnChallenge
-	(*WebAuthnFinishRequest)(nil),  // 5: lindm.auth.v1.WebAuthnFinishRequest
-	(*LocalAccount)(nil),           // 6: lindm.auth.v1.LocalAccount
-	(*ListAccountsResponse)(nil),   // 7: lindm.auth.v1.ListAccountsResponse
-	(*CreateAccountRequest)(nil),   // 8: lindm.auth.v1.CreateAccountRequest
-	(*UpdateAccountRequest)(nil),   // 9: lindm.auth.v1.UpdateAccountRequest
-	(*ResetAccountRequest)(nil),    // 10: lindm.auth.v1.ResetAccountRequest
-	(*AccountEnrollment)(nil),      // 11: lindm.auth.v1.AccountEnrollment
-	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
+	(*SessionPrincipal)(nil),            // 0: lindm.auth.v1.SessionPrincipal
+	(*AuthenticationOptions)(nil),       // 1: lindm.auth.v1.AuthenticationOptions
+	(*LocalLoginRequest)(nil),           // 2: lindm.auth.v1.LocalLoginRequest
+	(*LocalEnrollmentRequest)(nil),      // 3: lindm.auth.v1.LocalEnrollmentRequest
+	(*WebAuthnChallenge)(nil),           // 4: lindm.auth.v1.WebAuthnChallenge
+	(*WebAuthnFinishRequest)(nil),       // 5: lindm.auth.v1.WebAuthnFinishRequest
+	(*LocalAccount)(nil),                // 6: lindm.auth.v1.LocalAccount
+	(*ListAccountsResponse)(nil),        // 7: lindm.auth.v1.ListAccountsResponse
+	(*CreateAccountRequest)(nil),        // 8: lindm.auth.v1.CreateAccountRequest
+	(*UpdateAccountRequest)(nil),        // 9: lindm.auth.v1.UpdateAccountRequest
+	(*ResetAccountRequest)(nil),         // 10: lindm.auth.v1.ResetAccountRequest
+	(*AccountEnrollment)(nil),           // 11: lindm.auth.v1.AccountEnrollment
+	(*IdentitySettings)(nil),            // 12: lindm.auth.v1.IdentitySettings
+	(*RotateSCIMCredentialRequest)(nil), // 13: lindm.auth.v1.RotateSCIMCredentialRequest
+	(*SCIMCredential)(nil),              // 14: lindm.auth.v1.SCIMCredential
+	(*RoleBinding)(nil),                 // 15: lindm.auth.v1.RoleBinding
+	(*DeviceScope)(nil),                 // 16: lindm.auth.v1.DeviceScope
+	(*timestamppb.Timestamp)(nil),       // 17: google.protobuf.Timestamp
 }
 var file_lindm_auth_v1_auth_proto_depIdxs = []int32{
-	6,  // 0: lindm.auth.v1.ListAccountsResponse.accounts:type_name -> lindm.auth.v1.LocalAccount
-	12, // 1: lindm.auth.v1.AccountEnrollment.expires_at:type_name -> google.protobuf.Timestamp
-	2,  // [2:2] is the sub-list for method output_type
-	2,  // [2:2] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	15, // 0: lindm.auth.v1.SessionPrincipal.bindings:type_name -> lindm.auth.v1.RoleBinding
+	16, // 1: lindm.auth.v1.LocalAccount.scopes:type_name -> lindm.auth.v1.DeviceScope
+	6,  // 2: lindm.auth.v1.ListAccountsResponse.accounts:type_name -> lindm.auth.v1.LocalAccount
+	16, // 3: lindm.auth.v1.CreateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
+	16, // 4: lindm.auth.v1.UpdateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
+	17, // 5: lindm.auth.v1.AccountEnrollment.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 6: lindm.auth.v1.IdentitySettings.observed_at:type_name -> google.protobuf.Timestamp
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_lindm_auth_v1_auth_proto_init() }
@@ -883,13 +1199,14 @@ func file_lindm_auth_v1_auth_proto_init() {
 	if File_lindm_auth_v1_auth_proto != nil {
 		return
 	}
+	file_lindm_auth_v1_authorization_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_auth_v1_auth_proto_rawDesc), len(file_lindm_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

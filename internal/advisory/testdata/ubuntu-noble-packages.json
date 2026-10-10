@@ -1,0 +1,20 @@
+{
+  "packages": [
+    {
+      "name": "openssh-client",
+      "version": "1:9.6p1-3ubuntu13.19",
+      "architecture": "amd64",
+      "manager": "dpkg",
+      "source_name": "openssh",
+      "source_version": "1:9.6p1-3ubuntu13.19"
+    },
+    {
+      "name": "openssh-server",
+      "version": "1:9.6p1-3ubuntu13.19",
+      "architecture": "amd64",
+      "manager": "dpkg",
+      "source_name": "openssh",
+      "source_version": "1:9.6p1-3ubuntu13.19"
+    }
+  ]
+}

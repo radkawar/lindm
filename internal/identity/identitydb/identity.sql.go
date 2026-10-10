@@ -12,6 +12,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const advancePrincipalObservationFence = `-- name: AdvancePrincipalObservationFence :exec
+UPDATE principals
+SET lifecycle_not_before = GREATEST(lifecycle_not_before, $1::timestamptz)
+WHERE id = $2
+`
+
+type AdvancePrincipalObservationFenceParams struct {
+	ObservedAt pgtype.Timestamptz
+	ID         uuid.UUID
+}
+
+func (q *Queries) AdvancePrincipalObservationFence(ctx context.Context, arg AdvancePrincipalObservationFenceParams) error {
+	_, err := q.db.Exec(ctx, advancePrincipalObservationFence, arg.ObservedAt, arg.ID)
+	return err
+}
+
 const clearAuthFlowVerifier = `-- name: ClearAuthFlowVerifier :exec
 UPDATE auth_flows
 SET code_verifier = ''
@@ -90,6 +106,17 @@ func (q *Queries) DeleteStaleAuthFlows(ctx context.Context) error {
 	return err
 }
 
+const getAuthorizationPolicy = `-- name: GetAuthorizationPolicy :one
+SELECT digest FROM authorization_policy WHERE id = true
+`
+
+func (q *Queries) GetAuthorizationPolicy(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getAuthorizationPolicy)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
+}
+
 const getLineageByPrincipalID = `-- name: GetLineageByPrincipalID :one
 SELECT principal_id, broker_issuer, broker_subject, upstream_provider, upstream_subject,
   directory_connector, upstream_observed_at, created_at
@@ -140,7 +167,7 @@ func (q *Queries) GetLineageForUpdate(ctx context.Context, principalID uuid.UUID
 const getPrincipalByID = `-- name: GetPrincipalByID :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE id = $1
 `
@@ -161,6 +188,9 @@ func (q *Queries) GetPrincipalByID(ctx context.Context, id uuid.UUID) (Principal
 		&i.DirectoryObservedAt,
 		&i.AuthorizationVersion,
 		&i.AuthorizationRole,
+		&i.AuthorizationDigest,
+		&i.ServiceAccount,
+		&i.LifecycleNotBefore,
 	)
 	return i, err
 }
@@ -168,7 +198,7 @@ func (q *Queries) GetPrincipalByID(ctx context.Context, id uuid.UUID) (Principal
 const getPrincipalByIssuerSubject = `-- name: GetPrincipalByIssuerSubject :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE issuer = $1 AND subject = $2
 `
@@ -194,6 +224,9 @@ func (q *Queries) GetPrincipalByIssuerSubject(ctx context.Context, arg GetPrinci
 		&i.DirectoryObservedAt,
 		&i.AuthorizationVersion,
 		&i.AuthorizationRole,
+		&i.AuthorizationDigest,
+		&i.ServiceAccount,
+		&i.LifecycleNotBefore,
 	)
 	return i, err
 }
@@ -201,7 +234,7 @@ func (q *Queries) GetPrincipalByIssuerSubject(ctx context.Context, arg GetPrinci
 const getPrincipalForUpdate = `-- name: GetPrincipalForUpdate :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE id = $1
 FOR UPDATE
@@ -223,13 +256,16 @@ func (q *Queries) GetPrincipalForUpdate(ctx context.Context, id uuid.UUID) (Prin
 		&i.DirectoryObservedAt,
 		&i.AuthorizationVersion,
 		&i.AuthorizationRole,
+		&i.AuthorizationDigest,
+		&i.ServiceAccount,
+		&i.LifecycleNotBefore,
 	)
 	return i, err
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
 SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind
 FROM sessions
 WHERE token_hash = $1
 `
@@ -247,6 +283,7 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.RevokedAt,
 		&i.BreakGlass,
 		&i.IncidentReason,
+		&i.Kind,
 	)
 	return i, err
 }
@@ -388,6 +425,15 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 	return err
 }
 
+const invalidatePolicyAuthorizations = `-- name: InvalidatePolicyAuthorizations :exec
+UPDATE principals SET authorization_version = authorization_version + 1
+`
+
+func (q *Queries) InvalidatePolicyAuthorizations(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, invalidatePolicyAuthorizations)
+	return err
+}
+
 const listPrincipalGroupPaths = `-- name: ListPrincipalGroupPaths :many
 SELECT group_path
 FROM principal_groups
@@ -413,6 +459,28 @@ func (q *Queries) ListPrincipalGroupPaths(ctx context.Context, principalID uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAuthorizationPolicy = `-- name: LockAuthorizationPolicy :one
+SELECT digest FROM authorization_policy WHERE id = true FOR SHARE
+`
+
+func (q *Queries) LockAuthorizationPolicy(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, lockAuthorizationPolicy)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
+}
+
+const lockAuthorizationPolicyUpdate = `-- name: LockAuthorizationPolicyUpdate :one
+SELECT digest FROM authorization_policy WHERE id = true FOR UPDATE
+`
+
+func (q *Queries) LockAuthorizationPolicyUpdate(ctx context.Context) ([]byte, error) {
+	row := q.db.QueryRow(ctx, lockAuthorizationPolicyUpdate)
+	var digest []byte
+	err := row.Scan(&digest)
+	return digest, err
 }
 
 const lockDeploymentIdentity = `-- name: LockDeploymentIdentity :one
@@ -453,12 +521,18 @@ const pinOwnerRole = `-- name: PinOwnerRole :execrows
 UPDATE principals
 SET pinned_role = 'owner',
   authorization_version = authorization_version + CASE WHEN authorization_role = 'owner' THEN 0 ELSE 1 END,
-  authorization_role = 'owner'
-WHERE id = $1 AND pinned_role = ''
+  authorization_role = 'owner',
+  authorization_digest = $1
+WHERE id = $2 AND pinned_role = ''
 `
 
-func (q *Queries) PinOwnerRole(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, pinOwnerRole, id)
+type PinOwnerRoleParams struct {
+	AuthorizationDigest []byte
+	ID                  uuid.UUID
+}
+
+func (q *Queries) PinOwnerRole(ctx context.Context, arg PinOwnerRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, pinOwnerRole, arg.AuthorizationDigest, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -515,24 +589,40 @@ func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash []byte
 	return result.RowsAffected(), nil
 }
 
+const setAuthorizationPolicy = `-- name: SetAuthorizationPolicy :exec
+UPDATE authorization_policy SET digest = $1 WHERE id = true
+`
+
+func (q *Queries) SetAuthorizationPolicy(ctx context.Context, digest []byte) error {
+	_, err := q.db.Exec(ctx, setAuthorizationPolicy, digest)
+	return err
+}
+
 const setPrincipalAuthorization = `-- name: SetPrincipalAuthorization :one
 UPDATE principals
 SET authorization_role = $1,
+  authorization_digest = $2,
   authorization_version = authorization_version + 1
-WHERE id = $2
-  AND authorization_version = $3
-  AND authorization_role <> $1
+WHERE id = $3
+  AND authorization_version = $4
+  AND (authorization_role <> $1 OR authorization_digest <> $2)
 RETURNING authorization_version
 `
 
 type SetPrincipalAuthorizationParams struct {
-	AuthorizationRole string
-	ID                uuid.UUID
-	ExpectedVersion   int64
+	AuthorizationRole   string
+	AuthorizationDigest []byte
+	ID                  uuid.UUID
+	ExpectedVersion     int64
 }
 
 func (q *Queries) SetPrincipalAuthorization(ctx context.Context, arg SetPrincipalAuthorizationParams) (int64, error) {
-	row := q.db.QueryRow(ctx, setPrincipalAuthorization, arg.AuthorizationRole, arg.ID, arg.ExpectedVersion)
+	row := q.db.QueryRow(ctx, setPrincipalAuthorization,
+		arg.AuthorizationRole,
+		arg.AuthorizationDigest,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
 	var authorization_version int64
 	err := row.Scan(&authorization_version)
 	return authorization_version, err
@@ -541,13 +631,13 @@ func (q *Queries) SetPrincipalAuthorization(ctx context.Context, arg SetPrincipa
 const touchSession = `-- name: TouchSession :one
 UPDATE sessions
 SET last_seen_at = now(),
-  idle_expires_at = LEAST(absolute_expires_at, now() + interval '30 minutes')
+  idle_expires_at = LEAST(absolute_expires_at, now() + CASE WHEN kind = 'cli' THEN interval '15 minutes' ELSE interval '30 minutes' END)
 WHERE token_hash = $1
   AND revoked_at IS NULL
   AND idle_expires_at > now()
   AND absolute_expires_at > now()
 RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind
 `
 
 func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, error) {
@@ -563,6 +653,7 @@ func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, 
 		&i.RevokedAt,
 		&i.BreakGlass,
 		&i.IncidentReason,
+		&i.Kind,
 	)
 	return i, err
 }
@@ -644,7 +735,7 @@ ON CONFLICT (issuer, subject) DO UPDATE
 SET display_name = EXCLUDED.display_name
 RETURNING id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 `
 
 type UpsertPrincipalParams struct {
@@ -675,6 +766,9 @@ func (q *Queries) UpsertPrincipal(ctx context.Context, arg UpsertPrincipalParams
 		&i.DirectoryObservedAt,
 		&i.AuthorizationVersion,
 		&i.AuthorizationRole,
+		&i.AuthorizationDigest,
+		&i.ServiceAccount,
+		&i.LifecycleNotBefore,
 	)
 	return i, err
 }

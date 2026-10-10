@@ -1,0 +1,684 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Stable native identity, never a caller-selected device path. Providers require
+// all applicable identity facts to match before touching the exact signed target.
+message StorageTarget {
+  string luks_uuid = 1 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  string wwn = 2 [(buf.validate.field).string.max_len = 256];
+  string serial = 3 [(buf.validate.field).string.max_len = 256];
+  uint64 size_bytes = 4 [(buf.validate.field).uint64.gt = 0];
+  option (buf.validate.message).cel = {
+    id: "storage_target.identity"
+    message: "a stable storage identity is required"
+    expression: "this.luks_uuid != '' || this.wwn != '' || this.serial != ''"
+  };
+}
+message EscrowRotateAction {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  string escrow_key_id = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  // RSA public key encoded as PKIX DER; private custody remains on the server.
+  bytes escrow_public_key = 3 [(buf.validate.field).bytes = {
+    min_len: 256
+    max_len: 1024
+  }];
+  optional uint32 retire_keyslot = 4 [(buf.validate.field).uint32.lte = 31];
+  option (buf.validate.message).cel = {
+    id: "escrow_rotate.luks"
+    message: "rotation requires an exact LUKS UUID"
+    expression: "this.target.luks_uuid != ''"
+  };
+}
+message TPM2BindAction {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  repeated uint32 pcrs = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 24
+    unique: true
+    items: {
+      uint32: {lte: 23}
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "tpm2_bind.luks"
+    message: "binding requires an exact LUKS UUID"
+    expression: "this.target.luks_uuid != ''"
+  };
+}
+// Lock all graphical sessions through logind. Account selection is local-only;
+// root and the executor's protected accounts can never be selected.
+message LockSessionsAction {
+  bool terminate_sessions = 1;
+  repeated string usernames = 2 [(buf.validate.field).repeated = {
+    max_items: 128
+    unique: true
+    items: {
+      string: {pattern: "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"}
+    }
+  }];
+  bool all_human_accounts = 3;
+  option (buf.validate.message).cel = {
+    id: "lock_sessions.selection"
+    message: "select explicit usernames or all human accounts, not both"
+    expression: "!this.all_human_accounts || this.usernames.size() == 0"
+  };
+}
+// Restores only unchanged local accounts owned by this exact lock. Does not
+// unlock graphical screens or recreate terminated sessions.
+message ReleaseLockAction {
+  string lock_action_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+message QuarantineAction {
+  // Exact numeric IP endpoints retained for management, never shell fragments.
+  repeated string management_endpoints = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      string: {ip: true}
+    }
+  }];
+}
+message ReleaseQuarantineAction {
+  string quarantine_action_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+}
+enum CryptoEraseMode {
+  CRYPTO_ERASE_MODE_UNSPECIFIED = 0;
+  CRYPTO_ERASE_MODE_OFFLINE = 1;
+  CRYPTO_ERASE_MODE_LIVE_ROOT_HEADER = 2;
+}
+message CryptoEraseAction {
+  StorageTarget target = 1;
+  CryptoEraseMode mode = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated StorageTarget targets = 3 [(buf.validate.field).repeated.max_items = 8];
+  option (buf.validate.message).cel = {
+    id: "crypto_erase.scope"
+    message: "offline erasure selects one volume; live erasure freezes the complete encrypted volume set"
+    expression: "(this.mode == 1 && has(this.target) && this.target.luks_uuid != '' && this.targets.size() == 0) || (this.mode == 2 && !has(this.target) && this.targets.size() > 0 && this.targets.all(t, t.luks_uuid != '' && this.targets.filter(other, other.luks_uuid == t.luks_uuid).size() == 1))"
+  };
+}
+message CryptoEraseTargetPlan {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  bytes metadata_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  uint64 luks_header_bytes = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 134217728
+  }];
+  bool root_backing = 4;
+  bytes root_mapping_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+}
+message CryptoEraseTargetResult {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  uint64 header_bytes = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 134217728
+  }];
+  bool native_luks_erase = 3;
+  bool raw_zero_verified = 4;
+  bool metadata_absent = 5;
+  string evidence = 6 [(buf.validate.field).string.max_len = 256];
+}
+enum RecoveryBootMode {
+  RECOVERY_BOOT_MODE_UNSPECIFIED = 0;
+  RECOVERY_BOOT_MODE_UKI = 1;
+  RECOVERY_BOOT_MODE_KEXEC = 2;
+}
+message RecoveryBootSpec {
+  bytes image_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  RecoveryBootMode boot_mode = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // SHA256 of deterministic protobuf StorageTarget, never a native path.
+  bytes media_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+}
+enum SanitizeMethod {
+  SANITIZE_METHOD_UNSPECIFIED = 0;
+  SANITIZE_METHOD_OVERWRITE = 1;
+  SANITIZE_METHOD_DISCARD = 2;
+  SANITIZE_METHOD_NVME_FORMAT_USER_DATA = 3;
+  SANITIZE_METHOD_NVME_FORMAT_CRYPTO_ERASE = 4;
+  SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE = 5;
+  SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE = 6;
+}
+message NVMeSanitizeScope {
+  uint32 namespace_id = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 4294967294
+  }];
+  bool controller_wide = 2;
+}
+message NVMeSanitizePlan {
+  NVMeSanitizeScope scope = 1 [(buf.validate.field).required = true];
+  string controller_serial = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string controller_model = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string controller_firmware = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  uint32 controller_id = 5 [(buf.validate.field).uint32.lte = 65535];
+  uint32 oacs = 6 [(buf.validate.field).uint32.lte = 65535];
+  uint32 fna = 7 [(buf.validate.field).uint32.lte = 255];
+  uint32 sanicap = 8;
+  repeated uint32 allocated_namespace_ids = 9 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 256
+    unique: true
+    items: {
+      uint32: {
+        gte: 1
+        lte: 4294967294
+      }
+    }
+  }];
+  bytes identify_controller_sha256 = 10 [(buf.validate.field).bytes.len = 32];
+  // Canonical Identify Namespace bytes with NUSE[16:24] and FPI[32] cleared;
+  // allocation/progress counters cannot change the frozen native media scope.
+  bytes identify_namespace_sha256 = 11 [(buf.validate.field).bytes.len = 32];
+  bytes namespace_inventory_sha256 = 12 [(buf.validate.field).bytes.len = 32];
+}
+message NVMeSanitizeVerification {
+  NVMeSanitizePlan observed_scope = 1 [(buf.validate.field).required = true];
+  uint32 sanitize_status = 2 [(buf.validate.field).uint32.lte = 65535];
+  uint32 sanitize_progress = 3 [(buf.validate.field).uint32.lte = 65535];
+  uint32 sanitize_command_dword10 = 4;
+  bytes sample_sha256 = 5 [(buf.validate.field).bytes.max_len = 32];
+  uint32 samples_read = 6 [(buf.validate.field).uint32.lte = 257];
+  bool native_command_completed = 7;
+}
+message SanitizeAction {
+  StorageTarget target = 1 [(buf.validate.field).required = true];
+  SanitizeMethod method = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  // Presence selects the signed original-device recovery handoff. Absence
+  // retains qualified external/offline recovery execution.
+  RecoveryBootSpec recovery = 3;
+  NVMeSanitizeScope nvme_scope = 4;
+  option (buf.validate.message).cel = {
+    id: "sanitize.native_scope"
+    message: "native methods require exact namespace scope; generic methods cannot carry it"
+    expression: "(this.method >= 3) == has(this.nvme_scope)"
+  };
+  option (buf.validate.message).cel = {
+    id: "sanitize.unencrypted"
+    message: "sanitize targets unencrypted storage only"
+    expression: "this.target.luks_uuid == ''"
+  };
+}
+// Closed immutable action specification. No executable, command, script, path,
+// arbitrary native arguments, or generic extension map exists in this contract.
+message DeviceActionSpec {
+  oneof action {
+    option (buf.validate.oneof).required = true;
+    EscrowRotateAction escrow_rotate = 1;
+    TPM2BindAction tpm2_bind = 2;
+    LockSessionsAction lock_sessions = 3;
+    QuarantineAction quarantine = 4;
+    ReleaseQuarantineAction release_quarantine = 5;
+    CryptoEraseAction crypto_erase = 6;
+    SanitizeAction sanitize = 7;
+    ReleaseLockAction release_lock = 8;
+  }
+}
+// Public token inventory only: no native token blobs, sealed secrets or keys.
+message LUKSTokenObservation {
+  uint32 token_id = 1 [(buf.validate.field).uint32.lte = 31];
+  string type = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[A-Za-z0-9_.-]+$"
+  }];
+  repeated uint32 keyslots = 3 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      uint32: {lte: 31}
+    }
+  }];
+}
+message DeviceActionObservation {
+  google.protobuf.Timestamp observed_at = 1 [(buf.validate.field).required = true];
+  bool supported = 2;
+  string reason = 3 [(buf.validate.field).string.max_len = 256];
+  StorageTarget target = 4;
+  bool encrypted = 5;
+  bool tpm2_bound = 6;
+  bool sessions_locked = 7;
+  bool quarantined = 8;
+  bool recovery_environment = 9;
+  bool off_target_journal = 10;
+  repeated uint32 lindm_keyslots = 11 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      uint32: {lte: 31}
+    }
+  }];
+  bytes metadata_sha256 = 12 [(buf.validate.field).bytes.max_len = 32];
+  repeated uint32 occupied_keyslots = 13 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      uint32: {lte: 31}
+    }
+  }];
+  // Root-observed complete primary/secondary header and keyslot extent up to
+  // the first data offset; retained for verification after metadata destruction.
+  // Zero for non-LUKS targets. Never selected by the remote caller.
+  uint64 luks_header_bytes = 14 [(buf.validate.field).uint64.lte = 134217728];
+  repeated LUKSTokenObservation luks_tokens = 15 [(buf.validate.field).repeated.max_items = 32];
+  repeated CryptoEraseTargetPlan crypto_erase_targets = 16 [(buf.validate.field).repeated.max_items = 8];
+  NVMeSanitizePlan nvme_sanitize = 17;
+  // Public account names only. Shadow credentials never enter remote evidence.
+  repeated string disabled_accounts = 18 [(buf.validate.field).repeated.max_items = 128];
+  repeated string preserved_accounts = 19 [(buf.validate.field).repeated.max_items = 128];
+  option (buf.validate.message).cel = {
+    id: "device_action_observation.token_ids"
+    message: "native token IDs must be unique"
+    expression: "this.luks_tokens.all(t, this.luks_tokens.filter(other, other.token_id == t.token_id).size() == 1)"
+  };
+}
+message DeviceActionPlan {
+  DeviceActionSpec spec = 1 [(buf.validate.field).required = true];
+  DeviceActionObservation before = 2 [(buf.validate.field).required = true];
+  string action_id = 3 [(buf.validate.field).string.uuid = true];
+  RecoveryKeyBinding recovery_binding = 4;
+  repeated CryptoEraseTargetPlan crypto_erase_targets = 5 [(buf.validate.field).repeated.max_items = 8];
+}
+// RSA-OAEP-SHA256 ingress ciphertext; plaintext never enters the journal.
+message DeviceActionEscrow {
+  string escrow_key_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  bytes ciphertext = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  bytes recovery_key_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  uint32 new_keyslot = 4 [(buf.validate.field).uint32.lte = 31];
+  string luks_uuid = 5 [(buf.validate.field).string.uuid = true];
+  bytes metadata_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  uint32 token_id = 7 [(buf.validate.field).uint32.lte = 31];
+}
+message DeviceActionVerification {
+  bool verified = 1;
+  DeviceActionObservation after = 2 [(buf.validate.field).required = true];
+  string evidence = 3 [(buf.validate.field).string.max_len = 4096];
+  DeviceActionEscrow escrow = 4;
+  repeated CryptoEraseTargetResult crypto_erase_results = 5 [(buf.validate.field).repeated.max_items = 8];
+  NVMeSanitizeVerification nvme_sanitize = 6;
+  option (buf.validate.message).cel = {
+    id: "device_action_verification.nvme"
+    message: "verified native sanitize requires completed command and exact sampling evidence"
+    expression: "!this.verified || !has(this.nvme_sanitize) || (this.nvme_sanitize.native_command_completed && this.nvme_sanitize.samples_read == 257u && this.nvme_sanitize.sample_sha256.size() == 32)"
+  };
+}
+// Plan-role DSSE, preflight only. SHA256 is deterministic protobuf of spec.
+message DeviceActionIntent {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string action_id = 4 [(buf.validate.field).string.uuid = true];
+  string actor_id = 5 [(buf.validate.field).string.uuid = true];
+  uint64 action_sequence = 6 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 recovery_epoch = 7 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  uint64 root_version = 8 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 9 [(buf.validate.field).uint64.gt = 0];
+  uint64 authorization_version = 10 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  google.protobuf.Timestamp not_before = 11 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 12 [(buf.validate.field).required = true];
+  DeviceActionSpec spec = 13 [(buf.validate.field).required = true];
+  bytes spec_sha256 = 14 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "device_action_intent.validity"
+    message: "intent lifetime must be positive and at most fifteen minutes"
+    expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('900s')"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_intent.identity"
+    message: "identities must be nonzero"
+    expression: "[this.deployment_id,this.device_id,this.enrollment_generation,this.action_id,this.actor_id].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+}
+// Device-key proof, not execution authority; exact root-owned local deadline.
+message DeviceActionChallenge {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string action_id = 4 [(buf.validate.field).string.uuid = true];
+  uint64 action_sequence = 5 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 recovery_epoch = 6 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  bytes intent_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  bytes spec_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  bytes native_plan_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  bytes nonce = 10 [(buf.validate.field).bytes.len = 32];
+  string boot_id = 11 [(buf.validate.field).string.uuid = true];
+  string executor_incarnation = 12 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp issued_at = 13 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 14 [(buf.validate.field).required = true];
+  DeviceActionPlan native_plan = 15 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "device_action_challenge.validity"
+    message: "challenge lifetime must be positive and at most thirty seconds"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_challenge.identity"
+    message: "identities must be nonzero"
+    expression: "[this.deployment_id,this.device_id,this.enrollment_generation,this.action_id,this.boot_id,this.executor_incarnation].all(id, id != '00000000-0000-0000-0000-000000000000')"
+  };
+}
+// Exact immutable payload approved by two independently authorized humans.
+message DeviceActionApprovalBinding {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 2 [(buf.validate.field).string.uuid = true];
+  bytes spec_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+}
+message DeviceActionHumanApproval {
+  string actor_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 authorization_version = 2 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  DeviceActionApprovalBinding binding = 3 [(buf.validate.field).required = true];
+}
+message DeviceActionStartGrant {
+  DeviceActionChallenge challenge = 1 [(buf.validate.field).required = true];
+  string actor_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  uint64 authorization_version = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  uint64 root_version = 4 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 5 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp not_before = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 7 [(buf.validate.field).required = true];
+  repeated DeviceActionHumanApproval approvals = 8 [(buf.validate.field).repeated.max_items = 2];
+  option (buf.validate.message).cel = {
+    id: "device_action_start.validity"
+    message: "grant must fit challenge and thirty seconds"
+    expression: "this.expires_at > this.not_before && this.expires_at - this.not_before <= duration('30s') && this.expires_at <= this.challenge.expires_at"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_start.distinct"
+    message: "approvals require distinct humans"
+    expression: "this.approvals.all(a, this.approvals.filter(b, b.actor_id == a.actor_id).size() == 1)"
+  };
+}
+enum DeviceActionState {
+  DEVICE_ACTION_STATE_UNSPECIFIED = 0;
+  DEVICE_ACTION_STATE_PREPARED = 1;
+  DEVICE_ACTION_STATE_QUEUED = 2;
+  DEVICE_ACTION_STATE_RUNNING = 3;
+  DEVICE_ACTION_STATE_SUCCEEDED = 4;
+  DEVICE_ACTION_STATE_FAILED = 5;
+  DEVICE_ACTION_STATE_OUTCOME_UNKNOWN = 6;
+  DEVICE_ACTION_STATE_EXPIRED = 7;
+  DEVICE_ACTION_STATE_AWAITING_ESCROW = 8;
+  DEVICE_ACTION_STATE_RETIRING_ESCROW = 9;
+}
+enum DeviceActionFailure {
+  DEVICE_ACTION_FAILURE_UNSPECIFIED = 0;
+  DEVICE_ACTION_FAILURE_NONE = 1;
+  DEVICE_ACTION_FAILURE_PRECONDITION = 2;
+  DEVICE_ACTION_FAILURE_UNSUPPORTED = 3;
+  DEVICE_ACTION_FAILURE_NATIVE = 4;
+  DEVICE_ACTION_FAILURE_OBSERVATION = 5;
+  DEVICE_ACTION_FAILURE_AUTHORITY = 6;
+  DEVICE_ACTION_FAILURE_EXPIRED = 7;
+  DEVICE_ACTION_FAILURE_INTERRUPTED = 8;
+}
+message DeviceActionRecord {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  string installation_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes intent_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+  bytes intent_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  DeviceActionIntent intent = 5 [(buf.validate.field).required = true];
+  DeviceActionPlan native_plan = 6 [(buf.validate.field).required = true];
+  ExecutionRoot accepted_root = 7 [(buf.validate.field).required = true];
+  bytes accepted_delegation_envelope = 8 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  google.protobuf.Timestamp accepted_at = 9 [(buf.validate.field).required = true];
+  DeviceActionState state = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  DeviceActionFailure failure = 11 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  DeviceActionChallenge challenge = 12;
+  bytes challenge_proof = 13 [(buf.validate.field).bytes.max_len = 65536];
+  uint64 challenge_boottime_ns = 14 [(buf.validate.field).uint64.lte = 9223372036854775807];
+  bytes start_grant_envelope = 15 [(buf.validate.field).bytes.max_len = 65536];
+  bytes start_grant_sha256 = 16 [(buf.validate.field).bytes.max_len = 32];
+  google.protobuf.Timestamp started_at = 17;
+  google.protobuf.Timestamp completed_at = 18;
+  DeviceActionVerification verification = 19;
+  bytes challenge_certificate_pem = 20 [(buf.validate.field).bytes.max_len = 16384];
+  google.protobuf.Timestamp grant_accepted_at = 21;
+  bytes escrow_receipt_envelope = 22 [(buf.validate.field).bytes.max_len = 16384];
+  google.protobuf.Timestamp escrow_confirmed_at = 23;
+  ExecutionRoot receipt_root = 24;
+  bytes receipt_delegation_envelope = 25 [(buf.validate.field).bytes.max_len = 16384];
+  bytes handoff_proof = 26 [(buf.validate.field).bytes.max_len = 65536];
+  bytes recovery_credential_envelope = 27 [(buf.validate.field).bytes.max_len = 65536];
+  bytes recovery_boot_grant_envelope = 28 [(buf.validate.field).bytes.max_len = 65536];
+  bytes recovery_boot_grant_sha256 = 29 [(buf.validate.field).bytes.max_len = 32];
+  option (buf.validate.message).cel = {
+    id: "device_action_record.receipt"
+    message: "consumed receipt must retain its accepted trust snapshot"
+    expression: "(this.escrow_receipt_envelope.size() > 0) == has(this.escrow_confirmed_at) && has(this.escrow_confirmed_at) == has(this.receipt_root) && has(this.receipt_root) == (this.receipt_delegation_envelope.size() > 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_record.spec"
+    message: "native plan must match signed spec"
+    expression: "this.native_plan.spec == this.intent.spec"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_record.challenge"
+    message: "challenge evidence must be complete"
+    expression: "has(this.challenge) == (this.challenge_proof.size() > 0) && has(this.challenge) == (this.challenge_boottime_ns > 0u) && (has(this.challenge) ? this.challenge_certificate_pem.size() >= 64 : this.challenge_certificate_pem.size() == 0)"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_record.grant"
+    message: "one exact effect or boot grant must retain complete evidence"
+    expression: "(this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && this.recovery_boot_grant_envelope.size() == 0 && this.recovery_boot_grant_sha256.size() == 0 && !has(this.grant_accepted_at)) || (this.start_grant_envelope.size() > 0 && this.start_grant_sha256.size() == 32 && this.recovery_boot_grant_envelope.size() == 0 && this.recovery_boot_grant_sha256.size() == 0 && has(this.challenge) && has(this.grant_accepted_at)) || (this.recovery_boot_grant_envelope.size() > 0 && this.recovery_boot_grant_sha256.size() == 32 && this.start_grant_envelope.size() == 0 && this.start_grant_sha256.size() == 0 && has(this.challenge) && has(this.grant_accepted_at) && this.handoff_proof.size() > 0 && this.recovery_credential_envelope.size() > 0 && has(this.intent.spec.sanitize) && has(this.intent.spec.sanitize.recovery))"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_record.lifecycle"
+    message: "state must retain evidence"
+    expression: "((this.state <= 3 || this.state >= 8) == !has(this.completed_at)) && (this.state != 1 || (has(this.challenge) && !has(this.grant_accepted_at) && !has(this.started_at))) && (this.state != 2 || (has(this.grant_accepted_at) && !has(this.started_at))) && (this.state != 3 || (has(this.grant_accepted_at) && has(this.started_at))) && (this.state != 4 || (has(this.verification) && this.verification.verified)) && (this.state < 8 || (has(this.started_at) && has(this.verification) && has(this.verification.escrow))) && (this.state != 9 || (this.escrow_receipt_envelope.size() > 0 && has(this.escrow_confirmed_at)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_record.failure"
+    message: "pending or successful work cannot carry failure"
+    expression: "(this.state <= 4 || this.state >= 8) == (this.failure == 1)"
+  };
+}
+message DeviceActionStatus {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes intent_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  DeviceActionState state = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  DeviceActionFailure failure = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  google.protobuf.Timestamp accepted_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  DeviceActionObservation before = 8 [(buf.validate.field).required = true];
+  DeviceActionVerification verification = 9;
+  // Terminal evidence held only in executor memory after live-root metadata
+  // erasure; no claim that this result was committed to the destroyed journal.
+  bool volatile_result = 10;
+  // The live-root effect gate has consumed authority; only pinned-session
+  // reporting may continue. This may be true while RUNNING.
+  bool report_only = 11;
+  option (buf.validate.message).cel = {
+    id: "device_action_status.volatile"
+    message: "volatile evidence must be terminal"
+    expression: "!this.volatile_result || (has(this.started_at) && has(this.completed_at) && this.state >= 4 && this.state <= 7)"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_status.lifecycle"
+    message: "state must retain evidence"
+    expression: "((this.state <= 3 || this.state >= 8) == !has(this.completed_at)) && (this.state > 2 || !has(this.started_at)) && (this.state != 3 || has(this.started_at)) && (this.state != 4 || (has(this.verification) && this.verification.verified)) && (this.state < 8 || (has(this.started_at) && has(this.verification) && has(this.verification.escrow)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "device_action_status.failure"
+    message: "pending or successful work cannot carry failure"
+    expression: "(this.state <= 4 || this.state >= 8) == (this.failure == 1)"
+  };
+}
+message DeviceActionAttestation {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  uint64 session_epoch = 4 [(buf.validate.field).uint64.gt = 0];
+  uint64 action_revision = 5 [(buf.validate.field).uint64.gt = 0];
+  bytes nonce = 6 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp issued_at = 7 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 8 [(buf.validate.field).required = true];
+  DeviceActionStatus status = 9 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "device_action_attestation.validity"
+    message: "attestation lifetime must be positive and at most thirty seconds"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
+  };
+}
+// Start-role signed proof of committed ciphertext custody, not another start grant.
+// Hashes bind deterministic protobuf escrow and the original signed intent bytes.
+message DeviceActionEscrowReceipt {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 3 [(buf.validate.field).string.uuid = true];
+  string action_id = 4 [(buf.validate.field).string.uuid = true];
+  bytes intent_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  bytes escrow_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  bytes recovery_key_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  uint32 new_keyslot = 8 [(buf.validate.field).uint32.lte = 31];
+  string luks_uuid = 9 [(buf.validate.field).string.uuid = true];
+  string escrow_key_id = 10 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  google.protobuf.Timestamp stored_at = 11 [(buf.validate.field).required = true];
+  uint64 root_version = 12 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 13 [(buf.validate.field).uint64.gt = 0];
+}
+message PrepareDeviceActionRequest {
+  bytes intent_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+}
+message PrepareDeviceActionResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+  DeviceActionPlan native_plan = 2 [(buf.validate.field).required = true];
+  bytes challenge_proof = 3 [(buf.validate.field).bytes.max_len = 65536];
+}
+message StartDeviceActionRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes start_grant_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+message StartDeviceActionResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+}
+message GetDeviceActionRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetDeviceActionResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+}
+message AttestDeviceActionRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes nonce = 2 [(buf.validate.field).bytes.len = 32];
+}
+message AttestDeviceActionResponse {
+  bytes attestation_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ConfirmDeviceActionEscrowRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes receipt_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message ConfirmDeviceActionEscrowResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+}
+
+// Canonical deterministic protobuf OAEP label and server custody AAD.
+message RecoveryKeyBinding {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string enrollment_generation = 2 [(buf.validate.field).string.uuid = true];
+  string action_id = 3 [(buf.validate.field).string.uuid = true];
+  string luks_uuid = 4 [(buf.validate.field).string.uuid = true];
+  uint32 new_keyslot = 5 [(buf.validate.field).uint32.lte = 31];
+}
+// Root-only local operator upload; never persisted, logged or sent to the server.
+message SupplyDeviceActionCredentialRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes credential = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+message SupplyDeviceActionCredentialResponse {}

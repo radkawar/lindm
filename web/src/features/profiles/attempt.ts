@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ServiceProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
+import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
 import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";
 import { newRequestId } from "@/lib/ids";
 import type { RpcFailure } from "@/lib/errors";
@@ -14,9 +14,9 @@ export type PublishAttempt = {
   status: PublishStatus;
   failure: RpcFailure | null;
   conflict: boolean;
-  refreshedHead: ServiceProfileRevision | null;
+  refreshedHead: ProfileRevision | null;
   refreshFailure: RpcFailure | null;
-  published: ServiceProfileRevision | null;
+  published: ProfileRevision | null;
 };
 
 let attempts = new Map<string, PublishAttempt>();

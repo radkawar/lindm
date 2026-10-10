@@ -1,0 +1,136 @@
+Red Hat CSAF 2.0 advisory / VEX fixtures
+========================================
+
+Attribution: Red Hat, Inc., Red Hat Product Security. The unmodified JSON files
+include the vendor's Creative Commons Attribution 4.0 International terms:
+https://creativecommons.org/licenses/by/4.0/
+Original URLs below are the attribution/source links. Detached .asc signatures
+and .sha256 companions are retained verbatim alongside each document. These
+fixtures were acquired 2026-10-10; vendor generation dates can be newer than the
+original advisory publication dates. A pinned historical fixture is not evidence
+that a production advisory feed is current.
+
+Canonical source URLs and exact retained JSON SHA-256:
+
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_6783.json
+  Local: redhat-rhsa-2024_6783.json (66152 bytes)
+  a1b1b6751e159378b0ccf5a96c3e4ccee2d36e36dfd5de156e479a72274cbe92
+  OpenSSL CVE-2024-6119 fixed at 1:3.0.7-28.el9_4, not an upstream-only version
+  threshold. Platforms include BaseOS-9.4.0.Z.MAIN.EUS and
+  AppStream-9.4.0.Z.MAIN.EUS with enterprise_linux:9 CPEs.
+
+https://security.access.redhat.com/data/csaf/v2/vex/2024/cve-2024-6119.json
+  Local: redhat-cve-2024-6119.json (1988783 bytes)
+  a488c851437a9eb0616c3103787e1372e9cac1f3f7ea79ab2cadc7336c8f91be
+  Portfolio-wide VEX includes exact RHEL RPM fixes, bare affected and not-affected
+  RPM statuses, source RPMs, OCI content, and other non-host Red Hat products.
+
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_7846.json
+  Local: redhat-rhsa-2024_7846.json (72736 bytes)
+  2aa634dc4055d4966b63f5389bfbd46f0c554ba6abff9e994e4da660c14b8388
+  Genuine E4S 8.6 OpenSSL backport 1:1.1.1k-14.el8_6 for CVE-2024-5535.
+  Also includes AUS and TUS products, which are not selected as E4S.
+
+https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_1880.json
+  Local: redhat-rhsa-2024_1880.json (99800 bytes)
+  10fc03ff1284b4de59d03761b1d573c6028184b9ce1f7882554937c05be844bf
+  Genuine AppStream 8.8 EUS nodejs:18 module fixes; nodejs RPM epoch 1 and EVR
+  1:18.19.1-1.module+el8.8.0+21592+14a8b93e. The purl's rpmmod is
+  nodejs:18:8080020240322102042:63b34585. Includes CVE-2023-46809 and others.
+
+https://security.access.redhat.com/data/csaf/v2/vex/2024/cve-2024-21892.json
+  Local: redhat-cve-2024-21892.json (368420 bytes)
+  01061605d2ea43fe8c982e1e0a5092ee59edcc84ef52cad1c1de594f22dc43a8
+  Genuine nodejs module VEX with nodejs:16, :18 and :20 identities, standard and
+  EUS fixes and not-affected statuses. Module identities must not be collapsed.
+
+For each source URL, its exact companion URLs append .asc and .sha256.
+Provider metadata:
+https://security.access.redhat.com/data/csaf/v2/provider-metadata.json
+Vendor public key:
+https://security.access.redhat.com/data/97f5eac4.txt
+  Local test fixture: redhat-public-key.asc
+  SHA-256 bbf1e9fb75686377fec9ef675f6435f9d8441a5c8c580fe9f11ff0abf941b59a
+  Primary fingerprint 77E79ABE93673533ED09EBE2DCE3823597F5EAC4
+Production trust roots reside under keys/, not testdata. Detached verification
+and signature-time freshness are the signed transport's responsibility; parsing
+JSON alone never authenticates the publisher namespace.
+
+Normative semantics consulted
+----------------------------
+https://redhatproductsecurity.github.io/security-data-guidelines/csaf-vex/
+https://redhatproductsecurity.github.io/security-data-guidelines/cpe/
+https://redhatproductsecurity.github.io/security-data-guidelines/purl/
+https://redhatproductsecurity.github.io/security-data-guidelines/scanning-vendors/
+https://access.redhat.com/articles/5554431
+
+Selected product semantics implemented by redhat.go
+--------------------------------------------------
+* Distro must be native rhel, not Rocky, AlmaLinux, Fedora, or another RPM-
+  compatible distribution. Configuration supplies explicit standard/eus/e4s and
+  architecture. EUS and E4S require an exact major.minor release.
+* A product CPE under vendor Red Hat establishes platform applicability, reached
+  through a default_component_of relationship. A package display name or internal
+  Errata Tool product ID is not a substitute for that CPE.
+* Red Hat explicitly documents RHEL <=9 enterprise_linux major CPEs as spanning
+  the lifetime of the mainstream major release. Therefore standard 9.4 and 9.8
+  both use the enterprise_linux:9 fixed RPM range. MAIN.EUS is explicitly listed
+  among mainstream variants in the CPE guidelines: its .EUS suffix does NOT make
+  the RHSA-2024:6783 standard CPE into an EUS-only product. No package release
+  suffix such as el9_4 is used to guess a different product servicing stream.
+* enterprise_linux with a minor CPE (RHEL 10+) requires the exact configured
+  minor. rhel_eus / enterprise_linux_eus and rhel_e4s / enterprise_linux_e4s CPEs
+  require the exact selected minor and stream. AUS/TUS, UBI, SAP/layered products,
+  JBoss, OpenShift and OCI content are not interpreted as host RHEL applicability.
+  Recognized older channel suffixes are baseos, appstream, crb, server,
+  workstation, computenode and client; unsupported constraints remain excluded
+  under partial coverage, never a clean-product assertion.
+* Vendor guidance says xUS scanners must also consult the mainstream unfixed
+  CPE. A bare mainstream status cannot by itself prove that an arbitrary xUS
+  package remains affected after a backport. Such cross-stream statements are
+  retained as AssessmentUnknown, never an unbounded positive or not-affected
+  exemption. Only exact selected xUS fixes can reconcile that uncertainty. A
+  mainstream fixed EVR is not transplanted into an arbitrary xUS minor.
+* Only native pkg:rpm/redhat purls become host package records. Epoch defaults to
+  zero when omitted; nonzero epoch, decoded RPM version-release and architecture
+  must agree with the vendor's NEVRA name. Binary arch is exact (noarch applies
+  across architectures); source purls remain SourcePackage records and are not
+  guessed to be installed binaries. Matching a source row requires actual native
+  source inventory support in the consumer.
+* rpmmod gives name:stream or name:stream:version:context. The normalized key
+  retains module name and stream. A declared intermediate module relationship
+  is followed with a bounded traversal and checked against the RPM's rpmmod;
+  missing host module evidence does not authorize another stream's fix.
+* fixed creates a native RPM fixed-version boundary. known_affected without a
+  version is unfixed only within its established product; a versioned affected
+  purl is an exact affected-version interval. known_not_affected is explicitly
+  negative and a versioned negative is limited to that exact EVR.
+  under_investigation is AssessmentUnknown, not a positive vulnerability.
+* Before publishing, a bare affected/uncertain status for the same CVE, selected
+  platform, package, source/binary identity, module and matching architecture is
+  reconciled against exact fixes. The earliest fixed EVR is retained rather than
+  treating later fixed rebuilds as new vulnerability boundaries. Negative rows
+  never erase positive ranges. Combining advisory and VEX archives requires the
+  same reconciliation after both documents have been aggregated.
+* Unsupported relevant relationship/status constraints fail rather than silently
+  expanding applicability. Off-scope product documents are skipped in archives.
+  All output remains partial: neither one advisory, legacy VEX nor these weekly
+  snapshots prove completeness for unsupported coverage.
+
+Archive boundary
+----------------
+The caller verifies and stages each original compressed vendor archive before
+parsing. parseRedHatArchive streams tar.zst without extracting filesystem paths;
+32 MiB per JSON record, 250000 entries, 16 GiB total expanded bytes, 512 MiB zstd
+window/memory bound, and 500000 normalized records. Cancellation is checked at
+entry boundaries and compressed-reader calls. The archive parser does not renew
+freshness; the caller retains verified signature time and artifact provenance.
+Observed vendor URLs use advisories/archive_latest.txt and vex/archive_latest.txt
+under the CSAF v2 root, pointing to weekly csaf_advisories_YYYY-MM-DD.tar.zst and
+csaf_vex_YYYY-MM-DD.tar.zst. Older documents legitimately address products outside
+current RHEL: exclusion is not corruption and does not imply a clean inventory.
+
+Tests retain originals unchanged. In-memory derived mutations exercise conflicting
+bare/fixed statuses, unsupported relationships, publisher changes and malformed
+identity metadata; those mutations are not represented as vendor-authored data.
+No checks were executed by the parser implementation worker.

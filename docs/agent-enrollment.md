@@ -111,6 +111,132 @@ Software keys are reported as software keys. No TPM assurance is inferred from a
 machine having `/dev/tpm*`; TPM/non-exportability claims require their separate
 provider and physical qualification.
 
+### Unattended enrollment and approval
+
+Create a provisioning token in Enrollment with a bounded lifetime/use count and
+fixed metadata, groups and profile revisions. Its secret is displayed once; a lost
+issuance response cannot recover it from the server. Revoke and replace an
+unrecoverable secret instead of retrying with a different request ID blindly.
+Only a credential hash is retained. Tokens expire within 24 hours and permit at
+most 10,000 distinct reservations. Keep the first-boot seed and downloaded token
+file private; a short server lifetime is not forensic erasure of installer copies.
+
+After installing the verified agent and deployment bootstrap material, a
+root-owned first-boot service runs:
+
+```sh
+/usr/libexec/lindm/lindm-agent bootstrap \
+  -root /etc/lindm/execution-root.json \
+  -bundle /etc/lindm/bootstrap.dsse.json \
+  -provisioning-token-file /run/lindm/provisioning-token
+/usr/libexec/lindm/lindm-agent resume -wait-seconds 3600
+```
+
+The token file must be a protected root-only file, not an argument, environment
+value or image ingredient. The root executor persists one CSR/key/installation and
+transaction before submission. Resume proves that same key; an interrupted call
+does not allocate a second device or consume another token use. An initial
+successful bootstrap can mean `PENDING_APPROVAL`, not enrollment completion:
+bounded resume succeeds only after identity installation. On timeout inspect the
+pending state and use the same protected resume path; never discard the journal
+or generate a replacement key just to retry.
+
+Approval-required reservations appear in the existing approvals inbox and cannot
+authenticate as devices or execute assignments. An independently authorized human
+reviews the exact reservation; self-approval is denied. Rejection, expired
+authority and revoked provisioning credentials cannot be bypassed by old claims.
+
+### Offline-site file exchange
+
+The server must have current PLAN and START delegates explicitly authorized for
+`enrollment.offline.v1`; service-execution or TLS keys do not implicitly grant that
+capability. The device receives its independently trusted execution root and
+root-signed deployment bootstrap through the installation channel. In Enrollment,
+create an offline authorization for a provisioning token and the exact bootstrap
+root version/digest. The exported authorization contains no reusable token secret;
+it is still a sensitive, bounded enrollment capability. Validity is bounded by
+the token's remaining lifetime as well as signing authority, not merely the
+requested seven-day protocol maximum.
+
+Copy the authorization file to the device using protected media. All file inputs
+and outputs below are root-owned, mode 0600, bounded strict protobuf JSON:
+
+```sh
+/usr/libexec/lindm/lindm-agent offline-export \
+  -root /etc/lindm/execution-root.json \
+  -bundle /etc/lindm/bootstrap.dsse.json \
+  -file /root/offline-authorization.json \
+  -out /root/offline-request.json
+```
+
+The request includes a locally generated CSR and device-key-signed proof binding
+the deployment, protected installation, transaction, authorization digest, CSR
+digest and validity. Carry that request back to the console and import it. The
+normal reservation, max-use and approval rules apply. After approval, export the
+response for that same signed request and carry it to the device:
+
+```sh
+/usr/libexec/lindm/lindm-agent offline-import -file /root/offline-response.json
+```
+
+The response's authorized server signature, exact request/key binding, certificate
+chain and validity are checked before durable installation. The response cannot
+choose a new trust root or supply a private key. These device commands make no
+network request and do not require a reachable public service. They do not make
+the later device synchronization network optional: a local authorized site server
+is still needed for ongoing fleet management. If request export is interrupted,
+use `offline-export -resume -out /root/new-offline-request.json` to recover the
+same protected attempt; never initialize a different key to retry. Re-import
+after successful durable installation is rejected rather than resetting state.
+
+### Explicit reinstall and clone recovery
+
+Device detail's recovery action identifies the exact existing device and current
+generation; serial, hardware, MAC and TPM EK observations are evidence for the
+operator, not authenticators. Two-person approval produces a short-lived one-use
+recovery grant. On a clean installation, use the normal protected grant bootstrap
+path with a newly generated key. Consumption preserves the selected device ID,
+creates a new generation and retires every previous generation's certificates.
+An already used device key is rejected. The old journal is not reset by package
+remove/reinstall, and corrupt protected state is not repaired by an ordinary
+enrollment credential: retain incident evidence and follow the explicit approved
+reinstallation workflow.
+
+The same signed installation may acquire a new boot session from the current
+predecessor. A different signed installation or competing successor of a consumed
+predecessor instead puts both device and generation into recovery hold, including
+existing live sessions. Resolve that hold by approved generation replacement, not
+by merging devices with matching inventory or releasing an ambiguous old key.
+
+### Native unattended qualification
+
+The maintained command boots two fresh native guests for one max-uses-two token,
+checks real inventory and immutable preassignments, and requires an explicit
+exhaustion denial for a third valid new CSR. Approval mode also proves no device
+authority before an independent approval and then resumes the same reservation.
+Run each command with a new evidence output path:
+
+```sh
+artifacts/bin/lab vm enroll-unattended -repo . \
+  -manifest lab/images/ubuntu-noble-amd64.json \
+  -lindmd /absolute/path/lindmd -lab-binary /absolute/path/lab \
+  -record /private/new/ubuntu-unattended.json
+artifacts/bin/lab vm enroll-unattended -repo . \
+  -manifest lab/images/fedora-44-x86_64.json \
+  -lindmd /absolute/path/lindmd -lab-binary /absolute/path/lab \
+  -record /private/new/fedora-unattended.json
+```
+
+Repeat with `-approval-required` and a distinct evidence path. Prerequisites are
+KVM, QEMU, `qemu-img`, `cloud-localds`, the maintained native packaging/signing
+tools, pinned Go, current generated code/binaries, protected development trust
+and running PostgreSQL. Signed image acquisition needs a verified cache or access
+to the configured vendor sources. The lane uses an isolated database and dynamic
+listener ports, not Keycloak or shared `:18444`. Native guest observations are
+required; merely generating a seed or compiling the command is not qualification.
+The overall deadline is 60 minutes, with bounded boot, observation and approval
+waits; all run-owned resources are removed on failure or success.
+
 ### Execution-trust updates
 
 `execution_trust.proto` defines separate old/new quorum envelopes for each
@@ -215,8 +341,9 @@ slow storage from extending the grant. Durable commit and native submission are
 not OS-atomic: a scheduling interval remains between the final check and send.
 Started multi-effect work can outlive the grant; cancellation is not rollback.
 
-Actions retain verified success, failure, expiry, supersession or outcome unknown.
-Exact intent/grant retries return historical evidence without extending authority
+Actions retain verified success, failure, expiry, supersession or outcome unknown
+subject to the read-only retention window below. Exact retries of retained intents/grants
+return historical evidence without extending authority
 or repeating effects; conflicting reuse of an action UUID is rejected. Resource
 sequences only advance. Higher sequences can supersede prepared/queued work, never
 running work. Restart only observes previously running work: exact native convergence
@@ -232,8 +359,13 @@ Limits are 65,536 actions, 128 KiB per encoded record and
 a 256 MiB record budget. Each unfinished action reserves its entire 128 KiB allowance,
 including across restart; terminal records consume their actual size. New work is
 rejected at capacity, rather than accepting an effect whose outcome cannot fit.
+The newest 256 non-floor read-only successes and every current resource-floor record
+are retained. Older successful no-drift records without grants are pruned transactionally
+with admission, sequence-floor advancement and capacity accounting. Granted records
+and non-success outcomes are never removed by this policy. A pruned action's historical
+attestation is unavailable, but replay remains rejected by its retained sequence floor.
 These reservations do not guarantee physical disk availability. I/O failure holds
-execution and preserves the durable checkpoint; history is not silently evicted.
+execution and preserves the durable checkpoint; it never evicts protected outcomes.
 Malformed protected records, inconsistent floors/accounting or missing current
 schema enter recovery hold, never reconstruction from untrusted input.
 
@@ -576,6 +708,59 @@ Transport diagnostics use a descriptor-relative, no-symlink open: systemd's
 the network-owned final spool directory for diagnostics; mutable state and all
 ancestor checks retain their original ownership requirements.
 
+### Running the pinned Arch lane
+
+Use the same private development signer, but build explicitly with `-formats arch`.
+Arch packages contain `.PKGINFO`, `.MTREE` and `.BUILDINFO`, the shared systemd
+units/sysusers/tmpfiles, and a detached `.sig`. Each pacman sync database contains
+one version per package name, so publish separate initial and upgrade repositories:
+
+```sh
+for version in 0.1.0 0.1.1; do
+  artifacts/bin/lab packages build -repo . -version "$version" -formats arch \
+    -output "$work/$version" -signer-home "$work/key/package-signing-gnupg" \
+    -fingerprint "$FINGERPRINT" -development-key -record "$work/$version/build.json"
+  artifacts/bin/lab packages arch -output "$work/repo-$version" \
+    -signer-home "$work/key/package-signing-gnupg" \
+    -fingerprint "$FINGERPRINT" -development-key \
+    -record "$work/repo-$version/repository.json" \
+    "$work/$version/lindm-agent-$version-1-x86_64.pkg.tar.zst"
+done
+artifacts/bin/lab packages rejection-fixtures -arch \
+  -build "$work/0.1.0/build.json" -output "$work/rejections" \
+  -signer-home "$work/key/package-signing-gnupg" \
+  -fingerprint "$FINGERPRINT" -record "$work/rejections/fixtures.json"
+artifacts/bin/lab vm lifecycle -manifest lab/images/arch-20261001-x86_64.json \
+  -first-build "$work/0.1.0/build.json" -second-build "$work/0.1.1/build.json" \
+  -arch-first-repository "$work/repo-0.1.0/repository.json" \
+  -arch-second-repository "$work/repo-0.1.1/repository.json" \
+  -rejections "$work/rejections/fixtures.json" \
+  -public-key "$work/0.1.0/lindm-package-signing.asc" \
+  -fingerprint "$FINGERPRINT" -control-plane-trust -lindmd artifacts/bin/lindmd \
+  -allow-network -record "$work/arch-lifecycle.json"
+artifacts/bin/lab vm inspect -manifest lab/images/arch-20261001-x86_64.json \
+  -agent artifacts/bin/lindm-agent -allow-network -record "$work/arch-inspect.json"
+artifacts/bin/lab vm dispatch -manifest lab/images/arch-20261001-x86_64.json \
+  -repo . -lindmd artifacts/bin/lindmd -allow-network -record "$work/arch-dispatch.json"
+```
+
+The stock Arch image orders initial pacman keyring population and SSH after
+time synchronization. These connected commands explicitly permit user-mode
+egress for the vendor's first-boot services; the default lab network remains
+restricted. This is recorded as `user-egress`, not air-gap qualification, and
+does not change host networking or disable guest signature/time checks.
+Pass `-diagnostics DIR` only for private troubleshooting: a failed inspection can
+retain the complete raw host/package observation in a mode-0600 file there.
+These diagnostics are not the redacted `-record` qualification evidence.
+
+The guest trusts only the separately pinned development package key in an isolated
+pacman keyring and requires both package and database signatures. Removal retains
+protected identity/state and the system account; Arch has no separate DEB-style
+purge operation. These commands qualify only the recorded image/repository
+snapshot, architecture and exercised capabilities, not newer rolling snapshots,
+desktop sessions or whole-system update/rollback. See
+[rolling qualification semantics](verification.md#1-launch-platform-qualification).
+
 ### Running the control-plane authority lane
 
 Use a genuinely older installed package and a current second build, plus separately
@@ -585,6 +770,14 @@ lifecycle command above, using new output paths:
 ```sh
 -control-plane-trust -lindmd /absolute/path/to/lindmd
 ```
+
+Stamp the server with an actual release when building the laboratory executable,
+for example `go build -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0'
+-o /absolute/path/to/lindmd ./cmd/lindmd`. Unstamped development identities are
+not silently registered as supported releases. Both lifecycle modes use the normal
+authenticated release-management API to register the server's reported identity
+and the two actual signed package versions under test; no version is inferred from
+an image name. This also applies to the shared server used for signed service lanes.
 
 This mode is exclusive with `-execution-trust` and `-service-execution`. The lab
 creates a unique disposable PostgreSQL database and starts the real server on
@@ -622,28 +815,58 @@ artifacts/bin/lab vm dispatch \
   -lindmd artifacts/bin/lindmd -record "$HOME/.cache/dispatch-fedora.json"
 ```
 
+Allow both real five-minute reconcile intervals: each periodic wait has an
+eight-minute deadline, and the overall command has a 50-minute budget plus any
+`-hold` duration. An external runner should allow at least 55 minutes per guest
+plus that hold duration so owned cleanup and evidence writing can finish. Run
+the guests sequentially when sharing host VM capacity.
+
+Device revocation and cleanup use the normal two-human approval workflow. A
+separate test-owned Keycloak administrator is created and authenticated through
+code/PKCE only when the first tracked device needs revocation, then deleted at
+cleanup. Deferring that otherwise-unused session prevents long native scenarios
+from consuming its 30-minute idle lifetime before approval. No keepalive,
+authentication bypass or automatic mutation retry is introduced. The record
+includes the requester/approver IDs and exact approval.
+
 Use new record paths. This command builds the real agent into a development-signed
 RPM or signed APT archive using the lifecycle package path, installs it in an owned
 disposable guest, and starts a real isolated server/database with fresh online
 plan/start keys. The owner admits their offline-root-signed delegation through
 `UpdateExecutionAuthority`; no lab signer issues plans or start grants and no
 manual service-prepare/start commands are used. The guest imports trust and relays
-dispatch automatically. Fedora must remain SELinux Enforcing.
+dispatch automatically. Fedora and RHEL must remain SELinux Enforcing. RHEL
+manifests use the same RPM dispatch path; enabling that path is not evidence of
+a passing RHEL run.
 
 Before enrollment the lab installs an inert `labdispatch.service` fixture and
 checks its inactive/disabled baseline using independent `systemctl`. Profile
-revision 1 enables/starts it; revision 2 disables/stops it with a higher resource
-sequence. A further action remains open during a real server restart and must
-complete under the same action ID. Reassigning unchanged desired state must
-succeed without a start grant. Two further assignments must succeed with guest
+revision 1 enables/starts it. Assignments request `reconcile_interval_seconds=300`
+through the normal assignment API, and the returned interval must match.
+Without changing the initial assignment, the lane waits for a higher-sequence
+periodic successful check with `COMPLIANT` evidence, no start grant and no extra
+native start. It then runs guest `systemctl disable --now labdispatch.service`
+out of band, independently confirms inactive/disabled state, and waits for the
+next periodic action to observe that drift, obtain a start grant and finish with
+`DRIFT_REMEDIATED` evidence. Independent `systemctl` must again report
+active/enabled, with exactly one additional native start. Both checks require
+new action IDs, increasing sequences and fresh server verification/device
+observation timestamps; no assignment churn, shortened production timer or
+manual execution RPC triggers the rechecks.
+
+Revision 2 then disables/stops the unit with a higher resource sequence.
+A further action remains open during a real server restart and must complete
+under the same action ID. Reassigning unchanged desired state must succeed
+without a start grant. Two further assignments must succeed with guest
 network time disabled and its clock stepped first +90 seconds and then −90
 seconds relative to the host. Each case restores the guest clock and its original
 NTP setting. Certificate and admitted trust validity are never weakened.
 Revocation must deny another assignment, be observed by the automatic transport
 and leave native state unchanged. Each completion must contain verified device
 history, and remain in `recent_actions`.
-A persistent native start witness detects extra starts; timestamps, IDs,
-sequences, package/image/lab/server digests and native observations are recorded.
+A persistent native start witness detects extra starts; assignment intervals,
+periodic compliance snapshots, verification/observation timestamps, IDs, sequences,
+package/image/lab/server digests and native observations are recorded.
 Failed runs can also produce a record with `passed: false`; successful evidence
 is returned only after owned server/database/VM cleanup.
 
@@ -703,6 +926,16 @@ unit-definition fingerprint; changed preconditions prevent effects. Native job
 completion alone is not convergence. A submitted effect with lost/canceled
 observation remains uncertain, not implicitly canceled or rolled back.
 
+Job completion subscriptions use the pinned manager's sender, object path,
+interface and signal name, not bus-side argument filters. AlmaLinux 9's
+dbus-broker 28 accepts an `arg2` unit-name filter but incorrectly checks the
+first argument's type: `JobRemoved` (`uoss`) starts with an integer, so valid
+completion signals are dropped. This previously left completed services
+uncertain until the 90-second provider deadline. The provider checks the exact
+sender, job ID/path, canonical unit and result locally before re-observing
+convergence. This retains the existing authority, timeout and uncertainty rules
+without relaxing SELinux or retrying native effects.
+
 Legacy `.include` prefixes in fragments or drop-ins are unsupported: older native
 parsers can load files outside the definition set reported by systemd. Convert
 such definitions to native drop-ins before managing them. The bounded reader
@@ -748,6 +981,14 @@ native queries check outcomes and absence of effects after forged signature,
 plan-domain start, stale precondition, expired grant, same-boot restart and revoked
 delegation. Exact replay preserves terminal evidence.
 
+Failure assertions retain the complete public `ServiceExecutionStatus`, including
+before/verification observations and accepted/started/completed timestamps, rather
+than replacing it with a generic success mismatch. The packaged signed-service
+lane also collects a bounded action-UUID-filtered agent/executor journal tail.
+Only fixed nonsecret message-reason classifications, unit, numeric priority and
+timestamp fields are retained; all free-form message content and unrelated units
+are withheld. Empty matching history remains explicit absence, never a success.
+
 A slow sacrificial native job exposes `RUNNING`; the lab sends SIGKILL to the
 executor, not the target service. Read-only restart reconciliation preserves unknown
 outcome or verified convergence, while the target's stable native invocation ID
@@ -787,6 +1028,161 @@ Each coherent implementation slice receives real runtime proof, focused behavior
 regressions, independent review and separate corrective commits. G2 completion does
 not imply G3 policy execution, G4 sessions or any unrun release/hardware gate.
 
+## 7. Verified unattended agent-only updates
+
+P20/L08/L17 update execution is an explicit root-owned opt-in. Add an `updates`
+message to `/etc/lindm/executor.json`; preserve its other existing fields:
+
+```json
+{
+  "updates": {
+    "repository_url": "https://devices.example/updates",
+    "ring": "stable",
+    "poll_interval_seconds": 3600,
+    "manager": "NATIVE_UPDATE_MANAGER_APT"
+  }
+}
+```
+
+The repository endpoint must use the bootstrap transport CA. It is transport
+location, not release authority: the executor loads the separate release TUF root
+from its already authenticated protected bootstrap journal. There is no network
+trust-on-first-use or unsigned override. `manager` is one of APT, DNF, ZYPPER,
+or PACMAN, selected by the administrator for the native mutable OS. OSTree and
+NixOS are refused and require their distinct image/generation providers.
+Only the `lindm-agent` native package is eligible, never `lindmd`, `lindmctl`, an OS
+upgrade, or a transport-selected executable.
+
+The normal unprivileged `run` process polls without an operator command or a
+currently supported executable-plan session. Polling is independent of inventory
+and heartbeat scheduling. The executor's config determines its cadence
+(1–86,400 seconds; one second is for isolated lab rejection/expiry observation,
+not the recommended production interval). Absence of executor update config
+disables new admission. The network process uses protected connection CA material,
+rejects redirects and sends bounded HTTP range reads. `ExchangeAgentUpdate`
+accepts at most 256 KiB for one outstanding executor-generated request UUID,
+relative path, offset, and limit. The root process never performs HTTP transport.
+Both sides refuse updates in protected live-root report-only mode.
+
+The maintained TUF client checks role signatures, rotations, expiry, rollback
+high-water marks, catalog identity and compatibility before selecting a target.
+The installed stamped release and actual package architecture constrain selection;
+the signed catalog supplies an exact native package version as well as upstream
+`x.y.z`. Root streams at most 1 GiB into a protected staging file and rechecks its
+signed length/hash, product, native version and architecture before effects.
+Metadata/catalog transfers are separately bounded. An interrupted download is
+not an admitted native transaction.
+
+The immutable transaction records the earliest expiry of the catalog and complete
+verified TUF role chain. The helper checks it again immediately before its first
+native write, after dependency previews: a merely staged package cannot initiate
+an install after expiry. Past expiry, an already consumed transaction may repair
+only observed own-package effects (target database state, incomplete/absent state,
+or native payload divergence from the recorded exact predecessor). An intact
+predecessor is not proof of an interrupted install. An expired unstarted transaction
+is durably `rejected`; a later fresh signed selection may replace it without
+resetting installed-version high-water marks. Signed pause/rollout changes stop
+future selection; they do not claim to cancel an already started native transaction.
+
+Arch catalogs also bind the detached `.pkg.tar.zst.sig` as its own signed TUF target.
+The executor streams and verifies that bounded signature beside the package;
+Pacman's existing native signature/keyring policy is not disabled or replaced.
+
+### Native transaction and reboot recovery
+
+Protected state is under `/var/lib/lindm/executor/updates`:
+
+- `state.pb` is an atomic, fsynced protobuf checkpoint containing the installed
+  version high-water mark and immutable current transaction. Missing/corrupt
+  checkpoints in initialized state fail closed.
+- `tuf/` retains the verifier's protected metadata/version checkpoints.
+- `<transaction-uuid>/transaction.pb`, `agent.deb`/`agent.rpm`/
+  `agent.pkg.tar.zst`, and `helper` bind the exact admitted native transaction.
+  `helper` is a bounded copy of the known-current running executable, not a
+  path inside the package being unpacked. Its exact source SELinux executable
+  context is preserved on that single owned file; no permissive mode or broad
+  directory relabel is used.
+- `<transaction-uuid>/helper.pb` records the detached helper's `installing`,
+  `installed`, `rejected`, or `recovery_required` phase durably.
+
+Transaction staging retains the durable journal's current UUID, including its
+terminal recovery evidence, plus at most the next in-flight download during
+cutover. Before another download, superseded terminal transactions and abandoned
+pre-admission staging are reclaimed only with protected custody, an exclusive
+transaction lock, no active helper and no remaining persistent recovery unit/link.
+The new transaction's journal admission must be durable before the prior current
+UUID becomes reclaimable. Retirement first renames to `.retired-<uuid>` and fsyncs
+the parent; interrupted deletion can then resume without trusting partially
+removed receipts. Unresolved or ambiguous helper state and unsafe filesystem
+entries block new staging rather than deleting recovery material or accumulating
+unbounded packages. Neither reclamation nor unit cleanup removes another active
+transaction's recovery state.
+
+The executor records `staged` then `applying` before launching
+`lindm-agent-update-<transaction-uuid>.service` through systemd. This independently
+owned cgroup resides in `lindm-updates.slice` and has no `Requires`/`PartOf`
+relationship to executor/network services; native package scripts can stop or
+replace those services without killing it. The lab may apply a runtime-only I/O
+limit to that slice to observe the actual native transaction before power loss.
+Before native effects, the helper fsyncs the owned
+`/etc/systemd/system/lindm-agent-update-recovery.service` and its multi-user boot
+link. That service executes the preserved helper after a power loss, even if the
+installed binary is partially unpacked. `Type=exec` releases startup ordering
+after the recovery executable has started, avoiding a dependency deadlock when
+native post-install scripts synchronously restart the executor. The unit and
+owned link are removed after verified native completion or a proven unstarted,
+expired transaction's durable rejection.
+
+Both helper services use `PrivateNetwork=yes` and `RestrictAddressFamilies=AF_UNIX`.
+The helper additionally refuses to run in PID 1's network namespace. Native argv
+is fixed, not supplied by metadata or the network. APT uses an empty private cache,
+no source files/downloads/removals and a preview that refuses unrelated packages.
+DNF/Zypper disable repositories and weak/recommended dependencies; Pacman must
+resolve exactly the local agent target. Missing dependencies fail rather than
+silently installing unrelated content. Native signature policy remains in force.
+Zypper's local-install flags follow its
+[native command contract](https://manpages.opensuse.org/Tumbleweed/zypper/zypper.8.en.html).
+
+Recovery first observes the exact native installed package/version/architecture.
+Only the signed target or its recorded exact predecessor may be repaired.
+APT distinguishes fully installed from unpacked/half-configured states, configures
+only `lindm-agent`, and re-unpacks only its staged package if an interrupted unpack
+requires it. RPM recovery may reinstall the exact admitted package after observing
+its database state; it never treats a version row alone as completed scriptlets.
+Success additionally requires native payload verification, the exact installed
+executable version and a durable helper completion record. DPKG verification may
+report exit 1 for deliberate owner conffile edits (including update configuration);
+only strictly parsed conffile-only differences with no diagnostic stderr are
+accepted, and the installed database/executable checks still apply. Other payload
+differences, malformed output or operational failures cannot establish success.
+Unknown/failed state remains `recovery_required`; there is no blind downgrade or
+whole-system repair.
+Update admission and imperative action gates mutually exclude native effects,
+including unresolved consumed recovery-boot grants across executor restart.
+Disabling polling does not clear an unresolved update's destructive-action fence.
+
+### Runtime evidence for the native laboratory
+
+Root may run `/usr/libexec/lindm/lindm-agent update-status`. This reads
+`GetAgentUpdate` and emits protobuf JSON with `status.phase`, `version`,
+`transaction_id`, `reason`, `observed_at`, `attempt_started_at`,
+`attempt_finished_at`, `last_outcome`, and `last_metadata_at`.
+Attempt/metadata timestamps are persisted; a repeated old success is not fresh
+rejection evidence. Rejected refreshes retain the prior installed version and
+record a new `rejected` outcome. Acceptance/staging is never reported as installed.
+
+For the Ubuntu/Fedora VM lane, configure the explicit lab cadence, publish
+compatible signed N and N+1 packages, and wait for fresh native installed evidence.
+To test power-loss recovery, observe durable `installing` plus the actual apt/dnf
+process in the owned helper cgroup, then power-cycle the disposable guest. Merely
+interrupting a download does not establish native recovery. Preserve the package
+database status, helper/systemd journals, installed executable version, identity
+and protected checkpoints as evidence; Fedora must remain SELinux Enforcing.
+Expiry tests use actually elapsed signed timestamp expiry, not a fake guest clock.
+Tampered, mismatched, expired and downgraded targets must not change installed
+package state. These are runtime contracts and regression coverage, not claims
+that any unrun VM or physical platform gate passed.
+
 ## Research anchors
 
 - [DSSE specification and implementations](https://github.com/secure-systems-lab/dsse).
@@ -807,3 +1203,86 @@ go-tuf/v2 v2.4.2 are pinned and exercised by the bootstrap verifier and real
 development fixtures. Modernc SQLite v1.60.1 backs the protected journal and
 unprivileged spool through sqlc. Native packages use the host DEB/RPM tools;
 nFPM remains a researched candidate, not an adopted dependency.
+
+## Console enrollment operator flow
+
+The Enrollment page retains interactive one-use grants and adds separately bounded
+provisioning tokens. Issue a token with an expiry, maximum use count, approval
+requirement, labels/owner/typed attributes, static group IDs and an immutable service
+profile revision. The server validates current scope and assignment authority;
+entering a UUID does not grant authority. The paginated list exposes assignments,
+use count, issuer, expiry and revocation, never secrets. Revoking a token stops new
+redemptions and pending issuance, not already enrolled device credentials.
+
+Token issuance calls do not use a mutation/query cache. Secrets and generated
+installer inputs exist only in the issuing component until dismissal, navigation
+or authentication-lifetime teardown. Explicit downloads are the operator's
+sensitive copies; the browser uses a transient local Blob handle and immediately
+revokes it, never a credential-bearing network URL. A lost issuance response is
+not recoverable: retry the exact request to identify its token, revoke that token,
+and issue a replacement with a new request ID.
+
+The one-time result generates cloud-init, Kickstart, Ubuntu autoinstall, AutoYaST
+and NixOS integration fragments. These are merged into the operator's complete
+trusted installation configuration, not substituted for an OS installer. The
+signed agent package, its executor/network configuration and independently
+authenticated execution root/bootstrap bundle must already be installed. Commands
+use `/usr/libexec/lindm/lindm-agent` with the maintained `-root`, `-bundle` and
+`-provisioning-token-file` flags, never bearer arguments or environment variables.
+
+- Cloud-init writes the actual token as root:root mode 0600 and starts the installed
+  first-boot unit. Autoinstall delivers this through target `user-data`, not a
+  secret-bearing `curtin` command argument.
+- Kickstart and AutoYaST write a root-only token through a quoted, base64-encoded
+  heredoc. Encoding is not encryption. Their chroot hooks only enable the unit;
+  enrollment occurs on the target's first boot.
+- NixOS expressions never contain the token because the Nix store is readable.
+  Download the actual token file and deliver it to the target as a root-only file.
+  The module includes exact target-local `systemd-creds encrypt` commands and uses
+  `LoadCredentialEncrypted`; the operator supplies the verified agent derivation
+  and executor module. No undefined secret-store integration is implied.
+- The root unit executes bootstrap followed by `resume -wait-seconds 3600`, with a
+  bounded systemd timeout. It removes the plaintext or encrypted delivery file only
+  after successful installation. Pending approval is not reported as installed.
+  After resolving a timeout/transient error, restarting the unit retries the same
+  protected transaction/key; it never resets the journal.
+
+All generated seeds and browser downloads require controlled delivery and retention.
+Cloud-init/installer data sources may retain copies outside the installed token
+file; removing that file is not forensic erasure. Never bake credentials, journals,
+installation markers or keys into a reusable image. Remove delivered seed copies
+and revoke unused credentials within their bounded lifetime.
+
+Enrollment transactions expose pending, ready, rejected, expired and held lifecycle
+facts as returned by the server. The existing Approval inbox presents the exact
+pending-enrollment payload. A different authorized human approves or rejects;
+the original requester executes the approved payload. Current scope, expiry and
+no-self-approval remain server-enforced. The agent's bounded root resume installs
+only the identity-bound response after approval.
+
+Offline enrollment uses three strict protobuf-JSON files: authorization, device
+request and signed response. Issue authorization using a provisioning token and the
+authenticated bootstrap root version/digest. On the offline device, run
+`offline-export -root ROOT -bundle BUNDLE -file AUTHORIZATION -out REQUEST`.
+Import that request in the console, complete any approval in the inbox, and export
+the response using the same request file. Return it to the same installation and
+run `offline-import -file RESPONSE`. Interrupted request export uses
+`offline-export -resume -out REQUEST`. Files require root ownership and mode 0600;
+browser downloads do not enforce those permissions. No private key travels with
+the files, and signed response export is not proof of installation or first contact.
+
+Device detail's Encryption / Actions tab offers explicit reinstall/identity
+recovery, with a stronger hold warning when clones or divergent identity evidence
+are present. Retype the device ID and give independently verified linkage evidence
+to request a two-person approval bound to its current generation and revocation
+state. A changed generation or later revocation requires refresh and a new approval;
+earlier authorization cannot silently override that revocation. The requester
+executes the approved recovery payload in the inbox and receives a one-time grant
+for the selected device. Successful consumption retires all old-generation
+credentials. Hostname/serial/MAC/TPM hints never authorize merging, and the UI never
+offers blind release of the ambiguous old identity.
+
+This console slice adds generated-output regression coverage in
+`test/tooling/enrollment-snippets.test.mjs`. Its author did not run web checks,
+browser acceptance or native installer lanes; final integrated verification remains
+parent-owned. The snippets do not claim new native-package/platform qualification.

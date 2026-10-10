@@ -36,20 +36,74 @@ const (
 	// AdminServiceListDevicesProcedure is the fully-qualified name of the AdminService's ListDevices
 	// RPC.
 	AdminServiceListDevicesProcedure = "/lindm.admin.v1.AdminService/ListDevices"
+	// AdminServiceGetFleetSummaryProcedure is the fully-qualified name of the AdminService's
+	// GetFleetSummary RPC.
+	AdminServiceGetFleetSummaryProcedure = "/lindm.admin.v1.AdminService/GetFleetSummary"
 	// AdminServiceGetDeviceProcedure is the fully-qualified name of the AdminService's GetDevice RPC.
 	AdminServiceGetDeviceProcedure = "/lindm.admin.v1.AdminService/GetDevice"
 	// AdminServiceListDevicePackagesProcedure is the fully-qualified name of the AdminService's
 	// ListDevicePackages RPC.
 	AdminServiceListDevicePackagesProcedure = "/lindm.admin.v1.AdminService/ListDevicePackages"
+	// AdminServiceSetDeviceMetadataProcedure is the fully-qualified name of the AdminService's
+	// SetDeviceMetadata RPC.
+	AdminServiceSetDeviceMetadataProcedure = "/lindm.admin.v1.AdminService/SetDeviceMetadata"
+	// AdminServiceSetAttributeDefinitionProcedure is the fully-qualified name of the AdminService's
+	// SetAttributeDefinition RPC.
+	AdminServiceSetAttributeDefinitionProcedure = "/lindm.admin.v1.AdminService/SetAttributeDefinition"
+	// AdminServiceListAttributeDefinitionsProcedure is the fully-qualified name of the AdminService's
+	// ListAttributeDefinitions RPC.
+	AdminServiceListAttributeDefinitionsProcedure = "/lindm.admin.v1.AdminService/ListAttributeDefinitions"
+	// AdminServiceExportDevicesProcedure is the fully-qualified name of the AdminService's
+	// ExportDevices RPC.
+	AdminServiceExportDevicesProcedure = "/lindm.admin.v1.AdminService/ExportDevices"
 	// AdminServiceCreateEnrollmentGrantProcedure is the fully-qualified name of the AdminService's
 	// CreateEnrollmentGrant RPC.
 	AdminServiceCreateEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/CreateEnrollmentGrant"
 	// AdminServiceRevokeEnrollmentGrantProcedure is the fully-qualified name of the AdminService's
 	// RevokeEnrollmentGrant RPC.
 	AdminServiceRevokeEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/RevokeEnrollmentGrant"
+	// AdminServiceCreateProvisioningTokenProcedure is the fully-qualified name of the AdminService's
+	// CreateProvisioningToken RPC.
+	AdminServiceCreateProvisioningTokenProcedure = "/lindm.admin.v1.AdminService/CreateProvisioningToken"
+	// AdminServiceListProvisioningTokensProcedure is the fully-qualified name of the AdminService's
+	// ListProvisioningTokens RPC.
+	AdminServiceListProvisioningTokensProcedure = "/lindm.admin.v1.AdminService/ListProvisioningTokens"
+	// AdminServiceRevokeProvisioningTokenProcedure is the fully-qualified name of the AdminService's
+	// RevokeProvisioningToken RPC.
+	AdminServiceRevokeProvisioningTokenProcedure = "/lindm.admin.v1.AdminService/RevokeProvisioningToken"
+	// AdminServiceGetPendingEnrollmentsProcedure is the fully-qualified name of the AdminService's
+	// GetPendingEnrollments RPC.
+	AdminServiceGetPendingEnrollmentsProcedure = "/lindm.admin.v1.AdminService/GetPendingEnrollments"
+	// AdminServiceApprovePendingEnrollmentProcedure is the fully-qualified name of the AdminService's
+	// ApprovePendingEnrollment RPC.
+	AdminServiceApprovePendingEnrollmentProcedure = "/lindm.admin.v1.AdminService/ApprovePendingEnrollment"
+	// AdminServiceCreateRecoveryEnrollmentGrantProcedure is the fully-qualified name of the
+	// AdminService's CreateRecoveryEnrollmentGrant RPC.
+	AdminServiceCreateRecoveryEnrollmentGrantProcedure = "/lindm.admin.v1.AdminService/CreateRecoveryEnrollmentGrant"
+	// AdminServiceCreateOfflineEnrollmentAuthorizationProcedure is the fully-qualified name of the
+	// AdminService's CreateOfflineEnrollmentAuthorization RPC.
+	AdminServiceCreateOfflineEnrollmentAuthorizationProcedure = "/lindm.admin.v1.AdminService/CreateOfflineEnrollmentAuthorization"
+	// AdminServiceImportOfflineEnrollmentRequestProcedure is the fully-qualified name of the
+	// AdminService's ImportOfflineEnrollmentRequest RPC.
+	AdminServiceImportOfflineEnrollmentRequestProcedure = "/lindm.admin.v1.AdminService/ImportOfflineEnrollmentRequest"
+	// AdminServiceExportOfflineEnrollmentResponseProcedure is the fully-qualified name of the
+	// AdminService's ExportOfflineEnrollmentResponse RPC.
+	AdminServiceExportOfflineEnrollmentResponseProcedure = "/lindm.admin.v1.AdminService/ExportOfflineEnrollmentResponse"
 	// AdminServiceRevokeDeviceProcedure is the fully-qualified name of the AdminService's RevokeDevice
 	// RPC.
 	AdminServiceRevokeDeviceProcedure = "/lindm.admin.v1.AdminService/RevokeDevice"
+	// AdminServiceCreateApprovalProcedure is the fully-qualified name of the AdminService's
+	// CreateApproval RPC.
+	AdminServiceCreateApprovalProcedure = "/lindm.admin.v1.AdminService/CreateApproval"
+	// AdminServiceListApprovalsProcedure is the fully-qualified name of the AdminService's
+	// ListApprovals RPC.
+	AdminServiceListApprovalsProcedure = "/lindm.admin.v1.AdminService/ListApprovals"
+	// AdminServiceApproveApprovalProcedure is the fully-qualified name of the AdminService's
+	// ApproveApproval RPC.
+	AdminServiceApproveApprovalProcedure = "/lindm.admin.v1.AdminService/ApproveApproval"
+	// AdminServiceRejectApprovalProcedure is the fully-qualified name of the AdminService's
+	// RejectApproval RPC.
+	AdminServiceRejectApprovalProcedure = "/lindm.admin.v1.AdminService/RejectApproval"
 	// AdminServiceListAuditEventsProcedure is the fully-qualified name of the AdminService's
 	// ListAuditEvents RPC.
 	AdminServiceListAuditEventsProcedure = "/lindm.admin.v1.AdminService/ListAuditEvents"
@@ -59,39 +113,144 @@ const (
 	// AdminServiceUpdateExecutionAuthorityProcedure is the fully-qualified name of the AdminService's
 	// UpdateExecutionAuthority RPC.
 	AdminServiceUpdateExecutionAuthorityProcedure = "/lindm.admin.v1.AdminService/UpdateExecutionAuthority"
-	// AdminServicePublishServiceProfileRevisionProcedure is the fully-qualified name of the
-	// AdminService's PublishServiceProfileRevision RPC.
-	AdminServicePublishServiceProfileRevisionProcedure = "/lindm.admin.v1.AdminService/PublishServiceProfileRevision"
-	// AdminServiceGetServiceProfileRevisionProcedure is the fully-qualified name of the AdminService's
-	// GetServiceProfileRevision RPC.
-	AdminServiceGetServiceProfileRevisionProcedure = "/lindm.admin.v1.AdminService/GetServiceProfileRevision"
-	// AdminServiceListServiceProfilesProcedure is the fully-qualified name of the AdminService's
-	// ListServiceProfiles RPC.
-	AdminServiceListServiceProfilesProcedure = "/lindm.admin.v1.AdminService/ListServiceProfiles"
-	// AdminServiceSetServiceAssignmentProcedure is the fully-qualified name of the AdminService's
-	// SetServiceAssignment RPC.
-	AdminServiceSetServiceAssignmentProcedure = "/lindm.admin.v1.AdminService/SetServiceAssignment"
-	// AdminServiceGetDeviceServiceStateProcedure is the fully-qualified name of the AdminService's
-	// GetDeviceServiceState RPC.
-	AdminServiceGetDeviceServiceStateProcedure = "/lindm.admin.v1.AdminService/GetDeviceServiceState"
+	// AdminServicePublishProfileRevisionProcedure is the fully-qualified name of the AdminService's
+	// PublishProfileRevision RPC.
+	AdminServicePublishProfileRevisionProcedure = "/lindm.admin.v1.AdminService/PublishProfileRevision"
+	// AdminServiceGetProfileRevisionProcedure is the fully-qualified name of the AdminService's
+	// GetProfileRevision RPC.
+	AdminServiceGetProfileRevisionProcedure = "/lindm.admin.v1.AdminService/GetProfileRevision"
+	// AdminServiceListProfilesProcedure is the fully-qualified name of the AdminService's ListProfiles
+	// RPC.
+	AdminServiceListProfilesProcedure = "/lindm.admin.v1.AdminService/ListProfiles"
+	// AdminServiceSetResourceAssignmentProcedure is the fully-qualified name of the AdminService's
+	// SetResourceAssignment RPC.
+	AdminServiceSetResourceAssignmentProcedure = "/lindm.admin.v1.AdminService/SetResourceAssignment"
+	// AdminServiceGetDeviceResourceStateProcedure is the fully-qualified name of the AdminService's
+	// GetDeviceResourceState RPC.
+	AdminServiceGetDeviceResourceStateProcedure = "/lindm.admin.v1.AdminService/GetDeviceResourceState"
+	// AdminServicePutDynamicGroupProcedure is the fully-qualified name of the AdminService's
+	// PutDynamicGroup RPC.
+	AdminServicePutDynamicGroupProcedure = "/lindm.admin.v1.AdminService/PutDynamicGroup"
+	// AdminServiceGetDynamicGroupProcedure is the fully-qualified name of the AdminService's
+	// GetDynamicGroup RPC.
+	AdminServiceGetDynamicGroupProcedure = "/lindm.admin.v1.AdminService/GetDynamicGroup"
+	// AdminServiceListDynamicGroupsProcedure is the fully-qualified name of the AdminService's
+	// ListDynamicGroups RPC.
+	AdminServiceListDynamicGroupsProcedure = "/lindm.admin.v1.AdminService/ListDynamicGroups"
+	// AdminServicePutTargetAssignmentProcedure is the fully-qualified name of the AdminService's
+	// PutTargetAssignment RPC.
+	AdminServicePutTargetAssignmentProcedure = "/lindm.admin.v1.AdminService/PutTargetAssignment"
+	// AdminServiceListTargetAssignmentsProcedure is the fully-qualified name of the AdminService's
+	// ListTargetAssignments RPC.
+	AdminServiceListTargetAssignmentsProcedure = "/lindm.admin.v1.AdminService/ListTargetAssignments"
+	// AdminServicePreviewTargetAssignmentsProcedure is the fully-qualified name of the AdminService's
+	// PreviewTargetAssignments RPC.
+	AdminServicePreviewTargetAssignmentsProcedure = "/lindm.admin.v1.AdminService/PreviewTargetAssignments"
+	// AdminServiceActivateTargetPreviewProcedure is the fully-qualified name of the AdminService's
+	// ActivateTargetPreview RPC.
+	AdminServiceActivateTargetPreviewProcedure = "/lindm.admin.v1.AdminService/ActivateTargetPreview"
+	// AdminServicePutRolloutProcedure is the fully-qualified name of the AdminService's PutRollout RPC.
+	AdminServicePutRolloutProcedure = "/lindm.admin.v1.AdminService/PutRollout"
+	// AdminServiceControlRolloutProcedure is the fully-qualified name of the AdminService's
+	// ControlRollout RPC.
+	AdminServiceControlRolloutProcedure = "/lindm.admin.v1.AdminService/ControlRollout"
+	// AdminServiceListRolloutsProcedure is the fully-qualified name of the AdminService's ListRollouts
+	// RPC.
+	AdminServiceListRolloutsProcedure = "/lindm.admin.v1.AdminService/ListRollouts"
+	// AdminServiceCreateDeviceActionProcedure is the fully-qualified name of the AdminService's
+	// CreateDeviceAction RPC.
+	AdminServiceCreateDeviceActionProcedure = "/lindm.admin.v1.AdminService/CreateDeviceAction"
+	// AdminServiceGetDeviceActionsProcedure is the fully-qualified name of the AdminService's
+	// GetDeviceActions RPC.
+	AdminServiceGetDeviceActionsProcedure = "/lindm.admin.v1.AdminService/GetDeviceActions"
+	// AdminServiceGetDeviceActionProcedure is the fully-qualified name of the AdminService's
+	// GetDeviceAction RPC.
+	AdminServiceGetDeviceActionProcedure = "/lindm.admin.v1.AdminService/GetDeviceAction"
+	// AdminServiceGetDeviceEncryptionProcedure is the fully-qualified name of the AdminService's
+	// GetDeviceEncryption RPC.
+	AdminServiceGetDeviceEncryptionProcedure = "/lindm.admin.v1.AdminService/GetDeviceEncryption"
+	// AdminServiceRevealRecoveryKeyProcedure is the fully-qualified name of the AdminService's
+	// RevealRecoveryKey RPC.
+	AdminServiceRevealRecoveryKeyProcedure = "/lindm.admin.v1.AdminService/RevealRecoveryKey"
+	// AdminServiceListDeviceGroupsProcedure is the fully-qualified name of the AdminService's
+	// ListDeviceGroups RPC.
+	AdminServiceListDeviceGroupsProcedure = "/lindm.admin.v1.AdminService/ListDeviceGroups"
+	// AdminServiceSetDeviceGroupProcedure is the fully-qualified name of the AdminService's
+	// SetDeviceGroup RPC.
+	AdminServiceSetDeviceGroupProcedure = "/lindm.admin.v1.AdminService/SetDeviceGroup"
+	// AdminServiceDeleteDeviceGroupProcedure is the fully-qualified name of the AdminService's
+	// DeleteDeviceGroup RPC.
+	AdminServiceDeleteDeviceGroupProcedure = "/lindm.admin.v1.AdminService/DeleteDeviceGroup"
+	// AdminServiceListDeviceFindingsProcedure is the fully-qualified name of the AdminService's
+	// ListDeviceFindings RPC.
+	AdminServiceListDeviceFindingsProcedure = "/lindm.admin.v1.AdminService/ListDeviceFindings"
+	// AdminServiceListAdvisorySummaryProcedure is the fully-qualified name of the AdminService's
+	// ListAdvisorySummary RPC.
+	AdminServiceListAdvisorySummaryProcedure = "/lindm.admin.v1.AdminService/ListAdvisorySummary"
+	// AdminServiceListAdvisoryFeedsProcedure is the fully-qualified name of the AdminService's
+	// ListAdvisoryFeeds RPC.
+	AdminServiceListAdvisoryFeedsProcedure = "/lindm.admin.v1.AdminService/ListAdvisoryFeeds"
+	// AdminServiceAcceptAdvisoryFindingProcedure is the fully-qualified name of the AdminService's
+	// AcceptAdvisoryFinding RPC.
+	AdminServiceAcceptAdvisoryFindingProcedure = "/lindm.admin.v1.AdminService/AcceptAdvisoryFinding"
 )
 
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
 type AdminServiceClient interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
 	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
 	ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error)
+	SetDeviceMetadata(context.Context, *connect.Request[v1.SetDeviceMetadataRequest]) (*connect.Response[v1.SetDeviceMetadataResponse], error)
+	SetAttributeDefinition(context.Context, *connect.Request[v1.SetAttributeDefinitionRequest]) (*connect.Response[v1.SetAttributeDefinitionResponse], error)
+	ListAttributeDefinitions(context.Context, *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error)
+	ExportDevices(context.Context, *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
+	CreateProvisioningToken(context.Context, *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error)
+	ListProvisioningTokens(context.Context, *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error)
+	RevokeProvisioningToken(context.Context, *connect.Request[v1.RevokeProvisioningTokenRequest]) (*connect.Response[v1.RevokeProvisioningTokenResponse], error)
+	GetPendingEnrollments(context.Context, *connect.Request[v1.GetPendingEnrollmentsRequest]) (*connect.Response[v1.GetPendingEnrollmentsResponse], error)
+	ApprovePendingEnrollment(context.Context, *connect.Request[v1.ApprovePendingEnrollmentRequest]) (*connect.Response[v1.ApprovePendingEnrollmentResponse], error)
+	CreateRecoveryEnrollmentGrant(context.Context, *connect.Request[v1.CreateRecoveryEnrollmentGrantRequest]) (*connect.Response[v1.CreateRecoveryEnrollmentGrantResponse], error)
+	CreateOfflineEnrollmentAuthorization(context.Context, *connect.Request[v1.CreateOfflineEnrollmentAuthorizationRequest]) (*connect.Response[v1.CreateOfflineEnrollmentAuthorizationResponse], error)
+	ImportOfflineEnrollmentRequest(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequestRequest]) (*connect.Response[v1.ImportOfflineEnrollmentRequestResponse], error)
+	ExportOfflineEnrollmentResponse(context.Context, *connect.Request[v1.ExportOfflineEnrollmentResponseRequest]) (*connect.Response[v1.ExportOfflineEnrollmentResponseResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	CreateApproval(context.Context, *connect.Request[v1.CreateApprovalRequest]) (*connect.Response[v1.CreateApprovalResponse], error)
+	ListApprovals(context.Context, *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error)
+	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
+	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
-	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
-	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
-	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
-	SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error)
-	GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error)
+	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
+	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
+	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
+	SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error)
+	GetDeviceResourceState(context.Context, *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error)
+	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
+	GetDynamicGroup(context.Context, *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error)
+	ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error)
+	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
+	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
+	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
+	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
+	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
+	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
+	ListRollouts(context.Context, *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error)
+	CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error)
+	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
+	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
+	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
+	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
+	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
+	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
+	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
+	ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error)
+	ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error)
+	ListAdvisoryFeeds(context.Context, *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error)
+	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
 }
 
 // NewAdminServiceClient constructs a client for the lindm.admin.v1.AdminService service. By
@@ -111,6 +270,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("ListDevices")),
 			connect.WithClientOptions(opts...),
 		),
+		getFleetSummary: connect.NewClient[v1.GetFleetSummaryRequest, v1.GetFleetSummaryResponse](
+			httpClient,
+			baseURL+AdminServiceGetFleetSummaryProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetFleetSummary")),
+			connect.WithClientOptions(opts...),
+		),
 		getDevice: connect.NewClient[v1.GetDeviceRequest, v1.GetDeviceResponse](
 			httpClient,
 			baseURL+AdminServiceGetDeviceProcedure,
@@ -121,6 +286,30 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceListDevicePackagesProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("ListDevicePackages")),
+			connect.WithClientOptions(opts...),
+		),
+		setDeviceMetadata: connect.NewClient[v1.SetDeviceMetadataRequest, v1.SetDeviceMetadataResponse](
+			httpClient,
+			baseURL+AdminServiceSetDeviceMetadataProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetDeviceMetadata")),
+			connect.WithClientOptions(opts...),
+		),
+		setAttributeDefinition: connect.NewClient[v1.SetAttributeDefinitionRequest, v1.SetAttributeDefinitionResponse](
+			httpClient,
+			baseURL+AdminServiceSetAttributeDefinitionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetAttributeDefinition")),
+			connect.WithClientOptions(opts...),
+		),
+		listAttributeDefinitions: connect.NewClient[v1.ListAttributeDefinitionsRequest, v1.ListAttributeDefinitionsResponse](
+			httpClient,
+			baseURL+AdminServiceListAttributeDefinitionsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAttributeDefinitions")),
+			connect.WithClientOptions(opts...),
+		),
+		exportDevices: connect.NewClient[v1.ExportDevicesRequest, v1.ExportDevicesResponse](
+			httpClient,
+			baseURL+AdminServiceExportDevicesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ExportDevices")),
 			connect.WithClientOptions(opts...),
 		),
 		createEnrollmentGrant: connect.NewClient[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse](
@@ -135,10 +324,88 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("RevokeEnrollmentGrant")),
 			connect.WithClientOptions(opts...),
 		),
+		createProvisioningToken: connect.NewClient[v1.CreateProvisioningTokenRequest, v1.CreateProvisioningTokenResponse](
+			httpClient,
+			baseURL+AdminServiceCreateProvisioningTokenProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateProvisioningToken")),
+			connect.WithClientOptions(opts...),
+		),
+		listProvisioningTokens: connect.NewClient[v1.ListProvisioningTokensRequest, v1.ListProvisioningTokensResponse](
+			httpClient,
+			baseURL+AdminServiceListProvisioningTokensProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListProvisioningTokens")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeProvisioningToken: connect.NewClient[v1.RevokeProvisioningTokenRequest, v1.RevokeProvisioningTokenResponse](
+			httpClient,
+			baseURL+AdminServiceRevokeProvisioningTokenProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RevokeProvisioningToken")),
+			connect.WithClientOptions(opts...),
+		),
+		getPendingEnrollments: connect.NewClient[v1.GetPendingEnrollmentsRequest, v1.GetPendingEnrollmentsResponse](
+			httpClient,
+			baseURL+AdminServiceGetPendingEnrollmentsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetPendingEnrollments")),
+			connect.WithClientOptions(opts...),
+		),
+		approvePendingEnrollment: connect.NewClient[v1.ApprovePendingEnrollmentRequest, v1.ApprovePendingEnrollmentResponse](
+			httpClient,
+			baseURL+AdminServiceApprovePendingEnrollmentProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ApprovePendingEnrollment")),
+			connect.WithClientOptions(opts...),
+		),
+		createRecoveryEnrollmentGrant: connect.NewClient[v1.CreateRecoveryEnrollmentGrantRequest, v1.CreateRecoveryEnrollmentGrantResponse](
+			httpClient,
+			baseURL+AdminServiceCreateRecoveryEnrollmentGrantProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateRecoveryEnrollmentGrant")),
+			connect.WithClientOptions(opts...),
+		),
+		createOfflineEnrollmentAuthorization: connect.NewClient[v1.CreateOfflineEnrollmentAuthorizationRequest, v1.CreateOfflineEnrollmentAuthorizationResponse](
+			httpClient,
+			baseURL+AdminServiceCreateOfflineEnrollmentAuthorizationProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateOfflineEnrollmentAuthorization")),
+			connect.WithClientOptions(opts...),
+		),
+		importOfflineEnrollmentRequest: connect.NewClient[v1.ImportOfflineEnrollmentRequestRequest, v1.ImportOfflineEnrollmentRequestResponse](
+			httpClient,
+			baseURL+AdminServiceImportOfflineEnrollmentRequestProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ImportOfflineEnrollmentRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		exportOfflineEnrollmentResponse: connect.NewClient[v1.ExportOfflineEnrollmentResponseRequest, v1.ExportOfflineEnrollmentResponseResponse](
+			httpClient,
+			baseURL+AdminServiceExportOfflineEnrollmentResponseProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ExportOfflineEnrollmentResponse")),
+			connect.WithClientOptions(opts...),
+		),
 		revokeDevice: connect.NewClient[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse](
 			httpClient,
 			baseURL+AdminServiceRevokeDeviceProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("RevokeDevice")),
+			connect.WithClientOptions(opts...),
+		),
+		createApproval: connect.NewClient[v1.CreateApprovalRequest, v1.CreateApprovalResponse](
+			httpClient,
+			baseURL+AdminServiceCreateApprovalProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateApproval")),
+			connect.WithClientOptions(opts...),
+		),
+		listApprovals: connect.NewClient[v1.ListApprovalsRequest, v1.ListApprovalsResponse](
+			httpClient,
+			baseURL+AdminServiceListApprovalsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListApprovals")),
+			connect.WithClientOptions(opts...),
+		),
+		approveApproval: connect.NewClient[v1.ApproveApprovalRequest, v1.ApproveApprovalResponse](
+			httpClient,
+			baseURL+AdminServiceApproveApprovalProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ApproveApproval")),
+			connect.WithClientOptions(opts...),
+		),
+		rejectApproval: connect.NewClient[v1.RejectApprovalRequest, v1.RejectApprovalResponse](
+			httpClient,
+			baseURL+AdminServiceRejectApprovalProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RejectApproval")),
 			connect.WithClientOptions(opts...),
 		),
 		listAuditEvents: connect.NewClient[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse](
@@ -159,34 +426,166 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
 			connect.WithClientOptions(opts...),
 		),
-		publishServiceProfileRevision: connect.NewClient[v1.PublishServiceProfileRevisionRequest, v1.PublishServiceProfileRevisionResponse](
+		publishProfileRevision: connect.NewClient[v1.PublishProfileRevisionRequest, v1.PublishProfileRevisionResponse](
 			httpClient,
-			baseURL+AdminServicePublishServiceProfileRevisionProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("PublishServiceProfileRevision")),
+			baseURL+AdminServicePublishProfileRevisionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PublishProfileRevision")),
 			connect.WithClientOptions(opts...),
 		),
-		getServiceProfileRevision: connect.NewClient[v1.GetServiceProfileRevisionRequest, v1.GetServiceProfileRevisionResponse](
+		getProfileRevision: connect.NewClient[v1.GetProfileRevisionRequest, v1.GetProfileRevisionResponse](
 			httpClient,
-			baseURL+AdminServiceGetServiceProfileRevisionProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("GetServiceProfileRevision")),
+			baseURL+AdminServiceGetProfileRevisionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetProfileRevision")),
 			connect.WithClientOptions(opts...),
 		),
-		listServiceProfiles: connect.NewClient[v1.ListServiceProfilesRequest, v1.ListServiceProfilesResponse](
+		listProfiles: connect.NewClient[v1.ListProfilesRequest, v1.ListProfilesResponse](
 			httpClient,
-			baseURL+AdminServiceListServiceProfilesProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
+			baseURL+AdminServiceListProfilesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListProfiles")),
 			connect.WithClientOptions(opts...),
 		),
-		setServiceAssignment: connect.NewClient[v1.SetServiceAssignmentRequest, v1.SetServiceAssignmentResponse](
+		setResourceAssignment: connect.NewClient[v1.SetResourceAssignmentRequest, v1.SetResourceAssignmentResponse](
 			httpClient,
-			baseURL+AdminServiceSetServiceAssignmentProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("SetServiceAssignment")),
+			baseURL+AdminServiceSetResourceAssignmentProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetResourceAssignment")),
 			connect.WithClientOptions(opts...),
 		),
-		getDeviceServiceState: connect.NewClient[v1.GetDeviceServiceStateRequest, v1.GetDeviceServiceStateResponse](
+		getDeviceResourceState: connect.NewClient[v1.GetDeviceResourceStateRequest, v1.GetDeviceResourceStateResponse](
 			httpClient,
-			baseURL+AdminServiceGetDeviceServiceStateProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("GetDeviceServiceState")),
+			baseURL+AdminServiceGetDeviceResourceStateProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDeviceResourceState")),
+			connect.WithClientOptions(opts...),
+		),
+		putDynamicGroup: connect.NewClient[v1.PutDynamicGroupRequest, v1.PutDynamicGroupResponse](
+			httpClient,
+			baseURL+AdminServicePutDynamicGroupProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PutDynamicGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		getDynamicGroup: connect.NewClient[v1.GetDynamicGroupRequest, v1.GetDynamicGroupResponse](
+			httpClient,
+			baseURL+AdminServiceGetDynamicGroupProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDynamicGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		listDynamicGroups: connect.NewClient[v1.ListDynamicGroupsRequest, v1.ListDynamicGroupsResponse](
+			httpClient,
+			baseURL+AdminServiceListDynamicGroupsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDynamicGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		putTargetAssignment: connect.NewClient[v1.PutTargetAssignmentRequest, v1.PutTargetAssignmentResponse](
+			httpClient,
+			baseURL+AdminServicePutTargetAssignmentProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PutTargetAssignment")),
+			connect.WithClientOptions(opts...),
+		),
+		listTargetAssignments: connect.NewClient[v1.ListTargetAssignmentsRequest, v1.ListTargetAssignmentsResponse](
+			httpClient,
+			baseURL+AdminServiceListTargetAssignmentsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListTargetAssignments")),
+			connect.WithClientOptions(opts...),
+		),
+		previewTargetAssignments: connect.NewClient[v1.PreviewTargetAssignmentsRequest, v1.PreviewTargetAssignmentsResponse](
+			httpClient,
+			baseURL+AdminServicePreviewTargetAssignmentsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignments")),
+			connect.WithClientOptions(opts...),
+		),
+		activateTargetPreview: connect.NewClient[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse](
+			httpClient,
+			baseURL+AdminServiceActivateTargetPreviewProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ActivateTargetPreview")),
+			connect.WithClientOptions(opts...),
+		),
+		putRollout: connect.NewClient[v1.PutRolloutRequest, v1.PutRolloutResponse](
+			httpClient,
+			baseURL+AdminServicePutRolloutProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PutRollout")),
+			connect.WithClientOptions(opts...),
+		),
+		controlRollout: connect.NewClient[v1.ControlRolloutRequest, v1.ControlRolloutResponse](
+			httpClient,
+			baseURL+AdminServiceControlRolloutProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ControlRollout")),
+			connect.WithClientOptions(opts...),
+		),
+		listRollouts: connect.NewClient[v1.ListRolloutsRequest, v1.ListRolloutsResponse](
+			httpClient,
+			baseURL+AdminServiceListRolloutsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListRollouts")),
+			connect.WithClientOptions(opts...),
+		),
+		createDeviceAction: connect.NewClient[v1.CreateDeviceActionRequest, v1.CreateDeviceActionResponse](
+			httpClient,
+			baseURL+AdminServiceCreateDeviceActionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CreateDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceActions: connect.NewClient[v1.GetDeviceActionsRequest, v1.GetDeviceActionsResponse](
+			httpClient,
+			baseURL+AdminServiceGetDeviceActionsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDeviceActions")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceAction: connect.NewClient[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse](
+			httpClient,
+			baseURL+AdminServiceGetDeviceActionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceEncryption: connect.NewClient[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse](
+			httpClient,
+			baseURL+AdminServiceGetDeviceEncryptionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetDeviceEncryption")),
+			connect.WithClientOptions(opts...),
+		),
+		revealRecoveryKey: connect.NewClient[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse](
+			httpClient,
+			baseURL+AdminServiceRevealRecoveryKeyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RevealRecoveryKey")),
+			connect.WithClientOptions(opts...),
+		),
+		listDeviceGroups: connect.NewClient[v1.ListDeviceGroupsRequest, v1.ListDeviceGroupsResponse](
+			httpClient,
+			baseURL+AdminServiceListDeviceGroupsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDeviceGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		setDeviceGroup: connect.NewClient[v1.SetDeviceGroupRequest, v1.SetDeviceGroupResponse](
+			httpClient,
+			baseURL+AdminServiceSetDeviceGroupProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("SetDeviceGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteDeviceGroup: connect.NewClient[v1.DeleteDeviceGroupRequest, v1.DeleteDeviceGroupResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteDeviceGroupProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteDeviceGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		listDeviceFindings: connect.NewClient[v1.ListDeviceFindingsRequest, v1.ListDeviceFindingsResponse](
+			httpClient,
+			baseURL+AdminServiceListDeviceFindingsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListDeviceFindings")),
+			connect.WithClientOptions(opts...),
+		),
+		listAdvisorySummary: connect.NewClient[v1.ListAdvisorySummaryRequest, v1.ListAdvisorySummaryResponse](
+			httpClient,
+			baseURL+AdminServiceListAdvisorySummaryProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAdvisorySummary")),
+			connect.WithClientOptions(opts...),
+		),
+		listAdvisoryFeeds: connect.NewClient[v1.ListAdvisoryFeedsRequest, v1.ListAdvisoryFeedsResponse](
+			httpClient,
+			baseURL+AdminServiceListAdvisoryFeedsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAdvisoryFeeds")),
+			connect.WithClientOptions(opts...),
+		),
+		acceptAdvisoryFinding: connect.NewClient[v1.AcceptAdvisoryFindingRequest, v1.AcceptAdvisoryFindingResponse](
+			httpClient,
+			baseURL+AdminServiceAcceptAdvisoryFindingProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("AcceptAdvisoryFinding")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -194,25 +593,70 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
-	listDevices                   *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	getDevice                     *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
-	listDevicePackages            *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
-	createEnrollmentGrant         *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
-	revokeEnrollmentGrant         *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
-	revokeDevice                  *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
-	listAuditEvents               *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
-	getExecutionAuthority         *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
-	updateExecutionAuthority      *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
-	publishServiceProfileRevision *connect.Client[v1.PublishServiceProfileRevisionRequest, v1.PublishServiceProfileRevisionResponse]
-	getServiceProfileRevision     *connect.Client[v1.GetServiceProfileRevisionRequest, v1.GetServiceProfileRevisionResponse]
-	listServiceProfiles           *connect.Client[v1.ListServiceProfilesRequest, v1.ListServiceProfilesResponse]
-	setServiceAssignment          *connect.Client[v1.SetServiceAssignmentRequest, v1.SetServiceAssignmentResponse]
-	getDeviceServiceState         *connect.Client[v1.GetDeviceServiceStateRequest, v1.GetDeviceServiceStateResponse]
+	listDevices                          *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	getFleetSummary                      *connect.Client[v1.GetFleetSummaryRequest, v1.GetFleetSummaryResponse]
+	getDevice                            *connect.Client[v1.GetDeviceRequest, v1.GetDeviceResponse]
+	listDevicePackages                   *connect.Client[v1.ListDevicePackagesRequest, v1.ListDevicePackagesResponse]
+	setDeviceMetadata                    *connect.Client[v1.SetDeviceMetadataRequest, v1.SetDeviceMetadataResponse]
+	setAttributeDefinition               *connect.Client[v1.SetAttributeDefinitionRequest, v1.SetAttributeDefinitionResponse]
+	listAttributeDefinitions             *connect.Client[v1.ListAttributeDefinitionsRequest, v1.ListAttributeDefinitionsResponse]
+	exportDevices                        *connect.Client[v1.ExportDevicesRequest, v1.ExportDevicesResponse]
+	createEnrollmentGrant                *connect.Client[v1.CreateEnrollmentGrantRequest, v1.CreateEnrollmentGrantResponse]
+	revokeEnrollmentGrant                *connect.Client[v1.RevokeEnrollmentGrantRequest, v1.RevokeEnrollmentGrantResponse]
+	createProvisioningToken              *connect.Client[v1.CreateProvisioningTokenRequest, v1.CreateProvisioningTokenResponse]
+	listProvisioningTokens               *connect.Client[v1.ListProvisioningTokensRequest, v1.ListProvisioningTokensResponse]
+	revokeProvisioningToken              *connect.Client[v1.RevokeProvisioningTokenRequest, v1.RevokeProvisioningTokenResponse]
+	getPendingEnrollments                *connect.Client[v1.GetPendingEnrollmentsRequest, v1.GetPendingEnrollmentsResponse]
+	approvePendingEnrollment             *connect.Client[v1.ApprovePendingEnrollmentRequest, v1.ApprovePendingEnrollmentResponse]
+	createRecoveryEnrollmentGrant        *connect.Client[v1.CreateRecoveryEnrollmentGrantRequest, v1.CreateRecoveryEnrollmentGrantResponse]
+	createOfflineEnrollmentAuthorization *connect.Client[v1.CreateOfflineEnrollmentAuthorizationRequest, v1.CreateOfflineEnrollmentAuthorizationResponse]
+	importOfflineEnrollmentRequest       *connect.Client[v1.ImportOfflineEnrollmentRequestRequest, v1.ImportOfflineEnrollmentRequestResponse]
+	exportOfflineEnrollmentResponse      *connect.Client[v1.ExportOfflineEnrollmentResponseRequest, v1.ExportOfflineEnrollmentResponseResponse]
+	revokeDevice                         *connect.Client[v1.RevokeDeviceRequest, v1.RevokeDeviceResponse]
+	createApproval                       *connect.Client[v1.CreateApprovalRequest, v1.CreateApprovalResponse]
+	listApprovals                        *connect.Client[v1.ListApprovalsRequest, v1.ListApprovalsResponse]
+	approveApproval                      *connect.Client[v1.ApproveApprovalRequest, v1.ApproveApprovalResponse]
+	rejectApproval                       *connect.Client[v1.RejectApprovalRequest, v1.RejectApprovalResponse]
+	listAuditEvents                      *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	getExecutionAuthority                *connect.Client[v1.GetExecutionAuthorityRequest, v1.GetExecutionAuthorityResponse]
+	updateExecutionAuthority             *connect.Client[v1.UpdateExecutionAuthorityRequest, v1.UpdateExecutionAuthorityResponse]
+	publishProfileRevision               *connect.Client[v1.PublishProfileRevisionRequest, v1.PublishProfileRevisionResponse]
+	getProfileRevision                   *connect.Client[v1.GetProfileRevisionRequest, v1.GetProfileRevisionResponse]
+	listProfiles                         *connect.Client[v1.ListProfilesRequest, v1.ListProfilesResponse]
+	setResourceAssignment                *connect.Client[v1.SetResourceAssignmentRequest, v1.SetResourceAssignmentResponse]
+	getDeviceResourceState               *connect.Client[v1.GetDeviceResourceStateRequest, v1.GetDeviceResourceStateResponse]
+	putDynamicGroup                      *connect.Client[v1.PutDynamicGroupRequest, v1.PutDynamicGroupResponse]
+	getDynamicGroup                      *connect.Client[v1.GetDynamicGroupRequest, v1.GetDynamicGroupResponse]
+	listDynamicGroups                    *connect.Client[v1.ListDynamicGroupsRequest, v1.ListDynamicGroupsResponse]
+	putTargetAssignment                  *connect.Client[v1.PutTargetAssignmentRequest, v1.PutTargetAssignmentResponse]
+	listTargetAssignments                *connect.Client[v1.ListTargetAssignmentsRequest, v1.ListTargetAssignmentsResponse]
+	previewTargetAssignments             *connect.Client[v1.PreviewTargetAssignmentsRequest, v1.PreviewTargetAssignmentsResponse]
+	activateTargetPreview                *connect.Client[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse]
+	putRollout                           *connect.Client[v1.PutRolloutRequest, v1.PutRolloutResponse]
+	controlRollout                       *connect.Client[v1.ControlRolloutRequest, v1.ControlRolloutResponse]
+	listRollouts                         *connect.Client[v1.ListRolloutsRequest, v1.ListRolloutsResponse]
+	createDeviceAction                   *connect.Client[v1.CreateDeviceActionRequest, v1.CreateDeviceActionResponse]
+	getDeviceActions                     *connect.Client[v1.GetDeviceActionsRequest, v1.GetDeviceActionsResponse]
+	getDeviceAction                      *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
+	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
+	revealRecoveryKey                    *connect.Client[v1.RevealRecoveryKeyRequest, v1.RevealRecoveryKeyResponse]
+	listDeviceGroups                     *connect.Client[v1.ListDeviceGroupsRequest, v1.ListDeviceGroupsResponse]
+	setDeviceGroup                       *connect.Client[v1.SetDeviceGroupRequest, v1.SetDeviceGroupResponse]
+	deleteDeviceGroup                    *connect.Client[v1.DeleteDeviceGroupRequest, v1.DeleteDeviceGroupResponse]
+	listDeviceFindings                   *connect.Client[v1.ListDeviceFindingsRequest, v1.ListDeviceFindingsResponse]
+	listAdvisorySummary                  *connect.Client[v1.ListAdvisorySummaryRequest, v1.ListAdvisorySummaryResponse]
+	listAdvisoryFeeds                    *connect.Client[v1.ListAdvisoryFeedsRequest, v1.ListAdvisoryFeedsResponse]
+	acceptAdvisoryFinding                *connect.Client[v1.AcceptAdvisoryFindingRequest, v1.AcceptAdvisoryFindingResponse]
 }
 
 // ListDevices calls lindm.admin.v1.AdminService.ListDevices.
 func (c *adminServiceClient) ListDevices(ctx context.Context, req *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
 	return c.listDevices.CallUnary(ctx, req)
+}
+
+// GetFleetSummary calls lindm.admin.v1.AdminService.GetFleetSummary.
+func (c *adminServiceClient) GetFleetSummary(ctx context.Context, req *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error) {
+	return c.getFleetSummary.CallUnary(ctx, req)
 }
 
 // GetDevice calls lindm.admin.v1.AdminService.GetDevice.
@@ -225,6 +669,26 @@ func (c *adminServiceClient) ListDevicePackages(ctx context.Context, req *connec
 	return c.listDevicePackages.CallUnary(ctx, req)
 }
 
+// SetDeviceMetadata calls lindm.admin.v1.AdminService.SetDeviceMetadata.
+func (c *adminServiceClient) SetDeviceMetadata(ctx context.Context, req *connect.Request[v1.SetDeviceMetadataRequest]) (*connect.Response[v1.SetDeviceMetadataResponse], error) {
+	return c.setDeviceMetadata.CallUnary(ctx, req)
+}
+
+// SetAttributeDefinition calls lindm.admin.v1.AdminService.SetAttributeDefinition.
+func (c *adminServiceClient) SetAttributeDefinition(ctx context.Context, req *connect.Request[v1.SetAttributeDefinitionRequest]) (*connect.Response[v1.SetAttributeDefinitionResponse], error) {
+	return c.setAttributeDefinition.CallUnary(ctx, req)
+}
+
+// ListAttributeDefinitions calls lindm.admin.v1.AdminService.ListAttributeDefinitions.
+func (c *adminServiceClient) ListAttributeDefinitions(ctx context.Context, req *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error) {
+	return c.listAttributeDefinitions.CallUnary(ctx, req)
+}
+
+// ExportDevices calls lindm.admin.v1.AdminService.ExportDevices.
+func (c *adminServiceClient) ExportDevices(ctx context.Context, req *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error) {
+	return c.exportDevices.CallUnary(ctx, req)
+}
+
 // CreateEnrollmentGrant calls lindm.admin.v1.AdminService.CreateEnrollmentGrant.
 func (c *adminServiceClient) CreateEnrollmentGrant(ctx context.Context, req *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error) {
 	return c.createEnrollmentGrant.CallUnary(ctx, req)
@@ -235,9 +699,76 @@ func (c *adminServiceClient) RevokeEnrollmentGrant(ctx context.Context, req *con
 	return c.revokeEnrollmentGrant.CallUnary(ctx, req)
 }
 
+// CreateProvisioningToken calls lindm.admin.v1.AdminService.CreateProvisioningToken.
+func (c *adminServiceClient) CreateProvisioningToken(ctx context.Context, req *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error) {
+	return c.createProvisioningToken.CallUnary(ctx, req)
+}
+
+// ListProvisioningTokens calls lindm.admin.v1.AdminService.ListProvisioningTokens.
+func (c *adminServiceClient) ListProvisioningTokens(ctx context.Context, req *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error) {
+	return c.listProvisioningTokens.CallUnary(ctx, req)
+}
+
+// RevokeProvisioningToken calls lindm.admin.v1.AdminService.RevokeProvisioningToken.
+func (c *adminServiceClient) RevokeProvisioningToken(ctx context.Context, req *connect.Request[v1.RevokeProvisioningTokenRequest]) (*connect.Response[v1.RevokeProvisioningTokenResponse], error) {
+	return c.revokeProvisioningToken.CallUnary(ctx, req)
+}
+
+// GetPendingEnrollments calls lindm.admin.v1.AdminService.GetPendingEnrollments.
+func (c *adminServiceClient) GetPendingEnrollments(ctx context.Context, req *connect.Request[v1.GetPendingEnrollmentsRequest]) (*connect.Response[v1.GetPendingEnrollmentsResponse], error) {
+	return c.getPendingEnrollments.CallUnary(ctx, req)
+}
+
+// ApprovePendingEnrollment calls lindm.admin.v1.AdminService.ApprovePendingEnrollment.
+func (c *adminServiceClient) ApprovePendingEnrollment(ctx context.Context, req *connect.Request[v1.ApprovePendingEnrollmentRequest]) (*connect.Response[v1.ApprovePendingEnrollmentResponse], error) {
+	return c.approvePendingEnrollment.CallUnary(ctx, req)
+}
+
+// CreateRecoveryEnrollmentGrant calls lindm.admin.v1.AdminService.CreateRecoveryEnrollmentGrant.
+func (c *adminServiceClient) CreateRecoveryEnrollmentGrant(ctx context.Context, req *connect.Request[v1.CreateRecoveryEnrollmentGrantRequest]) (*connect.Response[v1.CreateRecoveryEnrollmentGrantResponse], error) {
+	return c.createRecoveryEnrollmentGrant.CallUnary(ctx, req)
+}
+
+// CreateOfflineEnrollmentAuthorization calls
+// lindm.admin.v1.AdminService.CreateOfflineEnrollmentAuthorization.
+func (c *adminServiceClient) CreateOfflineEnrollmentAuthorization(ctx context.Context, req *connect.Request[v1.CreateOfflineEnrollmentAuthorizationRequest]) (*connect.Response[v1.CreateOfflineEnrollmentAuthorizationResponse], error) {
+	return c.createOfflineEnrollmentAuthorization.CallUnary(ctx, req)
+}
+
+// ImportOfflineEnrollmentRequest calls lindm.admin.v1.AdminService.ImportOfflineEnrollmentRequest.
+func (c *adminServiceClient) ImportOfflineEnrollmentRequest(ctx context.Context, req *connect.Request[v1.ImportOfflineEnrollmentRequestRequest]) (*connect.Response[v1.ImportOfflineEnrollmentRequestResponse], error) {
+	return c.importOfflineEnrollmentRequest.CallUnary(ctx, req)
+}
+
+// ExportOfflineEnrollmentResponse calls
+// lindm.admin.v1.AdminService.ExportOfflineEnrollmentResponse.
+func (c *adminServiceClient) ExportOfflineEnrollmentResponse(ctx context.Context, req *connect.Request[v1.ExportOfflineEnrollmentResponseRequest]) (*connect.Response[v1.ExportOfflineEnrollmentResponseResponse], error) {
+	return c.exportOfflineEnrollmentResponse.CallUnary(ctx, req)
+}
+
 // RevokeDevice calls lindm.admin.v1.AdminService.RevokeDevice.
 func (c *adminServiceClient) RevokeDevice(ctx context.Context, req *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return c.revokeDevice.CallUnary(ctx, req)
+}
+
+// CreateApproval calls lindm.admin.v1.AdminService.CreateApproval.
+func (c *adminServiceClient) CreateApproval(ctx context.Context, req *connect.Request[v1.CreateApprovalRequest]) (*connect.Response[v1.CreateApprovalResponse], error) {
+	return c.createApproval.CallUnary(ctx, req)
+}
+
+// ListApprovals calls lindm.admin.v1.AdminService.ListApprovals.
+func (c *adminServiceClient) ListApprovals(ctx context.Context, req *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error) {
+	return c.listApprovals.CallUnary(ctx, req)
+}
+
+// ApproveApproval calls lindm.admin.v1.AdminService.ApproveApproval.
+func (c *adminServiceClient) ApproveApproval(ctx context.Context, req *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error) {
+	return c.approveApproval.CallUnary(ctx, req)
+}
+
+// RejectApproval calls lindm.admin.v1.AdminService.RejectApproval.
+func (c *adminServiceClient) RejectApproval(ctx context.Context, req *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error) {
+	return c.rejectApproval.CallUnary(ctx, req)
 }
 
 // ListAuditEvents calls lindm.admin.v1.AdminService.ListAuditEvents.
@@ -255,47 +786,197 @@ func (c *adminServiceClient) UpdateExecutionAuthority(ctx context.Context, req *
 	return c.updateExecutionAuthority.CallUnary(ctx, req)
 }
 
-// PublishServiceProfileRevision calls lindm.admin.v1.AdminService.PublishServiceProfileRevision.
-func (c *adminServiceClient) PublishServiceProfileRevision(ctx context.Context, req *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error) {
-	return c.publishServiceProfileRevision.CallUnary(ctx, req)
+// PublishProfileRevision calls lindm.admin.v1.AdminService.PublishProfileRevision.
+func (c *adminServiceClient) PublishProfileRevision(ctx context.Context, req *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error) {
+	return c.publishProfileRevision.CallUnary(ctx, req)
 }
 
-// GetServiceProfileRevision calls lindm.admin.v1.AdminService.GetServiceProfileRevision.
-func (c *adminServiceClient) GetServiceProfileRevision(ctx context.Context, req *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error) {
-	return c.getServiceProfileRevision.CallUnary(ctx, req)
+// GetProfileRevision calls lindm.admin.v1.AdminService.GetProfileRevision.
+func (c *adminServiceClient) GetProfileRevision(ctx context.Context, req *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error) {
+	return c.getProfileRevision.CallUnary(ctx, req)
 }
 
-// ListServiceProfiles calls lindm.admin.v1.AdminService.ListServiceProfiles.
-func (c *adminServiceClient) ListServiceProfiles(ctx context.Context, req *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error) {
-	return c.listServiceProfiles.CallUnary(ctx, req)
+// ListProfiles calls lindm.admin.v1.AdminService.ListProfiles.
+func (c *adminServiceClient) ListProfiles(ctx context.Context, req *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error) {
+	return c.listProfiles.CallUnary(ctx, req)
 }
 
-// SetServiceAssignment calls lindm.admin.v1.AdminService.SetServiceAssignment.
-func (c *adminServiceClient) SetServiceAssignment(ctx context.Context, req *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error) {
-	return c.setServiceAssignment.CallUnary(ctx, req)
+// SetResourceAssignment calls lindm.admin.v1.AdminService.SetResourceAssignment.
+func (c *adminServiceClient) SetResourceAssignment(ctx context.Context, req *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error) {
+	return c.setResourceAssignment.CallUnary(ctx, req)
 }
 
-// GetDeviceServiceState calls lindm.admin.v1.AdminService.GetDeviceServiceState.
-func (c *adminServiceClient) GetDeviceServiceState(ctx context.Context, req *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error) {
-	return c.getDeviceServiceState.CallUnary(ctx, req)
+// GetDeviceResourceState calls lindm.admin.v1.AdminService.GetDeviceResourceState.
+func (c *adminServiceClient) GetDeviceResourceState(ctx context.Context, req *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error) {
+	return c.getDeviceResourceState.CallUnary(ctx, req)
+}
+
+// PutDynamicGroup calls lindm.admin.v1.AdminService.PutDynamicGroup.
+func (c *adminServiceClient) PutDynamicGroup(ctx context.Context, req *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error) {
+	return c.putDynamicGroup.CallUnary(ctx, req)
+}
+
+// GetDynamicGroup calls lindm.admin.v1.AdminService.GetDynamicGroup.
+func (c *adminServiceClient) GetDynamicGroup(ctx context.Context, req *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error) {
+	return c.getDynamicGroup.CallUnary(ctx, req)
+}
+
+// ListDynamicGroups calls lindm.admin.v1.AdminService.ListDynamicGroups.
+func (c *adminServiceClient) ListDynamicGroups(ctx context.Context, req *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error) {
+	return c.listDynamicGroups.CallUnary(ctx, req)
+}
+
+// PutTargetAssignment calls lindm.admin.v1.AdminService.PutTargetAssignment.
+func (c *adminServiceClient) PutTargetAssignment(ctx context.Context, req *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error) {
+	return c.putTargetAssignment.CallUnary(ctx, req)
+}
+
+// ListTargetAssignments calls lindm.admin.v1.AdminService.ListTargetAssignments.
+func (c *adminServiceClient) ListTargetAssignments(ctx context.Context, req *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error) {
+	return c.listTargetAssignments.CallUnary(ctx, req)
+}
+
+// PreviewTargetAssignments calls lindm.admin.v1.AdminService.PreviewTargetAssignments.
+func (c *adminServiceClient) PreviewTargetAssignments(ctx context.Context, req *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error) {
+	return c.previewTargetAssignments.CallUnary(ctx, req)
+}
+
+// ActivateTargetPreview calls lindm.admin.v1.AdminService.ActivateTargetPreview.
+func (c *adminServiceClient) ActivateTargetPreview(ctx context.Context, req *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error) {
+	return c.activateTargetPreview.CallUnary(ctx, req)
+}
+
+// PutRollout calls lindm.admin.v1.AdminService.PutRollout.
+func (c *adminServiceClient) PutRollout(ctx context.Context, req *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error) {
+	return c.putRollout.CallUnary(ctx, req)
+}
+
+// ControlRollout calls lindm.admin.v1.AdminService.ControlRollout.
+func (c *adminServiceClient) ControlRollout(ctx context.Context, req *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error) {
+	return c.controlRollout.CallUnary(ctx, req)
+}
+
+// ListRollouts calls lindm.admin.v1.AdminService.ListRollouts.
+func (c *adminServiceClient) ListRollouts(ctx context.Context, req *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error) {
+	return c.listRollouts.CallUnary(ctx, req)
+}
+
+// CreateDeviceAction calls lindm.admin.v1.AdminService.CreateDeviceAction.
+func (c *adminServiceClient) CreateDeviceAction(ctx context.Context, req *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error) {
+	return c.createDeviceAction.CallUnary(ctx, req)
+}
+
+// GetDeviceActions calls lindm.admin.v1.AdminService.GetDeviceActions.
+func (c *adminServiceClient) GetDeviceActions(ctx context.Context, req *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error) {
+	return c.getDeviceActions.CallUnary(ctx, req)
+}
+
+// GetDeviceAction calls lindm.admin.v1.AdminService.GetDeviceAction.
+func (c *adminServiceClient) GetDeviceAction(ctx context.Context, req *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error) {
+	return c.getDeviceAction.CallUnary(ctx, req)
+}
+
+// GetDeviceEncryption calls lindm.admin.v1.AdminService.GetDeviceEncryption.
+func (c *adminServiceClient) GetDeviceEncryption(ctx context.Context, req *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error) {
+	return c.getDeviceEncryption.CallUnary(ctx, req)
+}
+
+// RevealRecoveryKey calls lindm.admin.v1.AdminService.RevealRecoveryKey.
+func (c *adminServiceClient) RevealRecoveryKey(ctx context.Context, req *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error) {
+	return c.revealRecoveryKey.CallUnary(ctx, req)
+}
+
+// ListDeviceGroups calls lindm.admin.v1.AdminService.ListDeviceGroups.
+func (c *adminServiceClient) ListDeviceGroups(ctx context.Context, req *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error) {
+	return c.listDeviceGroups.CallUnary(ctx, req)
+}
+
+// SetDeviceGroup calls lindm.admin.v1.AdminService.SetDeviceGroup.
+func (c *adminServiceClient) SetDeviceGroup(ctx context.Context, req *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error) {
+	return c.setDeviceGroup.CallUnary(ctx, req)
+}
+
+// DeleteDeviceGroup calls lindm.admin.v1.AdminService.DeleteDeviceGroup.
+func (c *adminServiceClient) DeleteDeviceGroup(ctx context.Context, req *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error) {
+	return c.deleteDeviceGroup.CallUnary(ctx, req)
+}
+
+// ListDeviceFindings calls lindm.admin.v1.AdminService.ListDeviceFindings.
+func (c *adminServiceClient) ListDeviceFindings(ctx context.Context, req *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error) {
+	return c.listDeviceFindings.CallUnary(ctx, req)
+}
+
+// ListAdvisorySummary calls lindm.admin.v1.AdminService.ListAdvisorySummary.
+func (c *adminServiceClient) ListAdvisorySummary(ctx context.Context, req *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error) {
+	return c.listAdvisorySummary.CallUnary(ctx, req)
+}
+
+// ListAdvisoryFeeds calls lindm.admin.v1.AdminService.ListAdvisoryFeeds.
+func (c *adminServiceClient) ListAdvisoryFeeds(ctx context.Context, req *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error) {
+	return c.listAdvisoryFeeds.CallUnary(ctx, req)
+}
+
+// AcceptAdvisoryFinding calls lindm.admin.v1.AdminService.AcceptAdvisoryFinding.
+func (c *adminServiceClient) AcceptAdvisoryFinding(ctx context.Context, req *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error) {
+	return c.acceptAdvisoryFinding.CallUnary(ctx, req)
 }
 
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
 	GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error)
 	ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error)
+	SetDeviceMetadata(context.Context, *connect.Request[v1.SetDeviceMetadataRequest]) (*connect.Response[v1.SetDeviceMetadataResponse], error)
+	SetAttributeDefinition(context.Context, *connect.Request[v1.SetAttributeDefinitionRequest]) (*connect.Response[v1.SetAttributeDefinitionResponse], error)
+	ListAttributeDefinitions(context.Context, *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error)
+	ExportDevices(context.Context, *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error)
 	CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error)
 	RevokeEnrollmentGrant(context.Context, *connect.Request[v1.RevokeEnrollmentGrantRequest]) (*connect.Response[v1.RevokeEnrollmentGrantResponse], error)
+	CreateProvisioningToken(context.Context, *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error)
+	ListProvisioningTokens(context.Context, *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error)
+	RevokeProvisioningToken(context.Context, *connect.Request[v1.RevokeProvisioningTokenRequest]) (*connect.Response[v1.RevokeProvisioningTokenResponse], error)
+	GetPendingEnrollments(context.Context, *connect.Request[v1.GetPendingEnrollmentsRequest]) (*connect.Response[v1.GetPendingEnrollmentsResponse], error)
+	ApprovePendingEnrollment(context.Context, *connect.Request[v1.ApprovePendingEnrollmentRequest]) (*connect.Response[v1.ApprovePendingEnrollmentResponse], error)
+	CreateRecoveryEnrollmentGrant(context.Context, *connect.Request[v1.CreateRecoveryEnrollmentGrantRequest]) (*connect.Response[v1.CreateRecoveryEnrollmentGrantResponse], error)
+	CreateOfflineEnrollmentAuthorization(context.Context, *connect.Request[v1.CreateOfflineEnrollmentAuthorizationRequest]) (*connect.Response[v1.CreateOfflineEnrollmentAuthorizationResponse], error)
+	ImportOfflineEnrollmentRequest(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequestRequest]) (*connect.Response[v1.ImportOfflineEnrollmentRequestResponse], error)
+	ExportOfflineEnrollmentResponse(context.Context, *connect.Request[v1.ExportOfflineEnrollmentResponseRequest]) (*connect.Response[v1.ExportOfflineEnrollmentResponseResponse], error)
 	RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error)
+	CreateApproval(context.Context, *connect.Request[v1.CreateApprovalRequest]) (*connect.Response[v1.CreateApprovalResponse], error)
+	ListApprovals(context.Context, *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error)
+	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
+	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	GetExecutionAuthority(context.Context, *connect.Request[v1.GetExecutionAuthorityRequest]) (*connect.Response[v1.GetExecutionAuthorityResponse], error)
 	UpdateExecutionAuthority(context.Context, *connect.Request[v1.UpdateExecutionAuthorityRequest]) (*connect.Response[v1.UpdateExecutionAuthorityResponse], error)
-	PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error)
-	GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error)
-	ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error)
-	SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error)
-	GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error)
+	PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error)
+	GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error)
+	ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error)
+	SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error)
+	GetDeviceResourceState(context.Context, *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error)
+	PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error)
+	GetDynamicGroup(context.Context, *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error)
+	ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error)
+	PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error)
+	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
+	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
+	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
+	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
+	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
+	ListRollouts(context.Context, *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error)
+	CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error)
+	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
+	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
+	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
+	RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error)
+	ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error)
+	SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error)
+	DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error)
+	ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error)
+	ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error)
+	ListAdvisoryFeeds(context.Context, *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error)
+	AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error)
 }
 
 // NewAdminServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -311,6 +992,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("ListDevices")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceGetFleetSummaryHandler := connect.NewUnaryHandler(
+		AdminServiceGetFleetSummaryProcedure,
+		svc.GetFleetSummary,
+		connect.WithSchema(adminServiceMethods.ByName("GetFleetSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetDeviceHandler := connect.NewUnaryHandler(
 		AdminServiceGetDeviceProcedure,
 		svc.GetDevice,
@@ -321,6 +1008,30 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceListDevicePackagesProcedure,
 		svc.ListDevicePackages,
 		connect.WithSchema(adminServiceMethods.ByName("ListDevicePackages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetDeviceMetadataHandler := connect.NewUnaryHandler(
+		AdminServiceSetDeviceMetadataProcedure,
+		svc.SetDeviceMetadata,
+		connect.WithSchema(adminServiceMethods.ByName("SetDeviceMetadata")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetAttributeDefinitionHandler := connect.NewUnaryHandler(
+		AdminServiceSetAttributeDefinitionProcedure,
+		svc.SetAttributeDefinition,
+		connect.WithSchema(adminServiceMethods.ByName("SetAttributeDefinition")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAttributeDefinitionsHandler := connect.NewUnaryHandler(
+		AdminServiceListAttributeDefinitionsProcedure,
+		svc.ListAttributeDefinitions,
+		connect.WithSchema(adminServiceMethods.ByName("ListAttributeDefinitions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceExportDevicesHandler := connect.NewUnaryHandler(
+		AdminServiceExportDevicesProcedure,
+		svc.ExportDevices,
+		connect.WithSchema(adminServiceMethods.ByName("ExportDevices")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceCreateEnrollmentGrantHandler := connect.NewUnaryHandler(
@@ -335,10 +1046,88 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("RevokeEnrollmentGrant")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceCreateProvisioningTokenHandler := connect.NewUnaryHandler(
+		AdminServiceCreateProvisioningTokenProcedure,
+		svc.CreateProvisioningToken,
+		connect.WithSchema(adminServiceMethods.ByName("CreateProvisioningToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListProvisioningTokensHandler := connect.NewUnaryHandler(
+		AdminServiceListProvisioningTokensProcedure,
+		svc.ListProvisioningTokens,
+		connect.WithSchema(adminServiceMethods.ByName("ListProvisioningTokens")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRevokeProvisioningTokenHandler := connect.NewUnaryHandler(
+		AdminServiceRevokeProvisioningTokenProcedure,
+		svc.RevokeProvisioningToken,
+		connect.WithSchema(adminServiceMethods.ByName("RevokeProvisioningToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetPendingEnrollmentsHandler := connect.NewUnaryHandler(
+		AdminServiceGetPendingEnrollmentsProcedure,
+		svc.GetPendingEnrollments,
+		connect.WithSchema(adminServiceMethods.ByName("GetPendingEnrollments")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceApprovePendingEnrollmentHandler := connect.NewUnaryHandler(
+		AdminServiceApprovePendingEnrollmentProcedure,
+		svc.ApprovePendingEnrollment,
+		connect.WithSchema(adminServiceMethods.ByName("ApprovePendingEnrollment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceCreateRecoveryEnrollmentGrantHandler := connect.NewUnaryHandler(
+		AdminServiceCreateRecoveryEnrollmentGrantProcedure,
+		svc.CreateRecoveryEnrollmentGrant,
+		connect.WithSchema(adminServiceMethods.ByName("CreateRecoveryEnrollmentGrant")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceCreateOfflineEnrollmentAuthorizationHandler := connect.NewUnaryHandler(
+		AdminServiceCreateOfflineEnrollmentAuthorizationProcedure,
+		svc.CreateOfflineEnrollmentAuthorization,
+		connect.WithSchema(adminServiceMethods.ByName("CreateOfflineEnrollmentAuthorization")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceImportOfflineEnrollmentRequestHandler := connect.NewUnaryHandler(
+		AdminServiceImportOfflineEnrollmentRequestProcedure,
+		svc.ImportOfflineEnrollmentRequest,
+		connect.WithSchema(adminServiceMethods.ByName("ImportOfflineEnrollmentRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceExportOfflineEnrollmentResponseHandler := connect.NewUnaryHandler(
+		AdminServiceExportOfflineEnrollmentResponseProcedure,
+		svc.ExportOfflineEnrollmentResponse,
+		connect.WithSchema(adminServiceMethods.ByName("ExportOfflineEnrollmentResponse")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceRevokeDeviceHandler := connect.NewUnaryHandler(
 		AdminServiceRevokeDeviceProcedure,
 		svc.RevokeDevice,
 		connect.WithSchema(adminServiceMethods.ByName("RevokeDevice")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceCreateApprovalHandler := connect.NewUnaryHandler(
+		AdminServiceCreateApprovalProcedure,
+		svc.CreateApproval,
+		connect.WithSchema(adminServiceMethods.ByName("CreateApproval")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListApprovalsHandler := connect.NewUnaryHandler(
+		AdminServiceListApprovalsProcedure,
+		svc.ListApprovals,
+		connect.WithSchema(adminServiceMethods.ByName("ListApprovals")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceApproveApprovalHandler := connect.NewUnaryHandler(
+		AdminServiceApproveApprovalProcedure,
+		svc.ApproveApproval,
+		connect.WithSchema(adminServiceMethods.ByName("ApproveApproval")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRejectApprovalHandler := connect.NewUnaryHandler(
+		AdminServiceRejectApprovalProcedure,
+		svc.RejectApproval,
+		connect.WithSchema(adminServiceMethods.ByName("RejectApproval")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceListAuditEventsHandler := connect.NewUnaryHandler(
@@ -359,66 +1148,278 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("UpdateExecutionAuthority")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServicePublishServiceProfileRevisionHandler := connect.NewUnaryHandler(
-		AdminServicePublishServiceProfileRevisionProcedure,
-		svc.PublishServiceProfileRevision,
-		connect.WithSchema(adminServiceMethods.ByName("PublishServiceProfileRevision")),
+	adminServicePublishProfileRevisionHandler := connect.NewUnaryHandler(
+		AdminServicePublishProfileRevisionProcedure,
+		svc.PublishProfileRevision,
+		connect.WithSchema(adminServiceMethods.ByName("PublishProfileRevision")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceGetServiceProfileRevisionHandler := connect.NewUnaryHandler(
-		AdminServiceGetServiceProfileRevisionProcedure,
-		svc.GetServiceProfileRevision,
-		connect.WithSchema(adminServiceMethods.ByName("GetServiceProfileRevision")),
+	adminServiceGetProfileRevisionHandler := connect.NewUnaryHandler(
+		AdminServiceGetProfileRevisionProcedure,
+		svc.GetProfileRevision,
+		connect.WithSchema(adminServiceMethods.ByName("GetProfileRevision")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceListServiceProfilesHandler := connect.NewUnaryHandler(
-		AdminServiceListServiceProfilesProcedure,
-		svc.ListServiceProfiles,
-		connect.WithSchema(adminServiceMethods.ByName("ListServiceProfiles")),
+	adminServiceListProfilesHandler := connect.NewUnaryHandler(
+		AdminServiceListProfilesProcedure,
+		svc.ListProfiles,
+		connect.WithSchema(adminServiceMethods.ByName("ListProfiles")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceSetServiceAssignmentHandler := connect.NewUnaryHandler(
-		AdminServiceSetServiceAssignmentProcedure,
-		svc.SetServiceAssignment,
-		connect.WithSchema(adminServiceMethods.ByName("SetServiceAssignment")),
+	adminServiceSetResourceAssignmentHandler := connect.NewUnaryHandler(
+		AdminServiceSetResourceAssignmentProcedure,
+		svc.SetResourceAssignment,
+		connect.WithSchema(adminServiceMethods.ByName("SetResourceAssignment")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceGetDeviceServiceStateHandler := connect.NewUnaryHandler(
-		AdminServiceGetDeviceServiceStateProcedure,
-		svc.GetDeviceServiceState,
-		connect.WithSchema(adminServiceMethods.ByName("GetDeviceServiceState")),
+	adminServiceGetDeviceResourceStateHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceResourceStateProcedure,
+		svc.GetDeviceResourceState,
+		connect.WithSchema(adminServiceMethods.ByName("GetDeviceResourceState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePutDynamicGroupHandler := connect.NewUnaryHandler(
+		AdminServicePutDynamicGroupProcedure,
+		svc.PutDynamicGroup,
+		connect.WithSchema(adminServiceMethods.ByName("PutDynamicGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDynamicGroupHandler := connect.NewUnaryHandler(
+		AdminServiceGetDynamicGroupProcedure,
+		svc.GetDynamicGroup,
+		connect.WithSchema(adminServiceMethods.ByName("GetDynamicGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListDynamicGroupsHandler := connect.NewUnaryHandler(
+		AdminServiceListDynamicGroupsProcedure,
+		svc.ListDynamicGroups,
+		connect.WithSchema(adminServiceMethods.ByName("ListDynamicGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePutTargetAssignmentHandler := connect.NewUnaryHandler(
+		AdminServicePutTargetAssignmentProcedure,
+		svc.PutTargetAssignment,
+		connect.WithSchema(adminServiceMethods.ByName("PutTargetAssignment")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListTargetAssignmentsHandler := connect.NewUnaryHandler(
+		AdminServiceListTargetAssignmentsProcedure,
+		svc.ListTargetAssignments,
+		connect.WithSchema(adminServiceMethods.ByName("ListTargetAssignments")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePreviewTargetAssignmentsHandler := connect.NewUnaryHandler(
+		AdminServicePreviewTargetAssignmentsProcedure,
+		svc.PreviewTargetAssignments,
+		connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignments")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceActivateTargetPreviewHandler := connect.NewUnaryHandler(
+		AdminServiceActivateTargetPreviewProcedure,
+		svc.ActivateTargetPreview,
+		connect.WithSchema(adminServiceMethods.ByName("ActivateTargetPreview")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServicePutRolloutHandler := connect.NewUnaryHandler(
+		AdminServicePutRolloutProcedure,
+		svc.PutRollout,
+		connect.WithSchema(adminServiceMethods.ByName("PutRollout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceControlRolloutHandler := connect.NewUnaryHandler(
+		AdminServiceControlRolloutProcedure,
+		svc.ControlRollout,
+		connect.WithSchema(adminServiceMethods.ByName("ControlRollout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListRolloutsHandler := connect.NewUnaryHandler(
+		AdminServiceListRolloutsProcedure,
+		svc.ListRollouts,
+		connect.WithSchema(adminServiceMethods.ByName("ListRollouts")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceCreateDeviceActionHandler := connect.NewUnaryHandler(
+		AdminServiceCreateDeviceActionProcedure,
+		svc.CreateDeviceAction,
+		connect.WithSchema(adminServiceMethods.ByName("CreateDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDeviceActionsHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceActionsProcedure,
+		svc.GetDeviceActions,
+		connect.WithSchema(adminServiceMethods.ByName("GetDeviceActions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDeviceActionHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceActionProcedure,
+		svc.GetDeviceAction,
+		connect.WithSchema(adminServiceMethods.ByName("GetDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetDeviceEncryptionHandler := connect.NewUnaryHandler(
+		AdminServiceGetDeviceEncryptionProcedure,
+		svc.GetDeviceEncryption,
+		connect.WithSchema(adminServiceMethods.ByName("GetDeviceEncryption")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRevealRecoveryKeyHandler := connect.NewUnaryHandler(
+		AdminServiceRevealRecoveryKeyProcedure,
+		svc.RevealRecoveryKey,
+		connect.WithSchema(adminServiceMethods.ByName("RevealRecoveryKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListDeviceGroupsHandler := connect.NewUnaryHandler(
+		AdminServiceListDeviceGroupsProcedure,
+		svc.ListDeviceGroups,
+		connect.WithSchema(adminServiceMethods.ByName("ListDeviceGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceSetDeviceGroupHandler := connect.NewUnaryHandler(
+		AdminServiceSetDeviceGroupProcedure,
+		svc.SetDeviceGroup,
+		connect.WithSchema(adminServiceMethods.ByName("SetDeviceGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteDeviceGroupHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteDeviceGroupProcedure,
+		svc.DeleteDeviceGroup,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteDeviceGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListDeviceFindingsHandler := connect.NewUnaryHandler(
+		AdminServiceListDeviceFindingsProcedure,
+		svc.ListDeviceFindings,
+		connect.WithSchema(adminServiceMethods.ByName("ListDeviceFindings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAdvisorySummaryHandler := connect.NewUnaryHandler(
+		AdminServiceListAdvisorySummaryProcedure,
+		svc.ListAdvisorySummary,
+		connect.WithSchema(adminServiceMethods.ByName("ListAdvisorySummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAdvisoryFeedsHandler := connect.NewUnaryHandler(
+		AdminServiceListAdvisoryFeedsProcedure,
+		svc.ListAdvisoryFeeds,
+		connect.WithSchema(adminServiceMethods.ByName("ListAdvisoryFeeds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceAcceptAdvisoryFindingHandler := connect.NewUnaryHandler(
+		AdminServiceAcceptAdvisoryFindingProcedure,
+		svc.AcceptAdvisoryFinding,
+		connect.WithSchema(adminServiceMethods.ByName("AcceptAdvisoryFinding")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/lindm.admin.v1.AdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AdminServiceListDevicesProcedure:
 			adminServiceListDevicesHandler.ServeHTTP(w, r)
+		case AdminServiceGetFleetSummaryProcedure:
+			adminServiceGetFleetSummaryHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceProcedure:
 			adminServiceGetDeviceHandler.ServeHTTP(w, r)
 		case AdminServiceListDevicePackagesProcedure:
 			adminServiceListDevicePackagesHandler.ServeHTTP(w, r)
+		case AdminServiceSetDeviceMetadataProcedure:
+			adminServiceSetDeviceMetadataHandler.ServeHTTP(w, r)
+		case AdminServiceSetAttributeDefinitionProcedure:
+			adminServiceSetAttributeDefinitionHandler.ServeHTTP(w, r)
+		case AdminServiceListAttributeDefinitionsProcedure:
+			adminServiceListAttributeDefinitionsHandler.ServeHTTP(w, r)
+		case AdminServiceExportDevicesProcedure:
+			adminServiceExportDevicesHandler.ServeHTTP(w, r)
 		case AdminServiceCreateEnrollmentGrantProcedure:
 			adminServiceCreateEnrollmentGrantHandler.ServeHTTP(w, r)
 		case AdminServiceRevokeEnrollmentGrantProcedure:
 			adminServiceRevokeEnrollmentGrantHandler.ServeHTTP(w, r)
+		case AdminServiceCreateProvisioningTokenProcedure:
+			adminServiceCreateProvisioningTokenHandler.ServeHTTP(w, r)
+		case AdminServiceListProvisioningTokensProcedure:
+			adminServiceListProvisioningTokensHandler.ServeHTTP(w, r)
+		case AdminServiceRevokeProvisioningTokenProcedure:
+			adminServiceRevokeProvisioningTokenHandler.ServeHTTP(w, r)
+		case AdminServiceGetPendingEnrollmentsProcedure:
+			adminServiceGetPendingEnrollmentsHandler.ServeHTTP(w, r)
+		case AdminServiceApprovePendingEnrollmentProcedure:
+			adminServiceApprovePendingEnrollmentHandler.ServeHTTP(w, r)
+		case AdminServiceCreateRecoveryEnrollmentGrantProcedure:
+			adminServiceCreateRecoveryEnrollmentGrantHandler.ServeHTTP(w, r)
+		case AdminServiceCreateOfflineEnrollmentAuthorizationProcedure:
+			adminServiceCreateOfflineEnrollmentAuthorizationHandler.ServeHTTP(w, r)
+		case AdminServiceImportOfflineEnrollmentRequestProcedure:
+			adminServiceImportOfflineEnrollmentRequestHandler.ServeHTTP(w, r)
+		case AdminServiceExportOfflineEnrollmentResponseProcedure:
+			adminServiceExportOfflineEnrollmentResponseHandler.ServeHTTP(w, r)
 		case AdminServiceRevokeDeviceProcedure:
 			adminServiceRevokeDeviceHandler.ServeHTTP(w, r)
+		case AdminServiceCreateApprovalProcedure:
+			adminServiceCreateApprovalHandler.ServeHTTP(w, r)
+		case AdminServiceListApprovalsProcedure:
+			adminServiceListApprovalsHandler.ServeHTTP(w, r)
+		case AdminServiceApproveApprovalProcedure:
+			adminServiceApproveApprovalHandler.ServeHTTP(w, r)
+		case AdminServiceRejectApprovalProcedure:
+			adminServiceRejectApprovalHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditEventsProcedure:
 			adminServiceListAuditEventsHandler.ServeHTTP(w, r)
 		case AdminServiceGetExecutionAuthorityProcedure:
 			adminServiceGetExecutionAuthorityHandler.ServeHTTP(w, r)
 		case AdminServiceUpdateExecutionAuthorityProcedure:
 			adminServiceUpdateExecutionAuthorityHandler.ServeHTTP(w, r)
-		case AdminServicePublishServiceProfileRevisionProcedure:
-			adminServicePublishServiceProfileRevisionHandler.ServeHTTP(w, r)
-		case AdminServiceGetServiceProfileRevisionProcedure:
-			adminServiceGetServiceProfileRevisionHandler.ServeHTTP(w, r)
-		case AdminServiceListServiceProfilesProcedure:
-			adminServiceListServiceProfilesHandler.ServeHTTP(w, r)
-		case AdminServiceSetServiceAssignmentProcedure:
-			adminServiceSetServiceAssignmentHandler.ServeHTTP(w, r)
-		case AdminServiceGetDeviceServiceStateProcedure:
-			adminServiceGetDeviceServiceStateHandler.ServeHTTP(w, r)
+		case AdminServicePublishProfileRevisionProcedure:
+			adminServicePublishProfileRevisionHandler.ServeHTTP(w, r)
+		case AdminServiceGetProfileRevisionProcedure:
+			adminServiceGetProfileRevisionHandler.ServeHTTP(w, r)
+		case AdminServiceListProfilesProcedure:
+			adminServiceListProfilesHandler.ServeHTTP(w, r)
+		case AdminServiceSetResourceAssignmentProcedure:
+			adminServiceSetResourceAssignmentHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceResourceStateProcedure:
+			adminServiceGetDeviceResourceStateHandler.ServeHTTP(w, r)
+		case AdminServicePutDynamicGroupProcedure:
+			adminServicePutDynamicGroupHandler.ServeHTTP(w, r)
+		case AdminServiceGetDynamicGroupProcedure:
+			adminServiceGetDynamicGroupHandler.ServeHTTP(w, r)
+		case AdminServiceListDynamicGroupsProcedure:
+			adminServiceListDynamicGroupsHandler.ServeHTTP(w, r)
+		case AdminServicePutTargetAssignmentProcedure:
+			adminServicePutTargetAssignmentHandler.ServeHTTP(w, r)
+		case AdminServiceListTargetAssignmentsProcedure:
+			adminServiceListTargetAssignmentsHandler.ServeHTTP(w, r)
+		case AdminServicePreviewTargetAssignmentsProcedure:
+			adminServicePreviewTargetAssignmentsHandler.ServeHTTP(w, r)
+		case AdminServiceActivateTargetPreviewProcedure:
+			adminServiceActivateTargetPreviewHandler.ServeHTTP(w, r)
+		case AdminServicePutRolloutProcedure:
+			adminServicePutRolloutHandler.ServeHTTP(w, r)
+		case AdminServiceControlRolloutProcedure:
+			adminServiceControlRolloutHandler.ServeHTTP(w, r)
+		case AdminServiceListRolloutsProcedure:
+			adminServiceListRolloutsHandler.ServeHTTP(w, r)
+		case AdminServiceCreateDeviceActionProcedure:
+			adminServiceCreateDeviceActionHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceActionsProcedure:
+			adminServiceGetDeviceActionsHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceActionProcedure:
+			adminServiceGetDeviceActionHandler.ServeHTTP(w, r)
+		case AdminServiceGetDeviceEncryptionProcedure:
+			adminServiceGetDeviceEncryptionHandler.ServeHTTP(w, r)
+		case AdminServiceRevealRecoveryKeyProcedure:
+			adminServiceRevealRecoveryKeyHandler.ServeHTTP(w, r)
+		case AdminServiceListDeviceGroupsProcedure:
+			adminServiceListDeviceGroupsHandler.ServeHTTP(w, r)
+		case AdminServiceSetDeviceGroupProcedure:
+			adminServiceSetDeviceGroupHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteDeviceGroupProcedure:
+			adminServiceDeleteDeviceGroupHandler.ServeHTTP(w, r)
+		case AdminServiceListDeviceFindingsProcedure:
+			adminServiceListDeviceFindingsHandler.ServeHTTP(w, r)
+		case AdminServiceListAdvisorySummaryProcedure:
+			adminServiceListAdvisorySummaryHandler.ServeHTTP(w, r)
+		case AdminServiceListAdvisoryFeedsProcedure:
+			adminServiceListAdvisoryFeedsHandler.ServeHTTP(w, r)
+		case AdminServiceAcceptAdvisoryFindingProcedure:
+			adminServiceAcceptAdvisoryFindingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -432,12 +1433,32 @@ func (UnimplementedAdminServiceHandler) ListDevices(context.Context, *connect.Re
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDevices is not implemented"))
 }
 
+func (UnimplementedAdminServiceHandler) GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetFleetSummary is not implemented"))
+}
+
 func (UnimplementedAdminServiceHandler) GetDevice(context.Context, *connect.Request[v1.GetDeviceRequest]) (*connect.Response[v1.GetDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDevice is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ListDevicePackages(context.Context, *connect.Request[v1.ListDevicePackagesRequest]) (*connect.Response[v1.ListDevicePackagesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDevicePackages is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetDeviceMetadata(context.Context, *connect.Request[v1.SetDeviceMetadataRequest]) (*connect.Response[v1.SetDeviceMetadataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetDeviceMetadata is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetAttributeDefinition(context.Context, *connect.Request[v1.SetAttributeDefinitionRequest]) (*connect.Response[v1.SetAttributeDefinitionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetAttributeDefinition is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAttributeDefinitions(context.Context, *connect.Request[v1.ListAttributeDefinitionsRequest]) (*connect.Response[v1.ListAttributeDefinitionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAttributeDefinitions is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ExportDevices(context.Context, *connect.Request[v1.ExportDevicesRequest]) (*connect.Response[v1.ExportDevicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ExportDevices is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) CreateEnrollmentGrant(context.Context, *connect.Request[v1.CreateEnrollmentGrantRequest]) (*connect.Response[v1.CreateEnrollmentGrantResponse], error) {
@@ -448,8 +1469,60 @@ func (UnimplementedAdminServiceHandler) RevokeEnrollmentGrant(context.Context, *
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevokeEnrollmentGrant is not implemented"))
 }
 
+func (UnimplementedAdminServiceHandler) CreateProvisioningToken(context.Context, *connect.Request[v1.CreateProvisioningTokenRequest]) (*connect.Response[v1.CreateProvisioningTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateProvisioningToken is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListProvisioningTokens(context.Context, *connect.Request[v1.ListProvisioningTokensRequest]) (*connect.Response[v1.ListProvisioningTokensResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListProvisioningTokens is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RevokeProvisioningToken(context.Context, *connect.Request[v1.RevokeProvisioningTokenRequest]) (*connect.Response[v1.RevokeProvisioningTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevokeProvisioningToken is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetPendingEnrollments(context.Context, *connect.Request[v1.GetPendingEnrollmentsRequest]) (*connect.Response[v1.GetPendingEnrollmentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetPendingEnrollments is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ApprovePendingEnrollment(context.Context, *connect.Request[v1.ApprovePendingEnrollmentRequest]) (*connect.Response[v1.ApprovePendingEnrollmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ApprovePendingEnrollment is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CreateRecoveryEnrollmentGrant(context.Context, *connect.Request[v1.CreateRecoveryEnrollmentGrantRequest]) (*connect.Response[v1.CreateRecoveryEnrollmentGrantResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateRecoveryEnrollmentGrant is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CreateOfflineEnrollmentAuthorization(context.Context, *connect.Request[v1.CreateOfflineEnrollmentAuthorizationRequest]) (*connect.Response[v1.CreateOfflineEnrollmentAuthorizationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateOfflineEnrollmentAuthorization is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ImportOfflineEnrollmentRequest(context.Context, *connect.Request[v1.ImportOfflineEnrollmentRequestRequest]) (*connect.Response[v1.ImportOfflineEnrollmentRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ImportOfflineEnrollmentRequest is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ExportOfflineEnrollmentResponse(context.Context, *connect.Request[v1.ExportOfflineEnrollmentResponseRequest]) (*connect.Response[v1.ExportOfflineEnrollmentResponseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ExportOfflineEnrollmentResponse is not implemented"))
+}
+
 func (UnimplementedAdminServiceHandler) RevokeDevice(context.Context, *connect.Request[v1.RevokeDeviceRequest]) (*connect.Response[v1.RevokeDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevokeDevice is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CreateApproval(context.Context, *connect.Request[v1.CreateApprovalRequest]) (*connect.Response[v1.CreateApprovalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateApproval is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListApprovals(context.Context, *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListApprovals is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ApproveApproval is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RejectApproval is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
@@ -464,22 +1537,110 @@ func (UnimplementedAdminServiceHandler) UpdateExecutionAuthority(context.Context
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateExecutionAuthority is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) PublishServiceProfileRevision(context.Context, *connect.Request[v1.PublishServiceProfileRevisionRequest]) (*connect.Response[v1.PublishServiceProfileRevisionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PublishServiceProfileRevision is not implemented"))
+func (UnimplementedAdminServiceHandler) PublishProfileRevision(context.Context, *connect.Request[v1.PublishProfileRevisionRequest]) (*connect.Response[v1.PublishProfileRevisionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PublishProfileRevision is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) GetServiceProfileRevision(context.Context, *connect.Request[v1.GetServiceProfileRevisionRequest]) (*connect.Response[v1.GetServiceProfileRevisionResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetServiceProfileRevision is not implemented"))
+func (UnimplementedAdminServiceHandler) GetProfileRevision(context.Context, *connect.Request[v1.GetProfileRevisionRequest]) (*connect.Response[v1.GetProfileRevisionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetProfileRevision is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) ListServiceProfiles(context.Context, *connect.Request[v1.ListServiceProfilesRequest]) (*connect.Response[v1.ListServiceProfilesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListServiceProfiles is not implemented"))
+func (UnimplementedAdminServiceHandler) ListProfiles(context.Context, *connect.Request[v1.ListProfilesRequest]) (*connect.Response[v1.ListProfilesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListProfiles is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) SetServiceAssignment(context.Context, *connect.Request[v1.SetServiceAssignmentRequest]) (*connect.Response[v1.SetServiceAssignmentResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetServiceAssignment is not implemented"))
+func (UnimplementedAdminServiceHandler) SetResourceAssignment(context.Context, *connect.Request[v1.SetResourceAssignmentRequest]) (*connect.Response[v1.SetResourceAssignmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetResourceAssignment is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) GetDeviceServiceState(context.Context, *connect.Request[v1.GetDeviceServiceStateRequest]) (*connect.Response[v1.GetDeviceServiceStateResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceServiceState is not implemented"))
+func (UnimplementedAdminServiceHandler) GetDeviceResourceState(context.Context, *connect.Request[v1.GetDeviceResourceStateRequest]) (*connect.Response[v1.GetDeviceResourceStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceResourceState is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PutDynamicGroup(context.Context, *connect.Request[v1.PutDynamicGroupRequest]) (*connect.Response[v1.PutDynamicGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PutDynamicGroup is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDynamicGroup(context.Context, *connect.Request[v1.GetDynamicGroupRequest]) (*connect.Response[v1.GetDynamicGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDynamicGroup is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDynamicGroups(context.Context, *connect.Request[v1.ListDynamicGroupsRequest]) (*connect.Response[v1.ListDynamicGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDynamicGroups is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PutTargetAssignment(context.Context, *connect.Request[v1.PutTargetAssignmentRequest]) (*connect.Response[v1.PutTargetAssignmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PutTargetAssignment is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListTargetAssignments is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreviewTargetAssignments is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ActivateTargetPreview is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PutRollout is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ControlRollout is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListRollouts(context.Context, *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListRollouts is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateDeviceAction is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceActions is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceAction is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetDeviceEncryption is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RevealRecoveryKey(context.Context, *connect.Request[v1.RevealRecoveryKeyRequest]) (*connect.Response[v1.RevealRecoveryKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevealRecoveryKey is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDeviceGroups(context.Context, *connect.Request[v1.ListDeviceGroupsRequest]) (*connect.Response[v1.ListDeviceGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDeviceGroups is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) SetDeviceGroup(context.Context, *connect.Request[v1.SetDeviceGroupRequest]) (*connect.Response[v1.SetDeviceGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SetDeviceGroup is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteDeviceGroup(context.Context, *connect.Request[v1.DeleteDeviceGroupRequest]) (*connect.Response[v1.DeleteDeviceGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.DeleteDeviceGroup is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListDeviceFindings(context.Context, *connect.Request[v1.ListDeviceFindingsRequest]) (*connect.Response[v1.ListDeviceFindingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListDeviceFindings is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAdvisorySummary(context.Context, *connect.Request[v1.ListAdvisorySummaryRequest]) (*connect.Response[v1.ListAdvisorySummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAdvisorySummary is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAdvisoryFeeds(context.Context, *connect.Request[v1.ListAdvisoryFeedsRequest]) (*connect.Response[v1.ListAdvisoryFeedsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAdvisoryFeeds is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) AcceptAdvisoryFinding(context.Context, *connect.Request[v1.AcceptAdvisoryFindingRequest]) (*connect.Response[v1.AcceptAdvisoryFindingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.AcceptAdvisoryFinding is not implemented"))
 }

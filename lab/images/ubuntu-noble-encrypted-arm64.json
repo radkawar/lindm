@@ -1,0 +1,19 @@
+{
+  "id": "ubuntu-noble-encrypted-24.04.5-arm64",
+  "distribution": "ubuntu",
+  "version": "24.04",
+  "architecture": "arm64",
+  "edition": "live-server-encrypted-lab",
+  "release": "24.04.5",
+  "imageFilename": "ubuntu-24.04.5-live-server-arm64.iso",
+  "imageUrl": "https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/ubuntu-24.04.5-live-server-arm64.iso",
+  "checksumUrl": "https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/SHA256SUMS",
+  "signatureUrl": "https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "sha256": "f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb",
+  "signerFingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "imageSizeBytes": "3825512448",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://ubuntu.com/tutorials/how-to-verify-ubuntu",
+  "releaseProvenanceUrl": "https://cdimage.ubuntu.com/ubuntu/releases/24.04/release/"
+}

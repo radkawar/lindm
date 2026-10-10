@@ -1,0 +1,551 @@
+syntax = "proto3";
+
+package lindm.resource.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/resource/v1/accounts.proto";
+import "lindm/resource/v1/common.proto";
+import "lindm/resource/v1/credentials.proto";
+import "lindm/resource/v1/identity.proto";
+import "lindm/resource/v1/network.proto";
+import "lindm/resource/v1/software.proto";
+
+option go_package = "lindm/gen/lindm/resource/v1;resourcev1";
+
+enum ObservationStatus {
+  OBSERVATION_STATUS_UNSPECIFIED = 0;
+  OBSERVATION_STATUS_OK = 1;
+  OBSERVATION_STATUS_UNAVAILABLE = 2;
+  OBSERVATION_STATUS_PERMISSION_DENIED = 3;
+  OBSERVATION_STATUS_UNSUPPORTED = 4;
+  OBSERVATION_STATUS_INVALID = 5;
+  OBSERVATION_STATUS_TRANSIENT = 6;
+}
+message ObservationMetadata {
+  string boot_id = 1 [(buf.validate.field).string.uuid = true];
+  string executor_incarnation = 2 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp observed_at = 3 [(buf.validate.field).required = true];
+  BackendSelection backend = 4 [(buf.validate.field).required = true];
+  bytes native_revision = 5 [(buf.validate.field).bytes.len = 32];
+  ObservationStatus observation_status = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string reason = 7 [(buf.validate.field).string.max_len = 512];
+}
+message FileIdentity {
+  string path = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^/[^\\x00\\r\\n]+$"
+  }];
+  uint64 device = 2;
+  uint64 inode = 3;
+  uint32 uid = 4;
+  uint32 gid = 5;
+  uint32 mode = 6 [(buf.validate.field).uint32.lte = 4095];
+  bytes sha256 = 7 [(buf.validate.field).bytes.len = 32];
+}
+message InstallLink {
+  string path = 1 [(buf.validate.field).string = {
+    max_len: 4096
+    pattern: "^/[^\\x00\\r\\n]+$"
+  }];
+  string target = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  uint64 device = 3;
+  uint64 inode = 4;
+  bytes ancestry_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+}
+// Native strings remain evidence, including unrecognized native values.
+message SystemdServiceObservation {
+  string unit = 1 [(buf.validate.field).string.max_len = 255];
+  string boot_id = 2 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp observed_at = 3 [(buf.validate.field).required = true];
+  string load_state = 4 [(buf.validate.field).string.max_len = 64];
+  string active_state = 5 [(buf.validate.field).string.max_len = 64];
+  string sub_state = 6 [(buf.validate.field).string.max_len = 64];
+  string unit_file_state = 7 [(buf.validate.field).string.max_len = 64];
+  string service_type = 8 [(buf.validate.field).string.max_len = 64];
+  bool remain_after_exit = 9;
+  bool refuse_manual_start = 10;
+  bool refuse_manual_stop = 11;
+  bool need_daemon_reload = 12;
+  bool transient = 13;
+  bytes definition_sha256 = 14 [(buf.validate.field).bytes.len = 32];
+  bytes fingerprint_sha256 = 15 [(buf.validate.field).bytes.len = 32];
+  bool job_pending = 16;
+  repeated InstallLink install_links = 17 [(buf.validate.field).repeated.max_items = 128];
+  optional bytes invocation_id = 18 [(buf.validate.field).bytes.len = 16];
+  bool install_projection_complete = 19;
+}
+enum NSSOrigin {
+  NSS_ORIGIN_UNSPECIFIED = 0;
+  NSS_ORIGIN_LOCAL_FILES = 1;
+  NSS_ORIGIN_DIRECTORY = 2;
+  NSS_ORIGIN_IMAGE = 3;
+  NSS_ORIGIN_UNKNOWN = 4;
+}
+message LocalGroupObservation {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
+  bool exists = 2;
+  NSSOrigin origin = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint32 gid = 4;
+  repeated string members = 5 [(buf.validate.field).repeated = {
+    max_items: 1024
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 32
+      }
+    }
+  }];
+  bytes local_file_revision = 6 [(buf.validate.field).bytes.len = 32];
+  bytes identity_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+}
+message HomeMetadata {
+  string path = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  bool exists = 2;
+  uint32 owner_uid = 3;
+  uint32 owner_gid = 4;
+  uint32 mode = 5 [(buf.validate.field).uint32.lte = 4095];
+  uint64 device = 6;
+  uint64 inode = 7;
+}
+message LocalUserObservation {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 32
+  }];
+  bool exists = 2;
+  NSSOrigin origin = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  optional uint32 uid = 4;
+  optional uint32 gid = 5;
+  repeated string groups = 6 [(buf.validate.field).repeated = {
+    max_items: 1024
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 32
+      }
+    }
+  }];
+  HomeMetadata home = 7;
+  string shell = 8 [(buf.validate.field).string.max_len = 4096];
+  optional bool password_locked = 9;
+  optional PasswordHashAlgorithm password_algorithm = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  PasswordAging aging = 11;
+  bytes local_file_revision = 12 [(buf.validate.field).bytes.len = 32];
+  bytes identity_sha256 = 13 [(buf.validate.field).bytes.len = 32];
+  optional string uid_generation = 14 [(buf.validate.field).string.uuid = true];
+  bool has_processes = 15;
+  bool has_external_data = 16;
+}
+message SudoPermissionEvidence {
+  SudoPrincipal subject = 1 [(buf.validate.field).required = true];
+  SudoPrincipal run_as = 2 [(buf.validate.field).required = true];
+  SudoCommand command = 3 [(buf.validate.field).required = true];
+  bool permitted = 4;
+  bool password_required = 5;
+}
+message SudoRuleObservation {
+  bool exists = 1;
+  FileIdentity owned_file = 2;
+  bytes aggregate_policy_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  repeated SudoPermissionEvidence permissions = 4 [(buf.validate.field).repeated.max_items = 128];
+  string rule_id = 5 [(buf.validate.field).string.uuid = true];
+}
+message SSHIncludeEdge {
+  string source = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  string target = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  uint32 precedence = 3;
+}
+message SSHMatchEvidence {
+  repeated SSHMatchSelector context = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+  }];
+  SSHMatch effective = 2 [(buf.validate.field).required = true];
+  bytes effective_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+}
+message SSHServerObservation {
+  repeated SSHIncludeEdge includes = 1 [(buf.validate.field).repeated.max_items = 128];
+  bytes include_graph_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bytes effective_configuration_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  SSHServerDesired effective = 4 [(buf.validate.field).required = true];
+  repeated Endpoint listeners = 5 [(buf.validate.field).repeated.max_items = 32];
+  string service_unit = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+  }];
+  repeated SSHMatchEvidence matches = 7 [(buf.validate.field).repeated.max_items = 64];
+}
+message TimeSourceEvidence {
+  TimeSource source = 1 [(buf.validate.field).required = true];
+  bool reachable = 2;
+  bool selected = 3;
+  bool nts_authenticated = 4;
+}
+message TimeSyncObservation {
+  string daemon_unit = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+  }];
+  bool installed = 2;
+  bool running = 3;
+  repeated TimeSourceEvidence sources = 4 [(buf.validate.field).repeated.max_items = 32];
+  bool synchronized = 5;
+  sint64 offset_microseconds = 6;
+  bytes configuration_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+}
+message TrustPurposeEvidence {
+  CertificatePurpose purpose = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bool trusted = 2;
+  ProbeReceipt chain_probe = 3 [(buf.validate.field).required = true];
+}
+message TrustCAObservation {
+  bytes certificate_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  repeated FileIdentity sources = 2 [(buf.validate.field).repeated.max_items = 64];
+  bool owned_source = 3;
+  TrustStoreScope scope = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated TrustPurposeEvidence purposes = 5 [(buf.validate.field).repeated.max_items = 4];
+  bytes exported_store_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+}
+message FirewallZoneObservation {
+  string native_owner = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string native_version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bool exists = 3;
+  repeated FirewallRule persistent_rules = 4 [(buf.validate.field).repeated.max_items = 256];
+  repeated FirewallRule active_rules = 5 [(buf.validate.field).repeated.max_items = 256];
+  repeated InterfaceSelector bound_interfaces = 6 [(buf.validate.field).repeated.max_items = 64];
+  bytes persistent_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  bytes kernel_rules_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  FirewallVerdict default_ingress = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  FirewallVerdict default_egress = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string zone_id = 11 [(buf.validate.field).string.uuid = true];
+}
+enum ConnectionMedium {
+  CONNECTION_MEDIUM_UNSPECIFIED = 0;
+  CONNECTION_MEDIUM_ETHERNET = 1;
+  CONNECTION_MEDIUM_WIFI = 2;
+  CONNECTION_MEDIUM_OPENVPN = 3;
+  CONNECTION_MEDIUM_WIREGUARD = 4;
+  CONNECTION_MEDIUM_IPSEC = 5;
+}
+message NetworkConnectionObservation {
+  string connection_uuid = 1 [(buf.validate.field).string.uuid = true];
+  bool exists = 2;
+  ConnectionMedium medium = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  uint64 settings_revision = 4;
+  bytes settings_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  InterfaceSelector active_device = 6;
+  repeated IPAddress addresses = 7 [(buf.validate.field).repeated.max_items = 64];
+  repeated IPRoute routes = 8 [(buf.validate.field).repeated.max_items = 128];
+  bool active = 9;
+  bool credential_version_matches = 10;
+  string native_state = 11 [(buf.validate.field).string.max_len = 64];
+}
+message DNSLookupEvidence {
+  string name = 1 [(buf.validate.field).string = {
+    hostname: true
+    max_len: 253
+  }];
+  repeated string addresses = 2 [(buf.validate.field).repeated = {
+    max_items: 32
+    unique: true
+    items: {
+      string: {ip: true}
+    }
+  }];
+  DNSServer server = 3 [(buf.validate.field).required = true];
+  bool dnssec_validated = 4;
+  bool tls_authenticated = 5;
+  ProbeReceipt receipt = 6 [(buf.validate.field).required = true];
+}
+message DNSObservation {
+  DNSDesired effective = 1 [(buf.validate.field).required = true];
+  string native_owner = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bytes persistent_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes runtime_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated DNSLookupEvidence lookups = 5 [(buf.validate.field).repeated.max_items = 32];
+}
+message ProxyRequestEvidence {
+  Endpoint destination = 1 [(buf.validate.field).required = true];
+  bool bypassed = 2;
+  bool proxy_authenticated = 3;
+  ProbeReceipt receipt = 4 [(buf.validate.field).required = true];
+}
+message ProxyObservation {
+  ProxyConsumer consumer = 1 [(buf.validate.field).required = true];
+  string native_owner = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bytes persistent_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes effective_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated ProxyRequestEvidence requests = 5 [(buf.validate.field).repeated.max_items = 32];
+}
+message NativePackageRecord {
+  PackageIdentity package = 1 [(buf.validate.field).required = true];
+  NativeVersion version = 2 [(buf.validate.field).required = true];
+  ResourceRef source = 3 [(buf.validate.field).required = true];
+  bytes signer_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  bytes metadata_revision_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  option (buf.validate.message).cel = {
+    id: "native_package_record.source"
+    message: "package source must identify a repository"
+    expression: "this.source.kind == 13"
+  };
+}
+message NativePackageObservation {
+  PackageIdentity package = 1 [(buf.validate.field).required = true];
+  bool installed = 2;
+  NativePackageRecord record = 3;
+  bytes database_revision_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  bool native_lock_held = 5;
+  option (buf.validate.message).cel = {
+    id: "native_package_observation.record"
+    message: "installed packages require their native record"
+    expression: "this.installed == has(this.record)"
+  };
+}
+enum RepositoryEcosystem {
+  REPOSITORY_ECOSYSTEM_UNSPECIFIED = 0;
+  REPOSITORY_ECOSYSTEM_APT = 1;
+  REPOSITORY_ECOSYSTEM_RPM = 2;
+  REPOSITORY_ECOSYSTEM_ALPM = 3;
+  REPOSITORY_ECOSYSTEM_FLATPAK = 4;
+  REPOSITORY_ECOSYSTEM_NIX = 5;
+  REPOSITORY_ECOSYSTEM_OSTREE = 6;
+}
+message RepositoryObservation {
+  bool exists = 1;
+  repeated FileIdentity stanzas = 2 [(buf.validate.field).repeated.max_items = 32];
+  repeated FileIdentity key_objects = 3 [(buf.validate.field).repeated.max_items = 32];
+  bytes metadata_revision_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated bytes verified_signer_sha256 = 5 [(buf.validate.field).repeated = {
+    max_items: 16
+    unique: true
+    items: {
+      bytes: {len: 32}
+    }
+  }];
+  bool metadata_signature_valid = 6;
+  bool package_signature_required = 7;
+  bytes native_namespace_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  string repository_id = 9 [(buf.validate.field).string.uuid = true];
+  RepositoryEcosystem ecosystem = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+}
+message FlatpakAppObservation {
+  InstallationBinding installation = 1 [(buf.validate.field).required = true];
+  string app_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 255
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  string branch = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bool installed = 5;
+  optional string commit = 6 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  FlatpakPermissionPolicy permissions = 7;
+  bytes installation_revision_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+}
+message DeploymentIdentity {
+  string native_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  bytes content_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bool booted = 3;
+  bool pending = 4;
+}
+message InhibitorEvidence {
+  string native_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  uint32 uid = 2;
+  string reason = 3 [(buf.validate.field).string.max_len = 512];
+  bool blocks_reboot = 4;
+}
+message OSUpdateObservation {
+  SourceSnapshot source = 1 [(buf.validate.field).required = true];
+  repeated DeploymentIdentity deployments = 2 [(buf.validate.field).repeated.max_items = 32];
+  string kernel_release = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string boot_id = 4 [(buf.validate.field).string.uuid = true];
+  repeated InhibitorEvidence inhibitors = 5 [(buf.validate.field).repeated.max_items = 64];
+  ProbeReceipt drain_receipt = 6;
+  bool reboot_required = 7;
+  bytes native_database_revision = 8 [(buf.validate.field).bytes.len = 32];
+}
+message NativeModuleVersion {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+}
+message SessionPolicyObservation {
+  SessionScope scope = 1 [(buf.validate.field).required = true];
+  string session_manager = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  SessionPolicyDesired effective = 3 [(buf.validate.field).required = true];
+  repeated NativeModuleVersion modules = 4 [(buf.validate.field).repeated.max_items = 64];
+  bytes configuration_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+}
+message PasswordPolicyObservation {
+  string pam_owner = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  PasswordPolicyDesired effective = 2 [(buf.validate.field).required = true];
+  repeated NativeModuleVersion modules = 3 [(buf.validate.field).repeated.max_items = 64];
+  bytes configuration_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+}
+message SnapAppObservation {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 40
+  }];
+  string instance_key = 2 [(buf.validate.field).string.max_len = 10];
+  bool installed = 3;
+  uint64 revision = 4;
+  string channel = 5 [(buf.validate.field).string.max_len = 128];
+  SnapConfinement confinement = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string native_change_id = 7 [(buf.validate.field).string.max_len = 128];
+  repeated SnapInterfaceGrant interfaces = 8 [(buf.validate.field).repeated.max_items = 64];
+  bytes state_revision_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+}
+message PublicCertificate {
+  bytes der = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  bytes serial_number = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32
+  }];
+  repeated CertificatePurpose eku = 3 [(buf.validate.field).repeated = {
+    max_items: 4
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: 0
+      }
+    }
+  }];
+  repeated SubjectAlternativeName sans = 4 [(buf.validate.field).repeated.max_items = 64];
+  google.protobuf.Timestamp not_before = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp not_after = 6 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "public_certificate.validity"
+    message: "certificate validity must be ordered"
+    expression: "this.not_before < this.not_after"
+  };
+}
+message CertificateEnrollmentObservation {
+  string credential_id = 1 [(buf.validate.field).string.uuid = true];
+  repeated PublicCertificate chain = 2 [(buf.validate.field).repeated.max_items = 8];
+  string opaque_key_handle = 3 [(buf.validate.field).string.max_len = 256];
+  repeated CredentialConsumer active_consumers = 4 [(buf.validate.field).repeated.max_items = 64];
+  bool owned_key = 5;
+  bool revoked = 6;
+  CredentialSubjectBinding subject = 7 [(buf.validate.field).required = true];
+}
+message DirectoryAccountMapping {
+  string immutable_directory_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  NativeAccountBinding account = 2 [(buf.validate.field).required = true];
+}
+message DirectoryClientObservation {
+  DirectoryBackend backend = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bool joined = 2;
+  bool owned_join = 3;
+  string domain = 4 [(buf.validate.field).string = {
+    hostname: true
+    max_len: 253
+  }];
+  string native_owner = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  bytes configuration_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  bytes join_identity_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  bool reachable = 8;
+  repeated DirectoryAccountMapping mappings = 9 [(buf.validate.field).repeated.max_items = 64];
+  DirectoryLoginPolicy effective_login = 10 [(buf.validate.field).required = true];
+}

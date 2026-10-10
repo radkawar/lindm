@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
 )
@@ -107,7 +108,11 @@ func checkFreshAuthorization(ctx context.Context, root string, evidence io.Write
 	service, err := identity.New(ctx, database.Pool, identity.Config{
 		Issuer: issuer, ClientID: "lindm-console", ClientSecret: secrets["console-secret"],
 		DirectoryClientID: "lindm-directory", DirectoryClientSecret: secrets["directory-secret"],
-		PublicURL: consoleOrigin, AdminGroups: []string{"/" + fixture.name}, HTTPClient: client,
+		PublicURL: consoleOrigin, HTTPClient: client,
+		Policy: &authv1.AuthorizationPolicy{
+			Roles:         []*authv1.RoleDefinition{{Name: "lab-operator", Permissions: []string{string(identity.PermissionManageEnrollment), string(identity.PermissionReadFleet)}}},
+			GroupBindings: []*authv1.GroupBinding{{Group: "/" + fixture.name, Role: "lab-operator", Scopes: []*authv1.DeviceScope{{Labels: []string{"lab-owned"}, DeviceIds: []string{fixture.userID}}}}},
+		},
 	})
 	if err != nil {
 		return err
@@ -161,8 +166,16 @@ func exerciseFreshAuthorization(ctx context.Context, service *identity.Service, 
 		if err != nil {
 			return nil, err
 		}
-		if authorization == nil || authorization.ActorID() != actorID || authorization.Version() != state.version || state.role != identity.RoleAdmin || !state.enabled || (wantVersion != 0 && state.version != wantVersion) {
+		if authorization == nil || authorization.ActorID() != actorID || authorization.Version() != state.version || state.role != "lab-operator" || !state.enabled || (wantVersion != 0 && state.version != wantVersion) {
 			return nil, fmt.Errorf("fresh-check %s did not persist the expected allowed version", stage)
+		}
+		principal := authorization.Principal()
+		unrestricted, scopes := identity.DeviceScopes(principal, identity.PermissionManageEnrollment)
+		if unrestricted || len(scopes) != 1 || len(scopes[0].GetLabels()) != 1 || scopes[0].GetLabels()[0] != "lab-owned" || len(scopes[0].GetDeviceIds()) != 1 || scopes[0].GetDeviceIds()[0] != fixture.userID {
+			return nil, fmt.Errorf("fresh-check %s lost the custom role's exact device scope", stage)
+		}
+		if identity.Authorize(principal, identity.PermissionManageAccounts) || identity.Authorize(principal, identity.PermissionRevokeDevice) {
+			return nil, fmt.Errorf("fresh-check %s widened the custom role's explicit permissions", stage)
 		}
 		if !authorization.ExpiresAt().After(state.now) || authorization.ExpiresAt().After(state.observed.Add(30*time.Second)) {
 			return nil, fmt.Errorf("fresh-check %s approval deadline exceeds the observed 30s bound or is expired", stage)

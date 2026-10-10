@@ -8,21 +8,22 @@ SELECT * FROM local_accounts WHERE id = sqlc.arg(id);
 SELECT * FROM local_accounts WHERE username = sqlc.arg(username);
 
 -- name: ListLocalAccounts :many
-SELECT id, username, role, enabled, break_glass,
+SELECT id, username, role, enabled, break_glass, scope_binding,
   EXISTS (SELECT 1 FROM local_credentials c WHERE c.account_id = a.id) AS enrolled
 FROM local_accounts a ORDER BY username LIMIT 1000;
 
 -- name: InsertLocalAccount :exec
-INSERT INTO local_accounts (id, username, role, break_glass)
-VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(role), sqlc.arg(break_glass));
+INSERT INTO local_accounts (id, username, role, break_glass, scope_binding)
+VALUES (sqlc.arg(id), sqlc.arg(username), sqlc.arg(role), sqlc.arg(break_glass), sqlc.arg(scope_binding));
 
 -- name: UpdateLocalAccount :exec
 UPDATE local_accounts SET role = sqlc.arg(role), enabled = sqlc.arg(enabled),
-  break_glass = sqlc.arg(break_glass) WHERE id = sqlc.arg(id);
+  break_glass = sqlc.arg(break_glass), scope_binding = sqlc.arg(scope_binding) WHERE id = sqlc.arg(id);
 
 -- name: BumpLocalAuthorization :exec
 UPDATE principals SET authorization_version = authorization_version + 1,
-  authorization_role = sqlc.arg(authorization_role) WHERE id = sqlc.arg(id);
+  authorization_role = sqlc.arg(authorization_role), authorization_digest = sqlc.arg(authorization_digest)
+WHERE id = sqlc.arg(id);
 
 -- name: SetLocalPassword :exec
 UPDATE local_accounts SET password_hash = sqlc.arg(password_hash),

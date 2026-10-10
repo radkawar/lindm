@@ -148,6 +148,26 @@ func TestUnitVerifyAllowsMissingPackagedBinary(t *testing.T) {
 	}
 }
 
+func TestPassphraseRejectsRPMMacros(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"passphrase", "%{lua:print('unexpected')}"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("protected"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		err := checkPassphrase(path)
+		if name == "passphrase" && err != nil {
+			t.Fatalf("safe passphrase path: %v", err)
+		}
+		if name != "passphrase" && !errors.Is(err, ErrUnsafePath) {
+			t.Fatalf("macro-bearing passphrase path accepted: %v", err)
+		}
+	}
+}
+
 const elfEM386 = 3
 
 func minimalELF(machine uint16) []byte {

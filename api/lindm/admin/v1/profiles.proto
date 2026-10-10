@@ -4,24 +4,24 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
-import "lindm/policy/v1/service_profile.proto";
+import "lindm/policy/v1/profile.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 // A published revision is immutable. Publishing changes the catalog head, not
 // an assignment: devices remain pinned to explicitly activated revisions.
-message ServiceProfileRevision {
+message ProfileRevision {
   string profile_id = 1 [(buf.validate.field).string.uuid = true];
   string revision_id = 2 [(buf.validate.field).string.uuid = true];
   uint64 revision_number = 3 [(buf.validate.field).uint64.gt = 0];
-  lindm.policy.v1.ServiceProfileSpec spec = 4 [(buf.validate.field).required = true];
+  lindm.policy.v1.ResourceProfile spec = 4 [(buf.validate.field).required = true];
   string actor_id = 5 [(buf.validate.field).string.uuid = true];
   google.protobuf.Timestamp published_at = 6 [(buf.validate.field).required = true];
   bytes spec_sha256 = 7 [(buf.validate.field).bytes.len = 32];
 }
 
-message PublishServiceProfileRevisionRequest {
+message PublishProfileRevisionRequest {
   string request_id = 1 [
     (buf.validate.field).string.uuid = true,
     (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
@@ -36,16 +36,16 @@ message PublishServiceProfileRevisionRequest {
     (buf.validate.field).string.uuid = true,
     (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
   ];
-  lindm.policy.v1.ServiceProfileSpec spec = 4 [(buf.validate.field).required = true];
+  lindm.policy.v1.ResourceProfile spec = 4 [(buf.validate.field).required = true];
   string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
 }
 
-message PublishServiceProfileRevisionResponse {
+message PublishProfileRevisionResponse {
   // An exact retry returns the originally published revision, not a later head.
-  ServiceProfileRevision revision = 1 [(buf.validate.field).required = true];
+  ProfileRevision revision = 1 [(buf.validate.field).required = true];
 }
 
-message GetServiceProfileRevisionRequest {
+message GetProfileRevisionRequest {
   string profile_id = 1 [
     (buf.validate.field).string.uuid = true,
     (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
@@ -57,16 +57,16 @@ message GetServiceProfileRevisionRequest {
   ];
 }
 
-message GetServiceProfileRevisionResponse {
-  ServiceProfileRevision revision = 1 [(buf.validate.field).required = true];
+message GetProfileRevisionResponse {
+  ProfileRevision revision = 1 [(buf.validate.field).required = true];
 }
 
-message ListServiceProfilesRequest {
+message ListProfilesRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 100];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
 }
 
-message ServiceProfileSummary {
+message ProfileSummary {
   string profile_id = 1;
   string revision_id = 2;
   uint64 revision_number = 3;
@@ -78,8 +78,8 @@ message ServiceProfileSummary {
   bytes spec_sha256 = 9;
 }
 
-message ListServiceProfilesResponse {
+message ListProfilesResponse {
   // These are catalog heads, not evidence of deployment or native compliance.
-  repeated ServiceProfileSummary profiles = 1;
+  repeated ProfileSummary profiles = 1;
   string next_page_token = 2;
 }

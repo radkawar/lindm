@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/device_actions.proto";
+import "lindm/agent/v1/trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+enum RecoveryCustody {
+  RECOVERY_CUSTODY_UNSPECIFIED = 0;
+  RECOVERY_CUSTODY_OFF_TARGET = 1;
+  RECOVERY_CUSTODY_TPM = 2;
+}
+// Original device-key DSSE authorizes only issuance of one action-scoped recovery
+// credential. It never replaces a fresh boot-bound destructive start grant.
+message DeviceActionRecoveryHandoff {
+  DeviceActionIntent intent = 1 [(buf.validate.field).required = true];
+  bytes native_plan_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bytes recovery_image_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes media_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  bytes recovery_public_key = 5 [(buf.validate.field).bytes.len = 32];
+  string original_boot_id = 6 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  google.protobuf.Timestamp expires_at = 7 [(buf.validate.field).required = true];
+  RecoveryCustody custody = 8 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bytes intent_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+  DeviceActionChallenge challenge = 10 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "recovery_handoff.scope"
+    message: "handoff requires signed unencrypted recovery spec and bounded expiry"
+    expression: "has(this.intent.spec.sanitize) && has(this.intent.spec.sanitize.recovery) && this.expires_at <= this.intent.expires_at && this.expires_at > this.intent.not_before && this.recovery_image_sha256 == this.intent.spec.sanitize.recovery.image_sha256 && this.media_sha256 == this.intent.spec.sanitize.recovery.media_sha256"
+  };
+}
+// Start-role signature in its own DSSE domain; accepted only by RecoveryService.
+message DeviceActionRecoveryCredential {
+  string credential_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  DeviceActionRecoveryHandoff handoff = 2 [(buf.validate.field).required = true];
+  uint64 root_version = 3 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 4 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp issued_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 6 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "recovery_credential.validity"
+    message: "credential must fit original handoff and fifteen minutes"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('900s') && this.expires_at <= this.handoff.expires_at"
+  };
+}
+// Purpose-separated BOOT authority. Its signature cannot authorize erasure.
+message DeviceActionRecoveryBootGrant {
+  DeviceActionStartGrant grant = 1 [(buf.validate.field).required = true];
+  bytes handoff_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+enum RecoveryOperation {
+  RECOVERY_OPERATION_UNSPECIFIED = 0;
+  RECOVERY_OPERATION_ACQUIRE_WORK = 1;
+  RECOVERY_OPERATION_AUTHORIZE_START = 2;
+  RECOVERY_OPERATION_CHECKPOINT = 3;
+  RECOVERY_OPERATION_REPORT_RESULT = 4;
+}
+// Action-key signature. Consumers bind endpoint, exact deterministic payload,
+// credential bytes, new boot and incarnation, then consume RequestId+Nonce.
+message RecoveryRequestProof {
+  string credential_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes credential_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  string request_id = 3 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string boot_id = 4 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string executor_incarnation = 5 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  bytes nonce = 6 [(buf.validate.field).bytes.len = 32];
+  RecoveryOperation operation = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bytes payload_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp issued_at = 9 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp expires_at = 10 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "recovery_request.validity"
+    message: "request proof lasts at most thirty seconds"
+    expression: "this.expires_at > this.issued_at && this.expires_at - this.issued_at <= duration('30s')"
+  };
+}
+enum RecoveryPhase {
+  RECOVERY_PHASE_UNSPECIFIED = 0;
+  RECOVERY_PHASE_BOOTED = 1;
+  RECOVERY_PHASE_EFFECT_COMMITTED = 2;
+  RECOVERY_PHASE_TERMINAL = 3;
+}
+message RecoveryCheckpoint {
+  string credential_id = 1 [(buf.validate.field).string.uuid = true];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  string boot_id = 3 [(buf.validate.field).string.uuid = true];
+  string executor_incarnation = 4 [(buf.validate.field).string.uuid = true];
+  uint64 sequence = 5 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  RecoveryPhase phase = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  bytes previous_sha256 = 7 [(buf.validate.field).bytes.max_len = 32];
+  google.protobuf.Timestamp at = 8 [(buf.validate.field).required = true];
+  bytes grant_sha256 = 9 [(buf.validate.field).bytes.max_len = 32];
+  option (buf.validate.message).cel = {
+    id: "recovery_checkpoint.chain"
+    message: "checkpoint chain and effect grant must be complete"
+    expression: "(this.sequence == 1u ? this.previous_sha256.size() == 0 : this.previous_sha256.size() == 32) && (this.phase != 2 || this.grant_sha256.size() == 32)"
+  };
+}
+// Authenticated server acknowledgment of the committed checkpoint, not another
+// destructive grant. Persist this exact receipt before starting an effect.
+message RecoveryCheckpointReceipt {
+  string credential_id = 1 [(buf.validate.field).string.uuid = true];
+  string action_id = 2 [(buf.validate.field).string.uuid = true];
+  uint64 sequence = 3 [(buf.validate.field).uint64.gt = 0];
+  bytes checkpoint_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp stored_at = 5 [(buf.validate.field).required = true];
+  uint64 root_version = 6 [(buf.validate.field).uint64.gt = 0];
+  uint64 delegation_version = 7 [(buf.validate.field).uint64.gt = 0];
+}
+// Protected off-target journal. Private one-action keys are never serialized here.
+message RecoveryJournal {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  bytes credential_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes intent_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+  ExecutionRoot accepted_root = 4 [(buf.validate.field).required = true];
+  bytes delegation_envelope = 5 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  DeviceActionRecoveryHandoff handoff = 6 [(buf.validate.field).required = true];
+  RecoveryCheckpoint checkpoint = 7;
+  bytes start_grant_envelope = 8 [(buf.validate.field).bytes.max_len = 65536];
+  DeviceActionVerification verification = 9;
+  DeviceActionState state = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  DeviceActionChallenge challenge = 11;
+  bytes checkpoint_receipt_envelope = 12 [(buf.validate.field).bytes.max_len = 16384];
+  google.protobuf.Timestamp started_at = 13;
+  google.protobuf.Timestamp completed_at = 14;
+  DeviceActionFailure failure = 15 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  google.protobuf.Timestamp accepted_at = 16 [(buf.validate.field).required = true];
+  // Immutable credential-issuance trust, retained across current trust updates.
+  ExecutionRoot credential_root = 17 [(buf.validate.field).required = true];
+  bytes credential_delegation_envelope = 18 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  // Historical trust reconstruction only; new effects always use current time.
+  google.protobuf.Timestamp trust_accepted_at = 19 [(buf.validate.field).required = true];
+}
+message PrepareDeviceActionRecoveryRequest {
+  bytes intent_envelope = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 32768
+  }];
+}
+message PrepareDeviceActionRecoveryResponse {
+  bytes handoff_proof = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes certificate_pem = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+  DeviceActionStatus status = 3 [(buf.validate.field).required = true];
+}
+message CommitDeviceActionRecoveryRequest {
+  string action_id = 1 [(buf.validate.field).string.uuid = true];
+  bytes credential_envelope = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  bytes boot_grant_envelope = 3 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+}
+message CommitDeviceActionRecoveryResponse {
+  DeviceActionStatus status = 1 [(buf.validate.field).required = true];
+}
+
+// Nonsecret, deterministic checkpoint fitting the fixed TPM NV record. The
+// provider enforces the record's 508-byte payload capacity before any NV write.
+message TPMRecoveryCheckpoint {
+  uint32 format_version = 1 [(buf.validate.field).uint32.const = 1];
+  bytes handoff_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bytes image_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes recovery_public_key = 4 [(buf.validate.field).bytes.len = 32];
+  bytes object_name = 5 [(buf.validate.field).bytes.len = 34];
+  bytes policy_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  uint64 nv_counter = 7 [(buf.validate.field).uint64.gt = 0];
+  bytes journal_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  bool consumed = 9;
+  // UNSPECIFIED is the preboot state, before a recovery checkpoint exists.
+  RecoveryPhase phase = 10 [(buf.validate.field).enum.defined_only = true];
+  // Immutable original ESP capsule anchor, independent of later journal commits.
+  bytes initial_capsule_sha256 = 11 [(buf.validate.field).bytes.len = 32];
+}

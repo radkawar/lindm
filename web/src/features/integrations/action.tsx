@@ -1,0 +1,102 @@
+import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
+import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { clearCsrfToken } from "@/lib/rpc";
+
+// Pending requests (including write-only keys) stay only in component memory.
+// Ambiguous mutations retain the exact request closure for an explicit retry.
+export function useIntegrationAction() {
+  const lifetime = useAuthLifetime();
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const pending = useRef<(() => Promise<unknown>) | null>(null);
+  const running = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<RpcFailure | null>(null);
+
+  async function execute() {
+    if (running.current || !pending.current || lifetime.signal.aborted) return;
+    running.current = true;
+    setBusy(true);
+    setFailure(null);
+    try {
+      await pending.current();
+      lifetime.signal.throwIfAborted();
+      toast.success("Integration operation accepted");
+      pending.current = null;
+      await client.invalidateQueries({ queryKey: ["integrations", lifetime.generation] });
+    } catch (error) {
+      if (!lifetime.signal.aborted) {
+        const next = toRpcFailure(error);
+        if (next.unauthenticated) {
+          pending.current = null;
+          synchronizeAuthLifetime(null);
+          clearCsrfToken();
+          client.clear();
+          await navigate({ to: "/" });
+          return;
+        }
+        if (!next.ambiguous) pending.current = null;
+        setFailure(next);
+        toast.error(
+          next.ambiguous ? "Integration outcome unknown" : "Integration operation failed",
+          {
+            description: "Review the inline result before making another change.",
+          },
+        );
+      }
+    } finally {
+      running.current = false;
+      if (!lifetime.signal.aborted) setBusy(false);
+    }
+  }
+
+  function perform(operation: () => Promise<unknown>) {
+    if (running.current || pending.current || lifetime.signal.aborted) return;
+    pending.current = operation;
+    void execute();
+  }
+
+  return {
+    perform,
+    blocked: busy || failure?.ambiguous === true,
+    feedback: failure ? (
+      <Alert variant="destructive">
+        <AlertTitle>
+          {failure.ambiguous ? "Outcome unknown" : "Integration operation failed"}
+        </AlertTitle>
+        <AlertDescription className="grid gap-3">
+          <p>
+            {failure.codeName}: {failure.message}
+          </p>
+          {failure.ambiguous ? (
+            <>
+              <p>
+                The operation may have committed. Retry this exact request before making another
+                change. Navigating away discards its in-memory retry.
+              </p>
+              <Button
+                className="w-fit"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void execute()}
+              >
+                Retry exact request
+              </Button>
+            </>
+          ) : null}
+        </AlertDescription>
+      </Alert>
+    ) : busy ? (
+      <p role="status" className="border bg-muted/30 p-3 text-sm text-muted-foreground">
+        Working…
+      </p>
+    ) : null,
+  };
+}

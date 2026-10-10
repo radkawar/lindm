@@ -22,14 +22,27 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent executor
        lindm-agent run
        lindm-agent bootstrap -root FILE -bundle FILE -grant FILE
-       lindm-agent resume
+       lindm-agent bootstrap -root FILE -bundle FILE -provisioning-token-file FILE
+       lindm-agent offline-export -root FILE -bundle FILE -file AUTHORIZATION -out REQUEST
+       lindm-agent offline-export -resume -out REQUEST
+       lindm-agent offline-import -file RESPONSE
+       lindm-agent resume [-wait-seconds SECONDS]
        lindm-agent status
        lindm-agent trust-status
+       lindm-agent update-status
        lindm-agent trust-update -file FILE
        lindm-agent service-prepare -file FILE
        lindm-agent service-start -file FILE
        lindm-agent service-status -file FILE
        lindm-agent service-attest -file FILE
+       lindm-agent action-prepare -file FILE
+       lindm-agent action-start -file FILE
+       lindm-agent action-status -file FILE
+       lindm-agent action-attest -file FILE
+       lindm-agent action-confirm -file FILE
+       lindm-agent action-credential -action UUID
+       lindm-agent action-sandbox [-install]
+       lindm-agent recovery-run -config FILE
        lindm-agent version
        lindm-agent help
 
@@ -52,6 +65,11 @@ separately signed short-lived grant. Start acceptance is not native completion:
 read service-status for the durable result. service-attest returns a nonce-bound
 device-signed snapshot of that history, not a fresh native observation or current
 compliance. These commands cannot sign execution authority.
+action-* commands relay the separate imperative-action protocol. action-credential
+is root-only and reads an owner unlock credential from a protected stdin pipe,
+never argv or a plaintext file. Bytes are exact; do not append a newline.
+recovery-run is the signed recovery image's root-only entrypoint. It cannot enroll,
+serve general device/admin operations, or start without fresh online authority.
 version prints the packaging version and a newline.
 `
 
@@ -77,6 +95,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return serveNetwork(ctx, args[1:])
 	case "bootstrap":
 		return bootstrapCommand(ctx, args[1:])
+	case "offline-export", "offline-import":
+		return offlineEnrollmentCommand(ctx, args[0], args[1:])
 	case "resume":
 		return resumeCommand(ctx, args[1:])
 	case "status":
@@ -87,6 +107,20 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return executionTrustCommand(ctx, args[1:], output)
 	case "service-prepare", "service-start", "service-status", "service-attest":
 		return serviceExecutionCommand(ctx, args[0], args[1:], output)
+	case "action-prepare", "action-start", "action-status", "action-attest", "action-confirm":
+		return deviceActionCommand(ctx, args[0], args[1:], output)
+	case "action-credential":
+		return actionCredentialCommand(ctx, args[1:])
+	case "action-sandbox":
+		return actionSandboxCommand(ctx, args[1:], output)
+	case "live-root-poweroff":
+		return liveRootPoweroff(ctx, args[1:])
+	case "recovery-run":
+		return recoveryRun(ctx, args[1:])
+	case "update-apply":
+		return updateApplyCommand(ctx, args[1:])
+	case "update-status":
+		return updateStatusCommand(ctx, args[1:], output)
 	case "version":
 		return versionCommand(args[1:], output)
 	case "help", "--help", "-h":

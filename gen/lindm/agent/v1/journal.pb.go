@@ -23,31 +23,91 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type AccountLockPhase int32
+
+const (
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_UNSPECIFIED     AccountLockPhase = 0
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_DISABLE_PENDING AccountLockPhase = 1
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_DISABLED        AccountLockPhase = 2
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASE_PENDING AccountLockPhase = 3
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_RELEASED        AccountLockPhase = 4
+	AccountLockPhase_ACCOUNT_LOCK_PHASE_PRESERVED       AccountLockPhase = 5
+)
+
+// Enum value maps for AccountLockPhase.
+var (
+	AccountLockPhase_name = map[int32]string{
+		0: "ACCOUNT_LOCK_PHASE_UNSPECIFIED",
+		1: "ACCOUNT_LOCK_PHASE_DISABLE_PENDING",
+		2: "ACCOUNT_LOCK_PHASE_DISABLED",
+		3: "ACCOUNT_LOCK_PHASE_RELEASE_PENDING",
+		4: "ACCOUNT_LOCK_PHASE_RELEASED",
+		5: "ACCOUNT_LOCK_PHASE_PRESERVED",
+	}
+	AccountLockPhase_value = map[string]int32{
+		"ACCOUNT_LOCK_PHASE_UNSPECIFIED":     0,
+		"ACCOUNT_LOCK_PHASE_DISABLE_PENDING": 1,
+		"ACCOUNT_LOCK_PHASE_DISABLED":        2,
+		"ACCOUNT_LOCK_PHASE_RELEASE_PENDING": 3,
+		"ACCOUNT_LOCK_PHASE_RELEASED":        4,
+		"ACCOUNT_LOCK_PHASE_PRESERVED":       5,
+	}
+)
+
+func (x AccountLockPhase) Enum() *AccountLockPhase {
+	p := new(AccountLockPhase)
+	*p = x
+	return p
+}
+
+func (x AccountLockPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AccountLockPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_journal_proto_enumTypes[0].Descriptor()
+}
+
+func (AccountLockPhase) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_journal_proto_enumTypes[0]
+}
+
+func (x AccountLockPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AccountLockPhase.Descriptor instead.
+func (AccountLockPhase) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{0}
+}
+
 // Protected local persistence only. Never return this message from an RPC,
 // log it, or place it in the unprivileged transport spool.
 type ExecutorJournalState struct {
-	state                   protoimpl.MessageState   `protogen:"open.v1"`
-	FormatVersion           uint32                   `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
-	InstallationId          string                   `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
-	ExecutionRootJson       []byte                   `protobuf:"bytes,3,opt,name=execution_root_json,json=executionRootJson,proto3" json:"execution_root_json,omitempty"`
-	BootstrapEnvelope       []byte                   `protobuf:"bytes,4,opt,name=bootstrap_envelope,json=bootstrapEnvelope,proto3" json:"bootstrap_envelope,omitempty"`
-	BootstrapVerifiedAt     *timestamppb.Timestamp   `protobuf:"bytes,5,opt,name=bootstrap_verified_at,json=bootstrapVerifiedAt,proto3" json:"bootstrap_verified_at,omitempty"`
-	EnrollmentTransactionId string                   `protobuf:"bytes,6,opt,name=enrollment_transaction_id,json=enrollmentTransactionId,proto3" json:"enrollment_transaction_id,omitempty"`
-	IdentityPrivateKey      []byte                   `protobuf:"bytes,7,opt,name=identity_private_key,json=identityPrivateKey,proto3" json:"identity_private_key,omitempty"`
-	EnrollmentCsrPem        []byte                   `protobuf:"bytes,8,opt,name=enrollment_csr_pem,json=enrollmentCsrPem,proto3" json:"enrollment_csr_pem,omitempty"`
-	PendingGrant            string                   `protobuf:"bytes,9,opt,name=pending_grant,json=pendingGrant,proto3" json:"pending_grant,omitempty"`
-	CertificatePem          []byte                   `protobuf:"bytes,10,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
-	DeviceId                *string                  `protobuf:"bytes,11,opt,name=device_id,json=deviceId,proto3,oneof" json:"device_id,omitempty"`
-	EnrollmentGeneration    *string                  `protobuf:"bytes,12,opt,name=enrollment_generation,json=enrollmentGeneration,proto3,oneof" json:"enrollment_generation,omitempty"`
-	SessionEpoch            uint64                   `protobuf:"varint,13,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
-	SessionBootId           *string                  `protobuf:"bytes,14,opt,name=session_boot_id,json=sessionBootId,proto3,oneof" json:"session_boot_id,omitempty"`
-	PendingSession          *SessionAcquisition      `protobuf:"bytes,15,opt,name=pending_session,json=pendingSession,proto3" json:"pending_session,omitempty"`
-	PendingSessionProof     []byte                   `protobuf:"bytes,16,opt,name=pending_session_proof,json=pendingSessionProof,proto3" json:"pending_session_proof,omitempty"`
-	PendingRenewal          *PendingIdentityRenewal  `protobuf:"bytes,17,opt,name=pending_renewal,json=pendingRenewal,proto3" json:"pending_renewal,omitempty"`
-	PriorCredential         *PriorIdentityCredential `protobuf:"bytes,18,opt,name=prior_credential,json=priorCredential,proto3" json:"prior_credential,omitempty"`
-	RenewAfter              *timestamppb.Timestamp   `protobuf:"bytes,19,opt,name=renew_after,json=renewAfter,proto3" json:"renew_after,omitempty"`
-	RenewalReceipt          *RenewalCommitReceipt    `protobuf:"bytes,20,opt,name=renewal_receipt,json=renewalReceipt,proto3" json:"renewal_receipt,omitempty"`
-	SessionReceipt          *SessionCommitReceipt    `protobuf:"bytes,21,opt,name=session_receipt,json=sessionReceipt,proto3" json:"session_receipt,omitempty"`
+	state                   protoimpl.MessageState              `protogen:"open.v1"`
+	FormatVersion           uint32                              `protobuf:"varint,1,opt,name=format_version,json=formatVersion,proto3" json:"format_version,omitempty"`
+	InstallationId          string                              `protobuf:"bytes,2,opt,name=installation_id,json=installationId,proto3" json:"installation_id,omitempty"`
+	ExecutionRootJson       []byte                              `protobuf:"bytes,3,opt,name=execution_root_json,json=executionRootJson,proto3" json:"execution_root_json,omitempty"`
+	BootstrapEnvelope       []byte                              `protobuf:"bytes,4,opt,name=bootstrap_envelope,json=bootstrapEnvelope,proto3" json:"bootstrap_envelope,omitempty"`
+	BootstrapVerifiedAt     *timestamppb.Timestamp              `protobuf:"bytes,5,opt,name=bootstrap_verified_at,json=bootstrapVerifiedAt,proto3" json:"bootstrap_verified_at,omitempty"`
+	EnrollmentTransactionId string                              `protobuf:"bytes,6,opt,name=enrollment_transaction_id,json=enrollmentTransactionId,proto3" json:"enrollment_transaction_id,omitempty"`
+	IdentityPrivateKey      []byte                              `protobuf:"bytes,7,opt,name=identity_private_key,json=identityPrivateKey,proto3" json:"identity_private_key,omitempty"`
+	EnrollmentCsrPem        []byte                              `protobuf:"bytes,8,opt,name=enrollment_csr_pem,json=enrollmentCsrPem,proto3" json:"enrollment_csr_pem,omitempty"`
+	PendingGrant            string                              `protobuf:"bytes,9,opt,name=pending_grant,json=pendingGrant,proto3" json:"pending_grant,omitempty"`
+	CertificatePem          []byte                              `protobuf:"bytes,10,opt,name=certificate_pem,json=certificatePem,proto3" json:"certificate_pem,omitempty"`
+	DeviceId                *string                             `protobuf:"bytes,11,opt,name=device_id,json=deviceId,proto3,oneof" json:"device_id,omitempty"`
+	EnrollmentGeneration    *string                             `protobuf:"bytes,12,opt,name=enrollment_generation,json=enrollmentGeneration,proto3,oneof" json:"enrollment_generation,omitempty"`
+	SessionEpoch            uint64                              `protobuf:"varint,13,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	SessionBootId           *string                             `protobuf:"bytes,14,opt,name=session_boot_id,json=sessionBootId,proto3,oneof" json:"session_boot_id,omitempty"`
+	PendingSession          *SessionAcquisition                 `protobuf:"bytes,15,opt,name=pending_session,json=pendingSession,proto3" json:"pending_session,omitempty"`
+	PendingSessionProof     []byte                              `protobuf:"bytes,16,opt,name=pending_session_proof,json=pendingSessionProof,proto3" json:"pending_session_proof,omitempty"`
+	PendingRenewal          *PendingIdentityRenewal             `protobuf:"bytes,17,opt,name=pending_renewal,json=pendingRenewal,proto3" json:"pending_renewal,omitempty"`
+	PriorCredential         *PriorIdentityCredential            `protobuf:"bytes,18,opt,name=prior_credential,json=priorCredential,proto3" json:"prior_credential,omitempty"`
+	RenewAfter              *timestamppb.Timestamp              `protobuf:"bytes,19,opt,name=renew_after,json=renewAfter,proto3" json:"renew_after,omitempty"`
+	RenewalReceipt          *RenewalCommitReceipt               `protobuf:"bytes,20,opt,name=renewal_receipt,json=renewalReceipt,proto3" json:"renewal_receipt,omitempty"`
+	SessionReceipt          *SessionCommitReceipt               `protobuf:"bytes,21,opt,name=session_receipt,json=sessionReceipt,proto3" json:"session_receipt,omitempty"`
+	ProvisioningToken       bool                                `protobuf:"varint,22,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
+	OfflineAuthorization    *OfflineEnrollmentAuthorizationFile `protobuf:"bytes,23,opt,name=offline_authorization,json=offlineAuthorization,proto3" json:"offline_authorization,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -225,6 +285,20 @@ func (x *ExecutorJournalState) GetRenewalReceipt() *RenewalCommitReceipt {
 func (x *ExecutorJournalState) GetSessionReceipt() *SessionCommitReceipt {
 	if x != nil {
 		return x.SessionReceipt
+	}
+	return nil
+}
+
+func (x *ExecutorJournalState) GetProvisioningToken() bool {
+	if x != nil {
+		return x.ProvisioningToken
+	}
+	return false
+}
+
+func (x *ExecutorJournalState) GetOfflineAuthorization() *OfflineEnrollmentAuthorizationFile {
+	if x != nil {
+		return x.OfflineAuthorization
 	}
 	return nil
 }
@@ -428,11 +502,15 @@ func (x *RenewalCommitReceipt) GetCertificateSha256() []byte {
 }
 
 type SessionCommitReceipt struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	SessionEpoch  uint64                 `protobuf:"varint,2,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	RequestId    string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionEpoch uint64                 `protobuf:"varint,2,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	// Build identity from the exact executor-signed acquisition acknowledged by
+	// the server. A changed build reacquires even when the boot ID is unchanged.
+	AgentRelease         string `protobuf:"bytes,3,opt,name=agent_release,json=agentRelease,proto3" json:"agent_release,omitempty"`
+	AgentProtocolVersion uint32 `protobuf:"varint,4,opt,name=agent_protocol_version,json=agentProtocolVersion,proto3" json:"agent_protocol_version,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *SessionCommitReceipt) Reset() {
@@ -479,11 +557,217 @@ func (x *SessionCommitReceipt) GetSessionEpoch() uint64 {
 	return 0
 }
 
+func (x *SessionCommitReceipt) GetAgentRelease() string {
+	if x != nil {
+		return x.AgentRelease
+	}
+	return ""
+}
+
+func (x *SessionCommitReceipt) GetAgentProtocolVersion() uint32 {
+	if x != nil {
+		return x.AgentProtocolVersion
+	}
+	return 0
+}
+
+// Executor-only shadow ownership. These messages contain password hashes and
+// MUST NOT enter public plans, observations, errors, logs, or the network spool.
+type AccountLockSnapshot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Uid           uint32                 `protobuf:"varint,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	PasswdEntry   string                 `protobuf:"bytes,3,opt,name=passwd_entry,json=passwdEntry,proto3" json:"passwd_entry,omitempty"`
+	ShadowEntry   string                 `protobuf:"bytes,4,opt,name=shadow_entry,json=shadowEntry,proto3" json:"shadow_entry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountLockSnapshot) Reset() {
+	*x = AccountLockSnapshot{}
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountLockSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountLockSnapshot) ProtoMessage() {}
+
+func (x *AccountLockSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountLockSnapshot.ProtoReflect.Descriptor instead.
+func (*AccountLockSnapshot) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AccountLockSnapshot) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *AccountLockSnapshot) GetUid() uint32 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *AccountLockSnapshot) GetPasswdEntry() string {
+	if x != nil {
+		return x.PasswdEntry
+	}
+	return ""
+}
+
+func (x *AccountLockSnapshot) GetShadowEntry() string {
+	if x != nil {
+		return x.ShadowEntry
+	}
+	return ""
+}
+
+type AccountLockEntry struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Prior    *AccountLockSnapshot   `protobuf:"bytes,1,opt,name=prior,proto3" json:"prior,omitempty"`
+	Expected *AccountLockSnapshot   `protobuf:"bytes,2,opt,name=expected,proto3" json:"expected,omitempty"`
+	Phase    AccountLockPhase       `protobuf:"varint,3,opt,name=phase,proto3,enum=lindm.agent.v1.AccountLockPhase" json:"phase,omitempty"`
+	// An interrupted release can only attempt restoration under a NEW explicitly
+	// authorized release action; the same action never replays a native effect.
+	ReleaseActionId string `protobuf:"bytes,4,opt,name=release_action_id,json=releaseActionId,proto3" json:"release_action_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AccountLockEntry) Reset() {
+	*x = AccountLockEntry{}
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountLockEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountLockEntry) ProtoMessage() {}
+
+func (x *AccountLockEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountLockEntry.ProtoReflect.Descriptor instead.
+func (*AccountLockEntry) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AccountLockEntry) GetPrior() *AccountLockSnapshot {
+	if x != nil {
+		return x.Prior
+	}
+	return nil
+}
+
+func (x *AccountLockEntry) GetExpected() *AccountLockSnapshot {
+	if x != nil {
+		return x.Expected
+	}
+	return nil
+}
+
+func (x *AccountLockEntry) GetPhase() AccountLockPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return AccountLockPhase_ACCOUNT_LOCK_PHASE_UNSPECIFIED
+}
+
+func (x *AccountLockEntry) GetReleaseActionId() string {
+	if x != nil {
+		return x.ReleaseActionId
+	}
+	return ""
+}
+
+type AccountLockLedger struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LockActionId  string                 `protobuf:"bytes,1,opt,name=lock_action_id,json=lockActionId,proto3" json:"lock_action_id,omitempty"`
+	Accounts      []*AccountLockEntry    `protobuf:"bytes,2,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountLockLedger) Reset() {
+	*x = AccountLockLedger{}
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountLockLedger) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountLockLedger) ProtoMessage() {}
+
+func (x *AccountLockLedger) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_journal_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountLockLedger.ProtoReflect.Descriptor instead.
+func (*AccountLockLedger) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_journal_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AccountLockLedger) GetLockActionId() string {
+	if x != nil {
+		return x.LockActionId
+	}
+	return ""
+}
+
+func (x *AccountLockLedger) GetAccounts() []*AccountLockEntry {
+	if x != nil {
+		return x.Accounts
+	}
+	return nil
+}
+
 var File_lindm_agent_v1_journal_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1alindm/agent/v1/trust.proto\"\xab\x15\n" +
+	"\x1clindm/agent/v1/journal.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a\x1alindm/agent/v1/trust.proto\"\xad\x18\n" +
 	"\x14ExecutorJournalState\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x121\n" +
 	"\x0finstallation_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12;\n" +
@@ -508,10 +792,11 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\vrenew_after\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"renewAfter\x12M\n" +
 	"\x0frenewal_receipt\x18\x14 \x01(\v2$.lindm.agent.v1.RenewalCommitReceiptR\x0erenewalReceipt\x12M\n" +
-	"\x0fsession_receipt\x18\x15 \x01(\v2$.lindm.agent.v1.SessionCommitReceiptR\x0esessionReceipt:\x9a\n" +
-	"\xbaH\x96\n" +
-	"\x1a\x8f\x05\n" +
-	"!executor_journal.enrollment_shape\x12epending enrollment retains its grant; installed identity pins device/generation and removes the grant\x1a\x82\x04(this.certificate_pem.size() == 0 && this.pending_grant.size() >= 32 && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))\x1a\x8a\x03\n" +
+	"\x0fsession_receipt\x18\x15 \x01(\v2$.lindm.agent.v1.SessionCommitReceiptR\x0esessionReceipt\x12-\n" +
+	"\x12provisioning_token\x18\x16 \x01(\bR\x11provisioningToken\x12g\n" +
+	"\x15offline_authorization\x18\x17 \x01(\v22.lindm.agent.v1.OfflineEnrollmentAuthorizationFileR\x14offlineAuthorization:\x84\f\xbaH\x80\f\x1a\xb4\x05\n" +
+	"!executor_journal.enrollment_shape\x12epending enrollment retains its grant; installed identity pins device/generation and removes the grant\x1a\xa7\x04(this.certificate_pem.size() == 0 && (this.pending_grant.size() >= 32 || has(this.offline_authorization)) && !has(this.device_id) && !has(this.enrollment_generation) && this.session_epoch == 0u && !has(this.session_boot_id) && !has(this.pending_session) && !has(this.pending_renewal) && !has(this.prior_credential) && !has(this.renew_after) && !has(this.renewal_receipt) && !has(this.session_receipt)) || (this.certificate_pem.size() >= 64 && this.pending_grant == '' && has(this.device_id) && has(this.enrollment_generation) && has(this.renew_after))\x1a\xc2\x01\n" +
+	"\"executor_journal.offline_authority\x12@offline authorization is separate from online bearer credentials\x1aZ!has(this.offline_authorization) || (!this.provisioning_token && this.pending_grant == '')\x1a\x8a\x03\n" +
 	"\x1eexecutor_journal.session_shape\x12caccepted sessions have a boot identity and pending acquisition remains at the protected predecessor\x1a\x82\x02(this.session_epoch == 0u) == !has(this.session_boot_id) && (has(this.pending_session) == (this.pending_session_proof.size() > 0)) && (!has(this.pending_session) || (this.pending_session.predecessor_epoch == this.session_epoch && !has(this.pending_renewal)))\x1a\xf4\x01\n" +
 	" executor_journal.session_receipt\x12=the retained acknowledgment binds the committed session epoch\x1a\x90\x01!has(this.session_receipt) || (this.session_epoch > 0u && has(this.session_boot_id) && this.session_receipt.session_epoch == this.session_epoch)B\f\n" +
 	"\n" +
@@ -533,11 +818,37 @@ const file_lindm_agent_v1_journal_proto_rawDesc = "" +
 	"\fretain_until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vretainUntil\"\x88\x01\n" +
 	"\x14RenewalCommitReceipt\x128\n" +
 	"\x13issuance_request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x11issuanceRequestId\x126\n" +
-	"\x12certificate_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\"w\n" +
+	"\x12certificate_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11certificateSha256\"\xe9\x01\n" +
 	"\x14SessionCommitReceipt\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x126\n" +
-	"\rsession_epoch\x18\x02 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpochB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\rsession_epoch\x18\x02 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12-\n" +
+	"\ragent_release\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\fagentRelease\x12A\n" +
+	"\x16agent_protocol_version\x18\x04 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\xff\xff\aR\x14agentProtocolVersion\"\xd2\x01\n" +
+	"\x13AccountLockSnapshot\x12B\n" +
+	"\busername\x18\x01 \x01(\tB&\xbaH#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\busername\x12\x19\n" +
+	"\x03uid\x18\x02 \x01(\rB\a\xbaH\x04*\x02 \x00R\x03uid\x12-\n" +
+	"\fpasswd_entry\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80 R\vpasswdEntry\x12-\n" +
+	"\fshadow_entry\x18\x04 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80 R\vshadowEntry\"\x9b\x02\n" +
+	"\x10AccountLockEntry\x12A\n" +
+	"\x05prior\x18\x01 \x01(\v2#.lindm.agent.v1.AccountLockSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x05prior\x12G\n" +
+	"\bexpected\x18\x02 \x01(\v2#.lindm.agent.v1.AccountLockSnapshotB\x06\xbaH\x03\xc8\x01\x01R\bexpected\x12B\n" +
+	"\x05phase\x18\x03 \x01(\x0e2 .lindm.agent.v1.AccountLockPhaseB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05phase\x127\n" +
+	"\x11release_action_id\x18\x04 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x0freleaseActionId\"\xbc\x03\n" +
+	"\x11AccountLockLedger\x12.\n" +
+	"\x0elock_action_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\flockActionId\x12G\n" +
+	"\baccounts\x18\x02 \x03(\v2 .lindm.agent.v1.AccountLockEntryB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\baccounts:\xad\x02\xbaH\xa9\x02\x1a\xa6\x02\n" +
+	"\x17account_lock.identities\x12?account names and UIDs are unique and immutable across the lock\x1a\xc9\x01this.accounts.all(a, a.prior.username == a.expected.username && a.prior.uid == a.expected.uid && this.accounts.filter(b, a.prior.username == b.prior.username || a.prior.uid == b.prior.uid).size() == 1)*\xea\x01\n" +
+	"\x10AccountLockPhase\x12\"\n" +
+	"\x1eACCOUNT_LOCK_PHASE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"ACCOUNT_LOCK_PHASE_DISABLE_PENDING\x10\x01\x12\x1f\n" +
+	"\x1bACCOUNT_LOCK_PHASE_DISABLED\x10\x02\x12&\n" +
+	"\"ACCOUNT_LOCK_PHASE_RELEASE_PENDING\x10\x03\x12\x1f\n" +
+	"\x1bACCOUNT_LOCK_PHASE_RELEASED\x10\x04\x12 \n" +
+	"\x1cACCOUNT_LOCK_PHASE_PRESERVED\x10\x05B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_journal_proto_rawDescOnce sync.Once
@@ -551,30 +862,41 @@ func file_lindm_agent_v1_journal_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_journal_proto_rawDescData
 }
 
-var file_lindm_agent_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_lindm_agent_v1_journal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_lindm_agent_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_agent_v1_journal_proto_goTypes = []any{
-	(*ExecutorJournalState)(nil),    // 0: lindm.agent.v1.ExecutorJournalState
-	(*PendingIdentityRenewal)(nil),  // 1: lindm.agent.v1.PendingIdentityRenewal
-	(*PriorIdentityCredential)(nil), // 2: lindm.agent.v1.PriorIdentityCredential
-	(*RenewalCommitReceipt)(nil),    // 3: lindm.agent.v1.RenewalCommitReceipt
-	(*SessionCommitReceipt)(nil),    // 4: lindm.agent.v1.SessionCommitReceipt
-	(*timestamppb.Timestamp)(nil),   // 5: google.protobuf.Timestamp
-	(*SessionAcquisition)(nil),      // 6: lindm.agent.v1.SessionAcquisition
+	(AccountLockPhase)(0),                      // 0: lindm.agent.v1.AccountLockPhase
+	(*ExecutorJournalState)(nil),               // 1: lindm.agent.v1.ExecutorJournalState
+	(*PendingIdentityRenewal)(nil),             // 2: lindm.agent.v1.PendingIdentityRenewal
+	(*PriorIdentityCredential)(nil),            // 3: lindm.agent.v1.PriorIdentityCredential
+	(*RenewalCommitReceipt)(nil),               // 4: lindm.agent.v1.RenewalCommitReceipt
+	(*SessionCommitReceipt)(nil),               // 5: lindm.agent.v1.SessionCommitReceipt
+	(*AccountLockSnapshot)(nil),                // 6: lindm.agent.v1.AccountLockSnapshot
+	(*AccountLockEntry)(nil),                   // 7: lindm.agent.v1.AccountLockEntry
+	(*AccountLockLedger)(nil),                  // 8: lindm.agent.v1.AccountLockLedger
+	(*timestamppb.Timestamp)(nil),              // 9: google.protobuf.Timestamp
+	(*SessionAcquisition)(nil),                 // 10: lindm.agent.v1.SessionAcquisition
+	(*OfflineEnrollmentAuthorizationFile)(nil), // 11: lindm.agent.v1.OfflineEnrollmentAuthorizationFile
 }
 var file_lindm_agent_v1_journal_proto_depIdxs = []int32{
-	5, // 0: lindm.agent.v1.ExecutorJournalState.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	6, // 1: lindm.agent.v1.ExecutorJournalState.pending_session:type_name -> lindm.agent.v1.SessionAcquisition
-	1, // 2: lindm.agent.v1.ExecutorJournalState.pending_renewal:type_name -> lindm.agent.v1.PendingIdentityRenewal
-	2, // 3: lindm.agent.v1.ExecutorJournalState.prior_credential:type_name -> lindm.agent.v1.PriorIdentityCredential
-	5, // 4: lindm.agent.v1.ExecutorJournalState.renew_after:type_name -> google.protobuf.Timestamp
-	3, // 5: lindm.agent.v1.ExecutorJournalState.renewal_receipt:type_name -> lindm.agent.v1.RenewalCommitReceipt
-	4, // 6: lindm.agent.v1.ExecutorJournalState.session_receipt:type_name -> lindm.agent.v1.SessionCommitReceipt
-	5, // 7: lindm.agent.v1.PriorIdentityCredential.retain_until:type_name -> google.protobuf.Timestamp
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	9,  // 0: lindm.agent.v1.ExecutorJournalState.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	10, // 1: lindm.agent.v1.ExecutorJournalState.pending_session:type_name -> lindm.agent.v1.SessionAcquisition
+	2,  // 2: lindm.agent.v1.ExecutorJournalState.pending_renewal:type_name -> lindm.agent.v1.PendingIdentityRenewal
+	3,  // 3: lindm.agent.v1.ExecutorJournalState.prior_credential:type_name -> lindm.agent.v1.PriorIdentityCredential
+	9,  // 4: lindm.agent.v1.ExecutorJournalState.renew_after:type_name -> google.protobuf.Timestamp
+	4,  // 5: lindm.agent.v1.ExecutorJournalState.renewal_receipt:type_name -> lindm.agent.v1.RenewalCommitReceipt
+	5,  // 6: lindm.agent.v1.ExecutorJournalState.session_receipt:type_name -> lindm.agent.v1.SessionCommitReceipt
+	11, // 7: lindm.agent.v1.ExecutorJournalState.offline_authorization:type_name -> lindm.agent.v1.OfflineEnrollmentAuthorizationFile
+	9,  // 8: lindm.agent.v1.PriorIdentityCredential.retain_until:type_name -> google.protobuf.Timestamp
+	6,  // 9: lindm.agent.v1.AccountLockEntry.prior:type_name -> lindm.agent.v1.AccountLockSnapshot
+	6,  // 10: lindm.agent.v1.AccountLockEntry.expected:type_name -> lindm.agent.v1.AccountLockSnapshot
+	0,  // 11: lindm.agent.v1.AccountLockEntry.phase:type_name -> lindm.agent.v1.AccountLockPhase
+	7,  // 12: lindm.agent.v1.AccountLockLedger.accounts:type_name -> lindm.agent.v1.AccountLockEntry
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_journal_proto_init() }
@@ -582,6 +904,7 @@ func file_lindm_agent_v1_journal_proto_init() {
 	if File_lindm_agent_v1_journal_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_offline_enrollment_proto_init()
 	file_lindm_agent_v1_trust_proto_init()
 	file_lindm_agent_v1_journal_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
@@ -589,13 +912,14 @@ func file_lindm_agent_v1_journal_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_journal_proto_rawDesc), len(file_lindm_agent_v1_journal_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   5,
+			NumEnums:      1,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_lindm_agent_v1_journal_proto_goTypes,
 		DependencyIndexes: file_lindm_agent_v1_journal_proto_depIdxs,
+		EnumInfos:         file_lindm_agent_v1_journal_proto_enumTypes,
 		MessageInfos:      file_lindm_agent_v1_journal_proto_msgTypes,
 	}.Build()
 	File_lindm_agent_v1_journal_proto = out.File

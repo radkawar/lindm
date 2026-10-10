@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { DeviceFindings } from "@/features/advisories/device-findings";
+import { DeviceActionHistory } from "@/features/devices/actions";
 import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
 import { parsePackageSearch } from "@/features/devices/package-search";
-import { DeviceServices } from "@/features/services/view";
+import { DeviceResourceComplianceBadge, DeviceResources } from "@/features/services/view";
+import { RecoveryEnrollment } from "@/features/enrollment/recovery";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
@@ -30,13 +35,30 @@ function DeviceDetailRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
-    <div className="grid gap-6" key={deviceId}>
-      <DeviceDetailView
-        deviceId={deviceId}
-        search={search}
-        onSearch={(next, replace = false) => void navigate({ search: next, replace })}
-      />
-      <DeviceServices deviceId={deviceId} />
-    </div>
+    <DeviceDetailView
+      key={deviceId}
+      deviceId={deviceId}
+      search={search}
+      onSearch={(next, replace = false) => void navigate({ search: next, replace })}
+      compliance={<DeviceResourceComplianceBadge deviceId={deviceId} />}
+      resources={(assignProfile) => (
+        <DeviceResources
+          deviceId={deviceId}
+          emptyAction={
+            <Button onClick={assignProfile}>
+              <Plus aria-hidden="true" /> Assign profile
+            </Button>
+          }
+        />
+      )}
+      findings={<DeviceFindings deviceId={deviceId} />}
+      history={<DeviceActionHistory deviceId={deviceId} />}
+      enrollmentRecovery={(device) => (
+        <RecoveryEnrollment
+          key={`${device.enrollmentGeneration}:${device.lifecycleState}`}
+          device={device}
+        />
+      )}
+    />
   );
 }

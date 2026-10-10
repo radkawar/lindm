@@ -1,20 +1,15 @@
 package identity
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/google/uuid"
+
+	"lindm/internal/devlab/webauthnlab"
 )
 
 func TestLocalPassword(t *testing.T) {
@@ -55,12 +50,7 @@ func TestLocalPassword(t *testing.T) {
 	}
 }
 
-// This software authenticator creates real P-256 credentials and signs the
-// standard authenticatorData || SHA256(clientDataJSON) assertion payload.
-type localSoftwareAuthenticator struct {
-	key *ecdsa.PrivateKey
-	id  []byte
-}
+type localSoftwareAuthenticator struct{ *webauthnlab.Authenticator }
 
 func localTestJSON(t *testing.T, v any) []byte {
 	t.Helper()
@@ -71,53 +61,22 @@ func localTestJSON(t *testing.T, v any) []byte {
 	return b
 }
 
-func localTestCBOR(t *testing.T, v any) []byte {
+func localAuthenticator(t *testing.T) localSoftwareAuthenticator {
 	t.Helper()
-	b, err := cbor.Marshal(v)
+	auth, err := webauthnlab.New("console.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return b
+	return localSoftwareAuthenticator{auth}
 }
 
 func (a localSoftwareAuthenticator) response(t *testing.T, challenge, origin string, register, uv bool, counter uint32) ([]byte, []byte) {
 	t.Helper()
-	kind := "webauthn.get"
-	if register {
-		kind = "webauthn.create"
+	body, client, err := a.Response(challenge, origin, register, uv, counter)
+	if err != nil {
+		t.Fatal(err)
 	}
-	client := localTestJSON(t, map[string]any{"type": kind, "challenge": challenge, "origin": origin, "crossOrigin": false})
-	rpHash := sha256.Sum256([]byte("console.example.com"))
-	auth := make([]byte, 37)
-	copy(auth, rpHash[:])
-	auth[32] = 1
-	if uv {
-		auth[32] |= 4
-	}
-	binary.BigEndian.PutUint32(auth[33:], counter)
-	response := map[string]any{"clientDataJSON": base64.RawURLEncoding.EncodeToString(client)}
-	if register {
-		auth[32] |= 64
-		auth = append(auth, make([]byte, 16)...)
-		auth = binary.BigEndian.AppendUint16(auth, uint16(len(a.id)))
-		auth = append(auth, a.id...)
-		public := localTestCBOR(t, map[int]any{1: 2, 3: -7, -1: 1, -2: a.key.X.FillBytes(make([]byte, 32)), -3: a.key.Y.FillBytes(make([]byte, 32))})
-		auth = append(auth, public...)
-		attestation := localTestCBOR(t, map[string]any{"fmt": "none", "authData": auth, "attStmt": map[string]any{}})
-		response["attestationObject"] = base64.RawURLEncoding.EncodeToString(attestation)
-	} else {
-		clientHash := sha256.Sum256(client)
-		payload := append(append([]byte(nil), auth...), clientHash[:]...)
-		digest := sha256.Sum256(payload)
-		signature, err := ecdsa.SignASN1(rand.Reader, a.key, digest[:])
-		if err != nil {
-			t.Fatal(err)
-		}
-		response["authenticatorData"] = base64.RawURLEncoding.EncodeToString(auth)
-		response["signature"] = base64.RawURLEncoding.EncodeToString(signature)
-	}
-	id := base64.RawURLEncoding.EncodeToString(a.id)
-	return localTestJSON(t, map[string]any{"id": id, "rawId": id, "type": "public-key", "response": response}), client
+	return body, client
 }
 
 func TestLocalWebAuthnCeremonies(t *testing.T) {
@@ -126,11 +85,7 @@ func TestLocalWebAuthnCeremonies(t *testing.T) {
 		t.Fatal(err)
 	}
 	user := &localWebAuthnUser{ID: uuid.New(), Username: "owner"}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	auth := localSoftwareAuthenticator{key: key, id: []byte("software-authenticator-credential")}
+	auth := localAuthenticator(t)
 	for _, tc := range []struct {
 		name, origin string
 		uv, valid    bool

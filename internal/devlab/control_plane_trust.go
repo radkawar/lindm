@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -19,37 +20,61 @@ import (
 
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/config"
+	"lindm/internal/releaseupdate"
 )
 
 // AuthorityFixture owns a real lindmd process and a disposable PostgreSQL database.
-// Shared development trust and IdP resources are read-only. Logical origins stay
-// pinned: only the private owner's dialer and guest reverse tunnels are rerouted.
+// Shared development trust and IdP resources are read-only. Ordinary native lanes
+// keep pinned logical origins; browser and action lanes sign their allocated ports.
 // The development offline keys are never part of this server's configuration.
 type AuthorityFixture struct {
-	AdminAddress  string
-	DeviceAddress string
-	DatabaseName  string
-	repository    string
-	binary        string
-	directory     string
-	database      *authorityDatabase
-	log           *os.File
-	process       *exec.Cmd
-	done          chan error
-	closed        bool
+	AdminAddress     string
+	DeviceAddress    string
+	ConsoleOrigin    string
+	DatabaseName     string
+	repository       string
+	binary           string
+	directory        string
+	database         *authorityDatabase
+	cluster          *loadPostgres
+	environment      LoadExperimentEnvironment
+	serverCPUs       string
+	processPID       atomic.Int64
+	log              *os.File
+	process          *exec.Cmd
+	done             chan error
+	closed           bool
+	local            *localAuthority
+	releasePublisher *releaseupdate.Publisher
 }
 
+type authorityFixtureMode uint8
+
+const (
+	authorityKeycloak authorityFixtureMode = iota
+	authorityKeycloakConsole
+	authorityLocal
+	authorityLocalConsole
+	authorityDeviceActions
+	authorityReleaseUpdates
+)
+
 func OpenAuthorityFixture(ctx context.Context, repository, binary string) (_ *AuthorityFixture, resultErr error) {
-	return openAuthorityFixture(ctx, repository, binary, false)
+	return OpenLoadAuthorityFixture(ctx, repository, binary, LoadAuthorityOptions{})
 }
 
 // OpenConsoleAuthorityFixture reserves the normal development admin origin for
 // an interactive disposable run. It never evicts another listener on that port.
 func OpenConsoleAuthorityFixture(ctx context.Context, repository, binary string) (*AuthorityFixture, error) {
-	return openAuthorityFixture(ctx, repository, binary, true)
+	return openAuthorityFixture(ctx, repository, binary, authorityKeycloakConsole)
 }
 
-func openAuthorityFixture(ctx context.Context, repository, binary string, console bool) (_ *AuthorityFixture, resultErr error) {
+func openAuthorityFixture(ctx context.Context, repository, binary string, mode authorityFixtureMode) (_ *AuthorityFixture, resultErr error) {
+	return openAuthorityFixtureWithOptions(ctx, repository, binary, mode, LoadAuthorityOptions{})
+}
+
+func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary string, mode authorityFixtureMode, options LoadAuthorityOptions) (_ *AuthorityFixture, resultErr error) {
+	local := mode == authorityLocal || mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityReleaseUpdates
 	root, err := filepath.Abs(repository)
 	if err != nil {
 		return nil, err
@@ -62,16 +87,15 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
 		return nil, errors.New("control-plane trust requires an executable prebuilt lindmd binary")
 	}
-	material, err := ReadAgentFixture(ctx, root)
+	material, err := ReadPublicAgentFixture(ctx, root)
 	if err != nil {
 		return nil, err
 	}
 	shared := FixturePath(root)
-	document, err := config.Load(filepath.Join(shared, "server.json"))
-	if err != nil {
-		return nil, err
+	f := &AuthorityFixture{
+		repository: root, binary: binary, ConsoleOrigin: consoleOrigin, serverCPUs: options.ServerCPUs,
+		environment: LoadExperimentEnvironment{Storage: "storage: shared development PostgreSQL", ServerCPUs: options.ServerCPUs},
 	}
-	f := &AuthorityFixture{repository: root, binary: binary}
 	defer func() {
 		if resultErr != nil {
 			resultErr = errors.Join(resultErr, f.Close())
@@ -85,7 +109,22 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 	if err != nil {
 		return nil, err
 	}
-	dsnBytes, err := os.ReadFile(filepath.Join(shared, "migration-database-url"))
+	databaseResources := shared
+	if options.DatabaseStorage == "nvme" || options.DatabaseStorage == "tmpfs" {
+		f.cluster, err = openLoadPostgres(ctx, root, shared, options)
+		if err != nil {
+			return nil, err
+		}
+		databaseResources = f.cluster.directory
+		f.environment = f.cluster.environment
+	}
+	document, err := authorityDocument(ctx, f.configPath(), shared, material)
+	if err != nil {
+		return nil, err
+	}
+	// Override only generated configuration, never read the shared server.json.
+	document.Proto.Database.MigrationUrlFile = proto.String(filepath.Join(databaseResources, "migration-database-url"))
+	dsnBytes, err := os.ReadFile(filepath.Join(databaseResources, "migration-database-url"))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +134,7 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 		return nil, errors.New("invalid development migration database URL")
 	}
 	setup, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	f.database, err = newAuthorityDatabase(setup, document, shared)
+	f.database, err = newAuthorityDatabase(setup, document, databaseResources)
 	cancel()
 	if err != nil {
 		return nil, err
@@ -111,7 +150,7 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 		}
 	}
 	adminAddressToReserve := "127.0.0.1:0"
-	if console {
+	if mode == authorityKeycloakConsole {
 		adminAddressToReserve = "127.0.0.1:18444"
 	}
 	admin, err := net.Listen("tcp4", adminAddressToReserve)
@@ -141,20 +180,50 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 	cfg := proto.CloneOf(document.Proto)
 	cfg.AdminListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(adminAddress.Port)}
 	cfg.DeviceListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(deviceAddress.Port)}
+	deviceOrigin := "https://localhost:18445"
+	if mode == authorityLocalConsole || mode == authorityDeviceActions {
+		f.ConsoleOrigin = fmt.Sprintf("https://localhost:%d", adminAddress.Port)
+		cfg.PublicUrl = f.ConsoleOrigin
+		if mode == authorityDeviceActions {
+			deviceOrigin = fmt.Sprintf("https://localhost:%d", deviceAddress.Port)
+		}
+		material, err = f.originAgentFixture(ctx, material, deviceOrigin)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(f.directory, "bootstrap.dsse.json"), material.BootstrapEnvelope, 0600); err != nil {
+			return nil, err
+		}
+	}
 	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
 	cfg.Tls.CertificateFile = filepath.Join(shared, "server.crt")
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")
 	cfg.DeviceCa.CertificateFile = filepath.Join(shared, "device-ca.crt")
 	cfg.DeviceCa.PrivateKeyFile = filepath.Join(shared, "device-ca.key")
-	keycloak := cfg.GetAuthentication().GetKeycloak()
-	if keycloak == nil {
-		return nil, errors.New("isolated control-plane checks require the Keycloak development fixture")
+	if local {
+		cfg.Authentication = &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}
+		cfg.Authorization.GroupBindings = nil
+	} else {
+		keycloak := cfg.GetAuthentication().GetKeycloak()
+		if keycloak == nil {
+			return nil, errors.New("isolated control-plane checks require the Keycloak development fixture")
+		}
+		keycloak.ClientSecretFile = filepath.Join(shared, "console-secret")
+		keycloak.DirectoryClientSecretFile = filepath.Join(shared, "directory-secret")
 	}
-	keycloak.ClientSecretFile = filepath.Join(shared, "console-secret")
-	keycloak.DirectoryClientSecretFile = filepath.Join(shared, "directory-secret")
 	cfg.TrustedCaFile = filepath.Join(shared, "transport-ca.crt")
-	cfg.DevicePublicUrl = proto.String("https://localhost:18445")
+	cfg.DevicePublicUrl = proto.String(deviceOrigin)
 	cfg.ExecutionBootstrap = &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"}
+	if mode == authorityLocalConsole {
+		if err := f.configureConsoleIntegrations(cfg); err != nil {
+			return nil, err
+		}
+	}
+	if mode == authorityReleaseUpdates {
+		if err := f.configureReleaseRepository(ctx, cfg, material); err != nil {
+			return nil, err
+		}
+	}
 	encoded, err := protojson.Marshal(cfg)
 	if err != nil {
 		return nil, err
@@ -179,13 +248,21 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 	if err != nil {
 		return nil, errors.New("migrate isolated authority database failed")
 	}
-	bootstrap, stop := context.WithTimeout(ctx, time.Minute)
-	cmd := exec.CommandContext(bootstrap, f.binary, "bootstrap-owner", "-config", f.configPath(), "-issuer", issuer, "-subject", ownerSubject)
-	cmd.Stdout, cmd.Stderr, cmd.WaitDelay = f.log, f.log, 5*time.Second
-	err = cmd.Run()
-	stop()
-	if err != nil {
-		return nil, errors.New("bootstrap owner in isolated authority database failed")
+	var enrollmentSecret string
+	if local {
+		enrollmentSecret, err = f.bootstrapLocalOwner(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		bootstrap, stop := context.WithTimeout(ctx, time.Minute)
+		cmd := exec.CommandContext(bootstrap, f.binary, "bootstrap-owner", "-config", f.configPath(), "-issuer", issuer, "-subject", ownerSubject)
+		cmd.Stdout, cmd.Stderr, cmd.WaitDelay = f.log, f.log, 5*time.Second
+		err = cmd.Run()
+		stop()
+		if err != nil {
+			return nil, errors.New("bootstrap owner in isolated authority database failed")
+		}
 	}
 	err = errors.Join(admin.Close(), device.Close())
 	admin, device = nil, nil
@@ -194,6 +271,14 @@ func openAuthorityFixture(ctx context.Context, repository, binary string, consol
 	}
 	if err := f.start(ctx); err != nil {
 		return nil, err
+	}
+	if local {
+		if err := f.enrollLocalOwners(ctx, enrollmentSecret); err != nil {
+			return nil, err
+		}
+	}
+	if err := f.RegisterRelease(ctx, ""); err != nil {
+		return nil, fmt.Errorf("register isolated server release: %w", err)
 	}
 	return f, nil
 }
@@ -204,6 +289,9 @@ func (f *AuthorityFixture) OpenOwnerSession(ctx context.Context) (*OwnerSession,
 	if f.closed {
 		return nil, errors.New("isolated authority fixture is closed")
 	}
+	if f.local != nil {
+		return f.openLocalSession(ctx, f.local.owner)
+	}
 	return openOwnerSession(ctx, f.repository, f.AdminAddress)
 }
 
@@ -211,11 +299,15 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	if f.closed || f.process != nil {
 		return errors.New("isolated authority process lifecycle conflict")
 	}
-	cmd := exec.Command(f.binary, "serve", "-config", f.configPath())
+	cmd, err := newServerCommand(f.binary, f.configPath(), f.serverCPUs)
+	if err != nil {
+		return err
+	}
 	cmd.Stdout, cmd.Stderr = f.log, f.log
 	if err := cmd.Start(); err != nil {
 		return errors.New("start isolated lindmd failed")
 	}
+	f.processPID.Store(int64(cmd.Process.Pid))
 	f.process, f.done = cmd, make(chan error, 1)
 	done := f.done
 	go func() { done <- cmd.Wait() }()
@@ -234,10 +326,11 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 		select {
 		case <-f.done:
 			f.process, f.done = nil, nil
+			f.processPID.Store(0)
 			return errors.New("isolated lindmd exited before readiness")
 		default:
 		}
-		req, err := http.NewRequestWithContext(ready, http.MethodGet, consoleOrigin+"/readyz", nil)
+		req, err := http.NewRequestWithContext(ready, http.MethodGet, f.ConsoleOrigin+"/readyz", nil)
 		if err != nil {
 			return err
 		}
@@ -268,12 +361,14 @@ func (f *AuthorityFixture) stop() error {
 	select {
 	case waitErr := <-done:
 		f.process, f.done = nil, nil
+		f.processPID.Store(0)
 		return waitErr
 	case <-time.After(15 * time.Second):
 		_ = process.Process.Kill()
 		select {
 		case <-done:
 			f.process, f.done = nil, nil
+			f.processPID.Store(0)
 			return errors.New("isolated lindmd required forced shutdown")
 		case <-time.After(5 * time.Second):
 			return errors.New("isolated lindmd cleanup deadline")
@@ -293,7 +388,7 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 }
 
 func (f *AuthorityFixture) Close() error {
-	if f.closed && f.process == nil {
+	if f.closed && f.process == nil && f.cluster == nil {
 		return nil
 	}
 	f.closed = true
@@ -302,8 +397,17 @@ func (f *AuthorityFixture) Close() error {
 		// Never drop a database or unlink credentials still used by a live child.
 		return errors.Join(err, fmt.Errorf("isolated lindmd has not exited; owned database %s and resources %s retained", f.DatabaseName, f.directory))
 	}
+	if f.local != nil {
+		f.local.close()
+	}
 	if f.database != nil {
 		err = errors.Join(err, f.database.Close())
+	}
+	if f.cluster != nil {
+		if cleanupErr := f.cluster.Close(); cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
+		f.cluster = nil
 	}
 	if f.log != nil {
 		err = errors.Join(err, f.log.Close())

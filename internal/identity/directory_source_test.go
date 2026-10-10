@@ -61,20 +61,20 @@ func TestKeycloakSourceReadsCurrentAuthority(t *testing.T) {
 		t.Fatal(err)
 	}
 	var directory DirectorySource = source
-	observation, err := directory.Observe(context.Background(), subject)
-	if err != nil || !observation.Found || !observation.Enabled || !observation.Direct || observation.UserID != subject || len(observation.Groups) != 1 || observation.Groups[0] != "/admins" {
+	observation, err := directory.Observe(context.Background(), subject.String())
+	if err != nil || !observation.Found || !observation.Enabled || !observation.Direct || observation.UserID != subject.String() || len(observation.Groups) != 1 || observation.Groups[0] != "/admins" {
 		t.Fatalf("enabled observation = %+v, error = %v", observation, err)
 	}
 	if !observation.AcquiredAt.IsZero() {
 		t.Fatal("source assigned a timestamp instead of the service database clock")
 	}
 	state.Store(1)
-	observation, err = directory.Observe(context.Background(), subject)
+	observation, err = directory.Observe(context.Background(), subject.String())
 	if err != nil || !observation.Found || observation.Enabled || len(observation.Groups) != 0 {
 		t.Fatalf("disabled observation = %+v, error = %v", observation, err)
 	}
 	state.Store(2)
-	observation, err = directory.Observe(context.Background(), subject)
+	observation, err = directory.Observe(context.Background(), subject.String())
 	if err == nil || observation.Found || len(observation.Groups) != 0 {
 		t.Fatalf("failed read retained authority: observation = %+v, error = %v", observation, err)
 	}

@@ -49,19 +49,19 @@ ON CONFLICT (issuer, subject) DO UPDATE
 SET display_name = EXCLUDED.display_name
 RETURNING id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role;
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before;
 
 -- name: GetPrincipalByID :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE id = sqlc.arg(id);
 
 -- name: GetPrincipalForUpdate :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE id = sqlc.arg(id)
 FOR UPDATE;
@@ -75,10 +75,15 @@ SET display_name = sqlc.arg(display_name),
   deactivation_source = sqlc.arg(deactivation_source)
 WHERE id = sqlc.arg(id);
 
+-- name: AdvancePrincipalObservationFence :exec
+UPDATE principals
+SET lifecycle_not_before = GREATEST(lifecycle_not_before, sqlc.arg(observed_at)::timestamptz)
+WHERE id = sqlc.arg(id);
+
 -- name: GetPrincipalByIssuerSubject :one
 SELECT id, issuer, subject, display_name, pinned_role, created_at, deactivated_at,
   deactivation_source, directory_enabled, directory_observed_at,
-  authorization_version, authorization_role
+  authorization_version, authorization_role, authorization_digest, service_account, lifecycle_not_before
 FROM principals
 WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
 
@@ -148,20 +153,20 @@ INSERT INTO sessions (
 
 -- name: GetSessionByTokenHash :one
 SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind
 FROM sessions
 WHERE token_hash = sqlc.arg(token_hash);
 
 -- name: TouchSession :one
 UPDATE sessions
 SET last_seen_at = now(),
-  idle_expires_at = LEAST(absolute_expires_at, now() + interval '30 minutes')
+  idle_expires_at = LEAST(absolute_expires_at, now() + CASE WHEN kind = 'cli' THEN interval '15 minutes' ELSE interval '30 minutes' END)
 WHERE token_hash = sqlc.arg(token_hash)
   AND revoked_at IS NULL
   AND idle_expires_at > now()
   AND absolute_expires_at > now()
 RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
-  absolute_expires_at, revoked_at, break_glass, incident_reason;
+  absolute_expires_at, revoked_at, break_glass, incident_reason, kind;
 
 -- name: RevokeSessionByTokenHash :execrows
 UPDATE sessions
@@ -189,7 +194,8 @@ WHERE id = true AND owner_principal_id IS NULL;
 UPDATE principals
 SET pinned_role = 'owner',
   authorization_version = authorization_version + CASE WHEN authorization_role = 'owner' THEN 0 ELSE 1 END,
-  authorization_role = 'owner'
+  authorization_role = 'owner',
+  authorization_digest = sqlc.arg(authorization_digest)
 WHERE id = sqlc.arg(id) AND pinned_role = '';
 
 -- name: InsertAuditEvent :exec
@@ -205,11 +211,27 @@ VALUES (
 -- name: SetPrincipalAuthorization :one
 UPDATE principals
 SET authorization_role = sqlc.arg(authorization_role),
+  authorization_digest = sqlc.arg(authorization_digest),
   authorization_version = authorization_version + 1
 WHERE id = sqlc.arg(id)
   AND authorization_version = sqlc.arg(expected_version)
-  AND authorization_role <> sqlc.arg(authorization_role)
+  AND (authorization_role <> sqlc.arg(authorization_role) OR authorization_digest <> sqlc.arg(authorization_digest))
 RETURNING authorization_version;
 
 -- name: ReadAuthorizationClock :one
 SELECT clock_timestamp()::timestamptz;
+
+-- name: GetAuthorizationPolicy :one
+SELECT digest FROM authorization_policy WHERE id = true;
+
+-- name: LockAuthorizationPolicy :one
+SELECT digest FROM authorization_policy WHERE id = true FOR SHARE;
+
+-- name: LockAuthorizationPolicyUpdate :one
+SELECT digest FROM authorization_policy WHERE id = true FOR UPDATE;
+
+-- name: SetAuthorizationPolicy :exec
+UPDATE authorization_policy SET digest = sqlc.arg(digest) WHERE id = true;
+
+-- name: InvalidatePolicyAuthorizations :exec
+UPDATE principals SET authorization_version = authorization_version + 1;

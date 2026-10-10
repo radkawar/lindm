@@ -1,0 +1,20 @@
+{
+  "id": "arch-cloud-20261001.604814-x86-64",
+  "distribution": "arch",
+  "version": "rolling",
+  "architecture": "x86_64",
+  "edition": "cloudimg",
+  "release": "20261001.604814",
+  "imageFilename": "Arch-Linux-x86_64-cloudimg-20261001.604814.qcow2",
+  "imageUrl": "https://geo.mirror.pkgbuild.com/images/v20261001.604814/Arch-Linux-x86_64-cloudimg-20261001.604814.qcow2",
+  "checksumUrl": "https://geo.mirror.pkgbuild.com/images/v20261001.604814/Arch-Linux-x86_64-cloudimg-20261001.604814.qcow2.SHA256",
+  "signatureUrl": "https://geo.mirror.pkgbuild.com/images/v20261001.604814/Arch-Linux-x86_64-cloudimg-20261001.604814.qcow2.SHA256.sig",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x1B9A16984A4E8CB448712D2AE0B78BF4326C6F8F",
+  "sha256": "360f0fa49db6813bdc8e35bed230a2dc2ae3567b7b5ab74719c0a706e4e34e87",
+  "signerFingerprint": "1B9A16984A4E8CB448712D2AE0B78BF4326C6F8F",
+  "imageSizeBytes": "578080256",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://gitlab.archlinux.org/archlinux/arch-boxes/-/raw/master/README.md",
+  "releaseProvenanceUrl": "https://geo.mirror.pkgbuild.com/images/v20261001.604814/",
+  "repositorySnapshotDate": "2026-10-02"
+}

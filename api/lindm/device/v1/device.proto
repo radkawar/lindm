@@ -5,6 +5,7 @@ package lindm.device.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/device/v1/device_actions.proto";
 import "lindm/device/v1/service_dispatch.proto";
 import "lindm/inventory/v1/observation.proto";
 
@@ -28,6 +29,10 @@ service DeviceService {
   rpc AuthorizeServiceStart(AuthorizeServiceStartRequest) returns (AuthorizeServiceStartResponse);
   // Admits a nonce-bound device attestation of protected action history.
   rpc ReportServiceResult(ReportServiceResultRequest) returns (ReportServiceResultResponse);
+  rpc GetDeviceActionWork(GetDeviceActionWorkRequest) returns (GetDeviceActionWorkResponse);
+  rpc AuthorizeDeviceActionStart(AuthorizeDeviceActionStartRequest) returns (AuthorizeDeviceActionStartResponse);
+  rpc ReportDeviceActionResult(ReportDeviceActionResultRequest) returns (ReportDeviceActionResultResponse);
+  rpc RegisterDeviceActionRecovery(RegisterDeviceActionRecoveryRequest) returns (RegisterDeviceActionRecoveryResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {

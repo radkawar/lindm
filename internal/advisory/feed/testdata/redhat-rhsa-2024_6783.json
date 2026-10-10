@@ -1,0 +1,1299 @@
+{
+  "document": {
+    "aggregate_severity": {
+      "namespace": "https://access.redhat.com/security/updates/classification/",
+      "text": "Moderate"
+    },
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "distribution": {
+      "text": "Copyright © Red Hat, Inc. All rights reserved.",
+      "tlp": {
+        "label": "WHITE",
+        "url": "https://www.first.org/tlp/"
+      }
+    },
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "An update for openssl is now available for Red Hat Enterprise Linux 9.\n\nRed Hat Product Security has rated this update as having a security impact of Moderate. A Common Vulnerability Scoring System (CVSS) base score, which gives a detailed severity rating, is available for each vulnerability from the CVE link(s) in the References section.",
+        "title": "Topic"
+      },
+      {
+        "category": "general",
+        "text": "OpenSSL is a toolkit that implements the Secure Sockets Layer (SSL) and Transport Layer Security (TLS) protocols, as well as a full-strength general-purpose cryptography library.\n\nSecurity Fix(es):\n\n* openssl: Possible denial of service in X.509 name checks (CVE-2024-6119)\n\nFor more details about the security issue(s), including the impact, a CVSS score, acknowledgments, and other related information, refer to the CVE page(s) listed in the References section.",
+        "title": "Details"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "This content is licensed under the Creative Commons Attribution 4.0 International License (https://creativecommons.org/licenses/by/4.0/). If you distribute this content, or a modified version of it, you must provide attribution to Red Hat Inc. and provide a link to the original.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "https://access.redhat.com/security/team/contact/",
+      "issuing_authority": "Red Hat Product Security is responsible for vulnerability handling across all Red Hat products and services.",
+      "name": "Red Hat Product Security",
+      "namespace": "https://www.redhat.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "https://access.redhat.com/errata/RHSA-2024:6783",
+        "url": "https://access.redhat.com/errata/RHSA-2024:6783"
+      },
+      {
+        "category": "external",
+        "summary": "https://access.redhat.com/security/updates/classification/#moderate",
+        "url": "https://access.redhat.com/security/updates/classification/#moderate"
+      },
+      {
+        "category": "external",
+        "summary": "2306158",
+        "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2306158"
+      },
+      {
+        "category": "self",
+        "summary": "Canonical URL",
+        "url": "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_6783.json"
+      }
+    ],
+    "title": "Red Hat Security Advisory: openssl security update",
+    "tracking": {
+      "current_release_date": "2026-10-09T01:19:03+00:00",
+      "generator": {
+        "date": "2026-10-09T01:19:03+00:00",
+        "engine": {
+          "name": "Red Hat SDEngine",
+          "version": "5.4.2"
+        }
+      },
+      "id": "RHSA-2024:6783",
+      "initial_release_date": "2024-09-18T21:18:31+00:00",
+      "revision_history": [
+        {
+          "date": "2024-09-18T21:18:31+00:00",
+          "number": "1",
+          "summary": "Initial version"
+        },
+        {
+          "date": "2024-09-18T21:18:31+00:00",
+          "number": "2",
+          "summary": "Last updated version"
+        },
+        {
+          "date": "2026-10-09T01:19:03+00:00",
+          "number": "3",
+          "summary": "Last generated version"
+        }
+      ],
+      "status": "final",
+      "version": "3"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                  "product_id": "AppStream-9.4.0.Z.MAIN.EUS",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/a:redhat:enterprise_linux:9::appstream"
+                  }
+                }
+              },
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux BaseOS (v. 9)",
+                "product": {
+                  "name": "Red Hat Enterprise Linux BaseOS (v. 9)",
+                  "product_id": "BaseOS-9.4.0.Z.MAIN.EUS",
+                  "product_identification_helper": {
+                    "cpe": "cpe:/o:redhat:enterprise_linux:9::baseos"
+                  }
+                }
+              }
+            ],
+            "category": "product_family",
+            "name": "Red Hat Enterprise Linux"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-devel-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-devel-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-devel-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-devel@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-perl-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-perl-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-perl-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-perl@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debugsource@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debuginfo@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs-debuginfo@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-1:3.0.7-28.el9_4.aarch64",
+                "product": {
+                  "name": "openssl-libs-1:3.0.7-28.el9_4.aarch64",
+                  "product_id": "openssl-libs-1:3.0.7-28.el9_4.aarch64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs@3.0.7-28.el9_4?arch=aarch64&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "aarch64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-devel@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-perl@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debugsource@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debuginfo@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs-debuginfo@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+                "product": {
+                  "name": "openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+                  "product_id": "openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs@3.0.7-28.el9_4?arch=ppc64le&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "ppc64le"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-devel-1:3.0.7-28.el9_4.i686",
+                "product": {
+                  "name": "openssl-devel-1:3.0.7-28.el9_4.i686",
+                  "product_id": "openssl-devel-1:3.0.7-28.el9_4.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-devel@3.0.7-28.el9_4?arch=i686&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debugsource-1:3.0.7-28.el9_4.i686",
+                "product": {
+                  "name": "openssl-debugsource-1:3.0.7-28.el9_4.i686",
+                  "product_id": "openssl-debugsource-1:3.0.7-28.el9_4.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debugsource@3.0.7-28.el9_4?arch=i686&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+                "product": {
+                  "name": "openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+                  "product_id": "openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debuginfo@3.0.7-28.el9_4?arch=i686&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+                "product": {
+                  "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+                  "product_id": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs-debuginfo@3.0.7-28.el9_4?arch=i686&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-1:3.0.7-28.el9_4.i686",
+                "product": {
+                  "name": "openssl-libs-1:3.0.7-28.el9_4.i686",
+                  "product_id": "openssl-libs-1:3.0.7-28.el9_4.i686",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs@3.0.7-28.el9_4?arch=i686&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "i686"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-devel-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-devel-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-devel-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-devel@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-perl-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-perl-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-perl-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-perl@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debugsource@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debuginfo@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs-debuginfo@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-1:3.0.7-28.el9_4.x86_64",
+                "product": {
+                  "name": "openssl-libs-1:3.0.7-28.el9_4.x86_64",
+                  "product_id": "openssl-libs-1:3.0.7-28.el9_4.x86_64",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs@3.0.7-28.el9_4?arch=x86_64&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "x86_64"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-devel-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-devel-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-devel-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-devel@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-perl-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-perl-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-perl-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-perl@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debugsource@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-debuginfo@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs-debuginfo@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "openssl-libs-1:3.0.7-28.el9_4.s390x",
+                "product": {
+                  "name": "openssl-libs-1:3.0.7-28.el9_4.s390x",
+                  "product_id": "openssl-libs-1:3.0.7-28.el9_4.s390x",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl-libs@3.0.7-28.el9_4?arch=s390x&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "s390x"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "openssl-1:3.0.7-28.el9_4.src",
+                "product": {
+                  "name": "openssl-1:3.0.7-28.el9_4.src",
+                  "product_id": "openssl-1:3.0.7-28.el9_4.src",
+                  "product_identification_helper": {
+                    "purl": "pkg:rpm/redhat/openssl@3.0.7-28.el9_4?arch=src&epoch=1"
+                  }
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "src"
+          }
+        ],
+        "category": "vendor",
+        "name": "Red Hat"
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-devel-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-devel-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-devel-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-devel-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-devel-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-devel-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-devel-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-devel-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-devel-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-perl-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-perl-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-perl-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-perl-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-perl-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-perl-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 9)",
+          "product_id": "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-perl-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "AppStream-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-1:3.0.7-28.el9_4.src as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.src"
+        },
+        "product_reference": "openssl-1:3.0.7-28.el9_4.src",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-libs-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-libs-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-libs-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-libs-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 9)",
+          "product_id": "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+        },
+        "product_reference": "openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+        "relates_to_product_reference": "BaseOS-9.4.0.Z.MAIN.EUS"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2024-6119",
+      "cwe": {
+        "id": "CWE-843",
+        "name": "Access of Resource Using Incompatible Type ('Type Confusion')"
+      },
+      "discovery_date": "2024-08-20T17:50:04+00:00",
+      "ids": [
+        {
+          "system_name": "Red Hat Bugzilla ID",
+          "text": "2306158"
+        }
+      ],
+      "notes": [
+        {
+          "category": "description",
+          "text": "A flaw was found in OpenSSL. Applications performing certificate name checks (e.g., TLS clients checking server certificates) may attempt to read an invalid memory address resulting in abnormal termination of the application process.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "openssl: Possible denial of service in X.509 name checks",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "This vulnerability is classified as moderate severity rather than important because it primarily affects specific use cases involving certificate name checks against otherName subject alternative names, a scenario that is not commonly encountered. The issue only triggers a denial of service (DoS) by causing an abnormal application termination, without compromising the integrity, confidentiality, or availability of data at a broader scale. Additionally, TLS servers, which typically don't perform reference identity checks during client certificate validation, are largely unaffected. The impact is localized to certain TLS clients performing specific name comparisons, reducing the overall risk profile and justifying the moderate severity classification.",
+          "title": "Statement"
+        },
+        {
+          "category": "general",
+          "text": "The CVSS score(s) listed for this vulnerability do not reflect the associated product's status, and are included for informational purposes to better understand the severity of this vulnerability.",
+          "title": "CVSS score applicability"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.aarch64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.i686",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.s390x",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.x86_64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.aarch64",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.s390x",
+          "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.x86_64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.aarch64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.ppc64le",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.s390x",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.src",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.x86_64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.aarch64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.i686",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.s390x",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.x86_64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+          "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+        ]
+      },
+      "references": [
+        {
+          "category": "self",
+          "summary": "Canonical URL",
+          "url": "https://access.redhat.com/security/cve/CVE-2024-6119"
+        },
+        {
+          "category": "external",
+          "summary": "RHBZ#2306158",
+          "url": "https://bugzilla.redhat.com/show_bug.cgi?id=2306158"
+        },
+        {
+          "category": "external",
+          "summary": "https://www.cve.org/CVERecord?id=CVE-2024-6119",
+          "url": "https://www.cve.org/CVERecord?id=CVE-2024-6119"
+        },
+        {
+          "category": "external",
+          "summary": "https://nvd.nist.gov/vuln/detail/CVE-2024-6119",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-6119"
+        },
+        {
+          "category": "external",
+          "summary": "https://github.com/openssl/openssl/security/advisories/GHSA-5qrj-vq78-58fj",
+          "url": "https://github.com/openssl/openssl/security/advisories/GHSA-5qrj-vq78-58fj"
+        }
+      ],
+      "release_date": "2024-09-04T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2024-09-18T21:18:31+00:00",
+          "details": "For details on how to apply this update, which includes the changes described in this advisory, refer to:\n\nhttps://access.redhat.com/articles/11258",
+          "product_ids": [
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.src",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+          ],
+          "restart_required": {
+            "category": "none"
+          },
+          "url": "https://access.redhat.com/errata/RHSA-2024:6783"
+        },
+        {
+          "category": "workaround",
+          "details": "Mitigation for this issue is either not available or the currently available options do not meet the Red Hat Product Security criteria comprising ease of use and deployment, applicability to widespread installation base or stability.",
+          "product_ids": [
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.src",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+          ]
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "HIGH",
+            "attackVector": "NETWORK",
+            "availabilityImpact": "HIGH",
+            "baseScore": 5.9,
+            "baseSeverity": "MEDIUM",
+            "confidentialityImpact": "NONE",
+            "integrityImpact": "NONE",
+            "privilegesRequired": "NONE",
+            "scope": "UNCHANGED",
+            "userInteraction": "NONE",
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+            "version": "3.1"
+          },
+          "products": [
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-devel-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.aarch64",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.ppc64le",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.s390x",
+            "AppStream-9.4.0.Z.MAIN.EUS:openssl-perl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.src",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debuginfo-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-debugsource-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-1:3.0.7-28.el9_4.x86_64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.aarch64",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.i686",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.ppc64le",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.s390x",
+            "BaseOS-9.4.0.Z.MAIN.EUS:openssl-libs-debuginfo-1:3.0.7-28.el9_4.x86_64"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "Moderate"
+        }
+      ],
+      "title": "openssl: Possible denial of service in X.509 name checks"
+    }
+  ]
+}

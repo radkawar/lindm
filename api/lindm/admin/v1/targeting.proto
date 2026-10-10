@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/admin/v1/inventory_management.proto";
+import "lindm/policy/v1/targeting.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// A topologically ordered bounded AST. The last node is the root. Child indices
+// refer only backwards; declared depth decreases on every edge (maximum eight).
+// Predicates reuse inventory's typed filter and custom attribute vocabulary.
+// Attribute maps retain typed zero/false values and use deterministic key ordering
+// for targeting request and snapshot digests. Unknown protobuf fields are rejected,
+// including fields nested inside attribute values.
+message TargetExpression {
+  repeated TargetNode nodes = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  uint32 inventory_max_age_seconds = 2 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 86400
+  }];
+}
+message TargetChildren {
+  repeated uint32 indices = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      uint32: {lte: 63}
+    }
+  }];
+}
+message TargetNode {
+  uint32 depth = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 8
+  }];
+  oneof node {
+    option (buf.validate.oneof).required = true;
+    DeviceFilter predicate = 2;
+    TargetChildren all = 3;
+    TargetChildren any = 4;
+    uint32 not_index = 5 [(buf.validate.field).uint32.lte = 63];
+    string static_group_id = 6 [(buf.validate.field).string.uuid = true];
+  }
+}
+message DynamicTargetGroup {
+  string group_id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  TargetExpression expression = 3 [(buf.validate.field).required = true];
+  uint64 revision = 4;
+}
+message PutDynamicGroupRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  DynamicTargetGroup group = 2 [(buf.validate.field).required = true];
+  uint64 expected_revision = 3 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message PutDynamicGroupResponse {
+  DynamicTargetGroup group = 1;
+}
+message GetDynamicGroupRequest {
+  string group_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetDynamicGroupResponse {
+  DynamicTargetGroup group = 1;
+}
+message ListDynamicGroupsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100
+  }];
+  optional string after_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message ListDynamicGroupsResponse {
+  repeated DynamicTargetGroup groups = 1;
+}
+message PutTargetAssignmentRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.policy.v1.TargetAssignment assignment = 2 [(buf.validate.field).required = true];
+  uint64 expected_revision = 3 [(buf.validate.field).uint64.lte = 9223372036854775806];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message PutTargetAssignmentResponse {
+  lindm.policy.v1.TargetCandidate assignment = 1;
+}
+message ListTargetAssignmentsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100
+  }];
+  optional string after_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message ListTargetAssignmentsResponse {
+  repeated lindm.policy.v1.TargetCandidate assignments = 1;
+}
+message PreviewTargetAssignmentsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message PreviewTargetAssignmentsResponse {
+  lindm.policy.v1.TargetPreview preview = 1;
+}
+message ActivateTargetPreviewRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string preview_id = 2 [(buf.validate.field).string.uuid = true];
+  bytes preview_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string device_id = 5 [(buf.validate.field).string.uuid = true];
+  optional string approval_id = 6 [(buf.validate.field).string.uuid = true];
+}
+message ActivateTargetPreviewResponse {
+  lindm.policy.v1.TargetPreview preview = 1;
+}
+message PutRolloutRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.policy.v1.RolloutSpec rollout = 2 [(buf.validate.field).required = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message RolloutState {
+  lindm.policy.v1.RolloutSpec rollout = 1;
+  uint64 revision = 2;
+  uint32 ring_index = 3;
+  bool paused = 4;
+  string pause_reason = 5;
+  uint32 selected_count = 6;
+  uint32 pending_count = 7;
+  uint32 excluded_count = 8;
+}
+message PutRolloutResponse {
+  RolloutState rollout = 1;
+}
+message ControlRolloutRequest {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  string rollout_id = 2 [(buf.validate.field).string.uuid = true];
+  uint64 expected_revision = 3 [(buf.validate.field).uint64 = {
+    gte: 1
+    lte: 9223372036854775806
+  }];
+  enum Operation {
+    OPERATION_UNSPECIFIED = 0;
+    OPERATION_PAUSE = 1;
+    OPERATION_RESUME = 2;
+    OPERATION_PROMOTE = 3;
+  }
+  Operation operation = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message ControlRolloutResponse {
+  RolloutState rollout = 1;
+}
+message ListRolloutsRequest {
+  uint32 page_size = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100
+  }];
+  optional string after_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message ListRolloutsResponse {
+  repeated RolloutState rollouts = 1;
+}

@@ -36,6 +36,8 @@ services:
       - ${LINDM_DEV_DIR}/server.crt:/run/lindm-dev/server.crt:ro
       - ${LINDM_DEV_DIR}/server.key:/run/lindm-dev/server.key:ro
       - ${LINDM_DEV_DIR}/realm.json:/opt/keycloak/data/import/lindm-realm.json:ro
+      - ${LINDM_DEV_DIR}/broker-realm.json:/opt/keycloak/data/import/lindm-broker-realm.json:ro
+      - ${LINDM_DEV_DIR}/broker-upstream-realm.json:/opt/keycloak/data/import/lindm-upstream-realm.json:ro
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 volumes:
