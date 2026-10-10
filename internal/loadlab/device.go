@@ -28,6 +28,7 @@ import (
 
 type simulatedDevice struct {
 	id, generation, boot, incarnation    string
+	installation                         string
 	key                                  ed25519.PrivateKey
 	certificate                          []byte
 	transport                            *http.Transport
@@ -52,7 +53,7 @@ func (r *runner) transport(address string, certificate *tls.Certificate) *http.T
 	}}
 }
 func (r *runner) enroll(ctx context.Context, index int) (d *simulatedDevice, resultErr error) {
-	d = &simulatedDevice{boot: uuid.NewString(), incarnation: uuid.NewString(), root: r.bootstrap.Root, rootDigest: r.rootDigest, completed: make(map[string]bool)}
+	d = &simulatedDevice{boot: uuid.NewString(), incarnation: uuid.NewString(), installation: uuid.NewString(), root: r.bootstrap.Root, rootDigest: r.rootDigest, completed: make(map[string]bool)}
 	defer func() {
 		if resultErr != nil {
 			d.close()
@@ -71,12 +72,12 @@ func (r *runner) enroll(ctx context.Context, index int) (d *simulatedDevice, res
 	granted, err := r.owner.Admin.CreateEnrollmentGrant(ctx, connect.NewRequest(&adminv1.CreateEnrollmentGrantRequest{RequestId: uuid.NewString(), LifetimeSeconds: 300, Reason: "disposable capacity simulated device"}))
 	r.metrics.observe("CreateEnrollmentGrant", time.Since(started), err)
 	if err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: create enrollment grant: %w", index, err)
 	}
 	enrolled, err := r.enrollment.Enroll(ctx, connect.NewRequest(&enrollmentv1.EnrollRequest{GrantSecret: granted.Msg.GetSecret(), TransactionId: uuid.NewString(), CsrPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr})}))
 	granted.Msg.Secret = ""
 	if err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: enroll: %w", index, err)
 	}
 	d.id, d.generation, d.certificate = enrolled.Msg.GetDeviceId(), enrolled.Msg.GetEnrollmentGeneration(), enrolled.Msg.GetCertificatePem()
 	block, _ := pem.Decode(d.certificate)
@@ -86,27 +87,27 @@ func (r *runner) enroll(ctx context.Context, index int) (d *simulatedDevice, res
 	certificate := tls.Certificate{Certificate: [][]byte{block.Bytes}, PrivateKey: key}
 	d.transport = r.transport(r.fixture.DeviceAddress, &certificate)
 	d.client = devicev1connect.NewDeviceServiceClient(&http.Client{Transport: d.transport, Timeout: 30 * time.Second}, r.bootstrap.Bundle.GetDeviceOrigin(), connect.WithInterceptors(r.metrics))
-	proof, err := r.authority.Sign(ctx, &agentv1.SessionAcquisition{DeploymentId: r.bootstrap.Bundle.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, RequestId: uuid.NewString(), Incarnation: d.incarnation, BootId: d.boot, AgentRelease: r.agentRelease, AgentProtocolVersion: r.agentProtocol}, key)
+	proof, err := r.authority.Sign(ctx, &agentv1.SessionAcquisition{DeploymentId: r.bootstrap.Bundle.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, RequestId: uuid.NewString(), Incarnation: d.incarnation, BootId: d.boot, AgentRelease: r.agentRelease, AgentProtocolVersion: r.agentProtocol, InstallationId: d.installation}, key)
 	if err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: sign session acquisition: %w", index, err)
 	}
 	acquired, err := d.client.AcquireSession(ctx, connect.NewRequest(&devicev1.AcquireSessionRequest{AuthorityProof: proof}))
 	if err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: acquire session: %w", index, err)
 	}
 	d.epoch = acquired.Msg.GetSessionEpoch()
 	if err := r.syncTrust(ctx, d); err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: sync execution trust: %w", index, err)
 	}
 	if err := r.inventory(ctx, d, index); err != nil {
-		return d, err
+		return d, fmt.Errorf("device %d: report inventory: %w", index, err)
 	}
 	if index%100 < r.options.AssignmentPercent {
 		started := time.Now()
 		_, err = r.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: r.profile.GetProfileId(), RevisionId: r.profile.GetRevisionId()}, Reason: "disposable capacity service assignment"}))
 		r.metrics.observe("SetResourceAssignment", time.Since(started), err)
 		if err != nil {
-			return d, err
+			return d, fmt.Errorf("device %d: assign resource profile: %w", index, err)
 		}
 	}
 	return d, nil
@@ -135,7 +136,7 @@ func (r *runner) syncTrust(ctx context.Context, d *simulatedDevice) error {
 	for _, transition := range update.GetRootTransitions() {
 		root, err := r.verifier.VerifyRootTransition(ctx, d.root, transition, time.Now())
 		if err != nil {
-			return err
+			return fmt.Errorf("verify root transition: %w", err)
 		}
 		d.root = root
 		encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(root)
@@ -148,7 +149,7 @@ func (r *runner) syncTrust(ctx context.Context, d *simulatedDevice) error {
 	if envelope := update.GetDelegationEnvelope(); len(envelope) > 0 {
 		delegation, err := r.verifier.VerifyDelegation(ctx, d.root, envelope, d.delegation.GetVersion(), d.delegation.GetMinimumRecoveryEpoch(), time.Now())
 		if err != nil {
-			return err
+			return fmt.Errorf("verify delegation: %w", err)
 		}
 		d.delegation = delegation
 		digest := sha256.Sum256(envelope)
