@@ -85,6 +85,29 @@ func (e *Engine) Status() *agentv1.AgentUpdateStatus {
 	if e.running && (status.GetPhase() == "idle" || status.GetPhase() == "installed" || status.GetPhase() == "rejected") {
 		status.Phase = "checking"
 	}
+	// The native transaction may replace the executor and fail before its
+	// network process reconnects. Surface only durable helper failures here;
+	// status reads must neither launch recovery nor promote helper success
+	// without recover's independent native package/payload checks.
+	if !e.running && status.GetPhase() == "applying" && status.GetTransactionId() != "" {
+		helper := &agentv1.AgentUpdateHelperState{}
+		err := journal.ReadUpdateRecord(filepath.Join(e.store.Directory, status.GetTransactionId()), "helper.pb", helper)
+		if err == nil {
+			err = e.validator.Validate(helper)
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			status.Phase, status.Reason, status.LastOutcome = "recovery_required", "update_helper_state_unavailable", "incomplete"
+		} else if err == nil && (helper.GetPhase() == "recovery_required" || helper.GetPhase() == "rejected") {
+			status.Phase, status.Reason, status.LastOutcome = helper.GetPhase(), "native_transaction_incomplete", "incomplete"
+			if helper.GetPhase() == "rejected" {
+				status.Reason, status.LastOutcome = "verified_transaction_expired", "rejected"
+			}
+			status.ObservedAt = helper.GetObservedAt()
+			if helper.GetNativeDiagnostic() != nil {
+				status.NativeDiagnostic = helper.GetNativeDiagnostic()
+			}
+		}
+	}
 	return status
 }
 
@@ -228,12 +251,12 @@ func (e *Engine) cycle(ctx context.Context) error {
 			_ = os.RemoveAll(directory)
 		}
 	}()
-	// Keep the fixed package suffix needed by native package dispatch; neither
-	// the network nor signed target path chooses a local filesystem pathname.
+	// Derive the native filename only from validated package identity, never
+	// from a network pathname. APT requires its canonical private cache name.
 	downloadCtx, stopDownload := context.WithDeadline(ctx, selection.Deadline())
-	err = e.client.Stage(downloadCtx, selection, &remoteReader{ctx: downloadCtx, bridge: e.bridge, path: selection.TargetPath}, packagePath(directory, tx.GetManager()))
+	err = e.client.Stage(downloadCtx, selection, &remoteReader{ctx: downloadCtx, bridge: e.bridge, path: selection.TargetPath}, packagePath(directory, tx))
 	if err == nil && selection.SignaturePath != "" {
-		err = e.client.StageSignature(downloadCtx, selection, &remoteReader{ctx: downloadCtx, bridge: e.bridge, path: selection.SignaturePath}, packagePath(directory, tx.GetManager())+".sig")
+		err = e.client.StageSignature(downloadCtx, selection, &remoteReader{ctx: downloadCtx, bridge: e.bridge, path: selection.SignaturePath}, packagePath(directory, tx)+".sig")
 	}
 	stopDownload()
 	if err != nil {

@@ -36,7 +36,7 @@ func retentionFixture(t *testing.T, root, phase string) *agentv1.AgentUpdateTran
 	if err := journal.WriteUpdateRecord(path, "transaction.pb", tx); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(path, "agent.deb"), []byte("owned staged payload"), 0600); err != nil {
+	if err := os.WriteFile(packagePath(path, tx), []byte("owned staged payload"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if phase != "" {
@@ -99,7 +99,7 @@ func TestRetentionRequiresInactiveOwnedResolvedState(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "hardlink":
-				if err := os.Link(filepath.Join(path, "agent.deb"), filepath.Join(path, "duplicate")); err != nil {
+				if err := os.Link(packagePath(path, tx), filepath.Join(path, "duplicate")); err != nil {
 					t.Fatal(err)
 				}
 			case "mismatched":
@@ -111,7 +111,7 @@ func TestRetentionRequiresInactiveOwnedResolvedState(t *testing.T) {
 			if err := reclaimTransactions(root, "", active); err == nil {
 				t.Fatal("ambiguous transaction was reclaimed")
 			}
-			if _, err := os.Stat(filepath.Join(path, "agent.deb")); err != nil {
+			if _, err := os.Stat(packagePath(path, tx)); err != nil {
 				t.Fatal("rejected reclamation removed recovery payload:", err)
 			}
 		})
@@ -140,7 +140,7 @@ func TestRetentionReplaysPartialDeletionWithoutCrossingCurrent(t *testing.T) {
 	if _, err := os.Stat(retiredPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("retired deletion was not replayed:", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, current.GetId(), "agent.deb")); err != nil {
+	if _, err := os.Stat(packagePath(filepath.Join(root, current.GetId()), current)); err != nil {
 		t.Fatal("replay touched current recovery material:", err)
 	}
 }
@@ -189,7 +189,7 @@ func TestRetentionFollowsDurableJournalCutover(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(store.Directory, old.GetId())); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("superseded terminal material was not reclaimed:", err)
 	}
-	if _, err := os.Stat(filepath.Join(store.Directory, next.GetId(), "agent.deb")); err != nil {
+	if _, err := os.Stat(packagePath(filepath.Join(store.Directory, next.GetId()), next)); err != nil {
 		t.Fatal("durably admitted package was reclaimed:", err)
 	}
 }

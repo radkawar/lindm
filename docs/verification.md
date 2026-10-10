@@ -271,6 +271,28 @@ and Leap 16.0) passed authenticated acquisition and offline cache reverification
 records their individual signatures, image hashes and exact sizes. Acquisition
 does not qualify the remaining native lifecycle/dispatch cells.
 
+Additional completed native ARM records in the same directory use source `d303cec`
+and the exact `8c30afa7…` lab-only delta above, one `dgx20` KVM guest at a time:
+
+| Distro / lane       | Observed result                                                                                                                                                                                                                                    | Record / SHA-256                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Debian 13 dispatch  | Passed nine native scenarios; periodic compliant recheck and drift remediation used real five-minute intervals, ±90-second guest clocks and final revoked-device denial. Unstarted supersession remains integration-only, not a tenth native claim | `debian13-arm64-dgx20-dispatch.json` / `0973b1cf434265359808e6553f4c0766a29042c03e788ebe29996e7cf18376a0`  |
+| Debian 12 inspect   | Passed 361 native package identities and independent detail comparison                                                                                                                                                                             | `debian12-arm64-dgx20-inspect.json` / `5b872dedd2a611d7f6847b15cdacad6a0a941dd0d12c99c21ff6df7bea62bcc2`   |
+| Debian 12 lifecycle | Passed complete signed 0.7.0→0.7.1 automatic-trust lifecycle; five 362-package publications, denied attempt6 retained sequence5, epoch1→3, final revocation and missing-journal hold                                                               | `debian12-arm64-dgx20-lifecycle.json` / `1bda2586f58dee2764b8ca69e20cf99883412ad01e9414d540d5579d0af8d95a` |
+| Debian 12 dispatch  | Passed the same nine native scenarios with real periodic intervals and final revoked-device denial; unstarted supersession explicitly integration-only                                                                                             | `debian12-arm64-dgx20-dispatch.json` / `f29b8cdf4d4342c66e3928cc2d9ff5416fb1b92f243601e01682319376c7a8b0`  |
+
+Debian 12 lifecycle device `ef1dbc74-a7ed-4a68-8857-b6f6d5962280` retained
+generation `dbd9e3b5-aaa8-4963-8def-578c49ac1150`; its recorded remote lane lasted
+1,768.12 seconds. Debian 13/12 dispatch devices are respectively
+`740a50d1-c462-4861-8f2b-0caaf9f9447e` and
+`027db59b-a2f6-4289-8d3c-7692221ac284`; each remote lane lasted about 932 seconds.
+Their identically built native DEB SHA-256 is
+`773b35160f722e83ed9621d9440cc274de146cb90dab35db010acacd2cd91cf7`,
+remote lab `6f6188bf73dfaed9d2e61b3d9d89b4f34ef779597468756865c8c2aa019dea26`,
+and server `aa63607622525c5037fca78f4ddd00f06798727b394af3892b88d8d9d0c282bb`.
+Each lane uses isolated real local password/WebAuthn authority. These ARM passes
+do not retroactively pass the aborted Debian x86_64 lane.
+
 Arch cannot be substituted on these ARM hosts: [Arch's architecture policy](https://wiki.archlinux.org/title/Frequently_asked_questions#What_architectures_does_Arch_support?)
 supports x86_64 and identifies Arch Linux ARM as a separate derivative. The pinned
 official arch-boxes release publishes no aarch64 input. Tumbleweed's official
@@ -586,13 +608,69 @@ The maintained CLI now offers read-only `images redhat inventory` and
 owned public names unless an independently authorized `-legacy-consumer-uuid`
 is supplied. Future native registrations receive independent public
 `lindm-lab-<32 lowercase hex>` names and persist actual consumer UUID receipts
-outside disposable VM state. Regressions were added; no new native registration
-run or unit-test execution is claimed here.
+outside disposable VM state. Regressions were added; the following rerun now
+also proves that native registration identity/receipt path.
 
-RHEL 9.8 dispatch, RHEL 10.2 automatic trust/dispatch and Fedora 43
-signed-service lifecycle/trust/dispatch remain unrun. Local guests are restricted
-to the two owner-designated encryption/wipe lanes until the restriction is lifted.
-Continuation commands and custody notes are in `local://platformlanes2-handoff.md`.
+RHEL 9.8 **automatic control-plane trust lifecycle passed** after owner-approved
+resumption at local capacity2 using lease admission (`-host local`).
+`ROOT/rhel98-trust-receipts.json`, SHA-256
+`2cef05970f214a51f6a8573abf478a11cd228cc922b0f1371e94286f547e2ed2`,
+device `29f1e6ce-1dd8-4503-a83a-d5e5a6756747`, generation
+`dec2bec9-0b70-402d-8374-7d49d8f34c35`. Same-tree0.7.0→0.7.1,
+five492-package publications, deniedattempt6 retained snapshot5, epoch1→3.
+Automatic root/delegate rotation and revocation, quorum/delegation/epoch rollback
+denials, exact retry after server restart, unchanged TLS identity, no probe
+service effects, reboot/reinstall retention, spool recovery, final revocation and
+missing-journal hold all passed. SELinux remained Enforcing; user-egress explicit.
+All five Red Hat registration/cleanup outcomes were true. Public run name
+`lindm-lab-efca32db41200c2bf17160fd488a1f4c`, consumer UUID
+`7bf1b0d8-305f-4128-9250-b682b4ff3100`; retained receipt
+`ROOT/lindm-lab-efca32db41200c2bf17160fd488a1f4c.redhat-registration.jsonl`,
+SHA-256 `467e273741cfc6cc93fea9ff29cc68c0f4e8d42154baeeae1b76f434548c00b6`.
+
+Exact build inputs are in `ROOT/receipt-lanes-build.json`, SHA-256
+`43613f3f92bac84e38f838206d69eb7384158e4760ca786064d3dbed305fbb37`:
+base01495af plus the cleanup/receipt source patch above, no fixture copies;
+lab `3c5a1420054120e184c7595326f458eaaf338b3fbf76eeaef1d140acabdf23e9`,
+server `fcdac2c7a22eca5f049f5aee1ea2ab6f09ec6321120797390474cafbc32bff04`,
+RPM0.7.0 `84e0ad4de6aa1ca1a170febd247334e6951076b324e1ca4235213ef2831c0b2b`,
+RPM0.7.1 `c93c53ccd362e5d683a01b5eb4266609ff9d09a44cef1400b79f3625c2c53ad7`.
+The lifecycle uses `-control-plane-trust`, explicit RHEL `-allow-network` and
+protected token-file, real shared `-repo`, and `-work-dir ROOT` for durable public
+receipts. Continuation commands and custody notes are in
+`local://platformlanes2-handoff.md`.
+
+RHEL 9.8 **connected dispatch also passed**: `ROOT/rhel98-dispatch-receipts.json`,
+SHA-256 `7c6d4d0f715184ad4eb9b788f8815da69d874f6270d6f18d305fd89915fe5b62`,
+device `016b4c08-88aa-4135-b3cd-2343f0ccf16d`, generation
+`0c0d1af5-2066-4685-af43-e7f91eed743a`. Same receipt-aware lab/server/source
+custody, with real fixture `-repo` and private pinned `-build-repo`.
+Native signed RPM SHA-256
+`7de0e6ebebd4d5ba2611195280dfe144ab06acb88234c591f8a8b3e823b475fa`.
+Nine native scenarios passed, including actual300s periodic compliance/drift
+repair, open-action server restart, no drift without a grant, ±90s guest clocks
+and revoked-device denial. Unstarted supersession remains explicitly
+integration-only, not natively exercised. SELinux Enforcing and explicit
+user-egress; all five Red Hat registration/cleanup outcomes true.
+Public name `lindm-lab-6bc174ee8d92d6ad6ad30150b5f93b10`, consumer UUID
+`55e55c27-373b-491c-99c3-35b210b32b5d`; retained corresponding JSONL receipt
+SHA-256 `508cadd411756ad464a7e045a742c47a1e2fe9b0e9a80adde3a3e7e68aa79103`.
+
+RHEL 10.2 **automatic control-plane trust lifecycle passed** with the same
+0.7.0→0.7.1 artifacts and exact receipt-aware build provenance:
+`ROOT/rhel102-trust-receipts.json`, SHA-256
+`af60d409e6d367680655235e2a1e829448428aacca4fb2f57cbff0297d717723`,
+device `1e2031ec-d7e4-41eb-8ce8-5a9da971426b`, generation
+`14750bb9-08fb-4921-b8fa-634c7afdb84e`. Five530-package publications,
+epoch1→3, denied collection retaining snapshot5 at attempt6, and the full
+automatic authority/rollback/restart/retention/recovery/revocation/hold checks
+above all passed. SELinux Enforcing unchanged; explicit user-egress; all5
+registration and cleanup outcomes true. Public run
+`lindm-lab-606fcf750e0afb81e804ebe06d387152`, consumer UUID
+`5a20105a-218b-46bd-9840-439ac327f8f6`, retained corresponding JSONL receipt
+SHA-256 `b07c451be5b0595380fac8678b68be8454b984c63d239a31acb5db03426e0298`.
+RHEL10.2 dispatch and Fedora43 service/trust/dispatch remain unproven.
+
 The abort's build provenance is `ROOT/checkpoint-9138d17-build.json`, SHA-256
 `7aebb17cf8038d23e2ed9d77ac2ec218c82f92df6d3bf3bc7ec02685b88a186f`.
 The shared read-only build snapshot subsequently advanced to checkpoint
@@ -1172,29 +1250,29 @@ tailoring or automatic package remediation.
 Each family maps to product requirement IDs. Individual deterministic tests must
 assert externally meaningful results, not merely process existence or successful RPC.
 
-| ID                               | Scenarios and required result                                                                                                                                                                                                                                                                                 | Evidence surface                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L01                              | Fresh single-host server installation, first-owner binding, restart and invalid configuration                                                                                                                                                                                                                 | Actual installer/console/CLI; same pinned owner bootstrap is idempotent, replacement owner denied; persisted state recovered                                                                                                                                                                                                                                                                                                                                              |
-| L02                              | Real Keycloak/Entra/Okta/Google and SAML broker login, MFA/step-up, SCIM correlation, upstream disable/group removal during direct and brokered sessions without re-login, healthy broker with stale upstream, source outage, rename/recycled email                                                           | Original-directory propagation and local enforcement measured separately; no freshness reset from broker imports, stale-claim resurrection, source ambiguity or permissions beyond bound                                                                                                                                                                                                                                                                                  |
-| L03                              | Package enrollment, lost secret-issuance response, redaction/hash-only persistence, grant race, lost cert response, TPM/software key, renewal/revocation, cloned image and reinstall                                                                                                                          | Retry never recovers a bearer secret or creates a second credential; distinct device generation, correct denial and no secret in database/audit/outbox                                                                                                                                                                                                                                                                                                                    |
-| L04                              | Native hardware/OS/package collection, absent serial, package epochs, pagination/filters, delta duplicate/out-of-order ingestion, stale/offline device                                                                                                                                                        | Guest truth compared with API/export; stale evidence never compliant                                                                                                                                                                                                                                                                                                                                                                                                      |
-| L05                              | Profile preview/conflict/drift, trust bootstrap and quorum rotation, tampered/stale trust and plans, missing/corrupt executor journal, compromised network-process replay and restart during apply                                                                                                            | Actual state/revision, root-only replay fences and fail-closed recovery; unknown capability or trust never becomes privileged execution                                                                                                                                                                                                                                                                                                                                   |
-| L06                              | Native package/image/generation and repository transactions, invalid signatures, dependencies/locks/interruption, device/person catalog entitlements and UID/account reuse                                                                                                                                    | Native package database or booted generation and application health; no partial Arch upgrade, mutable-image overwrite, unapproved source or cross-person install                                                                                                                                                                                                                                                                                                          |
-| L07                              | Patch/advisory rings, canary pause, maintenance window/DST, desktop deferral/deadline, server availability budget, kernel update and reboot inhibitor                                                                                                                                                         | New boot/kernel and workload health, not just agent reconnect; no reboot outside policy                                                                                                                                                                                                                                                                                                                                                                                   |
-| L08                              | Agent install/upgrade/failed-upgrade recovery, purge/reinstall, journal migration, owner-safe config removal, supported OS upgrade or reinstall migration                                                                                                                                                     | Package/service/filesystem state and preserved/rotated identities as specified                                                                                                                                                                                                                                                                                                                                                                                            |
-| L09                              | GNOME/KDE sessions, built-in support consent/indicator/local stop/input, self-service/notices, Wayland/X11 as claimed, UID reuse/shared-device/ownership transfer, suspend/resume and accessibility                                                                                                           | Actual session evidence and isolated person binding; lock/logout/revocation terminates support; no tray or unattended-control dependency                                                                                                                                                                                                                                                                                                                                  |
-| L10                              | Network rollback, EAP-TLS/VPN, firewall, certificates/trust/SSSD, account controls, encryption escrow and person-certificate binding/deprovisioning                                                                                                                                                           | Real credential/network behavior and cold-boot recovery; no cross-person secret or competing native owner                                                                                                                                                                                                                                                                                                                                                                 |
-| L11                              | Compliance pass/fail/error/unknown/N/A, expiring exceptions, SCAP tailoring/content, distro backports/epochs, stale or conflicting advisories                                                                                                                                                                 | Native findings linked to content/version/freshness; no false healthy status                                                                                                                                                                                                                                                                                                                                                                                              |
-| L12                              | CLI/UI parity, idempotency, webhooks retry/signature/dedup, export access, typed diagnostics, bounded scripts and consent-controlled remote support                                                                                                                                                           | Receiver/user-visible outcomes, consent termination, redacted support bundle and action audit                                                                                                                                                                                                                                                                                                                                                                             |
-| L13                              | Approval separation, changed targets/authority, executor challenge replay/expiry/restart, restore epoch and actual lock/quarantine effects                                                                                                                                                                    | No high-risk start without a fresh verified one-use grant; the bounded residual authorization window is measured                                                                                                                                                                                                                                                                                                                                                          |
-| L14                              | Migration under traffic, DB/worker crash, both server installation modes, restore hold/epoch, revoked identity, key rotation/loss, audit/retention                                                                                                                                                            | Usable restored system with fresh authority; no stale destructive replay or revived directory access                                                                                                                                                                                                                                                                                                                                                                      |
-| L15                              | Real TPM/Secure Boot/recovery, lock boundaries, authenticated recovery-media handoff, wrong target/expiry/power loss, off-target state, sanitize/reinstall and key-copy implications                                                                                                                          | Physical signed evidence and separate verification/validation; lost state/report stays unknown rather than restarting wipe                                                                                                                                                                                                                                                                                                                                                |
-| L16                              | Full isolated management LAN with public egress blocked, local IdP/DNS/time/PKI, signed content import, expiry/replay/corruption and missed key rotation                                                                                                                                                      | Network capture/deny counters and successful offline lifecycle; no disabled integrity checks                                                                                                                                                                                                                                                                                                                                                                              |
-| L17                              | Cross-version contracts, generated code and two-clean-builder unsigned release-payload digest equality, TUF/freeze/rollback, native package/image trust, provenance/SBOM/licenses                                                                                                                             | Both build manifests and comparisons plus actual installed release artifacts; signatures/attestations verified separately from deterministic payload equality                                                                                                                                                                                                                                                                                                             |
-| L17 release archive matrix       | Passed two isolated clean source/HOME/Go/npm cache builds of all three products × amd64/arm64 × DEB/RPM, plus server/CLI OCI; complete unsigned archive equality and separate native/DSSE verification                                                                                                        | `artifacts/release-matrix-20261011.json` SHA-256 `dd92786edd9b97e2f8289b9d921ecb23c33edbdf42c5369199f8952117f8f668`; adjacent DSSE `270e32716f2e17609dd8abb73ebcfa1b34d764236606c08aa424ba1dbf9fde08`. Export includes dependency SBOMs, provenance and explicitly pinned OCI CA bytes. Development keys/CA, same host/toolchain; does not qualify native update transactions, independent builders, license approval or physical hardware.                               |
-| L08/L17 unattended native update | **Not yet qualified.** Ubuntu24 passed real pause/cohort and signed rollback/mix/freeze/target-tamper rejection, then native APT exited 100 before unpack. Successful update, interrupted recovery and downgrade refusal remain unproven. Fedora44 was aborted for host contention, not failed qualification. | Ubuntu `~/.cache/lindm-updatequal-20261010/ubuntu24-updates-02.json` SHA-256 `f6f897129092afae416df87186501a6cb6baf4cecf26d3758ac2b5c26dfd9620`; Fedora cancellation `fedora44-updates-01.json` SHA-256 `e6aa331a1ac0bf6cab7d19ba903beff36e2078ac8b022910245fc869ededfda8`. Earlier attempt4 retains the closed-SSH observer defect; current root diagnosis, diagnostic propagation checks and cancellation limitations are detailed below.                               |
-| L18                              | Single-host and replicated load/soak, reconnect storm, storage full, queue fairness and worker/DB failover                                                                                                                                                                                                    | Workload manifest and measured budgets from security/operations; accepted work preserved                                                                                                                                                                                                                                                                                                                                                                                  |
-| L18 single-host launch gate      | Maintained `lab load`: real lindmd/disposable PostgreSQL, grants/mTLS, jittered sync/trust/work, full snapshots, signed service cycles; explicit CPU/pool/storage and iostat/QEMU evidence                                                                                                                    | Durable co-resident baselines and WAL-pressure failures are documented in security/operations. `artifacts/load-isolated-tmpfs.json` (SHA-256 `8efe8ec08315276197d527618050035deeb4b0147215195ce991ab4fd1e7c193`) passes only the completed non-durable 5,000-device plateau; 10,000 interrupted by parent scheduling directive. Dedicated tmpfs and NVMe fixture integration passes, not capacity qualification. Isolated durable ramp, two-hour soak and HA remain open. |
+| ID                               | Scenarios and required result                                                                                                                                                                                                                                              | Evidence surface                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L01                              | Fresh single-host server installation, first-owner binding, restart and invalid configuration                                                                                                                                                                              | Actual installer/console/CLI; same pinned owner bootstrap is idempotent, replacement owner denied; persisted state recovered                                                                                                                                                                                                                                                                                                                                              |
+| L02                              | Real Keycloak/Entra/Okta/Google and SAML broker login, MFA/step-up, SCIM correlation, upstream disable/group removal during direct and brokered sessions without re-login, healthy broker with stale upstream, source outage, rename/recycled email                        | Original-directory propagation and local enforcement measured separately; no freshness reset from broker imports, stale-claim resurrection, source ambiguity or permissions beyond bound                                                                                                                                                                                                                                                                                  |
+| L03                              | Package enrollment, lost secret-issuance response, redaction/hash-only persistence, grant race, lost cert response, TPM/software key, renewal/revocation, cloned image and reinstall                                                                                       | Retry never recovers a bearer secret or creates a second credential; distinct device generation, correct denial and no secret in database/audit/outbox                                                                                                                                                                                                                                                                                                                    |
+| L04                              | Native hardware/OS/package collection, absent serial, package epochs, pagination/filters, delta duplicate/out-of-order ingestion, stale/offline device                                                                                                                     | Guest truth compared with API/export; stale evidence never compliant                                                                                                                                                                                                                                                                                                                                                                                                      |
+| L05                              | Profile preview/conflict/drift, trust bootstrap and quorum rotation, tampered/stale trust and plans, missing/corrupt executor journal, compromised network-process replay and restart during apply                                                                         | Actual state/revision, root-only replay fences and fail-closed recovery; unknown capability or trust never becomes privileged execution                                                                                                                                                                                                                                                                                                                                   |
+| L06                              | Native package/image/generation and repository transactions, invalid signatures, dependencies/locks/interruption, device/person catalog entitlements and UID/account reuse                                                                                                 | Native package database or booted generation and application health; no partial Arch upgrade, mutable-image overwrite, unapproved source or cross-person install                                                                                                                                                                                                                                                                                                          |
+| L07                              | Patch/advisory rings, canary pause, maintenance window/DST, desktop deferral/deadline, server availability budget, kernel update and reboot inhibitor                                                                                                                      | New boot/kernel and workload health, not just agent reconnect; no reboot outside policy                                                                                                                                                                                                                                                                                                                                                                                   |
+| L08                              | Agent install/upgrade/failed-upgrade recovery, purge/reinstall, journal migration, owner-safe config removal, supported OS upgrade or reinstall migration                                                                                                                  | Package/service/filesystem state and preserved/rotated identities as specified                                                                                                                                                                                                                                                                                                                                                                                            |
+| L09                              | GNOME/KDE sessions, built-in support consent/indicator/local stop/input, self-service/notices, Wayland/X11 as claimed, UID reuse/shared-device/ownership transfer, suspend/resume and accessibility                                                                        | Actual session evidence and isolated person binding; lock/logout/revocation terminates support; no tray or unattended-control dependency                                                                                                                                                                                                                                                                                                                                  |
+| L10                              | Network rollback, EAP-TLS/VPN, firewall, certificates/trust/SSSD, account controls, encryption escrow and person-certificate binding/deprovisioning                                                                                                                        | Real credential/network behavior and cold-boot recovery; no cross-person secret or competing native owner                                                                                                                                                                                                                                                                                                                                                                 |
+| L11                              | Compliance pass/fail/error/unknown/N/A, expiring exceptions, SCAP tailoring/content, distro backports/epochs, stale or conflicting advisories                                                                                                                              | Native findings linked to content/version/freshness; no false healthy status                                                                                                                                                                                                                                                                                                                                                                                              |
+| L12                              | CLI/UI parity, idempotency, webhooks retry/signature/dedup, export access, typed diagnostics, bounded scripts and consent-controlled remote support                                                                                                                        | Receiver/user-visible outcomes, consent termination, redacted support bundle and action audit                                                                                                                                                                                                                                                                                                                                                                             |
+| L13                              | Approval separation, changed targets/authority, executor challenge replay/expiry/restart, restore epoch and actual lock/quarantine effects                                                                                                                                 | No high-risk start without a fresh verified one-use grant; the bounded residual authorization window is measured                                                                                                                                                                                                                                                                                                                                                          |
+| L14                              | Migration under traffic, DB/worker crash, both server installation modes, restore hold/epoch, revoked identity, key rotation/loss, audit/retention                                                                                                                         | Usable restored system with fresh authority; no stale destructive replay or revived directory access                                                                                                                                                                                                                                                                                                                                                                      |
+| L15                              | Real TPM/Secure Boot/recovery, lock boundaries, authenticated recovery-media handoff, wrong target/expiry/power loss, off-target state, sanitize/reinstall and key-copy implications                                                                                       | Physical signed evidence and separate verification/validation; lost state/report stays unknown rather than restarting wipe                                                                                                                                                                                                                                                                                                                                                |
+| L16                              | Full isolated management LAN with public egress blocked, local IdP/DNS/time/PKI, signed content import, expiry/replay/corruption and missed key rotation                                                                                                                   | Network capture/deny counters and successful offline lifecycle; no disabled integrity checks                                                                                                                                                                                                                                                                                                                                                                              |
+| L17                              | Cross-version contracts, generated code and two-clean-builder unsigned release-payload digest equality, TUF/freeze/rollback, native package/image trust, provenance/SBOM/licenses                                                                                          | Both build manifests and comparisons plus actual installed release artifacts; signatures/attestations verified separately from deterministic payload equality                                                                                                                                                                                                                                                                                                             |
+| L17 release archive matrix       | Passed two isolated clean source/HOME/Go/npm cache builds of all three products × amd64/arm64 × DEB/RPM, plus server/CLI OCI; complete unsigned archive equality and separate native/DSSE verification                                                                     | `artifacts/release-matrix-20261011.json` SHA-256 `dd92786edd9b97e2f8289b9d921ecb23c33edbdf42c5369199f8952117f8f668`; adjacent DSSE `270e32716f2e17609dd8abb73ebcfa1b34d764236606c08aa424ba1dbf9fde08`. Export includes dependency SBOMs, provenance and explicitly pinned OCI CA bytes. Development keys/CA, same host/toolchain; does not qualify native update transactions, independent builders, license approval or physical hardware.                               |
+| L08/L17 unattended native update | **Ubuntu24 and Fedora44 passed.** Both prove six signed negative/hold phases, actual interrupted native unpack, boot-helper completion at 0.2.0, retained identity, fresh authenticated session/inventory and signed downgrade refusal. Fedora SELinux remained enforcing. | Under `~/.cache/lindm-updatequal-20261010/`: `ubuntu24-updates-05.json` SHA-256 `7716aa65b6d846dd935f2b087fa7a019563d33f124efda2e39ee81adc5da860c`; `fedora44-updates-06.json` SHA-256 `ae15ffd9663b050455c4e46a313038dd3dfaf7f88320d231908c0a665b0841e6`. Distinct version stamps from one source per run, development signing custody and native QEMU resets; not historical-release, physical-power-loss or production-custody certification.                          |
+| L18                              | Single-host and replicated load/soak, reconnect storm, storage full, queue fairness and worker/DB failover                                                                                                                                                                 | Workload manifest and measured budgets from security/operations; accepted work preserved                                                                                                                                                                                                                                                                                                                                                                                  |
+| L18 single-host launch gate      | Maintained `lab load`: real lindmd/disposable PostgreSQL, grants/mTLS, jittered sync/trust/work, full snapshots, signed service cycles; explicit CPU/pool/storage and iostat/QEMU evidence                                                                                 | Durable co-resident baselines and WAL-pressure failures are documented in security/operations. `artifacts/load-isolated-tmpfs.json` (SHA-256 `8efe8ec08315276197d527618050035deeb4b0147215195ce991ab4fd1e7c193`) passes only the completed non-durable 5,000-device plateau; 10,000 interrupted by parent scheduling directive. Dedicated tmpfs and NVMe fixture integration passes, not capacity qualification. Isolated durable ramp, two-hour soak and HA remain open. |
 
 Attempt4's last completed observation was the signed zero-percent hold at
 `2026-10-10T01:17:32Z`, with phase `idle`, version `0.1.0` and no admitted
@@ -1206,7 +1284,7 @@ socket. This is an identified observer-liveness defect, not evidence of a native
 update hang or a helper restarting the agent mid-command. The original initiating
 stall cannot be retrospectively attributed to guest/host pressure versus SSH
 transport loss: attempt4 retained neither an independent guest journal nor its
-first transport error. Read-only status/unpack observers now reconnect with the
+first transport error. Read-only status observers now reconnect with the
 original host-key pin inside unchanged deadlines; mutations are never replayed.
 Fresh-connection diagnostics and last successful state are retained on failure.
 Encrypted-SSH regressions cover lost/already-closed clients, service restart
@@ -1260,9 +1338,9 @@ overlay were removed; the isolated database and authority directory were matched
 by the exact built RPM digest and removed without FORCE or shared-fixture reset.
 The tool's termination signal/grace was not recorded, so this is not evidence that
 the existing SIGINT/SIGTERM context handler itself was absent or ineffective.
-Local starts are suspended under the owner's two-guest priority cap. Ubuntu's
-underlying APT error and both successful native recovery paths remain unproven
-until the instrumented lane can run without contending with those priority guests.
+At that stage local starts were suspended under the owner's two-guest priority
+cap, so the underlying APT error and native recovery paths were still unproven.
+The subsequent instrumented runs below supersede that historical limitation.
 
 The lane now distinguishes `outcome: cancelled`, preserves cancellation identity
 through native-tool error wrappers, and skips the independent failure probe when
@@ -1276,6 +1354,145 @@ test, not a whole `cmd/lab` package pass: that package initially failed compilat
 on concurrent Red Hat CLI work (`client.CleanupRegistrations` undefined). No guest
 or authority fixture was admitted in this regression; post-admission native
 cancellation and forced/SIGKILL termination are not claimed as proven.
+
+After local slots reopened, instrumented Ubuntu run
+`$HOME/.cache/lindm-updatequal-20261010/ubuntu24-updates-03.json` (SHA-256
+`67136205668557c98ecef9d20f187a3108b4b47076ee4e701e22ec7e1ca25b1a`)
+exposed a separate laboratory freshness race before reaching APT. The claimed
+zero-percent observation finished at `10:52:13Z`, before initial inventory finished
+at `10:52:14Z` and therefore before rollout mutation. Comparing only against the
+older paused observation accepted a pre-mutation cycle; the replayed timestamp
+had not been superseded at the guest. Healthy repeated `no_update` cycles then
+continued until the rejection-oracle deadline, without SSH transport loss.
+Independent diagnostic `lindm-cloud-init-112541792.json` (SHA-256
+`0b88b9b7a96adb77d7dcc8e0d0aaefe74b5f6420ebbccff5ce63e618d42b8502`)
+also identifies guest APT as `2.8.3`. The observer now fences on its first
+post-mutation observation and requires a newer cycle start, rejecting both cached
+and in-flight pre-mutation cycles. Focused encrypted-SSH race regressions passed,
+including that boundary, before rebuilding the maintained lane. This run does not
+claim a product rollback failure or a new native package failure.
+
+The cycle-fenced Ubuntu run `ubuntu24-updates-04.json` (same evidence directory,
+SHA-256 `9f6211d128eebbca6d5a504b547dfb262d97de25ada73ed215681519d208a5f8`)
+passed all six signed negative phases and immediately exposed the actual native
+APT `apply` error: `Internal Error, Pathname to install is not absolute
+'lindm-agent_0.2.0_amd64.deb'` (exit 100). Bounded diagnostics retained that message
+instead of a later SSH timeout. Diagnostic record `lindm-cloud-init-3380301119.json`
+has SHA-256 `89b1093225038f6ae97ec93bad37379b4ce1777024945ab8af768cf2b259231a`.
+
+APT `2.8.3` is observed in this guest. Its matching upstream tag is cloned read-only
+at `~/dev/minor/clones/linux-flavour/apt-2.8.3`, commit
+`01e6768bc131a5c50d3a705d00ff462395f9828e`.
+[`apt-pkg/acquire-item.cc:3464–3506`](https://salsa.debian.org/apt-team/apt/-/blob/2.8.3/apt-pkg/acquire-item.cc#L3464)
+derives the canonical package/version/architecture archive basename and resolves
+an existing private-cache file to its absolute pathname.
+[`apt-private/private-install.cc:183–208`](https://salsa.debian.org/apt-team/apt/-/blob/2.8.3/apt-private/private-install.cc#L183)
+removes pending acquisition under `--no-download`. Our protected `agent.deb` lay
+outside an empty separate `apt-cache`, leaving that install pathname unresolved.
+Staging now writes the verified DEB directly under APT's canonical filename and
+uses that same private transaction directory as its archive cache. No download,
+source, no-remove, package-ownership, signature or network-isolation gate changed;
+no copy, hardlink or symlink was added. Epoch/filename and retention regressions
+passed. A real APT/dpkg integration regression also installed a script-free
+epoch-version package into a disposable private root with no host package state,
+hooks, cache or configured network sources, then checked native configured state,
+payload bytes and retained archive. That fixture pass is not a guest self-update
+or reboot-recovery qualification.
+
+Ubuntu24 native qualification now **passes**:
+`$HOME/.cache/lindm-updatequal-20261010/ubuntu24-updates-05.json`, SHA-256
+`7716aa65b6d846dd935f2b087fa7a019563d33f124efda2e39ee81adc5da860c`.
+The source snapshot is
+`689714fe737b6cef2a8c2164f708f40dd40c93f05ee42c129b87521b060602f5`.
+All six signed negative/hold phases passed, followed by actual unpack witness
+`apt-get pid=7429 unpack=/usr/libexec/lindm/lindm-agent.dpkg-new bytes=39203473`,
+owned QMP reset, boot-ID change
+`98531dac-cdaf-440e-a2c8-8721fe4463c6` →
+`5b325330-8188-450d-844b-746f11fbfdd0`, and exact `0.2.0` native helper recovery.
+Device/enrollment identity was retained, authenticated session epoch advanced
+`1 → 2`, fresh inventory sequence advanced `1 → 3` with 665 packages, and a fresh
+signed downgrade catalog could not replace the installed agent. The lane completed
+with `outcome: passed`, including owned resource cleanup. This is native KVM
+guest evidence for distinct version stamps from one source snapshot, not historical
+release compatibility, independent production custody or physical power-loss proof.
+
+Fedora44 `fedora44-updates-02.json` (same evidence directory, SHA-256
+`c79763559153ab4800185c840bca822170977e3f32026af49f8f1c78860c1940`) passed
+all six signed negative phases under enforcing SELinux. Its next failure was a
+lab observer race, not an observed DNF rejection: the unpack script statted RPM's
+temporary file twice and the second read followed its atomic rename. Private
+diagnostic `lindm-cloud-init-552405339.json` (SHA-256
+`ebc0bf372b421b277668833f7f3561fff010fc5d9f8b89ca82e4fe03b456e05b`)
+retains partial witness `dnf pid=6928 unpack=` and the actual `stat` ENOENT for
+`/usr/libexec/lindm/lindm-agent;6aca1fa5`. The intermediate fix took one final
+file-size snapshot after matching the real update-helper process; a vanished path
+meant no witness, while other inspection errors remained visible. Deterministic
+real-process/filesystem regression covered both boundaries. Later Fedora runs
+below replace the sampled shell observer with a resident frozen-unpack witness.
+
+Fedora03 (`fedora44-updates-03.json`, SHA-256
+`e3024604058657bdb714a85b2f3da94f270f2fae6188398edbf3e4f3f9782fb5`) retained
+all six negative phases but exposed a lab-induced service-start limit failure.
+The four negative-fixture stop/start cycles consumed the network unit's
+60-second/five-start budget before RPM's legitimate upgrade restart. Its journal
+reports `Start request repeated too quickly` followed by native DNF apply exit 1,
+not a still-running package-manager hang. Diagnostic
+`lindm-cloud-init-3885517560.json` has SHA-256
+`8cb7c5fa4af12bd819611c63e9814d5b5360063c22b5c5ef5331e1d029899c72`.
+The lab now freezes/thaws that cgroup while publishing fault fixtures, leaving
+product start-limit settings intact. This run also exposed a diagnostic gap after
+executor replacement: with the network process failed, no transport poll triggered
+helper reconciliation, so cached root status remained `applying`. Read-only status
+now validates and projects durable helper failures without waiting for transport;
+it cannot launch recovery, mutate authority or promote a helper success marker.
+Focused race regressions cover disconnected failure projection, caller mutation,
+invalid helper state and retained destructive-action interlocks.
+
+Fedora04 (`fedora44-updates-04.json`, SHA-256
+`edc0c931a96c073d127bda717b8b9ac1b44c7cc0c146660025a93c96f62c795d`) then
+completed the native upgrade at `0.2.0` under enforcing SELinux, with no start-limit
+failure. It correctly did **not** pass interruption qualification: SSH polling
+missed RPM's short-lived temporary executable, so the observer returned the actual
+`installed` state instead of inventing a reset witness. Diagnostic
+`lindm-cloud-init-3522143806.json` has SHA-256
+`cef32402c8390814f0052f3268a43b0ebc934aceddd3ab45284ed85f177a9fe1`.
+The maintained lane now uses a resident inotify probe and freezes only the exact
+admitted update-helper cgroup after a real partial write, rechecking the native
+manager and nonempty regular file while the kernel reports `frozen 1`. Only then
+does the host reset the owned guest. Ambiguous SSH loss never replays this fault
+injection. Real-file rename/error and no-cgroup boundary tests, terminal-state
+tests and the encrypted-SSH nonreplay regression passed before native execution.
+
+The first resident-observer run, Fedora05, also completed the actual installation
+without a frozen witness; `fedora44-updates-05.json` has SHA-256
+`a39349985b8f0180b17817bc045521c04639d0be6e0a21d92bcc7f4924e42a06`.
+Its diagnostic `lindm-cloud-init-3627174350.json` has SHA-256
+`a502cbd46858ca5edbb9334c40fd6e1075d6dbfc8b17a8ed5555eb5d72cc311f`.
+That observer assumed a cgroup path and did not retain why no witness was obtained;
+wrong binding versus a missed write cannot be retrospectively distinguished.
+The maintained probe now resolves systemd's actual `ControlGroup` for the exact
+root-admitted transaction unit, validates the binding, and reports absent cgroups
+or missing native managers rather than silently losing those observations.
+
+Fedora44 native qualification **passes** in `fedora44-updates-06.json`, SHA-256
+`ae15ffd9663b050455c4e46a313038dd3dfaf7f88320d231908c0a665b0841e6`.
+Source snapshot SHA-256 is
+`cf4a847f9417b857bad33b508a306d9bfc5a6bc69ca1fd071abe05680be0eded`;
+lab binary SHA-256 is
+`e75230ba8e43887221f1117cc2c40d208429e0064b77d30a854cb1662d4c0973`.
+All six signed negative/hold phases passed under enforcing SELinux. The actual
+kernel-frozen witness was `dnf pid=6707`, partial native executable
+`/usr/libexec/lindm/lindm-agent;6aca29cf`, 35,356,672 bytes, in the admitted
+`lindm-agent-update-b0606305-7744-4b76-a318-d3e47b47aab6.service` cgroup.
+After owned QMP reset, boot ID changed from
+`42d7b0d9-4e3f-4889-9093-85a9c4b484f4` to
+`ac07a65d-034d-4968-95b1-0ed8fde33319`; the boot helper completed exact `0.2.0`.
+Device/enrollment identity remained unchanged, session epoch advanced `1 → 3`,
+fresh 429-package inventory advanced sequence `1 → 2`, and a fresh signed catalog
+could not downgrade the installed agent. The 444.6-second lane passed including
+cleanup. These records qualify the observed native QEMU tuples, not historical
+release combinations, physical storage power-loss behavior or independent
+production signing custody.
 
 ### Fault injection and oracle requirements
 

@@ -47,10 +47,10 @@ func TestUnrelatedAPTTransactionIsRefused(t *testing.T) {
 
 func TestStagedPackageChangedAfterAdmissionIsRefused(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "agent.deb")
 	data := []byte("exact TUF authenticated package bytes")
 	digest := sha256.Sum256(data)
-	tx := &agentv1.AgentUpdateTransaction{Length: uint64(len(data)), Sha256: hex.EncodeToString(digest[:])}
+	tx := &agentv1.AgentUpdateTransaction{Manager: agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT, NativeVersion: "0.2.0", Architecture: "amd64", Length: uint64(len(data)), Sha256: hex.EncodeToString(digest[:])}
+	path := packagePath(directory, tx)
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -182,5 +182,23 @@ func TestDPKGConffileOnlyExitRequiresStrictEvidence(t *testing.T) {
 	}
 	if err := verificationResult(conffile, exitOne, false); err == nil {
 		t.Fatal("dpkg conffile exception leaked into other native managers")
+	}
+}
+
+func TestNativePackagePathMatchesPrivateAPTArchiveIdentity(t *testing.T) {
+	for _, test := range []struct {
+		manager             agentv1.NativeUpdateManager
+		version, arch, name string
+	}{
+		{agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT, "0.2.0", "amd64", "lindm-agent_0.2.0_amd64.deb"},
+		{agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT, "2:0.2.0~rc1+build-3", "arm64", "lindm-agent_2%3a0.2.0~rc1+build-3_arm64.deb"},
+		{agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT, "0.2.0_custom", "amd64", "lindm-agent_0.2.0%5fcustom_amd64.deb"},
+		{agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_DNF, "0.2.0-1", "amd64", "agent.rpm"},
+		{agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_PACMAN, "0.2.0-1", "amd64", "agent.pkg.tar.zst"},
+	} {
+		tx := &agentv1.AgentUpdateTransaction{Manager: test.manager, NativeVersion: test.version, Architecture: test.arch}
+		if got := packagePath("/private/transaction", tx); got != filepath.Join("/private/transaction", test.name) {
+			t.Fatalf("native staged filename %q, want %q", got, test.name)
+		}
 	}
 }

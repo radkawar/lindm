@@ -11,6 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -131,7 +132,11 @@ func TestNativeFailurePersistsThroughHelperJournalRestartAndChecking(t *testing.
 	}
 	state := store.Load()
 	state.Transaction, state.Phase = tx, "applying"
-	e := &Engine{store: store}
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.AgentUpdateHelperState{}), protovalidate.WithDisableLazy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &Engine{store: store, validator: validator}
 	if err := e.recordHelperState(state, helper); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +152,7 @@ func TestNativeFailurePersistsThroughHelperJournalRestartAndChecking(t *testing.
 			t.Error(err)
 		}
 	})
-	e = &Engine{store: store}
+	e = &Engine{store: store, validator: validator}
 	state = store.Load()
 	e.recordStatus(state)
 	if !proto.Equal(e.Status().GetNativeDiagnostic(), want) {
@@ -192,5 +197,58 @@ func TestNativeFailurePersistsThroughHelperJournalRestartAndChecking(t *testing.
 	status.NativeDiagnostic.ErrorLines[0] = "mutated"
 	if !proto.Equal(e.Status().GetNativeDiagnostic(), want) {
 		t.Fatal("status caller mutated protected native diagnostic")
+	}
+}
+
+func TestNativeHelperFailureVisibleBeforeTransportReconnects(t *testing.T) {
+	store, err := journal.OpenUpdates(protectedRetentionDirectory(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	tx := retentionFixture(t, store.Directory, "")
+	directory := filepath.Join(store.Directory, tx.GetId())
+	state := store.Load()
+	state.Transaction, state.Phase = tx, "applying"
+	if err := store.Save(state); err != nil {
+		t.Fatal(err)
+	}
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.AgentUpdateHelperState{}), protovalidate.WithDisableLazy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := &Engine{store: store, validator: validator}
+	engine.recordStatus(store.Load())
+	failure := failingNativeChild(t, "", "E: native package service startup failed\n")
+	for _, phase := range []string{"recovery_required", "rejected", "installing", "installed"} {
+		if err := writeHelperState(directory, phase, nil, failure); err != nil {
+			t.Fatal(err)
+		}
+		status := engine.Status()
+		if phase == "recovery_required" || phase == "rejected" {
+			if status.GetPhase() != phase || !proto.Equal(status.GetNativeDiagnostic(), diagnosticForError(failure)) {
+				t.Fatalf("durable helper failure hidden until transport reconnect: %v", status)
+			}
+			status.NativeDiagnostic.ErrorLines[0] = "mutated returned diagnostic"
+			if !proto.Equal(engine.Status().GetNativeDiagnostic(), diagnosticForError(failure)) {
+				t.Fatal("status caller altered durable helper failure")
+			}
+		} else if status.GetPhase() != "applying" || status.GetNativeDiagnostic() != nil {
+			t.Fatalf("helper marker promoted without independent native verification: %v", status)
+		}
+		if engine.running || !engine.Busy() || !proto.Equal(store.Load(), state) {
+			t.Fatal("read-only status launched recovery, released its interlock or modified authority")
+		}
+	}
+	if err := journal.WriteUpdateRecord(directory, "helper.pb", &agentv1.AgentUpdateHelperState{Phase: "unknown"}); err != nil {
+		t.Fatal(err)
+	}
+	status := engine.Status()
+	if status.GetPhase() != "recovery_required" || status.GetReason() != "update_helper_state_unavailable" || status.GetNativeDiagnostic() != nil {
+		t.Fatalf("invalid durable helper observation was trusted: %v", status)
 	}
 }

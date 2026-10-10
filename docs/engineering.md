@@ -1577,7 +1577,7 @@ SIGKILL/tool-forced termination cannot execute defers or guarantee a final recor
 native signing staging and requires removal of owned bytes/processes plus a
 cancelled record, without launching a guest.
 
-Read-only update-status and unpack probes discard a closed SSH transport and
+Read-only update-status probes discard a closed SSH transport and
 reconnect with the original host-key pin inside their existing deadlines. Native
 mutations are never replayed after an ambiguous transport failure. A completed
 status command may observe an unavailable executor during package replacement;
@@ -1587,11 +1587,30 @@ fresh-pinned-connection, changed-boot-ID oracle, not old-socket FIN. Private fai
 diagnostics independently reconnect and capture uptime/load, process/unit state,
 update-helper and kernel journals; they do not reuse the failed connection.
 
-The unpack witness loop also reads protected update status once per second: a
-terminal recovery failure, rejection or already-completed installation is not an
-interruption witness and fails immediately with the actual status. Failure
-diagnostics include package-manager versions and a fresh protected update status.
-An observation deadline is never interpreted as a native package transaction hang.
+Metadata-negative/hold observations fence on the first post-mutation guest
+observation and require a newly started cycle, not merely a finish newer than an
+old caller sample. Otherwise a cycle completed during intervening inventory work,
+or an in-flight cycle using old metadata, can falsely attest to a later mutation.
+Durable installed state after native recovery is checked separately; it does not
+require another metadata cycle.
+Metadata fault fixtures freeze/thaw the owned network-service cgroup rather than
+repeatedly restarting that service. This keeps the native upgrade's legitimate
+restart inside the unchanged product service-start budget; it neither resets nor
+raises `StartLimitBurst`.
+
+The resident `guest update-unpack` probe watches native binary writes with inotify.
+It resolves systemd's actual `ControlGroup` for the root-admitted transaction unit.
+After observing a nonempty temporary executable, it freezes only that exact
+update-helper cgroup, waits for kernel `frozen 1`, and rechecks both the partial
+regular file and a native manager in that cgroup.
+A vanished/renamed file is no witness and the cgroup is thawed; other observation
+errors fail visibly.
+Only a verified witness leaves the helper frozen for the host's owned QMP reset.
+This probe is fault injection, not read-only polling: ambiguous SSH loss never
+replays it. The fixed ten-minute deadline is unchanged. It also reads protected
+update status once per second; native failure or installation without a witness
+terminates the lane rather than masquerading as an SSH timeout. No package
+mutation is replayed and no completed installation counts as interrupted recovery.
 
 Self-update failures carry `NativeUpdateDiagnostic`: a fixed native executable
 name, failed operation phase, exit code (`-1` when no exit status exists), at most
@@ -1601,6 +1620,10 @@ environment assignments and control/terminal escapes are withheld. Neither raw
 command arguments nor process environment are appended. The copied recovery helper
 and root update status retain the historical diagnostic through restart/checking.
 Only successful replacement clears the retained failure.
+After executor replacement, read-only root status also validates the durable helper
+checkpoint and surfaces its failure before the network process reconnects. This
+projection performs no recovery action or journal/high-water mutation and never
+promotes a helper success marker without independent native package/payload checks.
 
 Normal mTLS/session-fenced heartbeats read this state from the root executor.
 The server stores the current enrollment generation's latest status with a receipt

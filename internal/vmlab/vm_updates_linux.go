@@ -256,7 +256,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, false); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, false); err != nil {
 		return result, err
 	}
 	channel, err = setUpdateRollout(ctx, fixture, channel, false, 0)
@@ -267,7 +267,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, true); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, true); err != nil {
 		return result, errors.Join(err, restore())
 	}
 	status, err = assertRejectedUpdate(ctx, packages, built.first, status)
@@ -280,13 +280,13 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, false); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, false); err != nil {
 		return result, err
 	}
 	if _, err := fixture.BeginReleaseFreeze(ctx, 10*time.Second); err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, true); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, true); err != nil {
 		return result, err
 	}
 	status, err = waitUpdateObservation(ctx, vm, status, "no_update")
@@ -306,7 +306,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, false); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, false); err != nil {
 		return result, err
 	}
 	channel, err = setUpdateRollout(ctx, fixture, channel, false, 100)
@@ -317,11 +317,11 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	if err := updateNetworkService(ctx, vm, true); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, true); err != nil {
 		return result, errors.Join(err, restore())
 	}
 	status, err = assertRejectedUpdate(ctx, packages, built.first, status)
-	if stopErr := updateNetworkService(ctx, vm, false); stopErr != nil {
+	if stopErr := setUpdateTransportRunning(ctx, vm, false); stopErr != nil {
 		err = errors.Join(err, stopErr)
 	}
 	err = errors.Join(err, restore())
@@ -337,7 +337,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return result, err
 	}
 	result.InitialBootID = strings.TrimSpace(string(boot))
-	if err := updateNetworkService(ctx, vm, true); err != nil {
+	if err := setUpdateTransportRunning(ctx, vm, true); err != nil {
 		return result, err
 	}
 	result.InterruptionWitness, err = waitUpdateUnpack(ctx, vm)
@@ -463,10 +463,13 @@ func enableGuestUpdates(ctx context.Context, vm *guestVM, packages *nativeGuestP
 	return lifecycleCommand(ctx, vm, "enable authenticated unattended updates", "install -o root -g root -m 0600 "+nativeGuestDir+"/update-executor.json /etc/lindm/executor.json; if command -v restorecon >/dev/null 2>&1; then restorecon -F /etc/lindm/executor.json; fi; systemctl restart lindm-executor.service lindm-agent.service")
 }
 
-func updateNetworkService(ctx context.Context, vm *guestVM, start bool) error {
-	action := "stop"
-	if start {
-		action = "start"
+func setUpdateTransportRunning(ctx context.Context, vm *guestVM, running bool) error {
+	// Isolate fixture publication without spending the product's service-start
+	// budget. Repeated stop/start attacks otherwise make a legitimate native
+	// package restart hit StartLimitBurst rather than test update behavior.
+	action := "freeze"
+	if running {
+		action = "thaw"
 	}
 	return lifecycleCommand(ctx, vm, "control owned update transport", "systemctl "+action+" lindm-agent.service")
 }
@@ -516,6 +519,7 @@ func waitUpdateObservation(ctx context.Context, vm *guestVM, before *agentv1.Age
 	var last *agentv1.AgentUpdateStatus
 	var lastErr error
 	var firstTransportErr error
+	var cycleFloor *timestamppb.Timestamp
 	for {
 		var observed *agentv1.AgentUpdateStatus
 		if vm.client == nil {
@@ -542,12 +546,21 @@ func waitUpdateObservation(ctx context.Context, vm *guestVM, before *agentv1.Age
 			}
 		} else {
 			last = observed
+			// A caller's prior sample may predate the mutation by many cycles.
+			// Fence on the first post-mutation observation, then require a
+			// newly started cycle; an in-flight cycle can finish using old
+			// metadata. Installed is a durable native result, not a metadata
+			// probe, and need not wait for another check after boot recovery.
+			if cycleFloor == nil && outcome != "installed" {
+				cycleFloor = last.GetAttemptStartedAt()
+			}
 		}
 		matched := last.GetLastOutcome() == outcome && last.GetPhase() != "checking"
 		if outcome == "installed" {
 			matched = last.GetPhase() == "installed" && last.GetVersion() == updateNextVersion && (last.GetLastOutcome() == "installed" || last.GetLastOutcome() == "no_update")
 		}
-		if lastErr == nil && last.GetAttemptFinishedAt() != nil && (before == nil || before.GetAttemptFinishedAt() == nil || last.GetAttemptFinishedAt().AsTime().After(before.GetAttemptFinishedAt().AsTime())) && matched {
+		freshCycle := outcome == "installed" || (cycleFloor != nil && last.GetAttemptStartedAt() != nil && last.GetAttemptStartedAt().AsTime().After(cycleFloor.AsTime()))
+		if lastErr == nil && freshCycle && last.GetAttemptFinishedAt() != nil && (before == nil || before.GetAttemptFinishedAt() == nil || last.GetAttemptFinishedAt().AsTime().After(before.GetAttemptFinishedAt().AsTime())) && matched {
 			return last, nil
 		}
 		select {
@@ -573,89 +586,26 @@ func assertRejectedUpdate(ctx context.Context, packages *nativeGuestPackages, ar
 func waitUpdateUnpack(ctx context.Context, vm *guestVM) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
-	nextStatus := time.Now().Add(time.Second)
-	var firstTransportErr error
-	const witness = `sudo -n sh -eu -c 'for file in ` + packaging.BinaryPath + `.dpkg-new ` + packaging.BinaryPath + `\;*; do
-  if [ -f "$file" ] && [ "$(stat -c %s "$file")" -gt 0 ]; then
-    for name in apt-get dpkg dnf dnf5; do
-      for pid in $(pgrep -x "$name" || true); do
-        if test -r /proc/$pid/cgroup && grep -q "lindm-agent-update-" /proc/$pid/cgroup; then
-          printf "%s pid=%s unpack=" "$name" "$pid"; stat -c "%n bytes=%s" "$file"; exit 0
-        fi
-      done
-    done
-  fi
-done
-exit 1'`
-	for {
-		var data []byte
-		var err error
-		if vm.client == nil {
-			err = vm.connect(ctx)
-		}
-		if err == nil {
-			var result guestCommandResult
-			result, err = vm.runResult(ctx, witness, nil, 4096, 10*time.Second)
-			if err == nil && result.ExitCode == 0 && len(result.Stderr) == 0 {
-				data = result.Stdout
-			} else if err == nil && (result.ExitCode != 1 || len(result.Stderr) != 0) {
-				return "", errors.New("native unpack witness command failed")
-			}
-		}
-		if err == nil && len(data) == 0 && !time.Now().Before(nextStatus) {
-			var status *agentv1.AgentUpdateStatus
-			status, err = readUpdateStatus(ctx, vm)
-			nextStatus = time.Now().Add(time.Second)
-			if err == nil {
-				if terminal := updateUnpackTerminal(status); terminal != nil {
-					return "", terminal
-				}
-			} else {
-				var unavailable *updateStatusUnavailable
-				if errors.As(err, &unavailable) {
-					// A completed read may race the native service replacement.
-					err = nil
-				}
-			}
-		}
-		if err != nil {
-			if !updateObservationTransportLost(err) {
-				return "", fmt.Errorf("observe native unpack: %w", err)
-			}
-			if firstTransportErr == nil {
-				firstTransportErr = fmt.Errorf("first unpack observation transport loss: %w", err)
-			}
-			if vm.client != nil {
-				_ = vm.client.Close()
-				vm.client = nil
-			}
-		} else if len(data) > 0 {
-			return strings.TrimSpace(string(data)), nil
-		}
-		select {
-		case <-ctx.Done():
-			return "", fmt.Errorf("observe actual native package unpack before reset: %w", errors.Join(ctx.Err(), err, firstTransportErr))
-		case <-ticker.C:
+	if vm.client == nil {
+		if err := vm.connect(ctx); err != nil {
+			return "", err
 		}
 	}
-}
-
-func updateUnpackTerminal(status *agentv1.AgentUpdateStatus) error {
-	switch status.GetPhase() {
-	case "recovery_required", "rejected", "installed":
-		// A completed or failed transaction cannot become an interrupted unpack
-		// witness. Preserve the actual product state rather than later blaming
-		// the SSH operation that happened to overlap the observer deadline.
-		encoded, err := protojson.Marshal(status)
-		if err != nil {
-			return fmt.Errorf("encode terminal native update status: %w", err)
-		}
-		return fmt.Errorf("native update became terminal before unpack witness: %s", encoded)
-	default:
-		return nil
+	// The resident probe freezes the exact admitted update cgroup only after
+	// observing a real partial executable. It is a fault injection, not a
+	// read-only observation, and must not be replayed on ambiguous SSH loss.
+	result, err := vm.runResult(ctx, "sudo -n "+guestLifecycleProbe+" guest update-unpack", nil, 16<<10, 10*time.Minute)
+	if err != nil {
+		return "", fmt.Errorf("native unpack fault observation interrupted; not replayed: %w", err)
 	}
+	if result.ExitCode != 0 || len(result.Stderr) != 0 {
+		return "", fmt.Errorf("native unpack fault observation exited %d: %.16384s", result.ExitCode, result.Stderr)
+	}
+	witness := strings.TrimSpace(string(result.Stdout))
+	if witness == "" || !strings.HasSuffix(witness, " frozen=1") {
+		return "", errors.New("native unpack observer returned no frozen helper witness")
+	}
+	return witness, nil
 }
 
 // Failure diagnostics must not reuse the transport whose loss caused the failure.

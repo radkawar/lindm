@@ -38,13 +38,18 @@ import (
 // runGuestProbe is a development-only guest helper, never a product command.
 // Bootstrap material is accepted only on stdin; errors never echo RPC bodies.
 func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) error {
+	if len(args) == 1 && args[0] == "update-unpack" {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+		return guestUpdateUnpack(ctx, stdout)
+	}
 	if len(args) == 2 && args[0] == "nvme-identity" {
 		ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 		defer cancel()
 		return guestNVMeIdentity(ctx, args[1], stdout)
 	}
 	if len(args) != 1 {
-		return errors.New("guest requires a single probe operation without flags (bootstrap-interrupted, network-boundaries, executor-ready, connection-identity, connection-certificate, services, action-authorize-denied, live-erase-no-report, redhat-ready, redhat-register, redhat-identity, redhat-repositories, or redhat-unregister)")
+		return errors.New("guest requires a single probe operation without flags (bootstrap-interrupted, network-boundaries, executor-ready, connection-identity, connection-certificate, services, action-authorize-denied, live-erase-no-report, update-unpack, redhat-ready, redhat-register, redhat-identity, redhat-repositories, or redhat-unregister)")
 	}
 	if args[0] == "redhat-ready" || args[0] == "redhat-register" || args[0] == "redhat-unregister" || args[0] == "redhat-identity" || args[0] == "redhat-repositories" {
 		return guestRedHat(ctx, args[0])

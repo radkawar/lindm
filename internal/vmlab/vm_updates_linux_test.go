@@ -121,7 +121,7 @@ func updateSSHFixture(t *testing.T, changedHostKey bool, observe func(int) (stri
 func updateStatusJSON(t *testing.T, finished time.Time) string {
 	t.Helper()
 	data, err := protojson.Marshal(&agentv1.GetAgentUpdateResponse{Status: &agentv1.AgentUpdateStatus{
-		Enabled: true, Phase: "idle", LastOutcome: "rejected", AttemptFinishedAt: timestamppb.New(finished),
+		Enabled: true, Phase: "idle", LastOutcome: "rejected", AttemptStartedAt: timestamppb.New(finished.Add(-time.Millisecond)), AttemptFinishedAt: timestamppb.New(finished),
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -131,9 +131,8 @@ func updateStatusJSON(t *testing.T, finished time.Time) string {
 
 func TestUpdateObservationReconnectsOnlyReadOnlyStatus(t *testing.T) {
 	now := time.Now()
-	response := updateStatusJSON(t, now)
 	vm, connections := updateSSHFixture(t, false, func(call int) (string, uint32, bool) {
-		return response, 0, call == 1
+		return updateStatusJSON(t, now.Add(time.Duration(call)*time.Second)), 0, call == 1
 	})
 	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
 	defer cancel()
@@ -184,21 +183,25 @@ func TestUpdateObservationRejectsMalformedStatusWithoutPolling(t *testing.T) {
 	}
 }
 
-func TestUpdateUnpackReconnectsWithoutReplayingMutation(t *testing.T) {
-	vm, connections := updateSSHFixture(t, false, func(call int) (string, uint32, bool) {
-		return "dpkg pid=123 unpack=/fixture.dpkg-new bytes=1", 0, call == 1
+func TestUpdateUnpackFaultInjectionNeverReplayedOnTransportLoss(t *testing.T) {
+	var calls atomic.Int32
+	vm, connections := updateSSHFixture(t, false, func(int) (string, uint32, bool) {
+		calls.Add(1)
+		return "", 0, true
 	})
 	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
 	defer cancel()
 	witness, err := waitUpdateUnpack(ctx, vm)
-	if err != nil || witness == "" || connections.Load() != 2 {
-		t.Fatalf("unpack observer lost after transport failure: connections=%d err=%v", connections.Load(), err)
+	if err == nil || witness != "" || connections.Load() != 1 || calls.Load() != 1 || !strings.Contains(err.Error(), "not replayed") {
+		t.Fatalf("mutating unpack probe replayed after transport loss: calls=%d connections=%d err=%v", calls.Load(), connections.Load(), err)
 	}
 }
 
 func TestUpdateObservationDiscardsAlreadyClosedClient(t *testing.T) {
-	response := updateStatusJSON(t, time.Now())
-	vm, connections := updateSSHFixture(t, false, func(int) (string, uint32, bool) { return response, 0, false })
+	now := time.Now()
+	vm, connections := updateSSHFixture(t, false, func(call int) (string, uint32, bool) {
+		return updateStatusJSON(t, now.Add(time.Duration(call)*time.Second)), 0, false
+	})
 	// runResult closes this same client when a command deadline fires. The next
 	// observation must not spend the entire five-minute window reusing it.
 	if err := vm.client.Close(); err != nil {
@@ -232,17 +235,33 @@ func TestUpdateObservationCancellationRetainsLastStatus(t *testing.T) {
 	}
 }
 
-func TestUpdateUnpackStopsOnTerminalProductState(t *testing.T) {
-	for _, phase := range []string{"recovery_required", "rejected", "installed"} {
-		status := &agentv1.AgentUpdateStatus{Phase: phase, Reason: "native_transaction_incomplete"}
-		err := updateUnpackTerminal(status)
-		if err == nil || !strings.Contains(err.Error(), phase) || !strings.Contains(err.Error(), status.GetReason()) {
-			t.Fatalf("terminal %s hidden behind unpack deadline: %v", phase, err)
+func TestUpdateObservationFencesPreMutationAndInflightCycles(t *testing.T) {
+	now := time.Now()
+	var calls atomic.Int32
+	vm, _ := updateSSHFixture(t, false, func(call int) (string, uint32, bool) {
+		calls.Add(1)
+		started, finished := now, now.Add(time.Second)
+		if call == 2 {
+			// Completion is newer than both the caller's sample and our first
+			// observation, but this cycle already started before the mutation.
+			finished = now.Add(2 * time.Second)
 		}
-	}
-	for _, phase := range []string{"idle", "checking", "staged", "applying", "installing"} {
-		if err := updateUnpackTerminal(&agentv1.AgentUpdateStatus{Phase: phase}); err != nil {
-			t.Fatalf("pending %s treated as terminal: %v", phase, err)
+		if call >= 3 {
+			started, finished = now.Add(3*time.Second), now.Add(4*time.Second)
 		}
+		data, err := protojson.Marshal(&agentv1.GetAgentUpdateResponse{Status: &agentv1.AgentUpdateStatus{
+			Enabled: true, Phase: "idle", LastOutcome: "no_update",
+			AttemptStartedAt: timestamppb.New(started), AttemptFinishedAt: timestamppb.New(finished),
+		}})
+		if err != nil {
+			t.Error(err)
+		}
+		return string(data), 0, false
+	})
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
+	defer cancel()
+	status, err := waitUpdateObservation(ctx, vm, &agentv1.AgentUpdateStatus{AttemptFinishedAt: timestamppb.New(now.Add(-time.Minute))}, "no_update")
+	if err != nil || calls.Load() < 3 || !status.GetAttemptStartedAt().AsTime().Equal(now.Add(3*time.Second)) {
+		t.Fatalf("pre-mutation/in-flight observation accepted: calls=%d status=%v err=%v", calls.Load(), status, err)
 	}
 }

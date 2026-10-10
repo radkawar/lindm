@@ -80,8 +80,15 @@ func packageFormat(manager agentv1.NativeUpdateManager) string {
 	}
 }
 
-func packagePath(directory string, manager agentv1.NativeUpdateManager) string {
-	ext := packageFormat(manager)
+func packagePath(directory string, tx *agentv1.AgentUpdateTransaction) string {
+	ext := packageFormat(tx.GetManager())
+	if ext == "deb" {
+		// APT --no-download requires the verified archive to already occupy its
+		// canonical cache filename. The validated native version admits no
+		// path separators; APT percent-escapes ':' and '_' in this component.
+		version := strings.ReplaceAll(strings.ReplaceAll(tx.GetNativeVersion(), ":", "%3a"), "_", "%5f")
+		return filepath.Join(directory, "lindm-agent_"+version+"_"+tx.GetArchitecture()+".deb")
+	}
 	if ext == "arch" {
 		ext = "pkg.tar.zst"
 	}
@@ -203,7 +210,7 @@ func colonFields(data []byte) map[string]string {
 
 func validatePackage(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction) (resultErr error) {
 	defer func() { resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), "validation") }()
-	path := packagePath(directory, tx.GetManager())
+	path := packagePath(directory, tx)
 	if err := verifyFile(path, tx); err != nil {
 		return err
 	}
@@ -394,7 +401,7 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		phase = "recovery"
 	}
 	defer func() { resultErr = withNativeDiagnostic(resultErr, managerExecutable(tx.GetManager()), phase) }()
-	path := packagePath(directory, tx.GetManager())
+	path := packagePath(directory, tx)
 	var err error
 	switch tx.GetManager() {
 	case agentv1.NativeUpdateManager_NATIVE_UPDATE_MANAGER_APT:
@@ -417,13 +424,15 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 			_, err = nativeCommand(ctx, "configure", "/usr/bin/dpkg", "--force-confold", "--no-triggers", "--configure", "lindm-agent")
 			return err
 		}
-		// Empty private cache and no configured sources prevent dependency or
-		// unrelated cached upgrades. Missing dependencies fail, never download.
-		cache := filepath.Join(directory, "apt-cache")
-		if err := os.MkdirAll(filepath.Join(cache, "partial"), 0700); err != nil {
+		// The protected transaction directory is the entire private archive
+		// cache and contains only our verified, canonically named DEB. An
+		// empty separate cache with --no-download leaves APT's install pathname
+		// unresolved even when the local input DEB exists. No copies, links or
+		// other cached packages are admitted; missing dependencies fail.
+		if err := os.MkdirAll(filepath.Join(directory, "partial"), 0700); err != nil {
 			return err
 		}
-		args := []string{"--assume-yes", "--no-download", "--no-remove", "--no-install-recommends", "-o", "Dir::Cache::archives=" + cache, "-o", "Dir::Etc::sourcelist=/dev/null", "-o", "Dir::Etc::sourceparts=-", "-o", "Dpkg::Options::=--force-confold", "install", path}
+		args := []string{"--assume-yes", "--no-download", "--no-remove", "--no-install-recommends", "-o", "Dir::Cache::archives=" + directory, "-o", "Dir::Etc::sourcelist=/dev/null", "-o", "Dir::Etc::sourceparts=-", "-o", "Dpkg::Options::=--force-confold", "install", path}
 		preview, err := nativeCommand(ctx, "simulate", "/usr/bin/apt-get", append([]string{"--simulate"}, args...)...)
 		if err != nil {
 			return err

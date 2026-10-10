@@ -1100,8 +1100,13 @@ Protected state is under `/var/lib/lindm/executor/updates`:
   version high-water mark and immutable current transaction. Missing/corrupt
   checkpoints in initialized state fail closed.
 - `tuf/` retains the verifier's protected metadata/version checkpoints.
-- `<transaction-uuid>/transaction.pb`, `agent.deb`/`agent.rpm`/
-  `agent.pkg.tar.zst`, and `helper` bind the exact admitted native transaction.
+- `<transaction-uuid>/transaction.pb`, `lindm-agent_<native-version>_<arch>.deb`/
+  `agent.rpm`/`agent.pkg.tar.zst`, and `helper` bind the exact admitted native
+  transaction. Debian staging uses APT's canonical archive filename (with native
+  version `:`/`_` percent-escaped) and the same private directory as its cache;
+  `--no-download` therefore resolves the verified archive without copying/linking
+  it or consulting unrelated caches. Native package and network security gates
+  remain unchanged.
   `helper` is a bounded copy of the known-current running executable, not a
   path inside the package being unpacked. Its exact source SELinux executable
   context is preserved on that single owned file; no permissive mode or broad
