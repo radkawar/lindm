@@ -191,6 +191,7 @@ const (
 	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY               ResourceOwnedDimension = 60
 	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE             ResourceOwnedDimension = 61
 	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION ResourceOwnedDimension = 62
+	ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SSH_BANNER                     ResourceOwnedDimension = 70
 )
 
 // Enum value maps for ResourceOwnedDimension.
@@ -242,6 +243,7 @@ var (
 		60: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY",
 		61: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE",
 		62: "RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION",
+		70: "RESOURCE_OWNED_DIMENSION_SSH_BANNER",
 	}
 	ResourceOwnedDimension_value = map[string]int32{
 		"RESOURCE_OWNED_DIMENSION_UNSPECIFIED":                    0,
@@ -290,6 +292,7 @@ var (
 		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY":               60,
 		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE":             61,
 		"RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION": 62,
+		"RESOURCE_OWNED_DIMENSION_SSH_BANNER":                     70,
 	}
 )
 
@@ -395,6 +398,7 @@ type ResourceOwnershipSnapshot struct {
 	Firewall           *FirewallNativeSnapshot    `protobuf:"bytes,10,opt,name=firewall,proto3" json:"firewall,omitempty"`
 	AccountNssReceipt  *v1.ProbeReceipt           `protobuf:"bytes,11,opt,name=account_nss_receipt,json=accountNssReceipt,proto3" json:"account_nss_receipt,omitempty"`
 	OsUpdate           *OSUpdateOwnership         `protobuf:"bytes,12,opt,name=os_update,json=osUpdate,proto3" json:"os_update,omitempty"`
+	SshServer          *SSHServerOwnership        `protobuf:"bytes,13,opt,name=ssh_server,json=sshServer,proto3" json:"ssh_server,omitempty"`
 	// Authenticated helper command outcome, separate from independently read
 	// file/archive evidence. Absent means no rebuild was attempted.
 	ModuleInitramfsRebuildSucceeded *bool `protobuf:"varint,14,opt,name=module_initramfs_rebuild_succeeded,json=moduleInitramfsRebuildSucceeded,proto3,oneof" json:"module_initramfs_rebuild_succeeded,omitempty"`
@@ -516,11 +520,193 @@ func (x *ResourceOwnershipSnapshot) GetOsUpdate() *OSUpdateOwnership {
 	return nil
 }
 
+func (x *ResourceOwnershipSnapshot) GetSshServer() *SSHServerOwnership {
+	if x != nil {
+		return x.SshServer
+	}
+	return nil
+}
+
 func (x *ResourceOwnershipSnapshot) GetModuleInitramfsRebuildSucceeded() bool {
 	if x != nil && x.ModuleInitramfsRebuildSucceeded != nil {
 		return *x.ModuleInitramfsRebuildSucceeded
 	}
 	return false
+}
+
+// Closed SSH banner object set. Native contents and labels never leave root custody.
+type SSHNativeFileSnapshot struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	State         *v1.ManagedFileObservation `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
+	Content       []byte                     `protobuf:"bytes,2,opt,name=content,proto3,oneof" json:"content,omitempty"`
+	Xattrs        []*NativeFileXattr         `protobuf:"bytes,3,rep,name=xattrs,proto3" json:"xattrs,omitempty"`
+	Continuity    *NativeFileContinuity      `protobuf:"bytes,4,opt,name=continuity,proto3" json:"continuity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SSHNativeFileSnapshot) Reset() {
+	*x = SSHNativeFileSnapshot{}
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SSHNativeFileSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SSHNativeFileSnapshot) ProtoMessage() {}
+
+func (x *SSHNativeFileSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SSHNativeFileSnapshot.ProtoReflect.Descriptor instead.
+func (*SSHNativeFileSnapshot) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SSHNativeFileSnapshot) GetState() *v1.ManagedFileObservation {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+func (x *SSHNativeFileSnapshot) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *SSHNativeFileSnapshot) GetXattrs() []*NativeFileXattr {
+	if x != nil {
+		return x.Xattrs
+	}
+	return nil
+}
+
+func (x *SSHNativeFileSnapshot) GetContinuity() *NativeFileContinuity {
+	if x != nil {
+		return x.Continuity
+	}
+	return nil
+}
+
+type SSHServerOwnership struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Directive     *SSHNativeFileSnapshot `protobuf:"bytes,1,opt,name=directive,proto3" json:"directive,omitempty"`
+	Banner        *SSHNativeFileSnapshot `protobuf:"bytes,2,opt,name=banner,proto3" json:"banner,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SSHServerOwnership) Reset() {
+	*x = SSHServerOwnership{}
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SSHServerOwnership) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SSHServerOwnership) ProtoMessage() {}
+
+func (x *SSHServerOwnership) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SSHServerOwnership.ProtoReflect.Descriptor instead.
+func (*SSHServerOwnership) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SSHServerOwnership) GetDirective() *SSHNativeFileSnapshot {
+	if x != nil {
+		return x.Directive
+	}
+	return nil
+}
+
+func (x *SSHServerOwnership) GetBanner() *SSHNativeFileSnapshot {
+	if x != nil {
+		return x.Banner
+	}
+	return nil
+}
+
+// Filesystem identity, inode generation and every ancestor generation survive
+// device-number reassignment at boot. These are private custody, not content.
+type NativeFileContinuity struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	InodeGenerationSha256    []byte                 `protobuf:"bytes,1,opt,name=inode_generation_sha256,json=inodeGenerationSha256,proto3" json:"inode_generation_sha256,omitempty"`
+	AncestryGenerationSha256 []byte                 `protobuf:"bytes,2,opt,name=ancestry_generation_sha256,json=ancestryGenerationSha256,proto3" json:"ancestry_generation_sha256,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *NativeFileContinuity) Reset() {
+	*x = NativeFileContinuity{}
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NativeFileContinuity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NativeFileContinuity) ProtoMessage() {}
+
+func (x *NativeFileContinuity) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NativeFileContinuity.ProtoReflect.Descriptor instead.
+func (*NativeFileContinuity) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *NativeFileContinuity) GetInodeGenerationSha256() []byte {
+	if x != nil {
+		return x.InodeGenerationSha256
+	}
+	return nil
+}
+
+func (x *NativeFileContinuity) GetAncestryGenerationSha256() []byte {
+	if x != nil {
+		return x.AncestryGenerationSha256
+	}
+	return nil
 }
 
 type FirewallNativeSnapshot struct {
@@ -544,7 +730,7 @@ type FirewallNativeSnapshot struct {
 
 func (x *FirewallNativeSnapshot) Reset() {
 	*x = FirewallNativeSnapshot{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +742,7 @@ func (x *FirewallNativeSnapshot) String() string {
 func (*FirewallNativeSnapshot) ProtoMessage() {}
 
 func (x *FirewallNativeSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +755,7 @@ func (x *FirewallNativeSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FirewallNativeSnapshot.ProtoReflect.Descriptor instead.
 func (*FirewallNativeSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{1}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *FirewallNativeSnapshot) GetTable() string {
@@ -669,7 +855,7 @@ type SysctlPersistenceSnapshot struct {
 
 func (x *SysctlPersistenceSnapshot) Reset() {
 	*x = SysctlPersistenceSnapshot{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -681,7 +867,7 @@ func (x *SysctlPersistenceSnapshot) String() string {
 func (*SysctlPersistenceSnapshot) ProtoMessage() {}
 
 func (x *SysctlPersistenceSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -694,7 +880,7 @@ func (x *SysctlPersistenceSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SysctlPersistenceSnapshot.ProtoReflect.Descriptor instead.
 func (*SysctlPersistenceSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{2}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SysctlPersistenceSnapshot) GetState() *v1.ManagedFileObservation {
@@ -735,7 +921,7 @@ type DefinitionFileSnapshot struct {
 
 func (x *DefinitionFileSnapshot) Reset() {
 	*x = DefinitionFileSnapshot{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -747,7 +933,7 @@ func (x *DefinitionFileSnapshot) String() string {
 func (*DefinitionFileSnapshot) ProtoMessage() {}
 
 func (x *DefinitionFileSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -760,7 +946,7 @@ func (x *DefinitionFileSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefinitionFileSnapshot.ProtoReflect.Descriptor instead.
 func (*DefinitionFileSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DefinitionFileSnapshot) GetState() *v1.ManagedFileObservation {
@@ -818,7 +1004,7 @@ type PasswordNativeFileSnapshot struct {
 
 func (x *PasswordNativeFileSnapshot) Reset() {
 	*x = PasswordNativeFileSnapshot{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +1016,7 @@ func (x *PasswordNativeFileSnapshot) String() string {
 func (*PasswordNativeFileSnapshot) ProtoMessage() {}
 
 func (x *PasswordNativeFileSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +1029,7 @@ func (x *PasswordNativeFileSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasswordNativeFileSnapshot.ProtoReflect.Descriptor instead.
 func (*PasswordNativeFileSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PasswordNativeFileSnapshot) GetKind() PasswordNativeFile {
@@ -900,7 +1086,7 @@ type PasswordPolicyOwnership struct {
 
 func (x *PasswordPolicyOwnership) Reset() {
 	*x = PasswordPolicyOwnership{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1098,7 @@ func (x *PasswordPolicyOwnership) String() string {
 func (*PasswordPolicyOwnership) ProtoMessage() {}
 
 func (x *PasswordPolicyOwnership) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1111,7 @@ func (x *PasswordPolicyOwnership) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PasswordPolicyOwnership.ProtoReflect.Descriptor instead.
 func (*PasswordPolicyOwnership) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{5}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PasswordPolicyOwnership) GetFiles() []*PasswordNativeFileSnapshot {
@@ -989,7 +1175,7 @@ type OSUpdateNativeFileSnapshot struct {
 
 func (x *OSUpdateNativeFileSnapshot) Reset() {
 	*x = OSUpdateNativeFileSnapshot{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1001,7 +1187,7 @@ func (x *OSUpdateNativeFileSnapshot) String() string {
 func (*OSUpdateNativeFileSnapshot) ProtoMessage() {}
 
 func (x *OSUpdateNativeFileSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +1200,7 @@ func (x *OSUpdateNativeFileSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdateNativeFileSnapshot.ProtoReflect.Descriptor instead.
 func (*OSUpdateNativeFileSnapshot) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *OSUpdateNativeFileSnapshot) GetKind() v1.OSUpdateNativeFile {
@@ -1057,7 +1243,7 @@ type OSUpdateOwnership struct {
 
 func (x *OSUpdateOwnership) Reset() {
 	*x = OSUpdateOwnership{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1255,7 @@ func (x *OSUpdateOwnership) String() string {
 func (*OSUpdateOwnership) ProtoMessage() {}
 
 func (x *OSUpdateOwnership) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1268,7 @@ func (x *OSUpdateOwnership) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OSUpdateOwnership.ProtoReflect.Descriptor instead.
 func (*OSUpdateOwnership) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *OSUpdateOwnership) GetFiles() []*OSUpdateNativeFileSnapshot {
@@ -1109,7 +1295,7 @@ type NativeFileXattr struct {
 
 func (x *NativeFileXattr) Reset() {
 	*x = NativeFileXattr{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1121,7 +1307,7 @@ func (x *NativeFileXattr) String() string {
 func (*NativeFileXattr) ProtoMessage() {}
 
 func (x *NativeFileXattr) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1134,7 +1320,7 @@ func (x *NativeFileXattr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NativeFileXattr.ProtoReflect.Descriptor instead.
 func (*NativeFileXattr) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *NativeFileXattr) GetName() string {
@@ -1166,7 +1352,7 @@ type ResourceAccountPrivate struct {
 
 func (x *ResourceAccountPrivate) Reset() {
 	*x = ResourceAccountPrivate{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1178,7 +1364,7 @@ func (x *ResourceAccountPrivate) String() string {
 func (*ResourceAccountPrivate) ProtoMessage() {}
 
 func (x *ResourceAccountPrivate) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1191,7 +1377,7 @@ func (x *ResourceAccountPrivate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceAccountPrivate.ProtoReflect.Descriptor instead.
 func (*ResourceAccountPrivate) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResourceAccountPrivate) GetPasswordToken() string {
@@ -1241,7 +1427,7 @@ type ResourceOwnedMemberEdge struct {
 
 func (x *ResourceOwnedMemberEdge) Reset() {
 	*x = ResourceOwnedMemberEdge{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1253,7 +1439,7 @@ func (x *ResourceOwnedMemberEdge) String() string {
 func (*ResourceOwnedMemberEdge) ProtoMessage() {}
 
 func (x *ResourceOwnedMemberEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,7 +1452,7 @@ func (x *ResourceOwnedMemberEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnedMemberEdge.ProtoReflect.Descriptor instead.
 func (*ResourceOwnedMemberEdge) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{10}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ResourceOwnedMemberEdge) GetUser() string {
@@ -1323,7 +1509,7 @@ type ResourceOwnershipLedger struct {
 
 func (x *ResourceOwnershipLedger) Reset() {
 	*x = ResourceOwnershipLedger{}
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1521,7 @@ func (x *ResourceOwnershipLedger) String() string {
 func (*ResourceOwnershipLedger) ProtoMessage() {}
 
 func (x *ResourceOwnershipLedger) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_resource_ownership_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1534,7 @@ func (x *ResourceOwnershipLedger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnershipLedger.ProtoReflect.Descriptor instead.
 func (*ResourceOwnershipLedger) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{11}
+	return file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ResourceOwnershipLedger) GetFormatVersion() uint32 {
@@ -1474,7 +1660,7 @@ var File_lindm_agent_v1_resource_ownership_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xf1\x17\n" +
+	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\xc8\x19\n" +
 	"\x19ResourceOwnershipSnapshot\x12P\n" +
 	"\vobservation\x18\x01 \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x12@\n" +
 	"\x14managed_file_content\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x12managedFileContent\x88\x01\x01\x12G\n" +
@@ -1488,8 +1674,10 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\bfirewall\x18\n" +
 	" \x01(\v2&.lindm.agent.v1.FirewallNativeSnapshotR\bfirewall\x12O\n" +
 	"\x13account_nss_receipt\x18\v \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x11accountNssReceipt\x12>\n" +
-	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate\x12P\n" +
-	"\"module_initramfs_rebuild_succeeded\x18\x0e \x01(\bH\x01R\x1fmoduleInitramfsRebuildSucceeded\x88\x01\x01:\x84\x0f\xbaH\x80\x0f\x1a\xfb\x01\n" +
+	"\tos_update\x18\f \x01(\v2!.lindm.agent.v1.OSUpdateOwnershipR\bosUpdate\x12A\n" +
+	"\n" +
+	"ssh_server\x18\r \x01(\v2\".lindm.agent.v1.SSHServerOwnershipR\tsshServer\x12P\n" +
+	"\"module_initramfs_rebuild_succeeded\x18\x0e \x01(\bH\x01R\x1fmoduleInitramfsRebuildSucceeded\x88\x01\x01:\x98\x10\xbaH\x94\x10\x1a\xfb\x01\n" +
 	"!ownership_snapshot.module_rebuild\x12@module rebuild outcomes belong only to the typed module template\x1a\x93\x01!has(this.module_initramfs_rebuild_succeeded) || (has(this.observation.managed_file) && has(this.observation.managed_file.kernel_module_blocklist))\x1a\xa1\x01\n" +
 	"\x1aownership_snapshot.content\x12<private content is only valid for a managed file observation\x1aE!has(this.managed_file_content) || has(this.observation.managed_file)\x1a\x80\x03\n" +
 	"\x1fownership_snapshot.private_kind\x121private state must match its native resource kind\x1a\xa9\x02(this.managed_file_xattrs.size() == 0 || has(this.observation.managed_file)) && (!has(this.account_private) || has(this.observation.local_user) || has(this.observation.local_group)) && (this.account_member_edges.size() == 0 || has(this.observation.local_user) || has(this.observation.local_group))\x1a\xbe\x02\n" +
@@ -1498,9 +1686,26 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\x1downership_snapshot.definition\x12@definition private evidence belongs only to a systemd definition\x1aEhas(this.definition_file) == has(this.observation.systemd_definition)\x1a\x9c\x01\n" +
 	"\x1bownership_snapshot.password\x129password private evidence belongs only to password policy\x1aBhas(this.password_policy) == has(this.observation.password_policy)\x1a\x92\x01\n" +
 	"\x1bownership_snapshot.firewall\x128firewall private evidence belongs only to firewall zones\x1a9has(this.firewall) == has(this.observation.firewall_zone)\x1a\x98\x01\n" +
-	"\x1cownership_snapshot.os_update\x12@update policy private evidence belongs only to the update policy\x1a6has(this.os_update) == has(this.observation.os_update)B\x17\n" +
+	"\x1cownership_snapshot.os_update\x12@update policy private evidence belongs only to the update policy\x1a6has(this.os_update) == has(this.observation.os_update)\x1a\x91\x01\n" +
+	"\x16ownership_snapshot.ssh\x12=SSH private evidence belongs only to SSH server configuration\x1a8has(this.ssh_server) == has(this.observation.ssh_server)B\x17\n" +
 	"\x15_managed_file_contentB%\n" +
-	"#_module_initramfs_rebuild_succeeded\"\xdc\a\n" +
+	"#_module_initramfs_rebuild_succeeded\"\xa3\x03\n" +
+	"\x15SSHNativeFileSnapshot\x12G\n" +
+	"\x05state\x18\x01 \x01(\v2).lindm.resource.v1.ManagedFileObservationB\x06\xbaH\x03\xc8\x01\x01R\x05state\x12(\n" +
+	"\acontent\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\acontent\x88\x01\x01\x12A\n" +
+	"\x06xattrs\x18\x03 \x03(\v2\x1f.lindm.agent.v1.NativeFileXattrB\b\xbaH\x05\x92\x01\x02\x10@R\x06xattrs\x12L\n" +
+	"\n" +
+	"continuity\x18\x04 \x01(\v2$.lindm.agent.v1.NativeFileContinuityB\x06\xbaH\x03\xc8\x01\x01R\n" +
+	"continuity:z\xbaHw\x1au\n" +
+	"\x10ssh_file.content\x129existing SSH files require exact private baseline content\x1a&this.state.exists == has(this.content)B\n" +
+	"\n" +
+	"\b_content\"\xa8\x01\n" +
+	"\x12SSHServerOwnership\x12K\n" +
+	"\tdirective\x18\x01 \x01(\v2%.lindm.agent.v1.SSHNativeFileSnapshotB\x06\xbaH\x03\xc8\x01\x01R\tdirective\x12E\n" +
+	"\x06banner\x18\x02 \x01(\v2%.lindm.agent.v1.SSHNativeFileSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06banner\"\x9e\x01\n" +
+	"\x14NativeFileContinuity\x12?\n" +
+	"\x17inode_generation_sha256\x18\x01 \x01(\fB\a\xbaH\x04z\x02h R\x15inodeGenerationSha256\x12E\n" +
+	"\x1aancestry_generation_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x18ancestryGenerationSha256\"\xdc\a\n" +
 	"\x16FirewallNativeSnapshot\x123\n" +
 	"\x05table\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x182\x16^lindm_z_[a-f0-9]{32}$R\x05table\x12$\n" +
 	"\buserdata\x18\x02 \x01(\fB\b\xbaH\x05z\x03\x18\x80\x02R\buserdata\x12F\n" +
@@ -1625,7 +1830,7 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"#PASSWORD_NATIVE_FEATURE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fPASSWORD_NATIVE_FEATURE_QUALITY\x10\x01\x12#\n" +
 	"\x1fPASSWORD_NATIVE_FEATURE_HISTORY\x10\x02\x12$\n" +
-	" PASSWORD_NATIVE_FEATURE_FAILLOCK\x10\x03*\x99\x11\n" +
+	" PASSWORD_NATIVE_FEATURE_FAILLOCK\x10\x03*\xc2\x11\n" +
 	"\x16ResourceOwnedDimension\x12(\n" +
 	"$RESOURCE_OWNED_DIMENSION_UNSPECIFIED\x10\x00\x12,\n" +
 	"(RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME\x10\x01\x12/\n" +
@@ -1673,7 +1878,8 @@ const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"-RESOURCE_OWNED_DIMENSION_FIREWALL_PERSISTENCE\x103\x12-\n" +
 	")RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY\x10<\x12/\n" +
 	"+RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE\x10=\x12;\n" +
-	"7RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION\x10>*\xdb\x01\n" +
+	"7RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION\x10>\x12'\n" +
+	"#RESOURCE_OWNED_DIMENSION_SSH_BANNER\x10F*\xdb\x01\n" +
 	"\x16ResourceOwnershipState\x12(\n" +
 	"$RESOURCE_OWNERSHIP_STATE_UNSPECIFIED\x10\x00\x12$\n" +
 	" RESOURCE_OWNERSHIP_STATE_CLAIMED\x10\x01\x12$\n" +
@@ -1694,85 +1900,94 @@ func file_lindm_agent_v1_resource_ownership_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_resource_ownership_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_lindm_agent_v1_resource_ownership_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_lindm_agent_v1_resource_ownership_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lindm_agent_v1_resource_ownership_proto_goTypes = []any{
 	(PasswordNativeFile)(0),            // 0: lindm.agent.v1.PasswordNativeFile
 	(PasswordNativeFeature)(0),         // 1: lindm.agent.v1.PasswordNativeFeature
 	(ResourceOwnedDimension)(0),        // 2: lindm.agent.v1.ResourceOwnedDimension
 	(ResourceOwnershipState)(0),        // 3: lindm.agent.v1.ResourceOwnershipState
 	(*ResourceOwnershipSnapshot)(nil),  // 4: lindm.agent.v1.ResourceOwnershipSnapshot
-	(*FirewallNativeSnapshot)(nil),     // 5: lindm.agent.v1.FirewallNativeSnapshot
-	(*SysctlPersistenceSnapshot)(nil),  // 6: lindm.agent.v1.SysctlPersistenceSnapshot
-	(*DefinitionFileSnapshot)(nil),     // 7: lindm.agent.v1.DefinitionFileSnapshot
-	(*PasswordNativeFileSnapshot)(nil), // 8: lindm.agent.v1.PasswordNativeFileSnapshot
-	(*PasswordPolicyOwnership)(nil),    // 9: lindm.agent.v1.PasswordPolicyOwnership
-	(*OSUpdateNativeFileSnapshot)(nil), // 10: lindm.agent.v1.OSUpdateNativeFileSnapshot
-	(*OSUpdateOwnership)(nil),          // 11: lindm.agent.v1.OSUpdateOwnership
-	(*NativeFileXattr)(nil),            // 12: lindm.agent.v1.NativeFileXattr
-	(*ResourceAccountPrivate)(nil),     // 13: lindm.agent.v1.ResourceAccountPrivate
-	(*ResourceOwnedMemberEdge)(nil),    // 14: lindm.agent.v1.ResourceOwnedMemberEdge
-	(*ResourceOwnershipLedger)(nil),    // 15: lindm.agent.v1.ResourceOwnershipLedger
-	(*v1.ResourceObservation)(nil),     // 16: lindm.resource.v1.ResourceObservation
-	(*v1.ArtifactRef)(nil),             // 17: lindm.resource.v1.ArtifactRef
-	(*v1.MemberEdgeChange)(nil),        // 18: lindm.resource.v1.MemberEdgeChange
-	(*v1.ProbeReceipt)(nil),            // 19: lindm.resource.v1.ProbeReceipt
-	(*FirewallNativeChain)(nil),        // 20: lindm.agent.v1.FirewallNativeChain
-	(*FirewallNativeRule)(nil),         // 21: lindm.agent.v1.FirewallNativeRule
-	(*FirewallPersistentState)(nil),    // 22: lindm.agent.v1.FirewallPersistentState
+	(*SSHNativeFileSnapshot)(nil),      // 5: lindm.agent.v1.SSHNativeFileSnapshot
+	(*SSHServerOwnership)(nil),         // 6: lindm.agent.v1.SSHServerOwnership
+	(*NativeFileContinuity)(nil),       // 7: lindm.agent.v1.NativeFileContinuity
+	(*FirewallNativeSnapshot)(nil),     // 8: lindm.agent.v1.FirewallNativeSnapshot
+	(*SysctlPersistenceSnapshot)(nil),  // 9: lindm.agent.v1.SysctlPersistenceSnapshot
+	(*DefinitionFileSnapshot)(nil),     // 10: lindm.agent.v1.DefinitionFileSnapshot
+	(*PasswordNativeFileSnapshot)(nil), // 11: lindm.agent.v1.PasswordNativeFileSnapshot
+	(*PasswordPolicyOwnership)(nil),    // 12: lindm.agent.v1.PasswordPolicyOwnership
+	(*OSUpdateNativeFileSnapshot)(nil), // 13: lindm.agent.v1.OSUpdateNativeFileSnapshot
+	(*OSUpdateOwnership)(nil),          // 14: lindm.agent.v1.OSUpdateOwnership
+	(*NativeFileXattr)(nil),            // 15: lindm.agent.v1.NativeFileXattr
+	(*ResourceAccountPrivate)(nil),     // 16: lindm.agent.v1.ResourceAccountPrivate
+	(*ResourceOwnedMemberEdge)(nil),    // 17: lindm.agent.v1.ResourceOwnedMemberEdge
+	(*ResourceOwnershipLedger)(nil),    // 18: lindm.agent.v1.ResourceOwnershipLedger
+	(*v1.ResourceObservation)(nil),     // 19: lindm.resource.v1.ResourceObservation
+	(*v1.ArtifactRef)(nil),             // 20: lindm.resource.v1.ArtifactRef
+	(*v1.MemberEdgeChange)(nil),        // 21: lindm.resource.v1.MemberEdgeChange
+	(*v1.ProbeReceipt)(nil),            // 22: lindm.resource.v1.ProbeReceipt
 	(*v1.ManagedFileObservation)(nil),  // 23: lindm.resource.v1.ManagedFileObservation
-	(v1.OSUpdateNativeFile)(0),         // 24: lindm.resource.v1.OSUpdateNativeFile
-	(*v1.HomeMetadata)(nil),            // 25: lindm.resource.v1.HomeMetadata
-	(*PrivateCustodyEnvelope)(nil),     // 26: lindm.agent.v1.PrivateCustodyEnvelope
-	(*v1.ResourceRef)(nil),             // 27: lindm.resource.v1.ResourceRef
-	(*ResourceOwnershipBinding)(nil),   // 28: lindm.agent.v1.ResourceOwnershipBinding
+	(*FirewallNativeChain)(nil),        // 24: lindm.agent.v1.FirewallNativeChain
+	(*FirewallNativeRule)(nil),         // 25: lindm.agent.v1.FirewallNativeRule
+	(*FirewallPersistentState)(nil),    // 26: lindm.agent.v1.FirewallPersistentState
+	(v1.OSUpdateNativeFile)(0),         // 27: lindm.resource.v1.OSUpdateNativeFile
+	(*v1.HomeMetadata)(nil),            // 28: lindm.resource.v1.HomeMetadata
+	(*PrivateCustodyEnvelope)(nil),     // 29: lindm.agent.v1.PrivateCustodyEnvelope
+	(*v1.ResourceRef)(nil),             // 30: lindm.resource.v1.ResourceRef
+	(*ResourceOwnershipBinding)(nil),   // 31: lindm.agent.v1.ResourceOwnershipBinding
 }
 var file_lindm_agent_v1_resource_ownership_proto_depIdxs = []int32{
-	16, // 0: lindm.agent.v1.ResourceOwnershipSnapshot.observation:type_name -> lindm.resource.v1.ResourceObservation
-	17, // 1: lindm.agent.v1.ResourceOwnershipSnapshot.artifacts:type_name -> lindm.resource.v1.ArtifactRef
-	12, // 2: lindm.agent.v1.ResourceOwnershipSnapshot.managed_file_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	13, // 3: lindm.agent.v1.ResourceOwnershipSnapshot.account_private:type_name -> lindm.agent.v1.ResourceAccountPrivate
-	18, // 4: lindm.agent.v1.ResourceOwnershipSnapshot.account_member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
-	6,  // 5: lindm.agent.v1.ResourceOwnershipSnapshot.sysctl_persistence:type_name -> lindm.agent.v1.SysctlPersistenceSnapshot
-	7,  // 6: lindm.agent.v1.ResourceOwnershipSnapshot.definition_file:type_name -> lindm.agent.v1.DefinitionFileSnapshot
-	9,  // 7: lindm.agent.v1.ResourceOwnershipSnapshot.password_policy:type_name -> lindm.agent.v1.PasswordPolicyOwnership
-	5,  // 8: lindm.agent.v1.ResourceOwnershipSnapshot.firewall:type_name -> lindm.agent.v1.FirewallNativeSnapshot
-	19, // 9: lindm.agent.v1.ResourceOwnershipSnapshot.account_nss_receipt:type_name -> lindm.resource.v1.ProbeReceipt
-	11, // 10: lindm.agent.v1.ResourceOwnershipSnapshot.os_update:type_name -> lindm.agent.v1.OSUpdateOwnership
-	20, // 11: lindm.agent.v1.FirewallNativeSnapshot.chains:type_name -> lindm.agent.v1.FirewallNativeChain
-	21, // 12: lindm.agent.v1.FirewallNativeSnapshot.rules:type_name -> lindm.agent.v1.FirewallNativeRule
-	22, // 13: lindm.agent.v1.FirewallNativeSnapshot.persistent:type_name -> lindm.agent.v1.FirewallPersistentState
-	23, // 14: lindm.agent.v1.FirewallNativeSnapshot.persistence_file:type_name -> lindm.resource.v1.ManagedFileObservation
-	12, // 15: lindm.agent.v1.FirewallNativeSnapshot.persistence_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	12, // 16: lindm.agent.v1.FirewallNativeSnapshot.creation_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	23, // 17: lindm.agent.v1.SysctlPersistenceSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	12, // 18: lindm.agent.v1.SysctlPersistenceSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	23, // 19: lindm.agent.v1.DefinitionFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	12, // 20: lindm.agent.v1.DefinitionFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	0,  // 21: lindm.agent.v1.PasswordNativeFileSnapshot.kind:type_name -> lindm.agent.v1.PasswordNativeFile
-	23, // 22: lindm.agent.v1.PasswordNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	12, // 23: lindm.agent.v1.PasswordNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	8,  // 24: lindm.agent.v1.PasswordPolicyOwnership.files:type_name -> lindm.agent.v1.PasswordNativeFileSnapshot
-	1,  // 25: lindm.agent.v1.PasswordPolicyOwnership.enabled_features:type_name -> lindm.agent.v1.PasswordNativeFeature
-	1,  // 26: lindm.agent.v1.PasswordPolicyOwnership.acquired_features:type_name -> lindm.agent.v1.PasswordNativeFeature
-	24, // 27: lindm.agent.v1.OSUpdateNativeFileSnapshot.kind:type_name -> lindm.resource.v1.OSUpdateNativeFile
-	23, // 28: lindm.agent.v1.OSUpdateNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
-	12, // 29: lindm.agent.v1.OSUpdateNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
-	10, // 30: lindm.agent.v1.OSUpdateOwnership.files:type_name -> lindm.agent.v1.OSUpdateNativeFileSnapshot
-	25, // 31: lindm.agent.v1.ResourceAccountPrivate.desired_home:type_name -> lindm.resource.v1.HomeMetadata
-	26, // 32: lindm.agent.v1.ResourceAccountPrivate.encrypted_password_token:type_name -> lindm.agent.v1.PrivateCustodyEnvelope
-	27, // 33: lindm.agent.v1.ResourceOwnershipLedger.ref:type_name -> lindm.resource.v1.ResourceRef
-	28, // 34: lindm.agent.v1.ResourceOwnershipLedger.owner:type_name -> lindm.agent.v1.ResourceOwnershipBinding
-	3,  // 35: lindm.agent.v1.ResourceOwnershipLedger.state:type_name -> lindm.agent.v1.ResourceOwnershipState
-	4,  // 36: lindm.agent.v1.ResourceOwnershipLedger.baseline:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	4,  // 37: lindm.agent.v1.ResourceOwnershipLedger.last_applied:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	4,  // 38: lindm.agent.v1.ResourceOwnershipLedger.before_effect:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
-	2,  // 39: lindm.agent.v1.ResourceOwnershipLedger.owned_dimensions:type_name -> lindm.agent.v1.ResourceOwnedDimension
-	14, // 40: lindm.agent.v1.ResourceOwnershipLedger.owned_member_edges:type_name -> lindm.agent.v1.ResourceOwnedMemberEdge
-	41, // [41:41] is the sub-list for method output_type
-	41, // [41:41] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	19, // 0: lindm.agent.v1.ResourceOwnershipSnapshot.observation:type_name -> lindm.resource.v1.ResourceObservation
+	20, // 1: lindm.agent.v1.ResourceOwnershipSnapshot.artifacts:type_name -> lindm.resource.v1.ArtifactRef
+	15, // 2: lindm.agent.v1.ResourceOwnershipSnapshot.managed_file_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	16, // 3: lindm.agent.v1.ResourceOwnershipSnapshot.account_private:type_name -> lindm.agent.v1.ResourceAccountPrivate
+	21, // 4: lindm.agent.v1.ResourceOwnershipSnapshot.account_member_edges:type_name -> lindm.resource.v1.MemberEdgeChange
+	9,  // 5: lindm.agent.v1.ResourceOwnershipSnapshot.sysctl_persistence:type_name -> lindm.agent.v1.SysctlPersistenceSnapshot
+	10, // 6: lindm.agent.v1.ResourceOwnershipSnapshot.definition_file:type_name -> lindm.agent.v1.DefinitionFileSnapshot
+	12, // 7: lindm.agent.v1.ResourceOwnershipSnapshot.password_policy:type_name -> lindm.agent.v1.PasswordPolicyOwnership
+	8,  // 8: lindm.agent.v1.ResourceOwnershipSnapshot.firewall:type_name -> lindm.agent.v1.FirewallNativeSnapshot
+	22, // 9: lindm.agent.v1.ResourceOwnershipSnapshot.account_nss_receipt:type_name -> lindm.resource.v1.ProbeReceipt
+	14, // 10: lindm.agent.v1.ResourceOwnershipSnapshot.os_update:type_name -> lindm.agent.v1.OSUpdateOwnership
+	6,  // 11: lindm.agent.v1.ResourceOwnershipSnapshot.ssh_server:type_name -> lindm.agent.v1.SSHServerOwnership
+	23, // 12: lindm.agent.v1.SSHNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 13: lindm.agent.v1.SSHNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	7,  // 14: lindm.agent.v1.SSHNativeFileSnapshot.continuity:type_name -> lindm.agent.v1.NativeFileContinuity
+	5,  // 15: lindm.agent.v1.SSHServerOwnership.directive:type_name -> lindm.agent.v1.SSHNativeFileSnapshot
+	5,  // 16: lindm.agent.v1.SSHServerOwnership.banner:type_name -> lindm.agent.v1.SSHNativeFileSnapshot
+	24, // 17: lindm.agent.v1.FirewallNativeSnapshot.chains:type_name -> lindm.agent.v1.FirewallNativeChain
+	25, // 18: lindm.agent.v1.FirewallNativeSnapshot.rules:type_name -> lindm.agent.v1.FirewallNativeRule
+	26, // 19: lindm.agent.v1.FirewallNativeSnapshot.persistent:type_name -> lindm.agent.v1.FirewallPersistentState
+	23, // 20: lindm.agent.v1.FirewallNativeSnapshot.persistence_file:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 21: lindm.agent.v1.FirewallNativeSnapshot.persistence_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	15, // 22: lindm.agent.v1.FirewallNativeSnapshot.creation_xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	23, // 23: lindm.agent.v1.SysctlPersistenceSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 24: lindm.agent.v1.SysctlPersistenceSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	23, // 25: lindm.agent.v1.DefinitionFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 26: lindm.agent.v1.DefinitionFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	0,  // 27: lindm.agent.v1.PasswordNativeFileSnapshot.kind:type_name -> lindm.agent.v1.PasswordNativeFile
+	23, // 28: lindm.agent.v1.PasswordNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 29: lindm.agent.v1.PasswordNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	11, // 30: lindm.agent.v1.PasswordPolicyOwnership.files:type_name -> lindm.agent.v1.PasswordNativeFileSnapshot
+	1,  // 31: lindm.agent.v1.PasswordPolicyOwnership.enabled_features:type_name -> lindm.agent.v1.PasswordNativeFeature
+	1,  // 32: lindm.agent.v1.PasswordPolicyOwnership.acquired_features:type_name -> lindm.agent.v1.PasswordNativeFeature
+	27, // 33: lindm.agent.v1.OSUpdateNativeFileSnapshot.kind:type_name -> lindm.resource.v1.OSUpdateNativeFile
+	23, // 34: lindm.agent.v1.OSUpdateNativeFileSnapshot.state:type_name -> lindm.resource.v1.ManagedFileObservation
+	15, // 35: lindm.agent.v1.OSUpdateNativeFileSnapshot.xattrs:type_name -> lindm.agent.v1.NativeFileXattr
+	13, // 36: lindm.agent.v1.OSUpdateOwnership.files:type_name -> lindm.agent.v1.OSUpdateNativeFileSnapshot
+	28, // 37: lindm.agent.v1.ResourceAccountPrivate.desired_home:type_name -> lindm.resource.v1.HomeMetadata
+	29, // 38: lindm.agent.v1.ResourceAccountPrivate.encrypted_password_token:type_name -> lindm.agent.v1.PrivateCustodyEnvelope
+	30, // 39: lindm.agent.v1.ResourceOwnershipLedger.ref:type_name -> lindm.resource.v1.ResourceRef
+	31, // 40: lindm.agent.v1.ResourceOwnershipLedger.owner:type_name -> lindm.agent.v1.ResourceOwnershipBinding
+	3,  // 41: lindm.agent.v1.ResourceOwnershipLedger.state:type_name -> lindm.agent.v1.ResourceOwnershipState
+	4,  // 42: lindm.agent.v1.ResourceOwnershipLedger.baseline:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	4,  // 43: lindm.agent.v1.ResourceOwnershipLedger.last_applied:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	4,  // 44: lindm.agent.v1.ResourceOwnershipLedger.before_effect:type_name -> lindm.agent.v1.ResourceOwnershipSnapshot
+	2,  // 45: lindm.agent.v1.ResourceOwnershipLedger.owned_dimensions:type_name -> lindm.agent.v1.ResourceOwnedDimension
+	17, // 46: lindm.agent.v1.ResourceOwnershipLedger.owned_member_edges:type_name -> lindm.agent.v1.ResourceOwnedMemberEdge
+	47, // [47:47] is the sub-list for method output_type
+	47, // [47:47] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_resource_ownership_proto_init() }
@@ -1785,19 +2000,20 @@ func file_lindm_agent_v1_resource_ownership_proto_init() {
 	file_lindm_agent_v1_resource_execution_proto_init()
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[0].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[1].OneofWrappers = []any{}
-	file_lindm_agent_v1_resource_ownership_proto_msgTypes[2].OneofWrappers = []any{}
-	file_lindm_agent_v1_resource_ownership_proto_msgTypes[3].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[4].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[5].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[6].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[7].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[9].OneofWrappers = []any{}
-	file_lindm_agent_v1_resource_ownership_proto_msgTypes[11].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[12].OneofWrappers = []any{}
+	file_lindm_agent_v1_resource_ownership_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_resource_ownership_proto_rawDesc), len(file_lindm_agent_v1_resource_ownership_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

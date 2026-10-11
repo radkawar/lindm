@@ -130,11 +130,16 @@ var QualifiedResourceKinds = map[resourcev1.ResourceKind]resourceQualification{
 	resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {Modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, Releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 	// The update policy only creates lindm-owned objects; it never adopts.
 	resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY: {Modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY}, Releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
+	// Only the banner-only SSH admission below is qualified, not auth/network directives.
+	resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER: {Modes: []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION}, Releases: []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}},
 }
 
 // The generic wire is not native qualification. Keep unqualified kinds and
 // unsupported ownership, applicability and verification operations blocked.
 func ResourceDispatchUnsupported(item *policyv1.ProfileResource) string {
+	if item.GetDesired().GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER && !resource.SSHBannerOnly(item.GetDesired().GetSshServer()) {
+		return "resource_executor_not_available"
+	}
 	qualification, ok := QualifiedResourceKinds[item.GetDesired().GetRef().GetKind()]
 	if !ok {
 		return "resource_executor_not_available"

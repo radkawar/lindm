@@ -67,14 +67,19 @@ export function ProfileDetailView({
   const isHead =
     revision === "" ||
     (record !== undefined && head !== undefined && record.revisionId === head.revisionId);
-  const headLabel =
-    revision === "" || isHead
+  const headKnown = record !== undefined && head !== undefined && headFailure === null;
+  const revisionLabel = !headKnown
+    ? "Saved revision"
+    : isHead
+      ? "Latest revision"
+      : "Older revision";
+  const headLabel = !headKnown
+    ? headFailure
+      ? "Couldn't check whether this is the latest revision."
+      : "Checking whether this is the latest revision…"
+    : isHead
       ? "This is the latest revision."
-      : headQuery.isPending
-        ? "This is an older revision. Checking for newer ones…"
-        : headFailure
-          ? "This is an older revision. Couldn't check for newer ones."
-          : "This is an older revision. A newer one is available.";
+      : "This is an older revision. A newer one is available.";
   const published = formatTimestamp(record?.publishedAt);
 
   function displayedSource(): EditorSource | null {
@@ -126,8 +131,7 @@ export function ProfileDetailView({
         }
       />
       <p className="max-w-3xl text-sm text-muted-foreground">
-        {revision === "" ? "Latest revision. " : "Older revision. "}
-        {CATALOG_SEMANTICS}
+        {revisionLabel}. {CATALOG_SEMANTICS}
       </p>
       <Card>
         <CardHeader>
@@ -189,10 +193,10 @@ export function ProfileDetailView({
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-wrap gap-2">
-                <StatusBadge status={isHead ? "info" : "neutral"}>
-                  {isHead ? "Latest revision" : "Older revision"}
+                <StatusBadge status={headKnown && isHead ? "info" : "neutral"}>
+                  {revisionLabel}
                 </StatusBadge>
-                {!isHead && head ? (
+                {headKnown && !isHead && head ? (
                   <Link
                     to="/profiles/$profileId"
                     params={{ profileId }}
@@ -305,13 +309,16 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ResourceFacts({ resource }: { resource: ProfileResource }) {
+  const kind = resource.desired?.state.case;
   return (
     <article className="grid min-w-0 gap-3 border bg-muted/20 p-4">
       <h2 className="break-all text-sm font-medium">
-        {resource.desired?.ref?.canonicalKey || "Unnamed setting"}
+        {kind === "sshServer"
+          ? "SSH settings"
+          : resource.desired?.ref?.canonicalKey || "Unnamed setting"}
       </h2>
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Fact label="Type">{resource.desired?.state.case ?? "Unknown"}</Fact>
+        <Fact label="Type">{kind === "sshServer" ? "SSH server" : (kind ?? "Unknown")}</Fact>
         <Fact label="Depends on">
           {resource.dependsOn.length === 0
             ? "None"

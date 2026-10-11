@@ -154,6 +154,9 @@ type Quirks struct {
 	// entry to the vendor shim+GRUB chain. Read from the release's own row,
 	// never a derivative's base: a derivative may ship another loader.
 	RecoveryGRUB GRUBChain
+	// SSHBannerUnit admits only the typed pre-authentication banner provider.
+	// Read the release's own row, not Native(): qualification is not inherited.
+	SSHBannerUnit string
 }
 
 // GRUBEntries is the vendor GRUB menu source a one-shot entry is added to.

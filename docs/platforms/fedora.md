@@ -373,6 +373,24 @@ The native aarch64 KVM lane passed all ten scenarios with SELinux enforcing,
 including reboot/load refusal, same-inode initramfs-only drift repair, built-in
 `kvm` findings and release. See [receipts and limits](../verification.md#typed-kernel-module-blocklist).
 
+SSH banner-only desired state uses the existing SSH resource model and reloads
+`sshd.service`, never restarts or starts a service. It manages the fixed Banner
+drop-in and `/etc/issue.net`; creation predicts the native SELinux file context
+and atomic replacement preserves captured security attributes. The dedicated
+[native lane](../verification.md#ssh-login-banner) checks `matchpathcon` and
+SELinux enforcing alongside the fresh banner exchange, authenticated login,
+automatic content drift repair and baseline/removal release cases. Existing
+distribution includes (including the crypto-policy symlink and its root-protected
+hardlinked target) are read, not rewritten or claimed as replaceable files.
+The stock `/etc/issue.net` symlink is not adoptable: a native administrator must
+prepare a regular notice file before explicit adoption. The disposable native lane
+does this as an operator fixture, never by relaxing provider custody.
+Authentication/listener controls remain unqualified; see
+[ownership and prerequisites](../security-and-operations.md#ssh-login-banner).
+The recorded aarch64 KVM lane passed all eleven cases with SELinux Enforcing,
+including terminal pre-effect refusals for an unsafe Include alias and an empty
+writable Include search directory. Protected vendor links remain supported.
+
 Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
 reading `name:hash` on stdin with `--prefix` (shadow-utils 4.14 and later).
 With `-e`, Fedora's chpasswd accepts only `$y$`, `$2[abxy]$`, `$6$`, `$5$`, a `!`

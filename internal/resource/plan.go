@@ -72,6 +72,12 @@ func ValidatePlanVerification(plan *resourcev1.ResourcePlan, verification *resou
 			}
 		}
 	}
+	if verification.GetSshServer().GetBannerExchange() != nil && !SSHBannerOnly(plan.GetSshServer().GetDesired()) {
+		return errors.New("resource: banner_proof_cannot_verify_ssh_authentication")
+	}
+	if SSHBannerOnly(plan.GetSshServer().GetDesired()) && verification.GetSshServer().GetBannerExchange() == nil {
+		return errors.New("resource: banner_exchange_required")
+	}
 	return nil
 }
 
@@ -111,6 +117,9 @@ func PlanRequiresEffect(plan *resourcev1.ResourcePlan) bool {
 	}
 	if packages := plan.GetNativePackage(); packages != nil {
 		return packages.GetChangePackages() || packages.GetChangePin()
+	}
+	if ssh := plan.GetSshServer(); ssh != nil {
+		return len(ssh.GetChangedDirectives()) != 0
 	}
 	if update := plan.GetOsUpdate(); update != nil {
 		return len(update.GetChangedFiles()) != 0 || update.GetTimerChange()

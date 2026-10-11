@@ -31,6 +31,7 @@ message ResourceOwnershipSnapshot {
   FirewallNativeSnapshot firewall = 10;
   lindm.resource.v1.ProbeReceipt account_nss_receipt = 11;
   OSUpdateOwnership os_update = 12;
+  SSHServerOwnership ssh_server = 13;
   // Authenticated helper command outcome, separate from independently read
   // file/archive evidence. Absent means no rebuild was attempted.
   optional bool module_initramfs_rebuild_succeeded = 14;
@@ -79,7 +80,37 @@ message ResourceOwnershipSnapshot {
     message: "update policy private evidence belongs only to the update policy"
     expression: "has(this.os_update) == has(this.observation.os_update)"
   };
+  option (buf.validate.message).cel = {
+    id: "ownership_snapshot.ssh"
+    message: "SSH private evidence belongs only to SSH server configuration"
+    expression: "has(this.ssh_server) == has(this.observation.ssh_server)"
+  };
 }
+
+// Closed SSH banner object set. Native contents and labels never leave root custody.
+message SSHNativeFileSnapshot {
+  lindm.resource.v1.ManagedFileObservation state = 1 [(buf.validate.field).required = true];
+  optional bytes content = 2 [(buf.validate.field).bytes.max_len = 32768];
+  repeated NativeFileXattr xattrs = 3 [(buf.validate.field).repeated.max_items = 64];
+  NativeFileContinuity continuity = 4 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "ssh_file.content"
+    message: "existing SSH files require exact private baseline content"
+    expression: "this.state.exists == has(this.content)"
+  };
+}
+message SSHServerOwnership {
+  SSHNativeFileSnapshot directive = 1 [(buf.validate.field).required = true];
+  SSHNativeFileSnapshot banner = 2 [(buf.validate.field).required = true];
+}
+
+// Filesystem identity, inode generation and every ancestor generation survive
+// device-number reassignment at boot. These are private custody, not content.
+message NativeFileContinuity {
+  bytes inode_generation_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  bytes ancestry_generation_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+
 message FirewallNativeSnapshot {
   string table = 1 [(buf.validate.field).string = {pattern: "^lindm_z_[a-f0-9]{32}$"}];
   bytes userdata = 2 [(buf.validate.field).bytes.max_len = 256];
@@ -323,6 +354,7 @@ enum ResourceOwnedDimension {
   RESOURCE_OWNED_DIMENSION_OS_UPDATE_POLICY = 60;
   RESOURCE_OWNED_DIMENSION_OS_UPDATE_SCHEDULE = 61;
   RESOURCE_OWNED_DIMENSION_OS_UPDATE_NATIVE_CONFIGURATION = 62;
+  RESOURCE_OWNED_DIMENSION_SSH_BANNER = 70;
 }
 
 enum ResourceOwnershipState {

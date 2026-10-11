@@ -318,10 +318,17 @@ message SSHServerDesired {
   SSHAccessList allow_users = 12;
   SSHAccessList allow_groups = 13;
   repeated SSHMatch match = 14 [(buf.validate.field).repeated.max_items = 64];
+  // Exact public pre-authentication text. Removal is ownership-safe release,
+  // not an empty string or a caller-selected native path.
+  optional string banner_text = 15 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 8192
+    pattern: "^[^\\x00-\\x08\\x0b-\\x1f\\x7f]+$"
+  }];
   option (buf.validate.message).cel = {
     id: "ssh_server.dimension"
     message: "manage at least one SSH directive"
-    expression: "has(this.port) || has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.max_auth_tries) || has(this.client_alive_interval_seconds) || has(this.client_alive_count_max) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding) || has(this.allow_users) || has(this.allow_groups) || this.match.size() > 0"
+    expression: "has(this.port) || has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.max_auth_tries) || has(this.client_alive_interval_seconds) || has(this.client_alive_count_max) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding) || has(this.allow_users) || has(this.allow_groups) || this.match.size() > 0 || has(this.banner_text)"
   };
 }
 message SessionPolicyDesired {

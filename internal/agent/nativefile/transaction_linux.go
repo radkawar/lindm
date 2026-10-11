@@ -27,7 +27,22 @@ func Capture(path string, template *resourcev1.ResourceObservation) (result *age
 	if template == nil || template.GetMetadata() == nil {
 		return nil, ErrUnsupported
 	}
-	c, err := openCustody(path)
+	c, err := openCustody(path, false)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, c.close()) }()
+	return c.snapshot(template)
+}
+
+// CaptureReadOnly inspects a root-protected configuration dependency, not a
+// replaceable managed file. Hardlinks are allowed only on this observation path;
+// Capture, CaptureWithContinuity and Prepare continue to reject them.
+func CaptureReadOnly(path string, template *resourcev1.ResourceObservation) (result *agentv1.ResourceOwnershipSnapshot, err error) {
+	if template == nil || template.GetMetadata() == nil {
+		return nil, ErrUnsupported
+	}
+	c, err := openCustody(path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +72,7 @@ func Prepare(before, target *agentv1.ResourceOwnershipSnapshot) (tx *Transaction
 	if path != target.GetObservation().GetManagedFile().GetPath() {
 		return nil, ErrConflict
 	}
-	c, err := openCustody(path)
+	c, err := openCustody(path, false)
 	if err != nil {
 		return nil, err
 	}

@@ -846,7 +846,7 @@ func ResourceKindSelection(value string) (map[string]bool, error) {
 	selected := make(map[string]bool)
 	for name := range strings.SplitSeq(value, ",") {
 		switch name {
-		case "packages", "files", "modules", "accounts", "sysctl", "definitions", "password", "firewall", "secret-password", "local-admin", "os-update":
+		case "packages", "files", "modules", "accounts", "sysctl", "definitions", "password", "firewall", "secret-password", "local-admin", "os-update", "ssh-banner":
 			selected[name] = true
 		default:
 			return nil, fmt.Errorf("unknown resource lane kind %q", name)

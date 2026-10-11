@@ -356,6 +356,13 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 			return err
 		}
 	}
+	if selected["ssh-banner"] {
+		r.fresh()
+		result.Resources.SSHBanner = &VMResourceKindEvidence{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER, Unproven: []string{"typed SSH banner native lifecycle not completed"}}
+		if err := exerciseSSHBanner(ctx, r, result.Resources.SSHBanner); err != nil {
+			return err
+		}
+	}
 	if selected["secret-password"] {
 		r.fresh()
 		result.Resources.SecretPassword = new(VMSecretPasswordEvidence)

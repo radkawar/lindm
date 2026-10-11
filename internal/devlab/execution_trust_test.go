@@ -18,6 +18,9 @@ func TestDefaultExecutionCapabilitiesCoverClosedDeviceActions(t *testing.T) {
 	if !slices.Contains(capabilities, "systemd.service.v1") {
 		t.Fatal("default delegation lost service execution")
 	}
+	if !slices.Contains(capabilities, "ssh.server.v1") {
+		t.Fatal("default delegation lost the banner-only SSH provider")
+	}
 	fields := (&agentv1.DeviceActionSpec{}).ProtoReflect().Descriptor().Oneofs().ByName("action").Fields()
 	if len(capabilities) != fields.Len()+len(executableResourceKinds) {
 		t.Fatalf("default delegation has %d capabilities for %d actions plus %d resource kinds", len(capabilities), fields.Len(), len(executableResourceKinds))

@@ -187,6 +187,7 @@ enum SSHDirective {
   SSH_DIRECTIVE_ALLOW_USERS = 12;
   SSH_DIRECTIVE_ALLOW_GROUPS = 13;
   SSH_DIRECTIVE_MATCH = 14;
+  SSH_DIRECTIVE_BANNER = 15;
 }
 enum ReloadMechanism {
   RELOAD_MECHANISM_UNSPECIFIED = 0;
@@ -198,7 +199,7 @@ enum ReloadMechanism {
 message SSHServerPlan {
   SSHServerDesired desired = 1 [(buf.validate.field).required = true];
   repeated SSHDirective changed_directives = 2 [(buf.validate.field).repeated = {
-    max_items: 14
+    max_items: 15
     unique: true
     items: {
       enum: {

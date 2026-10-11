@@ -46,13 +46,14 @@ type custody struct {
 	stat     unix.Stat_t
 	ancestry []byte
 	leased   bool
+	readOnly bool
 }
 
-func openCustody(path string) (_ *custody, err error) {
+func openCustody(path string, readOnly bool) (_ *custody, err error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" {
 		return nil, ErrUnsafePath
 	}
-	c := &custody{path: path, name: filepath.Base(path)}
+	c := &custody{path: path, name: filepath.Base(path), readOnly: readOnly}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, c.close())
@@ -100,7 +101,13 @@ func openCustody(path string) (_ *custody, err error) {
 	if err = unix.Fstat(fd, &c.stat); err != nil {
 		return nil, err
 	}
-	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Nlink != 1 || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent || c.stat.Dev != c.stats[len(c.stats)-1].Dev {
+	if c.stat.Mode&unix.S_IFMT != unix.S_IFREG || c.stat.Mode&07000 != 0 || c.stat.Size < 0 || c.stat.Size > maxContent || c.stat.Dev != c.stats[len(c.stats)-1].Dev {
+		return nil, ErrUnsafePath
+	}
+	// A read-only dependency may be hardlinked (for example, a packaged crypto
+	// policy), but cannot be writable by an unprivileged owner or group.
+	// Every mutation-capable capture still requires exclusive link ownership.
+	if (!readOnly && c.stat.Nlink != 1) || (readOnly && !pathcustody.RootProtected(&c.stat)) {
 		return nil, ErrUnsafePath
 	}
 	// Replacing immutable, append-only, verity, encrypted or other special files
@@ -133,7 +140,7 @@ func (c *custody) close() error {
 	return result
 }
 func (c *custody) unchanged() (err error) {
-	fresh, err := openCustody(c.path)
+	fresh, err := openCustody(c.path, c.readOnly)
 	if err != nil {
 		return err
 	}

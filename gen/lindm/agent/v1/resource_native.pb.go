@@ -999,15 +999,15 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\rallowed_roots\x18\x01 \x03(\tB8\xbaH5\x92\x012\x10 \x18\x01\",r*(\x80\b2%^/([a-zA-Z0-9_.-]+/)*[a-zA-Z0-9_.-]+$R\fallowedRoots\x126\n" +
 	"\x17kernel_module_blocklist\x18\x02 \x01(\bR\x15kernelModuleBlocklist:\xd2\x02\xbaH\xce\x02\x1a\xaa\x01\n" +
 	"\x1enative_file_provider.authority\x12Jfile provider requires approved roots or the closed kernel-module template\x1a<size(this.allowed_roots) > 0 || this.kernel_module_blocklist\x1a\x9e\x01\n" +
-	"$native_file_provider.canonical_roots\x12=approved file roots must not contain dot or parent components\x1a7this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))\"\xb1\x04\n" +
+	"$native_file_provider.canonical_roots\x12=approved file roots must not contain dot or parent components\x1a7this.allowed_roots.all(p, !p.matches('/[.]{1,2}(/|$)'))\"\xb4\x04\n" +
 	" NativeResourceTransactionRequest\x12;\n" +
 	"\x04plan\x18\x01 \x01(\v2\x1f.lindm.resource.v1.ResourcePlanB\x06\xbaH\x03\xc8\x01\x01R\x04plan\x12I\n" +
 	"\x06before\x18\x02 \x01(\v2).lindm.agent.v1.ResourceOwnershipSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06before\x12I\n" +
 	"\x06target\x18\x03 \x01(\v2).lindm.agent.v1.ResourceOwnershipSnapshotB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12M\n" +
 	"\townership\x18\x04 \x01(\v2'.lindm.agent.v1.ResourceOwnershipLedgerB\x06\xbaH\x03\xc8\x01\x01R\townership\x12%\n" +
 	"\taction_id\x18\x05 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x12\x1d\n" +
-	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce:\xa4\x01\xbaH\xa0\x01\x1a\x9d\x01\n" +
-	" native_resource_transaction.kind\x12Dnative resource helper only accepts closed local configuration plans\x1a3this.plan.ref.kind in [2, 3, 8, 15, 17, 21, 22, 23]\"w\n" +
+	"\x05nonce\x18\x06 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce:\xa7\x01\xbaH\xa3\x01\x1a\xa0\x01\n" +
+	" native_resource_transaction.kind\x12Dnative resource helper only accepts closed local configuration plans\x1a6this.plan.ref.kind in [2, 3, 5, 8, 15, 17, 21, 22, 23]\"w\n" +
 	"\x1aNativeSysctlProviderConfig\x12Y\n" +
 	"\fallowed_keys\x18\x01 \x03(\tB6\xbaH3\x92\x010\b\x01\x10\x80\x01\x18\x01\"'r%(\x80\x022 ^[a-z0-9_]+([.][a-zA-Z0-9_-]+)+$R\vallowedKeys\"\x9c\x02\n" +
 	"\x16NativeApprovedHomeRoot\x12!\n" +
@@ -1052,7 +1052,7 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\x05ready\x18\x01 \x01(\v2!.lindm.agent.v1.NativeHelperReadyH\x00R\x05ready\x12<\n" +
 	"\x06permit\x18\x02 \x01(\v2\".lindm.agent.v1.NativeEffectPermitH\x00R\x06permit\x12<\n" +
 	"\x06result\x18\x03 \x01(\v2\".lindm.agent.v1.NativeHelperResultH\x00R\x06resultB\x10\n" +
-	"\amessage\x12\x05\xbaH\x02\b\x01\"\xf0\t\n" +
+	"\amessage\x12\x05\xbaH\x02\b\x01\"\xf3\t\n" +
 	" NativeResourceObservationRequest\x12I\n" +
 	"\adesired\x18\x01 \x01(\v2'.lindm.resource.v1.ResourceDesiredStateB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12F\n" +
 	"\bplatform\x18\x02 \x01(\v2\".lindm.resource.v1.PlatformProductB\x06\xbaH\x03\xc8\x01\x01R\bplatform\x12;\n" +
@@ -1060,8 +1060,8 @@ const file_lindm_agent_v1_resource_native_proto_rawDesc = "" +
 	"\x0eobservation_id\x18\x04 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\robservationId\x12\x1d\n" +
 	"\x05nonce\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x05nonce\x12=\n" +
 	"\abackend\x18\x06 \x01(\v2#.lindm.resource.v1.BackendSelectionR\abackend\x12[\n" +
-	"\x15firewall_verification\x18\a \x01(\v2&.lindm.resource.v1.ResourceObservationR\x14firewallVerification:\x8f\x06\xbaH\x8b\x06\x1a\xf0\x01\n" +
-	" native_resource_observation.kind\x12Hnative observation helper accepts only sandbox-inaccessible native facts\x1a\x81\x01this.desired.ref.kind in [2, 3, 8, 24] || (this.desired.ref.kind == 21 && has(this.desired.managed_file.kernel_module_blocklist))\x1a\xe2\x01\n" +
+	"\x15firewall_verification\x18\a \x01(\v2&.lindm.resource.v1.ResourceObservationR\x14firewallVerification:\x92\x06\xbaH\x8e\x06\x1a\xf3\x01\n" +
+	" native_resource_observation.kind\x12Hnative observation helper accepts only sandbox-inaccessible native facts\x1a\x84\x01this.desired.ref.kind in [2, 3, 5, 8, 24] || (this.desired.ref.kind == 21 && has(this.desired.managed_file.kernel_module_blocklist))\x1a\xe2\x01\n" +
 	"#native_resource_observation.backend\x12Gnative firewall observation must bind the provider and current platform\x1ar(!has(this.backend) || this.backend.product == this.platform) && (this.desired.ref.kind != 8 || has(this.backend))\x1a\xb0\x02\n" +
 	"1native_resource_observation.firewall_verification\x12Cfresh firewall probes bind the exact requested resource observation\x1a\xb5\x01!has(this.firewall_verification) || (this.desired.ref.kind == 8 && this.firewall_verification.ref == this.desired.ref && this.firewall_verification.metadata.backend == this.backend)\"\x8e\x01\n" +
 	"\x1aNativeRootRecoveryEvidence\x12%\n" +

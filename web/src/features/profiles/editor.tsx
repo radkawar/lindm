@@ -160,6 +160,11 @@ export function ProfileEditor({
     clearAttempt(lifetime, profileId);
   }
 
+  function changeDraft(next: DraftSpec) {
+    setFieldErrors([]);
+    setDraft(next);
+  }
+
   return (
     <Card className="min-w-0">
       <CardHeader>
@@ -225,7 +230,7 @@ export function ProfileEditor({
               maxLength={NAME_MAX * 2}
               value={shown.name}
               readOnly={locked}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              onChange={(event) => changeDraft({ ...draft, name: event.target.value })}
             />
           </div>
           <div className="grid gap-1.5">
@@ -235,7 +240,7 @@ export function ProfileEditor({
               maxLength={DESCRIPTION_MAX * 2}
               value={shown.description}
               readOnly={locked}
-              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              onChange={(event) => changeDraft({ ...draft, description: event.target.value })}
             />
           </div>
           <div className="grid gap-3">
@@ -246,8 +251,8 @@ export function ProfileEditor({
                 resource={resource}
                 resources={shown.resources}
                 locked={locked}
-                onChange={(next) => setDraft(updateResource(draft, next))}
-                onRemove={() => setDraft(removeResource(draft, resource.resourceId))}
+                onChange={(next) => changeDraft(updateResource(draft, next))}
+                onRemove={() => changeDraft(removeResource(draft, resource.resourceId))}
               />
             ))}
           </div>
@@ -256,7 +261,9 @@ export function ProfileEditor({
               type="button"
               variant="outline"
               disabled={locked || shown.resources.length >= MAX_RESOURCES}
-              onClick={() => setDraft({ ...draft, resources: [...draft.resources, newResource()] })}
+              onClick={() =>
+                changeDraft({ ...draft, resources: [...draft.resources, newResource()] })
+              }
             >
               Add setting
             </Button>
@@ -271,19 +278,24 @@ export function ProfileEditor({
               required
               value={shownReason}
               readOnly={locked}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) => {
+                setFieldErrors([]);
+                setReason(event.target.value);
+              }}
             />
           </div>
           {fieldErrors.length > 0 ? (
-            <ul
+            <div
               id="profile-draft-errors"
               role="alert"
-              className="grid gap-1 border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
             >
-              {fieldErrors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
+              <ul className="grid gap-1">
+                {fieldErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
           {note !== "" ? (
             <Alert>

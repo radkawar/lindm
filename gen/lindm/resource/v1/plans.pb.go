@@ -319,6 +319,7 @@ const (
 	SSHDirective_SSH_DIRECTIVE_ALLOW_USERS               SSHDirective = 12
 	SSHDirective_SSH_DIRECTIVE_ALLOW_GROUPS              SSHDirective = 13
 	SSHDirective_SSH_DIRECTIVE_MATCH                     SSHDirective = 14
+	SSHDirective_SSH_DIRECTIVE_BANNER                    SSHDirective = 15
 )
 
 // Enum value maps for SSHDirective.
@@ -339,6 +340,7 @@ var (
 		12: "SSH_DIRECTIVE_ALLOW_USERS",
 		13: "SSH_DIRECTIVE_ALLOW_GROUPS",
 		14: "SSH_DIRECTIVE_MATCH",
+		15: "SSH_DIRECTIVE_BANNER",
 	}
 	SSHDirective_value = map[string]int32{
 		"SSH_DIRECTIVE_UNSPECIFIED":               0,
@@ -356,6 +358,7 @@ var (
 		"SSH_DIRECTIVE_ALLOW_USERS":               12,
 		"SSH_DIRECTIVE_ALLOW_GROUPS":              13,
 		"SSH_DIRECTIVE_MATCH":                     14,
+		"SSH_DIRECTIVE_BANNER":                    15,
 	}
 )
 
@@ -4331,7 +4334,7 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\ainverse\x18\x06 \x01(\v2*.lindm.resource.v1.OwnershipInverseBindingR\ainverse\"\xa0\x04\n" +
 	"\rSSHServerPlan\x12E\n" +
 	"\adesired\x18\x01 \x01(\v2#.lindm.resource.v1.SSHServerDesiredB\x06\xbaH\x03\xc8\x01\x01R\adesired\x12c\n" +
-	"\x12changed_directives\x18\x02 \x03(\x0e2\x1f.lindm.resource.v1.SSHDirectiveB\x13\xbaH\x10\x92\x01\r\x10\x0e\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x11changedDirectives\x12=\n" +
+	"\x12changed_directives\x18\x02 \x03(\x0e2\x1f.lindm.resource.v1.SSHDirectiveB\x13\xbaH\x10\x92\x01\r\x10\x0f\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x11changedDirectives\x12=\n" +
 	"\x16candidate_graph_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x14candidateGraphSha256\x12F\n" +
 	"\x06reload\x18\x04 \x01(\x0e2\".lindm.resource.v1.ReloadMechanismB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06reload\x12T\n" +
@@ -4636,7 +4639,7 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x10USER_FIELD_SHELL\x10\x03\x12\x17\n" +
 	"\x13USER_FIELD_PASSWORD\x10\x04\x12\x14\n" +
 	"\x10USER_FIELD_AGING\x10\x05\x12\x1b\n" +
-	"\x17USER_FIELD_ACCOUNT_LOCK\x10\x06*\x84\x04\n" +
+	"\x17USER_FIELD_ACCOUNT_LOCK\x10\x06*\x9e\x04\n" +
 	"\fSSHDirective\x12\x1d\n" +
 	"\x19SSH_DIRECTIVE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12SSH_DIRECTIVE_PORT\x10\x01\x12\x1c\n" +
@@ -4653,7 +4656,8 @@ const file_lindm_resource_v1_plans_proto_rawDesc = "" +
 	"\x1cSSH_DIRECTIVE_X11_FORWARDING\x10\v\x12\x1d\n" +
 	"\x19SSH_DIRECTIVE_ALLOW_USERS\x10\f\x12\x1e\n" +
 	"\x1aSSH_DIRECTIVE_ALLOW_GROUPS\x10\r\x12\x17\n" +
-	"\x13SSH_DIRECTIVE_MATCH\x10\x0e*\xb9\x01\n" +
+	"\x13SSH_DIRECTIVE_MATCH\x10\x0e\x12\x18\n" +
+	"\x14SSH_DIRECTIVE_BANNER\x10\x0f*\xb9\x01\n" +
 	"\x0fReloadMechanism\x12 \n" +
 	"\x1cRELOAD_MECHANISM_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fRELOAD_MECHANISM_SYSTEMD_RELOAD\x10\x01\x12 \n" +

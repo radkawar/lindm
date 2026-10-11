@@ -23,6 +23,18 @@ import (
 // the other results are its canonical absolute path and metadata at open time.
 // Callers must bound reads and check stability separately.
 func OpenResolved(path string, maxBytes int64, maxPath, maxSymlinks int) (*os.File, string, unix.Stat_t, error) {
+	return openResolved(path, maxBytes, maxPath, maxSymlinks, false)
+}
+
+// OpenResolvedRoot applies OpenResolved's pinned symlink traversal with the
+// stricter RootProtected directory rule: group zero may not replace any
+// original or resolved ancestor. Link metadata itself only requires UID zero;
+// its root-protected parent prevents replacement.
+func OpenResolvedRoot(path string, maxBytes int64, maxPath, maxSymlinks int) (*os.File, string, unix.Stat_t, error) {
+	return openResolved(path, maxBytes, maxPath, maxSymlinks, true)
+}
+
+func openResolved(path string, maxBytes int64, maxPath, maxSymlinks int, rootOnly bool) (*os.File, string, unix.Stat_t, error) {
 	var zero unix.Stat_t
 	if maxPath <= 0 || maxPath > unix.PathMax || maxBytes <= 0 || !strings.HasPrefix(path, "/") || strings.ContainsRune(path, '\x00') || len(path) > maxPath {
 		return nil, "", zero, fmt.Errorf("invalid absolute definition path")
@@ -37,7 +49,7 @@ func OpenResolved(path string, maxBytes int64, maxPath, maxSymlinks int) (*os.Fi
 	if err := unix.Fstat(fd, &rootStat); err != nil {
 		return nil, "", zero, err
 	}
-	if !TrustedDirectory(&rootStat) {
+	if !TrustedDirectory(&rootStat) || (rootOnly && !RootProtected(&rootStat)) {
 		return nil, "", zero, fmt.Errorf("untrusted root directory")
 	}
 	pending := strings.Split(strings.TrimPrefix(path, "/"), "/")
@@ -96,7 +108,7 @@ func OpenResolved(path string, maxBytes int64, maxPath, maxSymlinks int) (*os.Fi
 			continue
 		}
 		if stat.Mode&unix.S_IFMT == unix.S_IFDIR {
-			if !TrustedDirectory(&stat) {
+			if !TrustedDirectory(&stat) || (rootOnly && !RootProtected(&stat)) {
 				_ = unix.Close(next)
 				return nil, "", zero, fmt.Errorf("writable definition directory")
 			}

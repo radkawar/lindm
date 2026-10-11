@@ -91,6 +91,10 @@ func TestQualifiedKindsAdmitOnlyExercisedOwnership(t *testing.T) {
 			for _, release := range []resourcev1.ReleaseBehavior{resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED, resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN} {
 				item := qualifiedServiceResource()
 				item.Desired.Ref.Kind = kind
+				if kind == resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER {
+					item.Desired.Ref.CanonicalKey = "system"
+					item.Desired.State = &resourcev1.ResourceDesiredState_SshServer{SshServer: &resourcev1.SSHServerDesired{BannerText: proto.String("Authorized use only.\n")}}
+				}
 				item.Ownership = &resourcev1.OwnershipPolicy{Mode: mode, Release: release}
 				exercised := slices.Contains(qualification.Releases, release) && slices.Contains(qualification.Modes, mode)
 				if got := dispatch.ResourceDispatchUnsupported(item); (got == "") != exercised || (!exercised && got != dispatch.ResourceOwnershipUnavailable) {
@@ -113,5 +117,18 @@ func TestResourceDependencyPresenceFollowsDesiredState(t *testing.T) {
 	sysctl := &policyv1.ProfileResource{Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: "vm.swappiness"}, State: &resourcev1.ResourceDesiredState_Sysctl{Sysctl: &resourcev1.SysctlDesired{Key: "vm.swappiness", Value: "10"}}}}
 	if dispatch.ResourceDependencySatisfied(sysctl, policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_PRESENT) || !dispatch.ResourceDependencySatisfied(sysctl, policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_CONFIGURED) {
 		t.Fatal("configuration-only kind fabricated presence")
+	}
+}
+
+func TestSSHDispatchAdmitsOnlyBanner(t *testing.T) {
+	item := qualifiedServiceResource()
+	item.Desired = &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER, CanonicalKey: "system"}, State: &resourcev1.ResourceDesiredState_SshServer{SshServer: &resourcev1.SSHServerDesired{BannerText: proto.String("Authorized use only.\n")}}}
+	item.Ownership.Release = resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED
+	if reason := dispatch.ResourceDispatchUnsupported(item); reason != "" {
+		t.Fatal(reason)
+	}
+	item.Desired.GetSshServer().Port = proto.Uint32(22)
+	if reason := dispatch.ResourceDispatchUnsupported(item); reason != "resource_executor_not_available" {
+		t.Fatal("banner qualification admitted unimplemented listener changes", reason)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	authv1 "lindm/gen/lindm/auth/v1"
 	orgv1 "lindm/gen/lindm/org/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 func TestApplyIdempotencyAndProfileRevision(t *testing.T) {
@@ -69,6 +70,43 @@ func TestApplyIdempotencyAndProfileRevision(t *testing.T) {
 	}
 	if _, err := Apply(t.Context(), client, changed, Options{}); connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("stale plan must surface CAS conflict, got %v", err)
+	}
+}
+
+func TestApplySSHBannerUsesTypedProfileAndTracksTextChanges(t *testing.T) {
+	spec := organizationFixture()
+	item := spec.Profiles[0].Spec.Resources[0]
+	item.Desired = &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER, CanonicalKey: "system"}, State: &resourcev1.ResourceDesiredState_SshServer{SshServer: &resourcev1.SSHServerDesired{BannerText: proto.String("Company managed device.\nAuthorized use only.\n")}}}
+	item.Ownership.Release = resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED
+	client := newFakeAdmin()
+	first, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Apply(t.Context(), client, first, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	second, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := len(client.requests)
+	if _, err := Apply(t.Context(), client, second, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.requests) != count {
+		t.Fatal("identical banner republished")
+	}
+	item.Desired.GetSshServer().BannerText = proto.String("Revised public notice.\n")
+	changed, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Apply(t.Context(), client, changed, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if client.profiles[profileID].GetRevisionNumber() != 2 {
+		t.Fatal("banner change did not publish immutable revision")
 	}
 }
 

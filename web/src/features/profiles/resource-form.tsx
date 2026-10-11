@@ -14,6 +14,7 @@ import {
   withDerivedRef,
 } from "./resource-draft";
 import { TypedFields, type ReferenceChoice } from "./typed-fields";
+import { SSHBannerFields } from "./ssh-banner-fields";
 
 export function ResourceFields({
   index,
@@ -135,6 +136,13 @@ export function ResourceFields({
             loaded until restart; built-in drivers cannot be blocked.
           </p>
         </div>
+      ) : arm === "sshServer" ? (
+        <SSHBannerFields
+          id={`${id}-banner`}
+          value={object(desired[arm])}
+          disabled={locked}
+          onChange={(next) => update({ ...document, desired: { ...desired, [arm]: next } })}
+        />
       ) : field?.fieldKind === "message" && kind ? (
         <TypedFields
           schema={

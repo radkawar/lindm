@@ -205,6 +205,14 @@ message SSHServerObservation {
     max_len: 255
   }];
   repeated SSHMatchEvidence matches = 7 [(buf.validate.field).repeated.max_items = 64];
+  string banner_path = 8 [(buf.validate.field).string.max_len = 4096];
+  ManagedFileObservation banner_file = 9;
+  ManagedFileObservation directive_file = 10;
+  ProbeReceipt syntax = 11;
+  // A fresh host-key-verified SSH transport and userauth banner exchange,
+  // not a claim that any account authenticated successfully.
+  ProbeReceipt connection = 12;
+  optional bytes received_banner_sha256 = 13 [(buf.validate.field).bytes.len = 32];
 }
 message TimeSourceEvidence {
   TimeSource source = 1 [(buf.validate.field).required = true];

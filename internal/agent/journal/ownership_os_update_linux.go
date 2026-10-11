@@ -40,7 +40,7 @@ func osUpdateOwnershipSnapshotValid(snapshot *agentv1.ResourceOwnershipSnapshot)
 		if state.GetPath() != path || state.GetExists() != (file.Content != nil) || state.GetExists() != (state.GetFile() != nil) || len(state.GetAncestrySha256()) != 32 || len(state.GetNativeIdentitySha256()) != 32 || len(state.GetSecurityMetadataSha256()) != 32 {
 			return false
 		}
-		if !osUpdateXattrsValid(file) {
+		if !nativeOwnershipXattrsValid(state.GetExists(), file.GetXattrs()) {
 			return false
 		}
 		if !state.GetExists() {
@@ -73,12 +73,12 @@ func osUpdateBackendFiles(backend resourcev1.OSUpdateBackend) []resourcev1.OSUpd
 	}
 }
 
-func osUpdateXattrsValid(file *agentv1.OSUpdateNativeFileSnapshot) bool {
-	if !file.GetState().GetExists() && len(file.GetXattrs()) != 0 {
+func nativeOwnershipXattrsValid(exists bool, attrs []*agentv1.NativeFileXattr) bool {
+	if !exists && len(attrs) != 0 {
 		return false
 	}
 	previous, size := "", 0
-	for _, attr := range file.GetXattrs() {
+	for _, attr := range attrs {
 		if attr.GetName() <= previous || (!strings.HasPrefix(attr.GetName(), "user.") && attr.GetName() != "security.selinux") {
 			return false
 		}

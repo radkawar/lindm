@@ -25,6 +25,7 @@ import (
 	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/agent/sshprovider"
 	"lindm/internal/agent/sysctlprovider"
 	"lindm/internal/platform"
 	"lindm/internal/resource"
@@ -124,6 +125,26 @@ func moduleStateWritePath(directory string) (string, error) {
 
 // nativeKinds is the only kind dispatch in the root helper.
 var nativeKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]nativeKind{
+	resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER: {
+		effect: func(s *effectSandbox, _ string, _ *agentv1.NativeResourceTransactionRequest, _ *resourcev1.ResourceDesiredState) error {
+			// issue.net needs atomic sibling replacement; no arbitrary path is
+			// accepted by the SSH provider. The helper validates its closed set.
+			s.paths = append(s.paths, "/etc")
+			s.fileCaps()
+			s.privateNetwork = false
+			s.families = append(s.families, "AF_INET", "AF_INET6")
+			return nil
+		},
+		apply: applyOnly(sshprovider.ApplyNative),
+		observation: func(_ context.Context, properties []unitProperty, _ *agentv1.NativeResourceObservationRequest) ([]unitProperty, error) {
+			properties = setProperty(properties, "PrivateNetwork", false)
+			return setProperty(properties, "RestrictAddressFamilies", addressFamilies("AF_UNIX", "AF_INET", "AF_INET6")), nil
+		},
+		observe: func(ctx context.Context, _ *config.Document, env resourceprovider.NativeEnv, request *agentv1.NativeResourceObservationRequest, result *agentv1.NativeHelperResult) (err error) {
+			result.After, err = sshprovider.ObserveNative(ctx, env, request)
+			return err
+		},
+	},
 	resourcev1.ResourceKind_RESOURCE_KIND_MANAGED_FILE: {
 		effect: func(s *effectSandbox, _ string, request *agentv1.NativeResourceTransactionRequest, desired *resourcev1.ResourceDesiredState) error {
 			s.paths = append(s.paths, filepath.Dir(desired.GetManagedFile().GetPath()))

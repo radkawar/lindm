@@ -27,6 +27,7 @@ import (
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/resourceprovider"
 	"lindm/internal/agent/serviceprovider"
+	"lindm/internal/agent/sshprovider"
 	"lindm/internal/agent/sysctlprovider"
 	"lindm/internal/resource"
 	"lindm/internal/trust"
@@ -69,6 +70,7 @@ func init() {
 		resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE: {open: openEncryptionResource},
 		resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:       {open: openPasswordResource},
 		resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY:      {open: openOSUpdateResource},
+		resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER:            {open: openSSHResource},
 	})
 }
 
@@ -196,6 +198,22 @@ func openOSUpdateResource(ctx context.Context, o resourceOpen) (nativeResource, 
 		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
 		EnrollmentGeneration: intent.GetEnrollmentGeneration(), Native: s.nativeResources.OSUpdate, StateDirectory: s.directory,
 		ExecuteNative: s.resourceNativeTransaction,
+	})
+}
+
+func openSSHResource(ctx context.Context, o resourceOpen) (nativeResource, error) {
+	s, intent := o.service, o.intent
+	return sshprovider.Open(ctx, sshprovider.Config{
+		Journal: s.store, ExecutorIncarnation: s.incarnation, Ownership: intent.GetOwnership(), Platform: o.platform,
+		ActionID: intent.GetActionId(), DeploymentID: intent.GetDeploymentId(), DeviceID: intent.GetDeviceId(),
+		EnrollmentGeneration: intent.GetEnrollmentGeneration(), ExecuteNative: s.resourceNativeTransaction,
+		ObserveNative: func(ctx context.Context) (*agentv1.ResourceOwnershipSnapshot, error) {
+			result, err := s.observeNativeResource(ctx, intent.GetDesired(), o.platform, nil)
+			if err != nil {
+				return nil, err
+			}
+			return result.GetAfter(), nil
+		},
 	})
 }
 

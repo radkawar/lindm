@@ -650,6 +650,26 @@
             }
           },
           {
+            "resourceId": "68dfcd82-54f3-4e6d-922c-d890c0c3ef34",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SSH_SERVER",
+                "canonicalKey": "system"
+              },
+              "sshServer": {
+                "bannerText": "Company managed device. Authorized use only.\n"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
             "resourceId": "82e49a02-f029-561e-a5c8-b55a9d6b5c70",
             "desired": {
               "ref": {

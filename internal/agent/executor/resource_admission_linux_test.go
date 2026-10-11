@@ -15,6 +15,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/serviceprovider"
+	"lindm/internal/agent/sshprovider"
 )
 
 type admissionRefusingNative struct {
@@ -42,6 +43,8 @@ func TestResourceAdmissionRefusalIsDurableAuthenticatedAndNeverAnEffect(t *testi
 		{"baseline", serviceprovider.ErrBaselineUnknown, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED},
 		{"unsupported", serviceprovider.ErrUnsupported, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED},
 		{"precondition", serviceprovider.ErrConflict, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
+		{"ssh-unsupported", sshprovider.ErrUnsupported, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED},
+		{"ssh-collision", sshprovider.ErrConflict, agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newResourceFixture(t, false)
@@ -136,5 +139,11 @@ func TestResourceProviderOpenRefusalIsNotNativeObservation(t *testing.T) {
 	prepared, _ := f.prepare(t, f.intent(t, 1))
 	if prepared.GetStatus().GetAdmissionRefusal().GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE || prepared.GetStatus().GetBefore() != nil || f.native.plans.Load() != 0 {
 		t.Fatal("provider setup refusal fabricated observation")
+	}
+}
+
+func TestSSHUnknownEffectIsNeverAnAdmissionRefusal(t *testing.T) {
+	if _, _, classified := resourceAdmissionCause(sshprovider.ErrOutcomeUnknown); classified {
+		t.Fatal("unknown native effect was represented as effect-free refusal")
 	}
 }

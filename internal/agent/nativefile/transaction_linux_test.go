@@ -342,3 +342,66 @@ func TestNativeCreateNeedsExistingParentAndCancellationPreservesData(t *testing.
 		t.Fatal("cancelled transaction changed path")
 	}
 }
+
+func TestReadOnlyHardlinkCaptureCannotAuthorizeMutation(t *testing.T) {
+	path, template := nativeFixture(t)
+	if err := os.WriteFile(path, []byte("root-owned configuration"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(path, path+".alias"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := CaptureReadOnly(path, template)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(snapshot.GetManagedFileContent()) != "root-owned configuration" {
+		t.Fatal("read-only capture changed dependency bytes")
+	}
+	if _, err := Capture(path, template); !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("managed capture accepted a hardlink: %v", err)
+	}
+	if _, _, err := CaptureWithContinuity(path, template); !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("ownership capture accepted a hardlink: %v", err)
+	}
+	if _, err := Prepare(snapshot, snapshot); !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("read-only snapshot authorized mutation: %v", err)
+	}
+	if err := os.Chmod(path, 0664); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CaptureReadOnly(path, template); !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("read-only capture accepted group-writable configuration: %v", err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chown(path, 65534, 65534); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CaptureReadOnly(path, template); !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("read-only capture accepted unprivileged configuration ownership: %v", err)
+	}
+}
+
+func TestReadOnlyCaptureRetainsLinkCountCAS(t *testing.T) {
+	path, template := nativeFixture(t)
+	if err := os.WriteFile(path, []byte("before"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := openCustody(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	if err := os.Link(path, path+".alias"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.snapshot(template); !errors.Is(err, ErrConflict) {
+		t.Fatalf("read-only capture ignored concurrent inode metadata change: %v", err)
+	}
+}

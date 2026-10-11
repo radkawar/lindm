@@ -548,10 +548,10 @@ window end. The executor's managed-file `allowed_roots` must explicitly include
 `/etc/motd.d`; approving `/etc` is not a substitute. The host must use pam_motd to
 display that directory.
 
-Engineering adds git, htop and podman plus the local `developers` group and a
-`developer` user with a locked password, not an embedded login secret. Finance
-strengthens password controls, removes the SSH firewall exception and stops/disables
-`sshd.service` for its native host; other service names need an explicit profile
+Engineering adds git, htop and podman, the typed SSH login banner, plus the local
+`developers` group and a `developer` user with a locked password, not an embedded
+login secret. Finance strengthens password controls, removes the SSH firewall
+exception and stops/disables `sshd.service` for its native host; other service names need an explicit profile
 change. Contractors deny ingress and default egress, permitting only outbound
 TCP 80/443/53 and UDP 53 for both IP families, with a nightly 02:00–02:30 update
 start window. This restriction requires a compatible firewall backend and may block
@@ -644,6 +644,59 @@ immutable tenant group object ID, and Okta/Google their immutable group referenc
 The provider-specific reference-entry limitation remains a design-owner decision,
 not a claim of searchable upstream catalog coverage.
 
+#### SSH login banner
+
+`SSHServerDesired.banner_text` is public, exact UTF-8 pre-authentication text, not
+MOTD, a template, a shell fragment or a secret. The task-shaped **SSH login banner**
+profile field and `lindmctl apply -f org.json` use the same typed resource. The
+Engineering example declares `bannerText: "Company managed device. Authorized use only.\n"`.
+The protobuf bounds it to 8 KiB, disallows terminal control characters except
+tab/newline, and rejects empty text. Removing the resource releases its owned
+state; an omitted field is not permission to erase an existing banner.
+
+This qualification admits **banner-only** SSH desired state on Ubuntu 24.04 and
+Fedora 44, not arbitrary SSH authentication, listener or `Match` policy. Combining
+the banner with those controls remains `resource_executor_not_available`.
+An already-running OpenSSH service, the globally included
+`/etc/ssh/sshd_config.d/*.conf` path, a local Ed25519 host key and a loopback
+listener are prerequisites. The provider owns only
+`/etc/ssh/sshd_config.d/00-lindm-banner.conf` and `/etc/issue.net`; it does not
+install, enable, start or restart SSH, change its authentication policy, or open
+a firewall.
+
+Create-only refuses a pre-existing unowned `/etc/issue.net`, including stock
+distribution notices. Use the normal explicit adoption approval to retain a regular
+file's baseline before replacing it. Symlinks and hardlinked managed files are
+refused even with approval; a native administrator must first prepare an independent
+regular file. The reserved drop-in is never silently adopted. Any other `Banner`
+directive, including one in a different `Match`
+context, is a visible collision; ambiguous includes, unsafe paths and unsupported
+file metadata also fail closed. The normal resource claim graph reserves both
+native paths against other assignments.
+
+Include search directories must already exist, use canonical non-symlink paths
+and have root-owned ancestry without group/other write access. Filename wildcards
+are supported; directory wildcards are not. Empty matches still require protected
+search directories, so files cannot be planted just for reload. Vendor file
+symlinks are followed only through protected original **and** resolved ancestry.
+Read-only configuration dependencies may be hardlinked; that exception never
+authorizes adoption or mutation of a hardlinked managed file.
+
+Every effect is CAS-bound to observed native bytes, inode generation, root custody
+and security metadata. Filesystem identity and birth-time proofs bind the file
+and every ancestor across reboots, so neither inode reuse nor replaced protected
+parents transfer ownership. Syntax is checked before effects and again before reload.
+Effective configuration, a fresh locally host-key-verified SSH banner exchange
+and independent post-helper observation must agree with the exact content hash.
+That unauthenticated exchange proves the public notice and continued SSH
+connectivity, **not** account authentication. Native qualification additionally
+uses a fresh authenticated lab login. The reconciler repairs in-place content
+drift while refusing replaced files or changed ownership/security attributes.
+Release restores the adopted baseline or removes only unchanged files created
+by lindm; administrator edits prevent destructive restoration. A failed effect
+attempts custody-checked rollback and remains outcome-unknown rather than being
+blindly replayed. See [native records](verification.md#ssh-login-banner).
+
 #### Declarative organization gaps
 
 - USB-storage blocking uses the typed `managedFile.kernelModuleBlocklist` template,
@@ -664,7 +717,9 @@ not a claim of searchable upstream catalog coverage.
   scheduled reboot delay are supported.
 - Remote assistance has one permission for view and control, not separate grants.
 - Advisory exceptions have reason/expiry but no two-human approval workflow.
-- SSH banner configuration is not dispatchable; the managed MOTD is not an SSH banner.
+- SSH banner text now has a dispatchable banner-only typed resource, drift repair
+  and ownership-safe release; see [SSH login banner](#ssh-login-banner). The managed
+  MOTD remains a separate post-login facility.
 - **Gate: membership-safe static group rename.** The existing replacement API
   rewrites membership without compare-and-swap. Automatically repairing name drift
   could restore revoked RBAC access, so apply reports it as unsupported. Closing

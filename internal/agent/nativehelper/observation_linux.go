@@ -18,7 +18,9 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/config"
+	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/resourceprovider"
+	"lindm/internal/agent/sshprovider"
 	"lindm/internal/resource"
 )
 
@@ -138,6 +140,14 @@ func ObserveResource(ctx context.Context, stateDirectory string, input *agentv1.
 		return nil, errors.New("native_observation_retained_mismatch")
 	}
 	if result.GetOutcome() != agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_OBSERVED {
+		if request.GetDesired().GetSshServer() != nil {
+			switch result.GetReason() {
+			case "ssh_banner_native_conflict":
+				return nil, sshprovider.ErrConflict
+			case "ssh_banner_native_unsupported":
+				return nil, sshprovider.ErrUnsupported
+			}
+		}
 		return nil, errors.New("native_observation_failed")
 	}
 	kind, err := observedKind(request.GetDesired().GetRef().GetKind())
@@ -232,6 +242,14 @@ func RunObservation(ctx context.Context, document *config.Document, observationI
 		result.FirewallEvidence = nil
 		result.Outcome = agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED
 		result.Reason = "native_observation_unavailable"
+		if request.GetDesired().GetSshServer() != nil {
+			switch {
+			case errors.Is(err, sshprovider.ErrConflict), errors.Is(err, nativefile.ErrConflict), errors.Is(err, nativefile.ErrUnsafePath):
+				result.Reason = "ssh_banner_native_conflict"
+			case errors.Is(err, sshprovider.ErrUnsupported), errors.Is(err, nativefile.ErrUnsupported):
+				result.Reason = "ssh_banner_native_unsupported"
+			}
+		}
 	}
 	encodedResult, encodeErr := encodeRecord(result)
 	if encodeErr != nil {

@@ -159,6 +159,18 @@ func TestModuleStateWritePathDoesNotCreateBeforePermit(t *testing.T) {
 	}
 }
 
+func TestSSHBannerHelperHasNoAuthenticationOrNetworkAdministrationAuthority(t *testing.T) {
+	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
+	plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER, CanonicalKey: "system"}, Plan: &resourcev1.ResourcePlan_SshServer{SshServer: &resourcev1.SSHServerPlan{Desired: &resourcev1.SSHServerDesired{}}}}
+	values := unitValues(t, directory, plan, nil, nil)
+	if !slices.Equal(unitValue[[]string](t, values, "ReadWritePaths"), []string{directory, "/etc"}) || values["PrivateNetwork"] != false {
+		t.Fatal("banner atomic siblings or fresh host-namespace connection scope changed")
+	}
+	if unitValue[uint64](t, values, "CapabilityBoundingSet")&(uint64(1)<<unix.CAP_SYS_ADMIN|uint64(1)<<unix.CAP_NET_ADMIN|uint64(1)<<unix.CAP_SYS_CHROOT|uint64(1)<<unix.CAP_SETUID) != 0 {
+		t.Fatal("banner helper inherited unrelated capabilities")
+	}
+}
+
 func TestOSUpdateHelperOnlyReceivesOwnedConfigurationParents(t *testing.T) {
 	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
 	for _, test := range []struct {

@@ -200,6 +200,10 @@ func (b *claimBuilder) sshServer(ssh *resourcev1.SSHServerDesired) error {
 	if ssh.GetAllowGroups() != nil && len(ssh.GetAllowGroups().GetNames()) == 0 {
 		return errors.New("resource: no_ssh_allowed_groups")
 	}
+	if ssh.BannerText != nil {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, SSHBannerPath, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "ssh-banner")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, SSHBannerDirectivePath, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "ssh-banner")
+	}
 	if ssh.Port != nil {
 		port := strconv.FormatUint(uint64(ssh.GetPort()), 10)
 		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT, "tcp/"+port+"-"+port, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "accept")

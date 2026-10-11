@@ -57,6 +57,8 @@ type VMResourceEvidence struct {
 	SecretPassword  *VMSecretPasswordEvidence `json:"secret_password,omitempty"`
 	LocalAdmin      *VMLocalAdminEvidence     `json:"local_admin,omitempty"`
 	ModuleBlocklist *VMResourceKindEvidence   `json:"module_blocklist,omitempty"`
+	// Banner-only SSH qualification does not certify authentication policy.
+	SSHBanner *VMResourceKindEvidence `json:"ssh_banner,omitempty"`
 }
 
 func newVMResourceEvidence() *VMResourceEvidence {

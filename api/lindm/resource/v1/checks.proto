@@ -65,13 +65,17 @@ message SSHServerChecks {
   ProbeReceipt syntax = 1 [(buf.validate.field).required = true];
   bool effective_settings_match = 2;
   bool match_contexts_match = 3;
-  ProbeReceipt authentication = 4 [(buf.validate.field).required = true];
+  // Authentication changes require this proof; a banner-only change instead
+  // proves the pre-authentication banner exchange on a fresh SSH connection.
+  ProbeReceipt authentication = 4;
   ProbeReceipt connectivity = 5 [(buf.validate.field).required = true];
   bool converged = 6;
+  ProbeReceipt banner_exchange = 7;
+  bool banner_content_match = 8;
   option (buf.validate.message).cel = {
     id: "ssh_checks.convergence"
-    message: "SSH convergence requires effective Match settings and fresh authentication/connectivity"
-    expression: "!this.converged || (this.syntax.passed && this.effective_settings_match && this.match_contexts_match && this.authentication.passed && this.connectivity.passed)"
+    message: "SSH convergence requires native syntax, effective settings and fresh connection evidence for the managed effect"
+    expression: "!this.converged || (this.syntax.passed && this.effective_settings_match && this.match_contexts_match && this.connectivity.passed && ((has(this.banner_exchange) && this.banner_exchange.passed && this.banner_content_match) || (has(this.authentication) && this.authentication.passed)))"
   };
 }
 message TimeSyncChecks {

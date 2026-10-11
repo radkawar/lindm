@@ -2066,6 +2066,89 @@ unit names, killed neither, and the transaction succeeded instead of ending
 `OUTCOME_UNKNOWN`. The repository is now `lindm-lab-resource-repository.service`,
 and the watcher kills exactly one UUID-named effect helper or records why not.
 
+##### SSH login banner
+
+`lab vm resources -phase connected -kinds ssh-banner -local-authority` exercises
+only banner-only `SSHServerDesired`, not full SSH authentication or listener
+policy. It uses a disposable native guest and the real typed profile, assignment,
+signed intent/start grant, protected journal and native helper. No persistent
+demo instance is modified. The eleven required scenarios are unowned-file refusal,
+approved adoption, repeat without a start grant, automatic in-place content drift
+repair without a new assignment, repeat after actual reboot, restoration of the
+adopted baseline, absent-file creation, owned-file removal on release, a
+foreign `Match` banner collision, an unsafe Include alias and an empty writable
+Include search directory, all refused before effects. Every positive banner
+oracle opens a new host-key-pinned connection and authenticates the existing lab
+account, compares exact pre-authentication bytes, runs `sshd -t`/`sshd -T`, and
+records SHA-256, owner and mode. Fedora additionally requires SELinux enforcing
+and matching file contexts. A missing or failed `ssh_banner` evidence block is
+not qualification.
+
+Native receipts from source `83105b58`, retained under
+`$HOME/.cache/lindm-org-ssh-banner-20261011/`, completed on 2026-10-11:
+
+| Platform / host              | Record                   | Required scenarios                                           | SHA-256                                                            |
+| ---------------------------- | ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Ubuntu 24.04 aarch64 / dgx20 | `ubuntu24-arm64-05.json` | 11/11; `ssh_banner.native_qualified=true`                    | `65fb70a9faa16e486f5eaf357506ee872398a25c3e3217a477d1502726e356c1` |
+| Fedora 44 aarch64 / dgx21    | `fedora44-arm64-06.json` | 11/11; `ssh_banner.native_qualified=true`, SELinux Enforcing | `76d3e2833920e61d3a60aaa64051774a44e7fd8518e34fc5a55df842e1f2ab00` |
+
+Both are disposable KVM guests with AAVMF `2024.02-2ubuntu0.10`, not physical
+machine or full SSH-policy qualification. Their common lab SHA-256 is
+`fe92e6c73fb36eb706dc1552192d9cb7062a76405a61f88d6abc2b6aea685f5d`;
+lindmd is `53bc2c6bac9a874e915df3f4dbd7462038b00b4ca4b725f8a33af596fff04659`.
+The signed agent package hashes are respectively
+`ae23d236407d7e5c420b9e52ed554f1514bf549a665beae139348fa8c1d0ee76` and
+`188418441b4c208bc795d2663182827d5fd21a35833c12a2315f19f7543858b0`.
+Fedora's stock crypto-policy symlink and root-protected hardlinked target remain
+unmodified dependencies. Its stock `/etc/issue.net` symlink is replaced by the
+explicit disposable operator fixture before adoption: the provider never adopts
+symlinks or hardlinked managed files.
+
+Earlier `ubuntu24-arm64-01.json` and `fedora44-arm64-02.json` stopped before SSH
+effects because the lab's execution-signing delegation omitted `ssh.server.v1`;
+the fixture capability list was corrected. `fedora44-arm64-03.json` refused the
+stock hardlinked crypto-policy dependency; read-only dependency capture now
+supports it without weakening mutation custody. These failed records are retained,
+not counted as qualification.
+
+The expanded-lane `ubuntu24-arm64-04.json` and `fedora44-arm64-05.json` repeated
+the original nine scenarios successfully but failed the new unsafe-alias case:
+the safety check blocked effects, yet its untyped error prevented a terminal
+admission refusal. Include read failures now preserve their cause under the SSH
+precondition-conflict type; these failed receipts are not full qualification.
+
+Separate privileged Linux filesystem regressions exercise inode/ancestor
+generation continuity, read-only hardlink capture versus mutation refusal, unsafe
+dependency ownership/modes and link-count races. The helper's syntax, reload,
+cancellation and concurrent operator-edit failure cases use injected command
+failures with real native file transactions; they are failure-boundary regressions,
+not native `sshd` qualification.
+
+The real-browser console review at source `04d984d2` passed **188/188** captures
+with no findings: `$HOME/.cache/lindm-org-ssh-banner-20261011/ui-after-04/report.json`,
+SHA-256 `d053d2550d9ee720014bd0212011d40bc3cf483805aeb1968fec5132a89ec183`.
+Its server SHA-256 is
+`33ba575355fdfb67a12361180829ce61806a8b49cdea9dd488ddb51065d6f838`.
+The SSH task exercises empty, invalid, long draft and saved states in light/dark
+desktop/mobile modes, keyboard focus, publication and reload of exact bytes from
+the fetched server revision. A pinned latest revision is not labelled older;
+unavailable head comparisons remain unknown rather than fabricated freshness.
+No RPC interception is used. Assistant visual inspection covered the long desktop
+draft, mobile validation error and dark mobile saved revision; automation does
+not constitute owner design approval: **awaiting owner edit pass**.
+
+Before screenshots are under
+`$HOME/.cache/lindm-org-gaps-20261011/ui-before/screenshots/`:
+`profiles-new-light-desktop-full.png` and `profiles-new-dark-mobile-full.png`.
+That baseline report SHA-256 is
+`e5cef739767edf1e88a83198d7d41e1c2baf1da8f0c161d1b7ce02c23ce42655`;
+its four historical audit-caption failures are not green qualification.
+After screenshots are under the `ui-after-04/screenshots/` directory above:
+`profiles-new-ssh-banner-draft-light-desktop-full.png`,
+`profiles-new-ssh-banner-invalid-light-mobile-full.png` and
+`profiles-profileid-ssh-banner-saved-dark-mobile-full.png`.
+Earlier after-reviews are retained as failed iterations, not qualification.
+
 ##### OS update policy, patch now and patch status
 
 `lab vm resources -phase connected -kinds os-update -allow-network -accelerator kvm

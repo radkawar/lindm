@@ -1703,8 +1703,11 @@ type SSHServerDesired struct {
 	AllowUsers                        *SSHAccessList         `protobuf:"bytes,12,opt,name=allow_users,json=allowUsers,proto3" json:"allow_users,omitempty"`
 	AllowGroups                       *SSHAccessList         `protobuf:"bytes,13,opt,name=allow_groups,json=allowGroups,proto3" json:"allow_groups,omitempty"`
 	Match                             []*SSHMatch            `protobuf:"bytes,14,rep,name=match,proto3" json:"match,omitempty"`
-	unknownFields                     protoimpl.UnknownFields
-	sizeCache                         protoimpl.SizeCache
+	// Exact public pre-authentication text. Removal is ownership-safe release,
+	// not an empty string or a caller-selected native path.
+	BannerText    *string `protobuf:"bytes,15,opt,name=banner_text,json=bannerText,proto3,oneof" json:"banner_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SSHServerDesired) Reset() {
@@ -1833,6 +1836,13 @@ func (x *SSHServerDesired) GetMatch() []*SSHMatch {
 		return x.Match
 	}
 	return nil
+}
+
+func (x *SSHServerDesired) GetBannerText() string {
+	if x != nil && x.BannerText != nil {
+		return *x.BannerText
+	}
+	return ""
 }
 
 type SessionPolicyDesired struct {
@@ -2162,7 +2172,7 @@ const file_lindm_resource_v1_accounts_proto_rawDesc = "" +
 	"\x1a_public_key_authenticationB\x19\n" +
 	"\x17_permit_empty_passwordsB\x17\n" +
 	"\x15_allow_tcp_forwardingB\x11\n" +
-	"\x0f_x11_forwarding\"\xa2\r\n" +
+	"\x0f_x11_forwarding\"\x9b\x0e\n" +
 	"\x10SSHServerDesired\x12$\n" +
 	"\x04port\x18\x01 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\x03(\x01H\x00R\x04port\x88\x01\x01\x12R\n" +
 	"\n" +
@@ -2182,8 +2192,10 @@ const file_lindm_resource_v1_accounts_proto_rawDesc = "" +
 	"\vallow_users\x18\f \x01(\v2 .lindm.resource.v1.SSHAccessListR\n" +
 	"allowUsers\x12C\n" +
 	"\fallow_groups\x18\r \x01(\v2 .lindm.resource.v1.SSHAccessListR\vallowGroups\x12;\n" +
-	"\x05match\x18\x0e \x03(\v2\x1b.lindm.resource.v1.SSHMatchB\b\xbaH\x05\x92\x01\x02\x10@R\x05match:\xff\x03\xbaH\xfb\x03\x1a\xf8\x03\n" +
-	"\x14ssh_server.dimension\x12!manage at least one SSH directive\x1a\xbc\x03has(this.port) || has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.max_auth_tries) || has(this.client_alive_interval_seconds) || has(this.client_alive_count_max) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding) || has(this.allow_users) || has(this.allow_groups) || this.match.size() > 0B\a\n" +
+	"\x05match\x18\x0e \x03(\v2\x1b.lindm.resource.v1.SSHMatchB\b\xbaH\x05\x92\x01\x02\x10@R\x05match\x12N\n" +
+	"\vbanner_text\x18\x0f \x01(\tB(\xbaH%r#\x10\x01(\x80@2\x1c^[^\\x00-\\x08\\x0b-\\x1f\\x7f]+$H\vR\n" +
+	"bannerText\x88\x01\x01:\x98\x04\xbaH\x94\x04\x1a\x91\x04\n" +
+	"\x14ssh_server.dimension\x12!manage at least one SSH directive\x1a\xd5\x03has(this.port) || has(this.root_login) || has(this.password_authentication) || has(this.keyboard_interactive_authentication) || has(this.public_key_authentication) || has(this.permit_empty_passwords) || has(this.max_auth_tries) || has(this.client_alive_interval_seconds) || has(this.client_alive_count_max) || has(this.allow_tcp_forwarding) || has(this.x11_forwarding) || has(this.allow_users) || has(this.allow_groups) || this.match.size() > 0 || has(this.banner_text)B\a\n" +
 	"\x05_portB\r\n" +
 	"\v_root_loginB\x1a\n" +
 	"\x18_password_authenticationB&\n" +
@@ -2194,7 +2206,8 @@ const file_lindm_resource_v1_accounts_proto_rawDesc = "" +
 	"\x1e_client_alive_interval_secondsB\x19\n" +
 	"\x17_client_alive_count_maxB\x17\n" +
 	"\x15_allow_tcp_forwardingB\x11\n" +
-	"\x0f_x11_forwarding\"\xff\x04\n" +
+	"\x0f_x11_forwardingB\x0e\n" +
+	"\f_banner_text\"\xff\x04\n" +
 	"\x14SessionPolicyDesired\x12=\n" +
 	"\x05scope\x18\x01 \x01(\v2\x1f.lindm.resource.v1.SessionScopeB\x06\xbaH\x03\xc8\x01\x01R\x05scope\x12:\n" +
 	"\x11idle_lock_seconds\x18\x02 \x01(\rB\t\xbaH\x06*\x04\x18\x80\xf5$H\x00R\x0fidleLockSeconds\x88\x01\x01\x12+\n" +

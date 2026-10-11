@@ -455,6 +455,20 @@ The native arm64 KVM lane passed all ten scenarios, including initially absent
 tool state, actual reboot/load refusal, both drift repairs, built-in `kvm` findings
 and release. See [receipts and limits](../verification.md#typed-kernel-module-blocklist).
 
+SSH banner-only desired state uses the existing SSH resource model and reloads
+`ssh.service`, never restarts or starts a service. It manages the fixed Banner
+drop-in and `/etc/issue.net`, preserving an explicitly adopted distribution
+notice for release. Native syntax/effective configuration and a fresh
+host-key-verified loopback banner exchange bind verification to the actual
+pre-authentication text; content-only drift is repairable, inode/security changes
+are not. Authentication/listener controls remain unqualified. Prerequisites and
+collision semantics are in [SSH login banner](../security-and-operations.md#ssh-login-banner);
+the dedicated [native lane](../verification.md#ssh-login-banner) also proves
+fresh authenticated connectivity, automatic drift repair and release.
+The recorded aarch64 KVM lane passed all eleven cases, including terminal
+pre-effect refusals for an unsafe Include alias and an empty writable Include
+search directory. This is banner-only qualification, not arbitrary SSH policy.
+
 Delivered password hashes (`HashedPasswordPolicy`) use `chpasswd --encrypted`
 reading `name:hash` on stdin. Ubuntu 24.04 shadow 4.13
 (`passwd 1:4.13+dfsg1-4ubuntu3.2`) has no `chpasswd --prefix`, so the root

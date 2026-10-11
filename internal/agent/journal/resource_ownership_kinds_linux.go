@@ -23,6 +23,7 @@ type ownershipKind struct {
 
 // ownershipKinds is the journal's only resource-kind dispatch.
 var ownershipKinds = resourceprovider.NewRegistry(map[resourcev1.ResourceKind]ownershipKind{
+	resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER:         {valid: sshOwnershipSnapshotValid, acquisition: sshOwnershipAcquisitionAllowed},
 	resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL:             {valid: sysctlOwnershipSnapshotValid, acquisition: sysctlOwnershipAcquisitionAllowed},
 	resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_DEFINITION: {valid: definitionOwnershipSnapshotValid, acquisition: definitionOwnershipAcquisitionAllowed},
 	resourcev1.ResourceKind_RESOURCE_KIND_PASSWORD_POLICY:    {valid: passwordOwnershipSnapshotValid, acquisition: passwordOwnershipAcquisitionAllowed, baseline: PasswordBaselineDimensionMatches},

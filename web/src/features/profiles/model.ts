@@ -18,6 +18,7 @@ import {
   ResourceProfileSchema,
   type ResourceProfile,
 } from "../../../gen/lindm/policy/v1/profile_pb";
+import { SSHServerDesiredSchema } from "../../../gen/lindm/resource/v1/accounts_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
@@ -125,7 +126,33 @@ export function updateResource(draft: DraftSpec, next: DraftResource): DraftSpec
 
 export function publishErrors(payload: PublishPayload): string[] {
   const result = validator.validate(PublishProfileRevisionRequestSchema, payload);
-  if (result.kind === "invalid") return result.violations.map((violation) => violation.toString());
+  if (result.kind === "invalid") {
+    return result.violations.flatMap((violation) => {
+      if (violation.field.at(-1) !== SSHServerDesiredSchema.field.bannerText)
+        return [violation.toString()];
+      const entry = violation.field.find((part) => part.kind === "list_sub");
+      const prefix = entry === undefined ? "" : `Setting ${entry.index + 1}: `;
+      if (violation.ruleId === "string.min_len")
+        return [`${prefix}Enter the notice shown before SSH sign-in.`];
+      if (violation.ruleId === "string.pattern") {
+        // The schema can report both required text and character rules for an
+        // empty notice. Present the actionable required-text error only.
+        if (
+          result.violations.some(
+            (other) =>
+              other.ruleId === "string.min_len" &&
+              other.field.length === violation.field.length &&
+              other.field.every((part, offset) => part === violation.field[offset]),
+          )
+        )
+          return [];
+        return [
+          `${prefix}Use plain text in the SSH login notice, without terminal control characters.`,
+        ];
+      }
+      return [`${prefix}SSH login notice: ${violation.message}`];
+    });
+  }
   if (result.kind === "error") return [`Couldn't check the profile: ${result.error.message}`];
   // Canonical resource identity, dependency cycles and ownership claims are checked by the server.
   return [];

@@ -76,6 +76,7 @@ var executableResourceKinds = []resourcev1.ResourceKind{
 	resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE,
 	resourcev1.ResourceKind_RESOURCE_KIND_ENCRYPTION_COMPLIANCE,
 	resourcev1.ResourceKind_RESOURCE_KIND_OS_UPDATE_POLICY,
+	resourcev1.ResourceKind_RESOURCE_KIND_SSH_SERVER,
 }
 
 func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabilities []string) (result *ExecutionTrustExercise, err error) {

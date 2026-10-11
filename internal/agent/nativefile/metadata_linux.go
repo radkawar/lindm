@@ -24,7 +24,7 @@ func CreationMetadata(ctx context.Context, target *agentv1.ResourceOwnershipSnap
 	if o == nil || !o.GetExists() || o.GetFile() == nil {
 		return ErrUnsupported
 	}
-	c, err := openCustody(o.GetPath())
+	c, err := openCustody(o.GetPath(), false)
 	if err != nil {
 		return err
 	}

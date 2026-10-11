@@ -357,11 +357,15 @@ type SSHServerChecks struct {
 	Syntax                 *ProbeReceipt          `protobuf:"bytes,1,opt,name=syntax,proto3" json:"syntax,omitempty"`
 	EffectiveSettingsMatch bool                   `protobuf:"varint,2,opt,name=effective_settings_match,json=effectiveSettingsMatch,proto3" json:"effective_settings_match,omitempty"`
 	MatchContextsMatch     bool                   `protobuf:"varint,3,opt,name=match_contexts_match,json=matchContextsMatch,proto3" json:"match_contexts_match,omitempty"`
-	Authentication         *ProbeReceipt          `protobuf:"bytes,4,opt,name=authentication,proto3" json:"authentication,omitempty"`
-	Connectivity           *ProbeReceipt          `protobuf:"bytes,5,opt,name=connectivity,proto3" json:"connectivity,omitempty"`
-	Converged              bool                   `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Authentication changes require this proof; a banner-only change instead
+	// proves the pre-authentication banner exchange on a fresh SSH connection.
+	Authentication     *ProbeReceipt `protobuf:"bytes,4,opt,name=authentication,proto3" json:"authentication,omitempty"`
+	Connectivity       *ProbeReceipt `protobuf:"bytes,5,opt,name=connectivity,proto3" json:"connectivity,omitempty"`
+	Converged          bool          `protobuf:"varint,6,opt,name=converged,proto3" json:"converged,omitempty"`
+	BannerExchange     *ProbeReceipt `protobuf:"bytes,7,opt,name=banner_exchange,json=bannerExchange,proto3" json:"banner_exchange,omitempty"`
+	BannerContentMatch bool          `protobuf:"varint,8,opt,name=banner_content_match,json=bannerContentMatch,proto3" json:"banner_content_match,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *SSHServerChecks) Reset() {
@@ -432,6 +436,20 @@ func (x *SSHServerChecks) GetConnectivity() *ProbeReceipt {
 func (x *SSHServerChecks) GetConverged() bool {
 	if x != nil {
 		return x.Converged
+	}
+	return false
+}
+
+func (x *SSHServerChecks) GetBannerExchange() *ProbeReceipt {
+	if x != nil {
+		return x.BannerExchange
+	}
+	return nil
+}
+
+func (x *SSHServerChecks) GetBannerContentMatch() bool {
+	if x != nil {
+		return x.BannerContentMatch
 	}
 	return false
 }
@@ -2023,15 +2041,17 @@ const file_lindm_resource_v1_checks_proto_rawDesc = "" +
 	"\x10aggregate_syntax\x18\x02 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x0faggregateSyntax\x12Z\n" +
 	"\x14effective_privileges\x18\x03 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x13effectivePrivileges\x12\x1c\n" +
 	"\tconverged\x18\x04 \x01(\bR\tconverged:\xdd\x01\xbaH\xd9\x01\x1a\xd6\x01\n" +
-	"\x17sudo_checks.convergence\x12Isudo convergence requires aggregate syntax and effective privilege proofs\x1ap!this.converged || (this.owned_file_matches && this.aggregate_syntax.passed && this.effective_privileges.passed)\"\x97\x05\n" +
+	"\x17sudo_checks.convergence\x12Isudo convergence requires aggregate syntax and effective privilege proofs\x1ap!this.converged || (this.owned_file_matches && this.aggregate_syntax.passed && this.effective_privileges.passed)\"\x9e\a\n" +
 	"\x0fSSHServerChecks\x12?\n" +
 	"\x06syntax\x18\x01 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x06syntax\x128\n" +
 	"\x18effective_settings_match\x18\x02 \x01(\bR\x16effectiveSettingsMatch\x120\n" +
-	"\x14match_contexts_match\x18\x03 \x01(\bR\x12matchContextsMatch\x12O\n" +
-	"\x0eauthentication\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\x0eauthentication\x12K\n" +
+	"\x14match_contexts_match\x18\x03 \x01(\bR\x12matchContextsMatch\x12G\n" +
+	"\x0eauthentication\x18\x04 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x0eauthentication\x12K\n" +
 	"\fconnectivity\x18\x05 \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptB\x06\xbaH\x03\xc8\x01\x01R\fconnectivity\x12\x1c\n" +
-	"\tconverged\x18\x06 \x01(\bR\tconverged:\x9a\x02\xbaH\x96\x02\x1a\x93\x02\n" +
-	"\x16ssh_checks.convergence\x12WSSH convergence requires effective Match settings and fresh authentication/connectivity\x1a\x9f\x01!this.converged || (this.syntax.passed && this.effective_settings_match && this.match_contexts_match && this.authentication.passed && this.connectivity.passed)\"\x97\x04\n" +
+	"\tconverged\x18\x06 \x01(\bR\tconverged\x12H\n" +
+	"\x0fbanner_exchange\x18\a \x01(\v2\x1f.lindm.resource.v1.ProbeReceiptR\x0ebannerExchange\x120\n" +
+	"\x14banner_content_match\x18\b \x01(\bR\x12bannerContentMatch:\xad\x03\xbaH\xa9\x03\x1a\xa6\x03\n" +
+	"\x16ssh_checks.convergence\x12oSSH convergence requires native syntax, effective settings and fresh connection evidence for the managed effect\x1a\x9a\x02!this.converged || (this.syntax.passed && this.effective_settings_match && this.match_contexts_match && this.connectivity.passed && ((has(this.banner_exchange) && this.banner_exchange.passed && this.banner_content_match) || (has(this.authentication) && this.authentication.passed)))\"\x97\x04\n" +
 	"\x0eTimeSyncChecks\x12\x1e\n" +
 	"\n" +
 	"configured\x18\x01 \x01(\bR\n" +
@@ -2236,29 +2256,30 @@ var file_lindm_resource_v1_checks_proto_depIdxs = []int32{
 	25, // 5: lindm.resource.v1.SSHServerChecks.syntax:type_name -> lindm.resource.v1.ProbeReceipt
 	25, // 6: lindm.resource.v1.SSHServerChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
 	25, // 7: lindm.resource.v1.SSHServerChecks.connectivity:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 8: lindm.resource.v1.TimeSyncChecks.source_reachability:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 9: lindm.resource.v1.TrustCAChecks.tls_chain:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 10: lindm.resource.v1.FirewallZoneChecks.allow_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 11: lindm.resource.v1.FirewallZoneChecks.deny_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 12: lindm.resource.v1.NetworkConnectionChecks.end_to_end_reachability:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 13: lindm.resource.v1.DNSChecks.split_dns_lookup:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 14: lindm.resource.v1.ProxyChecks.request:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 15: lindm.resource.v1.ProxyChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 16: lindm.resource.v1.ProxyChecks.bypass:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 17: lindm.resource.v1.NativePackageChecks.native_configuration_readiness:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 18: lindm.resource.v1.RepositoryChecks.metadata_signature:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 19: lindm.resource.v1.FlatpakAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 20: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 21: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 22: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 23: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 24: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
-	25, // 25: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	25, // 8: lindm.resource.v1.SSHServerChecks.banner_exchange:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 9: lindm.resource.v1.TimeSyncChecks.source_reachability:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 10: lindm.resource.v1.TrustCAChecks.tls_chain:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 11: lindm.resource.v1.FirewallZoneChecks.allow_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 12: lindm.resource.v1.FirewallZoneChecks.deny_packet_probe:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 13: lindm.resource.v1.NetworkConnectionChecks.end_to_end_reachability:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 14: lindm.resource.v1.DNSChecks.split_dns_lookup:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 15: lindm.resource.v1.ProxyChecks.request:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 16: lindm.resource.v1.ProxyChecks.authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 17: lindm.resource.v1.ProxyChecks.bypass:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 18: lindm.resource.v1.NativePackageChecks.native_configuration_readiness:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 19: lindm.resource.v1.RepositoryChecks.metadata_signature:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 20: lindm.resource.v1.FlatpakAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 21: lindm.resource.v1.SessionPolicyChecks.visible_session_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 22: lindm.resource.v1.SnapAppChecks.launch:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 23: lindm.resource.v1.CertificateEnrollmentChecks.tls_client_acceptance:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 24: lindm.resource.v1.CertificateEnrollmentChecks.removal_revocation_behavior:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 25: lindm.resource.v1.DirectoryClientChecks.domain_authentication:type_name -> lindm.resource.v1.ProbeReceipt
+	25, // 26: lindm.resource.v1.DirectoryClientChecks.offline_outage_policy:type_name -> lindm.resource.v1.ProbeReceipt
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_lindm_resource_v1_checks_proto_init() }
