@@ -251,8 +251,12 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 		// GNOME Software's PackageKit refreshes APT lists right after login and
 		// holds the lists lock, which apt-get update cannot wait for (debian 13
 		// arm64 encryption-03). Runtime-mask it in this disposable guest; the
-		// mask lives in /run, and dpkg's frontend lock is waited for.
-		return "export DEBIAN_FRONTEND=noninteractive; if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
+		// mask lives in /run, and dpkg's frontend lock is waited for. A vendor
+		// boot-time apt-get (Pop!_OS 24.04 pop2404-lock-quarantine-01) holds the
+		// same lists lock, so any running apt is waited for, bounded, first.
+		return "export DEBIAN_FRONTEND=noninteractive; if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; " +
+			"for i in $(seq 600); do pgrep -x apt-get >/dev/null || pgrep -x apt >/dev/null || pgrep -x unattended-upgr >/dev/null || break; sleep 1; done; " +
+			"apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
 	case backend.DNF():
 		return "dnf -y install " + strings.Join(packages, " "), nil
 	case backend == platform.BackendPacman:

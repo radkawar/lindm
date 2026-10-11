@@ -183,9 +183,23 @@ case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) ech
 		logindLock: true,
 		lockKeys:   []string{"meta_l", "esc"},
 		// xdg-desktop-portal-cosmic implements ScreenCast but, in the shipped
-		// 0.1.0pop1, no RemoteDesktop: CONTROL is refused before consent.
-		assistance: append(slices.Clone(assistanceScenarios[1:]), unavailableScenarios("", "portal_remote_desktop_unavailable")[1]),
+		// 0.1.0pop1, no RemoteDesktop: CONTROL is refused before consent, and
+		// only the VIEW-mode live scenarios run.
+		assistance: append(namedScenarios("view", "decline", "portal-cancel", "lock"), unavailableScenarios("", "portal_remote_desktop_unavailable")[1]),
 	},
+}
+
+// namedScenarios selects live scenarios by name, so a scenario added to the
+// GNOME list never silently joins a desktop that cannot serve its mode. An
+// unknown name selects nothing; each profile's test asserts its exact list.
+func namedScenarios(names ...string) []assistanceScenarioSpec {
+	selected := make([]assistanceScenarioSpec, 0, len(names))
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(names, spec.name) {
+			selected = append(selected, spec)
+		}
+	}
+	return selected
 }
 
 // labDesktopFor returns the profile of the golden's desktop variant, which

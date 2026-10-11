@@ -16,6 +16,8 @@ import (
 // debian13-arm64-dgx21-device-actions-encryption-03: packagekitd held the APT
 // lists lock right after login and apt-get update failed at once. The lab
 // stops PackageKit for this boot before APT and waits for dpkg's lock.
+// pop2404-lock-quarantine-01: a vendor boot-time apt-get held the lists lock;
+// the lab waits for running apt processes before its own update.
 func TestLabAPTInstallStopsPackageKitFirst(t *testing.T) {
 	release, ok := platform.Lookup("debian-13")
 	if !ok {
@@ -27,10 +29,16 @@ func TestLabAPTInstallStopsPackageKitFirst(t *testing.T) {
 	}
 	bin := t.TempDir()
 	calls := filepath.Join(t.TempDir(), "calls")
-	for _, name := range []string{"systemctl", "apt-get"} {
+	running := filepath.Join(t.TempDir(), "running")
+	for _, name := range []string{"systemctl", "apt-get", "sleep"} {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\necho "+name+" \"$*\" >> "+nativeQuote(calls)+"\n"), 0o700); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// A boot-time apt-get is visible to the first two checks, then exits.
+	pgrep := "#!/bin/sh\n[ \"$2\" = apt-get ] || exit 1\necho x >> " + nativeQuote(running) + "\n[ $(wc -l < " + nativeQuote(running) + ") -le 2 ]\n"
+	if err := os.WriteFile(filepath.Join(bin, "pgrep"), []byte(pgrep), 0o700); err != nil {
+		t.Fatal(err)
 	}
 	cmd := exec.Command("/bin/sh", "-eu", "-c", command)
 	cmd.Env = append(os.Environ(), "PATH="+bin+":/usr/bin:/bin")
@@ -45,6 +53,8 @@ func TestLabAPTInstallStopsPackageKitFirst(t *testing.T) {
 	want := []string{
 		"systemctl cat packagekit.service",
 		"systemctl mask --runtime --now packagekit.service",
+		"sleep 1",
+		"sleep 1",
 		"apt-get -q -o DPkg::Lock::Timeout=600 update",
 		"apt-get -q -y -o DPkg::Lock::Timeout=600 install curl",
 	}
