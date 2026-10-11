@@ -32,8 +32,9 @@ that SHA, then posts statuses with gh signoff create --commit SHA from -root.
                -root/artifacts/acceptance-<ts>. -acceptance-flags appends
                lab acceptance flags.
 
-Options: -root <checkout> (default .), -timeout <duration> (default 2h; 5h
-with -acceptance).
+Options: -root <checkout> (default .), -timeout <duration> (default 5h: make
+check, up to 3h queued for the integration lock and its 45m run; 5h with
+-acceptance).
 `
 
 func runSignoff(args []string) (resultErr error) {
@@ -41,7 +42,7 @@ func runSignoff(args []string) (resultErr error) {
 	root := flags.String("root", ".", "checkout whose pushed HEAD and dev fixture are used")
 	acceptance := flags.Bool("acceptance", false, "run make acceptance instead of check and integration")
 	acceptanceFlags := flags.String("acceptance-flags", "", "extra lab acceptance flags")
-	timeout := flags.Duration("timeout", 0, "overall deadline (default 2h; 5h with -acceptance)")
+	timeout := flags.Duration("timeout", 0, "overall deadline (default 5h, covering the bounded integration queue)")
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), signoffUsage) }
 	if err := flags.Parse(args); err != nil {
@@ -50,11 +51,10 @@ func runSignoff(args []string) (resultErr error) {
 	if flags.NArg() != 0 {
 		return errors.New("signoff takes no positional arguments")
 	}
+	// The integration queue (integrationQueueLimit) and run (integrationLockCap)
+	// are bounded on their own; the overall default must not cut them short.
 	if *timeout == 0 {
-		*timeout = 2 * time.Hour
-		if *acceptance {
-			*timeout = 5 * time.Hour
-		}
+		*timeout = 5 * time.Hour
 	}
 	if *timeout < 0 {
 		return errors.New("timeout must be positive")
