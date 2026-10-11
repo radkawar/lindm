@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -27,23 +28,64 @@ import (
 // Args contain the VM lane and flags without scheduler -host/-arch flags.
 // Records are copied back before exact run-directory cleanup, including failures.
 type RemoteRun struct {
-	Host           *labv1.LabHost
-	Architecture   string
-	Repository     string
-	Args           []string
-	Hold           bool
+	Host         *labv1.LabHost
+	Architecture string
+	Repository   string
+	Args         []string
+	Hold         bool
+	// ReverseForwards are "PORT:HOST:PORT" ssh -R entries on the execution
+	// connection only: the lab host's 127.0.0.1:PORT (bound explicitly, never
+	// ::1) reaches HOST:PORT on the controller for the run's lifetime, and a
+	// refused bind fails the run.
+	ReverseForwards []string
+	// OnHeld is called once, with the run's execution context and the bytes of
+	// the private marker the remote lane writes as <evidence>/held, when a held
+	// run is ready. The marker is read over ssh without logging, removed
+	// remotely and never returned as evidence. The context ends when the
+	// remote run does; publish nothing after that. An error cancels the run.
+	OnHeld         func(ctx context.Context, marker []byte) error
 	Stdout, Stderr io.Writer
 }
+
+// heldMarker is the remote evidence file that announces a ready held run.
+const heldMarker = "held"
+
+// maxHeldMarker bounds the held marker; it carries small JSON only.
+const maxHeldMarker = 64 << 10
 
 // QuoteShell quotes one argument for the explicit remote Bash, never the user's
 // login shell. SSH sends a command string, not an argv vector.
 func QuoteShell(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
 
-func executionCommand(ctx context.Context, alias, script string) *exec.Cmd {
+func executionCommand(ctx context.Context, alias, script string, sshOptions ...string) *exec.Cmd {
 	if alias == "" {
 		return exec.CommandContext(ctx, "/bin/bash", "--noprofile", "--norc", "-c", script)
 	}
-	return exec.CommandContext(ctx, "ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "--", alias, "bash -c "+QuoteShell(script))
+	args := append([]string{"-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3"}, sshOptions...)
+	return exec.CommandContext(ctx, "ssh", append(args, "--", alias, "bash -c "+QuoteShell(script))...)
+}
+
+// reverseForwardOptions validates "PORT:HOST:PORT" entries (HOST an IP
+// literal) and returns ssh options that fail the connection if any remote
+// bind is refused.
+func reverseForwardOptions(forwards []string) ([]string, error) {
+	if len(forwards) == 0 {
+		return nil, nil
+	}
+	options := []string{"-o", "ExitOnForwardFailure=yes"}
+	for _, forward := range forwards {
+		parts := strings.Split(forward, ":")
+		if len(parts) != 3 || net.ParseIP(parts[1]) == nil {
+			return nil, fmt.Errorf("reverse forward %q must be PORT:IP:PORT", forward)
+		}
+		for _, port := range []string{parts[0], parts[2]} {
+			if value, err := strconv.ParseUint(port, 10, 16); err != nil || value == 0 {
+				return nil, fmt.Errorf("reverse forward %q has an invalid port", forward)
+			}
+		}
+		options = append(options, "-R", "127.0.0.1:"+forward)
+	}
+	return options, nil
 }
 
 func runOutput(ctx context.Context, alias, script string) (string, error) {
@@ -179,7 +221,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	guestProbe := remote + "/bin/lab"
 	if r.Architecture != nativeArch {
 		switch args[1] {
-		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "updates", "assistance":
+		case "lifecycle", "dispatch", "resources", "device-actions", "enroll-unattended", "enroll-from-console", "updates", "assistance":
 			executables = append(executables, executable{"lab-guest", r.Architecture, "./cmd/lab"})
 			guestProbe = remote + "/bin/lab-guest"
 		}
@@ -235,7 +277,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if FlagValue(args, "lindmd") != "" || args[1] == "dispatch" || args[1] == "resources" || args[1] == "device-actions" || args[1] == "enroll-unattended" || args[1] == "assistance" {
 		args = SetFlag(args, "lindmd", remote+"/bin/lindmd")
 	}
-	if args[1] == "enroll-unattended" {
+	if args[1] == "enroll-unattended" || args[1] == "enroll-from-console" {
 		args = SetFlag(args, "lab-binary", guestProbe)
 	}
 	if (args[1] == "device-actions" || args[1] == "assistance") && FlagValue(args, "architecture") == "" {
@@ -279,7 +321,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" || args[1] == "assistance" {
 		args = SetFlag(args, "golden-cache", filepath.Join(work, "encrypted"))
 	}
-	for _, name := range []string{"manifest", "recovery-manifest", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
+	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "command-file", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
 		value := FlagValue(args, name)
 		if value == "" {
 			continue
@@ -304,6 +346,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 				}
 			}
 			outputs[name] = value
+			if name == "evidence" {
+				// Created up front, exclusively, so a held run's controller can
+				// place owner-only files beside the returned evidence.
+				if err := os.Mkdir(value, 0o700); err != nil {
+					return err
+				}
+			}
 			args = SetFlag(args, name, remote+"/records/"+name)
 			if name == "diagnostics" {
 				if err := stage.mkdir(remote + "/records/diagnostics"); err != nil {
@@ -355,8 +404,17 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 		}
 		script = "exec docker run -i --name " + QuoteShell(container) + " --network host --user \"$(id -u):$(id -g)\"" + devices + database + " --mount " + QuoteShell("type=bind,src="+work+",dst="+work) + " --workdir " + QuoteShell(remote+"/source") + " --env " + QuoteShell("TMPDIR="+remote+"/work") + " " + QuoteShell(r.Host.RunnerImage) + " " + strings.Join(command, " ")
 	}
+	forwards, err := reverseForwardOptions(r.ReverseForwards)
+	if err != nil {
+		return err
+	}
+	if len(forwards) != 0 && r.Host.SshAlias == "" {
+		return errors.New("reverse forwards require an SSH lab host")
+	}
 	started := time.Now().UTC()
-	cmd := executionCommand(ctx, r.Host.SshAlias, script)
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	cmd := executionCommand(runCtx, r.Host.SshAlias, script, forwards...)
 	// A terminal Ctrl-C belongs to the controller, not SSH. Keep SSH alive
 	// while cancellation closes stdin and the worker tears down its lease.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -370,7 +428,24 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	cmd.Cancel = stdin.Close
 	cmd.WaitDelay = 2 * time.Minute
 	cmd.Stdout, cmd.Stderr = r.Stdout, r.Stderr
-	runErr := cmd.Run()
+	runErr := cmd.Start()
+	var heldErr error
+	if runErr == nil {
+		watched := make(chan struct{})
+		if r.OnHeld != nil && outputs["evidence"] != "" {
+			go func() {
+				defer close(watched)
+				if heldErr = r.watchHeld(runCtx, remote+"/records/evidence/"+heldMarker, 10*time.Second); heldErr != nil {
+					cancelRun()
+				}
+			}()
+		} else {
+			close(watched)
+		}
+		runErr = cmd.Wait()
+		cancelRun()
+		<-watched
+	}
 	if r.Hold && ctx.Err() != nil && cmd.ProcessState != nil && cmd.ProcessState.Success() {
 		// The worker acknowledged EOF and completed fixture/VM teardown.
 		runErr = nil
@@ -383,14 +458,14 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if errors.Is(closeErr, os.ErrClosed) {
 		closeErr = nil
 	}
-	err = errors.Join(runErr, closeErr)
+	err = errors.Join(runErr, closeErr, heldErr)
 	copyCtx, stop := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer stop()
 	// Remote output paths embedded in the lane record (e.g. inspect's
 	// InventoryRecordPath) are rewritten to their local copies; the record is
 	// returned last so it never names a local file that has not been copied.
 	relocated := map[string]string{}
-	for _, name := range []string{"inventory-record", "diagnostics", "fixture-output", "record"} {
+	for _, name := range []string{"evidence", "inventory-record", "diagnostics", "fixture-output", "record"} {
 		destination, ok := outputs[name]
 		if !ok {
 			continue
@@ -458,19 +533,58 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	return err
 }
 
-// collectAssistanceEvidence returns immutable records and screenshots, but never
-// the held owner's credentials. The destination is exclusively created so an
-// existing qualification cannot be overwritten by another run.
+// collectAssistanceEvidence returns immutable records and screenshots into the
+// run's exclusively created destination, but never the held owner's
+// credentials or the held marker.
 func collectAssistanceEvidence(ctx context.Context, alias, source, destination string, stderr io.Writer) error {
-	if err := os.Mkdir(destination, 0700); err != nil {
-		return err
-	}
-	cmd := exec.CommandContext(ctx, "rsync", "-a", "--protect-args", "--chmod=Du=rwx,Dgo=", "--exclude=/owner-access", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=10", "--", transferPath(alias, source+"/"), destination+"/")
+	cmd := exec.CommandContext(ctx, "rsync", "-a", "--protect-args", "--chmod=Du=rwx,Dgo=", "--exclude=/owner-access", "--exclude=/"+heldMarker, "-e", "ssh -o BatchMode=yes -o ConnectTimeout=10", "--", transferPath(alias, source+"/"), destination+"/")
 	cmd.Stdout, cmd.Stderr = stderr, stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("collect assistance evidence: %w", err)
 	}
 	return nil
+}
+
+// watchHeld polls for the remote held marker until the run ends. Once present,
+// it reads the bounded marker without logging it, removes it remotely and
+// hands it to OnHeld exactly once.
+func (r RemoteRun) watchHeld(ctx context.Context, marker string, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+		probe := executionCommand(ctx, r.Host.SshAlias, "test -e "+QuoteShell(marker))
+		if err := probe.Run(); err != nil {
+			var exit *exec.ExitError
+			if ctx.Err() != nil || (errors.As(err, &exit) && exit.ExitCode() == 1) {
+				continue
+			}
+			return fmt.Errorf("probe held marker: %w", err)
+		}
+		read := executionCommand(ctx, r.Host.SshAlias, "head -c "+strconv.Itoa(maxHeldMarker+1)+" -- "+QuoteShell(marker)+" && rm -f -- "+QuoteShell(marker))
+		out := baselineOutput{limit: maxHeldMarker}
+		read.Stdout = &out
+		err := read.Run()
+		data := out.Bytes()
+		defer clear(data)
+		if ctx.Err() != nil {
+			// The run ended while the marker was being read: nothing to hold.
+			return nil
+		}
+		if err != nil || out.exceeded {
+			return errors.New("read held marker failed or exceeded its bound")
+		}
+		if err := r.OnHeld(ctx, data); err != nil && ctx.Err() == nil {
+			return err
+		}
+		// A run that ended (Ctrl-C or remote teardown) while OnHeld waited is
+		// an orderly shutdown, not a held-access failure.
+		return nil
+	}
 }
 
 func removeFlag(args []string, name string) []string {

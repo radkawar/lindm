@@ -1,11 +1,13 @@
 package labhost
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,32 +149,100 @@ func TestRemotePackageRelocationPreservesRepositoryBasename(t *testing.T) {
 
 func TestAssistanceEvidenceReturnKeepsOwnerCredentialsRemote(t *testing.T) {
 	source, destination := t.TempDir(), filepath.Join(t.TempDir(), "returned")
-	for name, data := range map[string]string{"assistance.json": "record", "guest.png": "screenshot", "owner-access": "secret"} {
+	for name, data := range map[string]string{"assistance.json": "record", "guest.png": "screenshot", "owner-access": "secret", heldMarker: "held secret"} {
 		if err := os.WriteFile(filepath.Join(source, name), []byte(data), 0400); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// The run creates the destination before it starts; a split held run's
+	// controller writes its own owner-access there, which must survive.
+	if err := os.Mkdir(destination, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, "owner-access"), []byte("local secret"), 0400); err != nil {
+		t.Fatal(err)
+	}
 	if err := collectAssistanceEvidence(t.Context(), "", source, destination, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	for name, want := range map[string]string{"assistance.json": "record", "guest.png": "screenshot"} {
+	for name, want := range map[string]string{"assistance.json": "record", "guest.png": "screenshot", "owner-access": "local secret"} {
 		got, err := os.ReadFile(filepath.Join(destination, name))
 		if err != nil || string(got) != want {
 			t.Fatalf("returned %s = %q, %v", name, got, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(destination, "owner-access")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("owner credentials were returned: %v", err)
+	if _, err := os.Stat(filepath.Join(destination, heldMarker)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("held marker was returned: %v", err)
 	}
 	if got, err := os.ReadFile(filepath.Join(source, "owner-access")); err != nil || string(got) != "secret" {
 		t.Fatalf("remote owner credentials changed: %q, %v", got, err)
 	}
-	if err := collectAssistanceEvidence(t.Context(), "", source, destination, io.Discard); !errors.Is(err, os.ErrExist) {
-		t.Fatalf("existing qualification was not refused: %v", err)
-	}
 	info, err := os.Stat(destination)
 	if err != nil || info.Mode().Perm() != 0700 {
 		t.Fatalf("returned evidence directory is not private: %v, %v", info, err)
+	}
+}
+
+func TestReverseForwardOptionsRequirePortIPPort(t *testing.T) {
+	options, err := reverseForwardOptions([]string{"43707:127.0.0.1:43707", "50639:192.168.0.109:50639"})
+	if err != nil || strings.Join(options, " ") != "-o ExitOnForwardFailure=yes -R 127.0.0.1:43707:127.0.0.1:43707 -R 127.0.0.1:50639:192.168.0.109:50639" {
+		t.Fatalf("options = %q, %v", options, err)
+	}
+	if options, err := reverseForwardOptions(nil); err != nil || options != nil {
+		t.Fatalf("no forwards = %q, %v", options, err)
+	}
+	for _, bad := range []string{"43707:localhost:43707", "0:127.0.0.1:1", "1:127.0.0.1:70000", "127.0.0.1:1", "1:127.0.0.1:1:2", "-oProxyCommand=x:127.0.0.1:1"} {
+		if _, err := reverseForwardOptions([]string{bad}); err == nil {
+			t.Errorf("forward %q accepted", bad)
+		}
+	}
+}
+
+func TestWatchHeldDeliversMarkerOnceAndRemovesIt(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), heldMarker)
+	var got []string
+	run := RemoteRun{Host: &labv1.LabHost{}, OnHeld: func(_ context.Context, data []byte) error {
+		got = append(got, string(data))
+		return nil
+	}}
+	if err := os.WriteFile(marker, []byte(`{"device_id":"d"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.watchHeld(t.Context(), marker, 10*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != `{"device_id":"d"}` {
+		t.Fatalf("OnHeld calls = %q", got)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("marker not removed: %v", err)
+	}
+	if err := os.WriteFile(marker, make([]byte, maxHeldMarker+1), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.watchHeld(t.Context(), marker, 10*time.Millisecond); err == nil {
+		t.Fatal("oversized marker accepted")
+	}
+	failing := RemoteRun{Host: &labv1.LabHost{}, OnHeld: func(context.Context, []byte) error { return errors.New("owner access failed") }}
+	if err := os.WriteFile(marker, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := failing.watchHeld(t.Context(), marker, 10*time.Millisecond); err == nil {
+		t.Fatal("OnHeld failure was not reported")
+	}
+	// Ctrl-C while OnHeld waits (e.g. for device findings) is an orderly
+	// shutdown: the run's end must not surface as a held-access failure.
+	ctx, cancel := context.WithCancel(t.Context())
+	interrupted := RemoteRun{Host: &labv1.LabHost{}, OnHeld: func(ctx context.Context, _ []byte) error {
+		cancel()
+		<-ctx.Done()
+		return ctx.Err()
+	}}
+	if err := os.WriteFile(marker, []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := interrupted.watchHeld(ctx, marker, 10*time.Millisecond); err != nil {
+		t.Fatalf("cancellation during OnHeld reported %v", err)
 	}
 }
 
