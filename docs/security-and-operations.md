@@ -783,14 +783,9 @@ and the separately attributable external-operator method is required. Physical g
 exercise compromised/replayed handoff, wrong media, power loss, expired authority,
 recovery-image changes and return to a clean installed state.
 
-If original-device recovery reports **unsupported: ESP capacity** or
-`device_action_recovery_attestation_unavailable`, retain the image digest and the
-displayed needed/available bytes or readiness reason; do not submit a wipe
-approval, change the ordinary boot image to make it fit, or disable the TPM gate.
-On a stock shim+GRUB machine with a TPM, publish a measured-GRUB initramfs and its
-vendor-kernel descriptor instead (`lindm-recovery-build -boot-mode measured-grub`,
-then `lab release repository publish-artifact` for `recovery/<sha>.initrd` and
-`recovery/<sha>.kernel`, in that order).
+If original-device recovery reports **unsupported: ESP capacity**, retain the
+signed-image digest and the displayed allocation-rounded needed/available bytes;
+do not submit a wipe approval or change the ordinary boot image to make it fit.
 The external-recovery-media alternative requires an on-site operator and a
 separately qualified, trust-verified recovery image booted from external media.
 Provide protected off-target identity and journal storage, observe the exact
@@ -1421,9 +1416,32 @@ traffic generator with every result; change budgets only by an explicit spec rev
 single-host device-protocol workload. It creates a disposable authority database
 and real server process on dynamic loopback ports; shared dev application data and
 the normal admin listener are never used. Existing Postgres/Keycloak development
-dependencies and verified lab provisioning trust are prerequisites. The generator
-is deliberately co-located and is **not** the dedicated-target reference profile
+dependencies and verified lab provisioning trust are prerequisites. By default the
+generator is co-located, which is **not** the dedicated-target reference profile
 above. It has no arbitrary endpoint or production-credential option.
+
+Two-host mode keeps the authority, owner session, sampling and SLO decisions on
+the target and runs only the simulated devices elsewhere:
+`-listen-address IP` binds the admin/device listeners to one literal local IPv4
+address (TLS names and signed origins are unchanged; clients dial the address),
+and `-generator-host ALIAS -generator-binary /abs/lab [-generator-ssh-config FILE]`
+starts `lab load-generator` over SSH. Only each one-use enrollment-grant secret
+crosses that channel; remote RPC histograms are merged bin-by-bin, so
+percentiles are exact. `-advisory-feeds FILE` (strict `AdvisoryConfig` JSON)
+enables real feed refresh and background evaluation: the workload starts only
+after every configured feed has a fresh publication, and each plateau adds an
+advisory freshness SLO — after a 5-minute warm-up at least 80% of active
+devices must have an evaluation bound to their current snapshot, host and feed
+revision (about two minutes of lag at the 10-minute inventory cadence), sampled
+every 30 s through `GetFleetSummary`; a failed or timed-out summary read is
+recorded and breaches the plateau. `-package-baseline FILE` places a recorded
+native `PackageBatch` first in every snapshot (synthetic dpkg padding carries
+source identity, as native dpkg does). `-postgres-settings name=value,...`
+applies allowlisted capacity parameters to a dedicated nvme/tmpfs cluster and
+records them; `fsync`, `synchronous_commit` and `full_page_writes` are never
+accepted. Each device continues its inventory cadence from its own previous
+collection across plateaus (the server rejects collections closer than its
+admission interval).
 
 The default ramp is 500, 2,000, 5,000 and 10,000 freshly enrolled identities,
 11 minutes per plateau, eight enrollment workers, 2,000 packages per device and a
@@ -1620,9 +1638,138 @@ owned container was removed, and the record preserves cancellation/session-
 revocation failure rather than presenting the interrupted run as successful.
 
 Dedicated tmpfs and NVMe TLS/roles/extension/cleanup integration regressions
-passed. The isolated durable ramp and two-hour durable soak have **not run**.
-Consequently no higher durable single-host limit or ≥10,000-device claim is
-published. Resume only after the parent releases the host's VM-priority hold.
+passed. That co-located lane was superseded by the two-host qualification below.
+
+#### Measured single-host limit: 10,000 devices (two-host, real feeds, 2026-10-11)
+
+**Published single-host limit: 10,000 enrolled devices** for this workload, with
+the PostgreSQL tuning below, the default eight-connection device pool and the
+default four-connection console pool. 20,000 failed. Not qualified: a 24-hour
+soak, 10x heartbeat bursts, 100 concurrent console users, retention-aged data, a
+feed-generation change re-evaluating the whole fleet, and heterogeneous fleets.
+Every simulated device shares one package set, so the whole fleet binds one
+advisory finding set (see architecture).
+
+Topology: lindmd and a dedicated pinned PostgreSQL 18.6 on dgx21 (NVIDIA GB10,
+20 Arm cores, 121 GiB; Linux 6.17, Go 1.26.9). Server CPUs 5–8 and PostgreSQL
+CPUs 15–18 give 8 CPUs together, the reference profile's vCPU count; memory was
+not capped. PostgreSQL ran on an owned NVMe-backed loop/XFS filesystem with
+durable fsync. The generator (`lab load-generator`) ran on dgx20 over the
+200 Gb/s direct link, with listeners bound to `169.254.40.186` and generator
+control SSH also over the direct link.
+
+Each device did real mTLS enrollment, sessions, trust/work polling, signed
+service cycles for 5% of devices and 2,000-package snapshots every ~10 min. The
+first 664 packages are the recorded native Ubuntu 24.04 inventory
+(`artifacts/inventory-ubuntu24-observation-20261009.json`, SHA-256
+`d07821f1…8e77709`; extracted baseline
+`29be31ff04655de84a0cbd912c08dc126e2ce2b566a05a9a3c794998df003f09`). The server
+refreshed the real Ubuntu OSV export
+(`https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip`: 2,157,314
+records, 4 rejected) and evaluated every device against it, giving 28,821
+findings per device. dgx21 also hosted other agents' KVM lanes; host contention
+samples are in each record. Records are under
+`~/.cache/lindm-capacity10k-20261011/records/`.
+
+| Run (record, SHA-256 prefix)               | Server                           | Result                                                                                                                    |
+| ------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `before-5k` `6d9fceb4`                     | baseline `e4becbee`              | aborted at 5,000: serial matcher 0.6 devices/s, 28,821 rows written per device, `GetFleetSummary` >30 s                   |
+| `ramp-a3` `3ecfe5de`, `ramp-a4` `f24bc8eb` | finding sets                     | 5,000 snapshots complete; advisory coverage 70%, and `GetFleetSummary` >30 s from WAL contention with PostgreSQL defaults |
+| `ramp-t1` `7c2ceb16`                       | + tuning, archive fix            | 10,000 passes (sync/work p99 48/46 ms) but `GetFleetSummary` p95 679 ms                                                   |
+| `soak-10k` `acdb2eb9`                      | same                             | 2 h steady state clean, harness-failed: the cold evaluation drain took 6.5 min                                            |
+| `ramp-v2-retrystorm` `c65987f4`            | single-flight sets               | cold drain throttled by 40001 retries during enrollment                                                                   |
+| `ramp-v4` `3e859f09`                       | busy-skip `75f784cd`             | 10,000 passes, cold drain 150 s; `GetFleetSummary` p95 1.41 s                                                             |
+| `soak-v4` `bf9009cb`                       | recent actions cached `11bf452d` | 2 h at 10,000 **passes**; `GetFleetSummary` p95 still 1.24 s                                                              |
+| `ramp-v6` `7ae52f51`                       | console pool `997577e8`          | **10,000 passes, `GetFleetSummary` p95 236 ms**; 20,000 fails on device admission                                         |
+| `ramp-v7-pool16` `a7370cf4`                | same, pool 16                    | 20,000 fails: protocol clean, but cold drain 390 s, `GetFleetSummary` p95 4.8 s, `AuthorizeResourceStart` p50 3.6 s       |
+| `soak-v5` `05dd9534`                       | console pool `997577e8`          | **2 h at 10,000 passes** (final code)                                                                                     |
+
+Passing 10,000 plateau (`ramp-v6`, final code): sync/work p50/p95/p99 13/60/79 and
+10/57/82 ms; zero non-retryable errors; 9,937 of 10,000 recurring snapshots
+(99.4%); 500 signed service cycles. The whole cold-enrolled fleet was evaluated
+210 s into the plateau, and coverage afterwards stayed ≥98.2%. `GetFleetSummary`
+p50/p95/p99 was 207/236/466 ms, within the 500 ms ordinary admin-read budget.
+Mean server CPU was 0.95 cores, peak server RSS 3.21 GB and database growth
+4.4 GB per 11 minutes. Retryable `admission_rejected` affected 5.1% of trust
+polls and 5.1% of syncs; agents defer and retry on their normal cadence.
+
+Two-hour soak at 10,000 (`soak-v5`, final code, pool 8 plus console pool 4,
+tuned):
+
+- 115,301 of 115,663 recurring snapshots (99.69%), 4,000 signed cycles and zero
+  non-retryable errors.
+- Sync/work p50/p95/p99: 16/61/74 and 12/56/75 ms.
+- `GetFleetSummary` p50/p95/p99: 213/298/423 ms over 240 reads, with no failed
+  read.
+- The fleet was fully evaluated 180 s into the plateau, and coverage stayed
+  ≥98.2% for the remaining two hours.
+- Server CPU averaged 0.95 cores. RSS was flat after warm-up (3.29→3.32 GB).
+- The database grew from 14.7 to 15.6 GB over the second hour.
+
+Record SHA-256 `05dd9534ca8b725868b0ff89da056811dbddba8de1a339ed490d6bf42f380a33`,
+server `997577e81e841d95a7f3cd2c774f9d5a6c065adc8fffe0ec7927e9b51dbeac3f` and
+generator `60db3bff4469265ff7ff7b2241f6fa4451ee612a5ae9b28547ce3785a6169286`
+(main `252d0163`). Full record hashes: `ramp-v6`
+`7ae52f51e6b9be7b5088699f73c682330d0b5843a50fb05dc21c42d81cdb8601`,
+`ramp-v7-pool16` `a7370cf4fdddf1f2b4054a92e967e6297e62b4aeba363c9287e531f850e2459e`,
+`before-5k` `6d9fceb40452a1bea0c8fc430a03033761465ee7211ece6a1efb00b00900c0f5`.
+
+20,000: at pool 8, device admission (64 in flight) rejected 48% of syncs and
+snapshots reached only 73.5% (`ramp-v6`). At pool 16 (`ramp-v7-pool16`, 128 in
+flight) the device protocol itself held: 100% snapshots, sync/work p99
+42/41 ms and all 1,000 signed cycles. It failed elsewhere:
+
+- The cold evaluation of 20,000 simultaneous enrollments finished 390 s into the
+  plateau, past the 300 s warm-up.
+- The four-connection console pool's background refresh fell behind, giving
+  `GetFleetSummary` p95 4.8 s and one 10 s timeout.
+- `AuthorizeResourceStart` p50 was 3.6 s.
+
+The knee is therefore between 10,000 and 20,000. Above 10,000 use the
+replicated profile.
+
+Fixes, each with regressions:
+
+1. Advisory finding sets (migration `00019`) replace per-device materialized
+   findings.
+2. Missing sets are built once (single-flight) outside device transactions. The
+   previous design livelocked a cold mass enrollment and starved the pool.
+3. The evaluator skips devices whose row is being updated (`FOR UPDATE SKIP
+LOCKED`) instead of failing with 40001. It runs four workers with jittered
+   retry and continues past isolated failures.
+4. A refresh interrupted by shutdown no longer counts as an attempt; previously
+   it suppressed every refresh for the 6 h interval.
+5. OSV archive downloads have no two-minute whole-request cap; the 780 MB export
+   failed twice on dgx21. They report watchdog progress instead.
+6. Device admission scales with the pool, 8 per connection within 64–512, with
+   a 16-request admin reserve. The agent treats `admission_rejected` as a
+   deferral and stops the current flush.
+7. `GetFleetSummary` serves a ≤30 s background population for unrestricted
+   readers, including recent actions.
+8. A separate console/identity pool (`database.admin_connections`). Each admin
+   RPC made about seven sequential pool acquisitions, which queued behind device
+   traffic.
+9. Harness corrections: dpkg source identity, per-device inventory phase, upload
+   retry at the agent's flush cadence, and recorded summary failures.
+
+**Tuning guidance (8 vCPU / 32 GiB single host).** Keep the database pool at 8
+and the console pool at 4. Pool 16 admitted 20,000 devices' traffic but made
+console reads and signed starts slower. Configure PostgreSQL with at least the
+qualified settings:
+
+- `shared_buffers=8GB`, `effective_cache_size=20GB`, `wal_buffers=64MB`
+- `max_wal_size=16GB`, `min_wal_size=2GB`, `checkpoint_timeout=15min`,
+  `checkpoint_completion_target=0.9`, `wal_compression=lz4`
+- `work_mem=16MB`, `maintenance_work_mem=1GB`,
+  `autovacuum_vacuum_cost_limit=2000`
+- `effective_io_concurrency=200`, `random_page_cost=1.1`
+
+Keep `fsync`, `synchronous_commit` and `full_page_writes` on. With PostgreSQL
+defaults, `GetFleetSummary` exceeded 30 s at 5,000 devices on WAL contention.
+Size `max_connections` for both pools per replica. Budget about 3.3 GB of server
+RSS and about 16 GB of database at 10,000 devices with 2,000-package
+inventories. A cold enrollment of the whole fleet is evaluated within about
+four minutes at 10,000 devices. Above 10,000 devices use the replicated profile.
 
 Profiling is explicitly operator-enabled through protobuf `profiling`
 configuration and a separate literal-loopback HTTP listener, disabled by default.
