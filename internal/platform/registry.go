@@ -245,12 +245,13 @@ var registry = []*Release{
 		// tpm2-tss module requires.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
 			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
-		// Measured natively (recovery-nvme-01): the owned-boot UKI holds the
-		// vendor kernel plus the non-hostonly dracut initrd (72 MB; 24.04's
-		// initramfs-tools image was 31 MB). Like Fedora 44, the ESP is not
-		// resized and no vendor file or kernel is substituted.
-		Gates: without(gates(string(RecoverySanitize), "stock 105 MiB cloud ESP: the owned-boot UKI (vendor kernel + dracut generic initrd) leaves 13,998,592 bytes; the signed recovery image needs 50,653,240"), OSUpdate),
+		// Recovery sanitize is qualified through measured GRUB (recovery-*-grub-03):
+		// on the stock 105 MiB cloud ESP the owned UKI holds the vendor kernel plus
+		// the non-hostonly dracut initrd (72 MB), so UKI mode is refused natively
+		// (device_action_esp_insufficient), as on Fedora 44. The ESP is not resized
+		// and no vendor file or kernel is substituted.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
+		Gates:    without(gates(), OSUpdate),
 	},
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",
