@@ -253,7 +253,7 @@ var registry = []*Release{
 		// The 26.04 desktop ISO carries dracut 110, systemd-cryptsetup and the
 		// TSS2 libraries, but not tpm2-tools, whose tpm2 binary dracut's
 		// tpm2-tss module requires.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneEnrollFromConsole},
 			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuResoluteSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
 		// Recovery sanitize is qualified through measured GRUB (recovery-*-grub-03):
 		// on the stock 105 MiB cloud ESP the owned UKI holds the vendor kernel plus
