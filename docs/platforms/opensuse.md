@@ -191,6 +191,20 @@ RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
 they neither match records nor make architecture coverage UNKNOWN
 ([Fedora advisory feeds](fedora.md#advisory-feeds)).
 
+## Remote assistance capability roadmap
+
+Leap and Tumbleweed, including their GNOME and Plasma editions, qualify separately.
+The [capability contract](../product-specification.md#remote-assistance-capabilities)
+defines all tiers' consent, off/limited/on policy, role permissions and audit.
+Probe the selected portal backend: Clipboard must attach to the existing
+RemoteDesktop session, FileChooser must mediate uploads, and notifications plus
+lock/logout must bind the same local user. GNOME support does not prove KWin support.
+Clipboard, keys/layouts, displays, messages, files, reconnect, recording and Tier 3
+are [not run](../verification.md#commercial-assistance-capability-qualification).
+Use pinned rolling snapshots and native nonce/hash, two-head and lifecycle evidence;
+never silently substitute X11 capture. KDE qualification and unattended access
+await parent confirmation.
+
 ## Lab inputs and recorded evidence
 
 Image/version pins, sizes and signer fingerprints are in:

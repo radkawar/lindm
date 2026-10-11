@@ -205,7 +205,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		return nil, deviceActionCapabilityError(capability, "start")
 	}
 	id := uuid.New()
-	intent := &agentv1.DeviceActionIntent{DeploymentId: s.deploymentID.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generationID.String(), ActionId: id.String(), ActorId: actor.ID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: req.Msg.GetExpiresAt(), Spec: req.Msg.GetSpec(), SpecSha256: specDigest}
+	intent := &agentv1.DeviceActionIntent{DeploymentId: s.deploymentID.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generationID.String(), ActionId: id.String(), ActorId: actor.ID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(deviceActionNotBefore(now, snapshot.Delegation)), ExpiresAt: req.Msg.GetExpiresAt(), Spec: req.Msg.GetSpec(), SpecSha256: specDigest}
 	envelope, err := s.authority.Sign(ctx, intent, s.signing.PlanKey)
 	if err != nil {
 		return nil, executionError(err)

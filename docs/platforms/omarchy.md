@@ -94,6 +94,21 @@ recovery sanitize each need native evidence here.
 
 Not recorded.
 
+## Remote assistance capability roadmap
+
+Omarchy/Hyprland inherits no Arch or GNOME desktop evidence. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines all tiers' consent, off/limited/on policy, role permissions and audit.
+Require reliable local lock/stop observation and the actual selected portal backend
+before enabling capture or input. Clipboard requires the existing RemoteDesktop
+Clipboard interface; a private compositor command is not an authorized substitute.
+File upload requires FileChooser. Clipboard, keys/layouts, two-head display
+selection, messages, files, reconnect, recording and Tier 3 are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Missing portal/native mechanisms stay explicitly gated; native nonce/hash/guest
+screenshots must qualify each capability. Unattended/KDE work awaits parent
+confirmation.
+
 ## Lab
 
 x86_64 only, on the local KVM host under lease admission (no arm64 build is used

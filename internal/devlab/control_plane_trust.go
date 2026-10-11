@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -45,7 +44,7 @@ type AuthorityFixture struct {
 	serverCPUs       string
 	processPID       atomic.Int64
 	log              *os.File
-	process          *exec.Cmd
+	process          *labexec.Process
 	done             chan error
 	closed           bool
 	local            *localAuthority
@@ -346,18 +345,20 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	if f.ha != nil {
 		return f.startHA(ctx)
 	}
-	cmd, err := newServerCommand(f.binary, f.configPath(), f.serverCPUs)
+	command, err := newServerCommand(f.binary, f.configPath(), f.serverCPUs)
 	if err != nil {
 		return err
 	}
-	cmd.Stdout, cmd.Stderr = f.log, f.log
-	if err := cmd.Start(); err != nil {
+	command.Stdout, command.Stderr = f.log, f.log
+	// The server outlives this call; stop and Close own its lifetime.
+	process, err := labexec.Start(context.WithoutCancel(ctx), command)
+	if err != nil {
 		return errors.New("start isolated lindmd failed")
 	}
-	f.processPID.Store(int64(cmd.Process.Pid))
-	f.process, f.done = cmd, make(chan error, 1)
+	f.processPID.Store(int64(process.Pid()))
+	f.process, f.done = process, make(chan error, 1)
 	done := f.done
-	go func() { done <- cmd.Wait() }()
+	go func() { done <- process.Wait() }()
 	tlsConfig, err := trustClient(FixturePath(f.repository))
 	if err != nil {
 		return err
@@ -404,17 +405,14 @@ func (f *AuthorityFixture) stop() error {
 		return nil
 	}
 	process, done := f.process, f.done
-	err := process.Process.Signal(syscall.SIGTERM)
-	if err != nil && !errors.Is(err, os.ErrProcessDone) {
-		_ = process.Process.Kill()
-	}
+	process.Signal(syscall.SIGTERM)
 	select {
 	case waitErr := <-done:
 		f.process, f.done = nil, nil
 		f.processPID.Store(0)
 		return waitErr
 	case <-time.After(15 * time.Second):
-		_ = process.Process.Kill()
+		process.Signal(syscall.SIGKILL)
 		select {
 		case <-done:
 			f.process, f.done = nil, nil

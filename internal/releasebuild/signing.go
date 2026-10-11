@@ -289,37 +289,9 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 				return nil, errors.New("releasebuild: build observation digest mismatch")
 			}
 		}
-		var sbomPredicate, provenancePredicate json.RawMessage
-		for _, item := range []struct{ path, kind string }{{artifact.GetSbomPath(), "https://cyclonedx.org/bom"}, {artifact.GetProvenancePath(), "https://slsa.dev/provenance/v1"}, {artifact.GetSignaturePath(), "https://lindm.invalid/release/artifact/v1"}} {
-			encoded, err := readBounded(filepath.Join(directory, item.path), maxDocument)
-			if err != nil {
-				return nil, err
-			}
-			statement, err := verifyEnvelope(encoded, statementType, verifier)
-			if err != nil {
-				return nil, err
-			}
-			var decoded struct {
-				Type          string          `json:"_type"`
-				PredicateType string          `json:"predicateType"`
-				Predicate     json.RawMessage `json:"predicate"`
-				Subject       []struct {
-					Name   string            `json:"name"`
-					Digest map[string]string `json:"digest"`
-				} `json:"subject"`
-			}
-			if err := json.Unmarshal(statement, &decoded); err != nil {
-				return nil, err
-			}
-			if decoded.Type != "https://in-toto.io/Statement/v1" || decoded.PredicateType != item.kind || len(decoded.Subject) != 1 || decoded.Subject[0].Name != artifact.GetPath() || decoded.Subject[0].Digest["sha256"] != sum {
-				return nil, fmt.Errorf("releasebuild: attestation subject/type mismatch: %s", item.path)
-			}
-			if item.path == artifact.GetSbomPath() {
-				sbomPredicate = decoded.Predicate
-			}
-			if item.path == artifact.GetProvenancePath() {
-				provenancePredicate = decoded.Predicate
-			}
+		sbomPredicate, provenancePredicate, err := verifyAttestations(directory, artifact, sum, verifier)
+		if err != nil {
+			return nil, err
 		}
 		if artifact.GetFormat() == "oci" {
 			if err := verifyOCICA(filepath.Join(directory, artifact.GetPath()), artifact, sbomPredicate, provenancePredicate); err != nil {
@@ -328,4 +300,42 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 		}
 	}
 	return manifest, nil
+}
+
+// verifyAttestations checks the artifact's SBOM, provenance and release
+// signature statements against the pinned verifier and the artifact digest. It
+// returns the SBOM and provenance predicates.
+func verifyAttestations(directory string, artifact *releasev1.ReleaseArtifact, sum string, verifier signature.Verifier) (sbomPredicate, provenancePredicate json.RawMessage, err error) {
+	for _, item := range []struct{ path, kind string }{{artifact.GetSbomPath(), "https://cyclonedx.org/bom"}, {artifact.GetProvenancePath(), "https://slsa.dev/provenance/v1"}, {artifact.GetSignaturePath(), "https://lindm.invalid/release/artifact/v1"}} {
+		encoded, err := readBounded(filepath.Join(directory, item.path), maxDocument)
+		if err != nil {
+			return nil, nil, err
+		}
+		statement, err := verifyEnvelope(encoded, statementType, verifier)
+		if err != nil {
+			return nil, nil, err
+		}
+		var decoded struct {
+			Type          string          `json:"_type"`
+			PredicateType string          `json:"predicateType"`
+			Predicate     json.RawMessage `json:"predicate"`
+			Subject       []struct {
+				Name   string            `json:"name"`
+				Digest map[string]string `json:"digest"`
+			} `json:"subject"`
+		}
+		if err := json.Unmarshal(statement, &decoded); err != nil {
+			return nil, nil, err
+		}
+		if decoded.Type != "https://in-toto.io/Statement/v1" || decoded.PredicateType != item.kind || len(decoded.Subject) != 1 || decoded.Subject[0].Name != artifact.GetPath() || decoded.Subject[0].Digest["sha256"] != sum {
+			return nil, nil, fmt.Errorf("releasebuild: attestation subject/type mismatch: %s", item.path)
+		}
+		if item.path == artifact.GetSbomPath() {
+			sbomPredicate = decoded.Predicate
+		}
+		if item.path == artifact.GetProvenancePath() {
+			provenancePredicate = decoded.Predicate
+		}
+	}
+	return sbomPredicate, provenancePredicate, nil
 }

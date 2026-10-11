@@ -39,8 +39,7 @@ func run(ctx context.Context, args []string) error {
 	output := flags.String("output", "", "new private build directory (must not exist)")
 	kernel := flags.String("kernel", "", "approved SHA256:PATH Linux kernel")
 	stub := flags.String("stub", "", "approved SHA256:PATH systemd EFI stub")
-	busybox := flags.String("busybox", "", "approved SHA256:PATH static busybox")
-	agent := flags.String("agent", "", "approved SHA256:PATH static lindm-agent")
+	agent := flags.String("agent", "", "approved SHA256:PATH static lindm-agent, archived as the image's PID 1 /init")
 	config := flags.String("config", "", "approved SHA256:PATH public RecoveryRuntimeConfig")
 	cert := flags.String("certificate", "", "approved SHA256:PATH PEM signing certificate")
 	key := flags.String("signing-key", "", "private PEM signing key (0600)")
@@ -61,7 +60,7 @@ func run(ctx context.Context, args []string) error {
 	for _, input := range []struct {
 		value  string
 		target *recoveryboot.Ingredient
-	}{{*kernel, &request.Kernel}, {*stub, &request.Stub}, {*busybox, &request.Busybox}, {*agent, &request.Agent}, {*config, &request.Config}, {*cert, &request.Certificate}} {
+	}{{*kernel, &request.Kernel}, {*stub, &request.Stub}, {*agent, &request.Agent}, {*config, &request.Config}, {*cert, &request.Certificate}} {
 		parsed, err := ingredient(input.value)
 		if err != nil {
 			return err

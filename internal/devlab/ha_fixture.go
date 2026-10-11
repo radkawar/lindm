@@ -138,7 +138,8 @@ func (f *AuthorityFixture) FreezeHAInstance(name string) error {
 	if instance.process == nil {
 		return errors.New("HA instance is not running")
 	}
-	return instance.process.Process.Signal(syscall.SIGSTOP)
+	instance.process.Signal(syscall.SIGSTOP)
+	return nil
 }
 
 // KillHAInstance crashes one replica with SIGKILL: no drain, no unlock.

@@ -20,7 +20,7 @@ message VendorImageReceipt {
   option (buf.validate.message).cel = {
     id: "vendor_receipt.filename"
     message: "filename must identify the exact RHEL minor and architecture"
-    expression: "this.image_filename == 'rhel-' + this.version + '-' + this.architecture + '-kvm.qcow2'"
+    expression: "this.image_filename in ['rhel-' + this.version + '-' + this.architecture + '-kvm.qcow2', 'rhel-' + this.version + '-' + this.architecture + '-dvd.iso']"
   };
   option (buf.validate.message).cel = {
     id: "vendor_receipt.catalog"
@@ -29,7 +29,7 @@ message VendorImageReceipt {
   };
   string image_filename = 1 [(buf.validate.field).string = {
     max_len: 255
-    pattern: "^rhel-(9|10)\\.[0-9]+-(x86_64|aarch64)-kvm\\.qcow2$"
+    pattern: "^rhel-(9|10)\\.[0-9]+-(x86_64|aarch64)-(kvm\\.qcow2|dvd\\.iso)$"
   }];
   string sha256 = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
   uint64 image_size_bytes = 3 [(buf.validate.field).uint64 = {

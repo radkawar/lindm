@@ -78,7 +78,7 @@ func measureBuildSizes(request BuildRequest, initrd, image string, signedSize in
 	if len(request.Files) > 1024 {
 		return nil, errors.New("recoveryboot: size_evidence_too_many_ingredients")
 	}
-	evidence := &SizeEvidence{Version: 1, Compression: "gzip", SignedImageBytes: signedSize}
+	evidence := &SizeEvidence{Version: 2, Compression: "gzip", SignedImageBytes: signedSize}
 	var err error
 	evidence.Kernel, err = componentSize(request.Kernel, "kernel", "kernel")
 	if err != nil {
@@ -104,8 +104,7 @@ func measureBuildSizes(request BuildRequest, initrd, image string, signedSize in
 		name  string
 		kind  string
 	}{
-		{request.Busybox, "bin/busybox", "busybox"},
-		{request.Agent, "usr/bin/lindm-agent", "agent"},
+		{request.Agent, "init", "agent"},
 		{request.Config, "etc/lindm/recovery.json", "configuration"},
 		{request.Certificate, "etc/lindm/image-signing.pem", "certificate"},
 	} {
@@ -122,10 +121,9 @@ func measureBuildSizes(request BuildRequest, initrd, image string, signedSize in
 		}
 		evidence.Ingredients = append(evidence.Ingredients, component)
 	}
-	for _, script := range []struct{ name, data string }{{"init", recoveryInitScript(request)}, {"etc/lindm/udhcpc", dhcpScript}} {
-		digest := sha256.Sum256([]byte(script.data))
-		evidence.Ingredients = append(evidence.Ingredients, ComponentSize{Name: script.name, Kind: "init_script", Bytes: int64(len(script.data)), SHA256: hex.EncodeToString(digest[:])})
-	}
+	params := initParamsFor(request).render()
+	digest := sha256.Sum256([]byte(params))
+	evidence.Ingredients = append(evidence.Ingredients, ComponentSize{Name: initParamsPath, Kind: "init_parameters", Bytes: int64(len(params)), SHA256: hex.EncodeToString(digest[:])})
 	sort.Slice(evidence.Ingredients, func(i, j int) bool { return evidence.Ingredients[i].Name < evidence.Ingredients[j].Name })
 	for _, component := range evidence.Ingredients {
 		evidence.InitramfsPayloadBytes += component.Bytes

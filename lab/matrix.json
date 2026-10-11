@@ -1,0 +1,105 @@
+{
+  "cells": [
+    {
+      "name": "inventory",
+      "title": "Inventory",
+      "capabilities": ["inventory"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "inspect"
+    },
+    {
+      "name": "lifecycle",
+      "title": "Lifecycle",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "lifecycle",
+      "args": ["-local-authority"]
+    },
+    {
+      "name": "dispatch",
+      "title": "Dispatch",
+      "capabilities": ["dispatch"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "dispatch",
+      "args": ["-local-authority"]
+    },
+    {
+      "name": "resources",
+      "title": "Resources",
+      "capabilities": ["packages", "accounts", "sysctl", "definitions", "password", "firewall"],
+      "capabilityKinds": true,
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "resources",
+      "args": ["-local-authority", "-kinds=files"]
+    },
+    {
+      "name": "encrypted",
+      "title": "Encryption",
+      "capabilities": ["encryption"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "encrypted"
+    },
+    {
+      "name": "device-actions",
+      "title": "Wipe/loss/lock",
+      "capabilities": ["wipe", "report-loss", "lock"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "device-actions",
+      "args": ["-scenario=wipe"]
+    },
+    {
+      "name": "recovery-sanitize",
+      "title": "Recovery sanitize",
+      "capabilities": ["recovery-sanitize"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "device-actions",
+      "args": ["-scenario=wipe", "-wipe-phase=recovery-nvme"]
+    },
+    {
+      "name": "self-update",
+      "title": "Self-update",
+      "capabilities": ["self-update"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "updates"
+    },
+    {
+      "name": "assistance",
+      "title": "Assistance",
+      "capabilities": ["assistance"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "assistance"
+    },
+    {
+      "name": "advisories",
+      "title": "Advisories",
+      "capabilities": ["advisories"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "noLane": "server-side feed matching has no maintained lab lane"
+    },
+    {
+      "name": "os-update",
+      "title": "OS update",
+      "capabilities": ["os-update"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "resources",
+      "args": ["-phase=connected", "-kinds=os-update", "-allow-network", "-local-authority"]
+    },
+    {
+      "name": "release-upgrade",
+      "title": "Release upgrade",
+      "capabilities": ["release-upgrade"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "noLane": "release-upgrade lane not landed"
+    }
+  ],
+  "architectureArgs": {
+    "aarch64": {
+      "args": [
+        "-firmware-code=/usr/share/AAVMF/AAVMF_CODE.secboot.fd",
+        "-firmware-vars=/usr/share/AAVMF/AAVMF_VARS.fd",
+        "-firmware-package=qemu-efi-aarch64",
+        "-firmware-version=2024.02-2ubuntu0.10"
+      ]
+    }
+  }
+}

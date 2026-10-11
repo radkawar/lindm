@@ -23,28 +23,28 @@ func TestRecoveryHelpersFollowQualifiedOperations(t *testing.T) {
 		{
 			name:   "SATA overwrite",
 			target: &agentv1.QualifiedActionTarget{AllowOverwrite: true},
-			want:   []string{"usr/bin/sbverify", "usr/bin/lsblk"},
+			want:   []string{"usr/bin/lsblk"},
 		},
 		{
 			name:   "NVMe format",
 			target: &agentv1.QualifiedActionTarget{NativeSanitizeMethods: []agentv1.SanitizeMethod{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA}},
-			want:   []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/nvme"},
+			want:   []string{"usr/bin/lsblk", "usr/sbin/nvme"},
 		},
 		{
 			name:   "LUKS observation",
 			target: &agentv1.QualifiedActionTarget{Target: &agentv1.StorageTarget{IdentityBasis: agentv1.StorageIdentityBasis_STORAGE_IDENTITY_BASIS_WWN_SERIAL, LuksUuid: "12345678-1234-1234-1234-123456789abc", Wwn: "fixture-wwn", Serial: "fixture-serial", SizeBytes: 1 << 30}},
-			want:   []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/cryptsetup"},
+			want:   []string{"usr/bin/lsblk", "usr/sbin/cryptsetup"},
 		},
 		{
 			name:   "offline crypto erase",
 			target: &agentv1.QualifiedActionTarget{AllowCryptoErase: true},
-			want:   []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/cryptsetup"},
+			want:   []string{"usr/bin/lsblk", "usr/sbin/cryptsetup"},
 		},
 		{
 			name:     "live root mapping observation",
 			target:   &agentv1.QualifiedActionTarget{AllowCryptoErase: true},
 			liveRoot: true,
-			want:     []string{"usr/bin/sbverify", "usr/bin/lsblk", "usr/sbin/cryptsetup", "usr/sbin/dmsetup"},
+			want:     []string{"usr/bin/lsblk", "usr/sbin/cryptsetup", "usr/sbin/dmsetup"},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestBuildClosureRequiresConfiguredMethodBeforeELFValidation(t *testing.T) {
 	config := fixtureIngredient(t, t.TempDir(), "recovery.json", data)
 	// These are ingredient declarations, not fake native executables. The build
 	// must reject the absent method helper before inspecting any ELF payload.
-	files := []Ingredient{{Destination: "usr/bin/sbverify", Executable: true}, {Destination: "usr/bin/lsblk", Executable: true}}
+	files := []Ingredient{{Destination: "usr/bin/lsblk", Executable: true}}
 	if err := validateBuildClosure(config, files); err == nil || !strings.Contains(err.Error(), "required_native_helper_missing: usr/sbin/nvme") {
 		t.Fatalf("NVMe qualification accepted without its native helper: %v", err)
 	}
@@ -121,14 +121,13 @@ func TestELFClosureRequiresExecutableInterpreter(t *testing.T) {
 	helper := ingredient("helper", "/lib64/ld-test.so")
 	loader := ingredient("loader", "")
 	files := []Ingredient{
-		{Source: helper.Source, Destination: "usr/bin/sbverify", Executable: true},
 		{Source: helper.Source, Destination: "usr/bin/lsblk", Executable: true},
 		{Source: loader.Source, Destination: "lib64/ld-test.so"},
 	}
 	if err := validateClosure(files); err == nil || !strings.Contains(err.Error(), "non_executable_elf_interpreter: /lib64/ld-test.so") {
 		t.Fatalf("non-executable loader admitted: %v", err)
 	}
-	files[2].Executable = true
+	files[1].Executable = true
 	if err := validateClosure(files); err != nil {
 		t.Fatalf("complete executable interpreter rejected: %v", err)
 	}

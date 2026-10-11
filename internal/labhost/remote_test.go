@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	labv1 "lindm/gen/lindm/lab/v1"
 )
 
 func TestReturnedEvidenceDoesNotOverwriteExistingRecord(t *testing.T) {
@@ -39,6 +42,37 @@ func TestReturnedEvidenceDoesNotOverwriteExistingRecord(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0600 {
 		t.Fatalf("evidence mode = %v", info.Mode())
+	}
+}
+
+// The dgx20 Ubuntu 26.04 inspect record named the cleaned remote run path
+// (/home/r/lindm-lab/runs/run-…/records/inventory-record) as its
+// InventoryRecordPath although the file had been copied to the requested
+// local path. Returned records must name the local copies.
+func TestReturnedRecordNamesLocalOutputCopies(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "returned-record.json")
+	remote := "/home/r/lindm-lab/runs/run-x/records/inventory-record"
+	if err := os.WriteFile(path, []byte(`{"InventoryRecordPath":"`+remote+`","InventoryRecordSHA256":"ab","ImageID":"/home/r/lindm-lab/runs/run-x/records/other","MatchedPackages":675}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	host := &labv1.LabHost{Name: "dgx20", Transport: "ssh", SshAlias: "dgx20"}
+	if err := annotateRemoteRecord(path, host, time.Unix(0, 0), time.Unix(1, 0), "rev", "diff", map[string]string{remote: "/local/inventory.json"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		InventoryRecordPath, InventoryRecordSHA256, ImageID string
+		MatchedPackages                                     int
+		LabHost                                             map[string]any `json:"lab_host"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+	if record.InventoryRecordPath != "/local/inventory.json" || record.InventoryRecordSHA256 != "ab" || record.ImageID != "/home/r/lindm-lab/runs/run-x/records/other" || record.MatchedPackages != 675 || record.LabHost["name"] != "dgx20" {
+		t.Fatalf("returned record = %s", data)
 	}
 }
 

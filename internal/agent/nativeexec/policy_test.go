@@ -15,7 +15,12 @@ import (
 // nativeexec, each with the reason it cannot use the shared policy. Test files
 // are excluded wholesale: they re-exec the test binary into namespaces or under
 // other credentials, which nativeexec deliberately cannot express.
-var spawnAllowlist = map[string]string{}
+var spawnAllowlist = map[string]string{
+	// As recovery-image PID 1 it starts its own signed /init (outside /usr) as
+	// recovery-run with the inherited console descriptors, and must reap every
+	// child with Wait4(-1); nativeexec's process-group runner cannot do either.
+	"recoveryboot/init_system_linux.go": "recovery PID 1 starts /init and reaps all children",
+}
 
 // spawners are the process-creation entry points nativeexec wraps, plus
 // exec.ExitError, which can never match a nativeexec result (*ExitError).

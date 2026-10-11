@@ -13,7 +13,7 @@ import (
 func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm updates", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "verified Ubuntu24 amd64 or Fedora44 x86_64 manifest")
+	manifestPath := flags.String("manifest", "", "verified Ubuntu24 amd64, Fedora44 x86_64 or RHEL 9.8/10.2 x86_64 manifest")
 	repository := flags.String("repo", ".", "checkout containing the existing development fixture")
 	buildRepository := flags.String("build-repo", "", "source checkout with built embedded console; default is -repo")
 	cache := flags.String("cache", ".cache/lab/images", "verified image cache")

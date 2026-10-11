@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="760" viewBox="0 0 1040 760" role="img" aria-labelledby="title desc">
+  <title id="title">DRAFT: Evidence fork, choose an observation before repairing a Linux service</title>
+  <desc id="desc">Illustrative, non-interactive concept. One workstation, studio-17, has an old service report and no fresh inventory. The operator compares a changed service against stopped reporting without claiming either explanation is true. Both branches identify evidence needed to distinguish them. The selected next action requests one inventory refresh, not a restart or policy change. Acceptance does not resolve the question; a new relevant report is required. Missing, collection-error and ambiguous-action outcomes remain unresolved. Saving questions and linking evidence are proposed backend work.</desc>
+  <rect width="1040" height="760" fill="#f6f7f9"/>
+  <g font-family="IBM Plex Sans, sans-serif" fill="#17212b">
+    <text x="32" y="32" font-size="12" fill="#596674">LINDM / CONCEPT 01 / DRAFT OWNER SELECTION / ILLUSTRATIVE DATA</text>
+    <text x="32" y="72" font-size="24">What would tell us whether to intervene?</text>
+    <text x="32" y="101" font-size="14">studio-17 · One unresolved question · No repair requested</text>
+    <rect x="32" y="123" width="976" height="72" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="149" font-size="16">Is the printing service still stopped?</text>
+    <text x="48" y="176" font-size="14">Last service report: stopped, yesterday 16:20. Current state: unknown.</text>
+    <path d="M520 195 V218 H270 V241 M520 218 H766 V241" fill="none" stroke="#667381" stroke-width="2"/>
+    <rect x="32" y="241" width="472" height="177" fill="#ffffff" stroke="#bcc5ce"/>
+    <rect x="536" y="241" width="472" height="177" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="269" font-size="16">Possibility A: the service is still stopped</text>
+    <text x="48" y="298" font-size="14">Would support it</text>
+    <text x="48" y="321" font-size="14">A fresh service observation still reports stopped.</text>
+    <text x="48" y="352" font-size="14">Would not establish it</text>
+    <text x="48" y="375" font-size="14">A missing report or an accepted refresh request.</text>
+    <text x="48" y="402" font-size="12" fill="#596674">Operator-authored question, not an automatic diagnosis</text>
+    <text x="552" y="269" font-size="16">Possibility B: our evidence stopped arriving</text>
+    <text x="552" y="298" font-size="14">Would support it</text>
+    <text x="552" y="321" font-size="14">Fresh inventory arrives but service evidence does not.</text>
+    <text x="552" y="352" font-size="14">Still uncertain</text>
+    <text x="552" y="375" font-size="14">A collection error does not prove a transport fault.</text>
+    <text x="552" y="402" font-size="12" fill="#596674">Both explanations may be incomplete</text>
+    <text x="32" y="452" font-size="16">Choose the next observation</text>
+    <rect x="32" y="466" width="976" height="58" fill="#edf3ff" stroke="#2455a6" stroke-width="2"/>
+    <circle cx="55" cy="495" r="8" fill="#ffffff" stroke="#2455a6"/>
+    <circle cx="55" cy="495" r="4" fill="#2455a6"/>
+    <text x="76" y="490" font-size="14">Refresh inventory for studio-17</text>
+    <text x="76" y="511" font-size="12" fill="#43576f">Existing action. Requests collection only; does not restart printing or change policy.</text>
+    <rect x="32" y="540" width="976" height="84" fill="#fff4d6" stroke="#9b701b"/>
+    <text x="48" y="566" font-size="16">Unknown stays unknown until relevant evidence arrives</text>
+    <text x="48" y="590" font-size="14">If accepted: wait for the new report. If collection fails: show the reported error.</text>
+    <text x="48" y="611" font-size="14">If submission is ambiguous: recover the same request, do not issue a second refresh.</text>
+    <rect x="32" y="643" width="252" height="42" fill="#2455a6"/>
+    <text x="48" y="669" font-size="14" fill="#ffffff">Review one inventory request</text>
+    <text x="304" y="669" font-size="14">Leave question unresolved</text>
+    <path d="M32 708 H1008" stroke="#bcc5ce"/>
+    <text x="32" y="732" font-size="12" fill="#596674">PROPOSED: saved questions + evidence links. Static sketch: controls are not interactive.</text>
+  </g>
+</svg>

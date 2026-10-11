@@ -95,13 +95,13 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		clean = append(clean, args[i])
 	}
 	held := vmHolds(clean)
-	if !held {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 3*time.Hour)
-		defer cancel()
-	}
 	manifestPath := labhost.FlagValue(clean, "manifest")
 	if manifestPath == "" {
+		if timing := laneTiming(held); timing.Lane > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timing.Lane)
+			defer cancel()
+		}
 		return runUnscheduled(ctx, clean, stdout, stderr)
 	}
 	manifest, err := vmlab.LoadManifest(manifestPath)
@@ -197,12 +197,25 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		clean = labhost.SetFlag(clean, workFlag, work)
 	}
-	leases, err := slots.AcquireN(ctx, vmGuestCount(clean[1], clean))
-	if err != nil {
-		return err
+	return slots.RunAdmitted(ctx, vmGuestCount(clean[1], clean), laneTiming(held), laneWaitReporter(stderr, chosen.Name), func(ctx context.Context) error {
+		return runUnscheduled(ctx, clean, stdout, stderr)
+	})
+}
+
+// laneTiming queues a lane for at most 12h and then gives it its full 3h; a
+// held assistance lane keeps its lease until interrupted.
+func laneTiming(held bool) labhost.LaneTiming {
+	timing := labhost.LaneTiming{Admission: 12 * time.Hour, Lane: 3 * time.Hour}
+	if held {
+		timing.Lane = 0
 	}
-	defer func() { err = errors.Join(err, closeLaneLeases(leases)) }()
-	return runUnscheduled(ctx, clean, stdout, stderr)
+	return timing
+}
+
+func laneWaitReporter(stderr io.Writer, host string) func(string) {
+	return func(reason string) {
+		_, _ = fmt.Fprintf(stderr, "lab host %s: waiting for admission: %s\n", host, reason)
+	}
 }
 
 // vmHolds reports a hands-on assistance lane that keeps its native host lease
@@ -269,14 +282,6 @@ func vmGuestCount(lane string, args []string) uint32 {
 	return 1
 }
 
-func closeLaneLeases(leases []*labhost.Lease) error {
-	var err error
-	for _, lease := range leases {
-		err = errors.Join(err, lease.Close())
-	}
-	return err
-}
-
 // runHostExec is the staged binary's internal entrypoint. It takes the remote
 // flock itself and watches the SSH stdin lifetime, so disconnect does not free a
 // slot while a detached VM continues running. QEMU helpers also use Pdeathsig.
@@ -293,11 +298,6 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	if !vmHolds(args[1:]) {
-		var deadlineCancel context.CancelFunc
-		ctx, deadlineCancel = context.WithTimeout(ctx, 3*time.Hour)
-		defer deadlineCancel()
-	}
 	// Reopen as a pollable descriptor: closing a plain blocking inherited stdin
 	// does not necessarily interrupt a concurrent read in the operating system.
 	lifetime, err := os.OpenFile("/proc/self/fd/0", os.O_RDONLY|syscall.O_NONBLOCK, 0)
@@ -311,14 +311,20 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 	if err != nil {
 		return err
 	}
-	leases, err := slots.AcquireN(ctx, vmGuestCount(args[2], args))
+	return slots.RunAdmitted(ctx, vmGuestCount(args[2], args), laneTiming(vmHolds(args[1:])), laneWaitReporter(stderr, cfg.Hosts[0].Name), func(ctx context.Context) error {
+		return runAdmittedHostExec(ctx, args, stdout, stderr, cfg.Hosts[0])
+	})
+}
+
+func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.Writer, host *labv1.LabHost) (err error) {
+	lane := args[2]
+	work, err := labhost.ResolveWorkDirectory(host)
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, closeLaneLeases(leases)) }()
-	lane := args[2]
-	work, err := labhost.ResolveWorkDirectory(cfg.Hosts[0])
-	if err != nil {
+	// Ubuntu installs /boot kernels root-only; header oracles use the
+	// baseline's private packaged copy of the running kernel instead.
+	if err := labhost.ExportSuperminEnvironment(work); err != nil {
 		return err
 	}
 	persistentCache := filepath.Join(work, "images")

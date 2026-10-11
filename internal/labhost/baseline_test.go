@@ -2,7 +2,9 @@ package labhost
 
 import (
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -44,6 +46,65 @@ func TestBaselineExactInstalledState(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := baselinePackagesReady(map[string]BaselinePackage{"qemu-utils": tc.state}, pins); got != tc.ready {
 				t.Fatalf("ready = %t, want %t", got, tc.ready)
+			}
+		})
+	}
+}
+
+func TestBaselineDerivesUkifyFromInstalledSystemd(t *testing.T) {
+	static := []string{"sbsigntool=0.9.4-3.1ubuntu7"}
+	got, err := baselineDerivedPins(map[string]BaselinePackage{"systemd": {Status: "installed", Version: "255.4-1ubuntu8.12"}}, static)
+	if err != nil || !reflect.DeepEqual(got, []string{"systemd-ukify=255.4-1ubuntu8.12"}) {
+		t.Fatalf("derived pins = %v, %v", got, err)
+	}
+	for name, packages := range map[string]map[string]BaselinePackage{
+		"absent":     {},
+		"unpacked":   {"systemd": {Status: "unpacked", Version: "255.4-1ubuntu8.12"}},
+		"no version": {"systemd": {Status: "installed"}},
+		"injection":  {"systemd": {Status: "installed", Version: "255 systemd=1"}},
+	} {
+		if _, err := baselineDerivedPins(packages, static); err == nil {
+			t.Errorf("%s: derived a pin without an exact installed systemd version", name)
+		}
+	}
+	if _, err := baselineDerivedPins(map[string]BaselinePackage{"systemd": {Status: "installed", Version: "255.4-1ubuntu8.12"}}, append(static, "systemd-ukify=255.4-1ubuntu8.17")); err == nil {
+		t.Fatal("accepted a static systemd-ukify pin that can diverge from installed systemd")
+	}
+}
+
+// The archive serves only newer systemd-ukify than the installed systemd.
+// apt-cache show exits zero for that unknown version; the transaction must
+// still refuse before privilege escalation instead of installing a substitute.
+func TestBaselineInstallRefusesPinAbsentFromArchive(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pin     string
+		install bool
+	}{
+		{"retired", "systemd-ukify=255.4-1ubuntu8.12", false},
+		{"available", "systemd-ukify=255.4-1ubuntu8.17", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bin := t.TempDir()
+			marker := filepath.Join(t.TempDir(), "sudo-invoked")
+			for name, body := range map[string]string{
+				"dpkg-query": "exit 1\n",
+				"apt-cache":  "printf 'Package: systemd-ukify\\nVersion: 255.4-1ubuntu8.17\\n\\n'\n",
+				"sudo":       "touch " + baselineQuote(marker) + "\n",
+			} {
+				if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/bash\n"+body), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("bash", "--noprofile", "--norc", "-s")
+			cmd.Stdin = strings.NewReader("set -euo pipefail\nexport PATH=" + baselineQuote(bin+":/usr/bin:/bin") + "\n" + baselineInstall([]string{tc.pin}))
+			output, err := cmd.CombinedOutput()
+			_, statErr := os.Stat(marker)
+			if installed := statErr == nil; installed != tc.install || (err == nil) != tc.install {
+				t.Fatalf("install invoked = %t, exit error = %v, want install %t: %s", installed, err, tc.install, output)
+			}
+			if !tc.install && !strings.Contains(string(output), "not available from the configured official archive") {
+				t.Fatalf("refusal lacks an actionable diagnostic: %s", output)
 			}
 		})
 	}

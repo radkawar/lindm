@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const loadPostgresDiskBytes int64 = 128 << 30
@@ -43,13 +45,14 @@ func loadStorageCommand(ctx context.Context, privileged bool, program string, ar
 		args = append([]string{"-n", "--", program}, args...)
 		name = "sudo"
 	}
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.WaitDelay = 5 * time.Second
-	output, err := cmd.Output()
-	if err != nil {
+	output := nativeexec.NewBuffer(1 << 20)
+	if err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Stdout: output}); err != nil {
 		return nil, fmt.Errorf("dedicated loop/XFS storage requires working %s%s", map[bool]string{true: "noninteractive root access to ", false: ""}[privileged], program)
 	}
-	return output, nil
+	if output.Truncated() {
+		return nil, fmt.Errorf("dedicated loop/XFS storage %s output exceeds 1 MiB", program)
+	}
+	return output.Bytes(), nil
 }
 
 func loadFindMount(ctx context.Context, selector, path string) (loadMount, error) {

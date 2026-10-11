@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="800" viewBox="0 0 1040 800" role="img" aria-labelledby="title desc">
+  <title id="title">DRAFT: Restart seat exchange, negotiate disruption inside a fixed maintenance budget</title>
+  <desc id="desc">Illustrative, non-interactive concept. A desktop window permits two unavailable workstations. Studio-17 and studio-18 occupy its two proposed restart seats. Studio-17 has requested a later turn, and studio-22 is a candidate replacement whose employee preference is still pending. The operator previews swapping those two devices without adding a seat or issuing a reboot. A separate server pool is blocked because drain evidence for build-02 is unknown. The proposed next action asks for the desktop preference; this neither reserves a seat nor authorizes a restart. A final exchange would require atomic server revalidation, eligibility, current inhibitors, and applicable approval. Restart interrupts applications and cannot undo unsaved work. Seat records, employee negotiation and atomic exchange are proposed backend work.</desc>
+  <rect width="1040" height="800" fill="#f6f7f9"/>
+  <g font-family="IBM Plex Sans, sans-serif" fill="#17212b">
+    <text x="32" y="32" font-size="12" fill="#596674">LINDM / CONCEPT 04 / DRAFT OWNER SELECTION / ILLUSTRATIVE DATA</text>
+    <text x="32" y="72" font-size="24">Trade a restart turn, not a larger outage</text>
+    <text x="32" y="101" font-size="14">Desktop maintenance · 12 Oct, 18:00–19:00 Europe/London · Two unavailable at most</text>
+    <text x="32" y="140" font-size="16">Current proposed seats</text>
+    <rect x="32" y="158" width="976" height="65" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="184" font-size="12" fill="#596674">SEAT 1</text>
+    <text x="133" y="184" font-size="16">studio-17</text>
+    <text x="348" y="184" font-size="14">Employee requested a later turn</text>
+    <text x="348" y="207" font-size="12" fill="#596674">Request is a preference, not an approved deferral or permission to miss the deadline</text>
+    <rect x="32" y="223" width="976" height="55" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="255" font-size="12" fill="#596674">SEAT 2</text>
+    <text x="133" y="255" font-size="16">studio-18</text>
+    <text x="348" y="255" font-size="14">Unchanged by this proposal</text>
+    <text x="32" y="318" font-size="16">One-for-one exchange proposal</text>
+    <rect x="32" y="336" width="398" height="106" fill="#ffffff" stroke="#bcc5ce"/>
+    <rect x="610" y="336" width="398" height="106" fill="#edf3ff" stroke="#2455a6"/>
+    <text x="48" y="365" font-size="16">studio-17 leaves seat 1</text>
+    <text x="48" y="391" font-size="14">Later turn: not yet reserved</text>
+    <text x="48" y="419" font-size="12" fill="#596674">Keep current turn until a valid exchange is accepted</text>
+    <text x="626" y="365" font-size="16">studio-22 could take seat 1</text>
+    <text x="626" y="391" font-size="14">Employee preference: pending</text>
+    <text x="626" y="419" font-size="12" fill="#43576f">Eligibility and inhibitors must be checked again</text>
+    <path d="M446 373 H594 M586 366 L594 373 L586 380 M594 400 H446 M454 393 L446 400 L454 407" stroke="#667381" stroke-width="2" fill="none"/>
+    <text x="466" y="433" font-size="12" fill="#596674">No extra seat</text>
+    <rect x="32" y="466" width="976" height="83" fill="#fff4d6" stroke="#9b701b"/>
+    <text x="48" y="491" font-size="16">Server pool is separate: build-02 is blocked</text>
+    <text x="48" y="516" font-size="14">Drain evidence: unknown. Health evidence must be current before a server seat can be used.</text>
+    <text x="48" y="537" font-size="12" fill="#644b13">An employee preference or a free desktop seat never satisfies a server's availability prerequisites.</text>
+    <text x="32" y="584" font-size="16">Next: ask for a preference, not permission to reboot</text>
+    <text x="32" y="611" font-size="14">Request studio-22's employee preference. This changes no reservation and sends no restart.</text>
+    <text x="32" y="636" font-size="14">A final exchange must revalidate both devices, the later turn, deadlines and the capacity budget.</text>
+    <text x="32" y="661" font-size="14">Any later restart interrupts applications; unsaved work cannot be restored by cancelling afterward.</text>
+    <rect x="32" y="680" width="286" height="42" fill="#2455a6"/>
+    <text x="48" y="706" font-size="14" fill="#ffffff">Request studio-22's time preference</text>
+    <text x="339" y="706" font-size="14">Keep both current turns</text>
+    <text x="32" y="748" font-size="12" fill="#596674">Existing policy fields are constraints, not a reservation API. Required authorization and approval remain in force.</text>
+    <text x="32" y="776" font-size="12" fill="#596674">PROPOSED: expiring seats + employee negotiation + atomic exchange. Static sketch, no controls are operable.</text>
+  </g>
+</svg>

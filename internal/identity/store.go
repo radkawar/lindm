@@ -161,6 +161,80 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 	if !observationNewer(obs.AcquiredAt, row.DirectoryObservedAt) {
 		return directorySnapshot{}, errStaleObservation
 	}
+	_, prevDeactivated := timeFrom(row.DeactivatedAt)
+	w := s.planObservation(row, existing, missing, obs)
+
+	observedStamp := pgStamp(w.observedAt, w.observed && !w.conflict)
+	deactivatedStamp := pgStamp(w.deactivatedAt, w.deactivated)
+	if err := q.UpdatePrincipalAuthState(ctx, identitydb.UpdatePrincipalAuthStateParams{
+		DisplayName:         w.display,
+		DirectoryEnabled:    w.enabled,
+		DirectoryObservedAt: observedStamp,
+		DeactivatedAt:       deactivatedStamp,
+		DeactivationSource:  w.source,
+		ID:                  row.ID,
+	}); err != nil {
+		return directorySnapshot{}, s.dbErr(err)
+	}
+	if w.conflict {
+		// Losing qualification clears freshness, not ordering: an older in-flight
+		// authoritative read must not restore grants after this denial.
+		if err := q.AdvancePrincipalObservationFence(ctx, identitydb.AdvancePrincipalObservationFenceParams{ID: row.ID, ObservedAt: pgStamp(obs.AcquiredAt, true)}); err != nil {
+			return directorySnapshot{}, s.dbErr(err)
+		}
+	}
+	if err := s.persistLineage(ctx, q, row.ID, missing, existing, w); err != nil {
+		return directorySnapshot{}, err
+	}
+	qualified := w.observed && !w.conflict && s.qualifiedLineage(row.Issuer, row.Subject, w.connector, w.upstreamProvider, w.upstreamSubject, w.brokerIssuer, w.brokerSubject)
+	granted := w.enabled && !w.deactivated && qualified
+	if !granted {
+		w.groups = nil
+	}
+	if err := s.replacePrincipalGroups(ctx, q, row.ID, w.groups); err != nil {
+		return directorySnapshot{}, err
+	}
+	nextRole := ""
+	if granted {
+		nextRole = effectiveRole(row.PinnedRole, w.groups, s.policy)
+	}
+	var bindings []*authv1.RoleBinding
+	if nextRole != "" {
+		bindings = s.policy.bindings(row.PinnedRole, w.groups)
+	}
+	digest, err := bindingsDigest(bindings)
+	if err != nil {
+		return directorySnapshot{}, err
+	}
+	authorizationVersion, err := s.persistAuthorization(ctx, q, row, nextRole, digest)
+	if err != nil {
+		return directorySnapshot{}, err
+	}
+	if err := s.revokeAndAudit(ctx, q, row.ID, w, prevDeactivated); err != nil {
+		return directorySnapshot{}, err
+	}
+	return directorySnapshot{
+		PrincipalID:          row.ID,
+		Issuer:               row.Issuer,
+		Subject:              row.Subject,
+		DisplayName:          w.display,
+		PinnedRole:           row.PinnedRole,
+		Enabled:              w.enabled && !w.conflict,
+		Deactivated:          w.deactivated,
+		DeactivationSource:   w.source,
+		Observed:             w.observed,
+		ObservedAt:           w.observedAt,
+		Qualified:            qualified,
+		Groups:               w.groups,
+		AuthorizationVersion: authorizationVersion,
+		AuthorizationRole:    nextRole,
+		ServiceAccount:       row.ServiceAccount,
+	}, nil
+}
+
+// planObservation decides the principal's next directory state, lineage,
+// session revocation and audit from a fresh observation. It writes nothing.
+func (s *Service) planObservation(row identitydb.Principal, existing identitydb.PrincipalLineage, missing bool, obs directoryObservation) authWrite {
 	prevAt, prevDeactivated := timeFrom(row.DeactivatedAt)
 	display := row.DisplayName
 	if obs.Found && obs.DisplayName != "" {
@@ -225,102 +299,78 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 			w.auditReason = reasonDisabled
 		}
 	default:
-		if row.Issuer != s.issuer || row.Subject != obs.UserID || (!missing && s.lineageConflict(existing, s.issuer, obs.UserID)) {
-			w.conflict = true
-			w.enabled = false
-			w.observed = true
-			w.observedAt = obs.AcquiredAt
-			w.revoke = true
-			w.auditAction = auditLineageDenied
-			w.auditReason = reasonConflict
-			break
-		}
-		if s.broker == nil {
-			w.connector = s.connector()
-			w.upstreamProvider = row.Issuer
-			w.upstreamSubject = row.Subject
-		}
+		s.planEnabledObservation(&w, row, existing, missing, obs, prevDeactivated)
+	}
+	return w
+}
+
+// planEnabledObservation handles a direct, enabled observation of the principal's
+// own subject: a lineage conflict or SCIM tombstone still denies it; otherwise it
+// (re)activates with the observed groups.
+func (s *Service) planEnabledObservation(w *authWrite, row identitydb.Principal, existing identitydb.PrincipalLineage, missing bool, obs directoryObservation, prevDeactivated bool) {
+	if row.Issuer != s.issuer || row.Subject != obs.UserID || (!missing && s.lineageConflict(existing, s.issuer, obs.UserID)) {
+		w.conflict = true
+		w.enabled = false
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
-		if row.DeactivationSource == deactivationSCIM {
-			w.enabled = true
-			w.deactivated = true
-			w.source = deactivationSCIM
-			w.revoke = true
-			w.auditAction = auditLineageDenied
-			w.auditReason = reasonTombstone
-			break
-		}
-		if prevDeactivated {
-			w.auditAction = auditReactivated
-			w.auditReason = reasonReactivated
-		}
+		w.revoke = true
+		w.auditAction = auditLineageDenied
+		w.auditReason = reasonConflict
+		return
+	}
+	if s.broker == nil {
+		w.connector = s.connector()
+		w.upstreamProvider = row.Issuer
+		w.upstreamSubject = row.Subject
+	}
+	w.observed = true
+	w.observedAt = obs.AcquiredAt
+	if row.DeactivationSource == deactivationSCIM {
 		w.enabled = true
-		w.deactivated = false
-		w.source = ""
-		w.deactivatedAt = time.Time{}
-		w.groups = obs.Groups
+		w.deactivated = true
+		w.source = deactivationSCIM
+		w.revoke = true
+		w.auditAction = auditLineageDenied
+		w.auditReason = reasonTombstone
+		return
 	}
+	if prevDeactivated {
+		w.auditAction = auditReactivated
+		w.auditReason = reasonReactivated
+	}
+	w.enabled = true
+	w.deactivated = false
+	w.source = ""
+	w.deactivatedAt = time.Time{}
+	w.groups = obs.Groups
+}
 
-	observedStamp := pgStamp(w.observedAt, w.observed && !w.conflict)
-	deactivatedStamp := pgStamp(w.deactivatedAt, w.deactivated)
-	if err := q.UpdatePrincipalAuthState(ctx, identitydb.UpdatePrincipalAuthStateParams{
-		DisplayName:         w.display,
-		DirectoryEnabled:    w.enabled,
-		DirectoryObservedAt: observedStamp,
-		DeactivatedAt:       deactivatedStamp,
-		DeactivationSource:  w.source,
-		ID:                  row.ID,
-	}); err != nil {
-		return directorySnapshot{}, s.dbErr(err)
+// replacePrincipalGroups replaces the stored directory groups with groups, which
+// is empty unless the observation grants access.
+func (s *Service) replacePrincipalGroups(ctx context.Context, q *identitydb.Queries, id uuid.UUID, groups []string) error {
+	if err := q.DeletePrincipalGroups(ctx, id); err != nil {
+		return s.dbErr(err)
 	}
-	if w.conflict {
-		// Losing qualification clears freshness, not ordering: an older in-flight
-		// authoritative read must not restore grants after this denial.
-		if err := q.AdvancePrincipalObservationFence(ctx, identitydb.AdvancePrincipalObservationFenceParams{ID: row.ID, ObservedAt: pgStamp(obs.AcquiredAt, true)}); err != nil {
-			return directorySnapshot{}, s.dbErr(err)
+	for _, g := range groups {
+		if err := q.InsertPrincipalGroup(ctx, identitydb.InsertPrincipalGroupParams{
+			PrincipalID: id,
+			GroupPath:   g,
+		}); err != nil {
+			return s.dbErr(err)
 		}
 	}
-	if err := s.persistLineage(ctx, q, row.ID, missing, existing, w); err != nil {
-		return directorySnapshot{}, err
-	}
-	if err := q.DeletePrincipalGroups(ctx, row.ID); err != nil {
-		return directorySnapshot{}, s.dbErr(err)
-	}
-	qualified := w.observed && !w.conflict && s.qualifiedLineage(row.Issuer, row.Subject, w.connector, w.upstreamProvider, w.upstreamSubject, w.brokerIssuer, w.brokerSubject)
-	if w.enabled && !w.deactivated && qualified {
-		for _, g := range w.groups {
-			if err := q.InsertPrincipalGroup(ctx, identitydb.InsertPrincipalGroupParams{
-				PrincipalID: row.ID,
-				GroupPath:   g,
-			}); err != nil {
-				return directorySnapshot{}, s.dbErr(err)
-			}
-		}
-	} else {
-		w.groups = nil
-	}
-	nextRole := ""
-	if w.enabled && !w.deactivated && qualified {
-		nextRole = effectiveRole(row.PinnedRole, w.groups, s.policy)
-	}
-	var bindings []*authv1.RoleBinding
-	if nextRole != "" {
-		bindings = s.policy.bindings(row.PinnedRole, w.groups)
-	}
-	digest, err := bindingsDigest(bindings)
-	if err != nil {
-		return directorySnapshot{}, err
-	}
-	authorizationVersion, err := s.persistAuthorization(ctx, q, row, nextRole, digest)
-	if err != nil {
-		return directorySnapshot{}, err
-	}
+	return nil
+}
+
+// revokeAndAudit revokes sessions when the plan requires it and records the
+// planned audit event; revocation alone is audited as a disable.
+func (s *Service) revokeAndAudit(ctx context.Context, q *identitydb.Queries, id uuid.UUID, w authWrite, prevDeactivated bool) error {
 	revoked := int64(0)
 	if w.revoke {
-		revoked, err = q.RevokePrincipalSessions(ctx, row.ID)
+		var err error
+		revoked, err = q.RevokePrincipalSessions(ctx, id)
 		if err != nil {
-			return directorySnapshot{}, s.dbErr(err)
+			return s.dbErr(err)
 		}
 	}
 	if w.auditAction == "" && revoked > 0 {
@@ -328,27 +378,9 @@ func (s *Service) writeObservation(ctx context.Context, q *identitydb.Queries, p
 		w.auditReason = reasonDisabled
 	}
 	if w.auditAction != "" && (w.auditAction != auditDisabled || !prevDeactivated || revoked > 0) {
-		if err := s.insertAudit(ctx, q, &row.ID, w.auditAction, principalResource(row.ID), w.auditReason); err != nil {
-			return directorySnapshot{}, err
-		}
+		return s.insertAudit(ctx, q, &id, w.auditAction, principalResource(id), w.auditReason)
 	}
-	return directorySnapshot{
-		PrincipalID:          row.ID,
-		Issuer:               row.Issuer,
-		Subject:              row.Subject,
-		DisplayName:          w.display,
-		PinnedRole:           row.PinnedRole,
-		Enabled:              w.enabled && !w.conflict,
-		Deactivated:          w.deactivated,
-		DeactivationSource:   w.source,
-		Observed:             w.observed,
-		ObservedAt:           w.observedAt,
-		Qualified:            qualified,
-		Groups:               w.groups,
-		AuthorizationVersion: authorizationVersion,
-		AuthorizationRole:    nextRole,
-		ServiceAccount:       row.ServiceAccount,
-	}, nil
+	return nil
 }
 
 func (s *Service) copyLineage(w *authWrite, existing identitydb.PrincipalLineage, missing bool, row identitydb.Principal) {

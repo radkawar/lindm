@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS                          | Ubuntu 26.04 LTS                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| lifecycle         | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| dispatch          | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| packages          | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| accounts          | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| sysctl            | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented                               | implemented                                                                                             |
-| password          | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| firewall          | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | gated: owned-boot recovery fixture not maintained for the 26.04 media                                   |
-| self-update       | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                             |
-| advisories        | implemented                                                                                             | implemented                               | implemented                                                                                             |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
-| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented | gated: release upgrade is not implemented                                                               |
+| Capability        | Ubuntu 22.04 LTS                                                                                        | Ubuntu 24.04 LTS                          | Ubuntu 26.04 LTS                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| lifecycle         | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| dispatch          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| packages          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| accounts          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| sysctl            | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented                               | implemented                                                                                                                                                    |
+| password          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| firewall          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | gated: stock 105 MiB cloud ESP: the owned-boot UKI (vendor kernel + dracut generic initrd) leaves 13,998,592 bytes; the signed recovery image needs 50,653,240 |
+| self-update       | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| advisories        | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                        |
+| release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented | gated: release upgrade is not implemented                                                                                                                      |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -521,6 +521,47 @@ remote guest screenshot response and clean teardown with credentials excluded
 from returned evidence. This is not a physical ARM desktop claim.
 Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays or
 multi-user seats.
+
+### Commercial assistance capability roadmap
+
+The [capability contract](../product-specification.md#remote-assistance-capabilities)
+defines each user story, consent, off/limited/on policy, per-role permission and
+audit. Ubuntu 24.04 GNOME 46 x86_64 Wayland is an initial target, not a completed
+capability suite. Clipboard uses Clipboard on the existing RemoteDesktop session;
+the frontend, GNOME backend and Mutter source versions must all support that path.
+No upgrade, private compositor API or X11 utility is substituted for a missing
+portal interface. Ubuntu 26.04 and ARM need separate capability evidence.
+
+[Pinned upstream inspection](../architecture.md#inspected-gnome-portal-sources)
+finds Clipboard v1 support in portal 1.18.4, portal-gnome 46.2 and upstream
+Mutter 46.0; GNOME 46 is not generically clipboard-unsupported. Request it before
+RemoteDesktop Start and require `clipboard_enabled=true`; GNOME presents a
+separate **Allow Clipboard Access** switch. The 46.2 backend forwards MIME types
+as `(as)` instead of the public `as` shape, requiring narrowly typed normalization
+after observing the distro wire behavior. Version checks alone miss this quirk.
+Some older FD/backend errors return success, so only independent nonce checks
+establish transfer success. Native tests must also record `libmutter-14-0` and
+`mutter-common` plus distro patch correspondence: prior GNOME Shell version
+evidence did not identify the installed Mutter build.
+
+Special keys/layouts use the RemoteDesktop keyboard grant; monitor selection
+requests multiple ScreenCast monitor sources on that same session and may choose
+only returned streams. Full screen/scaling change the browser display only.
+Messages use GNOME notifications for the bound user. File transfer is off by
+default, uses Downloads for accepted incoming files and local FileChooser for
+outgoing files; hashes, limits and per-file consent remain independent of control.
+Reconnect requires fresh consent after reboot/logout. Recording requires visible
+disclosure, separate permission, encrypted storage and retention.
+
+All added capabilities are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Required native evidence includes clipboard nonces in both directions where the
+portal supports them, special-key/layout guest effects, two-head virtio-gpu monitor
+and pointer checks, visible message/file notifications, transfer hashes, real
+reboot/logout re-consent and encrypted-recording retention. Elevation never bypasses
+polkit; annotation/audio need separate native grants. KDE/Kubuntu and X11 do not
+inherit GNOME evidence, and unattended implementation/KDE qualification await
+parent confirmation.
 
 ## Advisory feeds
 

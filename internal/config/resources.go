@@ -192,12 +192,22 @@ func (d *Document) Resolve() (*Resources, error) {
 	if err := d.authenticationSecrets(result); err != nil {
 		return nil, err
 	}
+	result.HTTPClient, err = d.outboundHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// outboundHTTPClient trusts the system roots plus trusted_ca_file, requires TLS
+// 1.3 and never follows redirects.
+func (d *Document) outboundHTTPClient() (*http.Client, error) {
 	roots, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, fmt.Errorf("load system trust roots: %w", err)
 	}
-	if cfg.GetTrustedCaFile() != "" {
-		pem, err := readFile(reference(base, cfg.GetTrustedCaFile()), false)
+	if d.Proto.GetTrustedCaFile() != "" {
+		pem, err := readFile(reference(d.base, d.Proto.GetTrustedCaFile()), false)
 		if err != nil {
 			return nil, fmt.Errorf("read trusted_ca_file: %w", err)
 		}
@@ -211,14 +221,13 @@ func (d *Document) Resolve() (*Resources, error) {
 	}
 	transport := defaultTransport.Clone()
 	transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}
-	result.HTTPClient = &http.Client{
+	return &http.Client{
 		Transport: transport,
 		Timeout:   10 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
-	}
-	return result, nil
+	}, nil
 }
 
 func (d *Document) authenticationSecrets(result *Resources) error {

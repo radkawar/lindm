@@ -41,6 +41,7 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		return b, ErrApprovalInvalid
 	}
 	var payload proto.Message
+	var err error
 	switch request := message.(type) {
 	case *adminv1.CreateRecoveryEnrollmentGrantRequest:
 		return bindRecoveryApproval(request)
@@ -50,52 +51,28 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "enrollment.approve", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("enrollment.approve", copy)
 	case *adminv1.RevokeDeviceRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "device.revoke", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("device.revoke", copy)
 	case *adminv1.SetResourceAssignmentRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "resources.assign", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("resources.assign", copy)
 	case *adminv1.ActivateTargetPreviewRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = nil
-		b.action, b.mutation = "resources.activate_preview", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("resources.activate_preview", copy)
 	case *adminv1.UpdateExecutionAuthorityRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
@@ -111,26 +88,14 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "device.action", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("device.action", copy)
 	case *adminv1.RevealRecoveryKeyRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "recovery_key.reveal", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("recovery_key.reveal", copy)
 	case *adminv1.RevealSecretRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
@@ -146,17 +111,13 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		}
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
-		b.action, b.mutation = "local_admin.reveal", copy.GetRequestId()
-		id, err := uuid.Parse(copy.GetDeviceId())
-		if err != nil || id == uuid.Nil {
-			return b, ErrApprovalInvalid
-		}
-		b.target = id
-		payload = copy
+		payload, err = b.bindDevice("local_admin.reveal", copy)
 	default:
 		return b, ErrApprovalInvalid
 	}
-	var err error
+	if err != nil {
+		return b, err
+	}
 	b.payload, err = (proto.MarshalOptions{Deterministic: true}).Marshal(payload)
 	if err != nil {
 		return b, fmt.Errorf("encode approval payload: %w", err)
@@ -166,6 +127,25 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		b.mutation = hex.EncodeToString(b.digest[:])
 	}
 	return b, nil
+}
+
+// deviceScopedRequest is an approvable request that targets one device.
+type deviceScopedRequest interface {
+	proto.Message
+	GetRequestId() string
+	GetDeviceId() string
+}
+
+// bindDevice binds action, the request's mutation ID and its device target, and
+// returns the request as the approval payload.
+func (b *approvalBinding) bindDevice(action string, request deviceScopedRequest) (proto.Message, error) {
+	b.action, b.mutation = action, request.GetRequestId()
+	id, err := uuid.Parse(request.GetDeviceId())
+	if err != nil || id == uuid.Nil {
+		return nil, ErrApprovalInvalid
+	}
+	b.target = id
+	return request, nil
 }
 
 func approvalPayload(request *adminv1.CreateApprovalRequest) proto.Message {

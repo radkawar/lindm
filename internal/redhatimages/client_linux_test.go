@@ -56,6 +56,9 @@ func fixtureClient(t *testing.T, f *acquisitionFixture) (*Client, string) {
 	payload := []byte("official fixture qcow bytes")
 	digest := sha256.Sum256(payload)
 	hexDigest := hex.EncodeToString(digest[:])
+	dvdPayload := []byte("official fixture binary dvd bytes")
+	dvdDigest := sha256.Sum256(dvdPayload)
+	dvdHexDigest := hex.EncodeToString(dvdDigest[:])
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -85,11 +88,19 @@ func fixtureClient(t *testing.T, f *acquisitionFixture) (*Client, string) {
 		}
 		if strings.Contains(r.URL.Path, "/images/rhel/") {
 			href := apiOrigin + "/management/v1/images/" + hexDigest + "/download"
+			dvdHref := apiOrigin + "/management/v1/images/" + dvdHexDigest + "/download"
 			if f.noEntitlement {
-				href = ""
+				href, dvdHref = "", ""
 			}
 			row := map[string]string{"filename": "rhel-9.8-x86_64-kvm.qcow2", "checksum": hexDigest, "arch": "x86_64", "datePublished": "2026-05-12T14:26:31Z", "downloadHref": href}
-			rows := []map[string]string{row}
+			// Boot ISOs and unrelated products share the catalog; only the
+			// exact selected publication may match.
+			rows := []map[string]string{
+				row,
+				{"filename": "rhel-9.8-x86_64-boot.iso", "checksum": hexDigest, "arch": "x86_64", "datePublished": "2026-05-12T14:42:35Z", "downloadHref": href},
+				{"filename": "rhel-9.8-x86_64-dvd.iso", "checksum": dvdHexDigest, "arch": "x86_64", "datePublished": "2026-05-12T14:42:37Z", "downloadHref": dvdHref},
+				{"filename": "rhel-rt-9.8-x86_64-dvd.iso", "checksum": hexDigest, "arch": "x86_64", "datePublished": "2026-05-12T14:42:31Z", "downloadHref": href},
+			}
 			if f.duplicate {
 				rows = append(rows, row)
 			}
@@ -99,13 +110,17 @@ func fixtureClient(t *testing.T, f *acquisitionFixture) (*Client, string) {
 			return
 		}
 		if r.Host == "api.access.redhat.com" {
-			href := "https://access.cdn.redhat.com/content/origin/files/sha256/ab/image.qcow2?_auth_=signed-secret"
+			filename, object := "rhel-9.8-x86_64-kvm.qcow2", "image.qcow2"
+			if strings.Contains(r.URL.Path, dvdHexDigest) {
+				filename, object = "rhel-9.8-x86_64-dvd.iso", "image.iso"
+			}
+			href := "https://access.cdn.redhat.com/content/origin/files/sha256/ab/" + object + "?_auth_=signed-secret"
 			if f.redirect != "" {
 				href = f.redirect
 			}
 			w.Header().Set("Location", href)
 			w.WriteHeader(307)
-			if err := json.NewEncoder(w).Encode(map[string]any{"body": map[string]string{"filename": "rhel-9.8-x86_64-kvm.qcow2", "href": href}}); err != nil {
+			if err := json.NewEncoder(w).Encode(map[string]any{"body": map[string]string{"filename": filename, "href": href}}); err != nil {
 				t.Error(err)
 			}
 			return
@@ -116,6 +131,9 @@ func fixtureClient(t *testing.T, f *acquisitionFixture) (*Client, string) {
 			return
 		}
 		data := payload
+		if strings.HasSuffix(r.URL.Path, "/image.iso") {
+			data = dvdPayload
+		}
 		if f.wrongHash {
 			data = []byte(strings.Repeat("x", len(payload)))
 		}
@@ -147,40 +165,75 @@ func fixtureClient(t *testing.T, f *acquisitionFixture) (*Client, string) {
 }
 
 func TestAcquisitionTLSAndPrivateReceipt(t *testing.T) {
+	for _, test := range []struct {
+		kind     ImageKind
+		filename string
+	}{{KVMImage, "rhel-9.8-x86_64-kvm.qcow2"}, {BinaryDVD, "rhel-9.8-x86_64-dvd.iso"}} {
+		t.Run(string(test.kind), func(t *testing.T) {
+			fixture := new(acquisitionFixture)
+			client, token := fixtureClient(t, fixture)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			if err := client.authenticate(ctx, token); err != nil {
+				t.Fatal(err)
+			}
+			image, err := client.Discover(ctx, "9.8", "x86_64", test.kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if image.Filename != test.filename {
+				t.Fatalf("selected %q, want %q", image.Filename, test.filename)
+			}
+			path, receipt, err := client.Download(ctx, image, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if receipt.ImageFilename != test.filename || receipt.Sha256 != image.SHA256 {
+				t.Fatal("receipt does not identify the selected publication")
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.Mode().Perm() != 0600 || uint64(info.Size()) != receipt.ImageSizeBytes {
+				t.Fatal("staged image mode or size mismatch")
+			}
+			serialized, err := protojson.Marshal(receipt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, secret := range []string{"offline-secret", "access-secret", "signed-secret", "access.cdn.redhat.com"} {
+				if strings.Contains(string(serialized), secret) {
+					t.Fatalf("receipt leaks %s", secret)
+				}
+			}
+			fixture.mu.Lock()
+			defer fixture.mu.Unlock()
+			if fixture.badAuth || len(fixture.calls) != 5 {
+				t.Fatalf("credential isolation or request sequence failed: bad auth=%v, calls=%d", fixture.badAuth, len(fixture.calls))
+			}
+		})
+	}
+}
+
+func TestDownloadRequiresBoundedDeadline(t *testing.T) {
 	fixture := new(acquisitionFixture)
 	client, token := fixtureClient(t, fixture)
-	ctx := context.Background()
-	if err := client.authenticate(ctx, token); err != nil {
+	if err := client.authenticate(t.Context(), token); err != nil {
 		t.Fatal(err)
 	}
-	image, err := client.Discover(ctx, "9.8", "x86_64")
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	image, err := client.Discover(ctx, "9.8", "x86_64", BinaryDVD)
 	if err != nil {
 		t.Fatal(err)
 	}
-	path, receipt, err := client.Download(ctx, image, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
+	dir := t.TempDir()
+	if _, _, err := client.Download(t.Context(), image, dir); err == nil {
+		t.Fatal("unbounded transfer accepted")
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0600 || uint64(info.Size()) != receipt.ImageSizeBytes {
-		t.Fatal("staged image mode or size mismatch")
-	}
-	serialized, err := protojson.Marshal(receipt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, secret := range []string{"offline-secret", "access-secret", "signed-secret", "access.cdn.redhat.com"} {
-		if strings.Contains(string(serialized), secret) {
-			t.Fatalf("receipt leaks %s", secret)
-		}
-	}
-	fixture.mu.Lock()
-	defer fixture.mu.Unlock()
-	if fixture.badAuth || len(fixture.calls) != 5 {
-		t.Fatalf("credential isolation or request sequence failed: bad auth=%v, calls=%d", fixture.badAuth, len(fixture.calls))
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Fatal("unbounded transfer staged bytes")
 	}
 }
 
@@ -189,7 +242,8 @@ func TestAcquisitionRejectsIntegrityAndDestinationChanges(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fixture := new(acquisitionFixture)
 			client, token := fixtureClient(t, fixture)
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
 			if err := client.authenticate(ctx, token); err != nil {
 				t.Fatal(err)
 			}
@@ -211,7 +265,7 @@ func TestAcquisitionRejectsIntegrityAndDestinationChanges(t *testing.T) {
 				fixture.duplicate = true
 			}
 			fixture.mu.Unlock()
-			image, err := client.Discover(ctx, "9.8", "x86_64")
+			image, err := client.Discover(ctx, "9.8", "x86_64", KVMImage)
 			dir := t.TempDir()
 			if err == nil {
 				_, _, err = client.Download(ctx, image, dir)
@@ -291,13 +345,18 @@ func TestTokenRequiresPrivateRegularOwnedFile(t *testing.T) {
 func TestMalformedVersionCannotChangeAPIDestination(t *testing.T) {
 	client, _ := fixtureClient(t, new(acquisitionFixture))
 	for _, version := range []string{"9.8/../../systems", "9.8?token=secret", "9.08", "11.0", "latest", "9.-1"} {
-		if _, err := client.Discover(context.Background(), version, "x86_64"); err == nil {
+		if _, err := client.Discover(context.Background(), version, "x86_64", KVMImage); err == nil {
 			t.Fatalf("accepted %q", version)
 		}
 	}
 	for _, architecture := range []string{"", "arm64", "x86_64/../../systems", "s390x"} {
-		if _, err := client.Discover(context.Background(), "9.8", architecture); err == nil {
+		if _, err := client.Discover(context.Background(), "9.8", architecture, BinaryDVD); err == nil {
 			t.Fatalf("accepted architecture %q", architecture)
+		}
+	}
+	for _, kind := range []ImageKind{"", "boot", "qcow2", "dvd/../../systems"} {
+		if _, err := client.Discover(context.Background(), "9.8", "x86_64", kind); err == nil {
+			t.Fatalf("accepted image kind %q", kind)
 		}
 	}
 }

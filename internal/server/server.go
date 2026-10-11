@@ -90,161 +90,22 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err := db.Check(startup, pool); err != nil {
 		return err
 	}
-	auth, err := NewIdentity(startup, pool, resources)
+	plane, err := newControlPlane(startup, pool, resources)
 	if err != nil {
-		return fmt.Errorf("initialize identity service: %w", err)
+		return err
 	}
-	var execution *executionauthority.Store
-	if bootstrap := resources.ExecutionBootstrap; bootstrap != nil {
-		execution, err = executionauthority.New(startup, pool, executionauthority.Config{
-			RootJSON: bootstrap.RootJSON, BootstrapEnvelope: bootstrap.Envelope,
-			TLSPublicKey: resources.ServerCertificate.Leaf.PublicKey,
-		})
-	} else {
-		err = executionauthority.CheckUnconfigured(startup, pool)
-	}
+	adminMux, err := plane.adminMux(pool, resources)
 	if err != nil {
-		return fmt.Errorf("initialize execution authority: %w", err)
+		return err
 	}
-	advisories, err := advisory.New(startup, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
-	if err != nil {
-		return fmt.Errorf("initialize advisories: %w", err)
-	}
-	releaseHandler, releasePublisher, err := newReleaseRepository(resources)
-	if err != nil {
-		return fmt.Errorf("initialize release repository: %w", err)
-	}
-	recoveryArtifacts, err := newRecoveryArtifacts(resources)
-	if err != nil {
-		return fmt.Errorf("initialize recovery artifact verification: %w", err)
-	}
-	var relay *assistrelay.Relay
-	if assistance := resources.Proto.GetAssistance(); assistance != nil {
-		relay, err = assistrelay.New(assistance, time.Now, slog.Default())
-		if err != nil {
-			return fmt.Errorf("initialize assistance relay: %w", err)
-		}
-	}
-	devices, err := device.New(pool, device.Config{
-		DeploymentID:                 resources.Proto.GetDeploymentId(),
-		CACertificate:                resources.DeviceCACertificate,
-		CAKey:                        resources.DeviceCAKey,
-		InventoryBudgetBytes:         resources.InventoryBudgetBytes,
-		ExecutionAuthority:           execution,
-		Identity:                     auth,
-		ExecutionSigning:             resources.ExecutionSigning,
-		Advisories:                   advisories,
-		Escrow:                       resources.Escrow,
-		EscrowRevealApprovalRequired: resources.EscrowRevealApprovalRequired,
-		ReleasePublisher:             releasePublisher,
-		RecoveryArtifacts:            recoveryArtifacts,
-		ServerRelease:                buildinfo.Current().Version,
-		ServerProtocol:               buildinfo.ProtocolVersion,
-		RequireReleaseCompatibility:  true,
-		EnrollmentInstructions:       enrollmentInstructions(resources),
-		Assistance:                   relay,
-	})
-	if err != nil {
-		return fmt.Errorf("initialize device service: %w", err)
-	}
-	var deliveries *integrations.Service
-	var reporting *reports.Service
-	if resources.Proto.GetIntegrations() != nil {
-		deliveries, err = integrations.New(pool, auth, resources.IntegrationEncryptionKey, time.Now)
-		if err != nil {
-			return fmt.Errorf("initialize integrations: %w", err)
-		}
-		signer, ok := resources.ServerCertificate.PrivateKey.(crypto.Signer)
-		if !ok {
-			return errors.New("server TLS key cannot sign report manifests")
-		}
-		reporting, err = reports.New(pool, auth, signer, resources.ServerCertificate.Certificate)
-		if err != nil {
-			return fmt.Errorf("initialize reports: %w", err)
-		}
-	}
-	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, advisories, deliveries, reporting)})
-	if err != nil {
-		return fmt.Errorf("initialize background jobs: %w", err)
-	}
-	console, err := web.Handler()
+	deviceMux, err := plane.deviceMux(resources)
 	if err != nil {
 		return err
 	}
 
-	adminMux := http.NewServeMux()
-	identityHandler := auth.Handler()
-	adminMux.Handle("/auth/", identityHandler)
-	adminMux.Handle("/scim/v2/", identityHandler)
-	// Initial installations have no session or device certificate. Only verified
-	// public installation documents are exposed here, never a filesystem tree.
-	adminMux.Handle("/bootstrap/", bootstrapMaterialHandler(resources.ExecutionBootstrap))
-	path, handler := devices.AdminHandler()
-	adminMux.Handle(path, auth.RequireSession(handler))
-	path, handler = devices.ReleaseManagementHandler()
-	adminMux.Handle(path, auth.RequireSession(handler))
-	if releaseHandler != nil {
-		adminMux.Handle("/updates/", http.StripPrefix("/updates/", releaseHandler))
-	}
-	if resources.OfflineBundleDirectory != "" {
-		offlineHandler, err := offlinebundle.NewRepositoryHandler(resources.OfflineBundleDirectory)
-		if err != nil {
-			return fmt.Errorf("initialize offline repository handler: %w", err)
-		}
-		// Signed native repositories and release artifacts from verified
-		// imports; packages authenticate natively with client-pinned keys.
-		adminMux.Handle("/offline/", http.StripPrefix("/offline/", offlineHandler))
-	}
-	if deliveries != nil {
-		path, handler = deliveries.AdminHandler()
-		adminMux.Handle(path, auth.RequireSession(handler))
-		path, handler = reporting.AdminHandler()
-		adminMux.Handle(path, auth.RequireSession(handler))
-	}
-	path, handler = devices.EnrollmentHandler()
-	adminMux.Handle(path, handler)
-	path, handler = devices.RecoveryHandler()
-	adminMux.Handle(path, handler)
-	adminMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	adminMux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		probe, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := pool.Ping(probe); err != nil {
-			http.Error(w, "not ready", http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
-	adminMux.Handle("/", console)
-	deviceMux := http.NewServeMux()
-	path, handler = devices.DeviceHandler()
-	deviceMux.Handle(path, handler)
-	if len(resources.Proto.GetConnectivityProbes()) != 0 {
-		confirmation, err := devices.ConnectivityConfirmationHandler(resources.Proto.GetConnectivityProbes())
-		if err != nil {
-			return fmt.Errorf("configure native connectivity confirmation: %w", err)
-		}
-		deviceMux.Handle(device.ConnectivityConfirmationPath, confirmation)
-	}
-
 	requestContext, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelRequests()
-	admin := httpServer(config.Address(resources.Proto.GetAdminListener()), adminMux, requestContext)
-	admin.TLSConfig = &tls.Config{
-		MinVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{resources.ServerCertificate},
-	}
-	deviceServer := httpServer(config.Address(resources.Proto.GetDeviceListener()), deviceMux, requestContext)
-	deviceRoots := x509.NewCertPool()
-	deviceRoots.AddCert(resources.DeviceCACertificate)
-	deviceServer.TLSConfig = &tls.Config{
-		MinVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{resources.ServerCertificate},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    deviceRoots,
-	}
+	admin, deviceServer := tlsServers(requestContext, resources, adminMux, deviceMux)
 	listenerConfig := new(net.ListenConfig)
 	adminListener, err := listenerConfig.Listen(ctx, "tcp", admin.Addr)
 	if err != nil {
@@ -255,8 +116,8 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		return errors.Join(fmt.Errorf("bind device listener: %w", err), adminListener.Close())
 	}
 	var relayServer *assistrelay.Server
-	if relay != nil {
-		relayServer, err = relay.Listen(ctx)
+	if plane.relay != nil {
+		relayServer, err = plane.relay.Listen(ctx)
 		if err != nil {
 			return errors.Join(err, adminListener.Close(), deviceListener.Close())
 		}
@@ -294,7 +155,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	jobsDone := make(chan struct{})
 	go func() {
 		defer close(jobsDone)
-		supervisor.Run(workerContext)
+		plane.supervisor.Run(workerContext)
 	}()
 	defer func() {
 		cancelWorkers()
@@ -313,6 +174,209 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		serveErr = errors.Join(serveErr, <-stopped)
 	}
 	return errors.Join(serveErr, shutdownErr)
+}
+
+// controlPlane holds the domain services one Run composes and serves.
+type controlPlane struct {
+	auth           *identity.Service
+	devices        *device.Service
+	deliveries     *integrations.Service
+	reporting      *reports.Service
+	releaseHandler http.Handler
+	relay          *assistrelay.Relay
+	supervisor     *jobs.Supervisor
+	console        http.Handler
+}
+
+// newControlPlane initializes every configured domain service against a checked
+// schema. It binds no listener.
+func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources) (*controlPlane, error) {
+	auth, err := NewIdentity(ctx, pool, resources)
+	if err != nil {
+		return nil, fmt.Errorf("initialize identity service: %w", err)
+	}
+	execution, err := newExecutionAuthority(ctx, pool, resources)
+	if err != nil {
+		return nil, fmt.Errorf("initialize execution authority: %w", err)
+	}
+	advisories, err := advisory.New(ctx, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
+	if err != nil {
+		return nil, fmt.Errorf("initialize advisories: %w", err)
+	}
+	releaseHandler, releasePublisher, err := newReleaseRepository(resources)
+	if err != nil {
+		return nil, fmt.Errorf("initialize release repository: %w", err)
+	}
+	recoveryArtifacts, err := newRecoveryArtifacts(resources)
+	if err != nil {
+		return nil, fmt.Errorf("initialize recovery artifact verification: %w", err)
+	}
+	var relay *assistrelay.Relay
+	if assistance := resources.Proto.GetAssistance(); assistance != nil {
+		relay, err = assistrelay.New(assistance, time.Now, slog.Default())
+		if err != nil {
+			return nil, fmt.Errorf("initialize assistance relay: %w", err)
+		}
+	}
+	devices, err := device.New(pool, device.Config{
+		DeploymentID:                 resources.Proto.GetDeploymentId(),
+		CACertificate:                resources.DeviceCACertificate,
+		CAKey:                        resources.DeviceCAKey,
+		InventoryBudgetBytes:         resources.InventoryBudgetBytes,
+		ExecutionAuthority:           execution,
+		Identity:                     auth,
+		ExecutionSigning:             resources.ExecutionSigning,
+		Advisories:                   advisories,
+		Escrow:                       resources.Escrow,
+		EscrowRevealApprovalRequired: resources.EscrowRevealApprovalRequired,
+		ReleasePublisher:             releasePublisher,
+		RecoveryArtifacts:            recoveryArtifacts,
+		ServerRelease:                buildinfo.Current().Version,
+		ServerProtocol:               buildinfo.ProtocolVersion,
+		RequireReleaseCompatibility:  true,
+		EnrollmentInstructions:       enrollmentInstructions(resources),
+		Assistance:                   relay,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialize device service: %w", err)
+	}
+	deliveries, reporting, err := newIntegrations(pool, auth, resources)
+	if err != nil {
+		return nil, err
+	}
+	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, advisories, deliveries, reporting)})
+	if err != nil {
+		return nil, fmt.Errorf("initialize background jobs: %w", err)
+	}
+	console, err := web.Handler()
+	if err != nil {
+		return nil, err
+	}
+	return &controlPlane{
+		auth: auth, devices: devices, deliveries: deliveries, reporting: reporting,
+		releaseHandler: releaseHandler, relay: relay, supervisor: supervisor, console: console,
+	}, nil
+}
+
+// newExecutionAuthority opens the configured quorum trust store, or proves that
+// an unconfigured deployment has none persisted.
+func newExecutionAuthority(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources) (*executionauthority.Store, error) {
+	bootstrap := resources.ExecutionBootstrap
+	if bootstrap == nil {
+		return nil, executionauthority.CheckUnconfigured(ctx, pool)
+	}
+	return executionauthority.New(ctx, pool, executionauthority.Config{
+		RootJSON: bootstrap.RootJSON, BootstrapEnvelope: bootstrap.Envelope,
+		TLSPublicKey: resources.ServerCertificate.Leaf.PublicKey,
+	})
+}
+
+// newIntegrations composes outbound deliveries and signed reports, which are
+// configured together; both are nil when integrations are not configured.
+func newIntegrations(pool *pgxpool.Pool, auth *identity.Service, resources *config.Resources) (*integrations.Service, *reports.Service, error) {
+	if resources.Proto.GetIntegrations() == nil {
+		return nil, nil, nil
+	}
+	deliveries, err := integrations.New(pool, auth, resources.IntegrationEncryptionKey, time.Now)
+	if err != nil {
+		return nil, nil, fmt.Errorf("initialize integrations: %w", err)
+	}
+	signer, ok := resources.ServerCertificate.PrivateKey.(crypto.Signer)
+	if !ok {
+		return nil, nil, errors.New("server TLS key cannot sign report manifests")
+	}
+	reporting, err := reports.New(pool, auth, signer, resources.ServerCertificate.Certificate)
+	if err != nil {
+		return nil, nil, fmt.Errorf("initialize reports: %w", err)
+	}
+	return deliveries, reporting, nil
+}
+
+// adminMux routes the administrative listener: sessions, SCIM, public
+// installation material, session-guarded admin APIs, health and the console.
+func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+	identityHandler := p.auth.Handler()
+	mux.Handle("/auth/", identityHandler)
+	mux.Handle("/scim/v2/", identityHandler)
+	// Initial installations have no session or device certificate. Only verified
+	// public installation documents are exposed here, never a filesystem tree.
+	mux.Handle("/bootstrap/", bootstrapMaterialHandler(resources.ExecutionBootstrap))
+	path, handler := p.devices.AdminHandler()
+	mux.Handle(path, p.auth.RequireSession(handler))
+	path, handler = p.devices.ReleaseManagementHandler()
+	mux.Handle(path, p.auth.RequireSession(handler))
+	if p.releaseHandler != nil {
+		mux.Handle("/updates/", http.StripPrefix("/updates/", p.releaseHandler))
+	}
+	if resources.OfflineBundleDirectory != "" {
+		offlineHandler, err := offlinebundle.NewRepositoryHandler(resources.OfflineBundleDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("initialize offline repository handler: %w", err)
+		}
+		// Signed native repositories and release artifacts from verified
+		// imports; packages authenticate natively with client-pinned keys.
+		mux.Handle("/offline/", http.StripPrefix("/offline/", offlineHandler))
+	}
+	if p.deliveries != nil {
+		path, handler = p.deliveries.AdminHandler()
+		mux.Handle(path, p.auth.RequireSession(handler))
+		path, handler = p.reporting.AdminHandler()
+		mux.Handle(path, p.auth.RequireSession(handler))
+	}
+	path, handler = p.devices.EnrollmentHandler()
+	mux.Handle(path, handler)
+	path, handler = p.devices.RecoveryHandler()
+	mux.Handle(path, handler)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		probe, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(probe); err != nil {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.Handle("/", p.console)
+	return mux, nil
+}
+
+// deviceMux routes the mTLS device listener.
+func (p *controlPlane) deviceMux(resources *config.Resources) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+	path, handler := p.devices.DeviceHandler()
+	mux.Handle(path, handler)
+	if len(resources.Proto.GetConnectivityProbes()) != 0 {
+		confirmation, err := p.devices.ConnectivityConfirmationHandler(resources.Proto.GetConnectivityProbes())
+		if err != nil {
+			return nil, fmt.Errorf("configure native connectivity confirmation: %w", err)
+		}
+		mux.Handle(device.ConnectivityConfirmationPath, confirmation)
+	}
+	return mux, nil
+}
+
+// tlsServers configures the TLS 1.3 administrative server and the device server,
+// which requires a client certificate issued by the device CA.
+func tlsServers(requestContext context.Context, resources *config.Resources, adminMux, deviceMux http.Handler) (admin, deviceServer *http.Server) {
+	admin = httpServer(config.Address(resources.Proto.GetAdminListener()), adminMux, requestContext)
+	admin.TLSConfig = &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{resources.ServerCertificate},
+	}
+	deviceServer = httpServer(config.Address(resources.Proto.GetDeviceListener()), deviceMux, requestContext)
+	deviceRoots := x509.NewCertPool()
+	deviceRoots.AddCert(resources.DeviceCACertificate)
+	deviceServer.TLSConfig = &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{resources.ServerCertificate},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    deviceRoots,
+	}
+	return admin, deviceServer
 }
 
 func httpServer(address string, handler http.Handler, ctx context.Context) *http.Server {

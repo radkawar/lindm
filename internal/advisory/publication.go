@@ -65,106 +65,24 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	if source.TotalClaimsLimit == nil {
 		limit = 5000000
 	}
-	var emitted uint64
-	var unique int64
-	var sinkErr error
-	batch := make([]advisorydb.InsertAdvisoryPublicationBatchParams, 0, advisoryPublicationBatchSize)
-	namespace := uuid.NewSHA1(uuid.NameSpaceOID, []byte(source.GetId()))
-	flush := func() error {
-		if len(batch) == 0 {
-			return nil
-		}
-		inserted, err := s.stageAdvisoryBatch(ctx, generation.revision, batch)
-		clear(batch)
-		batch = batch[:0]
-		if err != nil {
-			return err
-		}
-		unique += inserted
-		return progress.Mark()
+	stager := &publicationStager{
+		s: s, progress: progress, generation: generation.revision, feedID: source.GetId(), limit: limit,
+		namespace: uuid.NewSHA1(uuid.NameSpaceOID, []byte(source.GetId())),
+		batch:     make([]advisorydb.InsertAdvisoryPublicationBatchParams, 0, advisoryPublicationBatchSize),
 	}
-	emit := func(record *advisoryv1.Advisory) error {
-		if sinkErr != nil {
-			return sinkErr
-		}
-		if sinkErr = ctx.Err(); sinkErr != nil {
-			return sinkErr
-		}
-		if emitted >= limit {
-			sinkErr = ErrCapacity
-			return sinkErr
-		}
-		emitted++
-		if record == nil {
-			sinkErr = ErrInvalid
-			return sinkErr
-		}
-		if size := proto.Size(record); size == 0 || size > 64<<10 {
-			sinkErr = ErrCapacity
-			return sinkErr
-		}
-		payload, marshalErr := proto.MarshalOptions{Deterministic: true}.Marshal(record)
-		if marshalErr != nil {
-			sinkErr = marshalErr
-			return sinkErr
-		}
-		batch = append(batch, advisorydb.InsertAdvisoryPublicationBatchParams{
-			PublicationID: generation.revision,
-			Position:      int16(len(batch)),
-			ID:            uuid.NewSHA1(namespace, payload),
-			FeedID:        source.GetId(),
-			AdvisoryID:    record.GetId(),
-			PackageName:   record.GetPackageName(),
-			SourcePackage: record.GetSourcePackage(),
-			Architecture:  record.GetArchitecture(),
-			RecordBytes:   payload,
-		})
-		if len(batch) == advisoryPublicationBatchSize {
-			sinkErr = flush()
-		}
-		return sinkErr
-	}
+	emit := func(record *advisoryv1.Advisory) error { return stager.emit(ctx, record) }
 	doc, err := producer(ctx, emit, progress.Mark)
-	if err != nil || sinkErr != nil {
-		return errors.Join(err, sinkErr, context.Cause(ctx))
+	if err != nil || stager.err != nil {
+		return errors.Join(err, stager.err, context.Cause(ctx))
 	}
 	if err := context.Cause(ctx); err != nil {
 		return err
 	}
-	if doc == nil || len(doc.GetSourceSha256()) != sha256.Size {
-		return ErrInvalid
-	}
-	artifacts := doc.GetArtifacts()
-	if len(artifacts) == 0 {
-		artifacts = []*advisoryv1.FeedArtifact{{Url: source.GetUrl(), Sha256: doc.GetSourceSha256()}}
-	}
-	publication := &advisoryv1.FeedManifest{Artifacts: artifacts, RejectedRecords: doc.GetRejectedRecords()}
-	if proto.Size(publication) > 64<<10 {
-		return ErrCapacity
-	}
-	manifest, err := proto.MarshalOptions{Deterministic: true}.Marshal(publication)
+	revisionData, err := s.describeFeedRevision(source, doc, started)
 	if err != nil {
 		return err
 	}
-	complete := doc.GetCompleteSnapshot()
-	for _, rejected := range doc.GetRejectedRecords() {
-		if rejected.GetUnscoped() || len(rejected.GetPackageNames()) == 0 {
-			complete = false
-			break
-		}
-	}
-	expires := started.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second)
-	var snapshotAt pgtype.Timestamptz
-	if doc.GetSnapshotAt() != nil {
-		if err := doc.GetSnapshotAt().CheckValid(); err != nil || doc.GetSnapshotAt().AsTime().After(s.clock().UTC()) {
-			return ErrInvalid
-		}
-		snapshotAt = timestamp(doc.GetSnapshotAt().AsTime())
-		if until := snapshotAt.Time.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second); until.Before(expires) {
-			expires = until
-		}
-	}
-	if err := flush(); err != nil {
+	if err := stager.flush(ctx); err != nil {
 		return err
 	}
 	// Stop and join before removing the lease in the switch transaction. A
@@ -204,7 +122,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	revision := current.Revision
 	// Rejection/coverage changes invalidate evaluations even for identical raw
 	// vendor bytes. A genuinely identical refresh only extends freshness.
-	if !bytes.Equal(current.SourceSha256, doc.GetSourceSha256()) || !bytes.Equal(current.SourceManifest, manifest) || current.CompleteSnapshot != complete || current.AdvisoryCount != unique {
+	if !bytes.Equal(current.SourceSha256, doc.GetSourceSha256()) || !bytes.Equal(current.SourceManifest, revisionData.manifest) || current.CompleteSnapshot != revisionData.complete || current.AdvisoryCount != stager.unique {
 		revision = generation.revision
 		if err := q.QueueAdvisoryGenerationCleanup(ctx, advisorydb.QueueAdvisoryGenerationCleanupParams{FeedID: source.GetId(), Generation: current.Revision}); err != nil {
 			return err
@@ -214,7 +132,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 		}
 		cleanup = append(cleanup, advisoryGeneration{feedID: source.GetId(), revision: current.Revision})
 	}
-	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: manifest, SnapshotAt: snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(expires), AdvisoryCount: unique, CompleteSnapshot: complete, ConfigBytes: encoded})
+	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: revisionData.manifest, SnapshotAt: revisionData.snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(revisionData.expires), AdvisoryCount: stager.unique, CompleteSnapshot: revisionData.complete, ConfigBytes: encoded})
 	if err != nil {
 		return err
 	}
@@ -231,8 +149,126 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	if revision == generation.revision {
 		cleanup = cleanup[1:]
 	}
-	slog.Info("advisory feed published", "feed_id", source.GetId(), "emitted_count", emitted, "unique_count", unique, "rejected_count", len(doc.GetRejectedRecords()), "elapsed", time.Since(elapsed))
+	slog.Info("advisory feed published", "feed_id", source.GetId(), "emitted_count", stager.emitted, "unique_count", stager.unique, "rejected_count", len(doc.GetRejectedRecords()), "elapsed", time.Since(elapsed))
 	return nil
+}
+
+// publicationStager stages one generation's emitted advisories in bounded
+// batches. A sink error is sticky: every later emit returns it.
+type publicationStager struct {
+	s          *Service
+	progress   *feed.RefreshProgress
+	generation uuid.UUID
+	feedID     string
+	namespace  uuid.UUID
+	limit      uint64
+	batch      []advisorydb.InsertAdvisoryPublicationBatchParams
+	emitted    uint64
+	unique     int64
+	err        error
+}
+
+func (p *publicationStager) flush(ctx context.Context) error {
+	if len(p.batch) == 0 {
+		return nil
+	}
+	inserted, err := p.s.stageAdvisoryBatch(ctx, p.generation, p.batch)
+	clear(p.batch)
+	p.batch = p.batch[:0]
+	if err != nil {
+		return err
+	}
+	p.unique += inserted
+	return p.progress.Mark()
+}
+
+func (p *publicationStager) emit(ctx context.Context, record *advisoryv1.Advisory) error {
+	if p.err != nil {
+		return p.err
+	}
+	if p.err = ctx.Err(); p.err != nil {
+		return p.err
+	}
+	if p.emitted >= p.limit {
+		p.err = ErrCapacity
+		return p.err
+	}
+	p.emitted++
+	if record == nil {
+		p.err = ErrInvalid
+		return p.err
+	}
+	if size := proto.Size(record); size == 0 || size > 64<<10 {
+		p.err = ErrCapacity
+		return p.err
+	}
+	payload, marshalErr := proto.MarshalOptions{Deterministic: true}.Marshal(record)
+	if marshalErr != nil {
+		p.err = marshalErr
+		return p.err
+	}
+	p.batch = append(p.batch, advisorydb.InsertAdvisoryPublicationBatchParams{
+		PublicationID: p.generation,
+		Position:      int16(len(p.batch)),
+		ID:            uuid.NewSHA1(p.namespace, payload),
+		FeedID:        p.feedID,
+		AdvisoryID:    record.GetId(),
+		PackageName:   record.GetPackageName(),
+		SourcePackage: record.GetSourcePackage(),
+		Architecture:  record.GetArchitecture(),
+		RecordBytes:   payload,
+	})
+	if len(p.batch) == advisoryPublicationBatchSize {
+		p.err = p.flush(ctx)
+	}
+	return p.err
+}
+
+// feedRevision is the verified feed-level metadata a publication records.
+type feedRevision struct {
+	manifest   []byte
+	complete   bool
+	snapshotAt pgtype.Timestamptz
+	expires    time.Time
+}
+
+// describeFeedRevision validates the producer's document and derives its
+// bounded manifest, completeness, snapshot time and expiry. Any unscoped
+// rejection makes the snapshot incomplete; expiry never outlives the snapshot.
+func (s *Service) describeFeedRevision(source *advisoryv1.FeedSource, doc *advisoryv1.FeedDocument, started time.Time) (feedRevision, error) {
+	if doc == nil || len(doc.GetSourceSha256()) != sha256.Size {
+		return feedRevision{}, ErrInvalid
+	}
+	artifacts := doc.GetArtifacts()
+	if len(artifacts) == 0 {
+		artifacts = []*advisoryv1.FeedArtifact{{Url: source.GetUrl(), Sha256: doc.GetSourceSha256()}}
+	}
+	publication := &advisoryv1.FeedManifest{Artifacts: artifacts, RejectedRecords: doc.GetRejectedRecords()}
+	if proto.Size(publication) > 64<<10 {
+		return feedRevision{}, ErrCapacity
+	}
+	manifest, err := proto.MarshalOptions{Deterministic: true}.Marshal(publication)
+	if err != nil {
+		return feedRevision{}, err
+	}
+	revision := feedRevision{manifest: manifest, complete: doc.GetCompleteSnapshot()}
+	for _, rejected := range doc.GetRejectedRecords() {
+		if rejected.GetUnscoped() || len(rejected.GetPackageNames()) == 0 {
+			revision.complete = false
+			break
+		}
+	}
+	revision.expires = started.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second)
+	if doc.GetSnapshotAt() != nil {
+		if err := doc.GetSnapshotAt().CheckValid(); err != nil || doc.GetSnapshotAt().AsTime().After(s.clock().UTC()) {
+			return feedRevision{}, ErrInvalid
+		}
+		revision.snapshotAt = timestamp(doc.GetSnapshotAt().AsTime())
+		if until := revision.snapshotAt.Time.Add(time.Duration(source.GetMaxAgeSeconds()) * time.Second); until.Before(revision.expires) {
+			revision.expires = until
+		}
+	}
+	return revision, nil
 }
 
 // stageAdvisoryBatch uses one short transaction, not a connection held while the

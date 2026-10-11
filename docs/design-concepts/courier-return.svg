@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="760" viewBox="0 0 1040 760" role="img" aria-labelledby="title desc">
+  <title id="title">DRAFT: Courier return ticket, reconcile an air-gapped delivery without a live connection</title>
+  <desc id="desc">Illustrative, non-interactive concept. A sending station exported one signed bundle for the isolated foundry site. The station's export half is known, but the site's return half is absent: import, rollout and device execution are unknown. A physical boundary separates these halves. The operator chooses to request a return ticket rather than send a replacement blindly. The ticket would contain signed, privacy-minimized import evidence tied to the exact bundle, not employee or device inventory. Export success is not import success; verified import does not start a rollout, and feed freshness remains anchored to acquisition time. A new signed return artifact and console exchange records require backend design.</desc>
+  <rect width="1040" height="760" fill="#f6f7f9"/>
+  <g font-family="IBM Plex Sans, sans-serif" fill="#17212b">
+    <text x="32" y="32" font-size="12" fill="#596674">LINDM / CONCEPT 03 / DRAFT OWNER SELECTION / ILLUSTRATIVE DATA</text>
+    <text x="32" y="72" font-size="24">Did the delivery reach the isolated site?</text>
+    <text x="32" y="101" font-size="14">Foundry site · One bundle exchange · No live connection assumed</text>
+    <text x="32" y="146" font-size="16">Sending station knows</text>
+    <text x="600" y="146" font-size="16">Site confirmation must travel back</text>
+    <rect x="32" y="165" width="408" height="244" fill="#ffffff" stroke="#bcc5ce"/>
+    <rect x="600" y="165" width="408" height="244" fill="#ffffff" stroke="#667381" stroke-dasharray="7 5"/>
+    <text x="48" y="194" font-size="16">Export half</text>
+    <text x="48" y="228" font-size="14">Bundle: Foundry October maintenance</text>
+    <text x="48" y="254" font-size="14">Export verified: 11 Oct, 09:00 UTC</text>
+    <text x="48" y="280" font-size="14">Expires: 15 Oct, 09:00 UTC</text>
+    <text x="48" y="315" font-size="14">Advisories acquired: 10 Oct, 18:00 UTC</text>
+    <text x="48" y="341" font-size="14">Importing later will not make them newer.</text>
+    <text x="48" y="386" font-size="12" fill="#596674">Export says nothing about the site's devices</text>
+    <text x="616" y="194" font-size="16">Return half: not received</text>
+    <text x="616" y="228" font-size="14">Site import: unknown</text>
+    <text x="616" y="254" font-size="14">Rollout started: unknown</text>
+    <text x="616" y="280" font-size="14">Device application: unknown</text>
+    <text x="616" y="315" font-size="14">Missing ticket is not a failed import.</text>
+    <text x="616" y="341" font-size="14">Do not resend as if nothing happened.</text>
+    <text x="616" y="386" font-size="12" fill="#596674">Proposed authenticated artifact, not a live status</text>
+    <path d="M520 168 V405" stroke="#667381" stroke-width="2" stroke-dasharray="4 6"/>
+    <path d="M448 232 H583 M575 225 L583 232 L575 239 M583 338 H448 M456 331 L448 338 L456 345" fill="none" stroke="#667381" stroke-width="2"/>
+    <rect x="462" y="270" width="116" height="34" fill="#f6f7f9"/>
+    <text x="471" y="291" font-size="12" fill="#596674">Physical transfer</text>
+    <rect x="32" y="433" width="976" height="92" fill="#fff4d6" stroke="#9b701b"/>
+    <text x="48" y="459" font-size="16">Decision: close the information gap before replacing the delivery</text>
+    <text x="48" y="485" font-size="14">Ask the site operator for a ticket bound to this exact bundle and its verified import result.</text>
+    <text x="48" y="510" font-size="14">Expiry or rejection must be reported as such. A copied filename is not proof of identity.</text>
+    <text x="32" y="560" font-size="16">What bringing back a ticket would do</text>
+    <text x="32" y="588" font-size="14">Verify the site's claim and reconcile this exchange. Reject untrusted or replayed return artifacts.</text>
+    <text x="32" y="613" font-size="14">No rollout starts. No new device health is inferred. Import proposals remain paused until authorized.</text>
+    <text x="32" y="638" font-size="12" fill="#596674">Proposed contents: bundle binding, site identity, observed import result and time; no device/user inventory.</text>
+    <rect x="32" y="657" width="254" height="42" fill="#2455a6"/>
+    <text x="48" y="683" font-size="14" fill="#ffffff">Prepare return-ticket instructions</text>
+    <text x="306" y="683" font-size="14">Review a replacement delivery instead</text>
+    <path d="M32 715 H1008" stroke="#bcc5ce"/>
+    <text x="32" y="740" font-size="12" fill="#596674">PROPOSED: signed return artifact + exchange record. Existing bundle verification does not supply this UI.</text>
+  </g>
+</svg>

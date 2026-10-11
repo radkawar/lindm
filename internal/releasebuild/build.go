@@ -155,51 +155,13 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 		if err := json.Unmarshal(built.sbom, &bom); err != nil {
 			return nil, err
 		}
-		dependencies := []any{map[string]any{"uri": "urn:lindm:captured-source", "digest": map[string]string{"sha256": sourceDigest}}}
-		if artifact.GetFormat() == "oci" {
-			dependencies = append(dependencies, map[string]any{"uri": "urn:lindm:explicit-oci-ca-bundle", "digest": map[string]string{"sha256": caDigest}})
-		}
-		provenance := map[string]any{
-			"buildDefinition": map[string]any{
-				"buildType":            "https://lindm.invalid/build/local-two-clean/v1",
-				"externalParameters":   map[string]any{"version": request.Version, "revision": request.Revision, "sourceDateEpoch": request.SourceDateEpoch, "product": artifact.GetProduct(), "architecture": artifact.GetArchitecture(), "format": artifact.GetFormat()},
-				"internalParameters":   map[string]any{"isolation": "separate source/home/npm/module/compiler-cache directories on one host; not a hermetic or independently trusted builder", "unsignedArchiveSha256": artifact.GetUnsignedSha256(), "secondUnsignedArchiveSha256": artifact.GetSecondUnsignedSha256()},
-				"resolvedDependencies": dependencies,
-			},
-			"runDetails": map[string]any{
-				"builder":  map[string]any{"id": "https://lindm.invalid/builders/local-release/v1", "version": first.observation.GetToolVersions()},
-				"metadata": map[string]string{"startedOn": first.observation.GetStartedAt(), "finishedOn": second.observation.GetFinishedAt()},
-			},
-		}
-		for _, item := range []struct {
-			path, kind string
-			predicate  any
-		}{{artifact.GetSbomPath(), "https://cyclonedx.org/bom", bom}, {artifact.GetProvenancePath(), "https://slsa.dev/provenance/v1", provenance}, {artifact.GetSignaturePath(), "https://lindm.invalid/release/artifact/v1", map[string]string{"custody": manifest.GetCustody(), "keyId": signer.id}}} {
-			envelope, err := signer.statement(artifact, item.kind, item.predicate)
-			if err != nil {
-				return nil, err
-			}
-			if err := writeNew(filepath.Join(exported, item.path), envelope, 0644); err != nil {
-				return nil, err
-			}
+		provenance := provenancePredicate(request, artifact, sourceDigest, caDigest, first.observation, second.observation)
+		if err := writeAttestations(exported, signer, artifact, bom, provenance, manifest.GetCustody()); err != nil {
+			return nil, err
 		}
 		manifest.Artifacts = append(manifest.Artifacts, artifact)
 	}
-	if err := protovalidate.Validate(manifest); err != nil {
-		return nil, err
-	}
-	document, err := (protojson.MarshalOptions{Indent: "  ", UseProtoNames: true}).Marshal(manifest)
-	if err != nil {
-		return nil, err
-	}
-	if err := writeNew(filepath.Join(exported, "release.json"), document, 0644); err != nil {
-		return nil, err
-	}
-	envelope, err := signer.sign(document, manifestType)
-	if err != nil {
-		return nil, err
-	}
-	if err := writeNew(filepath.Join(exported, "release.json.dsse"), envelope, 0644); err != nil {
+	if err := writeSignedManifest(exported, signer, manifest); err != nil {
 		return nil, err
 	}
 	if err := writeNew(filepath.Join(exported, "attestation.pub"), signer.public, 0644); err != nil {
@@ -221,6 +183,65 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 		return nil, err
 	}
 	return manifest, nil
+}
+
+// provenancePredicate is the SLSA v1 provenance for one artifact of the two
+// clean builds. It claims local isolation only, never a trusted builder.
+func provenancePredicate(request Request, artifact *releasev1.ReleaseArtifact, sourceDigest, caDigest string, first, second *releasev1.BuildObservation) map[string]any {
+	dependencies := []any{map[string]any{"uri": "urn:lindm:captured-source", "digest": map[string]string{"sha256": sourceDigest}}}
+	if artifact.GetFormat() == "oci" {
+		dependencies = append(dependencies, map[string]any{"uri": "urn:lindm:explicit-oci-ca-bundle", "digest": map[string]string{"sha256": caDigest}})
+	}
+	return map[string]any{
+		"buildDefinition": map[string]any{
+			"buildType":            "https://lindm.invalid/build/local-two-clean/v1",
+			"externalParameters":   map[string]any{"version": request.Version, "revision": request.Revision, "sourceDateEpoch": request.SourceDateEpoch, "product": artifact.GetProduct(), "architecture": artifact.GetArchitecture(), "format": artifact.GetFormat()},
+			"internalParameters":   map[string]any{"isolation": "separate source/home/npm/module/compiler-cache directories on one host; not a hermetic or independently trusted builder", "unsignedArchiveSha256": artifact.GetUnsignedSha256(), "secondUnsignedArchiveSha256": artifact.GetSecondUnsignedSha256()},
+			"resolvedDependencies": dependencies,
+		},
+		"runDetails": map[string]any{
+			"builder":  map[string]any{"id": "https://lindm.invalid/builders/local-release/v1", "version": first.GetToolVersions()},
+			"metadata": map[string]string{"startedOn": first.GetStartedAt(), "finishedOn": second.GetFinishedAt()},
+		},
+	}
+}
+
+// writeAttestations writes the artifact's signed SBOM, provenance and release
+// signature statements beside it in exported.
+func writeAttestations(exported string, signer *releaseSigner, artifact *releasev1.ReleaseArtifact, bom any, provenance map[string]any, custody string) error {
+	for _, item := range []struct {
+		path, kind string
+		predicate  any
+	}{{artifact.GetSbomPath(), "https://cyclonedx.org/bom", bom}, {artifact.GetProvenancePath(), "https://slsa.dev/provenance/v1", provenance}, {artifact.GetSignaturePath(), "https://lindm.invalid/release/artifact/v1", map[string]string{"custody": custody, "keyId": signer.id}}} {
+		envelope, err := signer.statement(artifact, item.kind, item.predicate)
+		if err != nil {
+			return err
+		}
+		if err := writeNew(filepath.Join(exported, item.path), envelope, 0644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeSignedManifest validates the manifest, then writes release.json and its
+// DSSE envelope.
+func writeSignedManifest(exported string, signer *releaseSigner, manifest *releasev1.ReleaseManifest) error {
+	if err := protovalidate.Validate(manifest); err != nil {
+		return err
+	}
+	document, err := (protojson.MarshalOptions{Indent: "  ", UseProtoNames: true}).Marshal(manifest)
+	if err != nil {
+		return err
+	}
+	if err := writeNew(filepath.Join(exported, "release.json"), document, 0644); err != nil {
+		return err
+	}
+	envelope, err := signer.sign(document, manifestType)
+	if err != nil {
+		return err
+	}
+	return writeNew(filepath.Join(exported, "release.json.dsse"), envelope, 0644)
 }
 
 func compareBuilds(first, second *buildOutput) error {
@@ -257,44 +278,10 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 			return nil, err
 		}
 	}
-	environment := []string{
-		"HOME=" + filepath.Join(root, "home"),
-		"GOCACHE=" + filepath.Join(root, "go-cache"),
-		"GOMODCACHE=" + filepath.Join(root, "go-mod"),
-		"GOPATH=" + filepath.Join(root, "home", "go"),
-		"GOTOOLCHAIN=local", "GOENV=off", "GOWORK=off", "GOOS=linux", "CGO_ENABLED=0",
-		"SOURCE_DATE_EPOCH=" + fmt.Sprint(request.SourceDateEpoch),
-		"npm_config_cache=" + filepath.Join(root, "npm-cache"),
-		"npm_config_userconfig=" + filepath.Join(root, "home", "user.npmrc"),
-		"npm_config_globalconfig=" + filepath.Join(root, "home", "global.npmrc"),
-		"npm_config_audit=false", "npm_config_fund=false",
-	}
+	environment := builderEnvironment(root, request.SourceDateEpoch)
 	observation := &releasev1.BuildObservation{SourceSha256: captured, StartedAt: time.Now().UTC().Format(time.RFC3339Nano), ToolVersions: map[string]string{}, UnsignedSha256: map[string]string{}, BinarySha256: map[string]string{}}
-	for _, tool := range []string{"go", "node", "npm", "dpkg-deb", "rpmbuild"} {
-		arg := "--version"
-		if tool == "go" {
-			arg = "version"
-		}
-		version, err := command(ctx, checkout, environment, tool, arg)
-		if err != nil {
-			return nil, err
-		}
-		observation.ToolVersions[tool] = strings.TrimSpace(string(version))
-	}
-	nodePin, err := readBounded(filepath.Join(checkout, ".node-version"), 128)
-	if err != nil {
+	if err := observeToolchain(ctx, checkout, environment, observation); err != nil {
 		return nil, err
-	}
-	if strings.TrimPrefix(observation.ToolVersions["node"], "v") != strings.TrimSpace(string(nodePin)) {
-		return nil, errors.New("releasebuild: Node version differs from pinned source")
-	}
-	goMod, err := readBounded(filepath.Join(checkout, "go.mod"), maxDocument)
-	if err != nil {
-		return nil, err
-	}
-	goPin := regexp.MustCompile(`(?m)^go ([0-9.]+)$`).FindSubmatch(goMod)
-	if len(goPin) != 2 || !strings.Contains(observation.ToolVersions["go"], "go"+string(goPin[1])+" ") {
-		return nil, errors.New("releasebuild: Go version differs from pinned source")
 	}
 	if _, err := command(ctx, checkout, environment, "npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
 		return nil, err
@@ -343,28 +330,7 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 			if err := os.Mkdir(packageDir, 0700); err != nil {
 				return nil, err
 			}
-			packageCommand, binaryFlag := "build", "-agent"
-			switch product {
-			case "lindmd":
-				packageCommand, binaryFlag = "build-server", "-lindmd"
-			case "lindmctl":
-				packageCommand, binaryFlag = "build-cli", "-lindmctl"
-			}
-			args := []string{"packages", packageCommand, binaryFlag, binary, "-version", request.Version, "-arch", arch, "-output", packageDir, "-source-date-epoch", fmt.Sprint(request.SourceDateEpoch), "-signer-home", request.PackageSigner.Home, "-fingerprint", request.PackageSigner.Fingerprint}
-			if request.PackageSigner.Custody == packaging.CustodyDevelopment {
-				args = append(args, "-development-key")
-			} else {
-				args = append(args, "-passphrase-file", request.PackageSigner.PassphraseFile)
-			}
-			for _, value := range request.PackageSigner.RejectPublicKeySHA256 {
-				args = append(args, "-reject-spki-sha256", value)
-			}
-			for _, value := range request.PackageSigner.RejectFingerprints {
-				args = append(args, "-reject-fingerprint", value)
-			}
-			for _, value := range request.PackageSigner.RejectPathPrefixes {
-				args = append(args, "-reject-home-prefix", value)
-			}
+			args := packageArgs(request, product, arch, binary, packageDir)
 			nativeJSON, err := command(ctx, checkout, hostEnvironment, helper, args...)
 			if err != nil {
 				return nil, err
@@ -402,6 +368,83 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 	}
 	observation.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	return result, nil
+}
+
+// builderEnvironment isolates one builder's HOME, Go and npm caches and pins
+// the toolchain, target OS and source epoch.
+func builderEnvironment(root string, sourceDateEpoch int64) []string {
+	return []string{
+		"HOME=" + filepath.Join(root, "home"),
+		"GOCACHE=" + filepath.Join(root, "go-cache"),
+		"GOMODCACHE=" + filepath.Join(root, "go-mod"),
+		"GOPATH=" + filepath.Join(root, "home", "go"),
+		"GOTOOLCHAIN=local", "GOENV=off", "GOWORK=off", "GOOS=linux", "CGO_ENABLED=0",
+		"SOURCE_DATE_EPOCH=" + fmt.Sprint(sourceDateEpoch),
+		"npm_config_cache=" + filepath.Join(root, "npm-cache"),
+		"npm_config_userconfig=" + filepath.Join(root, "home", "user.npmrc"),
+		"npm_config_globalconfig=" + filepath.Join(root, "home", "global.npmrc"),
+		"npm_config_audit=false", "npm_config_fund=false",
+	}
+}
+
+// observeToolchain records the builder's tool versions and requires the Node and
+// Go versions pinned by the captured source.
+func observeToolchain(ctx context.Context, checkout string, environment []string, observation *releasev1.BuildObservation) error {
+	for _, tool := range []string{"go", "node", "npm", "dpkg-deb", "rpmbuild"} {
+		arg := "--version"
+		if tool == "go" {
+			arg = "version"
+		}
+		version, err := command(ctx, checkout, environment, tool, arg)
+		if err != nil {
+			return err
+		}
+		observation.ToolVersions[tool] = strings.TrimSpace(string(version))
+	}
+	nodePin, err := readBounded(filepath.Join(checkout, ".node-version"), 128)
+	if err != nil {
+		return err
+	}
+	if strings.TrimPrefix(observation.ToolVersions["node"], "v") != strings.TrimSpace(string(nodePin)) {
+		return errors.New("releasebuild: Node version differs from pinned source")
+	}
+	goMod, err := readBounded(filepath.Join(checkout, "go.mod"), maxDocument)
+	if err != nil {
+		return err
+	}
+	goPin := regexp.MustCompile(`(?m)^go ([0-9.]+)$`).FindSubmatch(goMod)
+	if len(goPin) != 2 || !strings.Contains(observation.ToolVersions["go"], "go"+string(goPin[1])+" ") {
+		return errors.New("releasebuild: Go version differs from pinned source")
+	}
+	return nil
+}
+
+// packageArgs is the captured packaging helper's command line for one product
+// binary, carrying the package signer and every excluded key.
+func packageArgs(request Request, product, arch, binary, packageDir string) []string {
+	packageCommand, binaryFlag := "build", "-agent"
+	switch product {
+	case "lindmd":
+		packageCommand, binaryFlag = "build-server", "-lindmd"
+	case "lindmctl":
+		packageCommand, binaryFlag = "build-cli", "-lindmctl"
+	}
+	args := []string{"packages", packageCommand, binaryFlag, binary, "-version", request.Version, "-arch", arch, "-output", packageDir, "-source-date-epoch", fmt.Sprint(request.SourceDateEpoch), "-signer-home", request.PackageSigner.Home, "-fingerprint", request.PackageSigner.Fingerprint}
+	if request.PackageSigner.Custody == packaging.CustodyDevelopment {
+		args = append(args, "-development-key")
+	} else {
+		args = append(args, "-passphrase-file", request.PackageSigner.PassphraseFile)
+	}
+	for _, value := range request.PackageSigner.RejectPublicKeySHA256 {
+		args = append(args, "-reject-spki-sha256", value)
+	}
+	for _, value := range request.PackageSigner.RejectFingerprints {
+		args = append(args, "-reject-fingerprint", value)
+	}
+	for _, value := range request.PackageSigner.RejectPathPrefixes {
+		args = append(args, "-reject-home-prefix", value)
+	}
+	return args
 }
 
 func syncDirectory(path string) (err error) {

@@ -633,7 +633,11 @@ func (p *Provider) verify(ctx context.Context, plan *agentv1.DeviceActionPlan, r
 
 // SandboxDevices resolves only locally qualified identities to real native block
 // paths for packaging's narrow PrivateDevices bind/DeviceAllow drop-in. It does
-// not grant an action permission or modify a device.
+// not grant an action permission or modify a device. A LUKS target is named by
+// its approved UUID alias rather than its boot-local kernel name: the drop-in
+// outlives the boot, and kernel names can be reassigned between boots (a
+// virtio-SCSI root moved from sda to sdb on RHEL 10.2 once a second disk was
+// attached), which made the executor's mount namespace setup fail.
 func (p *Provider) SandboxDevices(ctx context.Context) (_ []string, err error) {
 	ctx, done, err := p.begin(ctx)
 	if err != nil {
@@ -647,11 +651,12 @@ func (p *Provider) SandboxDevices(ctx context.Context) (_ []string, err error) {
 		if e != nil {
 			return nil, e
 		}
-		if !slices.Contains(devices, target.node.Path) {
-			devices = append(devices, target.node.Path)
-		}
-		if e := target.file.Close(); e != nil {
+		path, e := sandboxTargetPath(qualified.GetTarget(), target, unix.Stat)
+		if e = errors.Join(e, target.file.Close()); e != nil {
 			return nil, e
+		}
+		if !slices.Contains(devices, path) {
+			devices = append(devices, path)
 		}
 		if qualified.GetAllowTpm2Binding() {
 			var st unix.Stat_t
@@ -662,4 +667,31 @@ func (p *Provider) SandboxDevices(ctx context.Context) (_ []string, err error) {
 	}
 	slices.Sort(devices)
 	return devices, nil
+}
+
+// stableTargetAlias is the udev alias derived from the approved identity itself,
+// so it resolves to the same identity on every boot. Only LUKS targets have one.
+func stableTargetAlias(target *agentv1.StorageTarget) string {
+	if uuid := target.GetLuksUuid(); uuid != "" {
+		return "/dev/disk/by-uuid/" + uuid
+	}
+	return ""
+}
+
+// sandboxTargetPath requires the alias to resolve to exactly the pinned,
+// identity-verified node. A missing or diverging alias fails closed rather than
+// silently pinning a boot-local name.
+func sandboxTargetPath(target *agentv1.StorageTarget, handle *targetHandle, stat func(string, *unix.Stat_t) error) (string, error) {
+	alias := stableTargetAlias(target)
+	if alias == "" {
+		return handle.node.Path, nil
+	}
+	var aliased unix.Stat_t
+	if err := stat(alias, &aliased); err != nil {
+		return "", fmt.Errorf("%w: stable_target_alias_unavailable", ErrConflict)
+	}
+	if aliased.Mode&unix.S_IFMT != unix.S_IFBLK || fmt.Sprintf("%d:%d", unix.Major(aliased.Rdev), unix.Minor(aliased.Rdev)) != handle.node.Device {
+		return "", fmt.Errorf("%w: stable_target_alias_mismatch", ErrConflict)
+	}
+	return alias, nil
 }

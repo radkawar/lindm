@@ -8,11 +8,12 @@ import (
 	"strings"
 
 	"lindm/internal/gendoc"
+	"lindm/internal/labmatrix"
 	"lindm/internal/platform"
 )
 
 // generateDocs rewrites (or with -check verifies) every Markdown block
-// generated from the platform registry.
+// generated from the platform registry and the lab matrix ledger.
 func generateDocs(args []string) error {
 	flags := flag.NewFlagSet("generate-docs", flag.ContinueOnError)
 	root := flags.String("root", ".", "repository root")
@@ -27,6 +28,11 @@ func generateDocs(args []string) error {
 	if err != nil {
 		return err
 	}
+	matrix, err := labmatrix.DocBlock(*root)
+	if err != nil {
+		return err
+	}
+	blocks = append(blocks, matrix)
 	stale, err := gendoc.Sync(*root, blocks, !*check)
 	if err != nil {
 		return err

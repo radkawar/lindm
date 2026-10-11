@@ -1,0 +1,15 @@
+{
+  "id": "rhel-9.8-dvd-x86-64",
+  "distribution": "rhel",
+  "version": "9.8",
+  "architecture": "x86_64",
+  "edition": "Binary DVD",
+  "release": "2026-05-12T14:42:37Z",
+  "imageFilename": "rhel-9.8-x86_64-dvd.iso",
+  "imageUrl": "https://api.access.redhat.com/management/v1/images/c0dd53b73406b85b40d6168d1748e605d71361b2992d282c408b7d7d2e1d2c80/download",
+  "checksumUrl": "https://api.access.redhat.com/management/v1/images/rhel/9.8/x86_64",
+  "sha256": "c0dd53b73406b85b40d6168d1748e605d71361b2992d282c408b7d7d2e1d2c80",
+  "imageSizeBytes": "15540420608",
+  "checksumMode": "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl": "https://api.access.redhat.com/management/v1/images/rhel/9.8/x86_64"
+}

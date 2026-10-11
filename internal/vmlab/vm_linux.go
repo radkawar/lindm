@@ -85,33 +85,30 @@ type guestVM struct {
 	stopRebootAfterConnect bool
 }
 
-// vmLog retains only bounded process diagnostics, never guest serial output.
+// vmLog retains the last 8 KiB of process diagnostics, never guest serial
+// output. Unlike a bare nativeexec.Buffer it is safe for concurrent writers.
 type vmLog struct {
 	mu   sync.Mutex
-	data []byte
+	tail *nativeexec.Buffer
 }
 
 func (l *vmLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	n := len(p)
-	const limit = 8192
-	if len(p) >= limit {
-		l.data = append(l.data[:0], p[len(p)-limit:]...)
-	} else {
-		if excess := len(l.data) + len(p) - limit; excess > 0 {
-			copy(l.data, l.data[excess:])
-			l.data = l.data[:len(l.data)-excess]
-		}
-		l.data = append(l.data, p...)
+	if l.tail == nil {
+		l.tail = nativeexec.NewTailBuffer(8192)
 	}
-	return n, nil
+	return l.tail.Write(p)
 }
 
 func (l *vmLog) diagnostic(dir string) string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	s := strings.ReplaceAll(string(l.data), dir, "<private-run>")
+	var data string
+	if l.tail != nil {
+		data = l.tail.String()
+	}
+	s := strings.ReplaceAll(data, dir, "<private-run>")
 	return strings.Map(func(r rune) rune {
 		if r < 32 || r > 126 {
 			return ' '
@@ -217,8 +214,11 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		// require cloud-init to configure a different one.
 		"preserve_hostname": true,
 		// Stop periodic native package mutation before taking the two truth snapshots.
-		// This changes the disposable guest only; it installs nothing.
-		"runcmd": []any{[]string{"sh", "-c", "for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat \"$unit\" >/dev/null 2>&1; then systemctl mask --now \"$unit\" || exit; fi; done"}},
+		// This changes the disposable guest only; it installs nothing. Stop before
+		// mask: "mask --now" reloads first, and systemd 259 then re-coldplugs the
+		// still-active masked timer without its Triggers= dependency and fails it
+		// ("Unit to trigger vanished", result resources), degrading Ubuntu 26.04.
+		"runcmd": []any{[]string{"sh", "-c", "for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat \"$unit\" >/dev/null 2>&1; then systemctl stop \"$unit\" && systemctl mask \"$unit\" || exit; fi; done"}},
 	}
 	if h.stockAcceptance {
 		delete(config, "runcmd")

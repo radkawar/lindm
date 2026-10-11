@@ -888,6 +888,83 @@ receipt checks. This narrows rather than extends existing credential, delegation
 and grant lifetimes. Missing time, failed signatures, nonce substitutions,
 monotonic rollback and expired authority fail closed before destructive effects.
 
+#### Recovery image init and image verification (security review)
+
+The signed recovery image boots with `rdinit=/init`, and `/init` is the static
+`lindm-agent`. No BusyBox, shell, interpreter, `modprobe`, DHCP client or other
+init exists in the archive, so the same closure works on every distribution.
+When PID 1 has `argv[0]` `/init`, it runs the recovery init and never returns:
+a returned error, panic, `SIGINT`/`SIGTERM`, a failed or successful
+`recovery-run` all end in `sync` plus `reboot(2)` power-off. There is no
+credential fallback, retry into another init or interactive path.
+
+The init preserves the previous boot contract and narrows it where the old
+shell was permissive:
+
+- It mounts devtmpfs, rebinds stdin/stdout/stderr to `/dev/console`, then
+  proc, sysfs and a `nosuid,nodev,mode=0755` tmpfs `/run`. The only
+  non-ingredient archive entries are directories, the signed init parameters
+  and the `/dev/console` and `/dev/null` character nodes needed by the Go
+  runtime before devtmpfs exists.
+- It reads only the signed `etc/lindm/recovery-init` parameters (exact
+  canonical text: boot mode, ESP volume serial, optional off-target ext4 UUID).
+  No identifier is substituted into executable text.
+- `etc/lindm/modules.load` must be newline-terminated, unique module names of
+  `[A-Za-z0-9_-]` up to 55 bytes and 1,024 entries. Each module file is opened
+  with `O_NOFOLLOW` from `/lib/modules/<running release>/` and loaded
+  unchanged with `finit_module(2)`; kernel module signature enforcement is
+  unchanged and an already loaded module is success.
+- Off-target state and the ESP are found by reading the first 2 KiB of every
+  `/sys/class/block` device whose opened node is a block device with the
+  sysfs device number. It retries for 30 one-second attempts as before.
+  Two volumes with the same identifier are refused instead of choosing the
+  first. State mounts `ext4` `nosuid,nodev,noexec`; the ESP mounts `vfat`
+  read-only `nosuid,nodev,noexec`. TPM custody instead sets the tmpfs state
+  directory to mode 0700.
+- UKI mode accepts `LoaderEntrySelected` only as at most 512 bytes of
+  printable-ASCII UTF-16LE with an optional final NUL. The entry must be exactly
+  `lindm-recovery-<lowercase canonical UUID>.efi`, matching the former shell
+  pattern. `booted.efi`, the TPM capsule (TPM custody only) and
+  `image-signing.pem` are copied with `O_NOFOLLOW` sources from regular files
+  within 1 GiB/1 MiB/1 MiB bounds. Each destination is first unlinked and then
+  created exclusively as root-owned mode 0400, so a symlink left on off-target
+  media is replaced rather than followed. The selection authorizes nothing:
+  `recovery-run` still authenticates the image, capsule and signer.
+- Measured BLS mode reads no loader variable and mounts no ESP. It only adds
+  securityfs, and `recovery-run` verifies the measured kernel options.
+- DHCPv4 keeps the `udhcpc -n -q -t 5 -T 3` bounds: interfaces are tried in
+  name order after loopback is raised. Each Ethernet interface gets at most
+  five DISCOVERs and three REQUESTs, each waiting three seconds, over a UDP
+  socket bound to that interface with the broadcast flag. Replies require
+  op/htype/hlen, xid, chaddr, magic cookie, an END option, in-bounds unique
+  options, no option overload and unicast addresses. A NAK ends that
+  interface's exchange rather than restarting it, so a hostile server cannot
+  extend the bound. An ACK must name the offering server and address. Address,
+  contiguous netmask (default `/24`), the first router as a replaced default
+  route and `nameserver` lines are applied with ioctls/rtnetlink. Failure to
+  raise a link or apply an acknowledged lease is fatal.
+- `RLIMIT_MEMLOCK` is raised to unlimited, then the same executable runs as
+  the `recovery-run -config /etc/lindm/recovery.json` child of PID 1. PID 1
+  reaps every child, so a panic in recovery code still reaches power-off.
+
+Authenticode verification for staging, image build and recovery is
+in-process (`sbverify` is not required on any distribution). go-uefi
+`v0.0.0-20251010190908-d29549a44f29`, sbctl's pinned version, supplies the PE
+Authenticode hash and PKCS#7/SpcIndirectDataContent parsing. Its
+`PKCS7.Verify` does not compare the signed `messageDigest` attribute with the
+content, so a valid signature could be transplanted onto another image's
+digest. Its WIN_CERTIFICATE reader also trusts the declared length. The lindm
+wrapper is therefore the security boundary. It requires one 8-byte-aligned
+certificate table at end of file after all headers and section data, with no
+trailing bytes, exactly one zero-padded revision-0x0200 PKCS#7 WIN_CERTIFICATE
+and exactly one SignerInfo. That signer's issuer and serial must equal the
+pinned PEM certificate, with SHA-256 digests. Authenticated attributes must
+carry contentType `SpcIndirectDataContent` and a `messageDigest` equal to
+SHA-256 of the signed content. The content's SHA-256 Authenticode digest must
+equal the image hash, and `crypto/x509` must verify the RSA signature with the
+pinned certificate key. Like UEFI and `sbverify`, certificate validity time is
+not evaluated. Unlike `sbverify`, multiple signatures are refused.
+
 ### Secret custody, per-device delivery and managed local-admin passwords
 
 Profiles reference credentials only by `resource.v1.SecretRef`
@@ -1660,7 +1737,8 @@ with reason and operator identity. The active local user explicitly accepts scre
 sharing; keyboard/pointer control is a separately visible permission. The local
 portal grant and product authorization are both required. No unattended access,
 login-screen capture, automatic unlock, cross-session access, file transfer or
-clipboard transfer is implied. These are separately authorized future scope decisions.
+clipboard transfer is implied by a view/control grant. Capability-specific authority
+is defined in the [remote assistance capabilities contract](product-specification.md#remote-assistance-capabilities).
 Visible indicator and local stop control persist throughout the session; lock,
 logout, UID/session change, consent withdrawal or authorization expiry terminates it.
 
@@ -1682,8 +1760,8 @@ typed diagnostics and authorized maintenance operations.
 
 Default audit records consent, operator/employee/session IDs, capabilities, reason,
 start/stop and termination cause, not captured screen contents. Session recording is
-off by default and not a launch guarantee; adding it requires explicit recording
-consent, encryption, retention/legal rules and product approval. L09/L12/L16 must
+off by default; the Tier 2 contract requires explicit recording consent, encryption,
+retention/legal rules and separate retrieval authority. L09/L12/L16 must
 prove the actual UI, input effects, identity isolation, local termination, relay-only
 operation and network interruption on real graphical sessions.
 
@@ -1772,3 +1850,178 @@ The embedded relay is single-instance: its credentials are not verifiable by ano
 replica. There is no TURN-over-TLS or TCP relay allocation (RFC 6062). There is no
 extension: a longer session needs a new invitation and fresh consent. KDE, X11 and
 older desktop versions are not qualified (see `verification.md`).
+
+### Capability extension contract
+
+The [product capability tables](product-specification.md#remote-assistance-capabilities)
+are authoritative for each user story, off/limited/on policy, role permission,
+consent, audit and qualification requirement. This section defines their technical
+boundaries; none of these planned extensions inherits the implemented path's passes.
+
+The versioned protobuf contract carries requested capabilities, effective server
+policy, locally granted capabilities and per-capability unsupported reasons.
+Unknown capabilities and unspecified policy deny, rather than becoming permission
+to use a generic data channel. Session creation and every privileged operation use
+fresh scoped authorization. The executor/helper receive expiring directives and
+enforce the same capability intersection; authority loss closes data/media streams.
+Permissions, policy and consent are not inferred from browser controls or SDP.
+Metadata belongs in structured audit fields, never concatenated into the reason.
+
+Tier 1 uses the existing authenticated session:
+
+- **Clipboard:** request the portal Clipboard interface on the existing
+  RemoteDesktop session before it starts **only** after non-off policy, scoped
+  permission, invitation directions and explicit local product consent all permit
+  it. Never call `RequestClipboard` merely to probe availability. Require the
+  separate portal grant as well; its default-selected switch is not product consent.
+  Limited operator-to-user policy never permits user-to-operator reads even if
+  the compositor's grant is bidirectional. Use selection signals and descriptor
+  transfers only when frontend and backend support them. Accept bounded UTF-8
+  plain text only; clipboard reads are explicit actions.
+  Selection-owner signals update only bounded MIME/ownership metadata; they never
+  trigger an eager read or transmit clipboard contents. Only an explicit authorized
+  transfer action opens a read descriptor. Outgoing offered bytes remain bounded
+  until ownership changes or authority ends, then are discarded.
+  A view-only ScreenCast session cannot quietly become RemoteDesktop to gain
+  clipboard access. Portal version/source capability and runtime grant are separate
+  gates; missing support returns an explicit platform reason without invoking
+  `xclip`, `wl-copy`, compositor-private root APIs or a second portal session.
+- **Keyboard:** semantic text uses keysyms; physical shortcuts use keycodes.
+  A fixed special-key menu expands into ordered press/release events with a
+  capability check before injection. Track input state and release all held inputs
+  on local/remote control loss, blur, stream switch and termination. The browser
+  must not send both semantic and physical forms for the same keystroke.
+  Keysyms do not promise arbitrary Unicode/IME support: the current XKB group must
+  map the symbol at a supported level. The console distinguishes semantic text from
+  physical shortcuts; there is no portal layout-discovery/change API and no use of
+  Mutter's private keymap API as a substitute.
+- **Displays:** negotiate portal-selected streams, preserve stream identity and
+  dimensions through media/signaling, and route absolute coordinates to the selected
+  stream. Full screen and fit/actual-size scaling are browser presentation only.
+  Monitor switching is restricted to streams the user already granted; changed
+  topology invalidates coordinates and requires a new selection or consent.
+- **Messages:** authenticated, session-bound, length/rate-bounded plain text reaches
+  the existing per-user notification service only after session consent. Report
+  accepted delivery separately from lab-observed visibility. No pre-consent free-text
+  channel, command links, credential prompts, markup or cross-session broadcast.
+  Content is ephemeral and excluded from logs/audit.
+
+Tier 2 has independent operation identities, cancellation and content bounds:
+
+- **Files:** server-authorized transfers bind actor/device/session/direction,
+  recipient, size, type and digest before acceptance; each streamed chunk is bounded
+  and cancellation/authority loss removes partial files. The sender's digest is
+  checked against independently computed received bytes before publication.
+  Downloads creation uses a user-owned directory descriptor, exclusive no-follow
+  temporary creation and collision-safe final publication; it never follows
+  symlinks, overwrites a file, sets executable mode or launches the result.
+  Upload authority comes only from local portal FileChooser selection, followed
+  by descriptor-based regular-file validation; a remote path is never accepted.
+  Before a per-file acceptance dialog or FileChooser opens, release pressed inputs,
+  discard queued injection and pause every remote input/clipboard path until local
+  acceptance/cancel and resume. A remote operator cannot click their own approval.
+  Chooser filters are usability hints, not the type-policy enforcement boundary.
+  Reject nonlocal/non-file URIs even if an older portal returns them.
+  Both endpoints enforce size/type policy and the server enforces aggregate quotas.
+  Notification follows verified completion, not queue acceptance.
+- **Reconnect:** a persistent bounded workflow references, but does not revive, an
+  ended session. Reboot/logout invalidates old consent, device epoch, local session,
+  TURN credentials and peer fingerprints. Fresh authorization and a newly accepted
+  portal session are mandatory. Only this connection's separately verified in-force
+  unattended approval and native persistent grant may change local-consent rules;
+  a policy setting or permission alone never does. An offline/expired/changed-user
+  result stays visible, never becomes an automatic retry of a privileged mutation.
+- **Recording:** the unprivileged session helper is the recorder. It takes only
+  granted encoded media before WebRTC encryption, produces a bounded playable
+  container, and encrypts the stream before temporary storage or upload using a
+  maintained standard authenticated streaming-encryption format and the deployment's
+  recording recipient key. This is an explicitly disclosed archive copy, not a
+  relay tap or a new live viewer. Live DTLS-SRTP remains end to end; the relay and
+  server receive no recording plaintext during capture. The server's protected
+  recipient private key is used only for a fresh-authorized, finalized-archive read,
+  streamed over TLS without plaintext disk storage. Upload authority cannot read.
+  Key rotation preserves authorized decryption until retention expires; keys are
+  excluded from audit, URLs and browser persistence. Metadata binds policy, consent,
+  session, start/stop, encrypted object digest, retention deadline and key identity.
+  Retrieval/deletion use independent permissions and device scope, not the live
+  assistance permission. Retention deletion removes encrypted content and records
+  outcome. Mandatory recording fails closed on notification, key or storage failure
+  rather than continuing an unrecorded session. Consent withdrawal closes capture
+  first; plaintext in-memory buffers and child processes have bounded lifetimes.
+
+Tier 3 keeps the same privilege boundaries. Unattended access requires a separately
+qualified persistent compositor grant, prior local opt-in, independent approval and
+an on-device banner/stop. It is limited to an already-unlocked opted-in user session;
+an absent-and-locked workstation remains unavailable. It does not expose a login
+screen or unlock a session. Elevation guidance releases/discards pending inputs and
+pauses all pointer, scroll, key, shortcut and clipboard injection until local resume;
+it never supplies credentials. Pointer/annotation needs a compositor-qualified,
+non-interactive overlay
+bound to the selected stream; audio needs its own visible source permission and
+mute. Plasma/KWin and X11 backend behavior must each pass native portal, input,
+notification, lock and session-isolation gates. No X11 fallback may bypass consent.
+Unattended implementation and KDE qualification wait for parent confirmation.
+
+The platform registry owns per-capability support and refusal reasons; the session
+level assistance gate remains a prerequisite, not evidence of clipboard/files/audio
+support. Qualification uses the maintained `lab vm assistance` scenarios with real
+portal interactions, independent nonce/digest assertions and SHA-256-bound screenshots.
+GNOME 46/Ubuntu 24.04 and GNOME 50/Fedora 44 are separate x86_64 Wayland targets.
+Two-head monitor tests use a two-head virtio-gpu guest, not two browser elements.
+The [verification ledger](verification.md#built-in-graphical-remote-assistance-l09-l12)
+must retain not-run rows until those exact paths have passed.
+
+### Inspected GNOME portal sources
+
+Source inspection covers xdg-desktop-portal 1.18.4 / portal-gnome 46.2 and
+xdg-desktop-portal 1.21.1 / portal-gnome 50.0, plus upstream Mutter 46.0 and 50.0.
+Clones live under `$HOME/dev/minor/clones/linux-flavour/` with project-version
+directory names. Exact commits and source-file hashes are recorded in
+`$HOME/.cache/lindm-assistance-roadmap-20261011/portal-source-evidence.json`,
+SHA-256 `6dcb3eb799e340e0db171538854a32efae98de5513c64e78221ac1876730e307`.
+This is source evidence, not a native clipboard pass. Historical guest records did
+not include Mutter packages: the new lab must observe `libmutter-14-0` /
+`mutter-common` on Ubuntu and `mutter` on Fedora and establish distro patch
+correspondence, rather than treating GNOME Shell's version as Mutter provenance.
+
+Both inspected stacks implement
+[Clipboard v1](https://github.com/flatpak/xdg-desktop-portal/blob/11c8a96b147aeae70e3f770313f93b367d53fedd/data/org.freedesktop.portal.Clipboard.xml#L21-L180)
+on RemoteDesktop v2. Call `RequestClipboard(session, options)` once **before**
+`Start`; require `clipboard_enabled=true` in the successful Start response.
+Both GNOME dialogs expose **Allow Clipboard Access**, initially selected when
+requested; the employee may turn it off. The product must still disclose and
+enforce its own directional grant. `SetSelection` advertises text, not successful
+paste. `SelectionTransfer` supplies the serial for `SelectionWrite`; write to its
+returned Unix FD, close it, then call `SelectionWriteDone`. `SelectionRead`
+returns a nonblocking FD. Bound bytes, lifetime and concurrent transfers; watch
+signals from the portal's unique owner before requests.
+
+GNOME 46's
+[clipboard signal forwarding](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/72d01648ab872c8d849c298fdd9f4d33b5eb820d/src/clipboard.c#L41-79)
+passes Mutter's `(as)` MIME tuple through, despite the public `as` contract.
+[GNOME 50 normalizes it](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/c9a231d3a0c77b6b14f998653b7323858d559dd7/src/clipboard.c#L41-92).
+Both advertise the same Clipboard version: version-only detection is insufficient.
+Normalize only the proven typed variant, or refuse with a specific capability
+reason; never accept arbitrary nested values. Native qualification must observe
+the distro wire behavior, pre-existing selections and both transfer directions.
+Some older backend errors are acknowledged as success, and
+[Mutter's completion handling](https://gitlab.gnome.org/GNOME/mutter/-/blob/c4753689e3413cd9332d885dd0297b3b7d9ba9ca/src/backends/meta-remote-desktop-session.c#L1233-1883)
+does not prove target paste: only an independent guest/console nonce observation
+establishes round-trip success.
+
+Both
+[GNOME 46](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/72d01648ab872c8d849c298fdd9f4d33b5eb820d/src/screencastwidget.c#L682-736)
+and
+[GNOME 50](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/c9a231d3a0c77b6b14f998653b7323858d559dd7/src/screencastwidget.c#L689-743)
+can return multiple locally selected monitors when `SelectSources(multiple=true)`
+precedes Start on the RemoteDesktop session. This permits, not guarantees, two
+streams. Use stream-local logical coordinates, not CSS or encoded-video pixels.
+[Mutter's keysym path](https://gitlab.gnome.org/GNOME/mutter/-/blob/e25c42e63234a9e3480567ab46ecf20fcefdf938/src/backends/native/meta-virtual-input-device-native.c#L468-633)
+depends on the active XKB group and supported levels; unmappable symbols are not
+silently called delivered.
+
+FileChooser returns selected URIs, not transfer bytes or filesystem confinement for
+a host helper. Portal 1.18.4 may return non-file URIs; reject these at the helper.
+GNOME 46 uses its GTK chooser, while
+[GNOME 50 delegates to Nautilus](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/c9a231d3a0c77b6b14f998653b7323858d559dd7/src/filechooser.c#L305-397).
+Record and qualify that Nautilus version as part of Fedora's file-transfer lane.

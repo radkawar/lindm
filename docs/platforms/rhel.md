@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | RHEL 8                                                                                                                          | RHEL 9                                                                                    | RHEL 10                                                                                   |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                                                     | implemented                                                                               | implemented                                                                               |
-| lifecycle         | gated: not implemented for RHEL 8                                                                                               | implemented                                                                               | implemented                                                                               |
-| dispatch          | gated: not implemented for RHEL 8                                                                                               | implemented                                                                               | implemented                                                                               |
-| packages          | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                                                                               | implemented                                                                               |
-| accounts          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                                               | implemented                                                                               |
-| sysctl            | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                                               | implemented                                                                               |
-| definitions       | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                                                                               | implemented                                                                               |
-| password          | gated: not implemented for RHEL 8                                                                                               | implemented                                                                               | implemented                                                                               |
-| firewall          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                                               | implemented                                                                               |
-| encryption        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| wipe              | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| report-loss       | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| lock              | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| recovery-sanitize | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| self-update       | gated: not implemented for RHEL 8                                                                                               | implemented                                                                               | implemented                                                                               |
-| assistance        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained encrypted installer, native action prerequisites or graphical golden | gated: no maintained encrypted installer, native action prerequisites or graphical golden |
-| advisories        | implemented                                                                                                                     | implemented                                                                               | implemented                                                                               |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                                                               | implemented                                                                               |
-| release-upgrade   | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented                                                 | gated: release upgrade is not implemented                                                 |
+| Capability        | RHEL 8                                                                                                                          | RHEL 9                                                              | RHEL 10                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| inventory         | implemented                                                                                                                     | implemented                                                         | implemented                                                         |
+| lifecycle         | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
+| dispatch          | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
+| packages          | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                                                         | implemented                                                         |
+| accounts          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
+| sysctl            | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
+| definitions       | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                                                         | implemented                                                         |
+| password          | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
+| firewall          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
+| encryption        | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
+| wipe              | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | gated: native qualification on the pinned RHEL minor not yet passed |
+| report-loss       | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | gated: native qualification on the pinned RHEL minor not yet passed |
+| lock              | gated: not implemented for RHEL 8                                                                                               | gated: native qualification on the pinned RHEL minor not yet passed | implemented                                                         |
+| recovery-sanitize | gated: not implemented for RHEL 8                                                                                               | gated: native qualification on the pinned RHEL minor not yet passed | gated: native qualification on the pinned RHEL minor not yet passed |
+| self-update       | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
+| assistance        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained RHEL assistance session recipe                 | gated: no maintained RHEL assistance session recipe                 |
+| advisories        | implemented                                                                                                                     | implemented                                                         | implemented                                                         |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                                         | implemented                                                         |
+| release-upgrade   | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented                           | gated: release upgrade is not implemented                           |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -132,8 +132,21 @@ Distinguish agent self-update, package-resource transactions and vendor OS strea
 upgrades. Native agent self-update verifies RPM name/version/architecture and
 rejects immutable OS markers
 ([`update/native_linux.go:111-147`](../../internal/agent/update/native_linux.go#L111-L147)).
-The RHEL service lifecycle records below prove their particular native agent
-upgrade, not every package resource or an interrupted self-update campaign.
+Unattended native self-update is qualified on RHEL 9.8 and 10.2 x86_64 KVM
+guests under SELinux Enforcing: signed hold/rollback/mix-and-match/expiry/tamper
+refusals, an actual DNF4 unpack frozen and interrupted by an owned guest reset,
+completion by the boot recovery helper, and signed downgrade refusal (see
+[verification](../verification.md#rhel-encrypted-device-actions-and-self-update)).
+The executor never runs the DNF4 CLI: the verified update helper runs
+`dnf --disablerepo=* --setopt=plugins=0 install|reinstall` on the staged,
+digest-verified local RPM inside its own transient `systemd-run` unit
+(`PrivateNetwork=yes`, `RestrictAddressFamilies=AF_UNIX`), which is not under the
+executor's read-only `/var`, so the hawkey-log limitation of the package-resource
+path below does not apply
+([`update/native_linux.go`](../../internal/agent/update/native_linux.go)).
+Authenticity comes from the TUF-signed target digest/length plus RPM
+name/version/architecture validation; the lane neither registered the guest nor
+used repositories. Not exercised: aarch64, registered or EUS/E4S guests.
 
 ### Package resources (DNF4)
 
@@ -330,16 +343,54 @@ plus independent recovery boots and signed action evidence. The default executor
 hides disks and TPMs; action provisioning must preserve private-device isolation
 and expose only exact approved nodes
 ([`lindm-executor.service:21-30`](../../internal/packaging/assets/lindm-executor.service#L21-L30)).
-Use the capability-specific encryption/recovery cells in [verification](../verification.md),
-not successful registration or RPM installation, to decide availability.
+
+The encrypted lab installs from the authenticated **Binary DVD**
+(`lab images redhat fetch -edition dvd`; pinned
+[`rhel-9.8-encrypted-x86_64.json`](../../lab/images/rhel-9.8-encrypted-x86_64.json) and
+[`rhel-10.2-encrypted-x86_64.json`](../../lab/images/rhel-10.2-encrypted-x86_64.json)),
+not the Boot ISO, which needs entitled network repositories. The Anaconda
+kickstart lays out LVM on LUKS2 with RHEL's autopart defaults (measured on the
+goldens: 613,160 KiB vfat ESP; xfs `/boot` 1 GiB on 9.8, 2 GiB on 10.2),
+keeps SELinux Enforcing and installs everything from the DVD: the
+`@^workstation-product-environment` GNOME session (RHEL ships no KDE), the TPM user
+space and the native action prerequisites, because the unregistered installed
+system has no repository. EL 9's dracut 057 has no split `systemd-cryptsetup`
+module (naming an absent module is fatal); EL 10's dracut 107 ships it, so the
+registry selects the TPM module list per major. Both majors ship
+`systemd-cryptenroll` with the `systemd-tpm2` token plugin; Secure Boot uses the
+Microsoft-signed RHEL shim.
+
+All five encryption scenarios (inventory/header agreement, KEK custody and
+two-person reveal, rotation with retired-key rejection, crash convergence, TPM2
+bind with unattended boot and PCR7-mismatch recovery) passed natively on RHEL 9.8
+and 10.2 x86_64 with Secure Boot enforced; see
+[verification](../verification.md#rhel-encrypted-device-actions-and-self-update).
+
+The executor's action sandbox drop-in names a LUKS target by its approved
+`/dev/disk/by-uuid/<luks_uuid>` alias, verified at provisioning to be the
+identity-checked block node. On RHEL 10.2 with a second virtio-SCSI disk the root
+moved from `sda` to `sdb` across a cold boot, and the former kernel-name binding
+kept the executor from starting (status 226/NAMESPACE); `openTarget` still checks
+the device number, size and native identity of whatever path it opens.
+
+Original-device recovery sanitize runs on the vendor KVM image, whose ESP is
+200 MiB vfat with 196,772 KiB (9.8) and 195,420 KiB (10.2) free, measured read-only
+from the pinned images. systemd-boot (`systemd-boot-unsigned`) and `systemd-ukify`
+are published in BaseOS/AppStream for both majors and are installed through the
+maintained registration (`vm device-actions -redhat-token-file`), held only for
+that transaction. RHEL ships no BusyBox and no sbsigntools, and the recovery
+image needs neither: its `/init` is the static lindm-agent and Authenticode is
+verified in-process. It still needs a `CONFIG_RD_GZIP=y` kernel, the unchanged
+distro-signed modules and host-side signing to build the image.
 
 ## Device actions
 
 Signed service execution is not desktop lock, quarantine, restart, shutdown,
 crypto-erase or sanitize evidence. Each requires its own authorization, native
 effect and recovery/uncertainty record. Server/minimal and vendor GNOME-capable
-installations remain separate qualification targets. Consult
-[verification's action gates](../verification.md#encryption-and-imperative-action-evidence-l10-l13-l15)
+installations remain separate qualification targets. The registry's RHEL rows
+list exactly the natively qualified action capabilities; see
+[verification](../verification.md#rhel-encrypted-device-actions-and-self-update)
 before enabling an action on a RHEL device.
 
 ## Advisory feeds
@@ -550,6 +601,21 @@ distinguishes 115 out-of-scope namespace entries and 290 valid display-label
 differences from that one remaining invalid document; the latter is rejected
 unscoped, not normalized to `nginx`.
 
+## Remote assistance capability roadmap
+
+RHEL desktop releases require their own vendor-supported portal/backend versions;
+Fedora GNOME evidence is not RHEL evidence. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines every tier's consent, off/limited/on policy, role permissions and audit.
+Clipboard requires Clipboard on the existing RemoteDesktop session, not a backported
+version assumption; FileChooser governs user-selected uploads and Downloads governs
+accepted downloads. SELinux and notification/session isolation remain enabled.
+Clipboard, keys/layouts, displays, messages, files, reconnect, recording and Tier 3
+are [not run](../verification.md#commercial-assistance-capability-qualification).
+Qualify each release/architecture with actual portal actions, two-head guest effects,
+nonces/hashes and termination evidence. Missing interfaces stay gated; unattended
+and KDE implementation/qualification require parent confirmation.
+
 ## Lab
 
 Use maintained image acquisition/offline verification and the registered native
@@ -576,8 +642,10 @@ physical hardware or disconnected vendor content.
 
 ## Gaps
 
-RHEL 8, native aarch64, vendor desktop coverage, physical TPM/media, entitled
-air-gap lifecycle and each unsupported resource/action remain independent work.
+RHEL 8, native aarch64, physical TPM/media, entitled air-gap lifecycle, the
+RHEL GNOME assistance session and each gated resource/action in the table above
+remain independent work; the encrypted Workstation golden qualifies only the
+lab's GDM autologin session, not every vendor desktop configuration.
 DNF4 repository observation is not package mutation qualification. Standard,
 EUS and E4S applicability must retain exact content provenance and cannot be
 borrowed from another vendor or minor release.

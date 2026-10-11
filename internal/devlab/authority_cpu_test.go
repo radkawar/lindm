@@ -9,7 +9,7 @@ import (
 
 func TestAuthorityServerCommandKeepsUnpinnedAPI(t *testing.T) {
 	cmd, err := newServerCommand("/tmp/lindmd", "/tmp/server config.json", "")
-	if err != nil || cmd.Path != "/tmp/lindmd" || !reflect.DeepEqual(cmd.Args, []string{"/tmp/lindmd", "serve", "-config", "/tmp/server config.json"}) {
+	if err != nil || cmd.Path != "/tmp/lindmd" || !reflect.DeepEqual(cmd.Args, []string{"serve", "-config", "/tmp/server config.json"}) {
 		t.Fatalf("default authority command changed: %+v, %v", cmd, err)
 	}
 }
@@ -24,7 +24,7 @@ func TestAuthorityServerCommandPinsBeforeRuntimeOnEveryLaunch(t *testing.T) {
 	}
 	for range 2 {
 		cmd, err := newServerCommand("/tmp/lindmd", "/tmp/server config.json", "4-11")
-		want := []string{taskset, "--cpu-list", "4-11", "/tmp/lindmd", "serve", "-config", "/tmp/server config.json"}
+		want := []string{"--cpu-list", "4-11", "/tmp/lindmd", "serve", "-config", "/tmp/server config.json"}
 		if err != nil || cmd.Path != taskset || !reflect.DeepEqual(cmd.Args, want) {
 			t.Fatalf("server runtime would start without taskset exec: %+v, %v", cmd, err)
 		}

@@ -168,6 +168,11 @@ of manager/background, remote or tty context. Local graphical user sessions with
 missing seats still fail as `UNAVAILABLE`; malformed or failed reads are never
 hidden by this classification. See the schema's `session.seat_applicability` rule,
 not a distro-wide absence exception.
+The independent `loginctl` oracle has table regressions for absent, empty and
+populated seats across these contexts and incomplete context reads. It also replays
+both retained Fedora44 sessions through the inventory-health check. These parser
+regressions do not add native qualification beyond the recorded
+[inventory evidence](../verification.md).
 
 On this Cloud image, Btrfs uses the same device for `/` and `/var`.
 The independent inventory oracle must read `lsblk MOUNTPOINTS`, not only the last
@@ -431,6 +436,46 @@ stop, decline, portal cancel and lock termination, with audit, in
 [`fedora44-assistance-03`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
 Not qualified: KDE Plasma spin, X11, Fedora 43, Atomic desktops, physical
 displays, multi-user seats and ARM desktops.
+
+### Commercial assistance capability roadmap
+
+The [capability contract](../product-specification.md#remote-assistance-capabilities)
+defines each user story, consent, off/limited/on policy, per-role permission and
+audit. Fedora 44 GNOME 50 x86_64 Wayland is an initial target, not a completed
+capability suite. Clipboard uses Clipboard on the existing RemoteDesktop session;
+frontend, GNOME backend and Mutter support must be proven from the pinned sources
+and actual session. No private compositor/root API or X11 clipboard fallback is
+permitted. Fedora 43, Atomic, ARM and the Plasma spin need separate evidence.
+
+[Pinned upstream inspection](../architecture.md#inspected-gnome-portal-sources)
+finds Clipboard v1 support in portal 1.21.1, portal-gnome 50.0 and upstream
+Mutter 50.0. Request Clipboard before RemoteDesktop Start and require the returned
+`clipboard_enabled` grant. GNOME's separate **Allow Clipboard Access** switch can
+deny it. The 50.0 backend normalizes Mutter's MIME tuple to the public array shape;
+method acceptance still does not prove paste or successful peer receipt.
+Record the actual Fedora `mutter` package and distro patches in new evidence,
+rather than equating GNOME Shell 50.0 with exact Mutter provenance. FileChooser in
+portal-gnome 50 delegates to Nautilus; record and qualify its installed version
+for user-to-admin file selection.
+
+Special keys/layouts require the RemoteDesktop keyboard grant. Multiple monitor
+selection uses ScreenCast sources on that same session, selects only granted stream
+IDs and binds pointer coordinates to the selected stream. Full screen/scaling are
+browser presentation, not broader capture consent. Messages use the bound user's
+GNOME notification service. File transfer remains off by default and separately
+authorized, with Downloads/FileChooser, per-file consent, size/type limits and
+hash audit. Reboot/logout reconnect needs fresh local/portal grants; recording
+needs visible disclosure, encrypted storage and retention.
+
+All added capabilities are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Qualify real clipboard nonces, shortcut/layout effects, two-head virtio-gpu
+selection/pointer coordinates, visible message/file notifications, transfer hashes,
+reboot/logout isolation and encrypted-recording retention on this exact tuple.
+SELinux stays enforcing. Annotation/audio require separately qualified native
+mechanisms; elevation leaves credential entry to the employee. Unattended
+implementation and KDE qualification await parent confirmation; X11 is not a
+silent fallback.
 
 ## Advisory feeds
 

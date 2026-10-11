@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -20,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 const loadPostgresImage = "postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336"
@@ -189,15 +190,25 @@ type loadPostgres struct {
 	createAttempted bool
 }
 
-// Never inherit a Docker context/DOCKER_HOST that could address a remote daemon.
+// loadDocker returns the bounded stdout that callers parse; truncation fails.
 func loadDocker(ctx context.Context, args ...string) ([]byte, error) {
-	command := exec.CommandContext(ctx, "docker", append([]string{"--host", "unix:///var/run/docker.sock"}, args...)...)
-	command.WaitDelay = 5 * time.Second
-	output, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("local dedicated PostgreSQL Docker %s failed", args[0])
+	output := nativeexec.NewBuffer(1 << 20)
+	if err := loadDockerInto(ctx, output, args...); err != nil {
+		return nil, err
 	}
-	return output, nil
+	if output.Truncated() {
+		return nil, fmt.Errorf("local dedicated PostgreSQL Docker %s output exceeds 1 MiB", args[0])
+	}
+	return output.Bytes(), nil
+}
+
+// loadDockerInto captures stdout into output, e.g. a log tail. It never
+// inherits a Docker context/DOCKER_HOST that could address a remote daemon.
+func loadDockerInto(ctx context.Context, output *nativeexec.Buffer, args ...string) error {
+	if err := labexec.Run(ctx, labexec.Command{Path: "docker", Args: append([]string{"--host", "unix:///var/run/docker.sock"}, args...), Stdout: output}); err != nil {
+		return fmt.Errorf("local dedicated PostgreSQL Docker %s failed", args[0])
+	}
+	return nil
 }
 
 func loadPostgresArgs(repository, shared, directory string, options LoadAuthorityOptions, storage *loadPostgresStorage) []string {

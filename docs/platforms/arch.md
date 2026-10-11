@@ -200,6 +200,21 @@ missing-pkgrel behavior (`docs/architecture.md:1160-1178`). No findings does not
 mean complete coverage or a secure snapshot; stale/offline feed rules remain
 explicit (`docs/architecture.md:1189-1196`).
 
+## Remote assistance capability roadmap
+
+Arch requires a pinned desktop, compositor and portal backend in addition to the
+rolling repository snapshot. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines consent, off/limited/on policy, role permissions and audit for every tier.
+Clipboard uses the existing RemoteDesktop Clipboard interface; uploads use local
+FileChooser and downloads target Downloads with notification. A headless cloud
+image or package presence proves none of those interfaces or local lock isolation.
+All added capabilities, including keys/layouts, display selection, messages,
+reconnect, recording and Tier 3, are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Qualify actual portal actions, clipboard nonces, two-head/input effects and content
+hashes on each selected desktop; KDE/unattended work awaits parent confirmation.
+
 ## Lab inputs and recorded evidence
 
 The immutable upstream image is

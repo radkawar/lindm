@@ -105,13 +105,7 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 			policy: policy, breakGlass: cfg.BreakGlass, webauthn: webAuthn, dummyHash: dummyPasswordHash(), now: time.Now, rules: rules}
 		s.directory = &localSource{pool: pool}
 		s.passwordSlots = make(chan struct{}, 2)
-		if err := s.activatePolicy(ctx); err != nil {
-			return nil, err
-		}
-		if err := s.terminateEmergencySessions(ctx); err != nil {
-			return nil, err
-		}
-		if err := s.configureSCIM(ctx, cfg.SCIM); err != nil {
+		if err := s.activate(ctx, cfg.SCIM); err != nil {
 			return nil, err
 		}
 		return s, nil
@@ -179,40 +173,54 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		verifier: provider.VerifierContext(oidc.ClientContext(context.Background(), httpClient), &oidc.Config{ClientID: cfg.ClientID}),
 		now:      time.Now,
 	}
-	switch {
-	case cfg.Okta != nil:
-		s.directory, err = newOktaSource(ctx, cfg.Okta.GetOrgUrl(), cfg.DirectoryClientID, cfg.Okta.GetDirectoryKeyId(), cfg.DirectoryPrivateKeyPEM, httpClient, s.clock)
-	case cfg.Google != nil:
-		groups := make([]string, 0, len(policy.groups))
-		for group := range policy.groups {
-			groups = append(groups, group)
-		}
-		s.directory, err = newGoogleSource(ctx, cfg.Google.GetServiceAccountEmail(), cfg.Google.GetPrivateKeyId(), cfg.DirectoryPrivateKeyPEM, cfg.Google.GetDelegatedSubject(), groups, httpClient, s.clock)
-	case entraTenant != uuid.Nil:
-		s.oauth.Scopes = append(s.oauth.Scopes, "profile")
-		s.directory, err = newEntraSource(ctx, "https://graph.microsoft.com/v1.0", cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
-	default:
-		var direct *keycloakSource
-		direct, err = newKeycloakSource(ctx, cfg.Issuer, cfg.DirectoryClientID, cfg.DirectoryClientSecret, endpoint.TokenURL, httpClient, s.clock)
-		s.directory = direct
-		if err == nil && cfg.Broker != nil {
-			s.broker, err = newBrokerSource(ctx, pool, cfg.Issuer, cfg.Broker, cfg.BrokerDirectoryClientSecret, direct, httpClient, s.clock)
-			s.directory = s.broker
-		}
-	}
-	if err != nil {
+	if err := s.configureDirectory(ctx, cfg, endpoint.TokenURL); err != nil {
 		return nil, err
 	}
-	if err := s.activatePolicy(ctx); err != nil {
-		return nil, err
-	}
-	if err := s.terminateEmergencySessions(ctx); err != nil {
-		return nil, err
-	}
-	if err := s.configureSCIM(ctx, cfg.SCIM); err != nil {
+	if err := s.activate(ctx, cfg.SCIM); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// configureDirectory connects the authoritative directory for the configured
+// primary identity provider: Okta, Google, Entra, or Keycloak with an optional
+// upstream broker.
+func (s *Service) configureDirectory(ctx context.Context, cfg Config, tokenURL string) error {
+	var err error
+	switch {
+	case cfg.Okta != nil:
+		s.directory, err = newOktaSource(ctx, cfg.Okta.GetOrgUrl(), cfg.DirectoryClientID, cfg.Okta.GetDirectoryKeyId(), cfg.DirectoryPrivateKeyPEM, s.httpClient, s.clock)
+	case cfg.Google != nil:
+		groups := make([]string, 0, len(s.policy.groups))
+		for group := range s.policy.groups {
+			groups = append(groups, group)
+		}
+		s.directory, err = newGoogleSource(ctx, cfg.Google.GetServiceAccountEmail(), cfg.Google.GetPrivateKeyId(), cfg.DirectoryPrivateKeyPEM, cfg.Google.GetDelegatedSubject(), groups, s.httpClient, s.clock)
+	case s.entraTenant != uuid.Nil:
+		s.oauth.Scopes = append(s.oauth.Scopes, "profile")
+		s.directory, err = newEntraSource(ctx, "https://graph.microsoft.com/v1.0", cfg.DirectoryClientID, cfg.DirectoryClientSecret, tokenURL, s.httpClient, s.clock)
+	default:
+		var direct *keycloakSource
+		direct, err = newKeycloakSource(ctx, cfg.Issuer, cfg.DirectoryClientID, cfg.DirectoryClientSecret, tokenURL, s.httpClient, s.clock)
+		s.directory = direct
+		if err == nil && cfg.Broker != nil {
+			s.broker, err = newBrokerSource(ctx, s.pool, cfg.Issuer, cfg.Broker, cfg.BrokerDirectoryClientSecret, direct, s.httpClient, s.clock)
+			s.directory = s.broker
+		}
+	}
+	return err
+}
+
+// activate applies the configured authorization policy, ends emergency sessions
+// and configures SCIM before the service is used.
+func (s *Service) activate(ctx context.Context, scim *configv1.SCIMConfig) error {
+	if err := s.activatePolicy(ctx); err != nil {
+		return err
+	}
+	if err := s.terminateEmergencySessions(ctx); err != nil {
+		return err
+	}
+	return s.configureSCIM(ctx, scim)
 }
 
 // Close releases idle connections if this service created its HTTP client.

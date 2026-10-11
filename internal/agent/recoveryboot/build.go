@@ -37,13 +37,13 @@ type BuildRequest struct {
 	OutputDirectory string
 	Kernel          Ingredient
 	Stub            Ingredient
-	Busybox         Ingredient
-	Agent           Ingredient
-	Config          Ingredient
-	Files           []Ingredient
-	SigningKey      string
-	Certificate     Ingredient
-	StateUUID       string
+	// Agent is the static lindm-agent archived as the image's PID 1 (/init).
+	Agent       Ingredient
+	Config      Ingredient
+	Files       []Ingredient
+	SigningKey  string
+	Certificate Ingredient
+	StateUUID   string
 	// ESPUUID identifies the prequalified FAT volume. The selected action is
 	// discovered at boot; approved images never embed a future action ID.
 	ESPUUID         string
@@ -113,7 +113,7 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	if err != nil {
 		return nil, err
 	}
-	inputs := []Ingredient{request.Kernel, request.Stub, request.Busybox, request.Agent, request.Config, request.Certificate}
+	inputs := []Ingredient{request.Kernel, request.Stub, request.Agent, request.Config, request.Certificate}
 	inputs = append(inputs, request.Files...)
 	for _, in := range inputs {
 		if err := approved(in); err != nil {
@@ -123,23 +123,22 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	if err := validateBuildClosure(request.Config, request.Files); err != nil {
 		return nil, err
 	}
-	for _, in := range []Ingredient{request.Busybox, request.Agent} {
-		binary, err := elf.Open(in.Source)
-		if err != nil {
-			return nil, fmt.Errorf("recoveryboot: executable ELF: %w", err)
+	// The agent is PID 1: it must run before any loader or library exists.
+	binary, err := elf.Open(request.Agent.Source)
+	if err != nil {
+		return nil, fmt.Errorf("recoveryboot: executable ELF: %w", err)
+	}
+	dynamic := false
+	for _, segment := range binary.Progs {
+		if segment.Type == elf.PT_INTERP {
+			dynamic = true
 		}
-		dynamic := false
-		for _, segment := range binary.Progs {
-			if segment.Type == elf.PT_INTERP {
-				dynamic = true
-			}
-		}
-		if err := binary.Close(); err != nil {
-			return nil, err
-		}
-		if dynamic {
-			return nil, errors.New("recoveryboot: agent_and_busybox_must_be_static")
-		}
+	}
+	if err := binary.Close(); err != nil {
+		return nil, err
+	}
+	if dynamic {
+		return nil, errors.New("recoveryboot: agent_must_be_static")
 	}
 	keyInfo, err := os.Lstat(request.SigningKey)
 	if err != nil {
@@ -164,8 +163,8 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 		}
 		inputs[i].Source = name
 	}
-	request.Kernel, request.Stub, request.Busybox, request.Agent, request.Config, request.Certificate = inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5]
-	request.Files = inputs[6:]
+	request.Kernel, request.Stub, request.Agent, request.Config, request.Certificate = inputs[0], inputs[1], inputs[2], inputs[3], inputs[4]
+	request.Files = inputs[5:]
 	initrd := filepath.Join(dir, "recovery.initrd")
 	closure, err := writeInitramfs(initrd, request)
 	if err != nil {
@@ -187,7 +186,9 @@ func Build(ctx context.Context, request BuildRequest) (_ *Artifact, err error) {
 	if err := native(ctx, nil, "sbsign", "--key", request.SigningKey, "--cert", request.Certificate.Source, "--output", image, unsigned); err != nil {
 		return nil, err
 	}
-	if err := native(ctx, nil, "sbverify", "--cert", request.Certificate.Source, image); err != nil {
+	// The same Authenticode verifier that the device stager and recovery image
+	// use checks the signed output against the approved certificate.
+	if err := verifyAuthenticode(image, request.Certificate.Source); err != nil {
 		return nil, err
 	}
 	digest, size, err := digestFile(image)
@@ -293,7 +294,7 @@ func closeExclusive(out *os.File, owned os.FileInfo, err error) error {
 // stdout/stderr from errors. Standard tools authenticate their own formats.
 func native(ctx context.Context, extraEnv []string, command string, args ...string) error {
 	switch command {
-	case "ukify", "sbsign", "sbverify", "bootctl", "systemctl":
+	case "ukify", "sbsign", "bootctl", "systemctl":
 	default:
 		return errors.New("recoveryboot: unapproved_native_tool")
 	}
@@ -324,27 +325,20 @@ func uuidText(value string) bool {
 	return true
 }
 
-func recoveryInitScript(request BuildRequest) string {
-	setup := offTargetSetup
-	if request.StateUUID == "" {
-		setup = tpmSetup
-	}
-	init := strings.NewReplacer("@CUSTODY_SETUP@", setup, "@BOOT_IMAGE_SETUP@", bootImageSetup).Replace(initScript)
-	return strings.NewReplacer("@STATE_UUID@", request.StateUUID, "@ESP_UUID@", request.ESPUUID).Replace(init)
-}
-
 func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
-	files := []Ingredient{request.Busybox, request.Agent, request.Config, request.Certificate}
-	files[0].Destination, files[0].Executable = "bin/busybox", true
-	files[1].Destination, files[1].Executable = "usr/bin/lindm-agent", true
-	files[2].Destination, files[2].Executable = "etc/lindm/recovery.json", false
-	files[3].Destination, files[3].Executable = "etc/lindm/image-signing.pem", false
+	files := []Ingredient{request.Agent, request.Config, request.Certificate}
+	files[0].Destination, files[0].Executable = "init", true
+	files[1].Destination, files[1].Executable = "etc/lindm/recovery.json", false
+	files[2].Destination, files[2].Executable = "etc/lindm/image-signing.pem", false
 	files = append(files, request.Files...)
 	// The initramfs root may start with tmpfs's replaceable default mode.
 	// Archive "." explicitly so every protected configuration ancestor is
 	// root-owned mode 0755, including the root itself.
-	dirs := map[string]bool{".": true, "dev": true, "proc": true, "sys": true, "run": true, "tmp": true}
-	seen := map[string]bool{"init": true, "etc/lindm/udhcpc": true}
+	dirs := map[string]bool{".": true, "dev": true, "proc": true, "sys": true, "run": true, "tmp": true, "etc": true, "etc/lindm": true}
+	seen := map[string]bool{initParamsPath: true}
+	for _, node := range recoveryDeviceNodes {
+		seen[node.name] = true
+	}
 	for _, in := range files {
 		if path.Clean(in.Destination) != in.Destination || strings.HasPrefix(in.Destination, "/") || in.Destination == "." || strings.HasPrefix(in.Destination, "../") || seen[in.Destination] {
 			return "", errors.New("recoveryboot: invalid_closure_path")
@@ -392,20 +386,27 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 			return "", err
 		}
 	}
-	init := recoveryInitScript(request)
-	inode++
-	if err := cpioEntry(compressed, inode, "init", 0100700, int64(len(init)), request.SourceDateEpoch, strings.NewReader(init)); err != nil {
-		return "", err
+	// The kernel opens /dev/console for PID 1's standard streams before init
+	// runs; Go's runtime otherwise requires /dev/null for closed descriptors.
+	// Both static nodes are hidden once init mounts devtmpfs over /dev.
+	for _, node := range recoveryDeviceNodes {
+		inode++
+		if err := cpioHeader(compressed, inode, node.name, node.mode, 0, request.SourceDateEpoch, node.major, node.minor); err != nil {
+			return "", err
+		}
 	}
+	params := initParamsFor(request).render()
 	inode++
-	if err := cpioEntry(compressed, inode, "etc/lindm/udhcpc", 0100700, int64(len(dhcpScript)), request.SourceDateEpoch, strings.NewReader(dhcpScript)); err != nil {
+	if err := cpioEntry(compressed, inode, initParamsPath, 0100600, int64(len(params)), request.SourceDateEpoch, strings.NewReader(params)); err != nil {
 		return "", err
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Destination < files[j].Destination })
 	var closure strings.Builder
-	fmt.Fprintf(&closure, "lindm-recovery-closure-v1\nepoch %d\nstate_uuid %s\nkernel %x\nstub %x\ncertificate %x\ninit %x\n", request.SourceDateEpoch, request.StateUUID, request.Kernel.SHA256, request.Stub.SHA256, request.Certificate.SHA256, sha256.Sum256([]byte(init)))
-	fmt.Fprintf(&closure, "udhcpc %x\n", sha256.Sum256([]byte(dhcpScript)))
+	fmt.Fprintf(&closure, "lindm-recovery-closure-v2\nepoch %d\nstate_uuid %s\nkernel %x\nstub %x\ncertificate %x\ninit_parameters %x\n", request.SourceDateEpoch, request.StateUUID, request.Kernel.SHA256, request.Stub.SHA256, request.Certificate.SHA256, sha256.Sum256([]byte(params)))
 	fmt.Fprintf(&closure, "esp_uuid %s\n", request.ESPUUID)
+	for _, node := range recoveryDeviceNodes {
+		fmt.Fprintf(&closure, "device %s %o %d:%d\n", node.name, node.mode, node.major, node.minor)
+	}
 	for _, in := range files {
 		if err := approved(in); err != nil {
 			return "", err
@@ -436,20 +437,33 @@ func writeInitramfs(name string, request BuildRequest) (_ string, err error) {
 	return closure.String(), nil
 }
 
+// recoveryDeviceNodes are the only non-directory entries not taken from an
+// approved ingredient: the kernel console and null character devices.
+var recoveryDeviceNodes = []struct {
+	name         string
+	mode         uint32
+	major, minor uint32
+}{{"dev/console", 0020600, 5, 1}, {"dev/null", 0020666, 1, 3}}
+
 func cpioEntry(out io.Writer, inode uint32, name string, mode uint32, size, epoch int64, data io.Reader) error {
-	if size < 0 || size > 0xffffffff || epoch > 0xffffffff {
-		return errors.New("recoveryboot: cpio_size_overflow")
-	}
-	if _, err := fmt.Fprintf(out, "070701%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x", inode, mode, 0, 0, 1, epoch, size, 0, 0, 0, 0, len(name)+1, 0); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(out, name+"\x00"+strings.Repeat("\x00", (4-(110+len(name)+1)%4)%4)); err != nil {
+	if err := cpioHeader(out, inode, name, mode, size, epoch, 0, 0); err != nil {
 		return err
 	}
 	if _, err := io.CopyN(out, data, size); err != nil {
 		return err
 	}
 	_, err := io.WriteString(out, strings.Repeat("\x00", int((4-size%4)%4)))
+	return err
+}
+
+func cpioHeader(out io.Writer, inode uint32, name string, mode uint32, size, epoch int64, rdevMajor, rdevMinor uint32) error {
+	if size < 0 || size > 0xffffffff || epoch < 0 || epoch > 0xffffffff {
+		return errors.New("recoveryboot: cpio_size_overflow")
+	}
+	if _, err := fmt.Fprintf(out, "070701%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x%08x", inode, mode, 0, 0, 1, epoch, size, 0, 0, rdevMajor, rdevMinor, len(name)+1, 0); err != nil {
+		return err
+	}
+	_, err := io.WriteString(out, name+"\x00"+strings.Repeat("\x00", (4-(110+len(name)+1)%4)%4))
 	return err
 }
 

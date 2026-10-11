@@ -347,28 +347,12 @@ func (s *session) walkLogical(path string, class pathClass, recurseFinal bool, s
 		if err := forbiddenSnapshotPath(pathHere); err != nil {
 			return err
 		}
-		next, err := unix.Openat(parentFD, component, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+		next, st, missing, err := s.openWalkComponent(parentFD, component, pathHere)
+		if missing {
+			return s.addNegative(pathHere, snapErrMissing)
+		}
 		if err != nil {
-			if errorsIsNotExist(err) {
-				return s.addNegative(pathHere, snapErrMissing)
-			}
-			if errors.Is(err, unix.ENOTDIR) {
-				return fmt.Errorf("%w: snapshot directory changed during walk: %w", ErrConflict, err)
-			}
-			return fmt.Errorf("%w: snapshot walk %s: %w", ErrUnsupported, pathHere, err)
-		}
-		var st unix.Stat_t
-		if err := unix.Fstat(next, &st); err != nil {
-			_ = unix.Close(next)
 			return err
-		}
-		if st.Uid != 0 {
-			_ = unix.Close(next)
-			return fmt.Errorf("%w: non-root snapshot component %s", ErrUnsupported, pathHere)
-		}
-		if s.sameDest(st) {
-			_ = unix.Close(next)
-			return fmt.Errorf("%w: snapshot would recurse into destination", ErrUnsupported)
 		}
 		switch st.Mode & unix.S_IFMT {
 		case unix.S_IFLNK:
@@ -421,39 +405,79 @@ func (s *session) walkLogical(path string, class pathClass, recurseFinal bool, s
 				return nil
 			}
 			stack.push(next, component, st.Dev, st.Ino)
-		case unix.S_IFREG:
-			if st.Mode&0022 != 0 {
-				_ = unix.Close(next)
-				return fmt.Errorf("%w: writable snapshot file %s", ErrUnsupported, pathHere)
-			}
-			if err := s.observeFile(parentFD, component, pathHere, st, class); err != nil {
-				_ = unix.Close(next)
-				return err
-			}
-			_ = unix.Close(next)
-			if len(pending) == 0 {
-				return nil
-			}
-			return s.addNegative(childPath(pathHere, pending[0]), snapErrNotDir)
-		case unix.S_IFCHR:
-			if !isNullDevice(pathHere, st) {
-				_ = unix.Close(next)
-				return fmt.Errorf("%w: unsupported snapshot device %s", ErrUnsupported, pathHere)
-			}
-			if err := s.observeNull(parentFD, component, pathHere, st); err != nil {
-				_ = unix.Close(next)
-				return err
-			}
-			_ = unix.Close(next)
-			if len(pending) == 0 {
-				return nil
-			}
-			return s.addNegative(childPath(pathHere, pending[0]), snapErrNotDir)
+		case unix.S_IFREG, unix.S_IFCHR:
+			return s.observeLeaf(next, parentFD, component, pathHere, st, class, pending)
 		default:
 			_ = unix.Close(next)
 			return fmt.Errorf("%w: unsupported snapshot file type %s", ErrUnsupported, pathHere)
 		}
 	}
+	return s.observeWalkEnd(stack, path, class, recurseFinal)
+}
+
+// openWalkComponent pins one path component without following it and requires
+// a root-owned object outside the snapshot destination. missing reports an
+// absent component, which the walk records as a negative result.
+func (s *session) openWalkComponent(parentFD int, component, pathHere string) (next int, st unix.Stat_t, missing bool, err error) {
+	next, err = unix.Openat(parentFD, component, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		if errorsIsNotExist(err) {
+			return -1, st, true, nil
+		}
+		if errors.Is(err, unix.ENOTDIR) {
+			return -1, st, false, fmt.Errorf("%w: snapshot directory changed during walk: %w", ErrConflict, err)
+		}
+		return -1, st, false, fmt.Errorf("%w: snapshot walk %s: %w", ErrUnsupported, pathHere, err)
+	}
+	if err := unix.Fstat(next, &st); err != nil {
+		_ = unix.Close(next)
+		return -1, st, false, err
+	}
+	if st.Uid != 0 {
+		_ = unix.Close(next)
+		return -1, st, false, fmt.Errorf("%w: non-root snapshot component %s", ErrUnsupported, pathHere)
+	}
+	if s.sameDest(st) {
+		_ = unix.Close(next)
+		return -1, st, false, fmt.Errorf("%w: snapshot would recurse into destination", ErrUnsupported)
+	}
+	return next, st, false, nil
+}
+
+// observeLeaf records the read-only regular file or null device that ends a
+// walk and closes next. A remaining suffix below it is recorded as a
+// not-a-directory negative result.
+func (s *session) observeLeaf(next, parentFD int, component, pathHere string, st unix.Stat_t, class pathClass, pending []string) error {
+	if st.Mode&unix.S_IFMT == unix.S_IFREG {
+		if st.Mode&0022 != 0 {
+			_ = unix.Close(next)
+			return fmt.Errorf("%w: writable snapshot file %s", ErrUnsupported, pathHere)
+		}
+		if err := s.observeFile(parentFD, component, pathHere, st, class); err != nil {
+			_ = unix.Close(next)
+			return err
+		}
+	} else {
+		if !isNullDevice(pathHere, st) {
+			_ = unix.Close(next)
+			return fmt.Errorf("%w: unsupported snapshot device %s", ErrUnsupported, pathHere)
+		}
+		if err := s.observeNull(parentFD, component, pathHere, st); err != nil {
+			_ = unix.Close(next)
+			return err
+		}
+	}
+	_ = unix.Close(next)
+	if len(pending) == 0 {
+		return nil
+	}
+	return s.addNegative(childPath(pathHere, pending[0]), snapErrNotDir)
+}
+
+// observeWalkEnd records the directory a walk ended in after consuming every
+// component (for example through a trailing ".."); only recursive captures may
+// end on a directory.
+func (s *session) observeWalkEnd(stack *dirStack, path string, class pathClass, recurseFinal bool) error {
 	current := stack.canonical()
 	if current == "" {
 		current = "/"

@@ -162,7 +162,7 @@ func preflight(ctx context.Context, request StageRequest, capacity func(string, 
 	if info.Size() != request.ImageSize {
 		return errors.New("recoveryboot: image_size_mismatch")
 	}
-	if err := native(ctx, nil, "sbverify", "--cert", request.CertificatePath, request.ImagePath); err != nil {
+	if err := verifyAuthenticode(request.ImagePath, request.CertificatePath); err != nil {
 		return err
 	}
 	one, err := readEFString("LoaderEntryOneShot", loaderGUID)
@@ -396,7 +396,7 @@ func VerifyBoot(ctx context.Context, stateDirectory, actionID, sourceBootID stri
 	if err := VerifyImage(ctx, image, imageSHA256); err != nil {
 		return "", err
 	}
-	if err := native(ctx, nil, "sbverify", "--cert", certificate, image); err != nil {
+	if err := verifyAuthenticode(image, certificate); err != nil {
 		return "", err
 	}
 	return bootID, nil

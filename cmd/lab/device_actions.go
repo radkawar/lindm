@@ -13,7 +13,7 @@ import (
 func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm device-actions", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04/26.04 or Fedora 44 encrypted installer manifest")
+	manifestPath := flags.String("manifest", "", "signed Ubuntu 24.04/26.04, Fedora 44 or RHEL 9.8/10.2 encrypted installer manifest")
 	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud recovery image manifest")
 	var options vmlab.VMDeviceActionsOptions
 	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")
@@ -31,6 +31,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.Encrypted.CacheDir, "cache", ".cache/lab/images", "verified official image cache")
 	flags.StringVar(&options.Encrypted.GoldenDir, "golden-cache", ".cache/lab/encrypted", "private encrypted installer golden cache")
 	flags.StringVar(&options.Encrypted.WorkDir, "work-dir", "", "existing parent for private disposable VM state")
+	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL original-device recovery, which installs entitled boot tooling in the disposable vendor guest")
 	flags.StringVar(&options.Encrypted.Firmware.Code, "firmware-code", "", "package-owned OVMF code")
 	flags.StringVar(&options.Encrypted.Firmware.Vars, "firmware-vars", "", "matching package-owned enrolled OVMF NVRAM template")
 	flags.StringVar(&options.Encrypted.Firmware.Package, "firmware-package", "", "installed host firmware package")

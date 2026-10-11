@@ -8,6 +8,7 @@ linters:
     - bodyclose
     - sqlclosecheck
     - depguard
+    - funlen
   settings:
     depguard:
       rules:
@@ -40,8 +41,146 @@ linters:
               desc: "Lab host scheduling and remote execution belong only to laboratory entrypoints."
     errcheck:
       check-type-assertions: true
+    funlen:
+      lines: 120
+      statements: -1
+      ignore-comments: true
   exclusions:
     generated: strict
+    rules:
+      # funlen applies to product code only: tests and laboratory entry points are exempt.
+      - path: _test\.go$
+        linters: [funlen]
+      - path: (^|/)internal/(vmlab|devlab|loadlab|labhost|deploylab)/
+        linters: [funlen]
+      - path: (^|/)cmd/(lab|dev)/
+        linters: [funlen]
+      # funlen baseline: reviewed product functions over 120 lines (2026-10-11).
+      # This list may only shrink. Never add an entry; split the function into
+      # meaningful named steps instead, then delete its entry here.
+      - path: '(^|/)internal/advisory/feed/osv\.go$'
+        text: "Function 'appendOSV' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/advisory/match\.go$'
+        text: "Function 'evaluateOnce' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/advisory/match\.go$'
+        text: "Function 'matchFindingSet' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/accountprovider/helper_linux\.go$'
+        text: "Function 'nativeCommands' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/accountprovider/native_linux\.go$'
+        text: "Function 'observeLocal' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/accountprovider/target_linux\.go$'
+        text: "Function 'target' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/actionprovider/compliance_linux\.go$'
+        text: "Function 'observeRootEncryption' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/actionprovider/provider_linux\.go$'
+        text: "Function 'observe' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/definitionprovider/files_linux\.go$'
+        text: "Function 'snapshot' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/executor/device_action_execution\.go$'
+        text: "Function 'beginDeviceAction' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/executor/device_action_recovery\.go$'
+        text: "Function 'prepareDeviceActionRecovery' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/executor/identity\.go$'
+        text: "Function 'bind' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/executor/resource_execution\.go$'
+        text: "Function 'prepareResourceExecution' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/journal/device_actions_linux\.go$'
+        text: "Function 'validateDeviceAction' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/nativehelper/observation_linux\.go$'
+        text: "Function 'ObserveResource' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/osupdateprovider/helper_linux\.go$'
+        text: "Function 'ApplyNative' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/packageprovider/apply_linux\.go$'
+        text: "Function 'Apply' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/packageprovider/apt_linux\.go$'
+        text: "Function 'planAPT' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/packageprovider/provider_linux\.go$'
+        text: "Function 'Plan' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/passwordprovider/helper_linux\.go$'
+        text: "Function 'ApplyNative' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/passwordprovider/native_linux\.go$'
+        text: "Function 'inspectManager' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/passwordprovider/policy_linux\.go$'
+        text: "Function 'targetSnapshot' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/recovery/runtime_linux\.go$'
+        text: "Function 'run' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/agent/sysctlprovider/native_linux\.go$'
+        text: "Function 'ApplyNative' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/admin_inventory\.go$'
+        text: "Function 'ListDevicePackages' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/admin_search\.go$'
+        text: "Function 'searchDevicePage' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/connectivity_guard\.go$'
+        text: "Function 'ConnectivityConfirmationHandler' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_admin\.go$'
+        text: "Function 'CreateDeviceAction' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_recovery_register\.go$'
+        text: "Function 'RegisterDeviceActionRecovery' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_recovery_result\.go$'
+        text: "Function 'CheckpointRecoveryAction' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_recovery_start\.go$'
+        text: "Function 'AuthorizeRecoveryStart' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_result\.go$'
+        text: "Function 'ReportDeviceActionResult' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/device_action_start\.go$'
+        text: "Function 'AuthorizeDeviceActionStart' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/offline_enrollment\.go$'
+        text: "Function 'CreateOfflineEnrollmentAuthorization' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/provisioning\.go$'
+        text: "Function 'reserveProvisioning' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/resource_assignments\.go$'
+        text: "Function 'GetDeviceResourceState' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/resource_assignments\.go$'
+        text: "Function 'SetResourceAssignment' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/resource_dispatch\.go$'
+        text: "Function 'getResourceWork' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/resource_result\.go$'
+        text: "Function 'ReportResourceResult' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/resource_start\.go$'
+        text: "Function 'AuthorizeResourceStart' is too long"
+        linters: [funlen]
+      - path: '(^|/)internal/device/service\.go$'
+        text: "Function 'New' is too long"
+        linters: [funlen]
 formatters:
   enable:
     - gofmt

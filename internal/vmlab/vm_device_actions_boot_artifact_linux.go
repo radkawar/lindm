@@ -78,10 +78,6 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	if err != nil {
 		return nil, err
 	}
-	request.Busybox, err = collect("/usr/bin/busybox", "", true)
-	if err != nil {
-		return nil, err
-	}
 	request.Agent, err = collect(packaging.BinaryPath, "", true)
 	if err != nil {
 		return nil, err
@@ -162,7 +158,8 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 	}
 	// Keep only the distro-signed modules needed by this exact emulated tuple.
 	// modprobe's ordered insmod closure is decompressed without altering module
-	// bytes/signatures; BusyBox does not need host zstd/depmod in the initramfs.
+	// bytes/signatures; recovery init loads modules.load in this order with
+	// finit_module(2), so no host zstd/depmod/modprobe enters the initramfs.
 	modules := []string{"virtio_pci", "virtio_net", "vfat", "efivarfs"}
 	if runtime.GetCustody() == agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET {
 		modules = append(modules, "ext4")
@@ -191,7 +188,7 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 		}
 		modules = append(modules, "tpm_tis")
 	}
-	var load, dependencies strings.Builder
+	var load strings.Builder
 	seenModules := make(map[string]bool)
 	for _, module := range modules {
 		output, err := vm.run(ctx, "sudo -n modprobe --show-depends "+nativeQuote(module), nil, 64<<10, 15*time.Second)
@@ -233,13 +230,9 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, signer *actio
 			}
 			request.Files = append(request.Files, moduleFile)
 			load.WriteString(strings.TrimSuffix(base, ".ko") + "\n")
-			dependencies.WriteString(base + ":\n")
 		}
 	}
 	if err := addPublic("modules.load", "etc/lindm/modules.load", []byte(load.String())); err != nil {
-		return nil, err
-	}
-	if err := addPublic("modules.dep", "lib/modules/"+boot.KernelRelease+"/modules.dep", []byte(dependencies.String())); err != nil {
 		return nil, err
 	}
 	return recoveryboot.Build(ctx, request)

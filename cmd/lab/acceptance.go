@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
 
 	"lindm/internal/devlab"
+	"lindm/internal/labexec"
 )
 
 type acceptanceBrowser struct {
@@ -246,15 +246,10 @@ func runAcceptanceBrowser(ctx context.Context, repository, private string, cfg a
 		return result, err
 	}
 	clear(encoded)
-	bounded, cancel := context.WithTimeout(ctx, 8*time.Minute)
-	defer cancel()
-	command := exec.CommandContext(bounded, "node", filepath.Join(repository, "web/acceptance/run.mjs"), path)
-	command.Dir, command.WaitDelay = repository, 45*time.Second
-	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
-	// Browser output can contain UI credentials in framework diagnostics; the
-	// maintained runner writes sanitized failures and masked screenshots itself.
-	command.Stdout, command.Stderr = io.Discard, io.Discard
-	runErr := command.Run()
+	// Browser output can contain UI credentials in framework diagnostics, so it is
+	// discarded; the maintained runner writes sanitized failures and masked
+	// screenshots itself. Cancellation lets it close browsers before the group dies.
+	runErr := labexec.Run(ctx, labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/run.mjs"), path}, Dir: repository, Timeout: 8 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
 	resultFile, readErr := os.Open(cfg.ResultPath)
 	var body []byte
 	if readErr == nil {

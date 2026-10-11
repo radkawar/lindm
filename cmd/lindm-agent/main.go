@@ -15,6 +15,7 @@ import (
 
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/inventory"
+	"lindm/internal/agent/recoveryboot"
 )
 
 const usage = `Usage: lindm-agent inspect
@@ -82,6 +83,12 @@ version prints the packaging version and a newline.
 `
 
 func main() {
+	// The signed recovery image archives this executable as /init. Only the
+	// kernel-started PID 1 with that exact argv[0] becomes the recovery init;
+	// RunInit never returns and always ends in poweroff.
+	if os.Getpid() == 1 && len(os.Args) > 0 && os.Args[0] == "/init" {
+		recoveryboot.RunInit()
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Args[1:], os.Stdout); err != nil {

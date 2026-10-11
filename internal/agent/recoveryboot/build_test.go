@@ -183,7 +183,7 @@ func TestCopyApprovedRetainsCompleteVerifiedFile(t *testing.T) {
 func TestInitramfsReproducibleAndRejectsClosureEscape(t *testing.T) {
 	dir := t.TempDir()
 	input := fixtureIngredient(t, dir, "ingredient", []byte("deterministic-approved-bytes"))
-	request := BuildRequest{Kernel: input, Stub: input, Busybox: input, Agent: input, Config: input, Certificate: input, StateUUID: "12345678-1234-1234-1234-123456789abc", ESPUUID: "ABCD-1234", SourceDateEpoch: 1700000000}
+	request := BuildRequest{Kernel: input, Stub: input, Agent: input, Config: input, Certificate: input, StateUUID: "12345678-1234-1234-1234-123456789abc", ESPUUID: "ABCD-1234", SourceDateEpoch: 1700000000}
 	first, second := filepath.Join(dir, "first.cpio"), filepath.Join(dir, "second.cpio")
 	closure, err := writeInitramfs(first, request)
 	if err != nil {
@@ -221,12 +221,35 @@ func TestInitramfsReproducibleAndRejectsClosureEscape(t *testing.T) {
 	// Decode the decompressed kernel payload, not just its compression header.
 	// All payloads must remain aligned newc records with required boot files.
 	entries := decodeCPIO(t, archive)
-	for _, name := range []string{".", "init", "etc/lindm/udhcpc", "bin/busybox", "usr/bin/lindm-agent", "etc/lindm/recovery.json", "etc/lindm/image-signing.pem"} {
+	for _, name := range []string{".", "init", initParamsPath, "dev/console", "dev/null", "etc/lindm/recovery.json", "etc/lindm/image-signing.pem"} {
 		if _, ok := entries[name]; !ok {
 			t.Fatalf("missing boot ingredient %s", name)
 		}
 	}
-	for _, destination := range []string{"../escape", "/absolute", "etc/../escape", "init", "usr/bin/lindm-agent", "usr"} {
+	// The static agent is PID 1; no shell, busybox, DHCP script or second
+	// agent copy is archived.
+	for _, name := range []string{"bin/busybox", "bin/sh", "etc/lindm/udhcpc", "usr/bin/lindm-agent"} {
+		if _, ok := entries[name]; ok {
+			t.Fatalf("closed recovery image archived %s", name)
+		}
+	}
+	if init := entries["init"]; init.mode != 0100700 || init.uid != 0 || init.gid != 0 || string(init.data) != "deterministic-approved-bytes" {
+		t.Fatalf("init is not the approved root-only agent: %+v", init)
+	}
+	params, err := parseInitParams(entries[initParamsPath].data)
+	if err != nil || params != (initParams{Mode: initModeUKI, ESPUUID: "ABCD-1234", StateUUID: request.StateUUID}) || entries[initParamsPath].mode != 0100600 {
+		t.Fatalf("init parameters not archived exactly: %+v, %v", params, err)
+	}
+	for name, want := range map[string][3]int{"dev/console": {0020600, 5, 1}, "dev/null": {0020666, 1, 3}} {
+		node := entries[name]
+		if node.mode != want[0] || node.rdevMajor != want[1] || node.rdevMinor != want[2] || len(node.data) != 0 {
+			t.Fatalf("%s is not the exact character device: %+v", name, node)
+		}
+	}
+	if !strings.HasPrefix(closure, "lindm-recovery-closure-v2\n") || !strings.Contains(closure, " init\n") || strings.Contains(closure, "udhcpc") {
+		t.Fatalf("closure does not bind the agent init: %q", closure)
+	}
+	for _, destination := range []string{"../escape", "/absolute", "etc/../escape", "init", initParamsPath, "dev/console", "dev/null", "dev", "etc/lindm"} {
 		request.Files = []Ingredient{{Source: input.Source, SHA256: input.SHA256, Destination: destination}}
 		if _, err := writeInitramfs(filepath.Join(dir, "rejected"), request); err == nil {
 			t.Fatalf("accepted invalid destination %q", destination)
@@ -262,17 +285,5 @@ func TestRecoveryCommandLinePinsDiagnosticConsole(t *testing.T) {
 		if _, err := recoveryCommandLine(console); err == nil {
 			t.Fatalf("arbitrary kernel console accepted: %q", console)
 		}
-	}
-}
-
-func TestRecoveryInitOpensConsoleAfterDeviceMount(t *testing.T) {
-	mount := strings.Index(initScript, "$BB mount -t devtmpfs devtmpfs /dev\n")
-	console := strings.Index(initScript, "exec </dev/console >/dev/console 2>&1\n")
-	proc := strings.Index(initScript, "$BB mount -t proc proc /proc\n")
-	if mount < 0 || console <= mount || proc <= console {
-		t.Fatal("recovery init must bind standard streams after devices exist and before fallible setup")
-	}
-	if !strings.Contains(initScript, "trap fail EXIT INT TERM") || !strings.Contains(initScript, "fail() { $BB poweroff -f; exit 1; }") {
-		t.Fatal("console diagnostics must not introduce an interactive failure path")
 	}
 }

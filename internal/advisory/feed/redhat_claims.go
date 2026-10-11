@@ -83,26 +83,9 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 				continue
 			}
 			record := &advisoryv1.Advisory{Id: d.Tracking.ID, Cves: []string{vulnerability.CVE}, PackageName: pkg.name, SourcePackage: pkg.source, Architecture: pkg.arch, Severity: d.Severity.Text, PublishedAt: published, SourceUrl: config.GetUrl(), PlatformRelease: config.GetRelease(), PlatformStream: config.GetPlatformStream(), ModuleName: pkg.module, ModuleStream: pkg.stream}
-			if pkg.source {
-				record.Architecture = ""
+			if err := applyRedHatStatus(record, pkg, status, uncertain); err != nil {
+				return err
 			}
-			switch status {
-			case "fixed":
-				if pkg.version == "" {
-					return errors.New("feed: Red Hat fixed RPM lacks exact EVR")
-				}
-				record.FixedVersion = pkg.version
-			case "known_affected":
-				// Vendor unfixed status applies to the package/source in this
-				// platform, even when its component PURL includes a version.
-				// Source-wide reconciliation still gives exact fixes priority.
-			case "known_not_affected":
-				record.NotAffected = !uncertain
-				if pkg.version != "" {
-					record.IntroducedVersion, record.LastAffectedVersion = pkg.version, pkg.version
-				}
-			}
-			record.AssessmentUnknown = uncertain || status == "under_investigation"
 			// Reuse the shared normalized-record validation without retaining
 			// an advisory-sized document or bypassing native RPM bounds.
 			var storage [1]*advisoryv1.Advisory
@@ -115,6 +98,39 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 			}
 		}
 	}
+	return rejectUnsupportedRedHatStatuses(config, vulnerability, products, relations, &scopeMemo)
+}
+
+// applyRedHatStatus applies one vendor product status to record: fixed needs an
+// exact EVR, not-affected bounds the stated version, and uncertain or
+// under-investigation statuses mark the assessment unknown.
+func applyRedHatStatus(record *advisoryv1.Advisory, pkg redHatRPM, status string, uncertain bool) error {
+	if pkg.source {
+		record.Architecture = ""
+	}
+	switch status {
+	case "fixed":
+		if pkg.version == "" {
+			return errors.New("feed: Red Hat fixed RPM lacks exact EVR")
+		}
+		record.FixedVersion = pkg.version
+	case "known_affected":
+		// Vendor unfixed status applies to the package/source in this
+		// platform, even when its component PURL includes a version.
+		// Source-wide reconciliation still gives exact fixes priority.
+	case "known_not_affected":
+		record.NotAffected = !uncertain
+		if pkg.version != "" {
+			record.IntroducedVersion, record.LastAffectedVersion = pkg.version, pkg.version
+		}
+	}
+	record.AssessmentUnknown = uncertain || status == "under_investigation"
+	return nil
+}
+
+// rejectUnsupportedRedHatStatuses rejects any other vendor status that names an
+// in-scope product; off-scope products are ignored.
+func rejectUnsupportedRedHatStatuses(config *advisoryv1.FeedSource, vulnerability redHatVulnerability, products map[string]redHatProduct, relations map[string]redHatRelationship, scopeMemo *map[string]redHatScopeProof) error {
 	for status, ids := range vulnerability.Status {
 		if status == "fixed" || status == "known_affected" || status == "known_not_affected" || status == "under_investigation" {
 			continue
@@ -128,14 +144,14 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 				return errors.New("feed: unresolved Red Hat status product")
 			}
 			if relation.ambiguous {
-				if redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+				if redHatReferenceOffScope(config, id, products, relations, 0, scopeMemo) {
 					continue
 				}
 				return errRedHatAmbiguousIdentity
 			}
 			platform, _, err := redHatPlatformProduct(relation.Platform, products, relations, 0)
 			if err != nil {
-				if errors.Is(err, errRedHatAmbiguousIdentity) && redHatReferenceOffScope(config, id, products, relations, 0, &scopeMemo) {
+				if errors.Is(err, errRedHatAmbiguousIdentity) && redHatReferenceOffScope(config, id, products, relations, 0, scopeMemo) {
 					continue
 				}
 				return err

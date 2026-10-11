@@ -30,6 +30,9 @@ type VMDeviceActionsOptions struct {
 	LindmdBinary     string
 	Encrypted        EncryptedVMOptions
 	RecoveryManifest *labv1.ImageManifest
+	// RedHatTokenFile is required only by subscription-entitled original-device
+	// recovery, whose unregistered vendor cloud image needs entitled boot tooling.
+	RedHatTokenFile string
 }
 
 type VMDeviceActionsResult struct {
@@ -245,6 +248,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		if err := release.Gate(c); err != nil {
 			return nil, err
 		}
+	}
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
+		return nil, err
 	}
 	if options.Encrypted.Desktop != "gnome" || !options.Encrypted.TPMBoot || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("device actions require installer GNOME, unbound TPM-capable boot stack, explicit topology and signed-package egress")

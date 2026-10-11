@@ -573,29 +573,11 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	if err != nil {
 		return err
 	}
-	potential := false
-	for _, product := range products {
-		if applies, _ := redHatPlatform(config, product.product, "under_investigation"); applies {
-			potential = true
-			break
-		}
-		for cpe := range product.cpes {
-			alternative := product.product
-			alternative.Helper.CPE = cpe
-			if applies, _ := redHatPlatform(config, alternative, "under_investigation"); applies {
-				potential = true
-				break
-			}
-		}
-		if potential {
-			break
-		}
-	}
 	// Signed distributions also contain historical informational advisories.
 	// Product CPEs independently establish scope; an off-scope document cannot
 	// supply claims and need not satisfy the selected product's advisory policy.
 	// Applicable documents still undergo every metadata and status check.
-	if !potential {
+	if !redHatPotentiallyApplicable(config, products) {
 		return errRedHatNotApplicable
 	}
 	d := &notice.Document
@@ -629,7 +611,32 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	if _, err := file.Seek(vulnerabilities, io.SeekStart); err != nil {
 		return err
 	}
-	j = &redHatJSON{decoder: json.NewDecoder(contextFeedReader{ctx, file})}
+	return emitRedHatVulnerabilities(ctx, config, file, &notice, products, tree.relations, validator, emit)
+}
+
+// redHatPotentiallyApplicable reports whether any product, or any of its CPE
+// alternatives, could apply to the configured platform.
+func redHatPotentiallyApplicable(config *advisoryv1.FeedSource, products map[string]redHatProduct) bool {
+	for _, product := range products {
+		if applies, _ := redHatPlatform(config, product.product, "under_investigation"); applies {
+			return true
+		}
+		for cpe := range product.cpes {
+			alternative := product.product
+			alternative.Helper.CPE = cpe
+			if applies, _ := redHatPlatform(config, alternative, "under_investigation"); applies {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// emitRedHatVulnerabilities streams the vulnerabilities array, which starts at
+// the current file offset, emitting claims until one is rejected; the rest of a
+// rejected document only adds its packages to the rejection.
+func emitRedHatVulnerabilities(ctx context.Context, config *advisoryv1.FeedSource, file *os.File, notice *suseCSAF, products map[string]redHatProduct, relations map[string]redHatRelationship, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
+	j := &redHatJSON{decoder: json.NewDecoder(contextFeedReader{ctx, file})}
 	j.decoder.UseNumber()
 	count := 0
 	var rejected *redHatRejectedRecordError
@@ -642,9 +649,9 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 			return err
 		}
 		if rejected != nil {
-			return rejected.includeRejectedPackages(ctx, config, vulnerability, products, tree.relations)
+			return rejected.includeRejectedPackages(ctx, config, vulnerability, products, relations)
 		}
-		err := redHatVulnerabilityClaims(config, &notice, vulnerability, products, tree.relations, validator, func(record *advisoryv1.Advisory) error {
+		err := redHatVulnerabilityClaims(config, notice, vulnerability, products, relations, validator, func(record *advisoryv1.Advisory) error {
 			if err := emit(record); err != nil {
 				return &redHatSinkError{cause: err}
 			}
@@ -658,8 +665,8 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 		if errors.As(err, &sink) {
 			return err
 		}
-		rejected = redHatMetadataRejection(&notice, err)
-		return rejected.includeRejectedPackages(ctx, config, vulnerability, products, tree.relations)
+		rejected = redHatMetadataRejection(notice, err)
+		return rejected.includeRejectedPackages(ctx, config, vulnerability, products, relations)
 	}); err != nil {
 		return err
 	}

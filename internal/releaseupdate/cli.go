@@ -66,18 +66,7 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		return errors.New("unexpected positional arguments")
 	}
 	if args[0] == "development-keys" {
-		if *keyDir == "" {
-			return errors.New("-keys required")
-		}
-		absolute, err := filepath.Abs(*keyDir)
-		if err != nil {
-			return err
-		}
-		if err = GenerateDevelopmentKeys(absolute); err != nil {
-			return err
-		}
-		_, err = fmt.Fprintln(stdout, "DEVELOPMENT ONLY: generated five independent local role keys; not production custody")
-		return err
+		return writeDevelopmentKeys(*keyDir, stdout)
 	}
 	if *directory == "" {
 		return errors.New("-repository required")
@@ -94,38 +83,14 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		if err != nil {
 			return err
 		}
-		return Mirror(ctx, MirrorConfig{Directory: absolute, BootstrapRoot: root, Fetch: DirectoryFetch(*source), OpenTarget: func(ctx context.Context, name string) (io.ReadCloser, error) {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			sourceRoot, err := os.OpenRoot(*source)
-			if err != nil {
-				return nil, err
-			}
-			file, openErr := openRegular(sourceRoot, name)
-			closeErr := sourceRoot.Close()
-			if openErr != nil || closeErr != nil {
-				if file != nil {
-					return nil, errors.Join(openErr, closeErr, file.Close())
-				}
-				return nil, errors.Join(openErr, closeErr)
-			}
-			return file, nil
-		}})
+		return Mirror(ctx, MirrorConfig{Directory: absolute, BootstrapRoot: root, Fetch: DirectoryFetch(*source), OpenTarget: directoryOpenTarget(*source)})
 	}
 	if *keyDir == "" {
 		return errors.New("explicit -keys required")
 	}
-	keysAbsolute, err := filepath.Abs(*keyDir)
+	keysAbsolute, err := custodyOutside(absolute, *keyDir, "private key custody cannot be within published repository")
 	if err != nil {
 		return err
-	}
-	rel, err := filepath.Rel(absolute, keysAbsolute)
-	if err != nil {
-		return err
-	}
-	if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
-		return errors.New("private key custody cannot be within published repository")
 	}
 	var signers RoleSigners
 	if args[0] == "rollout" || args[0] == "promote" {
@@ -155,24 +120,7 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		}
 		return errors.New("publish-artifact requires a target")
 	case "publish", "promote":
-		if *channelPath == "" {
-			return errors.New("publish requires -channel")
-		}
-		data, err := readCLIFile(*channelPath, MaxCatalogBytes)
-		if err != nil {
-			return err
-		}
-		channel := new(updatev1.AgentUpdateChannel)
-		if err = protojson.Unmarshal(data, channel); err != nil {
-			return err
-		}
-		if args[0] == "promote" {
-			if len(files) != 0 {
-				return errors.New("promote cannot accept new package targets")
-			}
-			return publisher.Promote(ctx, channel)
-		}
-		return publisher.Publish(ctx, channel, files)
+		return publishChannel(ctx, publisher, args[0] == "promote", *channelPath, files)
 	case "rollout":
 		if *percentage > 100 {
 			return errors.New("percentage must be 0 through 100")
@@ -191,16 +139,9 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 		if *nextKeys == "" {
 			return errors.New("rotate requires -new-keys")
 		}
-		nextAbsolute, err := filepath.Abs(*nextKeys)
+		nextAbsolute, err := custodyOutside(absolute, *nextKeys, "new private custody cannot be within published repository")
 		if err != nil {
 			return err
-		}
-		nextRelative, err := filepath.Rel(absolute, nextAbsolute)
-		if err != nil {
-			return err
-		}
-		if nextRelative == "." || (nextRelative != ".." && !strings.HasPrefix(nextRelative, ".."+string(filepath.Separator))) {
-			return errors.New("new private custody cannot be within published repository")
 		}
 		next, err := LoadRoleSigners(nextAbsolute, true)
 		if err != nil {
@@ -210,4 +151,84 @@ func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) error 
 	default:
 		return errors.New("unknown release repository command")
 	}
+}
+
+// writeDevelopmentKeys generates development-only role keys in keyDir and says
+// so on stdout.
+func writeDevelopmentKeys(keyDir string, stdout io.Writer) error {
+	if keyDir == "" {
+		return errors.New("-keys required")
+	}
+	absolute, err := filepath.Abs(keyDir)
+	if err != nil {
+		return err
+	}
+	if err = GenerateDevelopmentKeys(absolute); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(stdout, "DEVELOPMENT ONLY: generated five independent local role keys; not production custody")
+	return err
+}
+
+// custodyOutside resolves the private key directory and rejects one at or within
+// the published repository, reporting violation.
+func custodyOutside(repository, keyDir, violation string) (string, error) {
+	keysAbsolute, err := filepath.Abs(keyDir)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(repository, keysAbsolute)
+	if err != nil {
+		return "", err
+	}
+	if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))) {
+		return "", errors.New(violation)
+	}
+	return keysAbsolute, nil
+}
+
+// directoryOpenTarget opens mirrored target files from the air-gap source
+// directory, never following a path outside it.
+func directoryOpenTarget(source string) OpenTargetFunc {
+	return func(ctx context.Context, name string) (io.ReadCloser, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		sourceRoot, err := os.OpenRoot(source)
+		if err != nil {
+			return nil, err
+		}
+		file, openErr := openRegular(sourceRoot, name)
+		closeErr := sourceRoot.Close()
+		if openErr != nil || closeErr != nil {
+			if file != nil {
+				return nil, errors.Join(openErr, closeErr, file.Close())
+			}
+			return nil, errors.Join(openErr, closeErr)
+		}
+		return file, nil
+	}
+}
+
+// publishChannel publishes the strict protobuf JSON channel with new targets,
+// or promotes it using only already published targets.
+func publishChannel(ctx context.Context, publisher *Publisher, promote bool, channelPath string, files targetFlags) error {
+	if channelPath == "" {
+		return errors.New("publish requires -channel")
+	}
+	data, err := readCLIFile(channelPath, MaxCatalogBytes)
+	if err != nil {
+		return err
+	}
+	channel := new(updatev1.AgentUpdateChannel)
+	if err = protojson.Unmarshal(data, channel); err != nil {
+		return err
+	}
+	if promote {
+		if len(files) != 0 {
+			return errors.New("promote cannot accept new package targets")
+		}
+		return publisher.Promote(ctx, channel)
+	}
+	return publisher.Publish(ctx, channel, files)
 }

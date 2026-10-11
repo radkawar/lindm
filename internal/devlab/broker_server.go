@@ -11,7 +11,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -246,15 +245,14 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 	if err != nil {
 		return nil, "", err
 	}
-	cmd := exec.Command(binary, "serve", "-config", f.configPath())
-	cmd.Stdout, cmd.Stderr = f.log, f.log
-	cmd.Env = options.environment
-	if err := cmd.Start(); err != nil {
+	// The server outlives this call; the fixture's stop and Close own its lifetime.
+	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: binary, Args: []string{"serve", "-config", f.configPath()}, Env: options.environment, Stdout: f.log, Stderr: f.log})
+	if err != nil {
 		return nil, "", errors.New("start isolated broker lindmd failed")
 	}
-	f.process, f.done = cmd, make(chan error, 1)
+	f.process, f.done = process, make(chan error, 1)
 	done := f.done
-	go func() { done <- cmd.Wait() }()
+	go func() { done <- process.Wait() }()
 	tlsConfig, err := trustClient(shared)
 	if err != nil {
 		return nil, "", err

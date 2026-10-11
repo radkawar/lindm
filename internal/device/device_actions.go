@@ -21,6 +21,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
+	"lindm/internal/trust"
 )
 
 func deviceActionPermission(spec *agentv1.DeviceActionSpec) identity.Permission {
@@ -284,6 +285,19 @@ func deviceActionSignerDelegated(delegation *agentv1.ExecutionDelegation, key ed
 		}
 	}
 	return false
+}
+
+// deviceActionNotBefore backdates an intent by the device clock tolerance but
+// never before its signing delegation becomes valid: VerifyDeviceActionIntent
+// requires the intent window inside the delegation's. Without the clamp every
+// action created within MaxDeviceClockSkew of a newly valid delegation failed
+// as an internal error. Resource intents apply the same bound.
+func deviceActionNotBefore(now time.Time, delegation *agentv1.ExecutionDelegation) time.Time {
+	notBefore := now.Add(-trust.MaxDeviceClockSkew)
+	if valid := delegation.GetNotBefore().AsTime(); valid.After(notBefore) {
+		return valid
+	}
+	return notBefore
 }
 
 func deviceActionCapabilityError(capability, role string) error {

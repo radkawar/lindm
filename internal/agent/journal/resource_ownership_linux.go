@@ -214,18 +214,8 @@ func (s *Store) mutateResourceOwnership(ctx context.Context, actionID string, ex
 			return nil, err
 		}
 		if missing {
-			history, err := q.ResourceOwnershipHistoricalEffects(ctx, journaldb.ResourceOwnershipHistoricalEffectsParams(key))
-			if err != nil {
-				return nil, stateReadError(ctx)
-			}
-			if history != 0 {
-				effect, err := s.historicalEffect(ctx, q, key)
-				if err != nil {
-					return nil, err
-				}
-				if effect {
-					return nil, ErrResourceOwnershipUnknown
-				}
+			if err := s.rejectHistoricalEffect(ctx, q, key); err != nil {
+				return nil, err
 			}
 		}
 		ledger = &agentv1.ResourceOwnershipLedger{FormatVersion: 1, InstallationId: s.installationID, DeploymentId: key.DeploymentID, DeviceId: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Ref: proto.CloneOf(ref), Baseline: proto.CloneOf(snapshot), State: agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_CLAIMED}
@@ -233,58 +223,9 @@ func (s *Store) mutateResourceOwnership(ctx context.Context, actionID string, ex
 		if missing {
 			return nil, ErrResourceOwnershipNotFound
 		}
-		if ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {
-			return nil, ErrResourceOwnershipUnknown
-		}
-		if ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED {
-			return nil, ErrResourceOwnershipConflict
-		}
-		if ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_CLAIMED || ledger.GetClaimActionId() != actionID {
-			digest, err := ResourceOwnershipDigest(ledger)
-			if err != nil || !bytes.Equal(digest[:], action.GetNativePlan().GetOwnershipRevisionSha256()) {
-				return nil, ErrConflict
-			}
-		}
-		if !validOwnershipDimensions(ref.GetKind(), dimensions) {
-			return nil, ErrResourceOwnershipConflict
-		}
-		if release {
-			if ledger.GetLastApplied() == nil || len(ledger.GetOwnedDimensions()) == 0 {
-				return nil, ErrResourceOwnershipUnknown
-			}
-			if !ownershipLedgerMatches(ledger, snapshot) {
-				return nil, ErrResourceOwnershipDrift
-			}
-			if !sameDimensions(dimensions, ledger.GetOwnedDimensions()) {
-				return nil, ErrResourceOwnershipConflict
-			}
-		} else {
-			if !ownershipDimensionsAllowed(action, dimensions) {
-				return nil, ErrResourceOwnershipConflict
-			}
-			prior := ledger.GetLastApplied()
-			if prior == nil {
-				prior = ledger.GetBaseline()
-			}
-			if (ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER || ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP) && !accountIdentityMatches(prior, snapshot) {
-				return nil, ErrResourceOwnershipDrift
-			}
-			for _, dimension := range dimensions {
-				if !slices.Contains(ledger.OwnedDimensions, dimension) {
-					if !newOwnershipDimensionMatches(ledger, snapshot, dimension) {
-						return nil, ErrResourceOwnershipDrift
-					}
-					ledger.OwnedDimensions = append(ledger.OwnedDimensions, dimension)
-				}
-			}
-			slices.Sort(ledger.OwnedDimensions)
-		}
-		if err := beginAccountEdges(ledger, action, snapshot, release); err != nil {
+		if err := beginOwnershipEffect(ledger, action, actionID, snapshot, dimensions, release); err != nil {
 			return nil, err
 		}
-		ledger.BeforeEffect = proto.CloneOf(snapshot)
-		ledger.EffectActionId = proto.String(actionID)
-		ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN
 	case ownershipComplete:
 		if missing {
 			return nil, ErrResourceOwnershipNotFound
@@ -309,40 +250,131 @@ func (s *Store) mutateResourceOwnership(ctx context.Context, actionID string, ex
 	if err != nil {
 		return nil, err
 	}
-	if missing {
-		count, err := q.ReadResourceOwnershipUsage(ctx)
-		if err != nil {
-			return nil, stateReadError(ctx)
-		}
-		if count >= 256 {
-			return nil, ErrResourceOwnershipCapacity
-		}
-		if err := consumeResourceOwnershipReservation(ctx, q, action, count); err != nil {
-			return nil, err
-		}
-		changed, err := q.IncrementResourceOwnershipUsage(ctx, count)
-		if err != nil {
-			return nil, resourceActionWriteError(ctx)
-		}
-		if changed != 1 {
-			return nil, ErrRecoveryHold
-		}
-		if err := q.InsertResourceOwnership(ctx, journaldb.InsertResourceOwnershipParams{DeploymentID: key.DeploymentID, DeviceID: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Kind: key.Kind, CanonicalKey: key.CanonicalKey, Record: encoded}); err != nil {
-			return nil, resourceActionWriteError(ctx)
-		}
-	} else {
-		changed, err := q.ReplaceResourceOwnership(ctx, journaldb.ReplaceResourceOwnershipParams{Record: encoded, DeploymentID: key.DeploymentID, DeviceID: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Kind: key.Kind, CanonicalKey: key.CanonicalKey, Revision: expectedRevision})
-		if err != nil {
-			return nil, resourceActionWriteError(ctx)
-		}
-		if changed != 1 {
-			return nil, ErrConflict
-		}
+	if err := storeResourceOwnership(ctx, q, key, action, encoded, missing, expectedRevision); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, resourceActionWriteError(ctx)
 	}
 	return ledger, nil
+}
+
+// rejectHistoricalEffect refuses a fresh claim when an earlier generation's
+// effect on the resource may have left native state behind.
+func (s *Store) rejectHistoricalEffect(ctx context.Context, q *journaldb.Queries, key journaldb.ReadResourceOwnershipParams) error {
+	history, err := q.ResourceOwnershipHistoricalEffects(ctx, journaldb.ResourceOwnershipHistoricalEffectsParams(key))
+	if err != nil {
+		return stateReadError(ctx)
+	}
+	if history == 0 {
+		return nil
+	}
+	effect, err := s.historicalEffect(ctx, q, key)
+	if err != nil {
+		return err
+	}
+	if effect {
+		return ErrResourceOwnershipUnknown
+	}
+	return nil
+}
+
+// beginOwnershipEffect moves a claimed or applied ledger into the unknown
+// pre-effect state for actionID: it checks the plan's ownership revision and the
+// owned dimensions (exactly the owned ones for a release, otherwise adding newly
+// owned dimensions that still match), then records the pre-effect snapshot.
+func beginOwnershipEffect(ledger *agentv1.ResourceOwnershipLedger, action *agentv1.ResourceExecutionRecord, actionID string, snapshot *agentv1.ResourceOwnershipSnapshot, dimensions []agentv1.ResourceOwnedDimension, release bool) error {
+	kind := action.GetIntent().GetDesired().GetRef().GetKind()
+	if ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {
+		return ErrResourceOwnershipUnknown
+	}
+	if ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED {
+		return ErrResourceOwnershipConflict
+	}
+	if ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_CLAIMED || ledger.GetClaimActionId() != actionID {
+		digest, err := ResourceOwnershipDigest(ledger)
+		if err != nil || !bytes.Equal(digest[:], action.GetNativePlan().GetOwnershipRevisionSha256()) {
+			return ErrConflict
+		}
+	}
+	if !validOwnershipDimensions(kind, dimensions) {
+		return ErrResourceOwnershipConflict
+	}
+	if release {
+		if ledger.GetLastApplied() == nil || len(ledger.GetOwnedDimensions()) == 0 {
+			return ErrResourceOwnershipUnknown
+		}
+		if !ownershipLedgerMatches(ledger, snapshot) {
+			return ErrResourceOwnershipDrift
+		}
+		if !sameDimensions(dimensions, ledger.GetOwnedDimensions()) {
+			return ErrResourceOwnershipConflict
+		}
+	} else {
+		if !ownershipDimensionsAllowed(action, dimensions) {
+			return ErrResourceOwnershipConflict
+		}
+		prior := ledger.GetLastApplied()
+		if prior == nil {
+			prior = ledger.GetBaseline()
+		}
+		if (kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER || kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP) && !accountIdentityMatches(prior, snapshot) {
+			return ErrResourceOwnershipDrift
+		}
+		for _, dimension := range dimensions {
+			if !slices.Contains(ledger.OwnedDimensions, dimension) {
+				if !newOwnershipDimensionMatches(ledger, snapshot, dimension) {
+					return ErrResourceOwnershipDrift
+				}
+				ledger.OwnedDimensions = append(ledger.OwnedDimensions, dimension)
+			}
+		}
+		slices.Sort(ledger.OwnedDimensions)
+	}
+	if err := beginAccountEdges(ledger, action, snapshot, release); err != nil {
+		return err
+	}
+	ledger.BeforeEffect = proto.CloneOf(snapshot)
+	ledger.EffectActionId = proto.String(actionID)
+	ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN
+	return nil
+}
+
+// storeResourceOwnership inserts a new ledger within the bounded ownership
+// capacity, consuming the action's reservation, or replaces the expected
+// revision of an existing one.
+func storeResourceOwnership(ctx context.Context, q *journaldb.Queries, key journaldb.ReadResourceOwnershipParams, action *agentv1.ResourceExecutionRecord, encoded []byte, missing bool, expectedRevision int64) error {
+	if !missing {
+		changed, err := q.ReplaceResourceOwnership(ctx, journaldb.ReplaceResourceOwnershipParams{Record: encoded, DeploymentID: key.DeploymentID, DeviceID: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Kind: key.Kind, CanonicalKey: key.CanonicalKey, Revision: expectedRevision})
+		if err != nil {
+			return resourceActionWriteError(ctx)
+		}
+		if changed != 1 {
+			return ErrConflict
+		}
+		return nil
+	}
+	count, err := q.ReadResourceOwnershipUsage(ctx)
+	if err != nil {
+		return stateReadError(ctx)
+	}
+	if count >= 256 {
+		return ErrResourceOwnershipCapacity
+	}
+	if err := consumeResourceOwnershipReservation(ctx, q, action, count); err != nil {
+		return err
+	}
+	changed, err := q.IncrementResourceOwnershipUsage(ctx, count)
+	if err != nil {
+		return resourceActionWriteError(ctx)
+	}
+	if changed != 1 {
+		return ErrRecoveryHold
+	}
+	if err := q.InsertResourceOwnership(ctx, journaldb.InsertResourceOwnershipParams{DeploymentID: key.DeploymentID, DeviceID: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Kind: key.Kind, CanonicalKey: key.CanonicalKey, Record: encoded}); err != nil {
+		return resourceActionWriteError(ctx)
+	}
+	return nil
 }
 
 func (s *Store) ownershipAction(ctx context.Context, q *journaldb.Queries, actionID string, completing bool) (*agentv1.ResourceExecutionRecord, error) {

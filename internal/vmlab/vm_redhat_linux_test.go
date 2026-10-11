@@ -165,3 +165,20 @@ func TestVMRedHatPrivateReceiptSurvivesDisposableState(t *testing.T) {
 		t.Fatal("noncanonical receipt path accepted")
 	}
 }
+
+// RHEL original recovery must not silently fall back to an unentitled or
+// third-party repository: without the hosted credential it refuses before
+// touching the guest (a nil guest would otherwise be dereferenced).
+func TestRHELOwnedBootPackagesRequireRegistration(t *testing.T) {
+	evidence := new(VMRedHatEvidence)
+	registration, err := registerRHELOwnedBoot(context.Background(), nil, actionOwnedBootEntitlement{LabBinary: "/nonexistent-lab"}, evidence)
+	if err == nil || registration != nil || !strings.Contains(err.Error(), "-redhat-token-file") {
+		t.Fatalf("missing RHEL registration accepted: %v", err)
+	}
+	if evidence.Registered || evidence.RunName != "" {
+		t.Fatal("refused install recorded registration evidence")
+	}
+	if err := validateVMRedHatToken(platform.ForManifest("ubuntu", "24.04"), "/token"); err == nil {
+		t.Fatal("Red Hat token accepted for a non-RHEL device-action lane")
+	}
+}

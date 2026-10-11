@@ -90,6 +90,7 @@ type BaselineResult struct {
 	PackageChanges            []BaselinePackageChange `json:"package_changes"`
 	GroupsAdded               []string                `json:"groups_added"`
 	PackagesRequested         []string                `json:"packages_requested"`
+	DerivedPins               []string                `json:"derived_pins,omitempty"`
 	CandidatesBefore          string                  `json:"candidates_before,omitempty"`
 	CandidatesAfterRefresh    string                  `json:"candidates_after_refresh,omitempty"`
 	APTTransaction            string                  `json:"apt_transaction,omitempty"`
@@ -98,15 +99,18 @@ type BaselineResult struct {
 	MembershipChangeAttempted bool                    `json:"membership_change_attempted"`
 	WorkDirectory             string                  `json:"work_directory,omitempty"`
 	WorkDirectoryCreated      bool                    `json:"work_directory_created"`
+	SuperminKernel            *BaselineSuperminKernel `json:"supermin_kernel,omitempty"`
 	Firmware                  []BaselineFirmware      `json:"firmware,omitempty"`
 	Tools                     map[string]BaselineTool `json:"tools,omitempty"`
 	Host                      *labv1.LabHost          `json:"-"`
 }
 
 // RunBaseline installs exact reviewed Ubuntu package versions, adds only the
-// authorized r account to kvm when necessary, and probes a fresh user session.
-// It never upgrades the distribution, removes packages, enables services, edits
-// repositories, changes device modes, or starts a container/guest/listener.
+// authorized r account to kvm when necessary, stages a private readable copy of
+// the running kernel's packaged image for libguestfs, and probes a fresh user
+// session. It never upgrades the distribution, removes packages, enables
+// services, edits repositories, changes /boot or device modes, or starts a
+// container/guest/listener.
 func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineResult, resultErr error) {
 	result = &BaselineResult{StartedAt: time.Now().UTC()}
 	defer func() {
@@ -143,6 +147,12 @@ func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineRes
 	}
 	digest := sha256.Sum256(pinData)
 	result.PinSHA256 = hex.EncodeToString(digest[:])
+	derived, err := baselineDerivedPins(before.Packages, pins)
+	if err != nil {
+		return result, err
+	}
+	pins = append(pins, derived...)
+	result.DerivedPins = derived
 	result.PackagesRequested = pins
 	host, err := baselineHost(opts.Host, before)
 	if err != nil {
@@ -177,6 +187,23 @@ func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineRes
 			}
 		}
 	}()
+	// Do not chmod an existing directory: it could contain another lane's work.
+	// The private work directory precedes the package transaction: it holds the
+	// appliance kernel, which is independent of the reviewed package pins.
+	result.WorkDirectory = host.GetWorkDirectory()
+	workData, workErr := baselineCommand(ctx, opts.Host, baselineAsUser(before.User, baselineWorkScript(host.GetWorkDirectory())), time.Minute, opts.Diagnostics)
+	result.WorkDirectoryCreated = strings.TrimSpace(string(workData)) == "true"
+	if err := workErr; err != nil {
+		return result, fmt.Errorf("prepare private native work directory: %w", err)
+	}
+	staged, err := baselineCommand(ctx, opts.Host, baselineAsUser(before.User, baselineSuperminScript(host.GetWorkDirectory(), "/lib/modules")), 10*time.Minute, opts.Diagnostics)
+	if err != nil {
+		return result, fmt.Errorf("stage private readable appliance kernel from the running kernel's official package (/boot is unchanged): %w", err)
+	}
+	result.SuperminKernel, err = parseBaselineSupermin(staged)
+	if err != nil {
+		return result, err
+	}
 	policy, err := baselineCommand(ctx, opts.Host, baselinePolicy(pins), time.Minute, opts.Diagnostics)
 	result.CandidatesBefore = string(policy)
 	if err != nil {
@@ -230,13 +257,6 @@ func RunBaseline(ctx context.Context, opts BaselineOptions) (result *BaselineRes
 		return result, fmt.Errorf("decode native readiness: %w", err)
 	}
 	result.Firmware, result.Tools = ready.Firmware, ready.Tools
-	// Do not chmod an existing directory: it could contain another lane's work.
-	result.WorkDirectory = host.GetWorkDirectory()
-	workData, workErr := baselineCommand(ctx, opts.Host, baselineAsUser(before.User, baselineWorkScript(host.GetWorkDirectory())), time.Minute, opts.Diagnostics)
-	result.WorkDirectoryCreated = strings.TrimSpace(string(workData)) == "true"
-	if err := workErr; err != nil {
-		return result, fmt.Errorf("prepare private native work directory: %w", err)
-	}
 	if err := Validate(&labv1.LabConfig{Hosts: []*labv1.LabHost{host}}); err != nil {
 		return result, fmt.Errorf("validate ready host entry: %w", err)
 	}
@@ -315,6 +335,30 @@ func parseBaselinePins(data string) ([]string, error) {
 	return pins, nil
 }
 
+// baselineDerivedPins pins host packages that must equal another installed
+// package's exact version rather than a static reviewed version. Host-side
+// recovery UKI builds need ukify, which shares systemd's source version: any
+// other systemd-ukify version would pull a systemd upgrade onto a shared host
+// running other lanes' guests. A version absent from the configured archive is
+// refused by the install transaction rather than substituted.
+func baselineDerivedPins(packages map[string]BaselinePackage, static []string) ([]string, error) {
+	systemd := packages["systemd"]
+	if systemd.Status != "installed" || systemd.Version == "" {
+		return nil, errors.New("labhost: systemd-ukify pin requires an installed host systemd package")
+	}
+	for _, c := range systemd.Version {
+		if !packageVersionRune(c) {
+			return nil, fmt.Errorf("labhost: invalid installed systemd version %q", systemd.Version)
+		}
+	}
+	for _, pin := range static {
+		if name, _, _ := strings.Cut(pin, "="); name == "systemd-ukify" {
+			return nil, errors.New("labhost: systemd-ukify is derived from the installed systemd version; remove its static pin")
+		}
+	}
+	return []string{"systemd-ukify=" + systemd.Version}, nil
+}
+
 func baselinePackagesReady(packages map[string]BaselinePackage, pins []string) bool {
 	for _, pin := range pins {
 		name, version, _ := strings.Cut(pin, "=")
@@ -346,7 +390,9 @@ func baselineInstall(pins []string) string {
 		name, version, _ := strings.Cut(pin, "=")
 		script.WriteString("installed=$(dpkg-query -W -f='${Version}' -- " + baselineQuote(name) + " 2>/dev/null || true)\n")
 		script.WriteString("if [[ -n $installed ]] && dpkg --compare-versions \"$installed\" gt " + baselineQuote(version) + "; then echo " + baselineQuote("refusing downgrade of "+name+"; review the maintained baseline pin") + " >&2; exit 1; fi\n")
-		script.WriteString("apt-cache" + baselineAPTOptions + " show -- " + baselineQuote(pin) + " >/dev/null\n")
+		// apt-cache show exits zero for an unknown version, so require the
+		// exact Version stanza from the configured archive before any change.
+		script.WriteString("if ! apt-cache" + baselineAPTOptions + " show -- " + baselineQuote(pin) + " | grep -xF -- " + baselineQuote("Version: "+version) + " >/dev/null; then echo " + baselineQuote("refusing "+pin+": exact version is not available from the configured official archive; review the pin, never install a substitute") + " >&2; exit 1; fi\n")
 	}
 	script.WriteString("sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get" + baselineAPTOptions + " -y --no-install-recommends --no-remove -o Dpkg::Options::=--force-confold install --")
 	for _, pin := range pins {

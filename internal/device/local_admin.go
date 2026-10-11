@@ -19,7 +19,6 @@ import (
 	"lindm/internal/escrow"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
-	"lindm/internal/trust"
 )
 
 // Managed local-admin passwords: a per-device policy names one account; the
@@ -458,7 +457,7 @@ func (s *Service) mintLocalAdminAction(ctx context.Context, principal devicePrin
 		return false, mapErr(err)
 	}
 	id := uuid.New()
-	intent := &agentv1.DeviceActionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), ActorId: locked.ActorID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(now.Add(-trust.MaxDeviceClockSkew)), ExpiresAt: timestamppb.New(expires), Spec: spec, SpecSha256: specDigest}
+	intent := &agentv1.DeviceActionIntent{DeploymentId: s.deploymentID.String(), DeviceId: principal.DeviceID.String(), EnrollmentGeneration: principal.GenerationID.String(), ActionId: id.String(), ActorId: locked.ActorID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(deviceActionNotBefore(now, snapshot.Delegation)), ExpiresAt: timestamppb.New(expires), Spec: spec, SpecSha256: specDigest}
 	envelope, err := s.authority.Sign(ctx, intent, s.signing.PlanKey)
 	if err != nil {
 		return false, executionError(err)

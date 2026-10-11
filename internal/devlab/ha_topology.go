@@ -28,6 +28,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/agent/nativeexec"
+	"lindm/internal/labexec"
 )
 
 //go:embed ha_postgres_entrypoint.sh
@@ -106,7 +108,7 @@ type haInstance struct {
 	admin, device      int
 	binary             string
 	log                *os.File
-	process            *exec.Cmd
+	process            *labexec.Process
 	done               chan error
 	state              HAInstanceState
 	binaryDigestByPath map[string]string
@@ -532,21 +534,23 @@ func (t *haTopology) startInstance(ctx context.Context, instance *haInstance, bi
 	if err := errors.Join(t.release(instance.admin), t.release(instance.device)); err != nil {
 		return err
 	}
-	cmd, err := newServerCommand(binary, instance.config, "")
+	command, err := newServerCommand(binary, instance.config, "")
 	if err != nil {
 		return err
 	}
-	cmd.Stdout, cmd.Stderr = instance.log, instance.log
+	command.Stdout, command.Stderr = instance.log, instance.log
 	instance.exit.Store(nil)
-	if err := cmd.Start(); err != nil {
+	// The replica outlives this call; signalInstance owns its lifetime.
+	process, err := labexec.Start(context.WithoutCancel(ctx), command)
+	if err != nil {
 		return fmt.Errorf("start HA instance %s failed", instance.name)
 	}
-	instance.process, instance.done, instance.binary = cmd, make(chan error, 1), binary
-	instance.state = HAInstanceState{Name: instance.name, PID: cmd.Process.Pid, Binary: filepath.Base(binary), BinarySHA256: digest,
+	instance.process, instance.done, instance.binary = process, make(chan error, 1), binary
+	instance.state = HAInstanceState{Name: instance.name, PID: process.Pid(), Binary: filepath.Base(binary), BinarySHA256: digest,
 		AdminAddress: net.JoinHostPort("127.0.0.1", strconv.Itoa(instance.admin)), DeviceAddress: net.JoinHostPort("127.0.0.1", strconv.Itoa(instance.device)), StartedAt: time.Now().UTC(), Running: true}
 	done := instance.done
 	go func() {
-		err := cmd.Wait()
+		err := process.Wait()
 		status := "exit status 0"
 		if err != nil {
 			status = err.Error()
@@ -581,9 +585,7 @@ func (t *haTopology) signalInstance(instance *haInstance, signal syscall.Signal)
 		return nil
 	}
 	process, done := instance.process, instance.done
-	if err := process.Process.Signal(signal); err != nil && !errors.Is(err, os.ErrProcessDone) {
-		return err
-	}
+	process.Signal(signal)
 	timer := time.NewTimer(40 * time.Second)
 	defer timer.Stop()
 	select {
@@ -595,7 +597,7 @@ func (t *haTopology) signalInstance(instance *haInstance, signal syscall.Signal)
 		}
 		return err
 	case <-timer.C:
-		_ = process.Process.Kill()
+		process.Signal(syscall.SIGKILL)
 		<-done
 		instance.process, instance.done, instance.state.Running = nil, nil, false
 		return fmt.Errorf("HA instance %s required forced shutdown", instance.name)
@@ -702,14 +704,12 @@ func (t *haTopology) proxyLog(ctx context.Context) (string, error) {
 	if t.proxyID == "" {
 		return "", errors.New("HAProxy is not running")
 	}
-	output, err := loadDocker(ctx, "logs", t.proxyID)
-	if err != nil {
+	// Diagnostics, not parsed: the most recent haLogLimit bytes are kept.
+	output := nativeexec.NewTailBuffer(haLogLimit)
+	if err := loadDockerInto(ctx, output, "logs", t.proxyID); err != nil {
 		return "", err
 	}
-	if len(output) > haLogLimit {
-		return "", errors.New("HAProxy log exceeds its evidence bound")
-	}
-	return string(output), nil
+	return output.String(), nil
 }
 
 // serverStates reads "backend/server" health from HAProxy's loopback

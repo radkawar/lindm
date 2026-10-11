@@ -337,7 +337,13 @@ func TestInspectReadinessRequiresNativeSettledSignals(t *testing.T) {
 					return guestCommandResult{Stdout: []byte(test.system), ExitCode: test.systemExit}, nil
 				case calls == 2 && command == inspectSystemdVersionCommand:
 					return guestCommandResult{Stdout: []byte("systemd 257 (257.13+suse.131.g575b4807b7)\n+PAM +AUDIT\n")}, nil
-				case calls == 2 && command == inspectNetworkReadinessCommand:
+				case calls == 2 && command == inspectFailedUnitsCommand:
+					return guestCommandResult{Stdout: []byte("example.service loaded failed failed Example\n")}, nil
+				case calls == 3 && strings.HasPrefix(command, "env LC_ALL=C systemctl show --property=Result"):
+					return guestCommandResult{Stdout: []byte("exit-code\n")}, nil
+				case calls == 4 && strings.HasPrefix(command, "sudo -n env LC_ALL=C journalctl"):
+					return guestCommandResult{Stdout: []byte("example failed\n")}, nil
+				case command == inspectNetworkReadinessCommand:
 					return guestCommandResult{Stdout: []byte(test.network), ExitCode: test.networkExit}, nil
 				}
 				t.Fatal("unexpected readiness probe")
@@ -346,8 +352,15 @@ func TestInspectReadinessRequiresNativeSettledSignals(t *testing.T) {
 			if (err != nil) != test.wantError {
 				t.Fatalf("readiness result: %v", err)
 			}
-			if err == nil && (calls != 2 || proof.SystemState == "" || proof.NetworkManagerStartup == "" || proof.CompletedAt.Before(proof.StartedAt)) {
+			wantCalls := 2
+			if test.system == "degraded\n" {
+				wantCalls = 5
+			}
+			if err == nil && (calls != wantCalls || proof.SystemState == "" || proof.NetworkManagerStartup == "" || proof.CompletedAt.Before(proof.StartedAt)) {
 				t.Fatalf("incomplete readiness proof: %v", proof)
+			}
+			if err == nil && (proof.SystemState == "degraded") != (len(proof.FailedUnits) == 1 && proof.FailedUnits[0].Unit == "example.service" && proof.FailedUnits[0].Result == "exit-code") {
+				t.Fatalf("failed units not bound to degraded state: %v", proof)
 			}
 		})
 	}
@@ -380,6 +393,8 @@ func TestInspectReadinessPollsSystemdWithoutWait(t *testing.T) {
 				return guestCommandResult{Stdout: []byte(state), ExitCode: 1}, nil
 			case inspectSystemdVersionCommand:
 				return guestCommandResult{Stdout: []byte("systemd 239 (239-82.el8_10.13)\n+PAM +AUDIT\n")}, nil
+			case inspectFailedUnitsCommand:
+				return guestCommandResult{}, nil
 			case inspectNetworkReadinessCommand:
 				return guestCommandResult{Stdout: []byte("complete\n")}, nil
 			}
@@ -389,7 +404,7 @@ func TestInspectReadinessPollsSystemdWithoutWait(t *testing.T) {
 		if err != nil || proof.SystemState != "degraded" {
 			t.Fatalf("legacy readiness = %+v, %v", proof, err)
 		}
-		want := []string{inspectSystemReadinessCommand, inspectSystemdVersionCommand, inspectSystemReadinessCommand, inspectSystemReadinessCommand, inspectNetworkReadinessCommand}
+		want := []string{inspectSystemReadinessCommand, inspectSystemdVersionCommand, inspectSystemReadinessCommand, inspectSystemReadinessCommand, inspectFailedUnitsCommand, inspectNetworkReadinessCommand}
 		if strings.Join(commands, "|") != strings.Join(want, "|") {
 			t.Fatalf("probe order = %q", commands)
 		}
@@ -416,5 +431,54 @@ func TestInspectReadinessPollsSystemdWithoutWait(t *testing.T) {
 		if err == nil {
 			t.Fatalf("accepted invalid systemd version %q", version)
 		}
+	}
+}
+
+// Ubuntu 26.04 cloud guests settled "degraded" with no recorded cause; the
+// readiness proof must name the native failed units, their native Result and
+// journal tail, bounded and validated.
+func TestInspectReadinessRecordsFailedUnits(t *testing.T) {
+	for _, test := range []struct {
+		name, listing, result string
+		exit                  int
+		want                  string
+		wantError             bool
+	}{
+		{name: "two", listing: "systemd-networkd-wait-online.service loaded failed failed Wait for Network\napt-daily.timer loaded failed failed Daily apt\n", result: "exit-code\n", want: "systemd-networkd-wait-online.service=exit-code|apt-daily.timer=exit-code"},
+		{name: "escaped-template", listing: "dev-disk-by\\x2dlabel-x.swap loaded failed failed Swap\n", result: "timeout\n", want: "dev-disk-by\\x2dlabel-x.swap=timeout"},
+		{name: "none", result: "exit-code\n"},
+		{name: "native-failure", exit: 1, wantError: true},
+		{name: "not-failed", listing: "a.service loaded active running A\n", result: "success\n", wantError: true},
+		{name: "shell-metacharacter", listing: "a';b.service loaded failed failed X\n", result: "exit-code\n", wantError: true},
+		{name: "too-many", listing: strings.Repeat("a.service loaded failed failed A\n", maxInspectFailedUnits+1), result: "exit-code\n", wantError: true},
+		{name: "invalid-result", listing: "a.service loaded failed failed A\n", result: "exit code; rm\n", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			units, err := inspectFailedUnits(t.Context(), func(ctx context.Context, command string, input io.Reader, limit int, timeout time.Duration) (guestCommandResult, error) {
+				if input != nil || limit > 4096 || timeout > 10*time.Second {
+					t.Fatal("failed-unit probe lost its bounds")
+				}
+				switch {
+				case command == inspectFailedUnitsCommand:
+					return guestCommandResult{Stdout: []byte(test.listing), ExitCode: test.exit}, nil
+				case strings.HasPrefix(command, "env LC_ALL=C systemctl show --property=Result --value -- '"):
+					return guestCommandResult{Stdout: []byte(test.result)}, nil
+				case strings.HasPrefix(command, "sudo -n env LC_ALL=C journalctl -b --no-pager --quiet -o cat -n 5 -u '"):
+					return guestCommandResult{Stdout: []byte("Started.\nFailed with result 'exit-code'.\n")}, nil
+				}
+				t.Fatalf("unexpected probe %q", command)
+				return guestCommandResult{}, nil
+			})
+			var got []string
+			for _, unit := range units {
+				if len(unit.Journal) != 2 || unit.Journal[1] != "Failed with result 'exit-code'." {
+					t.Fatalf("journal tail = %q", unit.Journal)
+				}
+				got = append(got, unit.Unit+"="+unit.Result)
+			}
+			if (err != nil) != test.wantError || strings.Join(got, "|") != test.want {
+				t.Fatalf("failed units = %q, %v", got, err)
+			}
+		})
 	}
 }

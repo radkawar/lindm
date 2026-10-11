@@ -163,63 +163,7 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		if initial == nil {
 			return nil, ErrUnprovisioned
 		}
-		s.installationID = initial.GetInstallationId()
-		encoded, err := s.encode(initial)
-		if err != nil {
-			return nil, err
-		}
-		trustEncoded, err := s.encodeTrust(unconfiguredExecutionTrust(s.installationID))
-		if err != nil {
-			return nil, err
-		}
-		if err := s.createFile(markerName, []byte(s.installationID+"\n")); err != nil {
-			return nil, err
-		}
-		s.privateCustody, err = privatecustody.Initialize(directory, s.installationID)
-		if err != nil {
-			return nil, ErrRecoveryHold
-		}
-		// The marker is durable before any SQLite file exists. A crash at any
-		// later point leaves an explicit recovery condition, never a new device.
-		if err := s.dir.Sync(); err != nil {
-			return nil, err
-		}
-		if err := s.createFile(databaseName, nil); err != nil {
-			return nil, err
-		}
-		if err := s.connect(ctx); err != nil {
-			return nil, err
-		}
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = tx.Rollback() }()
-		if _, err := tx.ExecContext(ctx, schema); err != nil {
-			return nil, errors.New("initialize executor schema failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeState(ctx, encoded); err != nil {
-			return nil, errors.New("initialize executor state failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, trustEncoded); err != nil {
-			return nil, errors.New("initialize execution trust failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeResourceActionUsage(ctx); err != nil {
-			return nil, errors.New("initialize resource action accounting failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeDeviceActionUsage(ctx); err != nil {
-			return nil, errors.New("initialize device action accounting failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeAccountLockUsage(ctx); err != nil {
-			return nil, errors.New("initialize account lock accounting failed")
-		}
-		if err := s.queries.WithTx(tx).InitializeResourceOwnershipUsage(ctx); err != nil {
-			return nil, errors.New("initialize resource ownership accounting failed")
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, errors.New("commit executor initialization failed")
-		}
-		if err := s.dir.Sync(); err != nil {
+		if err := s.provision(ctx, directory, initial); err != nil {
 			return nil, err
 		}
 		return s, nil
@@ -264,6 +208,72 @@ func open(ctx context.Context, directory string, locked *os.File, initial *agent
 		return nil, err
 	}
 	return s, nil
+}
+
+// provision durably records a new installation: the marker first, then private
+// custody, then a fresh SQLite schema with the initial state, unconfigured
+// execution trust and zeroed usage accounting.
+func (s *Store) provision(ctx context.Context, directory string, initial *agentv1.ExecutorJournalState) error {
+	s.installationID = initial.GetInstallationId()
+	encoded, err := s.encode(initial)
+	if err != nil {
+		return err
+	}
+	trustEncoded, err := s.encodeTrust(unconfiguredExecutionTrust(s.installationID))
+	if err != nil {
+		return err
+	}
+	if err := s.createFile(markerName, []byte(s.installationID+"\n")); err != nil {
+		return err
+	}
+	s.privateCustody, err = privatecustody.Initialize(directory, s.installationID)
+	if err != nil {
+		return ErrRecoveryHold
+	}
+	// The marker is durable before any SQLite file exists. A crash at any
+	// later point leaves an explicit recovery condition, never a new device.
+	if err := s.dir.Sync(); err != nil {
+		return err
+	}
+	if err := s.createFile(databaseName, nil); err != nil {
+		return err
+	}
+	if err := s.connect(ctx); err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, schema); err != nil {
+		return errors.New("initialize executor schema failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeState(ctx, encoded); err != nil {
+		return errors.New("initialize executor state failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeExecutionTrust(ctx, trustEncoded); err != nil {
+		return errors.New("initialize execution trust failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeResourceActionUsage(ctx); err != nil {
+		return errors.New("initialize resource action accounting failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeDeviceActionUsage(ctx); err != nil {
+		return errors.New("initialize device action accounting failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeAccountLockUsage(ctx); err != nil {
+		return errors.New("initialize account lock accounting failed")
+	}
+	if err := s.queries.WithTx(tx).InitializeResourceOwnershipUsage(ctx); err != nil {
+		return errors.New("initialize resource ownership accounting failed")
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.New("commit executor initialization failed")
+	}
+	if err := s.dir.Sync(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func openDirectory(directory string, locked *os.File) (int, error) {

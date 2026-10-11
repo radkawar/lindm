@@ -190,8 +190,32 @@ LINDM_GRUB
 		// including YAML syntax and shell metacharacters, rather than syntax.
 		return append([]byte("#cloud-config\n"), data...), nil
 	}
+	packages := "@core\nopenssh-server\nsudo\ncryptsetup\ngrub2-tools\ngrubby\n"
+	header, extra := "", ""
+	if lab.Kickstart != "" {
+		header = "#version=" + lab.Kickstart + "\n"
+	}
+	if lab.Repository != "" {
+		// The installed root adds packages from the signed release tree.
+		packages += "dnf5\n"
+	} else {
+		// No release tree: the vendor-authenticated Binary DVD (BaseOS and
+		// AppStream) is the only package source, and an unregistered installed
+		// system has no other repository. The action prerequisites, desktop
+		// environment and TPM user space are therefore part of the golden.
+		extra = "firstboot --disable\n"
+		packages += strings.Join(lab.Guest.Actions, "\n") + "\n"
+		if desktop != "" {
+			packages = strings.Join(lab.Session.Desktops[desktop], "\n") + "\n" + packages
+		}
+		if tpmBoot {
+			packages += strings.Join(lab.TPM.Packages, "\n") + "\n"
+		}
+	}
 	if tpmBoot {
-		provision += encryptedInstallerReleaseDNF(media.release, "lindm-tpm", architecture) + "install " + strings.Join(lab.TPM.Packages, " ") + "\n"
+		if lab.Repository != "" {
+			provision += encryptedInstallerReleaseDNF(media.release, "lindm-tpm", architecture) + "install " + strings.Join(lab.TPM.Packages, " ") + "\n"
+		}
 		provision += encryptedInstallerTPMProvision(lab.TPM.Modules)
 	}
 	provision += `install -d -m 0755 /etc/dracut.conf.d
@@ -205,7 +229,7 @@ dracut --regenerate-all --force
 restorecon -RF /home/lindm-lab/.ssh /etc/ssh /etc/sudoers.d
 systemctl enable sshd
 `
-	return []byte("#version=" + lab.Kickstart + "\ntext\ncdrom\nlang en_US.UTF-8\nkeyboard us\ntimezone UTC --utc\nnetwork --bootproto=dhcp --device=link --activate --onboot=yes --hostname=lindm-lab\nrootpw --lock\nuser --name=lindm-lab --groups=wheel --lock --shell=/bin/bash\nfirewall --enabled --service=ssh\nselinux --enforcing\nservices --enabled=sshd\nignoredisk --only-use=vda\nzerombr\nclearpart --all --initlabel --drives=vda\nautopart --type=lvm --encrypted --luks-version=luks2 --passphrase=" + nativeQuote(passphrase) + "\nbootloader --boot-drive=vda --append=\"console=tty0 console=" + serialConsole + "\"\npoweroff\n%packages\n@core\nopenssh-server\nsudo\ncryptsetup\ngrub2-tools\ngrubby\ndnf5\n%end\n%post --erroronfail --interpreter=/bin/sh\nset -eu\numask 077\n" + provision + "%end\n"), nil
+	return []byte(header + "text\ncdrom\nlang en_US.UTF-8\nkeyboard us\ntimezone UTC --utc\nnetwork --bootproto=dhcp --device=link --activate --onboot=yes --hostname=lindm-lab\nrootpw --lock\nuser --name=lindm-lab --groups=wheel --lock --shell=/bin/bash\nfirewall --enabled --service=ssh\nselinux --enforcing\nservices --enabled=sshd\n" + extra + "ignoredisk --only-use=vda\nzerombr\nclearpart --all --initlabel --drives=vda\nautopart --type=lvm --encrypted --luks-version=luks2 --passphrase=" + nativeQuote(passphrase) + "\nbootloader --boot-drive=vda --append=\"console=tty0 console=" + serialConsole + "\"\npoweroff\n%packages\n" + packages + "%end\n%post --erroronfail --interpreter=/bin/sh\nset -eu\numask 077\n" + provision + "%end\n"), nil
 }
 
 func encryptedInstallerArchitecture(architecture string) (canonical, console string, err error) {
@@ -262,9 +286,10 @@ func encryptedInstallerTPMProvision(dracutModules []string) string {
 func encryptedInstallerDesktopProvision(release *platform.Release, desktop, architecture string) string {
 	var script strings.Builder
 	session, anaconda := release.Lab.Session, release.Lab.Installer == platform.Anaconda
-	if anaconda {
+	if anaconda && release.Lab.Repository != "" {
 		// The vendor DVD authenticates the base system. DNF verifies RPM
-		// signatures with the key supplied by that base.
+		// signatures with the key supplied by that base. Without a release
+		// tree the desktop environment is already in the DVD %packages.
 		script.WriteString(encryptedInstallerReleaseDNF(release, "lindm-desktop", architecture))
 		script.WriteString("group install " + strings.Join(session.Desktops[desktop], " ") + "\n")
 	}

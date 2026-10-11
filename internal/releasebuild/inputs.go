@@ -75,23 +75,7 @@ func loadTrustInventory(path, pin string) (*signingExclusions, error) {
 	}
 	for _, group := range [][]string{inventory.GetExecutionPublicKeysPem(), inventory.GetTlsPublicKeysOrCertificatesPem()} {
 		for _, encoded := range group {
-			block, rest := pem.Decode([]byte(encoded))
-			if block == nil || len(bytes.TrimSpace(rest)) != 0 {
-				return nil, errors.New("releasebuild: inventory entry must contain one public key or certificate")
-			}
-			var public crypto.PublicKey
-			switch block.Type {
-			case "PUBLIC KEY":
-				public, err = x509.ParsePKIXPublicKey(block.Bytes)
-			case "CERTIFICATE":
-				var certificate *x509.Certificate
-				certificate, err = x509.ParseCertificate(block.Bytes)
-				if err == nil {
-					public = certificate.PublicKey
-				}
-			default:
-				return nil, errors.New("releasebuild: inventory contains nonpublic key material")
-			}
+			public, err := inventoryPublicKey(encoded)
 			if err != nil {
 				return nil, err
 			}
@@ -188,6 +172,27 @@ func loadTrustInventory(path, pin string) (*signingExclusions, error) {
 		out.homes = append(out.homes, value)
 	}
 	return out, nil
+}
+
+// inventoryPublicKey decodes one PEM public key or certificate; private or other
+// key material is rejected.
+func inventoryPublicKey(encoded string) (crypto.PublicKey, error) {
+	block, rest := pem.Decode([]byte(encoded))
+	if block == nil || len(bytes.TrimSpace(rest)) != 0 {
+		return nil, errors.New("releasebuild: inventory entry must contain one public key or certificate")
+	}
+	switch block.Type {
+	case "PUBLIC KEY":
+		return x509.ParsePKIXPublicKey(block.Bytes)
+	case "CERTIFICATE":
+		certificate, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		return certificate.PublicKey, nil
+	default:
+		return nil, errors.New("releasebuild: inventory contains nonpublic key material")
+	}
 }
 
 func loadCABundle(path, pin string) ([]byte, string, error) {

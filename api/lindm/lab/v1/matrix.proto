@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+package lindm.lab.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/lab/v1;labv1";
+
+// LabMatrix maps each qualification cell to an existing `lab vm` lane. Platforms,
+// their capability gates and their per-platform lane inputs come from the
+// platform registry and the pinned image manifests, never from this file.
+message LabMatrix {
+  option (buf.validate.message).cel = {
+    id: "lab.matrix_cell_names_unique"
+    message: "cell names must be unique"
+    expression: "this.cells.all(c, this.cells.filter(other, other.name == c.name).size() == 1)"
+  };
+
+  repeated MatrixCell cells = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 64
+  }];
+  // Execution-host arguments every hardware-selecting lane receives for a guest
+  // architecture, e.g. the pinned EFI firmware aarch64 guests require.
+  map<string, MatrixArgs> architecture_args = 2 [(buf.validate.field).map.keys.string = {
+    in: [
+      "x86_64",
+      "aarch64"
+    ]
+  }];
+}
+
+// MatrixArgs is a list of fixed lane arguments.
+message MatrixArgs {
+  repeated string args = 1 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 256
+        pattern: "^-"
+      }
+    }
+  }];
+}
+
+// MatrixCell is one documented column of the matrix.
+message MatrixCell {
+  option (buf.validate.message).cel = {
+    id: "lab.matrix_cell_lane"
+    message: "a cell names either a lane or the reason no maintained lane exists; arguments need a lane"
+    expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0)"
+  };
+
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+    pattern: "^[a-z][a-z0-9-]*$"
+  }];
+  // Documentation column header.
+  string title = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+  }];
+  // Registry capabilities the lane exercises. The cell is gated unless every
+  // capability is implemented for the platform (any one with capability_kinds).
+  repeated string capabilities = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      string: {
+        min_len: 1
+        max_len: 63
+      }
+    }
+  }];
+  // The lane receives the implemented subset of the capabilities as resource
+  // kinds, appended to any -kinds value in args.
+  bool capability_kinds = 4;
+  MatrixImage image = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // `lab vm <lane>` driver; empty when no maintained lane exists.
+  string lane = 6 [(buf.validate.field).string = {
+    max_len: 63
+    pattern: "^([a-z][a-z0-9-]*)?$"
+  }];
+  // Fixed lane arguments. Inputs (manifest, binaries, packages, records) are
+  // supplied by the matrix runner.
+  repeated string args = 7 [(buf.validate.field).repeated = {
+    max_items: 32
+    items: {
+      string: {
+        min_len: 1
+        max_len: 256
+        pattern: "^-"
+      }
+    }
+  }];
+  string no_lane = 8 [(buf.validate.field).string.max_len = 256];
+}
+
+// MatrixImage is the kind of pinned manifest a cell boots.
+enum MatrixImage {
+  MATRIX_IMAGE_UNSPECIFIED = 0;
+  // Vendor cloud (or installed netinst/DVD) server image.
+  MATRIX_IMAGE_CLOUD = 1;
+  // Lab encrypted-installer manifest (edition suffix "encrypted-lab").
+  MATRIX_IMAGE_ENCRYPTED_INSTALLER = 2;
+}
+
+// MatrixLedger is the append-only record of matrix cell outcomes.
+message MatrixLedger {
+  repeated MatrixLedgerEntry entries = 1 [(buf.validate.field).repeated.max_items = 100000];
+}
+
+// MatrixLedgerEntry binds one cell outcome to immutable evidence.
+message MatrixLedgerEntry {
+  // Platform registry key.
+  string platform = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+  }];
+  string cell = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 63
+  }];
+  string architecture = 3 [(buf.validate.field).string = {
+    in: [
+      "x86_64",
+      "aarch64"
+    ]
+  }];
+  // Image manifest id the lane booted; empty only for imports that do not name one.
+  string manifest = 4 [(buf.validate.field).string.max_len = 100];
+  MatrixVerdict verdict = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Evidence file path as recorded on the recording machine.
+  string evidence = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  string sha256 = 7 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  google.protobuf.Timestamp recorded = 8 [(buf.validate.field).required = true];
+  // Git revision of the recording checkout, "-dirty" suffixed for local changes.
+  string revision = 9 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  MatrixSource source = 10 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // True when the importer read the evidence file and matched sha256; false for
+  // digest-only imports of records documented elsewhere.
+  bool verified = 11;
+  // Named subset of the cell the record covers, empty for the complete lane.
+  string scope = 12 [(buf.validate.field).string.max_len = 100];
+  // docs/verification.md anchor narrating the record, e.g. "#resource-kind-coverage".
+  string reference = 13 [(buf.validate.field).string = {
+    max_len: 200
+    pattern: "^(#[a-z0-9-]+)?$"
+  }];
+}
+
+// MatrixVerdict is a lane outcome.
+enum MatrixVerdict {
+  MATRIX_VERDICT_UNSPECIFIED = 0;
+  MATRIX_VERDICT_PASS = 1;
+  MATRIX_VERDICT_FAIL = 2;
+}
+
+// MatrixSource says how a ledger entry was added.
+enum MatrixSource {
+  MATRIX_SOURCE_UNSPECIFIED = 0;
+  MATRIX_SOURCE_RUN = 1;
+  MATRIX_SOURCE_IMPORT = 2;
+}

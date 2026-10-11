@@ -101,7 +101,7 @@ var (
 	ubuntuGuest = LabGuest{
 		Initrd:    "/boot/initrd.img-%s",
 		Actions:   []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
-		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "sbsigntool", "busybox-static", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
 	fedoraGraphical = []string{"base-graphical", "desktop-accessibility", "fonts", "guest-desktop-agents", "hardware-support", "input-methods", "networkmanager-submodules"}
 	fedoraSession   = LabSession{
@@ -112,8 +112,23 @@ var (
 	fedoraGuest = LabGuest{
 		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
 		Actions:   []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl"},
-		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "sbsigntools", "busybox", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
+	// RHEL installs only from the vendor-authenticated Binary DVD (no Lab.Repository):
+	// the Workstation environment, TPM user space and action prerequisites
+	// become kickstart %packages. An unregistered installed system has no other
+	// repository, so the action prerequisites also carry the recovery helpers.
+	rhelSession = LabSession{
+		Desktops:  map[string][]string{"gnome": {"@^workstation-product-environment"}},
+		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+	}
+	rhelGuest = LabGuest{
+		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
+		Actions:   []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+		OwnedBoot: []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+	}
+	rhelTPMPackages   = []string{"tpm2-tools", "tpm2-tss"}
+	reasonRHELPending = "native qualification on the pinned RHEL minor not yet passed"
 )
 
 var registry = []*Release{
@@ -154,7 +169,11 @@ var registry = []*Release{
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
 			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), "owned-boot recovery fixture not maintained for the 26.04 media"),
+		// Measured natively (recovery-nvme-01): the owned-boot UKI holds the
+		// vendor kernel plus the non-hostonly dracut initrd (72 MB; 24.04's
+		// initramfs-tools image was 31 MB). Like Fedora 44, the ESP is not
+		// resized and no vendor file or kernel is substituted.
+		Gates: gates(string(RecoverySanitize), "stock 105 MiB cloud ESP: the owned-boot UKI (vendor kernel + dracut generic initrd) leaves 13,998,592 bytes; the signed recovery image needs 50,653,240"),
 	},
 	{
 		Key: "debian-11", Name: "Debian 11", Distribution: "Debian", ID: "debian", Version: Exact("11"), Codename: "bullseye",
@@ -230,9 +249,13 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}),
-		Gates:    without(actionGates(), OSUpdate),
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, Entitlement: true,
+			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
+			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
+			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
+		// Natively qualified on RHEL 9.8 x86_64 (verification.md, RHEL encrypted device actions).
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss}),
+		Gates:    rhelGates(OSUpdate, Wipe, ReportLoss),
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
@@ -240,9 +263,13 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}, Entitlement: true},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}),
-		Gates:    without(actionGates(), OSUpdate),
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, Entitlement: true,
+			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
+			// dracut 107 ships the split 01systemd-cryptsetup module.
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
+		// Natively qualified on RHEL 10.2 x86_64 (verification.md, RHEL encrypted device actions).
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Lock}),
+		Gates:    rhelGates(OSUpdate, Lock),
 	},
 	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
 	{
@@ -370,6 +397,14 @@ func withPins(q Quirks, pins []PasswordPins) Quirks {
 func withCapture(session LabSession, packages ...string) LabSession {
 	session.Capture = slices.Concat(session.Capture, packages)
 	return session
+}
+
+// rhelGates gates the action lanes not natively qualified on the RHEL major's
+// pinned minor; qualified lanes are listed in Supports instead.
+func rhelGates(qualified ...Capability) map[Capability]string {
+	m := gates(string(Wipe), reasonRHELPending, string(ReportLoss), reasonRHELPending, string(Lock), reasonRHELPending,
+		string(RecoverySanitize), reasonRHELPending, string(Assistance), "no maintained RHEL assistance session recipe")
+	return without(m, qualified...)
 }
 
 func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="760" viewBox="0 0 1040 760" role="img" aria-labelledby="title desc">
+  <title id="title">DRAFT: Custody seam, resolve a contested configuration boundary</title>
+  <desc id="desc">Illustrative, non-interactive concept. One resource on workshop-04, the printing service, differs from the last lindm-applied state. The last applied state was enabled; the new observation is disabled. The author of that change is unknown, so no other manager is accused. A central custody seam marks the contested resource. The operator chooses between leaving external control unresolved and preparing an adoption review. The shown next action opens a proposal for one exact resource and changes nothing. Adoption requires current provider evidence and the required independent approval, with its effect and rollback limitations shown before confirmation. The readable custody projection and boundary proposal are proposed, not existing console data.</desc>
+  <rect width="1040" height="760" fill="#f6f7f9"/>
+  <g font-family="IBM Plex Sans, sans-serif" fill="#17212b">
+    <text x="32" y="32" font-size="12" fill="#596674">LINDM / CONCEPT 02 / DRAFT OWNER SELECTION / ILLUSTRATIVE DATA</text>
+    <text x="32" y="72" font-size="24">Who should control this setting next?</text>
+    <text x="32" y="101" font-size="14">workshop-04 · Printing service · One contested resource</text>
+    <rect x="32" y="126" width="976" height="54" fill="#fff4d6" stroke="#9b701b"/>
+    <text x="48" y="149" font-size="14">Conflict: the current value differs from the last lindm-applied value.</text>
+    <text x="48" y="170" font-size="12" fill="#644b13">The change's author is unknown. Do not infer another manager from drift alone.</text>
+    <text x="32" y="218" font-size="16">Last lindm-applied state</text>
+    <text x="663" y="218" font-size="16">Current native observation</text>
+    <rect x="32" y="235" width="344" height="154" fill="#ffffff" stroke="#bcc5ce"/>
+    <rect x="663" y="235" width="345" height="154" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="264" font-size="14">Office printing policy</text>
+    <text x="48" y="292" font-size="16">Start at boot: enabled</text>
+    <text x="48" y="324" font-size="14">Applied before the external change</text>
+    <text x="48" y="369" font-size="12" fill="#596674">Previous state is not permission to restore it</text>
+    <text x="679" y="264" font-size="14">Printing service on workshop-04</text>
+    <text x="679" y="292" font-size="16">Start at boot: disabled</text>
+    <text x="679" y="324" font-size="14">Observed today, 09:12</text>
+    <text x="679" y="369" font-size="12" fill="#596674">Changed by: unknown</text>
+    <path d="M376 302 H448 M592 302 H663" stroke="#667381" stroke-width="2"/>
+    <rect x="448" y="252" width="144" height="100" fill="#fff4d6" stroke="#9b701b" stroke-width="2"/>
+    <text x="465" y="287" font-size="16">Custody seam</text>
+    <text x="472" y="315" font-size="14">Contested</text>
+    <text x="468" y="338" font-size="12">No overwrite</text>
+    <text x="32" y="426" font-size="16">Choose the boundary, not merely the value</text>
+    <rect x="32" y="445" width="472" height="110" fill="#ffffff" stroke="#bcc5ce"/>
+    <text x="48" y="471" font-size="14">Leave external control</text>
+    <text x="48" y="496" font-size="14">No configuration changes. Conflict stays visible.</text>
+    <text x="48" y="521" font-size="14">Any policy exclusion requires a separate review.</text>
+    <text x="48" y="544" font-size="12" fill="#596674">Not an automatic unassignment or a compliance pass</text>
+    <rect x="536" y="445" width="472" height="110" fill="#edf3ff" stroke="#2455a6" stroke-width="2"/>
+    <text x="552" y="471" font-size="14">Selected: prepare lindm adoption review</text>
+    <text x="552" y="496" font-size="14">Propose control of this resource only.</text>
+    <text x="552" y="521" font-size="14">Review the exact effect before seeking approval.</text>
+    <text x="552" y="544" font-size="12" fill="#43576f">Opening review grants no execution authority</text>
+    <text x="32" y="587" font-size="16">If adoption is later approved</text>
+    <text x="32" y="613" font-size="14">lindm may change this setting under the reviewed policy. Required independent approval comes first.</text>
+    <text x="32" y="636" font-size="14">Recheck native state before acting. Undo is not guaranteed after another administrator changes it.</text>
+    <rect x="32" y="655" width="264" height="42" fill="#2455a6"/>
+    <text x="48" y="681" font-size="14" fill="#ffffff">Review one resource's adoption</text>
+    <text x="316" y="681" font-size="14">Keep the boundary unresolved</text>
+    <path d="M32 713 H1008" stroke="#bcc5ce"/>
+    <text x="32" y="739" font-size="12" fill="#596674">PROPOSED: custody projection + boundary proposal. Existing ownership safeguards remain authoritative.</text>
+  </g>
+</svg>

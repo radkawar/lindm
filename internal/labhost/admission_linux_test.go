@@ -356,3 +356,67 @@ func TestAcquireReportingNamesEachChangedWaitReasonOnce(t *testing.T) {
 		t.Fatal("not admitted after the slot was released")
 	}
 }
+
+// A lane that queued longer than its own timeout must still receive the whole
+// lane timeout once admitted; queue time is bounded only by Admission.
+func TestRunAdmittedStartsLaneDeadlineAfterAdmission(t *testing.T) {
+	host := fixtureHost("deadline", t.TempDir())
+	host.MaxGuests = 1
+	slots, err := openFixtureSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := slots.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const lane = 200 * time.Millisecond
+	queued := make(chan struct{})
+	type admission struct {
+		remaining time.Duration
+		err       error
+	}
+	ran := make(chan admission, 1)
+	result := make(chan error, 1)
+	go func() {
+		result <- slots.RunAdmitted(context.Background(), 1, LaneTiming{Admission: time.Minute, Lane: lane}, func(string) { close(queued) }, func(ctx context.Context) error {
+			deadline, ok := ctx.Deadline()
+			if !ok {
+				ran <- admission{err: errors.New("lane has no deadline")}
+				return nil
+			}
+			ran <- admission{remaining: time.Until(deadline), err: ctx.Err()}
+			return nil
+		})
+	}()
+	<-queued
+	time.Sleep(3 * lane) // queue for longer than the lane's own budget
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-ran:
+		if got.err != nil || got.remaining < lane/2 || got.remaining > lane {
+			t.Fatalf("admitted lane remaining %v, error %v; want its full %v", got.remaining, got.err, lane)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("not admitted after the slot was released")
+	}
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+	if count, err := slots.Count(); err != nil || count != 0 {
+		t.Fatalf("lane leases not released: %d held, %v", count, err)
+	}
+	held, err = slots.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = held.Close() }()
+	if err := slots.RunAdmitted(context.Background(), 1, LaneTiming{Admission: lane, Lane: time.Minute}, nil, func(context.Context) error {
+		t.Error("lane ran without admission")
+		return nil
+	}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("admission wait beyond its bound returned %v", err)
+	}
+}

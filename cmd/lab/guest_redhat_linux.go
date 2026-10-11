@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/labexec"
 )
 
@@ -129,14 +130,14 @@ func guestRedHat(ctx context.Context, operation string) error {
 	case "redhat-identity":
 		return runRedHatSubscription(ctx, "identity", nil)
 	case "redhat-repositories":
-		var output serviceProofOutput
-		defer func() { clear(output.buffer.Bytes()) }()
-		if err := redHatGuest(ctx, nil, &output, "-c", redHatRepositoriesScript, "-q", "repolist", "--enabled"); err != nil {
+		output := nativeexec.NewBuffer(16 << 10)
+		defer func() { clear(output.Bytes()) }()
+		if err := redHatGuest(ctx, nil, output, "-c", redHatRepositoriesScript, "-q", "repolist", "--enabled"); err != nil || output.Truncated() {
 			return errors.New("redhat enabled repository observation failed (native output suppressed)")
 		}
 		// Refuse an empty repository set; makecache alone can succeed without
 		// repositories. Suppress native logs as well as command output.
-		if !redHatEnabledRepositories(output.buffer.Bytes()) {
+		if !redHatEnabledRepositories(output.Bytes()) {
 			return errors.New("redhat guest has no enabled repositories")
 		}
 		if err := redHatGuest(ctx, nil, nil, "-c", redHatRepositoriesScript, "-q", "--setopt=*.skip_if_unavailable=False", "--refresh", "makecache"); err != nil {

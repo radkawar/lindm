@@ -220,6 +220,22 @@ current complete coverage (`docs/architecture.md:1180-1196`). The existence of a
 advisory UI or a common CVE identifier does not fill the native inventory/identity
 gap.
 
+## Remote assistance capability roadmap
+
+Atomic desktops and NixOS require independently pinned image/generation, compositor
+and portal backend qualification. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines all tiers' consent, off/limited/on policy, role permissions and audit.
+Install the user helper and portal prerequisites through the native image/generation,
+not an imperative fallback. Clipboard requires the existing RemoteDesktop Clipboard
+interface; user uploads require FileChooser, and accepted downloads land in Downloads.
+All added capabilities, including keys/layouts, displays, messages, reconnect,
+recording, KDE, X11 and unattended access, are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Generation rollback grants no restored session authority; re-consent and independent
+nonce/hash/two-head/termination evidence remain mandatory. KDE/unattended work awaits
+parent confirmation.
+
 ## Lab inputs and recorded evidence
 
 There is no Atomic/NixOS image/generation execution record with a SHA-256 cited

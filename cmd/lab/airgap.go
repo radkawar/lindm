@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
 	"syscall"
 	"time"
 
 	"lindm/internal/devlab"
+	"lindm/internal/labexec"
 	"lindm/internal/vmlab"
 )
 
@@ -103,11 +103,8 @@ func enterIsolatedSite(ctx context.Context, args []string, stdout, stderr io.Wri
 	// The site stage is unscheduled: this outer lane already holds the slot.
 	command = append(command, self, "airgap-site", "-network-container", network.ContainerID)
 	command = append(command, args...)
-	child := exec.CommandContext(ctx, "sudo", command...)
-	child.Stdout, child.Stderr, child.Stdin = stdout, stderr, nil
-	child.Cancel = func() error { return child.Process.Signal(syscall.SIGTERM) }
-	child.WaitDelay = 3 * time.Minute
-	if err := child.Run(); err != nil {
+	// Cancellation lets the site stage run its owned cleanup before the group dies.
+	if err := labexec.Run(ctx, labexec.Command{Path: "sudo", Args: command, Stdout: stdout, Stderr: stderr, Interrupt: syscall.SIGTERM, Grace: 3 * time.Minute}); err != nil {
 		return fmt.Errorf("isolated site lane in namespace holder %s: %w", network.ContainerID, err)
 	}
 	return nil

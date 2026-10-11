@@ -95,6 +95,21 @@ recovery sanitize each need native evidence here.
 
 Not recorded.
 
+## Remote assistance capability roadmap
+
+Pop!_OS/COSMIC inherits no Ubuntu GNOME portal qualification. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines all tiers' consent, off/limited/on policy, role permissions and audit.
+Probe COSMIC's own RemoteDesktop/ScreenCast, Clipboard, FileChooser and notification
+interfaces and preserve native lock/logout isolation. Clipboard attaches only to
+the consented RemoteDesktop session; no compositor-private/root fallback is allowed.
+Keys/layouts, two-head displays, messages, clipboard, files, reconnect, recording
+and Tier 3 are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Each needs actual portal interactions and independent nonce/hash/guest screenshot
+evidence. Unsupported interfaces remain explicit gates; unattended/KDE work awaits
+parent confirmation.
+
 ## Lab
 
 x86_64 only, on the local KVM host under lease admission (no arm64 build is used

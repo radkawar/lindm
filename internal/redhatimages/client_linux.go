@@ -1,6 +1,7 @@
-// Package redhatimages acquires official RHEL KVM images and manages disposable
-// laboratory registration resources through Red Hat's authenticated APIs. It never
-// accepts subscription terms or treats authenticated checksums as vendor signatures.
+// Package redhatimages acquires official RHEL KVM images and Binary DVD installer
+// media and manages disposable laboratory registration resources through Red Hat's
+// authenticated APIs. It never accepts subscription terms or treats authenticated
+// checksums as vendor signatures.
 package redhatimages
 
 import (
@@ -33,6 +34,28 @@ const (
 	metadataLimit = 4 << 20
 	imageLimit    = 16 << 30
 )
+
+// ImageKind selects one official catalog publication family for a minor release.
+type ImageKind string
+
+const (
+	// KVMImage is the vendor KVM guest qcow2 used by cloud-image lanes.
+	KVMImage ImageKind = "kvm"
+	// BinaryDVD is the self-contained BaseOS/AppStream installer ISO used by
+	// kickstart installer lanes; it is not the network-dependent Boot ISO.
+	BinaryDVD ImageKind = "dvd"
+)
+
+func (k ImageKind) filename(version, architecture string) (string, error) {
+	switch k {
+	case KVMImage:
+		return "rhel-" + version + "-" + architecture + "-kvm.qcow2", nil
+	case BinaryDVD:
+		return "rhel-" + version + "-" + architecture + "-dvd.iso", nil
+	default:
+		return "", errors.New("redhatimages: image kind must be kvm or dvd")
+	}
+}
 
 // Image is a selected upstream catalog row, not a serialized local configuration.
 // The private download locator is never returned or persisted.
@@ -166,10 +189,10 @@ func (c *Client) ensureBearer(ctx context.Context) error {
 	return nil
 }
 
-// Discover selects exactly one official KVM qcow2 image for an explicit minor
-// version and architecture (x86_64 or aarch64). An absent entitlement is
-// reported, never bypassed.
-func (c *Client) Discover(ctx context.Context, version, architecture string) (Image, error) {
+// Discover selects exactly one official KVM qcow2 image or Binary DVD for an
+// explicit minor version and architecture (x86_64 or aarch64). An absent
+// entitlement is reported, never bypassed.
+func (c *Client) Discover(ctx context.Context, version, architecture string, kind ImageKind) (Image, error) {
 	major, minor, ok := strings.Cut(version, ".")
 	n, err := strconv.ParseUint(minor, 10, 32)
 	if !ok || (major != "9" && major != "10") || err != nil || strconv.FormatUint(n, 10) != minor {
@@ -177,6 +200,10 @@ func (c *Client) Discover(ctx context.Context, version, architecture string) (Im
 	}
 	if architecture != "x86_64" && architecture != "aarch64" {
 		return Image{}, errors.New("redhatimages: architecture must be x86_64 or aarch64")
+	}
+	filename, err := kind.filename(version, architecture)
+	if err != nil {
+		return Image{}, err
 	}
 	selected := Image{Version: version, Architecture: architecture}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -204,7 +231,7 @@ func (c *Client) Discover(ctx context.Context, version, architecture string) (Im
 	}
 	matches := 0
 	for _, row := range catalog.Body {
-		if row.Filename != "rhel-"+version+"-"+architecture+"-kvm.qcow2" || row.Arch != architecture {
+		if row.Filename != filename || row.Arch != architecture {
 			continue
 		}
 		matches++
@@ -223,7 +250,7 @@ func (c *Client) Discover(ctx context.Context, version, architecture string) (Im
 		}
 	}
 	if matches != 1 {
-		return Image{}, fmt.Errorf("redhatimages: catalog contains %d matching official KVM images, expected one", matches)
+		return Image{}, fmt.Errorf("redhatimages: catalog contains %d matching official %s publications, expected one", matches, filename)
 	}
 	return selected, nil
 }
@@ -290,14 +317,17 @@ func (c *Client) cdn(ctx context.Context, method, endpoint string) (*http.Respon
 
 // Download streams the selected image to a new private temporary file, verifies
 // the vendor SHA-256 and HEAD-published exact size, and returns sanitized receipt
-// evidence. Caller owns removing the temporary file, including after cache import.
-// No partial file survives a failure. The CDN URL remains memory-only.
+// evidence. Caller owns removing the temporary file, including after cache import,
+// and bounds the whole transfer with ctx's deadline (installer DVDs are an order
+// of magnitude larger than KVM images). No partial file survives a failure. The
+// CDN URL remains memory-only.
 func (c *Client) Download(ctx context.Context, image Image, directory string) (_ string, _ *labv1.VendorImageReceipt, err error) {
 	if !image.Entitled {
 		return "", nil, errors.New("redhatimages: Red Hat catalog does not grant download entitlement; enable Download Software and Updates permission and an eligible RHEL subscription")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 40*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		return "", nil, errors.New("redhatimages: download requires a bounded context deadline")
+	}
 	linkCtx, linkCancel := context.WithTimeout(ctx, time.Minute)
 	resp, err := c.api(linkCtx, image.DownloadURL())
 	if err != nil {

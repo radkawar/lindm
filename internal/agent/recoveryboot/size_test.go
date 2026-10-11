@@ -42,7 +42,7 @@ func TestBuildSizeEvidenceAccountsForExactIngredientsAndSections(t *testing.T) {
 	input := fixtureIngredient(t, dir, "private-source-name", []byte("approved payload"))
 	module := input
 	module.Destination = "lib/modules/qualified/nvme.ko"
-	request := BuildRequest{Kernel: input, Stub: input, Agent: input, Busybox: input, Config: input, Certificate: input, Files: []Ingredient{module}, ESPUUID: "ABCD-1234"}
+	request := BuildRequest{Kernel: input, Stub: input, Agent: input, Config: input, Certificate: input, Files: []Ingredient{module}, ESPUUID: "ABCD-1234"}
 	initrd := fixtureIngredient(t, dir, "initrd", []byte("compressed archive"))
 	image := sizeFixturePE(t, dir)
 	const signedSize = int64(8192)
@@ -53,7 +53,7 @@ func TestBuildSizeEvidenceAccountsForExactIngredientsAndSections(t *testing.T) {
 	if evidence.Compression != "gzip" || evidence.Kernel.Bytes != 16 || evidence.InitramfsBytes != 18 || evidence.SignedImageBytes != signedSize || evidence.UKIOverheadBytes+evidence.Kernel.Bytes+evidence.InitramfsBytes != signedSize {
 		t.Fatalf("incorrect component accounting: %+v", evidence)
 	}
-	if evidence.Kernel.SHA256 != hex.EncodeToString(input.SHA256) || len(evidence.Ingredients) != 7 {
+	if evidence.Kernel.SHA256 != hex.EncodeToString(input.SHA256) || len(evidence.Ingredients) != 5 || evidence.Version != 2 {
 		t.Fatalf("missing pinned ingredients: %+v", evidence)
 	}
 	var payload int64
@@ -64,6 +64,12 @@ func TestBuildSizeEvidenceAccountsForExactIngredientsAndSections(t *testing.T) {
 		}
 		if component.Name == module.Destination && component.Kind != "kernel_module" {
 			t.Fatal("module contribution was not distinguished")
+		}
+		if component.Kind == "busybox" || component.Kind == "init_script" || (component.Name == "init") != (component.Kind == "agent") {
+			t.Fatalf("PID 1 agent accounting is wrong: %+v", component)
+		}
+		if (component.Name == initParamsPath) != (component.Kind == "init_parameters") {
+			t.Fatalf("init parameter accounting is wrong: %+v", component)
 		}
 	}
 	if payload != evidence.InitramfsPayloadBytes || !reflect.DeepEqual(evidence.Sections, []SectionSize{{Name: ".linux", PayloadBytes: 4096, FileBytes: 4096}, {Name: ".initrd", PayloadBytes: 256, FileBytes: 512}}) {

@@ -147,22 +147,8 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 		if err != nil {
 			return nil, err
 		}
-		var desc strings.Builder
-		for _, field := range []struct {
-			key    string
-			values []string
-		}{
-			{"FILENAME", []string{name}}, {"NAME", []string{product}}, {"BASE", info["pkgbase"]}, {"VERSION", []string{version}},
-			{"DESC", info["pkgdesc"]}, {"CSIZE", []string{strconv.FormatInt(size, 10)}}, {"ISIZE", info["size"]},
-			{"SHA256SUM", []string{sum}}, {"PGPSIG", []string{base64.StdEncoding.EncodeToString(sig)}}, {"URL", info["url"]},
-			{"LICENSE", info["license"]}, {"ARCH", []string{arch}}, {"BUILDDATE", info["builddate"]}, {"PACKAGER", info["packager"]},
-			{"DEPENDS", info["depend"]}, {"OPTDEPENDS", info["optdepend"]}, {"PROVIDES", info["provides"]}, {"CONFLICTS", info["conflict"]}, {"REPLACES", info["replaces"]},
-		} {
-			if len(field.values) > 0 {
-				fmt.Fprintf(&desc, "%%%s%%\n%s\n\n", field.key, strings.Join(field.values, "\n"))
-			}
-		}
-		descriptions = append(descriptions, archMemoryMember(product+"-"+version+"/desc", []byte(desc.String())))
+		desc := archDescription(name, product, version, arch, sum, size, sig, info)
+		descriptions = append(descriptions, archMemoryMember(product+"-"+version+"/desc", desc))
 	}
 	sort.Slice(descriptions, func(i, j int) bool { return descriptions[i].name < descriptions[j].name })
 	database := filepath.Join(repo, "lindm.db")
@@ -189,6 +175,27 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 		return nil, err
 	}
 	return &ArchRepository{Root: final, Name: "lindm", Database: filepath.Join(final, filepath.Base(database)), DatabaseSignature: filepath.Join(final, filepath.Base(database)+".sig"), PublicKey: filepath.Join(final, filepath.Base(public)), PublicKeyArmor: filepath.Join(final, filepath.Base(armor)), Fingerprint: key.Fingerprint, Custody: key.Custody, PackagesVerified: true, RepoMetadataSigned: true, Tools: []ToolVersion{archBuildToolVersion(), toolVersion(ctx, work, "gpg", "--version"), toolVersion(ctx, work, "gpgv", "--version")}}, nil
+}
+
+// archDescription renders one package's sync-database desc entry, omitting
+// fields with no values.
+func archDescription(name, product, version, arch, sum string, size int64, sig []byte, info map[string][]string) []byte {
+	var desc strings.Builder
+	for _, field := range []struct {
+		key    string
+		values []string
+	}{
+		{"FILENAME", []string{name}}, {"NAME", []string{product}}, {"BASE", info["pkgbase"]}, {"VERSION", []string{version}},
+		{"DESC", info["pkgdesc"]}, {"CSIZE", []string{strconv.FormatInt(size, 10)}}, {"ISIZE", info["size"]},
+		{"SHA256SUM", []string{sum}}, {"PGPSIG", []string{base64.StdEncoding.EncodeToString(sig)}}, {"URL", info["url"]},
+		{"LICENSE", info["license"]}, {"ARCH", []string{arch}}, {"BUILDDATE", info["builddate"]}, {"PACKAGER", info["packager"]},
+		{"DEPENDS", info["depend"]}, {"OPTDEPENDS", info["optdepend"]}, {"PROVIDES", info["provides"]}, {"CONFLICTS", info["conflict"]}, {"REPLACES", info["replaces"]},
+	} {
+		if len(field.values) > 0 {
+			fmt.Fprintf(&desc, "%%%s%%\n%s\n\n", field.key, strings.Join(field.values, "\n"))
+		}
+	}
+	return []byte(desc.String())
 }
 
 func archCopyInput(src, dst string, limit, epoch int64) error {

@@ -5,7 +5,9 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,7 +19,7 @@ import (
 // labMedia is the cloud-installer media of an os-release ID's encrypted lab
 // release.
 func labMedia(distribution string) encryptedMedia {
-	return encryptedMedia{release: platform.ForManifest(distribution, map[string]string{"ubuntu": "24.04", "fedora": "44"}[distribution])}
+	return encryptedMedia{release: platform.ForManifest(distribution, map[string]string{"ubuntu": "24.04", "fedora": "44", "rhel": "9.8"}[distribution])}
 }
 
 func encryptedInstallerTestKeys(t *testing.T) (string, string, string) {
@@ -155,9 +157,81 @@ func TestEncryptedFedoraRecipe(t *testing.T) {
 	}
 }
 
+// RHEL installs from the vendor-authenticated Binary DVD only: an unregistered
+// installed system has no repository, so the desktop, TPM user space and action
+// prerequisites are kickstart packages, never a network or third-party tree.
+func TestEncryptedRHELRecipe(t *testing.T) {
+	login, private, public := encryptedInstallerTestKeys(t)
+	for _, version := range []string{"9.8", "10.2"} {
+		media := encryptedMedia{release: platform.ForManifest("rhel", version)}
+		if _, err := encryptedInstallerRecipeWithOptions(media, "lab-passphrase", login, private, public, "kde", true); err == nil {
+			t.Fatal("RHEL accepted a desktop absent from its Binary DVD")
+		}
+		for _, desktop := range []string{"", "gnome"} {
+			for _, tpmBoot := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/tpm=%t", version, desktop, tpmBoot), func(t *testing.T) {
+					recipe, err := encryptedInstallerRecipeWithOptions(media, "lab-passphrase", login, private, public, desktop, tpmBoot)
+					if err != nil {
+						t.Fatal(err)
+					}
+					text := string(recipe)
+					packagesText, post, ok := strings.Cut(text, "%post --erroronfail --interpreter=/bin/sh\n")
+					if !ok {
+						t.Fatal("missing installed-root provisioning")
+					}
+					_, packageList, ok := strings.Cut(packagesText, "%packages\n")
+					if !ok {
+						t.Fatal("missing package selection")
+					}
+					selected := strings.Fields(strings.TrimSuffix(packageList, "%end\n"))
+					for _, required := range []string{"@core", "cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "openssh-server", "sudo"} {
+						if !slices.Contains(selected, required) {
+							t.Errorf("RHEL golden omits %q", required)
+						}
+					}
+					if slices.Contains(selected, "@^workstation-product-environment") != (desktop == "gnome") {
+						t.Error("RHEL Workstation environment does not follow the desktop selection")
+					}
+					if slices.Contains(selected, "tpm2-tss") != tpmBoot {
+						t.Error("RHEL TPM user space does not follow the TPM boot selection")
+					}
+					for _, forbidden := range []string{"dnf5", "--repofrompath", "#version=", "rhsm", "subscription-manager", "group install"} {
+						if strings.Contains(text, forbidden) {
+							t.Errorf("RHEL kickstart contains %q", forbidden)
+						}
+					}
+					for _, required := range []string{"\ncdrom\n", "\nfirstboot --disable\n", "\nselinux --enforcing\n", "--luks-version=luks2", "\npoweroff\n"} {
+						if !strings.Contains(packagesText, required) {
+							t.Errorf("RHEL kickstart lacks %q", required)
+						}
+					}
+					script := strings.TrimSuffix(post, "%end\n")
+					// EL 9's dracut 057 has no split module, and naming an absent
+					// module is fatal; EL 10's dracut 107 ships 01systemd-cryptsetup.
+					modules := `add_dracutmodules+=" systemd crypt tpm2-tss lvm "`
+					if version == "10.2" {
+						modules = `add_dracutmodules+=" systemd crypt tpm2-tss lvm systemd-cryptsetup "`
+					}
+					if strings.Contains(script, modules) != tpmBoot || strings.Contains(script, "tpm2-device=auto") != tpmBoot {
+						t.Errorf("RHEL %s TPM early userspace does not match the release's dracut", version)
+					}
+					if desktop == "gnome" && (!strings.Contains(script, "/etc/gdm/custom.conf") || !strings.Contains(script, "restorecon -RF /etc/gdm /var/lib/AccountsService")) {
+						t.Error("RHEL GNOME autologin is not configured and relabeled")
+					}
+					cmd := exec.Command("/bin/sh", "-n")
+					cmd.Stdin = strings.NewReader(script)
+					if out, err := cmd.CombinedOutput(); err != nil {
+						t.Fatalf("invalid guest shell syntax: %v: %s", err, out)
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestEncryptedRecipeRejectsInjectionAndMismatchedKeys(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
-	for _, distribution := range []string{"ubuntu", "fedora"} {
+	for _, distribution := range []string{"ubuntu", "fedora", "rhel"} {
 		for _, tc := range []struct{ pass, login, private, public string }{
 			{"", login, private, public},
 			{"secret\npoweroff", login, private, public},
@@ -180,7 +254,7 @@ func TestEncryptedRecipeRejectsInjectionAndMismatchedKeys(t *testing.T) {
 }
 
 func TestEncryptedInstallerGRUBPreservesVendorBootPayload(t *testing.T) {
-	for _, distribution := range []string{"ubuntu", "fedora"} {
+	for _, distribution := range []string{"ubuntu", "fedora", "rhel"} {
 		input := []byte("set default=1\nset timeout=60\nmenuentry 'vendor installer' {\n linuxefi /images/pxeboot/vmlinuz inst.stage2=hd:LABEL=Fedora-Server quiet rhgb rd.live.check ---\n initrdefi /images/pxeboot/initrd.img\n}\n")
 		got, err := encryptedInstallerGRUB(input, labMedia(distribution).release.Lab.Installer)
 		if err != nil {
@@ -200,7 +274,7 @@ func TestEncryptedInstallerGRUBPreservesVendorBootPayload(t *testing.T) {
 		if distribution == "ubuntu" && !strings.Contains(text, "autoinstall noprompt ds=nocloud\\;s=/cdrom/lindm-seed/") {
 			t.Fatal("unattended shutdown or NoCloud kernel input is missing, or GRUB semicolon unescaped")
 		}
-		if distribution == "fedora" && !strings.Contains(text, "inst.ks=cdrom:/lindm-seed/ks.cfg inst.text") {
+		if distribution != "ubuntu" && !strings.Contains(text, "inst.ks=cdrom:/lindm-seed/ks.cfg inst.text") {
 			t.Fatal("kickstart kernel input is missing")
 		}
 	}

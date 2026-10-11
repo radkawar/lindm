@@ -99,50 +99,9 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 	if err := mkdir(dist, epoch); err != nil {
 		return nil, err
 	}
-	var arch string
-	for _, deb := range req.DEBs {
-		file, err := openRegular(deb)
-		if err != nil {
-			return nil, err
-		}
-		info, err := file.Stat()
-		if err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-		name := info.Name()
-		shown, _, err := runTool(ctx, work, toolCmd{
-			Name: "dpkg-deb",
-			Args: []string{"--show", "--showformat", "${Package}\t${Architecture}\n", file.Name()},
-		})
-		if err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-		fields := strings.Split(strings.TrimSpace(string(shown)), "\t")
-		if len(fields) != 2 || !supportedProduct(fields[0]) || !strings.HasPrefix(name, fields[0]+"_") || !strings.HasSuffix(name, ".deb") {
-			_ = file.Close()
-			return nil, fmt.Errorf("%w: unexpected deb product or filename", ErrArtifact)
-		}
-		if arch == "" {
-			arch = fields[1]
-		} else if arch != fields[1] {
-			_ = file.Close()
-			return nil, fmt.Errorf("%w: mixed deb architectures", ErrArtifact)
-		}
-		pool := filepath.Join(repo, "pool", "main", "l", fields[0])
-		if err := mkdir(pool, epoch); err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-		if err := copyFile(filepath.Join(pool, name), file, 0o644, epoch); err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-		_ = file.Close()
-	}
-	if arch != "amd64" && arch != "arm64" {
-		return nil, fmt.Errorf("%w: unsupported deb architecture", ErrArchitecture)
+	arch, err := stageDEBs(ctx, work, repo, req.DEBs, epoch)
+	if err != nil {
+		return nil, err
 	}
 	binaryDir := filepath.Join(repo, "dists", APTDistribution, "main", "binary-"+arch)
 	if arch != "amd64" {
@@ -155,116 +114,23 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 	} else {
 		binaryDir = dist
 	}
-	packagesPath := filepath.Join(binaryDir, "Packages")
-	packages, err := os.OpenFile(packagesPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err := writeAPTPackages(ctx, work, repo, filepath.Join(binaryDir, "Packages")); err != nil {
+		return nil, err
+	}
+	releasePath, err := writeAPTRelease(ctx, work, repo, key, arch, epoch)
 	if err != nil {
 		return nil, err
 	}
-	_, _, err = runTool(ctx, work, toolCmd{
-		Name:   "apt-ftparchive",
-		Args:   []string{"--sha256", "packages", "pool"},
-		Dir:    repo,
-		Stdout: packages,
-	})
-	closeErr := packages.Close()
-	if err != nil || closeErr != nil {
-		if err == nil {
-			err = closeErr
-		}
-		return nil, err
-	}
-	if err := verifyPackageIndex(repo, packagesPath); err != nil {
-		return nil, err
-	}
-	gz, err := os.OpenFile(packagesPath+".gz", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	inRelease, err := signAPTRelease(ctx, work, key, pass, releasePath)
 	if err != nil {
-		return nil, err
-	}
-	_, _, err = runTool(ctx, work, toolCmd{Name: "gzip", Args: []string{"-n", "-c", packagesPath}, Stdout: gz})
-	closeErr = gz.Close()
-	if err != nil || closeErr != nil {
-		if err == nil {
-			err = closeErr
-		}
-		return nil, err
-	}
-	origin := "lindm"
-	if key.Custody == CustodyDevelopment {
-		origin = "lindm-development"
-	}
-	conf := fmt.Sprintf("APT::FTPArchive::Release::Origin \"%s\";\nAPT::FTPArchive::Release::Label \"lindm\";\nAPT::FTPArchive::Release::Suite \"%s\";\nAPT::FTPArchive::Release::Codename \"%s\";\nAPT::FTPArchive::Release::Architectures \"%s\";\nAPT::FTPArchive::Release::Components \"%s\";\n", origin, APTDistribution, APTDistribution, arch, APTComponent)
-	confPath := filepath.Join(work, "apt-release.conf")
-	if err := writeFile(confPath, []byte(conf), 0o644, epoch); err != nil {
-		return nil, err
-	}
-	releasePath := filepath.Join(repo, "dists", APTDistribution, "Release")
-	// Keep the output outside the tree apt-ftparchive hashes.
-	releaseTemp := filepath.Join(work, "Release")
-	release, err := os.OpenFile(releaseTemp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return nil, err
-	}
-	_, _, err = runTool(ctx, work, toolCmd{
-		Name:   "apt-ftparchive",
-		Args:   []string{"-c", confPath, "--sha256", "release", filepath.Join(repo, "dists", APTDistribution)},
-		Stdout: release,
-	})
-	closeErr = release.Close()
-	if err != nil || closeErr != nil {
-		if err == nil {
-			err = closeErr
-		}
-		return nil, err
-	}
-	if err := os.Rename(releaseTemp, releasePath); err != nil {
-		return nil, err
-	}
-	if err := verifyReleaseHashes(filepath.Join(repo, "dists", APTDistribution), releasePath); err != nil {
-		return nil, err
-	}
-	inRelease := filepath.Join(repo, "dists", APTDistribution, "InRelease")
-	detached := filepath.Join(repo, "dists", APTDistribution, "Release.gpg")
-	if _, _, err := runTool(ctx, work, toolCmd{
-		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--clearsign", "--output", inRelease, releasePath},
-		ExtraEnv: gpgEnv(key.Home),
-	}); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(inRelease, 0o644); err != nil {
-		return nil, err
-	}
-	if _, _, err := runTool(ctx, work, toolCmd{
-		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--detach-sign", "--armor", "--output", detached, releasePath},
-		ExtraEnv: gpgEnv(key.Home),
-	}); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(detached, 0o644); err != nil {
 		return nil, err
 	}
 	binaryKey, armorKey, err := exportPublicKeys(ctx, work, key, repo)
 	if err != nil {
 		return nil, err
 	}
-	verified := filepath.Join(work, "inrelease-verified")
-	if _, _, err := runTool(ctx, work, toolCmd{
-		Name: "gpgv",
-		Args: []string{"--keyring", binaryKey, "--output", verified, inRelease},
-	}); err != nil {
-		return nil, fmt.Errorf("%w: InRelease verification failed", ErrArtifact)
-	}
-	releaseBytes, err := os.ReadFile(releasePath)
-	if err != nil {
+	if err := verifyInRelease(ctx, work, binaryKey, inRelease, releasePath); err != nil {
 		return nil, err
-	}
-	verifiedBytes, err := os.ReadFile(verified)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(releaseBytes, verifiedBytes) && !bytes.Equal(releaseBytes, bytes.TrimSuffix(verifiedBytes, []byte("\n"))) {
-		return nil, fmt.Errorf("%w: verified InRelease payload does not match Release", ErrArtifact)
 	}
 	if err := guard.close(ctx, work); err != nil {
 		return nil, err
@@ -291,6 +157,169 @@ func PublishAPT(ctx context.Context, req APTRequest) (result *APTRepository, err
 		PackagesHashVerified: true,
 		Tools:                []ToolVersion{toolVersion(ctx, work, "apt-ftparchive", "--help"), toolVersion(ctx, work, "gpg", "--version"), toolVersion(ctx, work, "gpgv", "--version")},
 	}, nil
+}
+
+// stageDEBs copies each supported product deb into the repository pool and
+// returns their single shared architecture (amd64 or arm64).
+func stageDEBs(ctx context.Context, work, repo string, debs []string, epoch int64) (string, error) {
+	var arch string
+	for _, deb := range debs {
+		var err error
+		if arch, err = stageDEB(ctx, work, repo, deb, arch, epoch); err != nil {
+			return "", err
+		}
+	}
+	if arch != "amd64" && arch != "arm64" {
+		return "", fmt.Errorf("%w: unsupported deb architecture", ErrArchitecture)
+	}
+	return arch, nil
+}
+
+// stageDEB checks that deb is a supported product named after its package and,
+// once arch is known, shares it; then copies it into pool/main/l/<package>. It
+// returns the deb's architecture.
+func stageDEB(ctx context.Context, work, repo, deb, arch string, epoch int64) (string, error) {
+	file, err := openRegular(deb)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	name := info.Name()
+	shown, _, err := runTool(ctx, work, toolCmd{
+		Name: "dpkg-deb",
+		Args: []string{"--show", "--showformat", "${Package}\t${Architecture}\n", file.Name()},
+	})
+	if err != nil {
+		return "", err
+	}
+	fields := strings.Split(strings.TrimSpace(string(shown)), "\t")
+	if len(fields) != 2 || !supportedProduct(fields[0]) || !strings.HasPrefix(name, fields[0]+"_") || !strings.HasSuffix(name, ".deb") {
+		return "", fmt.Errorf("%w: unexpected deb product or filename", ErrArtifact)
+	}
+	if arch != "" && arch != fields[1] {
+		return "", fmt.Errorf("%w: mixed deb architectures", ErrArtifact)
+	}
+	pool := filepath.Join(repo, "pool", "main", "l", fields[0])
+	if err := mkdir(pool, epoch); err != nil {
+		return "", err
+	}
+	if err := copyFile(filepath.Join(pool, name), file, 0o644, epoch); err != nil {
+		return "", err
+	}
+	return fields[1], nil
+}
+
+// writeAPTPackages generates and verifies the SHA-256 Packages index for the
+// pool, then writes its reproducible gzip copy.
+func writeAPTPackages(ctx context.Context, work, repo, packagesPath string) error {
+	if err := runToolToFile(ctx, work, packagesPath, toolCmd{
+		Name: "apt-ftparchive",
+		Args: []string{"--sha256", "packages", "pool"},
+		Dir:  repo,
+	}); err != nil {
+		return err
+	}
+	if err := verifyPackageIndex(repo, packagesPath); err != nil {
+		return err
+	}
+	return runToolToFile(ctx, work, packagesPath+".gz", toolCmd{Name: "gzip", Args: []string{"-n", "-c", packagesPath}})
+}
+
+// writeAPTRelease generates the distribution Release file and verifies the index
+// hashes it lists. It returns the Release path.
+func writeAPTRelease(ctx context.Context, work, repo string, key SigningKey, arch string, epoch int64) (string, error) {
+	origin := "lindm"
+	if key.Custody == CustodyDevelopment {
+		origin = "lindm-development"
+	}
+	conf := fmt.Sprintf("APT::FTPArchive::Release::Origin \"%s\";\nAPT::FTPArchive::Release::Label \"lindm\";\nAPT::FTPArchive::Release::Suite \"%s\";\nAPT::FTPArchive::Release::Codename \"%s\";\nAPT::FTPArchive::Release::Architectures \"%s\";\nAPT::FTPArchive::Release::Components \"%s\";\n", origin, APTDistribution, APTDistribution, arch, APTComponent)
+	confPath := filepath.Join(work, "apt-release.conf")
+	if err := writeFile(confPath, []byte(conf), 0o644, epoch); err != nil {
+		return "", err
+	}
+	distDir := filepath.Join(repo, "dists", APTDistribution)
+	releasePath := filepath.Join(distDir, "Release")
+	// Keep the output outside the tree apt-ftparchive hashes.
+	releaseTemp := filepath.Join(work, "Release")
+	if err := runToolToFile(ctx, work, releaseTemp, toolCmd{
+		Name: "apt-ftparchive",
+		Args: []string{"-c", confPath, "--sha256", "release", distDir},
+	}); err != nil {
+		return "", err
+	}
+	if err := os.Rename(releaseTemp, releasePath); err != nil {
+		return "", err
+	}
+	if err := verifyReleaseHashes(distDir, releasePath); err != nil {
+		return "", err
+	}
+	return releasePath, nil
+}
+
+// signAPTRelease writes the clearsigned InRelease and the detached Release.gpg
+// beside releasePath. It returns the InRelease path.
+func signAPTRelease(ctx context.Context, work string, key SigningKey, pass, releasePath string) (string, error) {
+	distDir := filepath.Dir(releasePath)
+	inRelease := filepath.Join(distDir, "InRelease")
+	detached := filepath.Join(distDir, "Release.gpg")
+	for _, mode := range [][]string{{"--clearsign", "--output", inRelease}, {"--detach-sign", "--armor", "--output", detached}} {
+		args := append([]string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!"}, mode...)
+		if _, _, err := runTool(ctx, work, toolCmd{
+			Name:     "gpg",
+			Args:     append(args, releasePath),
+			ExtraEnv: gpgEnv(key.Home),
+		}); err != nil {
+			return "", err
+		}
+		if err := os.Chmod(mode[len(mode)-1], 0o644); err != nil {
+			return "", err
+		}
+	}
+	return inRelease, nil
+}
+
+// verifyInRelease checks InRelease with gpgv against only the exported key and
+// requires its signed payload to be the Release file.
+func verifyInRelease(ctx context.Context, work, binaryKey, inRelease, releasePath string) error {
+	verified := filepath.Join(work, "inrelease-verified")
+	if _, _, err := runTool(ctx, work, toolCmd{
+		Name: "gpgv",
+		Args: []string{"--keyring", binaryKey, "--output", verified, inRelease},
+	}); err != nil {
+		return fmt.Errorf("%w: InRelease verification failed", ErrArtifact)
+	}
+	releaseBytes, err := os.ReadFile(releasePath)
+	if err != nil {
+		return err
+	}
+	verifiedBytes, err := os.ReadFile(verified)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(releaseBytes, verifiedBytes) && !bytes.Equal(releaseBytes, bytes.TrimSuffix(verifiedBytes, []byte("\n"))) {
+		return fmt.Errorf("%w: verified InRelease payload does not match Release", ErrArtifact)
+	}
+	return nil
+}
+
+// runToolToFile runs cmd with stdout captured in a new 0644 file at path. A tool
+// failure takes precedence over the close error.
+func runToolToFile(ctx context.Context, work, path string, cmd toolCmd) error {
+	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = out
+	_, _, err = runTool(ctx, work, cmd)
+	closeErr := out.Close()
+	if err != nil {
+		return err
+	}
+	return closeErr
 }
 
 func verifyPackageIndex(repo, packagesPath string) error {

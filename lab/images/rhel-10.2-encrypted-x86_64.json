@@ -1,0 +1,15 @@
+{
+  "id": "rhel-10.2-dvd-x86-64",
+  "distribution": "rhel",
+  "version": "10.2",
+  "architecture": "x86_64",
+  "edition": "Binary DVD",
+  "release": "2026-05-12T15:08:48Z",
+  "imageFilename": "rhel-10.2-x86_64-dvd.iso",
+  "imageUrl": "https://api.access.redhat.com/management/v1/images/e15cb333529c332e76e4b1b946efe3515c99f996546675aec18e8effdf2540a5/download",
+  "checksumUrl": "https://api.access.redhat.com/management/v1/images/rhel/10.2/x86_64",
+  "sha256": "e15cb333529c332e76e4b1b946efe3515c99f996546675aec18e8effdf2540a5",
+  "imageSizeBytes": "11059986432",
+  "checksumMode": "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl": "https://api.access.redhat.com/management/v1/images/rhel/10.2/x86_64"
+}

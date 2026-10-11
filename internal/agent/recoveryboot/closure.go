@@ -16,9 +16,10 @@ import (
 
 // RequiredNativeHelpers returns initramfs-relative paths for the configured
 // recovery operations. This selects dependencies, not execution authority.
-// Direct overwrite/discard use Go I/O/ioctl; native NVMe methods use nvme-cli.
+// Direct overwrite/discard use Go I/O/ioctl, image Authenticode verification
+// is in-process, and native NVMe methods use nvme-cli.
 func RequiredNativeHelpers(config *agentv1.RecoveryRuntimeConfig) []string {
-	required := []string{"usr/bin/sbverify", "usr/bin/lsblk"}
+	required := []string{"usr/bin/lsblk"}
 	provider := config.GetProvider()
 	var luks, nvme bool
 	for _, target := range provider.GetTargets() {

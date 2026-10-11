@@ -148,81 +148,11 @@ func BuildRejectionFixtures(ctx context.Context, req RejectionRequest) (result *
 		return nil, err
 	}
 	for _, kind := range []string{"unsigned", "tampered", "wrong-signer"} {
-		base := filepath.Join(staged, kind)
-		if err := os.Mkdir(base, 0o700); err != nil {
-			return nil, err
-		}
-		variantRepo, err := rejectionCopyAPT(repo, filepath.Join(base, "apt"))
+		cases, err := rejectionVariant(ctx, work, filepath.Join(staged, kind), kind, repo, deb, rpm, wrong, gpg)
 		if err != nil {
 			return nil, err
 		}
-		variantDEB := deb
-		variantDEB.Path = filepath.Join(variantRepo.Root, "pool", "main", "l", PackageName, filepath.Base(deb.Path))
-		variantRPM := rpm
-		if err := os.Mkdir(filepath.Join(base, "rpm"), 0o755); err != nil {
-			return nil, err
-		}
-		variantRPM.Path = filepath.Join(base, "rpm", filepath.Base(rpm.Path))
-		if err := rejectionCopyPath(rpm.Path, variantRPM.Path, maxBinaryBytes); err != nil {
-			return nil, err
-		}
-		switch kind {
-		case "unsigned", "wrong-signer":
-			if err := os.Remove(variantRepo.InRelease); err != nil {
-				return nil, err
-			}
-			if err := os.Remove(variantRepo.Release + ".gpg"); err != nil {
-				return nil, err
-			}
-			if _, _, err := runTool(ctx, work, toolCmd{Name: "rpmsign", Args: []string{"--delsign", variantRPM.Path}}); err != nil {
-				return nil, err
-			}
-			if kind == "wrong-signer" {
-				for _, signature := range []struct{ option, path string }{{"--clearsign", variantRepo.InRelease}, {"--detach-sign", variantRepo.Release + ".gpg"}} {
-					if _, _, err := runTool(ctx, work, toolCmd{
-						Name:     "gpg",
-						Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", wrong.PassphraseFile, "--homedir", wrong.Home, "--local-user", wrong.Fingerprint + "!", "--armor", signature.option, "--output", signature.path, variantRepo.Release},
-						ExtraEnv: gpgEnv(wrong.Home),
-					}); err != nil {
-						return nil, err
-					}
-					if err := os.Chmod(signature.path, 0o644); err != nil {
-						return nil, err
-					}
-				}
-				if err := signRPM(ctx, work, variantRPM.Path, *wrong, wrong.PassphraseFile, gpg, DefaultSourceDateEpoch); err != nil {
-					return nil, err
-				}
-				variantRPM.SignerFingerprint = wrong.Fingerprint
-				variantRepo.Fingerprint = wrong.Fingerprint
-			} else {
-				variantRPM.SignerFingerprint = ""
-				variantRepo.Fingerprint = ""
-				variantRepo.InRelease = ""
-			}
-		case "tampered":
-			if err := rejectionFlipByte(variantDEB.Path, deb.Size/2); err != nil {
-				return nil, err
-			}
-			payloadOffset, err := rejectionRPMPayload(variantRPM.Path)
-			if err != nil {
-				return nil, err
-			}
-			if err := rejectionFlipByte(variantRPM.Path, payloadOffset+(rpm.Size-payloadOffset)/2); err != nil {
-				return nil, err
-			}
-			variantDEB.PayloadSHA256 = ""
-			variantRPM.PayloadSHA256 = ""
-		}
-		variantDEB.Signed = false
-		variantRPM.Signed = false
-		for _, artifact := range []*Artifact{&variantDEB, &variantRPM} {
-			artifact.SHA256, artifact.Size, err = hashFile(artifact.Path)
-			if err != nil {
-				return nil, err
-			}
-		}
-		result.Cases = append(result.Cases, RejectionCase{Name: kind, Artifact: variantDEB, APT: variantRepo}, RejectionCase{Name: kind, Artifact: variantRPM})
+		result.Cases = append(result.Cases, cases...)
 	}
 	if err := errors.Join(wrongGuard.close(ctx, work), guard.close(ctx, work)); err != nil {
 		return nil, err
@@ -239,6 +169,91 @@ func BuildRejectionFixtures(ctx context.Context, req RejectionRequest) (result *
 		}
 	}
 	return result, nil
+}
+
+// rejectionVariant copies the positive APT tree and RPM into base, then makes
+// them the named kind of rejection case: unsigned, tampered or wrong-signer.
+func rejectionVariant(ctx context.Context, work, base, kind string, repo *APTRepository, deb, rpm Artifact, wrong *SigningKey, gpg string) ([]RejectionCase, error) {
+	if err := os.Mkdir(base, 0o700); err != nil {
+		return nil, err
+	}
+	variantRepo, err := rejectionCopyAPT(repo, filepath.Join(base, "apt"))
+	if err != nil {
+		return nil, err
+	}
+	variantDEB := deb
+	variantDEB.Path = filepath.Join(variantRepo.Root, "pool", "main", "l", PackageName, filepath.Base(deb.Path))
+	variantRPM := rpm
+	if err := os.Mkdir(filepath.Join(base, "rpm"), 0o755); err != nil {
+		return nil, err
+	}
+	variantRPM.Path = filepath.Join(base, "rpm", filepath.Base(rpm.Path))
+	if err := rejectionCopyPath(rpm.Path, variantRPM.Path, maxBinaryBytes); err != nil {
+		return nil, err
+	}
+	switch kind {
+	case "unsigned", "wrong-signer":
+		if err := os.Remove(variantRepo.InRelease); err != nil {
+			return nil, err
+		}
+		if err := os.Remove(variantRepo.Release + ".gpg"); err != nil {
+			return nil, err
+		}
+		if _, _, err := runTool(ctx, work, toolCmd{Name: "rpmsign", Args: []string{"--delsign", variantRPM.Path}}); err != nil {
+			return nil, err
+		}
+		if kind == "wrong-signer" {
+			if err := rejectionSignWrong(ctx, work, variantRepo, variantRPM.Path, wrong, gpg); err != nil {
+				return nil, err
+			}
+			variantRPM.SignerFingerprint = wrong.Fingerprint
+			variantRepo.Fingerprint = wrong.Fingerprint
+		} else {
+			variantRPM.SignerFingerprint = ""
+			variantRepo.Fingerprint = ""
+			variantRepo.InRelease = ""
+		}
+	case "tampered":
+		if err := rejectionFlipByte(variantDEB.Path, deb.Size/2); err != nil {
+			return nil, err
+		}
+		payloadOffset, err := rejectionRPMPayload(variantRPM.Path)
+		if err != nil {
+			return nil, err
+		}
+		if err := rejectionFlipByte(variantRPM.Path, payloadOffset+(rpm.Size-payloadOffset)/2); err != nil {
+			return nil, err
+		}
+		variantDEB.PayloadSHA256 = ""
+		variantRPM.PayloadSHA256 = ""
+	}
+	variantDEB.Signed = false
+	variantRPM.Signed = false
+	for _, artifact := range []*Artifact{&variantDEB, &variantRPM} {
+		artifact.SHA256, artifact.Size, err = hashFile(artifact.Path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return []RejectionCase{{Name: kind, Artifact: variantDEB, APT: variantRepo}, {Name: kind, Artifact: variantRPM}}, nil
+}
+
+// rejectionSignWrong re-signs the unsigned variant's InRelease, Release.gpg and
+// RPM with the untrusted wrong signer.
+func rejectionSignWrong(ctx context.Context, work string, repo *APTRepository, rpmPath string, wrong *SigningKey, gpg string) error {
+	for _, signature := range []struct{ option, path string }{{"--clearsign", repo.InRelease}, {"--detach-sign", repo.Release + ".gpg"}} {
+		if _, _, err := runTool(ctx, work, toolCmd{
+			Name:     "gpg",
+			Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", wrong.PassphraseFile, "--homedir", wrong.Home, "--local-user", wrong.Fingerprint + "!", "--armor", signature.option, "--output", signature.path, repo.Release},
+			ExtraEnv: gpgEnv(wrong.Home),
+		}); err != nil {
+			return err
+		}
+		if err := os.Chmod(signature.path, 0o644); err != nil {
+			return err
+		}
+	}
+	return signRPM(ctx, work, rpmPath, *wrong, wrong.PassphraseFile, gpg, DefaultSourceDateEpoch)
 }
 
 func rejectionSnapshotArtifact(ctx context.Context, work, dir string, artifact Artifact) (Artifact, error) {

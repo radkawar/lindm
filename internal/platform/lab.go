@@ -43,6 +43,10 @@ const (
 	LaneEncryptedAcceptance LabLane = "encrypted-acceptance"
 )
 
+// LabLanes lists every lane whose recipes are tracked per release; a lane
+// outside this list needs no per-release recipe.
+var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance}
+
 // LabLane returns nil when the release has a maintained recipe for the lane.
 func (r *Release) LabLane(l LabLane) error {
 	if slices.Contains(r.Lab.Lanes, l) {

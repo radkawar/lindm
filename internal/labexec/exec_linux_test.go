@@ -187,3 +187,22 @@ func TestCloseKillsGroupWithoutError(t *testing.T) {
 	}
 	awaitGone(t, pid)
 }
+
+func TestSignalReachesGroupUntilReaped(t *testing.T) {
+	stdout := newFirstLine()
+	p, err := Start(t.Context(), Command{Path: "sh", Args: []string{"-c", "sleep 60 & echo $!; wait"}, Stdout: stdout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := stdout.pid(t)
+	if p.Pid() <= 0 || p.Pid() == pid {
+		t.Fatalf("leader pid %d", p.Pid())
+	}
+	p.Signal(syscall.SIGTERM)
+	var exit *exec.ExitError
+	if err := p.Wait(); !errors.As(err, &exit) || !strings.Contains(err.Error(), "terminated") {
+		t.Fatalf("signalled leader = %v", err)
+	}
+	awaitGone(t, pid)
+	p.Signal(syscall.SIGKILL) // reaped: a no-op, never a recycled group
+}

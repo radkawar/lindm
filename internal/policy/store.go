@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
 	"lindm/internal/policy/profiledb"
 	"lindm/internal/protodata"
 )
@@ -134,19 +135,10 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 		if expected == nil || head.HeadRevisionID != *expected {
 			return nil, ErrProfileConflict
 		}
-		previous, err := q.GetProfileRevision(ctx, profiledb.GetProfileRevisionParams{ProfileID: profileID, RevisionID: expected})
+		number, previousTime, err = s.successorOf(ctx, q, profileID, *expected)
 		if err != nil {
 			return nil, err
 		}
-		// Validate the captured head before extending its immutable sequence.
-		if _, err := s.readRevisionRow(ctx, q, previous); err != nil {
-			return nil, err
-		}
-		if previous.RevisionNumber == math.MaxInt64 {
-			return nil, ErrProfileCapacity
-		}
-		number = previous.RevisionNumber + 1
-		previousTime = previous.PublishedAt
 	}
 	now, err := q.ProfileClock(ctx)
 	if err != nil {
@@ -160,44 +152,8 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 	}); err != nil {
 		return nil, err
 	}
-	resources := make([]profiledb.InsertProfileResourcesParams, 0, len(spec.GetResources()))
-	dependencyCount := 0
-	for _, resource := range spec.GetResources() {
-		dependencyCount += len(resource.GetDependsOn())
-	}
-	dependencies := make([]profiledb.InsertProfileDependenciesParams, 0, dependencyCount)
-	for _, resource := range spec.GetResources() {
-		resourceID, err := uuid.Parse(resource.GetResourceId())
-		if err != nil {
-			return nil, ErrProfileRejected
-		}
-		record := proto.CloneOf(resource)
-		record.DependsOn = nil
-		encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(record)
-		if err != nil {
-			return nil, ErrProfileRejected
-		}
-		ref := resource.GetDesired().GetRef()
-		resources = append(resources, profiledb.InsertProfileResourcesParams{RevisionID: revisionID, ResourceID: resourceID, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), ResourceProto: encoded})
-		for _, dependency := range resource.GetDependsOn() {
-			dependencies = append(dependencies, profiledb.InsertProfileDependenciesParams{RevisionID: revisionID, ResourceID: resourceID, DependencyKind: int16(dependency.GetRef().GetKind()), DependencyKey: dependency.GetRef().GetCanonicalKey(), Condition: int16(dependency.GetCondition())})
-		}
-	}
-	copied, err := q.InsertProfileResources(ctx, resources)
-	if err != nil {
+	if err := insertRevisionResources(ctx, q, revisionID, spec); err != nil {
 		return nil, err
-	}
-	if copied != int64(len(resources)) {
-		return nil, ErrProfileCorrupt
-	}
-	if len(dependencies) > 0 {
-		copied, err = q.InsertProfileDependencies(ctx, dependencies)
-		if err != nil {
-			return nil, err
-		}
-		if copied != int64(len(dependencies)) {
-			return nil, ErrProfileCorrupt
-		}
 	}
 	if !created {
 		count, err := q.AdvanceProfileHead(ctx, profiledb.AdvanceProfileHeadParams{NextID: revisionID, ProfileID: profileID, ExpectedID: *expected})
@@ -212,6 +168,68 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 		return nil, err
 	}
 	return &adminv1.ProfileRevision{ProfileId: profileID.String(), RevisionId: revisionID.String(), RevisionNumber: uint64(number), Spec: spec, ActorId: actorID.String(), PublishedAt: timestamppb.New(now.Time), SpecSha256: specDigest[:]}, nil
+}
+
+// successorOf validates the captured head revision before extending its
+// immutable sequence, returning the next revision number and the head's
+// publication time.
+func (s *Store) successorOf(ctx context.Context, q *profiledb.Queries, profileID, head uuid.UUID) (int64, pgtype.Timestamptz, error) {
+	previous, err := q.GetProfileRevision(ctx, profiledb.GetProfileRevisionParams{ProfileID: profileID, RevisionID: &head})
+	if err != nil {
+		return 0, pgtype.Timestamptz{}, err
+	}
+	if _, err := s.readRevisionRow(ctx, q, previous); err != nil {
+		return 0, pgtype.Timestamptz{}, err
+	}
+	if previous.RevisionNumber == math.MaxInt64 {
+		return 0, pgtype.Timestamptz{}, ErrProfileCapacity
+	}
+	return previous.RevisionNumber + 1, previous.PublishedAt, nil
+}
+
+// insertRevisionResources copies the revision's resources, without their
+// dependency lists, and its dependency edges, requiring every row to be written.
+func insertRevisionResources(ctx context.Context, q *profiledb.Queries, revisionID uuid.UUID, spec *policyv1.ResourceProfile) error {
+	resources := make([]profiledb.InsertProfileResourcesParams, 0, len(spec.GetResources()))
+	dependencyCount := 0
+	for _, resource := range spec.GetResources() {
+		dependencyCount += len(resource.GetDependsOn())
+	}
+	dependencies := make([]profiledb.InsertProfileDependenciesParams, 0, dependencyCount)
+	for _, resource := range spec.GetResources() {
+		resourceID, err := uuid.Parse(resource.GetResourceId())
+		if err != nil {
+			return ErrProfileRejected
+		}
+		record := proto.CloneOf(resource)
+		record.DependsOn = nil
+		encoded, err := (proto.MarshalOptions{Deterministic: true}).Marshal(record)
+		if err != nil {
+			return ErrProfileRejected
+		}
+		ref := resource.GetDesired().GetRef()
+		resources = append(resources, profiledb.InsertProfileResourcesParams{RevisionID: revisionID, ResourceID: resourceID, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), ResourceProto: encoded})
+		for _, dependency := range resource.GetDependsOn() {
+			dependencies = append(dependencies, profiledb.InsertProfileDependenciesParams{RevisionID: revisionID, ResourceID: resourceID, DependencyKind: int16(dependency.GetRef().GetKind()), DependencyKey: dependency.GetRef().GetCanonicalKey(), Condition: int16(dependency.GetCondition())})
+		}
+	}
+	copied, err := q.InsertProfileResources(ctx, resources)
+	if err != nil {
+		return err
+	}
+	if copied != int64(len(resources)) {
+		return ErrProfileCorrupt
+	}
+	if len(dependencies) > 0 {
+		copied, err = q.InsertProfileDependencies(ctx, dependencies)
+		if err != nil {
+			return err
+		}
+		if copied != int64(len(dependencies)) {
+			return ErrProfileCorrupt
+		}
+	}
+	return nil
 }
 
 func profileInputError(ctx context.Context, _ error) error {

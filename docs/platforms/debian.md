@@ -232,6 +232,21 @@ Source SHA-256: `4e1ad05000a2f1dcc0729e33ac80086ec2e5125ce20bcf31a83cf52d626c221
 Evidence: [`debian-osv-cve-cardinality-20261010.json`](../../artifacts/debian-osv-cve-cardinality-20261010.json),
 SHA-256 `3688a041de7c2b3c3fb3287ce5bbefcdf5ff63465ea44a878645ded4c3dd9900`.
 
+## Remote assistance capability roadmap
+
+Debian does not inherit Ubuntu's portal or GNOME results. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines consent, off/limited/on policy, role permissions and audit for clipboard,
+keys/layouts, displays, notifications, files, reconnect, recording and Tier 3.
+Each release needs pinned portal/frontend/backend/compositor capability probes.
+Clipboard requires the existing RemoteDesktop Clipboard interface; file upload
+requires FileChooser and download targets the session user's Downloads.
+No X11 fallback bypasses consent. All added capabilities are
+[not run](../verification.md#commercial-assistance-capability-qualification)
+on Debian; qualify actual guest effects, two monitors, clipboard nonces, transfer
+hashes and recording/reconnect boundaries independently. KDE/unattended work awaits
+parent confirmation.
+
 ## Lab
 
 The Debian path deliberately avoids pretending current cloud checksums have a vendor

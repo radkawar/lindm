@@ -58,7 +58,7 @@ func (f *AuthorityFixture) Measure(ctx context.Context) (_ AuthorityMetrics, res
 	m.WaitingConnections = counts.WaitingConnections
 	m.AutovacuumWorkers = counts.AutovacuumWorkers
 	m.OtherBackgroundBackends = counts.OtherBackgroundBackends
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", f.process.Process.Pid))
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", f.process.Pid()))
 	if err != nil {
 		return m, err
 	}

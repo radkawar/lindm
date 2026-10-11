@@ -5,6 +5,8 @@
 # Exact direct dependencies only. APT resolves their dependencies; evidence
 # includes the entire dpkg state before/after, including those dependencies.
 # Update these reviewed pins when repositories retire a version; never float.
+# systemd-ukify is not listed: the baseline derives it from the installed
+# systemd version and refuses when that exact version left the archive.
 qemu-system-arm=1:8.2.2+ds-0ubuntu1.18
 qemu-system-x86=1:8.2.2+ds-0ubuntu1.18
 qemu-system-common=1:8.2.2+ds-0ubuntu1.18

@@ -66,14 +66,7 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 		return nil, err
 	}
 	defer func() { _ = binary.Close() }()
-	arch, err := inspectELF(binary)
-	if err != nil {
-		return nil, err
-	}
-	if arch.GOARCH != target {
-		return nil, fmt.Errorf("%w: binary %s does not match requested %s", ErrArchitecture, arch.GOARCH, target)
-	}
-	goVersion, err := confirmModule(binary, p, arch, version)
+	arch, goVersion, err := inspectBinary(binary, target, p, version)
 	if err != nil {
 		return nil, err
 	}
@@ -86,21 +79,9 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 		return nil, err
 	}
 	defer func() { _ = cleanup() }()
-	versionValidation := "embedded-build-metadata"
-	if arch.hostMatch() {
-		stdout, stderr, err := runTool(ctx, work, toolCmd{
-			Path:    binary.Name(),
-			Args:    []string{"version"},
-			Dir:     "/",
-			Timeout: 10 * time.Second,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrVersion, err)
-		}
-		if err := parseVersionOutput(stdout, stderr, version); err != nil {
-			return nil, err
-		}
-		versionValidation = "native-execution"
+	versionValidation, err := validateBinaryVersion(ctx, work, binary, arch, version)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := binary.Seek(0, 0); err != nil {
 		return nil, err
@@ -134,9 +115,92 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 	if payloadSHA != binarySHA {
 		return nil, fmt.Errorf("%w: staged binary does not match the opened input", ErrArtifact)
 	}
+	artifacts, err := buildArtifacts(ctx, work, formats, payload, version, arch, epoch, signer, payloadSHA, staged, p)
+	if err != nil {
+		return nil, err
+	}
+	result = &BuildResult{
+		Product:                   p.name,
+		Artifacts:                 artifacts,
+		BinarySHA256:              binarySHA,
+		Architecture:              arch,
+		Version:                   version,
+		GoVersion:                 goVersion,
+		VersionValidation:         versionValidation,
+		UnitSyntaxOK:              syntaxOK,
+		ExecutablePresenceChecked: executableChecked,
+		CreaterepoC:               createrepoStatus(ctx, work),
+		Tools:                     buildToolVersions(ctx, work, formats),
+	}
+	var keyPaths []string
+	if signer.Fingerprint != "" {
+		result.SignerFingerprint = signer.Fingerprint
+		result.Custody = signer.Custody
+		binaryKey, armorKey, err := exportPublicKeys(ctx, work, signer, work)
+		if err != nil {
+			return nil, err
+		}
+		result.PublicKey = filepath.Join(req.OutputDir, filepath.Base(armorKey))
+		keyPaths = []string{binaryKey, armorKey}
+	}
+	// Agent cleanup is part of signing success, before any artifacts become
+	// public. The deferred close handles every earlier failure and cancellation.
+	if err := guard.close(ctx, work); err != nil {
+		return nil, err
+	}
+	if err := publishBuild(req.OutputDir, version, result, keyPaths); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// inspectBinary requires an ELF executable for the target architecture whose
+// embedded module build info names product p at version. It returns the
+// architecture and the Go version that built it.
+func inspectBinary(binary *os.File, target string, p product, version string) (Architecture, string, error) {
+	arch, err := inspectELF(binary)
+	if err != nil {
+		return Architecture{}, "", err
+	}
+	if arch.GOARCH != target {
+		return Architecture{}, "", fmt.Errorf("%w: binary %s does not match requested %s", ErrArchitecture, arch.GOARCH, target)
+	}
+	goVersion, err := confirmModule(binary, p, arch, version)
+	if err != nil {
+		return Architecture{}, "", err
+	}
+	return arch, goVersion, nil
+}
+
+// validateBinaryVersion runs `version` on a host-executable binary and requires
+// the requested version; other binaries rely on embedded build metadata. It
+// returns the validation method recorded in the result.
+func validateBinaryVersion(ctx context.Context, work string, binary *os.File, arch Architecture, version string) (string, error) {
+	if !arch.hostMatch() {
+		return "embedded-build-metadata", nil
+	}
+	stdout, stderr, err := runTool(ctx, work, toolCmd{
+		Path:    binary.Name(),
+		Args:    []string{"version"},
+		Dir:     "/",
+		Timeout: 10 * time.Second,
+	})
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrVersion, err)
+	}
+	if err := parseVersionOutput(stdout, stderr, version); err != nil {
+		return "", err
+	}
+	return "native-execution", nil
+}
+
+// buildArtifacts builds one artifact per requested format, in order, from the
+// staged payload.
+func buildArtifacts(ctx context.Context, work string, formats []Format, payload, version string, arch Architecture, epoch int64, signer SigningKey, payloadSHA string, staged []stagedFile, p product) ([]Artifact, error) {
 	var artifacts []Artifact
 	for _, format := range formats {
 		var artifact Artifact
+		var err error
 		switch format {
 		case FormatDEB:
 			artifact, err = buildDEB(ctx, work, payload, version, arch, epoch, staged, payloadSHA, p)
@@ -152,71 +216,49 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 		}
 		artifacts = append(artifacts, artifact)
 	}
-	result = &BuildResult{
-		Product:                   p.name,
-		Artifacts:                 artifacts,
-		BinarySHA256:              binarySHA,
-		Architecture:              arch,
-		Version:                   version,
-		GoVersion:                 goVersion,
-		VersionValidation:         versionValidation,
-		UnitSyntaxOK:              syntaxOK,
-		ExecutablePresenceChecked: executableChecked,
-		CreaterepoC:               createrepoStatus(ctx, work),
-		Tools: []ToolVersion{
-			toolVersion(ctx, work, "dpkg-deb", "--version"),
-			toolVersion(ctx, work, "rpmbuild", "--version"),
-			toolVersion(ctx, work, "gpg", "--version"),
-			toolVersion(ctx, work, "systemd-analyze", "--version"),
-		},
+	return artifacts, nil
+}
+
+func buildToolVersions(ctx context.Context, work string, formats []Format) []ToolVersion {
+	tools := []ToolVersion{
+		toolVersion(ctx, work, "dpkg-deb", "--version"),
+		toolVersion(ctx, work, "rpmbuild", "--version"),
+		toolVersion(ctx, work, "gpg", "--version"),
+		toolVersion(ctx, work, "systemd-analyze", "--version"),
 	}
 	if wants(formats, FormatArch) {
-		result.Tools = append(result.Tools, archBuildToolVersion(), toolVersion(ctx, work, "gpgv", "--version"))
+		tools = append(tools, archBuildToolVersion(), toolVersion(ctx, work, "gpgv", "--version"))
 	}
-	var binaryKey, armorKey string
-	if signer.Fingerprint != "" {
-		result.SignerFingerprint = signer.Fingerprint
-		result.Custody = signer.Custody
-		binaryKey, armorKey, err = exportPublicKeys(ctx, work, signer, work)
+	return tools
+}
+
+// publishBuild copies the exported public keys and moves every artifact and
+// signature into outputDir, then writes the manifest that describes them.
+func publishBuild(outputDir, version string, result *BuildResult, keyPaths []string) error {
+	for _, keyPath := range keyPaths {
+		data, err := os.ReadFile(keyPath)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		result.PublicKey = filepath.Join(req.OutputDir, filepath.Base(armorKey))
-	}
-	// Agent cleanup is part of signing success, before any artifacts become
-	// public. The deferred close handles every earlier failure and cancellation.
-	if err := guard.close(ctx, work); err != nil {
-		return nil, err
-	}
-	if signer.Fingerprint != "" {
-		for _, keyPath := range [2]string{binaryKey, armorKey} {
-			data, err := os.ReadFile(keyPath)
-			if err != nil {
-				return nil, err
-			}
-			if err := writeMatching(filepath.Join(req.OutputDir, filepath.Base(keyPath)), data, 0o644); err != nil {
-				return nil, err
-			}
+		if err := writeMatching(filepath.Join(outputDir, filepath.Base(keyPath)), data, 0o644); err != nil {
+			return err
 		}
 	}
 	for i := range result.Artifacts {
-		final, err := moveArtifact(result.Artifacts[i].Path, req.OutputDir)
+		final, err := moveArtifact(result.Artifacts[i].Path, outputDir)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		result.Artifacts[i].Path = final
 		if result.Artifacts[i].SignaturePath != "" {
-			signature, err := moveArtifact(result.Artifacts[i].SignaturePath, req.OutputDir)
+			signature, err := moveArtifact(result.Artifacts[i].SignaturePath, outputDir)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			result.Artifacts[i].SignaturePath = signature
 		}
 	}
-	if err := writeManifest(req.OutputDir, version, result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return writeManifest(outputDir, version, result)
 }
 
 func normalizeFormats(formats []Format) ([]Format, error) {

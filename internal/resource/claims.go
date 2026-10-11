@@ -21,284 +21,349 @@ func Claims(desired *resourcev1.ResourceDesiredState) ([]*resourcev1.ResourceCla
 	if err := ValidateDesired(desired); err != nil {
 		return nil, err
 	}
-	claims := make([]*resourcev1.ResourceClaim, 0, 4)
-	add := func(domain resourcev1.ClaimDomain, key string, mode resourcev1.ClaimMode, value string) {
-		claims = append(claims, &resourcev1.ResourceClaim{Domain: domain, Key: key, Mode: mode, Value: value})
-	}
-	presence := func(domain resourcev1.ClaimDomain, key string, state resourcev1.Presence) {
-		mode := resourcev1.ClaimMode_CLAIM_MODE_REQUIRED
-		if state == resourcev1.Presence_PRESENCE_ABSENT {
-			mode = resourcev1.ClaimMode_CLAIM_MODE_FORBIDDEN
-		}
-		add(domain, key, mode, "")
-	}
-	membership := func(key string, members *resourcev1.MemberSet) {
-		if members == nil {
-			return
-		}
-		if members.GetMode() == resourcev1.SetMode_SET_MODE_EXACT {
-			values := slices.Clone(members.GetLocalUserNames())
-			slices.Sort(values)
-			claims = append(claims, &resourcev1.ResourceClaim{Domain: resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, Key: key, Mode: resourcev1.ClaimMode_CLAIM_MODE_EXACT_SET, Members: values})
-		}
-		for _, member := range members.GetLocalUserNames() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, key, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, member)
-		}
-	}
-	requireRef := func(ref *resourcev1.ResourceRef) {
-		if ref == nil {
-			return
-		}
-		domain, ok := existenceDomain(ref.GetKind())
-		if ok {
-			add(domain, ref.GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
-	}
-	routeClaims := func(routes []*resourcev1.IPRoute) error {
-		for _, route := range routes {
-			prefix, err := CanonicalCIDR(route.GetDestination())
-			if err != nil {
-				return err
-			}
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, prefix.String(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, fmt.Sprintf("%s/%d", route.GetGateway(), route.GetMetric()))
-		}
-		return nil
-	}
-	credential := func(eap *resourcev1.EAPCredential) {
-		if eap != nil {
-			requireRef(eap.GetCertificate())
-			for _, ca := range eap.GetServerTrust().GetCertificates() {
-				requireRef(ca)
-			}
-		}
-	}
+	b := &claimBuilder{claims: make([]*resourcev1.ResourceClaim, 0, 4)}
+	ref := desired.GetRef().GetCanonicalKey()
+	var err error
 	switch state := desired.GetState().(type) {
 	case *resourcev1.ResourceDesiredState_SystemdService:
 		service := state.SystemdService
 		if service.GetRuntime() != resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_UNMANAGED {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, service.GetUnit(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, service.GetRuntime().String())
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, service.GetUnit(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, service.GetRuntime().String())
 		}
 	case *resourcev1.ResourceDesiredState_LocalGroup:
-		group := state.LocalGroup
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, group.GetName(), group.GetPresence())
-		membership("group:"+group.GetName(), group.GetMembers())
-		for _, user := range group.GetMembers().GetLocalUserNames() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, "user:"+user, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, group.GetName())
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, user, resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
+		b.localGroup(state.LocalGroup)
 	case *resourcev1.ResourceDesiredState_LocalUser:
-		user := state.LocalUser
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, user.GetName(), user.GetPresence())
-		if user.GetPrimaryGroup() != "" {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, user.GetPrimaryGroup(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
-		membership("user:"+user.GetName(), user.GetSupplementaryGroups())
-		for _, group := range user.GetSupplementaryGroups().GetLocalUserNames() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, "group:"+group, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, user.GetName())
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, group, resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
+		b.localUser(state.LocalUser)
 	case *resourcev1.ResourceDesiredState_SudoRule:
-		if state.SudoRule.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			for _, principal := range state.SudoRule.GetSubjects() {
-				claimPrincipal(principal, add)
-			}
-			for _, principal := range state.SudoRule.GetRunAs() {
-				claimPrincipal(principal, add)
-			}
-		}
+		b.sudoRule(state.SudoRule)
 	case *resourcev1.ResourceDesiredState_SshServer:
-		ssh := state.SshServer
-		if ssh.PasswordAuthentication != nil && !ssh.GetPasswordAuthentication() && ssh.KeyboardInteractiveAuthentication != nil && !ssh.GetKeyboardInteractiveAuthentication() && ssh.PublicKeyAuthentication != nil && !ssh.GetPublicKeyAuthentication() {
-			return nil, errors.New("resource: no_ssh_authentication_mechanism")
-		}
-		if ssh.GetAllowUsers() != nil && len(ssh.GetAllowUsers().GetNames()) == 0 {
-			return nil, errors.New("resource: no_ssh_allowed_users")
-		}
-		if ssh.GetAllowGroups() != nil && len(ssh.GetAllowGroups().GetNames()) == 0 {
-			return nil, errors.New("resource: no_ssh_allowed_groups")
-		}
-		if ssh.Port != nil {
-			port := strconv.FormatUint(uint64(ssh.GetPort()), 10)
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT, "tcp/"+port+"-"+port, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "accept")
-		}
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/openssh-server", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		err = b.sshServer(state.SshServer)
 	case *resourcev1.ResourceDesiredState_TimeSync:
-		// Unit naming is backend/product-dependent. This is a conservative
-		// conflict claim over known daemon choices, not canonical aliasing.
-		backend := state.TimeSync.GetBackend()
-		if backend != resourcev1.TimeBackendPreference_TIME_BACKEND_PREFERENCE_TIMESYNCD {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "chronyd.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE.String())
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "chrony.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE.String())
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/chrony", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
-		if backend != resourcev1.TimeBackendPreference_TIME_BACKEND_PREFERENCE_CHRONY {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "systemd-timesyncd.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE.String())
-		}
+		b.timeSync(state.TimeSync.GetBackend())
 	case *resourcev1.ResourceDesiredState_TrustCa:
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_CREDENTIAL, desired.GetRef().GetCanonicalKey(), state.TrustCa.GetPresence())
+		b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_CREDENTIAL, ref, state.TrustCa.GetPresence())
 	case *resourcev1.ResourceDesiredState_FirewallZone:
-		zone := state.FirewallZone
-		if zone.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-			break
-		}
-		for _, device := range zone.GetInterfaces() {
-			key := "hardware/" + device.GetHardwareId()
-			if device.GetPermanentMac() != "" {
-				key = "mac/" + device.GetPermanentMac()
-			}
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_INTERFACE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, zone.GetZoneId())
-		}
-		if zone.GetDefaultEgress() != resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT {
-			// Route reachability depends on native rule placement and guards;
-			// don't pretend an unproven allow exception makes this safe.
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, "*", resourcev1.ClaimMode_CLAIM_MODE_FORBIDDEN, "")
-		}
-		for _, rule := range zone.GetRules() {
-			if rule.GetDirection() != resourcev1.FirewallDirection_FIREWALL_DIRECTION_INPUT || rule.GetProtocol() != resourcev1.IPProtocol_IP_PROTOCOL_TCP {
-				continue
-			}
-			verdict := "deny"
-			if rule.GetVerdict() == resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT {
-				verdict = "accept"
-			}
-			for _, ports := range rule.GetDestinationPorts() {
-				key := fmt.Sprintf("tcp/%d-%d", ports.GetFirst(), ports.GetLast())
-				add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, verdict)
-			}
-		}
+		b.firewallZone(state.FirewallZone)
 	case *resourcev1.ResourceDesiredState_NetworkConnection:
-		connection := state.NetworkConnection
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_CONNECTION, connection.GetConnectionUuid(), connection.GetPresence())
-		if connection.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
-			break
-		}
-		for _, settings := range []*resourcev1.IPSettings{connection.GetIpv4(), connection.GetIpv6()} {
-			if err := routeClaims(settings.GetRoutes()); err != nil {
-				return nil, err
-			}
-			if settings.GetGateway() != "" {
-				key := "0.0.0.0/0"
-				if strings.Contains(settings.GetGateway(), ":") {
-					key = "::/0"
-				}
-				add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, fmt.Sprintf("%s/%d", settings.GetGateway(), settings.GetRouteMetric()))
-			}
-		}
-		credential(connection.GetEthernet().GetEap())
-		credential(connection.GetWifi().GetEap())
-		credential(connection.GetVpn().GetOpenvpnTls().GetCredential())
-		credential(connection.GetVpn().GetIpsecIkev2().GetCredential())
-		if err := routeClaims(connection.GetVpn().GetOpenvpnTls().GetRoutes()); err != nil {
-			return nil, err
-		}
-		if err := routeClaims(connection.GetVpn().GetIpsecIkev2().GetRoutes()); err != nil {
-			return nil, err
-		}
+		err = b.networkConnection(state.NetworkConnection)
 	case *resourcev1.ResourceDesiredState_Dns:
 		if connection := state.Dns.GetConnection(); connection != nil {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_CONNECTION, connection.GetConnectionUuid(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_CONNECTION, connection.GetConnectionUuid(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
 		}
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_DNS_OWNER, desired.GetRef().GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, "dns-resource")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_DNS_OWNER, ref, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "dns-resource")
 	case *resourcev1.ResourceDesiredState_NativePackage:
-		pkg := state.NativePackage
-		key := packageKey(pkg.GetPackage())
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, pkg.GetPresence())
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/"+pkg.GetPackage().GetNativeName(), pkg.GetPresence())
-		if pkg.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			requireRef(pkg.GetRepository())
-			if pkg.GetExact() != nil {
-				digest, err := messageDigest(pkg.GetExact())
-				if err != nil {
-					return nil, err
-				}
-				add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
-			}
-		}
+		err = b.nativePackage(state.NativePackage)
 	case *resourcev1.ResourceDesiredState_Repository:
 		repository := state.Repository
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_REPOSITORY, desired.GetRef().GetCanonicalKey(), repository.GetPresence())
+		b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_REPOSITORY, ref, repository.GetPresence())
 		if repository.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			alias := repositoryAlias(repository)
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_REPOSITORY_ALIAS, alias, resourcev1.ClaimMode_CLAIM_MODE_VALUE, desired.GetRef().GetCanonicalKey())
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_REPOSITORY_ALIAS, repositoryAlias(repository), resourcev1.ClaimMode_CLAIM_MODE_VALUE, ref)
 		}
 	case *resourcev1.ResourceDesiredState_FlatpakApp:
 		if state.FlatpakApp.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			requireRef(state.FlatpakApp.GetRemote())
+			b.requireRef(state.FlatpakApp.GetRemote())
 		}
 	case *resourcev1.ResourceDesiredState_OsUpdate:
-		// One native update scheduler per device; owned fixed paths exclude any
-		// managed file or systemd definition resource from the same objects.
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE, "system", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "timer/"+OSUpdateTimerUnit, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
-		for _, kind := range OSUpdateNativeFiles() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, OSUpdateNativePath(kind), resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update:"+kind.String())
-		}
+		b.osUpdate()
 	case *resourcev1.ResourceDesiredState_PasswordPolicy:
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PAM_OWNER, "system/local-auth", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "password-policy")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PAM_OWNER, "system/local-auth", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "password-policy")
 	case *resourcev1.ResourceDesiredState_CertificateEnrollment:
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_CREDENTIAL, desired.GetRef().GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_CREDENTIAL, ref, resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
 	case *resourcev1.ResourceDesiredState_DirectoryClient:
 		for _, ca := range state.DirectoryClient.GetTrust().GetCertificates() {
-			requireRef(ca)
+			b.requireRef(ca)
 		}
 	case *resourcev1.ResourceDesiredState_ManagedFile:
-		file := state.ManagedFile
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), file.GetPresence())
-		if file.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			digest, err := messageDigest(file)
-			if err != nil {
-				return nil, err
-			}
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
-		}
+		err = b.managedFile(state.ManagedFile)
 	case *resourcev1.ResourceDesiredState_Sysctl:
-		sysctl := state.Sysctl
-		// Hash bounded public values because claim values are smaller than
-		// the typed sysctl value bound. Persistence remains a separate claim.
-		digest := sha256.Sum256([]byte(sysctl.GetValue()))
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSCTL, sysctl.GetKey(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, hex.EncodeToString(digest[:]))
-		if sysctl.GetPersistent() {
-			keyDigest := sha256.Sum256([]byte(sysctl.GetKey()))
-			path := "/etc/sysctl.d/60-lindm-" + hex.EncodeToString(keyDigest[:]) + ".conf"
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "sysctl:"+sysctl.GetKey())
-		}
+		b.sysctl(state.Sysctl)
 	case *resourcev1.ResourceDesiredState_SystemdDefinition:
-		definition := state.SystemdDefinition
-		key := desired.GetRef().GetCanonicalKey()
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, definition.GetPresence())
-		path := "/etc/systemd/system/" + definition.GetDropIn().GetUnit() + ".d/60-lindm.conf"
-		if timer := definition.GetTimer(); timer != nil {
-			path = "/etc/systemd/system/" + timer.GetUnit()
-			if definition.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-				add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "service/"+timer.GetService().GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-			}
-		}
-		presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, definition.GetPresence())
-		if definition.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
-			digest, err := messageDigest(definition)
-			if err != nil {
-				return nil, err
-			}
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "systemd-definition:"+digest)
-		}
+		err = b.systemdDefinition(ref, state.SystemdDefinition)
 	case *resourcev1.ResourceDesiredState_EncryptionCompliance:
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/luks", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		if state.EncryptionCompliance.GetRequireEscrow() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/escrow", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
-		if state.EncryptionCompliance.GetRequireTpm() {
-			add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/tpm", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
-		}
+		b.encryptionCompliance(state.EncryptionCompliance)
 	}
-	return claims, nil
+	if err != nil {
+		return nil, err
+	}
+	return b.claims, nil
 }
 
-func claimPrincipal(principal *resourcev1.SudoPrincipal, add func(resourcev1.ClaimDomain, string, resourcev1.ClaimMode, string)) {
+// claimBuilder accumulates one desired state's claims in derivation order.
+type claimBuilder struct {
+	claims []*resourcev1.ResourceClaim
+}
+
+func (b *claimBuilder) add(domain resourcev1.ClaimDomain, key string, mode resourcev1.ClaimMode, value string) {
+	b.claims = append(b.claims, &resourcev1.ResourceClaim{Domain: domain, Key: key, Mode: mode, Value: value})
+}
+
+func (b *claimBuilder) presence(domain resourcev1.ClaimDomain, key string, state resourcev1.Presence) {
+	mode := resourcev1.ClaimMode_CLAIM_MODE_REQUIRED
+	if state == resourcev1.Presence_PRESENCE_ABSENT {
+		mode = resourcev1.ClaimMode_CLAIM_MODE_FORBIDDEN
+	}
+	b.add(domain, key, mode, "")
+}
+
+func (b *claimBuilder) membership(key string, members *resourcev1.MemberSet) {
+	if members == nil {
+		return
+	}
+	if members.GetMode() == resourcev1.SetMode_SET_MODE_EXACT {
+		values := slices.Clone(members.GetLocalUserNames())
+		slices.Sort(values)
+		b.claims = append(b.claims, &resourcev1.ResourceClaim{Domain: resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, Key: key, Mode: resourcev1.ClaimMode_CLAIM_MODE_EXACT_SET, Members: values})
+	}
+	for _, member := range members.GetLocalUserNames() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, key, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, member)
+	}
+}
+
+func (b *claimBuilder) requireRef(ref *resourcev1.ResourceRef) {
+	if ref == nil {
+		return
+	}
+	if domain, ok := existenceDomain(ref.GetKind()); ok {
+		b.add(domain, ref.GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+}
+
+func (b *claimBuilder) routes(routes []*resourcev1.IPRoute) error {
+	for _, route := range routes {
+		prefix, err := CanonicalCIDR(route.GetDestination())
+		if err != nil {
+			return err
+		}
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, prefix.String(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, fmt.Sprintf("%s/%d", route.GetGateway(), route.GetMetric()))
+	}
+	return nil
+}
+
+func (b *claimBuilder) credential(eap *resourcev1.EAPCredential) {
+	if eap == nil {
+		return
+	}
+	b.requireRef(eap.GetCertificate())
+	for _, ca := range eap.GetServerTrust().GetCertificates() {
+		b.requireRef(ca)
+	}
+}
+
+func (b *claimBuilder) principal(principal *resourcev1.SudoPrincipal) {
 	if principal.GetUser() != "" {
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, principal.GetUser(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, principal.GetUser(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
 	} else {
-		add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, principal.GetGroup(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, principal.GetGroup(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+}
+
+func (b *claimBuilder) localGroup(group *resourcev1.LocalGroupDesired) {
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, group.GetName(), group.GetPresence())
+	b.membership("group:"+group.GetName(), group.GetMembers())
+	for _, user := range group.GetMembers().GetLocalUserNames() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, "user:"+user, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, group.GetName())
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, user, resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+}
+
+func (b *claimBuilder) localUser(user *resourcev1.LocalUserDesired) {
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_ACCOUNT, user.GetName(), user.GetPresence())
+	if user.GetPrimaryGroup() != "" {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, user.GetPrimaryGroup(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+	b.membership("user:"+user.GetName(), user.GetSupplementaryGroups())
+	for _, group := range user.GetSupplementaryGroups().GetLocalUserNames() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP_MEMBERSHIP, "group:"+group, resourcev1.ClaimMode_CLAIM_MODE_MEMBER, user.GetName())
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_GROUP, group, resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+}
+
+func (b *claimBuilder) sudoRule(rule *resourcev1.SudoRuleDesired) {
+	if rule.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
+		return
+	}
+	for _, principal := range rule.GetSubjects() {
+		b.principal(principal)
+	}
+	for _, principal := range rule.GetRunAs() {
+		b.principal(principal)
+	}
+}
+
+func (b *claimBuilder) sshServer(ssh *resourcev1.SSHServerDesired) error {
+	if ssh.PasswordAuthentication != nil && !ssh.GetPasswordAuthentication() && ssh.KeyboardInteractiveAuthentication != nil && !ssh.GetKeyboardInteractiveAuthentication() && ssh.PublicKeyAuthentication != nil && !ssh.GetPublicKeyAuthentication() {
+		return errors.New("resource: no_ssh_authentication_mechanism")
+	}
+	if ssh.GetAllowUsers() != nil && len(ssh.GetAllowUsers().GetNames()) == 0 {
+		return errors.New("resource: no_ssh_allowed_users")
+	}
+	if ssh.GetAllowGroups() != nil && len(ssh.GetAllowGroups().GetNames()) == 0 {
+		return errors.New("resource: no_ssh_allowed_groups")
+	}
+	if ssh.Port != nil {
+		port := strconv.FormatUint(uint64(ssh.GetPort()), 10)
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT, "tcp/"+port+"-"+port, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "accept")
+	}
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/openssh-server", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	return nil
+}
+
+// timeSync claims known daemon choices. Unit naming is backend/product-dependent.
+// This is a conservative conflict claim, not canonical aliasing.
+func (b *claimBuilder) timeSync(backend resourcev1.TimeBackendPreference) {
+	active := resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE.String()
+	if backend != resourcev1.TimeBackendPreference_TIME_BACKEND_PREFERENCE_TIMESYNCD {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "chronyd.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, active)
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "chrony.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, active)
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/chrony", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+	if backend != resourcev1.TimeBackendPreference_TIME_BACKEND_PREFERENCE_CHRONY {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME, "systemd-timesyncd.service", resourcev1.ClaimMode_CLAIM_MODE_VALUE, active)
+	}
+}
+
+func (b *claimBuilder) firewallZone(zone *resourcev1.FirewallZoneDesired) {
+	if zone.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
+		return
+	}
+	for _, device := range zone.GetInterfaces() {
+		key := "hardware/" + device.GetHardwareId()
+		if device.GetPermanentMac() != "" {
+			key = "mac/" + device.GetPermanentMac()
+		}
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_INTERFACE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, zone.GetZoneId())
+	}
+	if zone.GetDefaultEgress() != resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT {
+		// Route reachability depends on native rule placement and guards;
+		// don't pretend an unproven allow exception makes this safe.
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, "*", resourcev1.ClaimMode_CLAIM_MODE_FORBIDDEN, "")
+	}
+	for _, rule := range zone.GetRules() {
+		if rule.GetDirection() != resourcev1.FirewallDirection_FIREWALL_DIRECTION_INPUT || rule.GetProtocol() != resourcev1.IPProtocol_IP_PROTOCOL_TCP {
+			continue
+		}
+		verdict := "deny"
+		if rule.GetVerdict() == resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT {
+			verdict = "accept"
+		}
+		for _, ports := range rule.GetDestinationPorts() {
+			key := fmt.Sprintf("tcp/%d-%d", ports.GetFirst(), ports.GetLast())
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_FIREWALL_PORT, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, verdict)
+		}
+	}
+}
+
+func (b *claimBuilder) networkConnection(connection *resourcev1.NetworkConnectionDesired) error {
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_CONNECTION, connection.GetConnectionUuid(), connection.GetPresence())
+	if connection.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
+		return nil
+	}
+	for _, settings := range []*resourcev1.IPSettings{connection.GetIpv4(), connection.GetIpv6()} {
+		if err := b.routes(settings.GetRoutes()); err != nil {
+			return err
+		}
+		if settings.GetGateway() != "" {
+			key := "0.0.0.0/0"
+			if strings.Contains(settings.GetGateway(), ":") {
+				key = "::/0"
+			}
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NETWORK_ROUTE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, fmt.Sprintf("%s/%d", settings.GetGateway(), settings.GetRouteMetric()))
+		}
+	}
+	b.credential(connection.GetEthernet().GetEap())
+	b.credential(connection.GetWifi().GetEap())
+	b.credential(connection.GetVpn().GetOpenvpnTls().GetCredential())
+	b.credential(connection.GetVpn().GetIpsecIkev2().GetCredential())
+	if err := b.routes(connection.GetVpn().GetOpenvpnTls().GetRoutes()); err != nil {
+		return err
+	}
+	return b.routes(connection.GetVpn().GetIpsecIkev2().GetRoutes())
+}
+
+func (b *claimBuilder) nativePackage(pkg *resourcev1.NativePackageDesired) error {
+	key := packageKey(pkg.GetPackage())
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, pkg.GetPresence())
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, "native-name/"+pkg.GetPackage().GetNativeName(), pkg.GetPresence())
+	if pkg.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
+		return nil
+	}
+	b.requireRef(pkg.GetRepository())
+	if pkg.GetExact() == nil {
+		return nil
+	}
+	digest, err := messageDigest(pkg.GetExact())
+	if err != nil {
+		return err
+	}
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_PACKAGE, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+	return nil
+}
+
+// osUpdate claims the single native update scheduler per device; owned fixed
+// paths exclude any managed file or systemd definition resource from the same
+// objects.
+func (b *claimBuilder) osUpdate() {
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_UPDATE_SOURCE, "system", resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "timer/"+OSUpdateTimerUnit, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update-policy")
+	for _, kind := range OSUpdateNativeFiles() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, OSUpdateNativePath(kind), resourcev1.ClaimMode_CLAIM_MODE_VALUE, "os-update:"+kind.String())
+	}
+}
+
+func (b *claimBuilder) managedFile(file *resourcev1.ManagedFileDesired) error {
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), file.GetPresence())
+	if file.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
+		return nil
+	}
+	digest, err := messageDigest(file)
+	if err != nil {
+		return err
+	}
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, file.GetPath(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+	return nil
+}
+
+// sysctl hashes bounded public values because claim values are smaller than the
+// typed sysctl value bound. Persistence remains a separate claim.
+func (b *claimBuilder) sysctl(sysctl *resourcev1.SysctlDesired) {
+	digest := sha256.Sum256([]byte(sysctl.GetValue()))
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSCTL, sysctl.GetKey(), resourcev1.ClaimMode_CLAIM_MODE_VALUE, hex.EncodeToString(digest[:]))
+	if sysctl.GetPersistent() {
+		keyDigest := sha256.Sum256([]byte(sysctl.GetKey()))
+		path := "/etc/sysctl.d/60-lindm-" + hex.EncodeToString(keyDigest[:]) + ".conf"
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "sysctl:"+sysctl.GetKey())
+	}
+}
+
+func (b *claimBuilder) systemdDefinition(key string, definition *resourcev1.SystemdDefinitionDesired) error {
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, definition.GetPresence())
+	path := "/etc/systemd/system/" + definition.GetDropIn().GetUnit() + ".d/60-lindm.conf"
+	if timer := definition.GetTimer(); timer != nil {
+		path = "/etc/systemd/system/" + timer.GetUnit()
+		if definition.GetPresence() == resourcev1.Presence_PRESENCE_PRESENT {
+			b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, "service/"+timer.GetService().GetCanonicalKey(), resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+		}
+	}
+	b.presence(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, definition.GetPresence())
+	if definition.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
+		return nil
+	}
+	digest, err := messageDigest(definition)
+	if err != nil {
+		return err
+	}
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_SYSTEMD_DEFINITION, key, resourcev1.ClaimMode_CLAIM_MODE_VALUE, digest)
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_NATIVE_FILE, path, resourcev1.ClaimMode_CLAIM_MODE_VALUE, "systemd-definition:"+digest)
+	return nil
+}
+
+func (b *claimBuilder) encryptionCompliance(compliance *resourcev1.EncryptionComplianceDesired) {
+	b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/luks", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	if compliance.GetRequireEscrow() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/escrow", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
+	}
+	if compliance.GetRequireTpm() {
+		b.add(resourcev1.ClaimDomain_CLAIM_DOMAIN_ENCRYPTION_COMPLIANCE, "system/root/tpm", resourcev1.ClaimMode_CLAIM_MODE_REQUIRED, "")
 	}
 }
 

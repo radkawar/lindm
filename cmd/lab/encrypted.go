@@ -13,7 +13,7 @@ import (
 func runVMEncrypted(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm encrypted", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "signed official Ubuntu 24.04/26.04 or Fedora 44 installer ISO manifest")
+	manifestPath := flags.String("manifest", "", "signed official Ubuntu 24.04/26.04, Fedora 44 or RHEL 9.8/10.2 installer ISO manifest")
 	var options vmlab.EncryptedVMOptions
 	var hardware vmlab.VMHardwareOptions
 	options.Hardware = &hardware

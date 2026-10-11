@@ -52,41 +52,11 @@ func buildArchRejectionFixtures(ctx context.Context, req RejectionRequest) (resu
 		}
 	}()
 	artifact := req.Arch
-	if !artifact.Signed || artifact.SignerFingerprint != key.Fingerprint || artifact.SignaturePath != artifact.Path+".sig" {
-		return nil, fmt.Errorf("%w: positive Arch input must have the development signer", ErrSigner)
-	}
-	if _, err := parseVersion(artifact.Version); err != nil {
-		return nil, err
-	}
-	name := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst", PackageName, artifact.Version, archRelease, artifact.Architecture.Arch)
-	if filepath.Base(artifact.Path) != name {
-		return nil, fmt.Errorf("%w: noncanonical positive Arch path", ErrArtifact)
-	}
-	positive := filepath.Join(work, name)
-	if err := archCopyInput(artifact.Path, positive, maxBinaryBytes+(8<<20), DefaultSourceDateEpoch); err != nil {
-		return nil, err
-	}
-	if err := archCopyInput(artifact.SignaturePath, positive+".sig", 64<<10, DefaultSourceDateEpoch); err != nil {
-		return nil, err
-	}
-	sum, size, err := hashFile(positive)
-	if err != nil || sum != artifact.SHA256 || size != artifact.Size {
-		return nil, fmt.Errorf("%w: positive Arch digest differs: %v", ErrArtifact, err)
-	}
-	public, _, err := exportPublicKeys(ctx, work, key, work)
+	positive, size, err := snapshotPositiveArch(ctx, work, key, artifact)
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyArchSignature(ctx, work, positive, public); err != nil {
-		return nil, err
-	}
-	info, err := readArchInfo(positive)
-	if err != nil {
-		return nil, err
-	}
-	if info["pkgver"][0] != artifact.Version+"-"+archRelease || info[pkgInfoArch][0] != artifact.Architecture.Arch {
-		return nil, fmt.Errorf("%w: positive Arch metadata differs", ErrArtifact)
-	}
+	name := filepath.Base(positive)
 	wrong, wrongGuard, err := generateDevelopmentSigner(ctx, work)
 	if err != nil {
 		return nil, err
@@ -155,4 +125,46 @@ func buildArchRejectionFixtures(ctx context.Context, req RejectionRequest) (resu
 		}
 	}
 	return result, syncDir(req.OutputDir)
+}
+
+// snapshotPositiveArch copies the canonical positive Arch package and signature
+// into work and proves they are the development signer's matching build. It
+// returns the copied package path and size.
+func snapshotPositiveArch(ctx context.Context, work string, key SigningKey, artifact Artifact) (string, int64, error) {
+	if !artifact.Signed || artifact.SignerFingerprint != key.Fingerprint || artifact.SignaturePath != artifact.Path+".sig" {
+		return "", 0, fmt.Errorf("%w: positive Arch input must have the development signer", ErrSigner)
+	}
+	if _, err := parseVersion(artifact.Version); err != nil {
+		return "", 0, err
+	}
+	name := fmt.Sprintf("%s-%s-%s-%s.pkg.tar.zst", PackageName, artifact.Version, archRelease, artifact.Architecture.Arch)
+	if filepath.Base(artifact.Path) != name {
+		return "", 0, fmt.Errorf("%w: noncanonical positive Arch path", ErrArtifact)
+	}
+	positive := filepath.Join(work, name)
+	if err := archCopyInput(artifact.Path, positive, maxBinaryBytes+(8<<20), DefaultSourceDateEpoch); err != nil {
+		return "", 0, err
+	}
+	if err := archCopyInput(artifact.SignaturePath, positive+".sig", 64<<10, DefaultSourceDateEpoch); err != nil {
+		return "", 0, err
+	}
+	sum, size, err := hashFile(positive)
+	if err != nil || sum != artifact.SHA256 || size != artifact.Size {
+		return "", 0, fmt.Errorf("%w: positive Arch digest differs: %v", ErrArtifact, err)
+	}
+	public, _, err := exportPublicKeys(ctx, work, key, work)
+	if err != nil {
+		return "", 0, err
+	}
+	if err := verifyArchSignature(ctx, work, positive, public); err != nil {
+		return "", 0, err
+	}
+	info, err := readArchInfo(positive)
+	if err != nil {
+		return "", 0, err
+	}
+	if info["pkgver"][0] != artifact.Version+"-"+archRelease || info[pkgInfoArch][0] != artifact.Architecture.Arch {
+		return "", 0, fmt.Errorf("%w: positive Arch metadata differs", ErrArtifact)
+	}
+	return positive, size, nil
 }

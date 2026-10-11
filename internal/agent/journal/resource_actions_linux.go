@@ -70,55 +70,9 @@ func (s *Store) AcceptResourceAction(ctx context.Context, authorityRevision, tru
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return 0, stateReadError(ctx)
 	}
-	floor, err := q.ReadResourceFloor(ctx, resourceFloorKey(record))
-	var previous journaldb.ResourceAction
-	var superseded []byte
-	if errors.Is(err, sql.ErrNoRows) {
-		count, err := q.ResourceActionCount(ctx, journaldb.ResourceActionCountParams(resourceFloorKey(record)))
-		if err != nil {
-			return 0, stateReadError(ctx)
-		}
-		if count != 0 {
-			return 0, ErrRecoveryHold
-		}
-	} else if err != nil {
-		return 0, stateReadError(ctx)
-	} else {
-		previous, err = q.ReadResourceAction(ctx, floor.ActionID)
-		if err != nil {
-			return 0, stateReadError(ctx)
-		}
-		old, err := s.decodeResourceAction(previous)
-		if err != nil {
-			return 0, err
-		}
-		if !floorMatchesAction(floor, previous) {
-			return 0, ErrRecoveryHold
-		}
-		if intent.GetResourceSequence() <= uint64(floor.ResourceSequence) {
-			return 0, ErrResourceActionRejected
-		}
-		if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
-			return 0, ErrResourceActionBusy
-		}
-		// A pending stage must be stopped by its owner before another action
-		// takes this floor. Never strand an independent native staging unit.
-		if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING ||
-			(old.GetIntent().GetPreparation() != nil && (old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED)) {
-			return 0, ErrResourceActionBusy
-		}
-		if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
-			if previous.Revision == math.MaxInt64 {
-				return 0, ErrConflict
-			}
-			old.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED
-			old.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_SUPERSEDED
-			old.CompletedAt = record.GetAcceptedAt()
-			superseded, err = s.encodeResourceAction(old)
-			if err != nil {
-				return 0, err
-			}
-		}
+	previous, superseded, err := s.supersedeResourceFloor(ctx, q, record)
+	if err != nil {
+		return 0, err
 	}
 	usage, err := q.ReadResourceActionUsage(ctx)
 	if err != nil {
@@ -166,6 +120,66 @@ func (s *Store) AcceptResourceAction(ctx context.Context, authorityRevision, tru
 		return 0, resourceActionWriteError(ctx)
 	}
 	return 1, nil
+}
+
+// supersedeResourceFloor checks the resource's current floor action against the
+// newly accepted record. An absent floor requires no prior actions; a newer
+// sequence may replace only a finished or unstarted, unstaged floor. It returns
+// the floor action and, when unstarted work must be superseded, its re-encoded
+// superseded record.
+func (s *Store) supersedeResourceFloor(ctx context.Context, q *journaldb.Queries, record *agentv1.ResourceExecutionRecord) (journaldb.ResourceAction, []byte, error) {
+	var previous journaldb.ResourceAction
+	floor, err := q.ReadResourceFloor(ctx, resourceFloorKey(record))
+	if errors.Is(err, sql.ErrNoRows) {
+		count, err := q.ResourceActionCount(ctx, journaldb.ResourceActionCountParams(resourceFloorKey(record)))
+		if err != nil {
+			return previous, nil, stateReadError(ctx)
+		}
+		if count != 0 {
+			return previous, nil, ErrRecoveryHold
+		}
+		return previous, nil, nil
+	}
+	if err != nil {
+		return previous, nil, stateReadError(ctx)
+	}
+	previous, err = q.ReadResourceAction(ctx, floor.ActionID)
+	if err != nil {
+		return previous, nil, stateReadError(ctx)
+	}
+	old, err := s.decodeResourceAction(previous)
+	if err != nil {
+		return previous, nil, err
+	}
+	if !floorMatchesAction(floor, previous) {
+		return previous, nil, ErrRecoveryHold
+	}
+	if record.GetIntent().GetResourceSequence() <= uint64(floor.ResourceSequence) {
+		return previous, nil, ErrResourceActionRejected
+	}
+	if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
+		return previous, nil, ErrResourceActionBusy
+	}
+	// A pending stage must be stopped by its owner before another action
+	// takes this floor. Never strand an independent native staging unit.
+	if old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING ||
+		(old.GetIntent().GetPreparation() != nil && (old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED || old.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED)) {
+		return previous, nil, ErrResourceActionBusy
+	}
+	if old.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED && old.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
+		return previous, nil, nil
+	}
+	if previous.Revision == math.MaxInt64 {
+		return previous, nil, ErrConflict
+	}
+	old.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED
+	old.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_SUPERSEDED
+	old.CompletedAt = record.GetAcceptedAt()
+	superseded, err := s.encodeResourceAction(old)
+	if err != nil {
+		return previous, nil, err
+	}
+	return previous, superseded, nil
 }
 
 // Keep the newest 256 non-floor read-only records as well as every current

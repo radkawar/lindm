@@ -27,12 +27,13 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 		return runRedHatRegistrationCommand(ctx, args[0], args[1:], stdout, stderr)
 	}
 	if len(args) == 0 || (args[0] != "discover" && args[0] != "fetch") {
-		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR [-arch x86_64|aarch64] -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat inventory -token-file FILE; lab images redhat cleanup -token-file FILE -confirm-delete-lab-registrations [-legacy-consumer-uuid UUID]; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
+		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR [-arch x86_64|aarch64] [-edition kvm|dvd] -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat inventory -token-file FILE; lab images redhat cleanup -token-file FILE -confirm-delete-lab-registrations [-legacy-consumer-uuid UUID]; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
 	}
 	flags := flag.NewFlagSet("images redhat "+args[0], flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	version := flags.String("version", "", "explicit supported RHEL 9 or 10 minor (for example 9.8 or 10.2), KVM qcow2 only")
+	version := flags.String("version", "", "explicit supported RHEL 9 or 10 minor (for example 9.8 or 10.2)")
 	architecture := flags.String("arch", "x86_64", "vendor image architecture: x86_64 or aarch64")
+	edition := flags.String("edition", "kvm", "vendor publication: kvm (KVM guest qcow2) or dvd (Binary DVD installer ISO for kickstart lanes)")
 	token := flags.String("token-file", "", "current-user-owned mode-0600 Red Hat offline-token file; never pass a token value")
 	cache := flags.String("cache", ".cache/lab/images", "dedicated digest-addressed image cache")
 	manifestPath := flags.String("manifest", "", "new mode-0600 protobuf JSON manifest (required for fetch)")
@@ -54,14 +55,20 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 			return errors.New("manifest parent must be an existing directory")
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
+	kind := redhatimages.ImageKind(*edition)
+	// The Binary DVD is roughly ten times a KVM image; both transfers stay bounded.
+	timeout, manifestEdition := 45*time.Minute, "KVM Guest Image"
+	if kind == redhatimages.BinaryDVD {
+		timeout, manifestEdition = 4*time.Hour, "Binary DVD"
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	client, err := redhatimages.New(ctx, *token)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	image, err := client.Discover(ctx, *version, *architecture)
+	image, err := client.Discover(ctx, *version, *architecture, kind)
 	if err != nil {
 		return err
 	}
@@ -84,8 +91,8 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 		return fmt.Errorf("RHEL %s is not a registry release", image.Version)
 	}
 	manifest := &labv1.ImageManifest{
-		Id:           "rhel-" + image.Version + "-kvm-" + strings.ReplaceAll(image.Architecture, "_", "-"),
-		Distribution: row.ID, Version: image.Version, Architecture: image.Architecture, Edition: "KVM Guest Image",
+		Id:           "rhel-" + image.Version + "-" + string(kind) + "-" + strings.ReplaceAll(image.Architecture, "_", "-"),
+		Distribution: row.ID, Version: image.Version, Architecture: image.Architecture, Edition: manifestEdition,
 		Release: image.Published.Format(time.RFC3339Nano), ImageFilename: image.Filename,
 		ImageUrl: image.DownloadURL(), ChecksumUrl: image.MetadataURL(), Sha256: image.SHA256,
 		ImageSizeBytes: receipt.ImageSizeBytes, ChecksumMode: labv1.ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED,

@@ -198,36 +198,7 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		maxPriority := contenders[0].priority
-		for _, item := range contenders[1:] {
-			if item.priority > maxPriority {
-				maxPriority = item.priority
-			}
-		}
-		var winners, losers []contender
-		for _, item := range contenders {
-			if item.priority == maxPriority {
-				winners = append(winners, item)
-			} else {
-				losers = append(losers, item)
-			}
-		}
-		resolution := &Resolution{
-			Ref:          proto.CloneOf(winners[0].resource.GetDesired().GetRef()),
-			State:        ResolutionReady,
-			Contributors: contributors(winners),
-			Overridden:   contributors(losers),
-		}
-		merged, ok := mergeResources(winners)
-		if !ok {
-			resolution.State = ResolutionConflict
-			resolution.Reason = ReasonEqualPriority
-			resolution.Dependencies = winnerDependencies(winners)
-		} else {
-			resolution.Resource = merged
-			resolution.Desired = merged.GetDesired()
-			resolution.Dependencies = merged.GetDependsOn()
-		}
+		resolution := resolveUnit(contenders)
 		resolved[unit] = resolution
 		edges[unit] = dependencyKeys(resolution.Dependencies)
 	}
@@ -262,6 +233,43 @@ func Resolve(ctx context.Context, assignments []Assignment) ([]Resolution, error
 		out[i] = *resolved[unit]
 	}
 	return out, nil
+}
+
+// resolveUnit merges the highest-priority contenders for one canonical resource;
+// lower priorities are recorded as overridden. Unmergeable equal-priority
+// winners are a conflict.
+func resolveUnit(contenders []contender) *Resolution {
+	maxPriority := contenders[0].priority
+	for _, item := range contenders[1:] {
+		if item.priority > maxPriority {
+			maxPriority = item.priority
+		}
+	}
+	var winners, losers []contender
+	for _, item := range contenders {
+		if item.priority == maxPriority {
+			winners = append(winners, item)
+		} else {
+			losers = append(losers, item)
+		}
+	}
+	resolution := &Resolution{
+		Ref:          proto.CloneOf(winners[0].resource.GetDesired().GetRef()),
+		State:        ResolutionReady,
+		Contributors: contributors(winners),
+		Overridden:   contributors(losers),
+	}
+	merged, ok := mergeResources(winners)
+	if !ok {
+		resolution.State = ResolutionConflict
+		resolution.Reason = ReasonEqualPriority
+		resolution.Dependencies = winnerDependencies(winners)
+	} else {
+		resolution.Resource = merged
+		resolution.Desired = merged.GetDesired()
+		resolution.Dependencies = merged.GetDependsOn()
+	}
+	return resolution
 }
 
 func canonicalID(name, value string) error {

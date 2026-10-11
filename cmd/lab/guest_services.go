@@ -20,7 +20,9 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/inventory"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/serviceprovider"
+	"lindm/internal/labexec"
 	"lindm/internal/vmlab"
 )
 
@@ -408,25 +410,15 @@ func serviceProofNative(ctx context.Context, unit string) (*vmlab.VMServiceNativ
 	return &vmlab.VMServiceNativeState{Unit: unit, ID: fields["Id"], LoadState: fields["LoadState"], ActiveState: fields["ActiveState"], SubState: fields["SubState"], UnitFileState: fields["UnitFileState"]}, nil
 }
 
-type serviceProofOutput struct{ buffer bytes.Buffer }
-
-func (b *serviceProofOutput) Write(data []byte) (int, error) {
-	if len(data) > (16<<10)-b.buffer.Len() {
-		return 0, errors.New("native service oracle output exceeds limit")
-	}
-	return b.buffer.Write(data)
-}
-
 func serviceProofCommand(ctx context.Context, executable string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, executable, args...)
-	command.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C", "LC_ALL=C", "SYSTEMD_PAGER=cat"}
-	command.WaitDelay = time.Second
-	var stdout, stderr serviceProofOutput
-	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		return stdout.buffer.Bytes(), fmt.Errorf("native service fixture/oracle command: %w", err)
+	stdout := nativeexec.NewBuffer(16 << 10)
+	env := []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C", "LC_ALL=C", "SYSTEMD_PAGER=cat"}
+	err := labexec.Run(ctx, labexec.Command{Path: executable, Args: args, Env: env, Stdout: stdout, Stderr: nativeexec.NewBuffer(16 << 10), Timeout: 10 * time.Second})
+	if stdout.Truncated() {
+		return nil, errors.New("native service fixture/oracle command: output exceeds limit")
 	}
-	return stdout.buffer.Bytes(), nil
+	if err != nil {
+		return stdout.Bytes(), fmt.Errorf("native service fixture/oracle command: %w", err)
+	}
+	return stdout.Bytes(), nil
 }

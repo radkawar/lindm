@@ -233,6 +233,14 @@ func (p *Process) Wait() error {
 	return p.err
 }
 
+// Pid is the leader's process ID, for observation such as /proc; signal the
+// process only through Signal.
+func (p *Process) Pid() int { return p.cmd.Process.Pid }
+
+// Signal sends sig to the whole group while its leader is unreaped and is a
+// no-op afterwards, e.g. a graceful SIGTERM before a bounded Wait.
+func (p *Process) Signal(sig syscall.Signal) { p.signal(sig) }
+
 // Close kills the whole group and waits. An exit caused by that kill is not an
 // error; a result the process already reached is returned unchanged.
 func (p *Process) Close() error {

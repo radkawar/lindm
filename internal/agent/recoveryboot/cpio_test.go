@@ -5,9 +5,15 @@ import (
 	"testing"
 )
 
-func decodeCPIO(t *testing.T, archive []byte) map[string][]byte {
+type cpioFile struct {
+	mode, uid, gid       int
+	rdevMajor, rdevMinor int
+	data                 []byte
+}
+
+func decodeCPIO(t *testing.T, archive []byte) map[string]cpioFile {
 	t.Helper()
-	entries := map[string][]byte{}
+	entries := map[string]cpioFile{}
 	for {
 		if len(archive) < 110 || string(archive[:6]) != "070701" {
 			t.Fatal("invalid newc header")
@@ -42,7 +48,7 @@ func decodeCPIO(t *testing.T, archive []byte) map[string][]byte {
 		if _, exists := entries[name]; exists {
 			t.Fatal("duplicate newc path")
 		}
-		entries[name] = archive[start:end]
+		entries[name] = cpioFile{mode: field(14), uid: field(22), gid: field(30), rdevMajor: field(78), rdevMinor: field(86), data: archive[start:end]}
 		archive = archive[next:]
 	}
 }

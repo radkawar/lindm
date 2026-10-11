@@ -4,26 +4,29 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+
+	"lindm/internal/labexec"
 )
 
 // newServerCommand applies affinity before lindmd starts its Go runtime. taskset
 // execs the server in place, so the fixture still owns the actual server PID and
 // its existing signal, wait and restart lifecycle. Every restart uses this hook.
-func newServerCommand(binary, configPath, cpus string) (*exec.Cmd, error) {
+func newServerCommand(binary, configPath, cpus string) (labexec.Command, error) {
+	serve := labexec.Command{Path: binary, Args: []string{"serve", "-config", configPath}}
 	if cpus == "" {
-		return exec.Command(binary, "serve", "-config", configPath), nil
+		return serve, nil
 	}
 	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("server CPU affinity requires Linux")
+		return serve, fmt.Errorf("server CPU affinity requires Linux")
 	}
 	if err := validateLoadCPUList(cpus); err != nil {
-		return nil, fmt.Errorf("server CPUs: %w", err)
+		return serve, fmt.Errorf("server CPUs: %w", err)
 	}
 	taskset, err := exec.LookPath("taskset")
 	if err != nil {
-		return nil, fmt.Errorf("server CPU affinity requires taskset: %w", err)
+		return serve, fmt.Errorf("server CPU affinity requires taskset: %w", err)
 	}
-	return exec.Command(taskset, "--cpu-list", cpus, binary, "serve", "-config", configPath), nil
+	return labexec.Command{Path: taskset, Args: append([]string{"--cpu-list", cpus, binary}, serve.Args...)}, nil
 }
 
 // ProcessID returns the current server PID, or zero while stopped. It is safe to

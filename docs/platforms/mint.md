@@ -98,6 +98,20 @@ recovery sanitize each need native evidence here.
 
 Not recorded.
 
+## Remote assistance capability roadmap
+
+Mint/Cinnamon inherits no Ubuntu GNOME portal qualification. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines all tiers' consent, off/limited/on policy, role permissions and audit.
+Require a reliable native lock/stop boundary before admitting any capability;
+Clipboard must use the existing RemoteDesktop interface and uploads must use
+FileChooser, never X11 clipboard/capture utilities. Keys/layouts, two-head display
+selection, messages, clipboard, files, reconnect, recording and Tier 3 are
+[not run](../verification.md#commercial-assistance-capability-qualification).
+Keep missing native mechanisms explicitly gated. Qualify Cinnamon with its actual
+portal backend and independent nonce/hash/guest screenshot evidence; unattended
+and KDE work require parent confirmation.
+
 ## Lab
 
 x86_64 only, on the local KVM host under lease admission (no arm64 build is used

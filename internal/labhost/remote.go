@@ -97,11 +97,9 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	if len(r.Args) >= 2 && r.Args[1] == "assistance" && r.Host.Runtime != "native" {
 		return errors.New("remote assistance requires a native lab host")
 	}
-	if !r.Hold {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 3*time.Hour)
-		defer cancel()
-	}
+	// No controller-side lane deadline: the remote host-exec queues for its
+	// own admission and only then starts the lane's deadline, and it ends the
+	// lane when this session's stdin closes.
 	root, err := filepath.Abs(r.Repository)
 	if err != nil {
 		return err
@@ -388,7 +386,15 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	err = errors.Join(runErr, closeErr)
 	copyCtx, stop := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer stop()
-	for name, destination := range outputs {
+	// Remote output paths embedded in the lane record (e.g. inspect's
+	// InventoryRecordPath) are rewritten to their local copies; the record is
+	// returned last so it never names a local file that has not been copied.
+	relocated := map[string]string{}
+	for _, name := range []string{"inventory-record", "diagnostics", "fixture-output", "record"} {
+		destination, ok := outputs[name]
+		if !ok {
+			continue
+		}
 		remotePath := remote + "/records/" + name
 		if _, existsErr := runOutput(copyCtx, r.Host.SshAlias, "test -e "+QuoteShell(remotePath)); existsErr != nil {
 			var exit *exec.ExitError
@@ -429,7 +435,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			continue
 		}
 		if name == "record" {
-			if e := annotateRemoteRecord(target, r.Host, started, time.Now().UTC(), revision, diffDigest); e != nil {
+			if e := annotateRemoteRecord(target, r.Host, started, time.Now().UTC(), revision, diffDigest, relocated); e != nil {
 				err = errors.Join(err, e)
 				preserveRemote = true
 				continue
@@ -439,8 +445,15 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			if e := publishRecord(target, destination); e != nil {
 				err = errors.Join(err, e)
 				preserveRemote = true
+				continue
 			}
 		}
+		absolute, e := filepath.Abs(destination)
+		if e != nil {
+			err = errors.Join(err, e)
+			continue
+		}
+		relocated[remote+"/records/"+name] = absolute
 	}
 	return err
 }
@@ -475,7 +488,7 @@ func removeFlag(args []string, name string) []string {
 	return out
 }
 
-func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time, revision, diffDigest string) error {
+func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time, revision, diffDigest string, relocated map[string]string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -489,6 +502,17 @@ func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time
 		return err
 	}
 	record["lab_host"] = metadata
+	for key, value := range record {
+		var remotePath string
+		if json.Unmarshal(value, &remotePath) != nil {
+			continue
+		}
+		if local, ok := relocated[remotePath]; ok {
+			if record[key], err = json.Marshal(local); err != nil {
+				return err
+			}
+		}
+	}
 	data, err = json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return err

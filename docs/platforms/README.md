@@ -119,6 +119,29 @@ Server-host qualification is a separate
   the qualified kernel to turn an unsupported cell green; see
   `docs/product-specification.md:145-160` and the Fedora page.
 
+## Remote assistance capability qualification
+
+The [remote assistance capabilities](../product-specification.md#remote-assistance-capabilities)
+contract defines each user story, consent model, off/limited/on policy, per-role
+permission, audit event and native mechanism. Apply it separately to every platform
+page; an `assistance` registry entry qualifies neither a clipboard interface nor
+file transfer, recording, audio, unattended access, KDE or X11. The existing local
+session/portal gate is mandatory for every extension, not a bypassable default.
+
+GNOME 46 on Ubuntu 24.04 and GNOME 50 on Fedora 44 are the initial x86_64 Wayland
+targets. Inspect exact portal frontend, backend and compositor sources and probe
+the running interface before enabling a capability. Clipboard must use the existing
+RemoteDesktop session; files use Downloads/FileChooser; messages use the bound
+user's notification service. No `ID_LIKE`, desktop-name or version-only assumption
+is sufficient. A missing native mechanism has an explicit registry refusal reason.
+
+The [new qualification rows](../verification.md#commercial-assistance-capability-qualification)
+are not run. Each platform needs its own clipboard nonce round-trip, guest shortcut
+effects, two-head monitor/pointer checks, visible notification, transfer hashes,
+reboot/logout re-consent and encrypted-recording/retention evidence as applicable.
+Tier 3 designs remain gated; unattended implementation and Plasma qualification
+require parent confirmation.
+
 ## Maintaining these pages
 
 Any change touching distro-specific behavior must update the matching page in the

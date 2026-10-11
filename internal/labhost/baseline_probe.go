@@ -102,6 +102,7 @@ versions = {
     'rsync': ['--version'], 'xorriso': ['-version'], 'guestfish': ['--version'],
     'virt-inspector': ['--version'], 'rpm': ['--version'], 'rpmbuild': ['--version'],
     'createrepo_c': ['--version'], 'gcc': ['--version'], 'go': ['version'],
+    'ukify': ['--version'],
 }
 required = list(versions) + ['swtpm_setup', 'cloud-localds', 'virt-fw-vars', 'mcopy', 'mkfs.vfat', 'mkfs.ext4', 'cryptsetup',
     'unsquashfs', 'zstd', 'jq', 'ssh', 'scp', 'dpkg-deb', 'dpkg-scanpackages', 'debsigs', 'rpm2cpio',

@@ -204,6 +204,12 @@ func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv
 	if err != nil {
 		return fmt.Errorf("native action prerequisites: %w", err)
 	}
+	if release.Lab.Entitlement {
+		// An unregistered entitled system has no repository. Its encrypted
+		// golden installed these from the vendor-authenticated Binary DVD;
+		// require them rather than reaching an unentitled or third-party source.
+		command = "rpm -q " + strings.Join(release.Lab.Guest.Actions, " ")
+	}
 	// Vendor-configured signature verification remains enabled. Network access
 	// is explicit disposable-QEMU user egress, never host routing or namespaces.
 	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, 1<<20, 10*time.Minute)

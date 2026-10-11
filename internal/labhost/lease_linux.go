@@ -163,6 +163,39 @@ func (s *Slots) AcquireNReporting(ctx context.Context, guests uint32, report fun
 	}
 }
 
+// LaneTiming bounds the two phases of a scheduled lane separately. Queue time
+// never consumes the lane's own budget: a lane admitted after a long wait still
+// gets its full Lane timeout. Zero Lane means no lane deadline (held lanes).
+type LaneTiming struct {
+	Admission, Lane time.Duration
+}
+
+// RunAdmitted waits, in FIFO order and for at most timing.Admission, until all
+// guests are admitted, then runs the lane under timing.Lane and releases every
+// lease after run returns.
+func (s *Slots) RunAdmitted(ctx context.Context, guests uint32, timing LaneTiming, report func(reason string), run func(context.Context) error) (err error) {
+	if timing.Admission <= 0 {
+		return errors.New("lab hosts: lane admission requires a positive deadline")
+	}
+	admission, cancelAdmission := context.WithTimeout(ctx, timing.Admission)
+	leases, err := s.AcquireNReporting(admission, guests, report)
+	cancelAdmission()
+	if err != nil {
+		return fmt.Errorf("lab hosts: lane admission: %w", err)
+	}
+	defer func() {
+		for _, lease := range leases {
+			err = errors.Join(err, lease.Close())
+		}
+	}()
+	if timing.Lane > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timing.Lane)
+		defer cancel()
+	}
+	return run(ctx)
+}
+
 // Lease holds a kernel flock. Closing the last inherited descriptor or crashing
 // releases it automatically, without stale PID cleanup or unlinking lock files.
 type Lease struct {

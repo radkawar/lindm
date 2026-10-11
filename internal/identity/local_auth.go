@@ -210,25 +210,9 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 			resultErr = errors.Join(resultErr, s.emergencyAudit(failureCtx, ceremony.AccountID, action, "WebAuthn ceremony denied"))
 		}
 	}()
-	var stored localCeremonySession
-	if err = json.Unmarshal(ceremony.SessionData, &stored); err != nil {
-		return "", errStore
-	}
-	var envelope struct {
-		Response struct {
-			ClientDataJSON string `json:"clientDataJSON"`
-		} `json:"response"`
-	}
-	if err = json.Unmarshal([]byte(request.GetCredentialJson()), &envelope); err != nil {
-		return "", errUnauthenticated
-	}
-	client, err := base64.RawURLEncoding.DecodeString(envelope.Response.ClientDataJSON)
+	stored, session, err := restoreCeremony(ceremony, request)
 	if err != nil {
-		return "", errUnauthenticated
-	}
-	session, err := restoreWebAuthnSession(stored.SessionData, ceremony.ChallengeHash, client)
-	if err != nil {
-		return "", errUnauthenticated
+		return "", err
 	}
 	var cookie string
 	denied := false
@@ -284,40 +268,10 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 			return err
 		}
 		if kind == "enroll" {
-			consumed, err := q.ConsumeLocalEnrollment(ctx, stored.EnrollmentSecretHash)
-			if err != nil || consumed != account.ID {
-				return errUnauthenticated
-			}
-			if err = q.InsertLocalCredential(ctx, identitydb.InsertLocalCredentialParams{CredentialID: credential.ID, AccountID: account.ID, CredentialJson: data}); err != nil {
-				return s.dbErr(err)
-			}
-			if err = q.SetLocalPassword(ctx, identitydb.SetLocalPasswordParams{ID: account.ID, PasswordHash: ceremony.PasswordHash}); err != nil {
-				return s.dbErr(err)
-			}
-			return s.insertAudit(ctx, q, &account.ID, "identity.local_enrolled", principalResource(account.ID), "")
+			return s.completeLocalEnrollment(ctx, q, ceremony, stored, account.ID, credential.ID, data)
 		}
-		if err = q.UpdateLocalCredential(ctx, identitydb.UpdateLocalCredentialParams{CredentialID: credential.ID, AccountID: account.ID, CredentialJson: data}); err != nil {
-			return s.dbErr(err)
-		}
-		if err = q.ClearLocalFailures(ctx, account.ID); err != nil {
-			return s.dbErr(err)
-		}
-		cookie, err = randomToken()
-		if err != nil {
-			return err
-		}
-		lifetime := 12 * time.Hour
-		reason := ""
-		action := auditLogin
-		if !s.localPrimary {
-			lifetime = s.breakGlass.GetMaxSessionLifetime().AsDuration()
-			reason = ceremony.IncidentReason
-			action = "identity.break_glass_activated"
-		}
-		if err = q.InsertLocalSession(ctx, identitydb.InsertLocalSessionParams{TokenHash: sessionHash(cookie), PrincipalID: account.ID, ExpiresAt: pgStamp(now.Add(lifetime), true), BreakGlass: !s.localPrimary, IncidentReason: reason}); err != nil {
-			return s.dbErr(err)
-		}
-		return s.insertAudit(ctx, q, &account.ID, action, principalResource(account.ID), reason)
+		cookie, err = s.startLocalSession(ctx, q, ceremony, account.ID, credential.ID, data, now)
+		return err
 	})
 	if err != nil {
 		return "", err
@@ -326,6 +280,75 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 		return "", errUnauthenticated
 	}
 	return cookie, nil
+}
+
+// restoreCeremony decodes the consumed ceremony's stored WebAuthn session and
+// binds it to the response's client data and the stored challenge hash.
+func restoreCeremony(ceremony identitydb.LocalCeremony, request *authv1.WebAuthnFinishRequest) (localCeremonySession, webauthn.SessionData, error) {
+	var stored localCeremonySession
+	if err := json.Unmarshal(ceremony.SessionData, &stored); err != nil {
+		return localCeremonySession{}, webauthn.SessionData{}, errStore
+	}
+	var envelope struct {
+		Response struct {
+			ClientDataJSON string `json:"clientDataJSON"`
+		} `json:"response"`
+	}
+	if err := json.Unmarshal([]byte(request.GetCredentialJson()), &envelope); err != nil {
+		return localCeremonySession{}, webauthn.SessionData{}, errUnauthenticated
+	}
+	client, err := base64.RawURLEncoding.DecodeString(envelope.Response.ClientDataJSON)
+	if err != nil {
+		return localCeremonySession{}, webauthn.SessionData{}, errUnauthenticated
+	}
+	session, err := restoreWebAuthnSession(stored.SessionData, ceremony.ChallengeHash, client)
+	if err != nil {
+		return localCeremonySession{}, webauthn.SessionData{}, errUnauthenticated
+	}
+	return stored, session, nil
+}
+
+// completeLocalEnrollment consumes the one-time enrollment secret, then stores
+// the verified credential and the ceremony's password hash.
+func (s *Service) completeLocalEnrollment(ctx context.Context, q *identitydb.Queries, ceremony identitydb.LocalCeremony, stored localCeremonySession, accountID uuid.UUID, credentialID, credentialJSON []byte) error {
+	consumed, err := q.ConsumeLocalEnrollment(ctx, stored.EnrollmentSecretHash)
+	if err != nil || consumed != accountID {
+		return errUnauthenticated
+	}
+	if err = q.InsertLocalCredential(ctx, identitydb.InsertLocalCredentialParams{CredentialID: credentialID, AccountID: accountID, CredentialJson: credentialJSON}); err != nil {
+		return s.dbErr(err)
+	}
+	if err = q.SetLocalPassword(ctx, identitydb.SetLocalPasswordParams{ID: accountID, PasswordHash: ceremony.PasswordHash}); err != nil {
+		return s.dbErr(err)
+	}
+	return s.insertAudit(ctx, q, &accountID, "identity.local_enrolled", principalResource(accountID), "")
+}
+
+// startLocalSession records the verified credential's updated state, clears
+// failures and issues a local or break-glass session. It returns the cookie.
+func (s *Service) startLocalSession(ctx context.Context, q *identitydb.Queries, ceremony identitydb.LocalCeremony, accountID uuid.UUID, credentialID, credentialJSON []byte, now time.Time) (string, error) {
+	if err := q.UpdateLocalCredential(ctx, identitydb.UpdateLocalCredentialParams{CredentialID: credentialID, AccountID: accountID, CredentialJson: credentialJSON}); err != nil {
+		return "", s.dbErr(err)
+	}
+	if err := q.ClearLocalFailures(ctx, accountID); err != nil {
+		return "", s.dbErr(err)
+	}
+	cookie, err := randomToken()
+	if err != nil {
+		return "", err
+	}
+	lifetime := 12 * time.Hour
+	reason := ""
+	action := auditLogin
+	if !s.localPrimary {
+		lifetime = s.breakGlass.GetMaxSessionLifetime().AsDuration()
+		reason = ceremony.IncidentReason
+		action = "identity.break_glass_activated"
+	}
+	if err = q.InsertLocalSession(ctx, identitydb.InsertLocalSessionParams{TokenHash: sessionHash(cookie), PrincipalID: accountID, ExpiresAt: pgStamp(now.Add(lifetime), true), BreakGlass: !s.localPrimary, IncidentReason: reason}); err != nil {
+		return "", s.dbErr(err)
+	}
+	return cookie, s.insertAudit(ctx, q, &accountID, action, principalResource(accountID), reason)
 }
 
 func (s *Service) verifyLocalPassword(ctx context.Context, encoded, password string) (bool, error) {

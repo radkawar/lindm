@@ -669,6 +669,19 @@ safe parent for package-signing state. The baseline never chmods that shared
 directory; configure the private alternative instead. Evidence records the work
 directory and whether it was created.
 
+`systemd-ukify` (host-side recovery UKI builds) is not a static pin: the baseline
+derives `systemd-ukify=<installed systemd version>` so it never pulls a systemd
+upgrade onto a shared host. Every pin, static or derived, must have its exact
+`Version:` stanza in the configured archive before APT runs (`apt-cache show`
+alone exits zero for an unknown version); a retired version stops the baseline
+without package changes, and the host needs a separately scheduled systemd update.
+Ubuntu installs `/boot/vmlinuz-*` root-only, so the baseline also downloads the
+running kernel's `linux-image-<release>` at its installed version through the same
+scoped sources, publishes its `vmlinuz` only when the bytes match dpkg's recorded
+MD5 of the installed file, and stores it as `<work>/supermin/vmlinuz-<release>`
+(mode 0600). Evidence records release, package version, SHA-256 and dpkg digest.
+`/boot` is never read or changed.
+
 `-arch arm64` (also `aarch64`; `amd64`/`x86_64` are equivalent) must match the
 pinned image manifest. Selection prefers matching KVM hosts over TCG, then a free
 configured host; `-host dgx20` overrides selection. `-accelerator kvm` explicitly
@@ -686,7 +699,10 @@ A host-local flock slot is held for the entire lane through VM/fixture teardown.
 Remote workers take the same locks over SSH on the target, not on the controller.
 Kernel locks release after process death, QEMU helpers have parent-death killing,
 and SSH stdin closure cancels the worker before its cleanup/lease release. Full
-hosts wait under the command deadline; agents do not coordinate by `pgrep`.
+hosts queue for at most 12 hours, printing each changed wait reason; the lane's
+3-hour deadline starts only at admission, so queue time never shortens a lane
+(remote workers apply the same split on the target). Agents do not coordinate
+by `pgrep`.
 
 Admission also samples native `MemAvailable` and `pswpout`: available memory must
 cover the configured per-guest RAM ceiling plus 8 GiB of headroom, with no
@@ -794,7 +810,9 @@ account through the real API, and verifies fresh two-human approvals.
 
 The encrypted installer lane is `lab vm encrypted -manifest
 lab/images/ubuntu-noble-encrypted-amd64.json` (or
-`lab/images/fedora-44-encrypted-x86_64.json`). Supply `-firmware-code`,
+`lab/images/fedora-44-encrypted-x86_64.json`,
+`lab/images/rhel-9.8-encrypted-x86_64.json`,
+`lab/images/rhel-10.2-encrypted-x86_64.json`). Supply `-firmware-code`,
 `-firmware-vars`, `-firmware-package` and the exact installed
 `-firmware-version`; `-secure-boot` requires an enrolled PK/KEK/db template and
 actual guest SecureBoot=1/SetupMode=0. Ubuntu hosts can use the `ovmf` package's
@@ -856,6 +874,9 @@ tools; Fedora 44 supplies them in `systemd-udev`, not a nonexistent
 
 On hosts whose installed kernel is not caller-readable, supply both
 `SUPERMIN_KERNEL` and `SUPERMIN_MODULES` explicitly for the libguestfs appliance.
+Remote `lab host-exec` sets them from the baseline's staged copy of the running
+kernel when it exists and neither is already set; a copy for another kernel
+release is never selected.
 Use a private, readable copy of a packaged kernel and its matching installed
 module directory; never relax `/boot` permissions. The harness validates both
 paths, records the selected kernel SHA-256/module-directory version, and forwards
@@ -968,10 +989,20 @@ observation then verifies the controller/namespace identity independently.
 For retained QEMU recovery diagnostics, the signed image selects the existing
 architecture's UART. `lindm-recovery-build -serial-console` accepts only
 `ttyS0,115200n8` or `ttyAMA0,115200`; omitting it preserves the default console.
-It cannot inject arbitrary kernel arguments. Recovery init binds standard streams
-to `/dev/console` after mounting devtmpfs; otherwise an archive without static
-device nodes can lose the precise init failure before forced poweroff. This adds
-no interactive shell or alternate boot path.
+It cannot inject arbitrary kernel arguments. The recovery image's `/init` is the
+static `lindm-agent` itself; there is no BusyBox, shell, DHCP script or second
+agent copy, so the same image recipe works on distributions without BusyBox.
+The archive carries only two static character nodes, `/dev/console` (5:1, 0600)
+and `/dev/null` (1:3, 0666), so the Go runtime has standard streams before PID 1
+mounts devtmpfs and rebinds them to the kernel console; precise init failures
+therefore reach the console before forced poweroff. Image-specific init inputs
+are the signed `etc/lindm/recovery-init` parameters (boot mode, ESP volume
+serial, optional off-target ext4 UUID), and `etc/lindm/modules.load` lists module
+files loaded unchanged with `finit_module(2)` in dependency order; no
+`modules.dep`, `modprobe` or decompressor is archived. Image and stager
+Authenticode checks use the in-process verifier, not `sbverify`; only host-side
+`sbsign` remains a build prerequisite. Tests for this init inject the syscall
+boundary and never need root.
 
 Signed recovery bootstraps time through the pinned recovery origin before
 generating an action-scoped proof. `GetRecoveryTime` signs a fresh nonce/boot-bound
@@ -1046,13 +1077,18 @@ official Red Hat x86_64 KVM catalog without creating a subscription or accepting
 terms. The [vendor release table](https://access.redhat.com/articles/red-hat-enterprise-linux-release-dates)
 lists `9.8` and `10.2` as the current minors, both generally available May 19, 2026.
 Version selection is explicit, not a mutable "latest" pin. `images redhat fetch
--version MINOR -token-file FILE -manifest NEW_FILE [-cache DIR]` obtains the authorized download, verifies its
+-version MINOR [-edition kvm|dvd] -token-file FILE -manifest NEW_FILE [-cache DIR]`
+obtains the authorized download (`kvm`, the default, is the KVM guest qcow2;
+`dvd` is the self-contained Binary DVD installer ISO used by the encrypted
+kickstart lane, never the network-dependent Boot ISO), verifies its
 published SHA-256 and exact CDN Content-Length, and imports it into the same
 digest-addressed cache used by VM lanes. The default cache is `.cache/lab/images`;
 the manifest parent must already exist. The token file must be a current-user-owned
 mode-0600 regular file, not a symlink. An eligible RHEL subscription (including an
 activated Developer subscription) and **Download Software and Updates** permission
 are required; an offline token alone does not grant download entitlement.
+The command bounds a KVM transfer at 45 minutes and a Binary DVD (about 11-16 GB)
+at 4 hours; the client refuses an unbounded download context.
 
 Authentication follows [Red Hat's refresh-grant documentation](https://access.redhat.com/articles/3626371)
 and its [download API contract](https://api.access.redhat.com/management/v1/swagger.json).
@@ -1068,7 +1104,10 @@ replacing both pins and evidence. Ubuntu/Fedora continue requiring their pinned
 vendor signatures. Acquisition evidence is not guest lifecycle qualification.
 
 `lab vm lifecycle` (including `-control-plane-trust`) and `lab vm dispatch`
-accept `-redhat-token-file FILE` for RHEL. Also supply `-allow-network` explicitly:
+accept `-redhat-token-file FILE` for RHEL. `lab vm device-actions` requires it
+only for RHEL original-device recovery: the vendor cloud guest registers just
+for its owned-boot package transaction and unregisters (activation key deleted)
+before boot conversion. Also supply `-allow-network` explicitly:
 registration and entitled metadata refresh require guest user-mode egress; the
 default QEMU `restrict=on` intentionally cannot reach vendor endpoints. This changes
 only the disposable guest's user-mode network and is recorded as `user-egress`.
@@ -1546,6 +1585,67 @@ file references to single unencrypted PKCS#8 Ed25519 private keys. Loading exclu
 pinned transport/root/release keys and TLS/device-CA identity keys. It does not
 delegate authority or enable an issuer; current authority and admission must still
 authorize every later issuance. Absent configuration provides no signing fallback.
+
+### Lab qualification matrix
+
+The platform × cell matrix is declarative. `lab/matrix.json` (strict protobuf JSON
+`LabMatrix`, `api/lindm/lab/v1/matrix.proto`) maps each cell to its registry
+capabilities, image kind and an existing `lab vm` lane with fixed arguments.
+Platforms are the Tier 1/2 rows of `internal/platform`; images are the
+`lab/images/*.json` manifests the registry identifies, one cell per (platform,
+cell, registry architecture). Edition suffix `encrypted-lab` marks an
+encrypted-installer manifest; every other manifest is a cloud/installed image.
+Per-release lane inputs are derived in `cmd/lab/matrix.go`, never written per
+distribution: lifecycle package formats and repositories from the row's native
+package backend, `-redhat-token-file` from the row's lab entitlement, resource
+`-kinds` from the row's implemented resource capabilities, and the device-action
+recovery image from the same release's cloud manifest. `architectureArgs` holds
+execution-host arguments every hardware-selecting lane receives for a guest
+architecture (the Sparks' pinned AAVMF firmware for aarch64). A cell whose
+capability the registry gates is `gated`; a cell without a maintained lane, or
+whose lane has no recipe in the row's `Lab.Lanes`, is `no lane`; a release
+without a pinned image for that architecture is `no image`; and a runnable cell
+without a ledger entry is `not run`. None of these is a pass.
+
+```sh
+artifacts/bin/lab matrix plan [-platform ubuntu-24.04] [-cells lifecycle,dispatch]
+artifacts/bin/lab matrix run -platform ubuntu-24.04 -cells lifecycle,dispatch \
+  -evidence "$HOME/.cache/lindm-matrix/run-$(date -u +%Y%m%dT%H%M%SZ)" \
+  -repo "$FIXTURE" -cache "$FIXTURE/.cache/lab/images"
+artifacts/bin/lab matrix report
+```
+
+`FIXTURE` is the checkout that owns the running development fixture and the
+verified image cache.
+
+`run` needs `make build` (embedded console assets and the `lab` executable) and
+the running development fixture in `-repo`; `-root` (default `.`) is the source
+checkout whose matrix, manifests and ledger are used and whose sources lanes
+build. It prepares shared inputs once in the new `-evidence` directory:
+release-stamped `lindmd` and `lindm-agent` built from `-root` (native fixtures
+refuse unstamped servers) and, through the in-process `lab packages` paths, a
+development signer, agent versions 0.1.0 and 0.1.1 in every needed format and
+architecture, the APT and pacman repositories and the rejection fixtures. Each
+selected runnable cell then runs as a child
+`lab vm <lane>` through the normal host admission (`-parallel`, default 4, bounds
+concurrent cells; host slots still bound guests). The child's output is kept in
+`<platform>/<cell>-<arch>.log` beside its record. Every finished cell appends one
+entry to `lab/ledger.json` (strict protobuf JSON `MatrixLedger`): platform key,
+cell, architecture, manifest id, `pass` only for a zero exit with a record,
+otherwise `fail` with the record or log as evidence, the evidence SHA-256, time,
+source revision (`-dirty` for local changes) and source. Writers lock the ledger
+directory and replace the file atomically. An interrupted run records nothing.
+Remote lanes stage source from `-repo` (see above), so keep that tree buildable
+while aarch64 cells run.
+
+`lab matrix import -platform KEY -cell CELL -architecture ARCH -evidence PATH
+[-sha256 HEX] [-recorded DATE] [-scope TEXT] [-reference #ANCHOR]` adds evidence
+recorded outside `run`. A readable file is hashed (and must match `-sha256`);
+an unreadable one needs the documented digest and date and is stored unverified.
+`lab matrix report` regenerates the verification ledger's
+[Tier capability matrix](verification.md#tier-capability-matrix);
+`go run ./cmd/dev generate-docs -check` fails when it is stale. Commit the
+ledger and the regenerated table together.
 
 ### Isolated native install and custody check
 

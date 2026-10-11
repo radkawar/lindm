@@ -40,68 +40,17 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 		// Flag errors are discarded like other commands: paths may be private.
 		return runBundle(ctx, args[1:], stdout, io.Discard, time.Now)
 	}
-	command, args := args[0], args[1:]
-	switch command {
-	case "enrollment":
-		if len(args) < 2 || args[0] != "grant" {
-			return errors.New(usage)
-		}
-		command += " grant " + args[1]
-		args = args[2:]
-	case "devices", "device", "profiles", "assignments", "audit":
-		if len(args) == 0 {
-			return errors.New(usage)
-		}
-		command += " " + args[0]
-		args = args[1:]
+	command, args, err := commandName(args)
+	if err != nil {
+		return err
 	}
 	flags := flag.NewFlagSet("lindmctl", flag.ContinueOnError)
 	flags.SetOutput(io.Discard) // Flag errors may contain user-supplied secrets.
 	configPath := flags.String("config", "", "protected configuration path (default XDG)")
 	output := flags.String("o", "table", "output: table or json")
-	var server, ca, device, grant, profile, revision, expected, reason, file, pageToken, requestID string
-	var pageSize, lifetime, interval uint
-	mutation := false
-	switch command {
-	case "login":
-		flags.StringVar(&server, "server", "", "HTTPS origin (first use)")
-		flags.StringVar(&ca, "ca", "", "PEM CA file (first use)")
-	case "logout", "whoami":
-	case "devices list", "profiles list", "audit list":
-		flags.UintVar(&pageSize, "page-size", 50, "page size")
-		flags.StringVar(&pageToken, "page-token", "", "continuation token")
-	case "devices get", "device revoke", "assignments get", "assignments set", "assignments clear":
-		flags.StringVar(&device, "device-id", "", "device UUID")
-		mutation = command == "device revoke" || command == "assignments set" || command == "assignments clear"
-		if command == "assignments set" || command == "assignments clear" {
-			flags.StringVar(&expected, "expected-assignment-id", "", "current assignment UUID; omit only for first assignment")
-		}
-		if command == "assignments set" {
-			flags.StringVar(&profile, "profile-id", "", "profile UUID")
-			flags.StringVar(&revision, "revision-id", "", "exact retained revision UUID")
-			flags.UintVar(&interval, "interval-seconds", 900, "reconciliation interval")
-		}
-	case "enrollment grant create":
-		mutation = true
-		flags.UintVar(&lifetime, "lifetime-seconds", 600, "grant lifetime")
-	case "enrollment grant revoke":
-		mutation = true
-		flags.StringVar(&grant, "grant-id", "", "grant UUID")
-	case "profiles get", "profiles publish":
-		flags.StringVar(&profile, "profile-id", "", "profile UUID")
-		if command == "profiles get" {
-			flags.StringVar(&revision, "revision-id", "", "retained revision UUID; omit for catalog head")
-		} else {
-			mutation = true
-			flags.StringVar(&expected, "expected-revision-id", "", "current head UUID; omit for new profile")
-			flags.StringVar(&file, "file", "", "strict ResourceProfile protobuf JSON file")
-		}
-	default:
-		return errors.New(usage)
-	}
-	if mutation {
-		flags.StringVar(&reason, "reason", "", "audit reason")
-		flags.StringVar(&requestID, "request-id", "", "idempotency UUID; generated if omitted")
+	var values commandFlags
+	if err := values.register(flags, command); err != nil {
+		return err
 	}
 	if err := flags.Parse(args); err != nil {
 		return errors.New("invalid command flags; use the documented command syntax")
@@ -120,15 +69,15 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 		*configPath = path
 	}
 	var cfg *authv1.CLIConfig
-	if server != "" || ca != "" {
-		if server == "" || ca == "" {
+	if values.server != "" || values.ca != "" {
+		if values.server == "" || values.ca == "" {
 			return errors.New("--server and --ca must be supplied together")
 		}
-		pem, err := readDocument(ca)
+		pem, err := readDocument(values.ca)
 		if err != nil {
 			return errors.New("read CA file failed")
 		}
-		cfg = &authv1.CLIConfig{ServerOrigin: server, CaPem: string(pem)}
+		cfg = &authv1.CLIConfig{ServerOrigin: values.server, CaPem: string(pem)}
 	}
 	client, err := New(*configPath, cfg)
 	if err != nil {
@@ -141,72 +90,155 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 	if command == "logout" {
 		return client.Logout(ctx)
 	}
-	if mutation && requestID == "" {
-		requestID = uuid.NewString()
+	if values.mutation && values.requestID == "" {
+		values.requestID = uuid.NewString()
 	}
-	// Reject integer representation overflow before applying protobuf rules.
-	uint32Value := func(value uint) (uint32, error) {
-		if uint64(value) > uint64(^uint32(0)) {
-			return 0, errors.New("integer flag cannot be represented by the protocol")
-		}
-		return uint32(value), nil
-	}
-	page, err := uint32Value(pageSize)
-	if err != nil {
-		return err
-	}
-	life, err := uint32Value(lifetime)
-	if err != nil {
-		return err
-	}
-	seconds, err := uint32Value(interval)
-	if err != nil {
-		return err
-	}
-	var message proto.Message
-	switch command {
-	case "whoami":
-		message, err = client.Whoami(ctx)
-	case "devices list":
-		message, err = rpcMessage(ctx, &adminv1.ListDevicesRequest{PageSize: page, PageToken: pageToken}, client.Admin().ListDevices)
-	case "devices get":
-		message, err = rpcMessage(ctx, &adminv1.GetDeviceRequest{DeviceId: device}, client.Admin().GetDevice)
-	case "device revoke":
-		message, err = rpcMessage(ctx, &adminv1.RevokeDeviceRequest{RequestId: requestID, DeviceId: device, Reason: reason}, client.Admin().RevokeDevice)
-	case "enrollment grant create":
-		message, err = rpcMessage(ctx, &adminv1.CreateEnrollmentGrantRequest{RequestId: requestID, LifetimeSeconds: life, Reason: reason}, client.Admin().CreateEnrollmentGrant)
-	case "enrollment grant revoke":
-		message, err = rpcMessage(ctx, &adminv1.RevokeEnrollmentGrantRequest{RequestId: requestID, GrantId: grant, Reason: reason}, client.Admin().RevokeEnrollmentGrant)
-	case "profiles list":
-		message, err = rpcMessage(ctx, &adminv1.ListProfilesRequest{PageSize: page, PageToken: pageToken}, client.Admin().ListProfiles)
-	case "profiles get":
-		message, err = rpcMessage(ctx, &adminv1.GetProfileRevisionRequest{ProfileId: profile, RevisionId: optionalString(revision)}, client.Admin().GetProfileRevision)
-	case "profiles publish":
-		data, readErr := readDocument(file)
-		if readErr != nil {
-			return errors.New("read profile file failed")
-		}
-		spec := &policyv1.ResourceProfile{}
-		if err := protojson.Unmarshal(data, spec); err != nil {
-			return errors.New("profile file must be strict ResourceProfile protobuf JSON")
-		}
-		message, err = rpcMessage(ctx, &adminv1.PublishProfileRevisionRequest{RequestId: requestID, ProfileId: profile, ExpectedRevisionId: optionalString(expected), Spec: spec, Reason: reason}, client.Admin().PublishProfileRevision)
-	case "assignments set", "assignments clear":
-		request := &adminv1.SetResourceAssignmentRequest{RequestId: requestID, DeviceId: device, ExpectedAssignmentId: optionalString(expected), Reason: reason, Clear: command == "assignments clear"}
-		if !request.Clear {
-			request.Target = &adminv1.ResourceAssignmentTarget{ProfileId: profile, RevisionId: revision}
-			request.ReconcileIntervalSeconds = &seconds
-		}
-		message, err = rpcMessage(ctx, request, client.Admin().SetResourceAssignment)
-	case "assignments get":
-		message, err = rpcMessage(ctx, &adminv1.GetDeviceResourceStateRequest{DeviceId: device}, client.Admin().GetDeviceResourceState)
-	case "audit list":
-		message, err = rpcMessage(ctx, &adminv1.ListAuditEventsRequest{PageSize: page, PageToken: pageToken}, client.Admin().ListAuditEvents)
-	}
+	message, err := values.call(ctx, client, command)
 	if err != nil {
 		return err
 	}
 	return printMessage(stdout, message, *output)
+}
+
+// commandName joins multi-word commands ("devices list", "enrollment grant
+// create") and returns the remaining flag arguments.
+func commandName(args []string) (string, []string, error) {
+	command, args := args[0], args[1:]
+	switch command {
+	case "enrollment":
+		if len(args) < 2 || args[0] != "grant" {
+			return "", nil, errors.New(usage)
+		}
+		command += " grant " + args[1]
+		args = args[2:]
+	case "devices", "device", "profiles", "assignments", "audit":
+		if len(args) == 0 {
+			return "", nil, errors.New(usage)
+		}
+		command += " " + args[0]
+		args = args[1:]
+	}
+	return command, args, nil
+}
+
+// commandFlags holds the per-command flag values; mutation marks commands that
+// take an audit reason and idempotency request ID.
+type commandFlags struct {
+	server, ca, device, grant, profile, revision, expected, reason, file, pageToken, requestID string
+	pageSize, lifetime, interval                                                               uint
+	mutation                                                                                   bool
+}
+
+// register defines exactly the flags command accepts; unknown commands are a
+// usage error.
+func (f *commandFlags) register(flags *flag.FlagSet, command string) error {
+	switch command {
+	case "login":
+		flags.StringVar(&f.server, "server", "", "HTTPS origin (first use)")
+		flags.StringVar(&f.ca, "ca", "", "PEM CA file (first use)")
+	case "logout", "whoami":
+	case "devices list", "profiles list", "audit list":
+		flags.UintVar(&f.pageSize, "page-size", 50, "page size")
+		flags.StringVar(&f.pageToken, "page-token", "", "continuation token")
+	case "devices get", "device revoke", "assignments get", "assignments set", "assignments clear":
+		flags.StringVar(&f.device, "device-id", "", "device UUID")
+		f.mutation = command == "device revoke" || command == "assignments set" || command == "assignments clear"
+		if command == "assignments set" || command == "assignments clear" {
+			flags.StringVar(&f.expected, "expected-assignment-id", "", "current assignment UUID; omit only for first assignment")
+		}
+		if command == "assignments set" {
+			flags.StringVar(&f.profile, "profile-id", "", "profile UUID")
+			flags.StringVar(&f.revision, "revision-id", "", "exact retained revision UUID")
+			flags.UintVar(&f.interval, "interval-seconds", 900, "reconciliation interval")
+		}
+	case "enrollment grant create":
+		f.mutation = true
+		flags.UintVar(&f.lifetime, "lifetime-seconds", 600, "grant lifetime")
+	case "enrollment grant revoke":
+		f.mutation = true
+		flags.StringVar(&f.grant, "grant-id", "", "grant UUID")
+	case "profiles get", "profiles publish":
+		flags.StringVar(&f.profile, "profile-id", "", "profile UUID")
+		if command == "profiles get" {
+			flags.StringVar(&f.revision, "revision-id", "", "retained revision UUID; omit for catalog head")
+		} else {
+			f.mutation = true
+			flags.StringVar(&f.expected, "expected-revision-id", "", "current head UUID; omit for new profile")
+			flags.StringVar(&f.file, "file", "", "strict ResourceProfile protobuf JSON file")
+		}
+	default:
+		return errors.New(usage)
+	}
+	if f.mutation {
+		flags.StringVar(&f.reason, "reason", "", "audit reason")
+		flags.StringVar(&f.requestID, "request-id", "", "idempotency UUID; generated if omitted")
+	}
+	return nil
+}
+
+// call issues the authenticated RPC for command once and returns its response.
+func (f *commandFlags) call(ctx context.Context, client *Client, command string) (proto.Message, error) {
+	page, err := protocolUint32(f.pageSize)
+	if err != nil {
+		return nil, err
+	}
+	life, err := protocolUint32(f.lifetime)
+	if err != nil {
+		return nil, err
+	}
+	seconds, err := protocolUint32(f.interval)
+	if err != nil {
+		return nil, err
+	}
+	switch command {
+	case "whoami":
+		return client.Whoami(ctx)
+	case "devices list":
+		return rpcMessage(ctx, &adminv1.ListDevicesRequest{PageSize: page, PageToken: f.pageToken}, client.Admin().ListDevices)
+	case "devices get":
+		return rpcMessage(ctx, &adminv1.GetDeviceRequest{DeviceId: f.device}, client.Admin().GetDevice)
+	case "device revoke":
+		return rpcMessage(ctx, &adminv1.RevokeDeviceRequest{RequestId: f.requestID, DeviceId: f.device, Reason: f.reason}, client.Admin().RevokeDevice)
+	case "enrollment grant create":
+		return rpcMessage(ctx, &adminv1.CreateEnrollmentGrantRequest{RequestId: f.requestID, LifetimeSeconds: life, Reason: f.reason}, client.Admin().CreateEnrollmentGrant)
+	case "enrollment grant revoke":
+		return rpcMessage(ctx, &adminv1.RevokeEnrollmentGrantRequest{RequestId: f.requestID, GrantId: f.grant, Reason: f.reason}, client.Admin().RevokeEnrollmentGrant)
+	case "profiles list":
+		return rpcMessage(ctx, &adminv1.ListProfilesRequest{PageSize: page, PageToken: f.pageToken}, client.Admin().ListProfiles)
+	case "profiles get":
+		return rpcMessage(ctx, &adminv1.GetProfileRevisionRequest{ProfileId: f.profile, RevisionId: optionalString(f.revision)}, client.Admin().GetProfileRevision)
+	case "profiles publish":
+		data, readErr := readDocument(f.file)
+		if readErr != nil {
+			return nil, errors.New("read profile file failed")
+		}
+		spec := &policyv1.ResourceProfile{}
+		if err := protojson.Unmarshal(data, spec); err != nil {
+			return nil, errors.New("profile file must be strict ResourceProfile protobuf JSON")
+		}
+		return rpcMessage(ctx, &adminv1.PublishProfileRevisionRequest{RequestId: f.requestID, ProfileId: f.profile, ExpectedRevisionId: optionalString(f.expected), Spec: spec, Reason: f.reason}, client.Admin().PublishProfileRevision)
+	case "assignments set", "assignments clear":
+		request := &adminv1.SetResourceAssignmentRequest{RequestId: f.requestID, DeviceId: f.device, ExpectedAssignmentId: optionalString(f.expected), Reason: f.reason, Clear: command == "assignments clear"}
+		if !request.Clear {
+			request.Target = &adminv1.ResourceAssignmentTarget{ProfileId: f.profile, RevisionId: f.revision}
+			request.ReconcileIntervalSeconds = &seconds
+		}
+		return rpcMessage(ctx, request, client.Admin().SetResourceAssignment)
+	case "assignments get":
+		return rpcMessage(ctx, &adminv1.GetDeviceResourceStateRequest{DeviceId: f.device}, client.Admin().GetDeviceResourceState)
+	case "audit list":
+		return rpcMessage(ctx, &adminv1.ListAuditEventsRequest{PageSize: page, PageToken: f.pageToken}, client.Admin().ListAuditEvents)
+	}
+	return nil, nil
+}
+
+// protocolUint32 rejects integer representation overflow before protobuf rules
+// apply.
+func protocolUint32(value uint) (uint32, error) {
+	if uint64(value) > uint64(^uint32(0)) {
+		return 0, errors.New("integer flag cannot be represented by the protocol")
+	}
+	return uint32(value), nil
 }
 
 func optionalString(value string) *string {

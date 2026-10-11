@@ -99,7 +99,16 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 	if writable {
 		flags = unix.O_RDWR
 	}
-	fd, err := unix.Open(node.Path, flags|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	// The executor's private /dev contains only the provisioned nodes. A LUKS
+	// target is bound at its stable UUID alias (see SandboxDevices), so the
+	// boot-local kernel name lsblk reports may be absent there. The device
+	// number check below still binds whichever path opens to the selected node.
+	path := node.Path
+	fd, err := unix.Open(path, flags|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	if errors.Is(err, unix.ENOENT) && node.UUID != "" && node.UUID == target.GetLuksUuid() {
+		path = stableTargetAlias(target)
+		fd, err = unix.Open(path, flags|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +139,7 @@ func (p *Provider) openTarget(ctx context.Context, spec *agentv1.DeviceActionSpe
 			if err := file.Close(); err != nil {
 				return nil, err
 			}
-			fd, err = unix.Open(node.Path, flags|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_EXCL|unix.O_NONBLOCK, 0)
+			fd, err = unix.Open(path, flags|unix.O_CLOEXEC|unix.O_NOFOLLOW|unix.O_EXCL|unix.O_NONBLOCK, 0)
 			if err != nil {
 				return nil, err
 			}

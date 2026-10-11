@@ -197,6 +197,21 @@ RPM `gpg-pubkey` signing-key rows without an architecture are keyring entries:
 they neither match records nor make architecture coverage UNKNOWN
 ([Fedora advisory feeds](fedora.md#advisory-feeds)).
 
+## Remote assistance capability roadmap
+
+AlmaLinux and Rocky Linux each require their own desktop/portal qualification;
+neither RHEL nor Fedora evidence transfers. The
+[capability contract](../product-specification.md#remote-assistance-capabilities)
+defines consent, off/limited/on policy, role permissions and audit for all tiers.
+GNOME version, Clipboard on the existing RemoteDesktop session, FileChooser,
+notifications and reliable lock/logout observation must be probed on each release.
+Missing interfaces are explicit capability gates, not reasons to use X11/root
+capture. Clipboard, keys/layouts, display selection, messages, files, reconnect,
+recording and Tier 3 are all
+[not run](../verification.md#commercial-assistance-capability-qualification)
+for these platforms. Native scenarios must prove guest effects and digest-bound
+artifacts independently; KDE/unattended work awaits parent confirmation.
+
 ## Lab
 
 Use each vendor's pinned manifest with maintained `lab images fetch`, offline

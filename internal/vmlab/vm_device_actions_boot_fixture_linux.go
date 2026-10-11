@@ -92,6 +92,8 @@ func (s *actionBootSigner) sign(ctx context.Context, input, output string) error
 	return err
 }
 
+// actionBoundedFileWriter is not an output capture: it streams a transfer into a
+// file and hash, and must abort the SSH copy as soon as the bound is crossed.
 type actionBoundedFileWriter struct {
 	writer    io.Writer
 	remaining int64
@@ -173,6 +175,7 @@ type actionOwnedBootEvidence struct {
 	StateUUID         string             `json:"off_target_state_uuid"`
 	OriginalTarget    actionNativeTarget `json:"original_unencrypted_target"`
 	StateTarget       actionNativeTarget `json:"off_target_state_target"`
+	RedHat            *VMRedHatEvidence  `json:"redhat,omitempty"`
 }
 
 func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTarget, *actionNativeTarget, error) {
@@ -218,9 +221,30 @@ func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTar
 	return root, state, nil
 }
 
+// actionOwnedBootEntitlement carries what an unregistered vendor image needs to
+// reach its entitled repositories through the maintained hosted path.
+type actionOwnedBootEntitlement struct {
+	LabBinary       string
+	RedHatTokenFile string
+}
+
+// registerRHELOwnedBoot registers the disposable vendor guest only for the
+// owned-boot package transaction; the caller unregisters and deletes the
+// activation key before any boot conversion or device action. RPM signatures
+// are verified against the vendor keys configured by the image.
+func registerRHELOwnedBoot(ctx context.Context, vm *guestVM, entitlement actionOwnedBootEntitlement, evidence *VMRedHatEvidence) (*vmRedHatRegistration, error) {
+	if entitlement.RedHatTokenFile == "" {
+		return nil, errors.New("entitled original recovery requires -redhat-token-file: the vendor image has no repository for systemd-boot/ukify")
+	}
+	if err := uploadLifecycleProbe(ctx, vm, entitlement.LabBinary); err != nil {
+		return nil, err
+	}
+	return registerVMRedHat(ctx, vm, entitlement.RedHatTokenFile, evidence)
+}
+
 // Conversion touches only this disposable guest's ESP, fstab and private NVRAM.
 // The baseline vendor golden and host boot configuration remain unchanged.
-func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest, signer *actionBootSigner) (_ *actionOwnedBootEvidence, err error) {
+func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest, signer *actionBootSigner, entitlement actionOwnedBootEntitlement) (_ *actionOwnedBootEvidence, err error) {
 	evidence := &actionOwnedBootEvidence{SignerPEMSHA256: hex.EncodeToString(signer.certificateSHA256)}
 	root, state, err := actionOwnedCloudTargets(ctx, vm)
 	if err != nil {
@@ -232,12 +256,19 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if err != nil || release.Lab.Guest.Initrd == "" {
 		return evidence, errors.Join(fmt.Errorf("owned boot fixture requires a maintained package recipe and initramfs path for %s", release.Name), err)
 	}
-	installed, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(install), nil, 1<<20, 15*time.Minute)
-	if err != nil {
-		return evidence, err
+	var registration *vmRedHatRegistration
+	if release.Lab.Entitlement {
+		evidence.RedHat = new(VMRedHatEvidence)
+		if registration, err = registerRHELOwnedBoot(ctx, vm, entitlement, evidence.RedHat); err != nil {
+			return evidence, err
+		}
 	}
-	if installed.ExitCode != 0 {
-		return evidence, fmt.Errorf("install owned boot prerequisites: guest exit %d: %s", installed.ExitCode, installed.Stderr)
+	installed, err := vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(install), nil, 1<<20, 15*time.Minute)
+	if err == nil && installed.ExitCode != 0 {
+		err = fmt.Errorf("install owned boot prerequisites: guest exit %d: %s", installed.ExitCode, installed.Stderr)
+	}
+	if err = errors.Join(err, registration.Close()); err != nil {
+		return evidence, err
 	}
 	initial, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id; uname -r", nil, 4096, 10*time.Second)
 	if err != nil {

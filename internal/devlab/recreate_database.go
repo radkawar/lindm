@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/config"
+	"lindm/internal/labexec"
 )
 
 // Shared with initial provisioning; cluster roles already exist on recreation.
@@ -116,26 +116,15 @@ func verifyRunningPostgres(ctx context.Context, root string) error {
 	// Inspect the checkout-specific Compose container and its actual mount and
 	// published endpoint; do not trust a reachable PostgreSQL port alone.
 	format := `{{.State.Running}}|{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{range .Mounts}}{{if eq .Destination "/run/lindm-dev/postgres-password"}}{{.Source}}{{end}}{{end}}|{{range (index .NetworkSettings.Ports "5432/tcp")}}{{.HostIp}}:{{.HostPort}}{{end}}`
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", format, ProjectName(root)+"-postgres-1")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start checkout-owned PostgreSQL inspection: %w", err)
-	}
-	output, readErr := io.ReadAll(io.LimitReader(stdout, 4097))
-	if readErr != nil || len(output) > 4096 {
-		cancel()
-	}
-	if err := errors.Join(readErr, cmd.Wait()); err != nil {
+	output := nativeexec.NewBuffer(4096)
+	if err := labexec.Run(ctx, labexec.Command{Path: "docker", Args: []string{"inspect", "--format", format, ProjectName(root) + "-postgres-1"}, Stdout: output}); err != nil {
 		return fmt.Errorf("inspect checkout-owned PostgreSQL container: %w", err)
 	}
-	if len(output) > 4096 {
+	if output.Truncated() {
 		return errors.New("checkout-owned PostgreSQL inspection exceeded output limit")
 	}
 	want := "true|" + ProjectName(root) + "|postgres|" + filepath.Join(FixturePath(root), "postgres-password") + "|" + net.JoinHostPort("127.0.0.1", "15432")
-	if strings.TrimSpace(string(output)) != want {
+	if strings.TrimSpace(output.String()) != want {
 		return errors.New("running PostgreSQL container does not match this checkout's Compose project, protected secret mount and loopback port")
 	}
 	return nil
