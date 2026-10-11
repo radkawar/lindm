@@ -376,6 +376,10 @@ enable the platform's maintained online advisory feeds, complete an initial real
 refresh and wait for the enrolled device's current evaluation before printing
 "running" and the affected/accepted/unknown/clear finding counts. Missing feed
 coverage or an unknown evaluation is a gate, never an empty successful result.
+The control scenario starts its terminal in the desktop user's home, not the
+SSH provisioning user's private directory. The terminal's own shell must
+receive the remotely typed nonce; a visible terminal window alone is not proof
+that its reader started.
 Before starting either a co-located or split held `lindmd`, the fixture also
 publishes the current source build's signed APT/RPM agent packages for the guest
 architecture at its own HTTPS `/repo` endpoints. Subsequent **Enroll** commands

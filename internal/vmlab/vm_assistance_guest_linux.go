@@ -206,6 +206,12 @@ func waitAssistanceSessionUnit(ctx context.Context, vm *guestVM, desktop *labDes
 	}
 }
 
+// assistanceTerminalAtHome runs after sudo selects the desktop user's HOME.
+// Terminal clients forward their working directory to the session service;
+// the SSH user's private home is not accessible to the desktop user.
+const assistanceTerminalAtHome = `cd "$HOME"
+exec "$@"`
+
 // openAssistanceTerminal starts a terminal in the lab user's session whose
 // shell reads exactly one line into path. Only keyboard input that reaches the
 // focused window can produce the file.
@@ -217,7 +223,7 @@ func openAssistanceTerminal(ctx context.Context, vm *guestVM, desktop *labDeskto
 	terminal := argv[0]
 	reader := `IFS= read -r line && printf %s "$line" > ` + nativeQuote(path)
 	script := `rm -f ` + nativeQuote(path) + `
-setsid sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus ` + desktop.userEnv + ` ` + strings.Join(argv, " ") + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
+setsid sudo -n -H -u "$u" sh -eu -c ` + nativeQuote(assistanceTerminalAtHome) + ` sh env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus ` + desktop.userEnv + ` ` + strings.Join(argv, " ") + ` bash -c ` + nativeQuote(reader) + ` </dev/null >/dev/null 2>&1 &`
 	if _, err := vm.run(ctx, desktop.rootScript(script), nil, 4096, 30*time.Second); err != nil {
 		return "", fmt.Errorf("open %s in the lab session: %w", terminal, err)
 	}
