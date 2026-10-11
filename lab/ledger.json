@@ -1389,6 +1389,21 @@
       "verified": true,
       "scope": "GNOME Wayland assistance; all five scenarios; split controller/dgx20; Secure Boot on",
       "reference": "#routed-split-topology-assistance"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "encrypted",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-encryption-01.json",
+      "sha256": "0dfcccf1cead839012e86b2f20981cff144ff45a35261cd801ecccb8062d7dac",
+      "recorded": "2026-10-11T16:55:51.777557088Z",
+      "revision": "41bd57a0aa79d7e2afd51d0e834ea15025c68b95-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full encryption; product TPM bind; unattended cold boot; Secure Boot enforced",
+      "reference": "#ubuntu-2404-aarch64-encryption-and-tpm"
     }
   ]
 }

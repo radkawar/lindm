@@ -251,9 +251,26 @@ swtpm and virtio-blk passed two passphrase cold boots and independent LUKS-heade
 equality. `artifacts/encrypted-ubuntu2404-amd64-secureboot-20261010.json`, SHA-256
 `e21191c8b7b149299f6f51b1e7164d239271c047772ced0d8114d4a2c5e1dc69`, explicitly
 uses stock initramfs and no desktop. It does not qualify TPM-token unlock, key
-rotation, wipe, ARM or Secure Boot off. The ARM encrypted installer timeout remains
-a failed qualification attempt in [verification](../verification.md).
-Consult that document's current encryption/recovery rows for subsequent action evidence.
+rotation, wipe, ARM or Secure Boot off. The historical ARM TCG installer timeout
+remains a failed qualification attempt in [verification](../verification.md);
+the later native KVM evidence below does not turn that timeout into a pass.
+
+Ubuntu 24.04.5 **aarch64 full encryption and product TPM binding passed** on
+2026-10-11: native `dgx20` KVM, GNOME installer golden, virtio-scsi, swtpm2,
+AAVMF `qemu-efi-aarch64=2024.02-2ubuntu0.10`, **Secure Boot enforced**
+with the package-owned `AAVMF_CODE.secboot.fd` and `AAVMF_VARS.ms.fd`
+(SetupMode false). The unchanged vendor boot chain needed no replacement kernel,
+custom enrolled key or aarch64-specific product fix. Record:
+`$HOME/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-encryption-01.json`,
+SHA-256 `0dfcccf1cead839012e86b2f20981cff144ff45a35261cd801ecccb8062d7dac`.
+It proves escrow/custody and audited reveal, rotation and retired-key rejection,
+hard-crash recovery, eight authorization negatives, the signed TPM bind action,
+unattended cold boot, PCR7 mismatch refusal and revealed-key recovery.
+The [full invocation and provenance](../verification.md#ubuntu-2404-aarch64-encryption-and-tpm)
+bind source and native binary/package digests. This is the dracut TPM variant
+above, not stock `cryptsetup-initramfs` TPM unlock; physical TPM/firmware/media,
+Secure Boot off, wipe/recovery-sanitize and assistance after TPM-bound boot
+remain separate qualification.
 
 A stock Ubuntu machine without a deployment key in firmware `db` would use
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` with the grub.d flavor
