@@ -219,11 +219,8 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		// require cloud-init to configure a different one.
 		"preserve_hostname": true,
 		// Stop periodic native package mutation before taking the two truth snapshots.
-		// This changes the disposable guest only; it installs nothing. Stop before
-		// mask: "mask --now" reloads first, and systemd 259 then re-coldplugs the
-		// still-active masked timer without its Triggers= dependency and fails it
-		// ("Unit to trigger vanished", result resources), degrading Ubuntu 26.04.
-		"runcmd": []any{[]string{"sh", "-c", "for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat \"$unit\" >/dev/null 2>&1; then systemctl stop \"$unit\" && systemctl mask \"$unit\" || exit; fi; done"}},
+		// This changes the disposable guest only; it installs nothing.
+		"runcmd": []any{[]string{"sh", "-c", labQuiescePackageUnits}},
 	}
 	if h.stockAcceptance {
 		delete(config, "runcmd")
@@ -557,3 +554,13 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 	}
 	return result, nil
 }
+
+// labQuiescePackageUnits stops and masks the vendor units that refresh or
+// upgrade packages on their own, including Pop!_OS's boot-time
+// com.system76.SystemUpdater (pop-system-updater), whose apt-get held the dpkg
+// frontend lock against a lab package install. Stop before mask: "mask --now"
+// reloads first, and systemd 259 then re-coldplugs the still-active masked
+// timer without its Triggers= dependency and fails it ("Unit to trigger
+// vanished", result resources), degrading Ubuntu 26.04. A unit absent from the
+// image is skipped.
+const labQuiescePackageUnits = `for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service com.system76.SystemUpdater.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit" && systemctl mask "$unit" || exit; fi; done`

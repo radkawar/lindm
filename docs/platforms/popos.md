@@ -148,6 +148,14 @@ installation time.
   `o=pop-os-release` at priority 1001. That pin made `apt-cache policy` print
   package-file lines at a 7-column indent, which the native APT-origin oracle first
   rejected (fixed with a 1001-pin regression).
+- **System updater.** `com.system76.SystemUpdater.service` (`pop-system-updater`
+  `0.1.0~1706713830~24.04~c208318`, enabled in `multi-user.target`) runs
+  `apt-get update` as soon as it starts and every 12 hours
+  ([daemon/src/service/system.rs](https://github.com/pop-os/system-updater/blob/c208318/daemon/src/service/system.rs));
+  automatic upgrades default to off. Its boot-time refresh held the dpkg
+  frontend lock and failed a lab agent install with exit 100, so lab guests stop
+  and mask it together with `apt-daily*` (regression
+  `TestLabQuiescePackageUnitsStopsPopUpdater`).
 - **Identity.** `os-release` reports `ID=pop` with `ID_LIKE="ubuntu debian"`;
   behavior is selected by the registry row, never resemblance.
 
