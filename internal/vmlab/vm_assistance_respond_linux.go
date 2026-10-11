@@ -56,19 +56,19 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 	switch action {
 	case "screenshot":
 	case "allow", "decline", "stop":
-		img, banner, err := screen.waitBanner(ctx, 15*time.Second)
+		_, banner, err := screen.waitBanner(ctx, 15*time.Second)
 		if err != nil {
 			return "", err
 		}
 		// The consent prompt declares allow, decline; the indicator only stop.
-		point := notificationActionPoint(banner, 1, 0)
+		actions, index := 1, 0
 		switch action {
 		case "allow":
-			point = notificationActionPoint(banner, 2, 0)
+			actions = 2
 		case "decline":
-			point = notificationActionPoint(banner, 2, 1)
+			actions, index = 2, 1
 		}
-		if err := screen.click(ctx, img.Bounds(), point, action, clicks); err != nil {
+		if err := screen.clickNotificationAction(ctx, banner, actions, index, action, clicks); err != nil {
 			return "", err
 		}
 		if action == "allow" {
@@ -77,6 +77,9 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 				return "", err
 			}
 			_, control := portalControlSwitch(img, dialog)
+			if _, devices := gnome41PortalRows(img, dialog, true); devices {
+				control = true
+			}
 			if err := sharePortal(ctx, screen, img, dialog, control, clicks); err != nil {
 				return "", err
 			}
@@ -93,7 +96,8 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 			break
 		}
 		control := action == "share-control"
-		if _, found := portalControlSwitch(img, dialog); control && !found {
+		_, found := portalControlSwitch(img, dialog)
+		if _, devices := gnome41PortalRows(img, dialog, true); control && !found && !devices {
 			return "", errors.New("the open dialog is a view-only screen share; it offers no remote interaction")
 		}
 		if err := sharePortal(ctx, screen, img, dialog, control, clicks); err != nil {
@@ -121,20 +125,11 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 	return filepath.Join(evidenceDir, saved), nil
 }
 
-// sharePortal clicks Share in the open portal dialog, switching on Allow Remote
-// Interaction first when control is granted.
+// sharePortal clicks Share in the open portal dialog after granting what the
+// request needs: Allow Remote Interaction, or GNOME 41's row selections.
 func sharePortal(ctx context.Context, screen *assistanceScreen, img *image.RGBA, dialog image.Rectangle, control bool, clicks *assistanceScenarioEvidence) error {
-	if control {
-		toggle, found := portalControlSwitch(img, dialog)
-		if !found {
-			return errors.New("the open dialog is a view-only screen share; it offers no remote interaction")
-		}
-		if err := screen.click(ctx, img.Bounds(), toggle, "allow-remote-interaction", clicks); err != nil {
-			return err
-		}
-		if _, err := screen.waitSwitchOn(ctx, toggle, 10*time.Second); err != nil {
-			return err
-		}
+	if _, _, err := screen.enablePortalShare(ctx, img, dialog, control, clicks); err != nil {
+		return err
 	}
 	return screen.click(ctx, img.Bounds(), portalShareButton(dialog), "share", clicks)
 }

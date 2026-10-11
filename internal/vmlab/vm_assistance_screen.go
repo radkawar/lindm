@@ -232,6 +232,88 @@ func portalSwitchOn(img *image.RGBA, centre image.Point) bool {
 	return saturated*10 >= area.Dx()*area.Dy()*3
 }
 
+// portalRow is one GNOME 41 list row the local user must select.
+type portalRow struct {
+	name   string
+	centre image.Point
+}
+
+// gnome41PortalRows locates the selection rows of xdg-desktop-portal-gnome
+// 41's share dialogs (GNOME 40, Enterprise Linux 9). They have no "Allow
+// Remote Interaction" switch and preselect nothing: Share stays insensitive
+// until the monitor row and, in the RemoteDesktop dialog, the keyboard and
+// pointer rows are selected. The monitor list sits under the 47 px header and
+// its heading; the device list ends 32 px above the dialog edge (observed in
+// the Rocky Linux 9.8 500x402 RemoteDesktop dialog). Every row's frame lines
+// must be present, so another layout is never clicked by position.
+func gnome41PortalRows(img *image.RGBA, dialog image.Rectangle, control bool) ([]portalRow, bool) {
+	centreX := dialog.Min.X + dialog.Dx()/2
+	if !portalListFrame(img, dialog, dialog.Min.Y+122, dialog.Min.Y+170) {
+		return nil, false
+	}
+	rows := []portalRow{{"monitor", image.Pt(centreX, dialog.Min.Y+146)}}
+	if !control {
+		return rows, true
+	}
+	if !portalListFrame(img, dialog, dialog.Max.Y-129, dialog.Max.Y-81, dialog.Max.Y-33) {
+		return nil, false
+	}
+	return append(rows, portalRow{"keyboard", image.Pt(centreX, dialog.Max.Y-105)}, portalRow{"pointer", image.Pt(centreX, dialog.Max.Y-57)}), true
+}
+
+// portalListFrame reports whether a framed list spans the given border rows
+// near both dialog edges, away from row labels: each border is a mid-grey
+// line, and the dialog background shows just outside the first and last.
+func portalListFrame(img *image.RGBA, dialog image.Rectangle, borders ...int) bool {
+	for _, x := range []int{dialog.Min.X + 50, dialog.Max.X - 50} {
+		outside := []image.Point{image.Pt(x, borders[0]-3), image.Pt(x, borders[len(borders)-1]+3)}
+		for _, point := range outside {
+			if !point.In(img.Bounds()) || pixelLuma(img, point.X, point.Y) < 235 {
+				return false
+			}
+		}
+		for _, y := range borders {
+			if !image.Pt(x, y).In(img.Bounds()) {
+				return false
+			}
+			if luma := pixelLuma(img, x, y); luma < 170 || luma > 225 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// portalRowSelected reports whether a GNOME 41 list row shows the selection
+// accent beside its label; an unselected row is plain white.
+func portalRowSelected(img *image.RGBA, dialog image.Rectangle, row image.Point) bool {
+	return portalSwitchOn(img, image.Pt(dialog.Min.X+60, row.Y))
+}
+
+// portalShareSensitive reports whether the header's Share button can be
+// pressed: an accent (suggested-action) button or label text as dark as
+// Cancel's. GNOME 41 greys an insensitive Share label instead.
+func portalShareSensitive(img *image.RGBA, dialog image.Rectangle) bool {
+	darkest := func(area image.Rectangle) (int, int) {
+		minimum, saturated := 255, 0
+		area = area.Intersect(img.Bounds())
+		for y := area.Min.Y; y < area.Max.Y; y++ {
+			for x := area.Min.X; x < area.Max.X; x++ {
+				minimum = min(minimum, pixelLuma(img, x, y))
+				if pixelSaturation(img, x, y) >= 90 {
+					saturated++
+				}
+			}
+		}
+		return minimum, saturated
+	}
+	share := portalShareButton(dialog)
+	shareDarkest, shareAccent := darkest(image.Rect(share.X-26, share.Y-10, share.X+26, share.Y+10))
+	cancel := portalCancelButton(dialog)
+	cancelDarkest, _ := darkest(image.Rect(cancel.X-28, cancel.Y-10, cancel.X+28, cancel.Y+10))
+	return shareAccent*10 >= 52*20 || shareDarkest <= cancelDarkest+40
+}
+
 // centreChanged reports whether a window now covers the display centre, by
 // comparing a central square with the clean reference.
 func centreChanged(reference, current *image.RGBA) bool {

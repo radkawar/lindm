@@ -183,6 +183,76 @@ func (s *assistanceScreen) waitSwitchOn(ctx context.Context, toggle image.Point,
 	}
 }
 
+// enablePortalShare prepares the open share dialog so Share grants what the
+// request needs: Allow Remote Interaction for control on GNOME 42 and later,
+// or the monitor row and, for control, the keyboard and pointer rows of
+// GNOME 41's selection lists. It returns the capture proving the selection
+// and its evidence name, or a nil capture when the dialog needed nothing.
+func (s *assistanceScreen) enablePortalShare(ctx context.Context, img *image.RGBA, dialog image.Rectangle, control bool, scenario *assistanceScenarioEvidence) (*image.RGBA, string, error) {
+	if control {
+		if toggle, found := portalControlSwitch(img, dialog); found {
+			if err := s.click(ctx, img.Bounds(), toggle, "portal-allow-remote-interaction", scenario); err != nil {
+				return nil, "", err
+			}
+			enabled, err := s.waitSwitchOn(ctx, toggle, 10*time.Second)
+			return enabled, "portal-interaction-enabled", err
+		}
+	}
+	rows, gnome41 := gnome41PortalRows(img, dialog, control)
+	if !gnome41 || (!control && portalShareSensitive(img, dialog)) {
+		if control {
+			return nil, "", errors.New("control request opened a portal dialog without a remote interaction switch or device list")
+		}
+		return nil, "", nil
+	}
+	selected, err := s.selectPortalRows(ctx, img, dialog, rows, scenario)
+	if err != nil {
+		return nil, "", err
+	}
+	if !portalShareSensitive(selected, dialog) {
+		return selected, "", errors.New("portal Share stayed insensitive after selecting its rows")
+	}
+	return selected, "portal-rows-selected", nil
+}
+
+// selectPortalRows selects each GNOME 41 list row that is not yet selected,
+// confirming every click by the row's selection accent, and returns the final
+// capture of the dialog.
+func (s *assistanceScreen) selectPortalRows(ctx context.Context, img *image.RGBA, dialog image.Rectangle, rows []portalRow, scenario *assistanceScenarioEvidence) (*image.RGBA, error) {
+	for _, row := range rows {
+		if portalRowSelected(img, dialog, row.centre) {
+			continue
+		}
+		if err := s.click(ctx, img.Bounds(), row.centre, "portal-select-"+row.name, scenario); err != nil {
+			return nil, err
+		}
+		var err error
+		if img, err = s.waitRowSelected(ctx, dialog, row, 10*time.Second); err != nil {
+			return nil, err
+		}
+	}
+	return img, nil
+}
+
+func (s *assistanceScreen) waitRowSelected(ctx context.Context, dialog image.Rectangle, row portalRow, timeout time.Duration) (*image.RGBA, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		img, err := s.vm.screendump(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if portalRowSelected(img, dialog, row.centre) {
+			return img, nil
+		}
+		select {
+		case <-ctx.Done():
+			return img, fmt.Errorf("portal %s row was not selected: %w", row.name, ctx.Err())
+		case <-time.After(screenPollInterval):
+		}
+	}
+}
+
 // waitCentreWindow waits for a window covering the display centre.
 func (s *assistanceScreen) waitCentreWindow(ctx context.Context, timeout time.Duration) (*image.RGBA, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -213,6 +283,51 @@ func (s *assistanceScreen) click(ctx context.Context, display image.Rectangle, p
 	}
 	scenario.Clicks = append(scenario.Clicks, assistanceClickEvidence{Target: target, X: point.X, Y: point.Y})
 	return s.vm.pointerMove(ctx, display, parkPoint(display))
+}
+
+// clickNotificationAction clicks action index of a banner declaring actions
+// actions once the pointer rests on it. The hovered banner is located again
+// first: if GNOME redrew it at other bounds under the pointer, the point
+// follows the new bounds until they hold, and the first moved frame is kept
+// as evidence. A click computed from stale bounds would land on the banner
+// body, which GNOME treats as activation and closes the notification without
+// an action (rocky102-arm64-dgx20-assistance-03/-05 ended prompt_dismissed).
+func (s *assistanceScreen) clickNotificationAction(ctx context.Context, banner image.Rectangle, actions, index int, target string, scenario *assistanceScenarioEvidence) error {
+	point := notificationActionPoint(banner, actions, index)
+	if err := s.waitPointerHover(ctx, point, target); err != nil {
+		return err
+	}
+	for attempt := 0; ; attempt++ {
+		hovered, err := s.vm.screendump(ctx)
+		if err != nil {
+			return err
+		}
+		current, found := locateNotificationBanner(s.reference, hovered)
+		if found && current == banner {
+			if err := s.vm.pointerClick(ctx, hovered.Bounds(), point, "left"); err != nil {
+				return fmt.Errorf("click %s: %w", target, err)
+			}
+			scenario.Clicks = append(scenario.Clicks, assistanceClickEvidence{Target: target, X: point.X, Y: point.Y})
+			return s.vm.pointerMove(ctx, hovered.Bounds(), parkPoint(hovered.Bounds()))
+		}
+		if attempt == 0 {
+			if _, err := s.save(fmt.Sprintf("banner-moved-%s-%d", target, time.Now().Unix()), hovered); err != nil {
+				return err
+			}
+		}
+		if !found || attempt == 3 {
+			return fmt.Errorf("notification banner did not hold still under the pointer for %s (last %v, found %t)", target, current, found)
+		}
+		banner, point = current, notificationActionPoint(current, actions, index)
+		if err := s.vm.pointerMove(ctx, hovered.Bounds(), point); err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(screenPollInterval):
+		}
+	}
 }
 
 func (s *assistanceScreen) waitPointerHover(ctx context.Context, point image.Point, target string) error {

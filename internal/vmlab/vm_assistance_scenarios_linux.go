@@ -164,12 +164,12 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	}
 	// The prompt's actions are declared allow, decline.
 	if spec.cause == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED && !spec.portalCancel {
-		if err := r.screen.click(ctx, prompt.Bounds(), notificationActionPoint(banner, 2, 1), "consent-decline", scenario); err != nil {
+		if err := r.screen.clickNotificationAction(ctx, banner, 2, 1, "consent-decline", scenario); err != nil {
 			return err
 		}
 		return r.finish(ctx, spec, scenario, false)
 	}
-	if err := r.screen.click(ctx, prompt.Bounds(), notificationActionPoint(banner, 2, 0), "consent-allow", scenario); err != nil {
+	if err := r.screen.clickNotificationAction(ctx, banner, 2, 0, "consent-allow", scenario); err != nil {
 		return err
 	}
 	portal, dialog, err := r.screen.waitDialog(ctx, 45*time.Second)
@@ -185,21 +185,12 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		}
 		return r.finish(ctx, spec, scenario, false)
 	}
-	if control {
-		toggle, found := portalControlSwitch(portal, dialog)
-		if !found {
-			return errors.New("control request opened a portal dialog without a remote interaction switch")
-		}
-		if err := r.screen.click(ctx, portal.Bounds(), toggle, "portal-allow-remote-interaction", scenario); err != nil {
-			return err
-		}
-		enabled, err := r.screen.waitSwitchOn(ctx, toggle, 10*time.Second)
-		if err != nil {
-			return err
-		}
-		if err := r.guestScreenshot(scenario, "portal-interaction-enabled", enabled); err != nil {
-			return err
-		}
+	prepared, evidenceName, err := r.screen.enablePortalShare(ctx, portal, dialog, control, scenario)
+	if prepared != nil && evidenceName != "" {
+		err = errors.Join(err, r.guestScreenshot(scenario, evidenceName, prepared))
+	}
+	if err != nil {
+		return err
 	}
 	if err := r.screen.click(ctx, portal.Bounds(), portalShareButton(dialog), "portal-share", scenario); err != nil {
 		return err
@@ -250,7 +241,7 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		if err := r.guestScreenshot(scenario, "indicator", indicator); err != nil {
 			return err
 		}
-		if err := r.screen.click(ctx, indicator.Bounds(), notificationActionPoint(banner, 1, 0), "indicator-stop", scenario); err != nil {
+		if err := r.screen.clickNotificationAction(ctx, banner, 1, 0, "indicator-stop", scenario); err != nil {
 			return err
 		}
 	case agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED:

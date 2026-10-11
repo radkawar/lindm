@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"slices"
 	"testing"
 )
 
@@ -270,5 +271,113 @@ func TestGNOME43PortalSwitchFollowsMonitorList(t *testing.T) {
 	}
 	if toggle, hasSwitch := portalControlSwitch(view, dialog); hasSwitch {
 		t.Fatalf("GNOME 43 ScreenCast dialog reported a switch at %v", toggle)
+	}
+}
+
+// syntheticGNOME41Dialog draws xdg-desktop-portal-gnome 41's share dialog as
+// observed on Rocky Linux 9.8 (rocky98-arm64-dgx20-assistance-01): a 47 px
+// header whose Share label is greyed while nothing is selected, a framed
+// monitor list under its heading and, in the RemoteDesktop dialog, a framed
+// keyboard/pointer list ending 32 px above the edge. Selected rows show the
+// Adwaita accent.
+func syntheticGNOME41Dialog(wallpaper color.RGBA, dialog image.Rectangle, control bool, selected map[string]bool, shareSensitive bool) *image.RGBA {
+	img := syntheticDialogFrame(wallpaper, dialog)
+	background, border, row, accent := color.RGBA{245, 245, 245, 0xff}, color.RGBA{200, 200, 200, 0xff}, color.RGBA{255, 255, 255, 0xff}, color.RGBA{53, 132, 228, 0xff}
+	fill(img, image.Rect(dialog.Min.X+10, dialog.Min.Y+47, dialog.Max.X-10, dialog.Max.Y-10), background)
+	fill(img, image.Rect(dialog.Min.X+28, dialog.Min.Y+17, dialog.Min.X+64, dialog.Min.Y+27), color.RGBA{50, 50, 50, 0xff})
+	label := color.RGBA{148, 148, 148, 0xff}
+	if shareSensitive {
+		label = color.RGBA{50, 50, 50, 0xff}
+	}
+	fill(img, image.Rect(dialog.Max.X-62, dialog.Min.Y+17, dialog.Max.X-26, dialog.Min.Y+27), label)
+	list := func(borders []int, names []string) {
+		for i, name := range names {
+			interior := row
+			if selected[name] {
+				interior = accent
+			}
+			fill(img, image.Rect(dialog.Min.X+32, borders[i], dialog.Max.X-32, borders[i+1]), interior)
+			fill(img, image.Rect(dialog.Min.X+dialog.Dx()/2-40, (borders[i]+borders[i+1])/2-6, dialog.Min.X+dialog.Dx()/2+40, (borders[i]+borders[i+1])/2+6), color.RGBA{30, 30, 30, 0xff})
+		}
+		for _, y := range borders {
+			fill(img, image.Rect(dialog.Min.X+32, y, dialog.Max.X-32, y+1), border)
+		}
+	}
+	list([]int{dialog.Min.Y + 122, dialog.Min.Y + 170}, []string{"monitor"})
+	if control {
+		list([]int{dialog.Max.Y - 129, dialog.Max.Y - 81, dialog.Max.Y - 33}, []string{"keyboard", "pointer"})
+	}
+	return img
+}
+
+// rocky98-arm64-dgx20-assistance-01 stopped at "control request opened a
+// portal dialog without a remote interaction switch": GNOME 40's portal asks
+// for a monitor and device rows instead, and its Share stays insensitive until
+// they are selected. Row centres are the measured Rocky Linux 9.8 ones.
+func TestGNOME41PortalRowsSelectEveryGrant(t *testing.T) {
+	wallpaper, bounds := color.RGBA{20, 40, 80, 0xff}, image.Rect(390, 215, 890, 617)
+	control := syntheticGNOME41Dialog(wallpaper, bounds, true, nil, false)
+	dialog, found := locatePortalDialog(control)
+	if !found || dialog.Min.X != bounds.Min.X || dialog.Max.X != bounds.Max.X {
+		t.Fatalf("GNOME 41 RemoteDesktop dialog = %v %t, want ~%v", dialog, found, bounds)
+	}
+	dialog = bounds
+	if toggle, found := portalControlSwitch(control, dialog); found {
+		t.Fatalf("GNOME 41 dialog reported a remote interaction switch at %v", toggle)
+	}
+	rows, ok := gnome41PortalRows(control, dialog, true)
+	want := []portalRow{{"monitor", image.Pt(640, 361)}, {"keyboard", image.Pt(640, 512)}, {"pointer", image.Pt(640, 560)}}
+	if !ok || !slices.Equal(rows, want) {
+		t.Fatalf("GNOME 41 rows = %v %t, want %v", rows, ok, want)
+	}
+	if portalShareSensitive(control, dialog) {
+		t.Fatal("greyed Share reported sensitive")
+	}
+	for _, row := range rows {
+		if portalRowSelected(control, dialog, row.centre) {
+			t.Fatalf("unselected %s row reported selected", row.name)
+		}
+	}
+	chosen := syntheticGNOME41Dialog(wallpaper, bounds, true, map[string]bool{"monitor": true, "keyboard": true, "pointer": true}, true)
+	if rows, ok := gnome41PortalRows(chosen, dialog, true); !ok || len(rows) != 3 {
+		t.Fatalf("selected rows no longer located: %v %t", rows, ok)
+	}
+	for _, row := range rows {
+		if !portalRowSelected(chosen, dialog, row.centre) {
+			t.Fatalf("selected %s row reported unselected", row.name)
+		}
+	}
+	if !portalShareSensitive(chosen, dialog) {
+		t.Fatal("dark Share label reported insensitive")
+	}
+	view := syntheticGNOME41Dialog(wallpaper, image.Rect(390, 300, 890, 560), false, nil, false)
+	if rows, ok := gnome41PortalRows(view, image.Rect(390, 300, 890, 560), false); !ok || !slices.Equal(rows, []portalRow{{"monitor", image.Pt(640, 446)}}) {
+		t.Fatalf("GNOME 41 ScreenCast monitor row = %v %t", rows, ok)
+	}
+	if _, ok := gnome41PortalRows(view, image.Rect(390, 300, 890, 560), true); ok {
+		t.Fatal("ScreenCast dialog reported keyboard and pointer rows")
+	}
+}
+
+// Newer portals keep their switch flow: their dialogs never match the GNOME 41
+// row frames, and their Share is sensitive without a selection.
+func TestGNOME41PortalRowsRejectNewerDialogs(t *testing.T) {
+	for name, img := range map[string]*image.RGBA{
+		"gnome46-control": syntheticPortalDialog(color.RGBA{60, 20, 50, 0xff}, image.Rect(343, 166, 1003, 666), false),
+		"gnome43-control": syntheticGNOME43Dialog(color.RGBA{0, 80, 90, 0xff}, image.Rect(390, 266, 890, 566), true, false),
+		"gnome43-view":    syntheticGNOME43Dialog(color.RGBA{0, 80, 90, 0xff}, image.Rect(390, 300, 890, 513), false, false),
+	} {
+		dialog, found := locatePortalDialog(img)
+		if !found {
+			t.Fatalf("%s: dialog not located", name)
+		}
+		for _, control := range []bool{false, true} {
+			if rows, ok := gnome41PortalRows(img, dialog, control); ok {
+				t.Errorf("%s: GNOME 41 rows %v located in a newer dialog", name, rows)
+			}
+		}
+		if !portalShareSensitive(img, dialog) {
+			t.Errorf("%s: Share reported insensitive", name)
+		}
 	}
 }
