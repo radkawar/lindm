@@ -1746,6 +1746,7 @@ after the sysctl lane's and firewall lane's real reboots. Records are under
 | RHEL 9.8 aarch64, registered (dgx21)              | `rhel98-arm64-dgx21-allkinds-g3.json`     | 73/73, eight kinds | `0ef046228e7cb999c3fb6dd2d43b27236a0b0a081cd5eca86f23b21a029c21f4` |
 | AlmaLinux 9.8 aarch64 (dgx20)                     | `alma98-arm64-dgx20-allkinds-g3.json`     | 73/73, eight kinds | `38bd4629131f2433869bcd190de19e3d211129f471c8b415fbaebe41e593f1c0` |
 | Ubuntu 24.04 x86_64 (local; firewall not in lane) | `ubuntu2404-amd64-local-allkinds-g1.json` | 59/59, seven kinds | `0f31861443b7e7256f7d262c59933a7c013fd042106cc1859926899bcb545fc7` |
+| Ubuntu 24.04 x86_64 (local), firewall only        | `ubuntu2404-amd64-local-firewall-g5.json` | 13/13, firewall    | `ae3766950c7a4d3115c294c7387efc0aca888b0fc19d28611bb24d6664484d7c` |
 
 The RHEL record's Red Hat block reports all five registration and cleanup
 outcomes true (run `lindm-lab-25119be2e02e805e01bcee0b5dc201b7`, consumer
@@ -1756,8 +1757,14 @@ AlmaLinux record was copied from the retained remote run directory
 (`dgx20:/home/r/lindm-lab/runs/run-biS1hilutM/records/record`) after the
 controller's SSH session to dgx20 dropped at the end of the lane; the remote
 lane had completed and written it, but its `lab_host` provenance block is
-therefore absent. The Ubuntu x86_64 lane ran the seven host-local kinds; the
-firewall kind needs a second x86_64 guest for its probe peer.
+therefore absent. The Ubuntu x86_64 all-kinds lane ran the seven host-local
+kinds; the firewall kind, which needs a second x86_64 guest for its probe peer,
+ran separately from a snapshot of shared revision `681e7ef` after first-come,
+all-or-nothing lab admission landed (its first attempt held one local slot
+while waiting for the second, the hold-and-wait deadlock described in
+[engineering](engineering.md)). It passed all 13 firewall scenarios with UFW
+active, including the real quarantine action, drift refusals, reboot restore
+and the helper-killed crash boundary.
 
 Two lane defects were found by these combined runs and fixed before the
 records. First (`*-allkinds-f1.json`), the signed fixture repository was a
