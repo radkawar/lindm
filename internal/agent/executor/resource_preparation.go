@@ -191,7 +191,7 @@ func (s *Service) checkResourcePreparation(ctx context.Context, loaded *bound, r
 	if s.now().Before(record.GetAcceptedAt().AsTime()) || !s.now().Before(record.GetIntent().GetPreparation().GetDeadline().AsTime()) {
 		return s.endResourcePreparation(ctx, loaded, record, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED)
 	}
-	if _, err := s.currentResourceIntent(ctx, loaded, record.GetIntentEnvelope()); err != nil {
+	if _, err := resourceAction.current(ctx, s, loaded, record.GetIntentEnvelope()); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

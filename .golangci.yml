@@ -8,6 +8,8 @@ linters:
     - bodyclose
     - sqlclosecheck
     - depguard
+    # Copied code is extracted into a shared abstraction, never duplicated.
+    - dupl
     - funlen
   settings:
     depguard:
@@ -151,12 +153,6 @@ linters:
       - path: '(^|/)internal/device/device_action_recovery_start\.go$'
         text: "Function 'AuthorizeRecoveryStart' is too long"
         linters: [funlen]
-      - path: '(^|/)internal/device/device_action_result\.go$'
-        text: "Function 'ReportDeviceActionResult' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/device_action_start\.go$'
-        text: "Function 'AuthorizeDeviceActionStart' is too long"
-        linters: [funlen]
       - path: '(^|/)internal/device/offline_enrollment\.go$'
         text: "Function 'CreateOfflineEnrollmentAuthorization' is too long"
         linters: [funlen]
@@ -171,12 +167,6 @@ linters:
         linters: [funlen]
       - path: '(^|/)internal/device/resource_dispatch\.go$'
         text: "Function 'getResourceWork' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/resource_result\.go$'
-        text: "Function 'ReportResourceResult' is too long"
-        linters: [funlen]
-      - path: '(^|/)internal/device/resource_start\.go$'
-        text: "Function 'AuthorizeResourceStart' is too long"
         linters: [funlen]
       - path: '(^|/)internal/device/service\.go$'
         text: "Function 'New' is too long"

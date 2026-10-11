@@ -3,17 +3,12 @@ package device
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
-	"math/big"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
@@ -28,258 +23,234 @@ import (
 )
 
 func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request[devicev1.ReportResourceResultRequest]) (*connect.Response[devicev1.ReportResourceResultResponse], error) {
-	ctx, cancel := bound(ctx)
-	defer cancel()
-	principal, ok := devicePrincipalFromContext(ctx)
-	if !ok {
-		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
+	k := &resourceResult{}
+	if req != nil && req.Msg != nil {
+		k.cancellation = req.Msg.GetNeverPrepared()
 	}
-	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
-		return nil, invalid("invalid_service_result_request")
-	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	st, err := reportSignedResult(ctx, s, message(req), k)
 	if err != nil {
-		return nil, mapErr(err)
+		return nil, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	if err := s.targeting.Lock(ctx, tx); err != nil {
-		return nil, mapErr(err)
+	return noStore(&devicev1.ReportResourceResultResponse{Closed: st.closed}), nil
+}
+
+type resourceResultState = resultState[*agentv1.ResourceExecutionStatus, *agentv1.ResourceExecutionAttestation]
+
+// resourceResult is the resource half of result admission: the exact desired
+// resource binding, staged preparation, release and disposition bookkeeping.
+// A late report for an older action retains its evidence without overwriting
+// a newer lease's disposition.
+type resourceResult struct {
+	cancellation *devicev1.ResourcePreparationCancellation
+	action       devicedb.ResourceAction
+	intent       *agentv1.ResourceExecutionIntent
+	prior        *agentv1.ResourceExecutionStatus
+}
+
+var (
+	_ resultKind[*agentv1.ResourceExecutionStatus, *agentv1.ResourceExecutionAttestation]      = (*resourceResult)(nil)
+	_ resultLocker[*agentv1.ResourceExecutionStatus, *agentv1.ResourceExecutionAttestation]    = (*resourceResult)(nil)
+	_ resultPreflight[*agentv1.ResourceExecutionStatus, *agentv1.ResourceExecutionAttestation] = (*resourceResult)(nil)
+	_ resultRepeat[*agentv1.ResourceExecutionStatus, *agentv1.ResourceExecutionAttestation]    = (*resourceResult)(nil)
+)
+
+func (*resourceResult) reasons() signedReasons { return resourceReasons }
+
+func (*resourceResult) newAttestation() *agentv1.ResourceExecutionAttestation {
+	return new(agentv1.ResourceExecutionAttestation)
+}
+
+func (*resourceResult) lock(ctx context.Context, s *Service, st *resourceResultState) error {
+	return mapErr(s.targeting.Lock(ctx, st.tx))
+}
+
+func (k *resourceResult) lockAction(ctx context.Context, _ *Service, st *resourceResultState) (signedRow, error) {
+	if _, err := st.q.LockResourceAssignment(ctx, st.principal.GenerationID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return signedRow{}, mapErr(err)
 	}
-	q := devicedb.New(tx)
-	device, err := s.lockAuthority(ctx, q, principal)
-	if err != nil {
-		return nil, mapErr(err)
+	var err error
+	if k.action, err = st.q.LockResourceAction(ctx, st.id); err != nil {
+		return signedRow{}, mapErr(err)
 	}
-	if uint64(device.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
-		return nil, mapErr(errSessionFenced)
+	if err := st.q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{ID: st.principal.DeviceID, LastSeenAt: timestamptz(st.now)}); err != nil {
+		return signedRow{}, mapErr(err)
 	}
-	if _, err := q.LockResourceAssignment(ctx, principal.GenerationID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, mapErr(err)
+	return resourceRow(k.action), nil
+}
+
+func (k *resourceResult) preflight(ctx context.Context, s *Service, st *resourceResultState) (bool, error) {
+	if k.cancellation == nil {
+		return false, nil
 	}
-	id, _ := uuid.Parse(req.Msg.GetActionId())
-	action, err := q.LockResourceAction(ctx, id)
-	if err != nil {
-		return nil, mapErr(err)
+	if _, err := s.reportNeverPreparedResource(ctx, st.tx, st.q, k.action, k.cancellation, st.now); err != nil {
+		return true, err
 	}
-	now, err := dispatchClock(ctx, q)
-	if err != nil {
-		return nil, mapErr(err)
+	st.closed = true
+	return true, nil
+}
+
+func (*resourceResult) verifyAttestation(ctx context.Context, s *Service, st *resourceResultState, binding *trust.ResourceAttestationBinding) (*agentv1.ResourceExecutionAttestation, error) {
+	return s.authority.VerifyResourceAttestation(ctx, st.envelope, st.certificate, s.ca, binding, st.now, trust.MaxDeviceClockSkew)
+}
+
+// sameRevision lets independent staging authenticate the identical pending
+// revision with a fresh nonce, never changed history or refreshed native proof.
+func (k *resourceResult) sameRevision(st *resourceResultState) (bool, error) {
+	if err := k.decodePrior(st); err != nil {
+		return false, err
 	}
-	if !enrollmentIssuanceResumable(device.certificate, now) {
-		return nil, mapErr(errCertificateRejected)
+	return k.prior != nil && proto.Equal(k.prior, st.attestation.GetStatus()), nil
+}
+
+func (k *resourceResult) decodePrior(st *resourceResultState) error {
+	if k.prior != nil || st.attestation.GetStatus().GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING || len(k.action.StatusDocument) == 0 {
+		return nil
 	}
-	if err := q.TouchDeviceLastSeen(ctx, devicedb.TouchDeviceLastSeenParams{ID: principal.DeviceID, LastSeenAt: timestamptz(now)}); err != nil {
-		return nil, mapErr(err)
+	k.prior = new(agentv1.ResourceExecutionStatus)
+	if err := proto.Unmarshal(k.action.StatusDocument, k.prior); err != nil {
+		return mapErr(errInternalState)
 	}
-	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_action_binding_rejected")
+	return nil
+}
+
+func (k *resourceResult) admit(ctx context.Context, _ *Service, st *resourceResultState) error {
+	if err := k.decodePrior(st); err != nil {
+		return err
 	}
-	if cancellation := req.Msg.GetNeverPrepared(); cancellation != nil {
-		return s.reportNeverPreparedResource(ctx, tx, q, action, cancellation, now)
+	status := st.attestation.GetStatus()
+	k.intent = new(agentv1.ResourceExecutionIntent)
+	if err := proto.Unmarshal(k.action.IntentDocument, k.intent); err != nil {
+		return mapErr(errInternalState)
 	}
-	block, rest := pem.Decode(req.Msg.GetCertificatePem())
-	if block == nil || block.Type != "CERTIFICATE" || len(bytes.TrimSpace(rest)) != 0 {
-		return nil, mapErr(errCertificateRejected)
+	if err := resourceResultBinding(k.intent, status); err != nil {
+		return rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 	}
-	leaf, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, mapErr(errCertificateRejected)
+	if _, err := resourceActionHead(k.action, k.intent); err != nil {
+		return mapErr(err)
 	}
-	fingerprint := sha256.Sum256(leaf.Raw)
-	certificate, err := q.GetCertificateByFingerprint(ctx, fingerprint[:])
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, mapErr(errCertificateRejected)
-		}
-		return nil, mapErr(err)
+	if err := requireReleaseBinding(ctx, st.q, k.action, k.intent); err != nil {
+		return err
 	}
-	// The CA signature alone is insufficient: only a registered, non-revoked
-	// certificate for this generation can attest, including during renewal overlap.
-	if certificate.DeviceID != principal.DeviceID || certificate.GenerationID != principal.GenerationID || now.Before(certificate.NotBefore.Time) || !now.Before(certificate.NotAfter.Time) || (certificate.Status != "active" && (certificate.Status != "overlapping" || !certificate.OverlapUntil.Valid || !now.Before(certificate.OverlapUntil.Time))) {
-		return nil, mapErr(errCertificateRejected)
+	granted := len(k.action.StartGrantEnvelope) != 0
+	preparing := status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING || status.GetPreparationOutcome() != nil
+	if granted && (status.GetReadOnly() || status.GetAdmissionRefusal() != nil || preparing) {
+		return rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 	}
-	if bytes.Equal(action.AttestationEnvelope, req.Msg.GetAttestationEnvelope()) && bytes.Equal(action.AttestationCertificate, req.Msg.GetCertificatePem()) {
-		// This exact evidence was already cryptographically admitted. Consumed nonce
-		// and subsequent wall-clock expiry cannot make a lost response non-idempotent.
-		public, ok := leaf.PublicKey.(ed25519.PublicKey)
-		if !ok {
-			return nil, mapErr(errCertificateRejected)
-		}
-		accepted := new(agentv1.ResourceExecutionAttestation)
-		if err := s.authority.Verify(ctx, action.AttestationEnvelope, accepted, 1, public); err != nil || accepted.GetSessionEpoch() != req.Msg.GetSessionEpoch() {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_rejected")
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return nil, mapErr(err)
-		}
-		return noStore(&devicev1.ReportResourceResultResponse{Closed: action.ClosedAt.Valid}), nil
+	if preparing && k.prior != nil && k.prior.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+		return resourceReasons.resultConflict.err()
 	}
-	if len(action.ResultNonce) != 32 || !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_nonce_rejected")
+	if k.action.ClosedAt.Valid && !resourceExecutionTerminal(status.GetState()) {
+		return resourceReasons.resultConflict.err()
 	}
-	binding := &trust.ResourceAttestationBinding{DeploymentID: s.deploymentID, DeviceID: principal.DeviceID, EnrollmentGeneration: principal.GenerationID, SessionEpoch: req.Msg.GetSessionEpoch(), ActionID: id, IntentSHA256: sha256.Sum256(action.IntentEnvelope)}
-	copy(binding.Nonce[:], action.ResultNonce)
-	attestation, err := s.authority.VerifyResourceAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), s.ca, binding, now, trust.MaxDeviceClockSkew)
-	if errors.Is(err, trust.ErrDeviceClockSkew) {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
-	}
-	if err != nil {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_rejected")
-	}
-	previous, err := resourceActionRevision(action)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	status := attestation.GetStatus()
-	var priorPreparation *agentv1.ResourceExecutionStatus
-	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING && len(action.StatusDocument) != 0 {
-		priorPreparation = new(agentv1.ResourceExecutionStatus)
-		if err := proto.Unmarshal(action.StatusDocument, priorPreparation); err != nil {
-			return nil, mapErr(errInternalState)
-		}
-	}
-	// Independent staging need not mutate the journal every cycle. A fresh
-	// nonce may authenticate the identical pending revision, never changed
-	// history or refreshed native proof. All other states remain increasing.
-	if attestation.GetActionRevision() < previous ||
-		(attestation.GetActionRevision() == previous && (priorPreparation == nil || !proto.Equal(priorPreparation, status))) {
-		return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
-	}
-	intent := new(agentv1.ResourceExecutionIntent)
-	if err := proto.Unmarshal(action.IntentDocument, intent); err != nil {
-		return nil, mapErr(errInternalState)
-	}
-	if err := resourceResultBinding(intent, status); err != nil {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
-	}
-	if _, err := resourceActionHead(action, intent); err != nil {
-		return nil, mapErr(err)
-	}
-	if action.ReleaseID != nil {
-		release, err := q.GetResourceRelease(ctx, *action.ReleaseID)
-		if err != nil {
-			return nil, mapErr(err)
-		}
-		if err := validateReleaseAction(release, action, intent); err != nil {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_release_binding_rejected")
-		}
-	}
-	if (status.GetReadOnly() || status.GetAdmissionRefusal() != nil) && len(action.StartGrantEnvelope) != 0 {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
+	return nil
+}
+
+func (k *resourceResult) persist(ctx context.Context, s *Service, st *resourceResultState, document []byte) error {
+	status, now := st.attestation.GetStatus(), st.now
+	if err := st.q.SetResourceResult(ctx, devicedb.SetResourceResultParams{ID: st.id, ActionRevision: actionRevision(st.attestation.GetActionRevision()), AttestationEnvelope: st.envelope, AttestationCertificate: st.certificate, StatusDocument: document, AttestedAt: timestamptz(st.attestation.GetIssuedAt().AsTime()), ReceivedAt: timestamptz(now)}); err != nil {
+		return mapErr(err)
 	}
 	terminal := resourceExecutionTerminal(status.GetState())
-	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING || status.GetPreparationOutcome() != nil {
-		if len(action.StartGrantEnvelope) != 0 {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
-		}
-		if priorPreparation != nil && priorPreparation.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
-			return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
-		}
-	}
-	if action.ClosedAt.Valid && !terminal {
-		return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
-	}
-	encoded, err := proto.Marshal(status)
-	if err != nil {
-		return nil, mapErr(err)
-	}
-	if err := q.SetResourceResult(ctx, devicedb.SetResourceResultParams{ID: id, ActionRevision: pgtype.Numeric{Int: new(big.Int).SetUint64(attestation.GetActionRevision()), Valid: true}, AttestationEnvelope: req.Msg.GetAttestationEnvelope(), AttestationCertificate: req.Msg.GetCertificatePem(), StatusDocument: encoded, AttestedAt: timestamptz(attestation.GetIssuedAt().AsTime()), ReceivedAt: timestamptz(now)}); err != nil {
-		return nil, mapErr(err)
-	}
-	disposition, reason := int16(2), action.ClosedReason
+	st.closed = terminal || k.action.ClosedAt.Valid
+	disposition, reason := int16(2), k.action.ClosedReason
 	if terminal {
-		closedReason := action.ClosedReason
+		closedReason := k.action.ClosedReason
 		if closedReason == "" {
 			closedReason = "result"
 		}
-		if err := q.CloseResourceAction(ctx, devicedb.CloseResourceActionParams{ID: id, ClosedAt: timestamptz(now), ClosedReason: closedReason}); err != nil {
-			return nil, mapErr(err)
+		if err := st.q.CloseResourceAction(ctx, devicedb.CloseResourceActionParams{ID: st.id, ClosedAt: timestamptz(now), ClosedReason: closedReason}); err != nil {
+			return mapErr(err)
 		}
-		switch {
-		case status.GetAdmissionRefusal() != nil:
-			disposition, reason = 6, "native_unsupported"
-			if status.GetAdmissionRefusal().GetReason() == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION {
-				disposition, reason = 5, "admission_precondition"
+		disposition, reason = resourceResultDisposition(status)
+	}
+	if k.action.ReleaseID != nil {
+		return k.settleRelease(ctx, st, terminal)
+	}
+	return k.settleAssignment(ctx, s, st, disposition, reason)
+}
+
+// resourceResultDisposition classifies terminal evidence for the assignment.
+func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, string) {
+	switch {
+	case status.GetAdmissionRefusal() != nil:
+		if status.GetAdmissionRefusal().GetReason() == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION {
+			return 5, "admission_precondition"
+		}
+		return 6, "native_unsupported"
+	case status.GetReadOnly() && status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE:
+		// A successful release acknowledgment is not proof of the active
+		// desired state, including when old converged evidence still exists.
+		return 5, "not_applicable"
+	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED:
+		return 3, ""
+	case (status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED) && status.GetStartedAt() == nil:
+		return 1, "no_effect"
+	case status.GetReadOnly():
+		if status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNKNOWN {
+			return 4, "verification_unknown"
+		}
+		return 4, "verification_drifted"
+	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED && status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY && status.GetStartedAt() == nil:
+		// Another native frontend owned the package database; nothing
+		// changed. The hold is retried after the reconcile interval.
+		return 5, resourceReasonNativeBusy
+	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN:
+		return 4, "outcome_unknown"
+	default:
+		return 4, "execution_failed"
+	}
+}
+
+func (k *resourceResult) settleRelease(ctx context.Context, st *resourceResultState, terminal bool) error {
+	latest, err := st.q.LatestResourceReleaseAction(ctx, k.action.ReleaseID)
+	if err != nil {
+		return mapErr(err)
+	}
+	if !terminal || latest.ID != k.action.ID {
+		return nil
+	}
+	state, reason := releaseResultState(st.attestation.GetStatus())
+	completed := pgtype.Timestamptz{}
+	if state == "released" {
+		completed = timestamptz(st.now)
+	}
+	return mapErr(st.q.SetResourceReleaseState(ctx, devicedb.SetResourceReleaseStateParams{ID: *k.action.ReleaseID, State: state, Reason: reason, CompletedAt: completed}))
+}
+
+// settleAssignment records the disposition only for the latest action of the
+// assigned resource, then execution health and read-only success retention.
+func (k *resourceResult) settleAssignment(ctx context.Context, s *Service, st *resourceResultState, disposition int16, reason string) error {
+	status, action := st.attestation.GetStatus(), k.action
+	latest, err := st.q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID})
+	if err != nil {
+		return mapErr(err)
+	}
+	if latest.ID == action.ID {
+		if reason == resourceReasonNativeBusy {
+			if err := st.q.HoldResource(ctx, devicedb.HoldResourceParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Reason: reason, ObservedAt: timestamptz(st.now)}); err != nil {
+				return mapErr(err)
 			}
-		case status.GetReadOnly() && status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE:
-			// A successful release acknowledgment is not proof of the active
-			// desired state, including when old converged evidence still exists.
-			disposition, reason = 5, "not_applicable"
-		case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED:
-			disposition, reason = 3, ""
-		case (status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED || status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED) && status.GetStartedAt() == nil:
-			disposition, reason = 1, "no_effect"
-		case status.GetReadOnly():
-			disposition, reason = 4, "verification_drifted"
-			if status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNKNOWN {
-				reason = "verification_unknown"
-			}
-		case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED && status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY && status.GetStartedAt() == nil:
-			// Another native frontend owned the package database; nothing
-			// changed. The hold is retried after the reconcile interval.
-			disposition, reason = 5, resourceReasonNativeBusy
-		default:
-			disposition, reason = 4, "execution_failed"
-			if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
-				reason = "outcome_unknown"
+		} else if err := st.q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
+			return mapErr(err)
+		}
+		if disposition == 3 {
+			if err := st.q.SetAssignmentResourceVerification(ctx, devicedb.SetAssignmentResourceVerificationParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, LastVerifiedAt: timestamptz(st.now), ObservedAt: timestamptz(status.GetVerification().GetAfter().GetMetadata().GetObservedAt().AsTime()), DriftRemediated: len(action.StartGrantEnvelope) != 0}); err != nil {
+				return mapErr(err)
 			}
 		}
 	}
-	if action.ReleaseID != nil {
-		latest, err := q.LatestResourceReleaseAction(ctx, action.ReleaseID)
-		if err != nil {
-			return nil, mapErr(err)
+	if err := s.targeting.RecordExecutionHealth(ctx, st.tx, st.principal.DeviceID, st.principal.GenerationID, action.AssignmentID); err != nil {
+		return mapErr(err)
+	}
+	if disposition == 3 && len(action.StartGrantEnvelope) == 0 && status.GetStartedAt() == nil {
+		if err := st.q.MarkResourceReadOnlySuccess(ctx, st.id); err != nil {
+			return mapErr(err)
 		}
-		if terminal && latest.ID == action.ID {
-			state, reason := releaseResultState(status)
-			completed := pgtype.Timestamptz{}
-			if state == "released" {
-				completed = timestamptz(now)
-			}
-			if err := q.SetResourceReleaseState(ctx, devicedb.SetResourceReleaseStateParams{ID: *action.ReleaseID, State: state, Reason: reason, CompletedAt: completed}); err != nil {
-				return nil, mapErr(err)
-			}
-		}
-	} else {
-		// A late report for an older action must not overwrite a newer lease's
-		// disposition, even though the signed evidence remains retained and audited.
-		latest, err := q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID})
-		if err != nil {
-			return nil, mapErr(err)
-		}
-		if latest.ID == action.ID {
-			if reason == resourceReasonNativeBusy {
-				if err := q.HoldResource(ctx, devicedb.HoldResourceParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Reason: reason, ObservedAt: timestamptz(now)}); err != nil {
-					return nil, mapErr(err)
-				}
-			} else if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
-				return nil, mapErr(err)
-			}
-			if disposition == 3 {
-				if err := q.SetAssignmentResourceVerification(ctx, devicedb.SetAssignmentResourceVerificationParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, LastVerifiedAt: timestamptz(now), ObservedAt: timestamptz(status.GetVerification().GetAfter().GetMetadata().GetObservedAt().AsTime()), DriftRemediated: len(action.StartGrantEnvelope) != 0}); err != nil {
-					return nil, mapErr(err)
-				}
-			}
-		}
-		if err := s.targeting.RecordExecutionHealth(ctx, tx, principal.DeviceID, principal.GenerationID, action.AssignmentID); err != nil {
-			return nil, mapErr(err)
-		}
-		if disposition == 3 && len(action.StartGrantEnvelope) == 0 && status.GetStartedAt() == nil {
-			if err := q.MarkResourceReadOnlySuccess(ctx, id); err != nil {
-				return nil, mapErr(err)
-			}
-			if err := q.PruneResourceReadOnlySuccesses(ctx, principal.GenerationID); err != nil {
-				return nil, mapErr(err)
-			}
+		if err := st.q.PruneResourceReadOnlySuccesses(ctx, st.principal.GenerationID); err != nil {
+			return mapErr(err)
 		}
 	}
-	if err := dispatchSystemAudit(ctx, q, nil, "resource_action.result", id, "proof", "verified_device_attestation"); err != nil {
-		return nil, mapErr(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, mapErr(err)
-	}
-	return noStore(&devicev1.ReportResourceResultResponse{Closed: terminal || action.ClosedAt.Valid}), nil
+	return nil
 }
 
 // The signed history authenticates the executor, but compliance must additionally

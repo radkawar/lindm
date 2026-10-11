@@ -41,7 +41,7 @@ func (s *Service) PrepareDeviceActionRecovery(ctx context.Context, req *connect.
 }
 
 func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []byte) (*agentv1.PrepareDeviceActionRecoveryResponse, error) {
-	actionID, err := s.lookupDeviceActionIntent(envelope)
+	actionID, err := deviceAction.lookup(s, envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 		s.mu.Unlock()
 		return nil, fmt.Errorf("%w: agent_update_busy", errResourceRejected)
 	}
-	intent, err := s.currentDeviceActionIntent(ctx, loaded, envelope)
+	intent, err := deviceAction.current(ctx, s, loaded, envelope)
 	if err != nil {
 		s.mu.Unlock()
 		return nil, err
@@ -202,7 +202,7 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	if err != nil {
 		return nil, err
 	}
-	intent, err = s.currentDeviceActionIntent(ctx, loaded, envelope)
+	intent, err = deviceAction.current(ctx, s, loaded, envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -354,18 +354,18 @@ func (s *Service) commitDeviceActionRecovery(ctx context.Context, request *agent
 }
 
 func (s *Service) authorizeRecoveryBoot(ctx context.Context, loaded *bound, record *agentv1.DeviceActionRecord, handoff *agentv1.DeviceActionRecoveryHandoff, credential, grant []byte) (*agentv1.DeviceActionRecoveryBootGrant, error) {
-	if _, err := s.currentDeviceActionIntent(ctx, loaded, record.GetIntentEnvelope()); err != nil {
+	if _, err := deviceAction.current(ctx, s, loaded, record.GetIntentEnvelope()); err != nil {
 		return nil, err
 	}
-	if err := s.deviceActionDeadline(record); err != nil {
+	if err := s.challengeDeadline(record.GetChallenge(), record.GetChallengeBoottimeNs()); err != nil {
 		return nil, err
 	}
 	if _, err := loaded.execution.verifier.VerifyDeviceActionRecoveryCredential(ctx, loaded.execution.root, loaded.execution.delegation, credential, handoff, s.now()); err != nil {
-		return nil, resourceAuthorityError(ctx, err)
+		return nil, signedAuthorityError(ctx)
 	}
 	verified, err := loaded.execution.verifier.VerifyDeviceActionRecoveryBoot(ctx, loaded.execution.root, loaded.execution.delegation, grant, handoff, s.now())
 	if err != nil {
-		return nil, resourceAuthorityError(ctx, err)
+		return nil, signedAuthorityError(ctx)
 	}
 	return verified, nil
 }

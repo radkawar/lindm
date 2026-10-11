@@ -1274,11 +1274,18 @@ timestamps; `GetSyncState` supplies the durable jittered 60-second heartbeat.
   current-session, action, intent digest and fresh result nonce, never as native
   proof. Once a grant is issued, the action stays open until verified terminal
   evidence arrives: the effect may already have run.
+- Resource executions and device actions share one signed-action core on each
+  side (`internal/agent/executor/signed_action.go`, `internal/device/signed_action.go`),
+  so every fence below applies identically to both kinds.
 - Start grants require a valid device challenge bound to the stored intent, a fresh
   re-authorization at the same version and the unchanged head. Exact retries return
-  stored bytes; nothing is re-signed for an existing action.
+  stored bytes; nothing is re-signed for an existing action. A grant window never
+  exceeds 30 seconds, the fresh authority, the intent or the delegation. The
+  executor admits a grant only while no agent self-update is in progress, and only
+  in the boot its native plan observed.
 - Results are nonce-bound attestations verified against the device CA and the
   registered, unrevoked device certificate, with monotonic `action_revision`.
+  Status with start evidence is refused unless a start grant was issued.
   Fresh nonces may authenticate the identical `PREPARING` status at the same
   protected revision; changed history and every other lifecycle state still
   require an increasing revision.

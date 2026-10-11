@@ -180,7 +180,7 @@ func (s *Service) consumeResourceStart(ctx context.Context, expected *agentv1.Re
 	if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED || !proto.Equal(record.GetNativePlan(), expected.GetNativePlan()) || !bytes.Equal(record.GetStartGrantEnvelope(), expected.GetStartGrantEnvelope()) {
 		return errResourceRejected
 	}
-	grant, err := s.authorizeResourceStart(ctx, loaded, record, record.GetStartGrantEnvelope())
+	grant, err := resourceAction.authorizeStart(ctx, s, loaded, record, record.GetStartGrantEnvelope())
 	if err != nil {
 		return err
 	}
@@ -190,22 +190,7 @@ func (s *Service) consumeResourceStart(ctx context.Context, expected *agentv1.Re
 	if err := s.updateResourceAction(ctx, loaded, revision, next); err != nil {
 		return err
 	}
-	// A slow durable commit cannot extend the start window. A rejection here
-	// leaves consumed RUNNING evidence but permits no native mutation.
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := s.resourceDeadline(record); err != nil {
-		return err
-	}
-	now := s.now()
-	if now.Before(grant.GetNotBefore().AsTime()) || !now.Before(grant.GetExpiresAt().AsTime()) {
-		return errResourceExpired
-	}
-	if !certUsable(loaded.cert, now) {
-		return errIdentityExpired
-	}
-	return nil
+	return s.consumedInWindow(ctx, loaded, record.GetChallenge(), record.GetChallengeBoottimeNs(), grant)
 }
 
 // Previously RUNNING work is NEVER replayed. Verify only observes the original

@@ -5,17 +5,11 @@ package executor
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
-	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
-	"lindm/internal/pki"
 )
 
 // Historical evidence is authenticated at its original acceptance times. Current
@@ -66,40 +60,12 @@ func (s *Service) verifyDeviceActionRecord(ctx context.Context, loaded *bound, r
 func (s *Service) verifyDeviceActionChallenge(ctx context.Context, loaded *bound, r *agentv1.DeviceActionRecord) error {
 	c, i := r.GetChallenge(), r.GetIntent()
 	planDigest, err := digestMessage(r.GetNativePlan())
-	if err != nil || c == nil || c.GetDeploymentId() != i.GetDeploymentId() || c.GetDeviceId() != i.GetDeviceId() || c.GetEnrollmentGeneration() != i.GetEnrollmentGeneration() || c.GetActionId() != i.GetActionId() || c.GetActionSequence() != i.GetActionSequence() || c.GetRecoveryEpoch() != i.GetRecoveryEpoch() || !bytes.Equal(c.GetIntentSha256(), r.GetIntentSha256()) || !bytes.Equal(c.GetSpecSha256(), i.GetSpecSha256()) || !bytes.Equal(c.GetNativePlanSha256(), planDigest) || !proto.Equal(c.GetNativePlan(), r.GetNativePlan()) || !proto.Equal(c.GetIssuedAt(), r.GetAcceptedAt()) || c.GetExpiresAt().AsTime().After(i.GetExpiresAt().AsTime()) {
+	if err != nil || c.GetDeploymentId() != i.GetDeploymentId() || c.GetDeviceId() != i.GetDeviceId() || c.GetEnrollmentGeneration() != i.GetEnrollmentGeneration() || c.GetActionId() != i.GetActionId() || c.GetActionSequence() != i.GetActionSequence() || c.GetRecoveryEpoch() != i.GetRecoveryEpoch() || !bytes.Equal(c.GetIntentSha256(), r.GetIntentSha256()) || !bytes.Equal(c.GetSpecSha256(), i.GetSpecSha256()) || !bytes.Equal(c.GetNativePlanSha256(), planDigest) || !proto.Equal(c.GetNativePlan(), r.GetNativePlan()) || !proto.Equal(c.GetIssuedAt(), r.GetAcceptedAt()) {
 		return errRecoveryHold
 	}
-	if _, err := canonicalUUID(c.GetBootId()); err != nil {
-		return errRecoveryHold
-	}
-	if _, err := canonicalUUID(c.GetExecutorIncarnation()); err != nil {
-		return errRecoveryHold
-	}
-	if r.GetChallengeBoottimeNs() < uint64(c.GetExpiresAt().AsTime().Sub(c.GetIssuedAt().AsTime())) {
-		return errRecoveryHold
-	}
-	block, rest := pem.Decode(r.GetChallengeCertificatePem())
-	if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
-		return errRecoveryHold
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+	public, err := verifyChallengeCustody(ctx, s, loaded, r, new(agentv1.DeviceActionChallenge))
 	if err != nil {
-		return errRecoveryHold
-	}
-	public, ok := cert.PublicKey.(ed25519.PublicKey)
-	if !ok {
-		return errRecoveryHold
-	}
-	deployment, device, generation, err := enrollmentIDs(i.GetDeploymentId(), i.GetDeviceId(), i.GetEnrollmentGeneration())
-	if err != nil {
-		return errRecoveryHold
-	}
-	if _, err := pki.VerifyDeviceCertificatePEM(r.GetChallengeCertificatePem(), public, loaded.bootstrap.DeviceCA, deployment, device, generation, c.GetIssuedAt().AsTime()); err != nil {
-		return errRecoveryHold
-	}
-	verified := new(agentv1.DeviceActionChallenge)
-	if err := s.authority.Verify(ctx, r.GetChallengeProof(), verified, 1, public); err != nil || !proto.Equal(verified, c) {
-		return historicalResourceError(ctx)
+		return err
 	}
 	if len(r.GetHandoffProof()) != 0 {
 		_, err := s.verifyRecoveryHandoff(ctx, r, public)
@@ -109,32 +75,11 @@ func (s *Service) verifyDeviceActionChallenge(ctx context.Context, loaded *bound
 }
 
 func (s *Service) loadDeviceAction(ctx context.Context, loaded *bound, actionID string) (*agentv1.DeviceActionRecord, int64, error) {
-	record, revision, err := s.store.LoadDeviceAction(ctx, actionID)
-	if err != nil {
-		return nil, 0, s.resourceStoreError(err)
-	}
-	if record.GetIntent().GetActionId() != actionID {
-		s.noteTrustDamage()
-		return nil, 0, errRecoveryHold
-	}
-	if err := s.verifyDeviceActionRecord(ctx, loaded, record); err != nil {
-		if errors.Is(err, errRecoveryHold) {
-			s.noteTrustDamage()
-		}
-		return nil, 0, err
-	}
-	return record, revision, nil
+	return deviceAction.loadAction(ctx, s, loaded, actionID)
 }
 
 func (s *Service) updateDeviceAction(ctx context.Context, loaded *bound, revision int64, next *agentv1.DeviceActionRecord) error {
-	if err := s.verifyDeviceActionRecord(ctx, loaded, next); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return errInternal
-	}
-	_, err := s.store.UpdateDeviceAction(ctx, revision, loaded.revision, loaded.execution.revision, next)
-	return s.resourceStoreError(err)
+	return deviceAction.update(ctx, s, loaded, revision, next)
 }
 
 // AttestDeviceAction signs only protected historical facts with current device
@@ -143,6 +88,9 @@ func (s *Service) AttestDeviceAction(ctx context.Context, req *connect.Request[a
 	ctx, cancel := s.bounded(ctx)
 	defer cancel()
 	if req == nil || s.admit(req.Msg) != nil {
+		return nil, mapError(errInvalid)
+	}
+	if _, err := canonicalUUID(req.Msg.GetActionId()); err != nil {
 		return nil, mapError(errInvalid)
 	}
 	if err := s.lock(ctx); err != nil {
@@ -156,29 +104,11 @@ func (s *Service) AttestDeviceAction(ctx context.Context, req *connect.Request[a
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if err := s.resourceIdentitySession(loaded); err != nil {
-		return nil, mapError(err)
-	}
-	record, revision, err := s.loadDeviceAction(ctx, loaded, req.Msg.GetActionId())
+	envelope, certificate, err := deviceAction.attest(ctx, s, loaded, req.Msg.GetActionId(), req.Msg.GetNonce(), func(h attestationHeader, record *agentv1.DeviceActionRecord) proto.Message {
+		return &agentv1.DeviceActionAttestation{DeploymentId: h.deploymentID, DeviceId: h.deviceID, EnrollmentGeneration: h.generation, SessionEpoch: h.sessionEpoch, ActionRevision: h.revision, Nonce: h.nonce, IssuedAt: h.issued, ExpiresAt: h.expires, Status: deviceActionStatus(record)}
+	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if revision <= 0 {
-		s.noteTrustDamage()
-		return nil, mapError(errRecoveryHold)
-	}
-	now := s.now()
-	if !certUsable(loaded.cert, now) {
-		return nil, mapError(errIdentityExpired)
-	}
-	expires := now.Add(30 * time.Second)
-	if loaded.cert.NotAfter.Before(expires) {
-		expires = loaded.cert.NotAfter
-	}
-	attestation := &agentv1.DeviceActionAttestation{DeploymentId: loaded.bootstrap.Root.GetDeploymentId(), DeviceId: loaded.state.GetDeviceId(), EnrollmentGeneration: loaded.state.GetEnrollmentGeneration(), SessionEpoch: loaded.state.GetSessionEpoch(), ActionRevision: uint64(revision), Nonce: bytes.Clone(req.Msg.GetNonce()), IssuedAt: protoTimestamp(now), ExpiresAt: protoTimestamp(expires), Status: deviceActionStatus(record)}
-	envelope, err := s.authority.Sign(ctx, attestation, loaded.identityKey)
-	if err != nil {
-		return nil, mapError(err)
-	}
-	return noStore(&agentv1.AttestDeviceActionResponse{AttestationEnvelope: envelope, CertificatePem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: loaded.cert.Raw})}), nil
+	return noStore(&agentv1.AttestDeviceActionResponse{AttestationEnvelope: envelope, CertificatePem: certificate}), nil
 }

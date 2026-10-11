@@ -302,7 +302,11 @@ func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
 	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
 	dispatchError(t, err, connect.CodePermissionDenied, "certificate_rejected")
 	f.key, f.certificate, f.principal = newKey, renewed.Msg.GetCertificatePem(), newPrincipal
+	// Start evidence is admitted only under an issued grant.
 	request = f.result(t, replacement, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, true)
+	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
+	dispatchError(t, err, connect.CodePermissionDenied, "resource_result_binding_rejected")
+	request = f.result(t, replacement, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, false)
 	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
 		t.Fatal(err)
 	}

@@ -48,7 +48,7 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 	if err != nil {
 		return nil, err
 	}
-	actionID, err := s.lookupResourceIntent(envelope)
+	actionID, err := resourceAction.lookup(s, envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (s *Service) refuseResourceAdmission(ctx context.Context, envelope []byte, 
 	} else if !errors.Is(err, journal.ErrResourceActionNotFound) {
 		return nil, err
 	}
-	intent, err := s.currentResourceIntent(ctx, loaded, envelope)
+	intent, err := resourceAction.current(ctx, s, loaded, envelope)
 	if err != nil {
 		return nil, err
 	}

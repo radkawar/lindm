@@ -104,7 +104,7 @@ func (s *Service) beginDeviceAction(ctx context.Context, actionID string, envelo
 			s.mu.Unlock()
 			return nil, errResourceRejected
 		}
-		if _, err := s.authorizeDeviceActionStart(ctx, loaded, record, envelope); err != nil {
+		if _, err := deviceAction.authorizeStart(ctx, s, loaded, record, envelope); err != nil {
 			s.mu.Unlock()
 			return nil, err
 		}
@@ -218,7 +218,7 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 		if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_PREPARED {
 			return nil, errResourceRejected
 		}
-		grant, err = s.authorizeDeviceActionStart(ctx, loaded, record, envelope)
+		grant, err = deviceAction.authorizeStart(ctx, s, loaded, record, envelope)
 		if err != nil {
 			return nil, err
 		}
@@ -240,30 +240,23 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 		return nil, err
 	}
 	// An unusually slow FULL-synchronous commit never extends authority.
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if !certUsable(loaded.cert, s.now()) {
-		return nil, errIdentityExpired
-	}
-	if !confirm {
-		if err := s.deviceActionDeadline(next); err != nil {
+	if confirm {
+		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if s.now().Before(grant.GetNotBefore().AsTime()) || !s.now().Before(grant.GetExpiresAt().AsTime()) {
-			return nil, errResourceExpired
+		if !certUsable(loaded.cert, s.now()) {
+			return nil, errIdentityExpired
 		}
+	} else if err := s.consumedInWindow(ctx, loaded, next.GetChallenge(), next.GetChallengeBoottimeNs(), grant); err != nil {
+		return nil, err
 	}
 	if actionprovider.LiveRootHeaderErase(next.GetIntent().GetSpec()) {
 		if err := s.closeLiveRootJournal(ctx, loaded, next); err != nil {
 			return nil, err
 		}
 		// Closing/checkpointing the journal must not extend a fresh grant.
-		if err := s.deviceActionDeadline(next); err != nil {
+		if err := s.consumedInWindow(ctx, loaded, next.GetChallenge(), next.GetChallengeBoottimeNs(), grant); err != nil {
 			return nil, err
-		}
-		if !certUsable(loaded.cert, s.now()) || !s.now().Before(grant.GetExpiresAt().AsTime()) {
-			return nil, errResourceExpired
 		}
 		return s.liveRootStatus(next.GetIntent().GetActionId())
 	}
@@ -271,14 +264,14 @@ func (s *Service) consumeDeviceAction(ctx context.Context, expected *agentv1.Dev
 }
 
 func (s *Service) authorizeDeviceActionReceipt(ctx context.Context, loaded *bound, record *agentv1.DeviceActionRecord, envelope []byte) error {
-	if err := s.resourceIdentitySession(loaded); err != nil {
+	if err := s.actionIdentitySession(loaded); err != nil {
 		return err
 	}
 	if record.GetChallenge().GetExecutorIncarnation() != s.incarnation || loaded.execution.delegation == nil {
 		return errResourceRejected
 	}
 	if _, err := loaded.execution.verifier.VerifyDeviceActionEscrowReceipt(ctx, loaded.execution.root, loaded.execution.delegation, envelope, record, s.now()); err != nil {
-		return resourceAuthorityError(ctx, err)
+		return signedAuthorityError(ctx)
 	}
 	return nil
 }
@@ -467,6 +460,6 @@ func (s *Service) recheckPowerActionStart(ctx context.Context, expected *agentv1
 	if record.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || !bytes.Equal(record.GetStartGrantEnvelope(), envelope) || !proto.Equal(record.GetNativePlan(), expected.GetNativePlan()) {
 		return errResourceRejected
 	}
-	_, err = s.authorizeDeviceActionStart(ctx, loaded, record, envelope)
+	_, err = deviceAction.authorizeStart(ctx, s, loaded, record, envelope)
 	return err
 }

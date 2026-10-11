@@ -734,20 +734,37 @@ func (s *dispatchServer) GetResourceWork(ctx context.Context, req *connect.Reque
 
 func (s *dispatchServer) AuthorizeResourceStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeResourceStartRequest]) (*connect.Response[devicev1.AuthorizeResourceStartResponse], error) {
 	f := s.f
-	f.remote(req.Msg.GetSessionEpoch())
-	f.authorizations++
-	if req.Msg.GetActionId() != f.work.GetActionId() || !bytes.Equal(req.Msg.GetChallengeProof(), f.challenge) {
-		f.t.Fatal("server did not receive the exact protected challenge/action")
-	}
-	if err := f.phase(ctx, "authorize"); err != nil {
+	grant, err := f.authorizeStart(ctx, req.Msg, f.work.GetActionId(), "authorize", func() { f.work.StartGrantEnvelope = f.grant })
+	if err != nil {
 		return nil, err
 	}
-	f.work.StartGrantEnvelope = f.grant
+	return connect.NewResponse(&devicev1.AuthorizeResourceStartResponse{StartGrantEnvelope: grant}), nil
+}
+
+type startRequest interface {
+	GetSessionEpoch() uint64
+	GetActionId() string
+	GetChallengeProof() []byte
+}
+
+// authorizeStart is the server half of every start-grant fake: it requires
+// the exact protected challenge and action, commits the grant, and may lose
+// the reply after the commit.
+func (f *dispatchFixture) authorizeStart(ctx context.Context, req startRequest, actionID, phase string, commit func()) ([]byte, error) {
+	f.remote(req.GetSessionEpoch())
+	f.authorizations++
+	if req.GetActionId() != actionID || !bytes.Equal(req.GetChallengeProof(), f.challenge) {
+		f.t.Fatal("server did not receive the exact protected challenge/action")
+	}
+	if err := f.phase(ctx, phase); err != nil {
+		return nil, err
+	}
+	commit()
 	if f.loseAuthorization {
 		f.loseAuthorization = false
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("response lost after grant committed"))
 	}
-	return connect.NewResponse(&devicev1.AuthorizeResourceStartResponse{StartGrantEnvelope: f.grant}), nil
+	return f.grant, nil
 }
 
 func (s *dispatchServer) ReportResourceResult(ctx context.Context, req *connect.Request[devicev1.ReportResourceResultRequest]) (*connect.Response[devicev1.ReportResourceResultResponse], error) {

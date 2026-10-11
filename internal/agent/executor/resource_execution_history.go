@@ -5,16 +5,12 @@ package executor
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/journal"
-	"lindm/internal/pki"
 	"lindm/internal/resource"
 )
 
@@ -107,39 +103,8 @@ func (s *Service) verifyResourceChallenge(ctx context.Context, loaded *bound, re
 	if preparation := intent.GetPreparation(); preparation != nil && challenge.GetExpiresAt().AsTime().After(preparation.GetDeadline().AsTime()) {
 		return errRecoveryHold
 	}
-	if _, err := canonicalUUID(challenge.GetBootId()); err != nil {
-		return errRecoveryHold
-	}
-	if _, err := canonicalUUID(challenge.GetExecutorIncarnation()); err != nil {
-		return errRecoveryHold
-	}
-	if record.GetChallengeBoottimeNs() < uint64(challenge.GetExpiresAt().AsTime().Sub(challenge.GetIssuedAt().AsTime())) {
-		return errRecoveryHold
-	}
-	block, rest := pem.Decode(record.GetChallengeCertificatePem())
-	if block == nil || block.Type != "CERTIFICATE" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
-		return errRecoveryHold
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return errRecoveryHold
-	}
-	public, ok := cert.PublicKey.(ed25519.PublicKey)
-	if !ok {
-		return errRecoveryHold
-	}
-	deployment, device, generation, err := enrollmentIDs(intent.GetDeploymentId(), intent.GetDeviceId(), intent.GetEnrollmentGeneration())
-	if err != nil {
-		return errRecoveryHold
-	}
-	if _, err := pki.VerifyDeviceCertificatePEM(record.GetChallengeCertificatePem(), public, loaded.bootstrap.DeviceCA, deployment, device, generation, challenge.GetIssuedAt().AsTime()); err != nil {
-		return errRecoveryHold
-	}
-	verified := new(agentv1.ResourceExecutionChallenge)
-	if err := s.authority.Verify(ctx, record.GetChallengeProof(), verified, 1, public); err != nil || !proto.Equal(verified, challenge) {
-		return historicalResourceError(ctx)
-	}
-	return nil
+	_, err = verifyChallengeCustody(ctx, s, loaded, record, new(agentv1.ResourceExecutionChallenge))
+	return err
 }
 
 func historicalResourceError(ctx context.Context) error {
@@ -151,21 +116,7 @@ func historicalResourceError(ctx context.Context) error {
 
 // All helpers below are called under Service.mu (or before New publishes it).
 func (s *Service) loadResourceAction(ctx context.Context, loaded *bound, actionID string) (*agentv1.ResourceExecutionRecord, int64, error) {
-	record, revision, err := s.store.LoadResourceAction(ctx, actionID)
-	if err != nil {
-		return nil, 0, s.resourceStoreError(err)
-	}
-	if record.GetIntent().GetActionId() != actionID {
-		s.noteTrustDamage()
-		return nil, 0, errRecoveryHold
-	}
-	if err := s.verifyResourceRecord(ctx, loaded, record); err != nil {
-		if errors.Is(err, errRecoveryHold) {
-			s.noteTrustDamage()
-		}
-		return nil, 0, err
-	}
-	return record, revision, nil
+	return resourceAction.loadAction(ctx, s, loaded, actionID)
 }
 
 func (s *Service) updateResourceAction(ctx context.Context, loaded *bound, revision int64, next *agentv1.ResourceExecutionRecord) error {
@@ -173,14 +124,7 @@ func (s *Service) updateResourceAction(ctx context.Context, loaded *bound, revis
 	if next.GetCompletedAt() != nil {
 		next.SealedSecrets = nil
 	}
-	if err := s.verifyResourceRecord(ctx, loaded, next); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return errInternal
-	}
-	_, err := s.store.UpdateResourceAction(ctx, revision, loaded.revision, loaded.execution.revision, next)
-	return s.resourceStoreError(err)
+	return resourceAction.update(ctx, s, loaded, revision, next)
 }
 
 func (s *Service) resourceStoreError(err error) error {

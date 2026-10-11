@@ -317,20 +317,11 @@ func (s *deviceActionRelayServer) GetDeviceActionWork(ctx context.Context, req *
 
 func (s *deviceActionRelayServer) AuthorizeDeviceActionStart(ctx context.Context, req *connect.Request[devicev1.AuthorizeDeviceActionStartRequest]) (*connect.Response[devicev1.AuthorizeDeviceActionStartResponse], error) {
 	f := s.action
-	f.remote(req.Msg.GetSessionEpoch())
-	f.authorizations++
-	if req.Msg.GetActionId() != f.work.GetActionId() || !bytes.Equal(req.Msg.GetChallengeProof(), f.challenge) {
-		f.t.Fatal("challenge bytes/action changed")
-	}
-	if err := f.phase(ctx, "action-authorize"); err != nil {
+	grant, err := f.authorizeStart(ctx, req.Msg, f.work.GetActionId(), "action-authorize", func() { f.work.StartGrantEnvelope = f.grant })
+	if err != nil {
 		return nil, err
 	}
-	f.work.StartGrantEnvelope = f.grant
-	if f.loseAuthorization {
-		f.loseAuthorization = false
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("grant reply lost"))
-	}
-	return connect.NewResponse(&devicev1.AuthorizeDeviceActionStartResponse{StartGrantEnvelope: f.grant}), nil
+	return connect.NewResponse(&devicev1.AuthorizeDeviceActionStartResponse{StartGrantEnvelope: grant}), nil
 }
 
 func (s *deviceActionRelayServer) ReportDeviceActionResult(ctx context.Context, req *connect.Request[devicev1.ReportDeviceActionResultRequest]) (*connect.Response[devicev1.ReportDeviceActionResultResponse], error) {

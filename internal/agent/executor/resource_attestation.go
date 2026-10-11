@@ -3,12 +3,10 @@
 package executor
 
 import (
-	"bytes"
 	"context"
-	"encoding/pem"
-	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
@@ -33,43 +31,11 @@ func (s *Service) AttestResourceExecution(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if err := s.resourceIdentitySession(loaded); err != nil {
-		return nil, mapError(err)
-	}
-	record, revision, err := s.loadResourceAction(ctx, loaded, req.Msg.GetActionId())
+	envelope, certificate, err := resourceAction.attest(ctx, s, loaded, req.Msg.GetActionId(), req.Msg.GetNonce(), func(h attestationHeader, record *agentv1.ResourceExecutionRecord) proto.Message {
+		return &agentv1.ResourceExecutionAttestation{DeploymentId: h.deploymentID, DeviceId: h.deviceID, EnrollmentGeneration: h.generation, SessionEpoch: h.sessionEpoch, ActionRevision: h.revision, Nonce: h.nonce, IssuedAt: h.issued, ExpiresAt: h.expires, Status: resourceStatus(record)}
+	})
 	if err != nil {
 		return nil, mapError(err)
 	}
-	if revision <= 0 {
-		s.noteTrustDamage()
-		return nil, mapError(errRecoveryHold)
-	}
-	// Historical validation can outlast the current credential. Recheck it at
-	// issuance; an expired execution delegation does not invalidate history.
-	now := s.now()
-	if !certUsable(loaded.cert, now) {
-		return nil, mapError(errIdentityExpired)
-	}
-	expires := now.Add(30 * time.Second)
-	if loaded.cert.NotAfter.Before(expires) {
-		expires = loaded.cert.NotAfter
-	}
-	attestation := &agentv1.ResourceExecutionAttestation{
-		DeploymentId:         loaded.bootstrap.Root.GetDeploymentId(),
-		DeviceId:             loaded.state.GetDeviceId(),
-		EnrollmentGeneration: loaded.state.GetEnrollmentGeneration(),
-		SessionEpoch:         loaded.state.GetSessionEpoch(),
-		ActionRevision:       uint64(revision),
-		Nonce:                bytes.Clone(req.Msg.GetNonce()),
-		IssuedAt:             protoTimestamp(now), ExpiresAt: protoTimestamp(expires),
-		Status: resourceStatus(record),
-	}
-	envelope, err := s.authority.Sign(ctx, attestation, loaded.identityKey)
-	if err != nil {
-		return nil, mapError(err)
-	}
-	return noStore(&agentv1.AttestResourceExecutionResponse{
-		AttestationEnvelope: envelope,
-		CertificatePem:      pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: loaded.cert.Raw}),
-	}), nil
+	return noStore(&agentv1.AttestResourceExecutionResponse{AttestationEnvelope: envelope, CertificatePem: certificate}), nil
 }

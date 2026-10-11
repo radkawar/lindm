@@ -3829,6 +3829,35 @@ refusal, with SELinux asserted Enforcing. No product change was needed; the DNF4
 CLI runs in the helper's own transient unit, outside the executor's read-only
 `/var`.
 
+#### Signed-action core regression lanes (2026-10-11)
+
+Resource executions and device actions now share one signed-action core on the
+executor and the server (architecture §resource dispatch). Two Ubuntu 24.04
+aarch64 KVM lanes ran against source `deadcc1` with an empty applied diff. All
+records and `source-provenance-and-results.json` (SHA-256
+`998ad923c867a6919538d0d09e56dbc57bcbb9b537277e46941dc44170bcfc06`) are under
+`$HOME/.cache/lindm-signedaction-20261011/`:
+
+- Resource apply, `lab vm resources -phase connected -kinds files` on `dgx20`:
+  **passed**, `ubuntu24-arm64-dgx20-files-03.json` (SHA-256
+  `8e366825f0112c34f5de98ea064f9ad03b186b56c913ab9ce2545409c9d3ebd5`). All nine
+  file scenarios ran through the real start grant and the attested result, and
+  the native oracle observed the created file. Attempts `-01` and `-02` failed
+  before enrollment because the guest could not resolve the Ubuntu mirror without
+  `-allow-network`. Signed-action code was not involved.
+- Device action, `lab vm device-actions -scenario wipe -wipe-phase lock-quarantine`
+  on the encrypted GNOME/Wayland golden on `dgx21` (Secure Boot, swtpm):
+  **native pass**, `ubuntu24-arm64-dgx21-lock-quarantine-01.json` (SHA-256
+  `a68ce9f961639bb9efda595279e690ab6a6266af51765eccdffd2b0f2847d245`).
+
+Unit characterization runs the same table against both kinds:
+`TestSignedActionLifecycleCharacterization` on the executor and the integration
+test `TestSignedActionServerCharacterization`. The table covers exact replay,
+expiry by wall clock and by boottime, revocation, reboot, a different executor
+incarnation, duplicate consumption, a foreign challenge, the self-update
+interlock, the 30-second grant window, generation and session fences, late
+nonces, mismatched attestation and ungranted start evidence.
+
 ### Built-in graphical remote assistance (L09, L12)
 
 The maintained lane `lab vm assistance` boots a disposable clone of a cached

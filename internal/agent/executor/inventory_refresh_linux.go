@@ -59,7 +59,7 @@ func (s *Service) ConfirmDeviceActionInventory(ctx context.Context, req *connect
 	}
 	receipt, err := loaded.execution.verifier.VerifyDeviceActionInventoryReceipt(ctx, loaded.execution.root, loaded.execution.delegation, req.Msg.GetReceiptEnvelope(), record, s.now())
 	if err != nil {
-		return nil, mapError(resourceAuthorityError(ctx, err))
+		return nil, mapError(signedAuthorityError(ctx))
 	}
 	next := proto.CloneOf(record)
 	next.InventoryReceiptEnvelope = bytes.Clone(req.Msg.GetReceiptEnvelope())

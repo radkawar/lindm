@@ -135,37 +135,30 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 }
 
 func (s *Service) ApproveApproval(ctx context.Context, req *connect.Request[adminv1.ApproveApprovalRequest]) (*connect.Response[adminv1.ApproveApprovalResponse], error) {
-	ctx, cancel := bound(ctx)
-	defer cancel()
-	actor, err := s.require(ctx, identity.PermissionManageApprovals)
+	approval, err := s.decideApproval(ctx, message(req), true)
 	if err != nil {
 		return nil, err
-	}
-	if actor.ServiceAccount {
-		return nil, approvalError(identity.ErrAuthorizationDenied)
-	}
-	if s.identity == nil {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
-	}
-	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
-		return nil, invalid("invalid_approval")
-	}
-	if err := s.acquire(ctx); err != nil {
-		return nil, mapErr(err)
-	}
-	defer s.release()
-	id, err := parseUUID(req.Msg.GetApprovalId())
-	if err != nil {
-		return nil, invalid("invalid_id")
-	}
-	approval, err := s.identity.DecideApproval(ctx, actor.ID, id, true, req.Msg.GetReason(), s.approvalScope)
-	if err != nil {
-		return nil, approvalError(err)
 	}
 	return noStore(&adminv1.ApproveApprovalResponse{Approval: approval}), nil
 }
 
 func (s *Service) RejectApproval(ctx context.Context, req *connect.Request[adminv1.RejectApprovalRequest]) (*connect.Response[adminv1.RejectApprovalResponse], error) {
+	approval, err := s.decideApproval(ctx, message(req), false)
+	if err != nil {
+		return nil, err
+	}
+	return noStore(&adminv1.RejectApprovalResponse{Approval: approval}), nil
+}
+
+type approvalDecision interface {
+	proto.Message
+	GetApprovalId() string
+	GetReason() string
+}
+
+// decideApproval records one human reviewer's decision; service accounts never
+// review.
+func (s *Service) decideApproval(ctx context.Context, msg approvalDecision, approve bool) (*adminv1.Approval, error) {
 	ctx, cancel := bound(ctx)
 	defer cancel()
 	actor, err := s.require(ctx, identity.PermissionManageApprovals)
@@ -178,20 +171,20 @@ func (s *Service) RejectApproval(ctx context.Context, req *connect.Request[admin
 	if s.identity == nil {
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
 	}
-	if req == nil || req.Msg == nil || s.rules.Validate(req.Msg) != nil {
+	if !msg.ProtoReflect().IsValid() || s.rules.Validate(msg) != nil {
 		return nil, invalid("invalid_approval")
 	}
 	if err := s.acquire(ctx); err != nil {
 		return nil, mapErr(err)
 	}
 	defer s.release()
-	id, err := parseUUID(req.Msg.GetApprovalId())
+	id, err := parseUUID(msg.GetApprovalId())
 	if err != nil {
 		return nil, invalid("invalid_id")
 	}
-	approval, err := s.identity.DecideApproval(ctx, actor.ID, id, false, req.Msg.GetReason(), s.approvalScope)
+	approval, err := s.identity.DecideApproval(ctx, actor.ID, id, approve, msg.GetReason(), s.approvalScope)
 	if err != nil {
 		return nil, approvalError(err)
 	}
-	return noStore(&adminv1.RejectApprovalResponse{Approval: approval}), nil
+	return approval, nil
 }

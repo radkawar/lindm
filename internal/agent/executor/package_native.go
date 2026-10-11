@@ -49,10 +49,10 @@ func (s *Service) nativeEffectPermit(ctx context.Context, actionID string) (*age
 	if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
 		return nil, errResourceRejected
 	}
-	if err := s.resourceDeadline(record); err != nil {
+	if err := s.challengeDeadline(record.GetChallenge(), record.GetChallengeBoottimeNs()); err != nil {
 		return nil, err
 	}
-	grant, err := s.authorizeResourceStart(ctx, loaded, record, record.GetStartGrantEnvelope())
+	grant, err := resourceAction.authorizeStart(ctx, s, loaded, record, record.GetStartGrantEnvelope())
 	if err != nil {
 		return nil, err
 	}

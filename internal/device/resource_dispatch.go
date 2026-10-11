@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -511,7 +512,12 @@ func assignmentAuthorizationDenied(err error) bool {
 }
 
 func resourceActionRevision(action devicedb.ResourceAction) (uint64, error) {
-	n := action.ActionRevision
+	return signedRevision(action.ActionRevision)
+}
+
+// signedRevision decodes a stored executor action revision; anything but a
+// finite unsigned integer is damaged state.
+func signedRevision(n pgtype.Numeric) (uint64, error) {
 	if !n.Valid || n.NaN || n.Int == nil || n.Exp != 0 || !n.Int.IsUint64() {
 		return 0, errInternalState
 	}
