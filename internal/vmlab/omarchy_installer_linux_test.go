@@ -10,6 +10,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -307,5 +308,36 @@ func TestOmarchyBootstrapUnlockRequiresPrompt(t *testing.T) {
 	cancel()
 	if err := <-result; err == nil {
 		t.Fatal("boot without a LUKS prompt accepted")
+	}
+}
+
+// cryptsetup writes "Enter passphrase for ...: " and then flushes queued input
+// with TCSAFLUSH while disabling echo; a secret typed on the first prompt
+// bytes was discarded and the Omarchy cold boot waited until the SSH deadline.
+// The unlock must type only after the prompt has settled.
+func TestUnlockEncryptedSerialWaitsOutPromptFlush(t *testing.T) {
+	guest, host := net.Pipe()
+	t.Cleanup(func() { _ = guest.Close(); _ = host.Close() })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := unlockEncryptedSerial(ctx, host, "lab-secret")
+		result <- err
+	}()
+	prompted := time.Now()
+	if _, err := io.WriteString(guest, "\nA password is required to access the root volume:\nEnter passphrase for /dev/vda2: "); err != nil {
+		t.Fatal(err)
+	}
+	line, err := bufio.NewReader(guest).ReadString('\r')
+	if err != nil || line != "lab-secret\r" {
+		t.Fatalf("secret not typed: %q %v", line, err)
+	}
+	if waited := time.Since(prompted); waited < encryptedPromptSettle {
+		t.Fatalf("secret typed %v after the prompt, inside the TCSAFLUSH window", waited)
+	}
+	cancel()
+	if err := <-result; err != nil {
+		t.Fatal(err)
 	}
 }

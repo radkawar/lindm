@@ -987,7 +987,11 @@ offline-proven passphrase once and ignores redraws. Provisioning then drops the
 `plymouth` hook from the lab initramfs (`/etc/mkinitcpio.conf.d/zz-lindm-lab.conf`,
 sorted after Omarchy's HOOKS file); the `encrypt` hook's console fallback prompts
 through cryptsetup and reports a wrong key explicitly, which every later cold boot
-relies on. Omarchy has no TPM early-boot variant (registry `Lab.TPM.Unsupported`):
+relies on. The serial unlock answers only cryptsetup's "Enter passphrase for"
+prompt (the hook's preceding sentence is not an input prompt) and types one
+second after it: cryptsetup disables echo with `TCSAFLUSH` after writing the
+prompt, which discarded an immediately typed secret. Omarchy has no TPM early-boot
+variant (registry `Lab.TPM.Unsupported`):
 the device-action lane binds a real TPM2 token and records the observed
 passphrase prompt as unsupported.
 

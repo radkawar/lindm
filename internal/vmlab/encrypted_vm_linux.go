@@ -459,6 +459,10 @@ func encryptedUnlockPrompt(text string) bool {
 	return strings.Contains(text, "please unlock disk") || strings.Contains(text, "enter passphrase for") || strings.Contains(text, "please enter passphrase for disk")
 }
 
+// encryptedPromptSettle separates an observed passphrase prompt from the typed
+// secret, longer than any prompt-to-tcsetattr gap of a native password reader.
+const encryptedPromptSettle = time.Second
+
 func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (bool, error) {
 	var pending string
 	sent := false
@@ -485,6 +489,15 @@ func unlockEncryptedSerial(ctx context.Context, conn net.Conn, secret string) (b
 				}
 				if sent {
 					return true, errors.New("encrypted boot rejected unlock secret")
+				}
+				// cryptsetup's console prompt writes the prompt and only then
+				// disables echo with TCSAFLUSH, which discards input already
+				// queued: typing on the first prompt bytes can lose the secret
+				// and leave the boot waiting (observed on Omarchy's encrypt hook).
+				select {
+				case <-ctx.Done():
+					return sent, nil
+				case <-time.After(encryptedPromptSettle):
 				}
 				if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 					return sent, err
