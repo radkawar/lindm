@@ -133,8 +133,7 @@ var (
 		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 	}
-	rhelTPMPackages   = []string{"tpm2-tools", "tpm2-tss"}
-	reasonRHELPending = "native qualification on the pinned RHEL minor not yet passed"
+	rhelTPMPackages = []string{"tpm2-tools", "tpm2-tss"}
 	// Rocky Linux and AlmaLinux 9.8/10.2 also install only from their vendor
 	// DVD, but their unregistered systems keep the free vendor repositories,
 	// so the lanes install action and owned-boot prerequisites with DNF. Only
@@ -326,9 +325,11 @@ var registry = []*Release{
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
-		// Natively qualified on RHEL 9.8 x86_64 (verification.md, RHEL encrypted device actions).
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock}),
-		Gates:    rhelGates(OSUpdate, Wipe, ReportLoss, Lock),
+		// Native qualification of each action is per pinned minor in
+		// verification.md (RHEL encrypted device actions); implemented
+		// capabilities stay admitted so their qualification lanes can run.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
+		Gates:    rhelGates(),
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
@@ -340,9 +341,9 @@ var registry = []*Release{
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
-		// Natively qualified on RHEL 10.2 x86_64 (verification.md, RHEL encrypted device actions).
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Lock}),
-		Gates:    rhelGates(OSUpdate, Lock),
+		// Native qualification per pinned minor: see the rhel-9 row.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
+		Gates:    rhelGates(),
 	},
 	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
 	{
@@ -476,12 +477,11 @@ func withCapture(session LabSession, packages ...string) LabSession {
 	return session
 }
 
-// rhelGates gates the action lanes not natively qualified on the RHEL major's
-// pinned minor; qualified lanes are listed in Supports instead.
-func rhelGates(qualified ...Capability) map[Capability]string {
-	m := gates(string(Wipe), reasonRHELPending, string(ReportLoss), reasonRHELPending, string(Lock), reasonRHELPending,
-		string(RecoverySanitize), reasonRHELPending, string(Assistance), "no maintained RHEL assistance session recipe")
-	return without(m, qualified...)
+// rhelGates gates the RHEL action lane without a maintained recipe. Gates mean
+// "not implemented", never "not yet qualified": a gated capability also
+// refuses its own qualification lane.
+func rhelGates() map[Capability]string {
+	return without(gates(string(Assistance), "no maintained RHEL assistance session recipe"), OSUpdate)
 }
 
 func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {

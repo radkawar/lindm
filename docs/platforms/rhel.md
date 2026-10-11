@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | RHEL 8                                                                                                                          | RHEL 9                                                              | RHEL 10                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| inventory         | implemented                                                                                                                     | implemented                                                         | implemented                                                         |
-| lifecycle         | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| dispatch          | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| packages          | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                                                         | implemented                                                         |
-| accounts          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
-| sysctl            | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
-| definitions       | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                                                         | implemented                                                         |
-| password          | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| firewall          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                                         | implemented                                                         |
-| encryption        | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| wipe              | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | gated: native qualification on the pinned RHEL minor not yet passed |
-| report-loss       | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | gated: native qualification on the pinned RHEL minor not yet passed |
-| lock              | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| recovery-sanitize | gated: not implemented for RHEL 8                                                                                               | gated: native qualification on the pinned RHEL minor not yet passed | gated: native qualification on the pinned RHEL minor not yet passed |
-| self-update       | gated: not implemented for RHEL 8                                                                                               | implemented                                                         | implemented                                                         |
-| assistance        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained RHEL assistance session recipe                 | gated: no maintained RHEL assistance session recipe                 |
-| advisories        | implemented                                                                                                                     | implemented                                                         | implemented                                                         |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                                         | implemented                                                         |
-| release-upgrade   | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented                           | gated: release upgrade is not implemented                           |
+| Capability        | RHEL 8                                                                                                                          | RHEL 9                                              | RHEL 10                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| inventory         | implemented                                                                                                                     | implemented                                         | implemented                                         |
+| lifecycle         | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| dispatch          | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| packages          | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                                         | implemented                                         |
+| accounts          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
+| sysctl            | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
+| definitions       | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                                         | implemented                                         |
+| password          | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| firewall          | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
+| encryption        | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| wipe              | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| report-loss       | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| lock              | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| recovery-sanitize | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| self-update       | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
+| assistance        | gated: not implemented for RHEL 8                                                                                               | gated: no maintained RHEL assistance session recipe | gated: no maintained RHEL assistance session recipe |
+| advisories        | implemented                                                                                                                     | implemented                                         | implemented                                         |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                         | implemented                                         |
+| release-upgrade   | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented           | gated: release upgrade is not implemented           |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -399,10 +399,11 @@ crypto-erase.
 Signed service execution is not desktop lock, quarantine, restart, shutdown,
 crypto-erase or sanitize evidence. Each requires its own authorization, native
 effect and recovery/uncertainty record. Server/minimal and vendor GNOME-capable
-installations remain separate qualification targets. The registry's RHEL rows
-list exactly the natively qualified action capabilities; see
-[verification](../verification.md#rhel-encrypted-device-actions-and-self-update)
-before enabling an action on a RHEL device.
+installations remain separate qualification targets. "Implemented" in the table
+above admits an action and its qualification lane; it is not qualification.
+Per-minor native results are in
+[verification](../verification.md#rhel-encrypted-device-actions-and-self-update);
+consult them before enabling an action on a RHEL device.
 
 ## Advisory feeds
 
