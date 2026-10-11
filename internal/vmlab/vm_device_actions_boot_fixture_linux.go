@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -351,10 +352,17 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if err := rebootLifecycleGuest(ctx, vm, evidence.OriginalBootID); err != nil {
 		return evidence, err
 	}
-	observed, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id; sudo -n bootctl --esp-path=/boot/efi status --no-pager", nil, 32<<10, 15*time.Second)
+	status, err := vm.runResult(ctx, "cat /proc/sys/kernel/random/boot_id; sudo -n bootctl --esp-path=/boot/efi status --no-pager", nil, 32<<10, 15*time.Second)
 	if err != nil {
 		return evidence, err
 	}
+	if status.ExitCode != 0 {
+		return evidence, fmt.Errorf("observe owned signed systemd-boot: guest exit %d", status.ExitCode)
+	}
+	if err := ownedBootStatusNotices(status.Stderr); err != nil {
+		return evidence, err
+	}
+	observed := status.Stdout
 	lines := strings.SplitN(string(observed), "\n", 2)
 	if len(lines) != 2 || !vmValidID(lines[0]) || lines[0] == evidence.OriginalBootID {
 		return evidence, errors.New("owned signed systemd-boot was not observed on a new guest boot")
@@ -416,4 +424,27 @@ func observeActionOwnedFirmware(ctx context.Context, vm *guestVM) (string, error
 		return "", errors.New("ordinary guest did not actually boot systemd-boot")
 	}
 	return loader, nil
+}
+
+// blsUnknownKeyNotice is systemd's boot-entry parser notice for a key it does
+// not define. Enterprise Linux's grub-written BLS entries in
+// /boot/loader/entries carry grub-only keys (grub_users, grub_arg,
+// grub_class), so systemd 257's bootctl status reports each one on stderr and
+// still exits 0 (natively on Rocky Linux 10.2, rocky102-arm64-dgx20-recovery-
+// nvme-03). The owned loader on the ESP never reads that non-XBOOTLDR /boot.
+var blsUnknownKeyNotice = regexp.MustCompile(`^/boot/loader/entries/[A-Za-z0-9._+-]+\.conf:[0-9]+: Unknown line '[a-z_]+', ignoring\.$`)
+
+// ownedBootStatusNotices admits bootctl status stderr only when every line is
+// that parser notice; any other diagnostic still fails the observation.
+func ownedBootStatusNotices(stderr []byte) error {
+	unexpected := 0
+	for line := range strings.SplitSeq(strings.TrimRight(string(stderr), "\n"), "\n") {
+		if line != "" && !blsUnknownKeyNotice.MatchString(line) {
+			unexpected++
+		}
+	}
+	if unexpected != 0 {
+		return fmt.Errorf("observe owned signed systemd-boot: bootctl status emitted %d unexpected stderr lines", unexpected)
+	}
+	return nil
 }
