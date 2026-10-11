@@ -1538,8 +1538,9 @@ neither block nor fail it.
 
 Integration runs (`dev test-integration` and `dev signoff`) pass heavy-job
 admission first and then take the exclusive host lock
-`~/.cache/lindm-integration.lock`, printing its holder while they queue, because
-every run shares the one fixed-port dev PostgreSQL. The run under the lock is
+`~/.cache/lindm-integration.lock`, because every run shares the one fixed-port dev
+PostgreSQL. Queueing is bounded separately, at 3 hours, and prints the queued
+time and the holder's record each time it changes. The run under the lock is
 bounded by `-timeout` (default 40m), and larger values are rejected: no run may
 hold the lock for more than 45 minutes, and a slower suite needs fixing or
 sharding instead. While it holds the lock, the run prints each package result as

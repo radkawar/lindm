@@ -167,6 +167,10 @@ func stream(ctx context.Context, dir string, env []string, name string, args ...
 // integrationLockCap bounds how long one run may hold the integration lock.
 const integrationLockCap = 45 * time.Minute
 
+// integrationQueueLimit bounds how long a run waits for the integration lock;
+// it is separate from the run's own deadline.
+const integrationQueueLimit = 3 * time.Hour
+
 // testIntegration runs the integration suite exclusively among integration
 // runs on this host, which share the one fixed-port dev PostgreSQL. Heavy-job
 // admission (local memory guard, nice 10) comes first, so a run never holds
@@ -182,9 +186,17 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit ti
 		return err
 	}
 	lock := filepath.Join(cache, "lindm-integration.lock")
-	unlock, err := worktree.LockFile(ctx, lock, func(holder string) {
-		fmt.Fprintf(os.Stderr, "test-integration: waiting for %s: another integration run holds the dev PostgreSQL (%s)\n", lock, holder)
+	queued := time.Now()
+	queue, stopQueue := context.WithTimeout(ctx, integrationQueueLimit)
+	defer stopQueue()
+	var lastHolder string
+	unlock, err := worktree.LockFile(queue, lock, func(holder string) {
+		lastHolder = holder
+		fmt.Fprintf(os.Stderr, "test-integration: queued %s for %s; the dev PostgreSQL is held by %s\n", time.Since(queued).Round(time.Second), lock, holder)
 	})
+	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+		return fmt.Errorf("gave up after queueing %s for %s (held by %s)", integrationQueueLimit, lock, lastHolder)
+	}
 	if err != nil {
 		return err
 	}

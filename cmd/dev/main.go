@@ -52,7 +52,8 @@ const usage = `Usage: go run ./cmd/dev <init|up|check|trust|test-integration|dow
   gate-commit -m MSG  Under the landing lock, make check, then commit if green.
 
 Options: -root <repository> (default .), -timeout <duration> (default 10m;
-for test-integration 40m, max 45m, counted only while it holds the integration lock).
+for test-integration 40m, max 45m, counted only while it holds the integration lock;
+queueing for the lock is bounded separately at 3h).
 Init/up accept -authentication local|keycloak (default keycloak). A fixture's mode
 is immutable. Local mode does not start or contact an IdP.
 Reset and recreate-database accept -confirm-delete. Requires Linux, Go, Docker

@@ -210,3 +210,35 @@ func TestLandCommitsPushesAndRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLockFileReportsEachHolderChange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lock")
+	unlock, err := LockFile(context.Background(), path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reports := make(chan string, 8)
+	acquired := make(chan error, 1)
+	go func() {
+		release, err := LockFile(context.Background(), path, func(holder string) { reports <- holder })
+		if err == nil {
+			err = release()
+		}
+		acquired <- err
+	}()
+	if first := <-reports; !strings.HasPrefix(first, "pid ") {
+		t.Fatalf("first holder report %q", first)
+	}
+	if err := os.WriteFile(path, []byte("pid 1 test: [3/9] ok pkg\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if progress := <-reports; progress != "pid 1 test: [3/9] ok pkg" {
+		t.Fatalf("progress report %q", progress)
+	}
+	if err := unlock(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-acquired; err != nil {
+		t.Fatal(err)
+	}
+}

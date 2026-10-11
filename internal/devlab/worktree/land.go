@@ -24,17 +24,18 @@ func (r *Repository) Lock(ctx context.Context, waiting func(holder string)) (unl
 	return LockFile(ctx, r.LockPath(), waiting)
 }
 
-// LockFile takes an exclusive flock on path, waiting until ctx ends. waiting
-// is called once with the recorded holder when the lock is busy. The flock is
-// the authority; the holder record is diagnostic. The returned unlock
-// releases it; a crashed holder releases it implicitly.
+// LockFile takes an exclusive flock on path, waiting until ctx ends. While the
+// lock is busy, waiting is called with the holder's record each time it
+// changes (a new holder, or a holder's progress). The flock is the authority;
+// the record is diagnostic. The returned unlock releases it; a crashed holder
+// releases it implicitly.
 func LockFile(ctx context.Context, path string, waiting func(holder string)) (unlock func() error, err error) {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0o600)
 	if err != nil {
 		return nil, err
 	}
 	fd := int(file.Fd())
-	for notified := false; ; {
+	for last := ""; ; {
 		err := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			break
@@ -42,10 +43,13 @@ func LockFile(ctx context.Context, path string, waiting func(holder string)) (un
 		if !errors.Is(err, syscall.EWOULDBLOCK) {
 			return nil, errors.Join(fmt.Errorf("lock %s: %w", path, err), file.Close())
 		}
-		if !notified && waiting != nil {
-			holder, _ := os.ReadFile(path)
-			waiting(strings.TrimSpace(string(holder)))
-			notified = true
+		if waiting != nil {
+			// A record mid-rewrite reads empty; report only complete changes.
+			recorded, _ := os.ReadFile(path)
+			if holder := strings.TrimSpace(string(recorded)); holder != "" && holder != last {
+				waiting(holder)
+				last = holder
+			}
 		}
 		select {
 		case <-ctx.Done():
