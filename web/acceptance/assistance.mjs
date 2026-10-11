@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import { enroll, signIn } from "./journey.mjs";
 import { privateDirectory, readPrivateJSON, writePrivate } from "./private-files.mjs";
+import { startupFailure, startupStage } from "./assistance-startup.mjs";
 
 // Line-oriented private control protocol for `lab vm assistance`
 // (internal/vmlab/vm_assistance_browser_linux.go). Each stdin line is one JSON
@@ -17,6 +18,12 @@ const SURFACE = '[aria-label^="Remote screen"]';
 let config;
 let driver;
 let ui;
+let startStage = "configuration";
+
+function starting(stage) {
+  startStage = stage;
+  startupStage(stage);
+}
 
 // Observe the console's own peer. Split lanes additionally restrict TURN URLs
 // to the SSH-forwarded endpoint to model a browser outside the controller LAN;
@@ -105,13 +112,19 @@ function timeout(args) {
 
 const commands = {
   async start() {
+    starting("chromium_launch");
     driver = new ChromiumDriver();
     await driver.open(config);
+    starting("browser_setup");
     await driver.context.addInitScript(observePeers, config.forwardedTurnUrl ?? "");
     ui = new UI(driver, config.actionTimeoutMs);
+    starting("navigation");
     await driver.goto(config.origin);
+    starting("authenticator");
     await driver.authenticator([]);
+    starting("enrollment");
     await enroll(ui, config);
+    starting("sign_in");
     await signIn(ui, config);
     return { engine: "chromium", version: driver.metadata.browserVersion };
   },
@@ -237,6 +250,7 @@ function reply(value) {
   process.stdout.write(JSON.stringify(value) + "\n");
 }
 
+starting("configuration");
 try {
   if (process.argv.length !== 3) throw new Error("private_config_path_required");
   config = await readPrivateJSON(resolve(process.argv[2]));
@@ -259,7 +273,12 @@ try {
     ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
     : [];
 } catch (error) {
-  reply({ id: 0, ok: false, error: failure(error) });
+  await new Promise((done) =>
+    process.stdout.write(
+      JSON.stringify({ id: 0, ok: false, error: startupFailure(error, startStage) }) + "\n",
+      done,
+    ),
+  );
   process.exit(1);
 }
 
@@ -294,7 +313,11 @@ for await (const line of lines) {
   try {
     reply({ id: request.id, ok: true, result: await command(request.args ?? {}) });
   } catch (error) {
-    reply({ id: request.id, ok: false, error: failure(error) });
+    reply({
+      id: request.id,
+      ok: false,
+      error: request.op === "start" ? startupFailure(error, startStage) : failure(error),
+    });
   }
 }
 await shutdown();

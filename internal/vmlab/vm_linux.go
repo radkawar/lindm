@@ -77,6 +77,7 @@ type guestVM struct {
 	config             *ssh.ClientConfig
 	client             *ssh.Client
 	captureDiagnostics bool
+	diagnosticsDir     string
 	lastOperation      *guestOperationDiagnostic
 	hardware           VMHardwareOptions
 	firmware           *EncryptedFirmwareEvidence

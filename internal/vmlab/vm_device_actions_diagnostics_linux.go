@@ -19,6 +19,13 @@ import (
 	"lindm/internal/packaging"
 )
 
+func actionDiagnosticsDirectory(vm *guestVM) string {
+	if vm.diagnosticsDir != "" {
+		return vm.diagnosticsDir
+	}
+	return os.TempDir()
+}
+
 // observeActionGuest retains only the post-unlock console window and unit
 // diagnostics, never credentials, configuration files or disk/header contents.
 // A separate pinned connection diagnoses a failed transport; it never repeats
@@ -77,7 +84,7 @@ func observeActionGuest(ctx context.Context, vm *guestVM) (func(error) error, er
 		if err != nil {
 			return errors.Join(cause, err)
 		}
-		path, err := saveGuestDiagnostics(os.TempDir(), data)
+		path, err := saveGuestDiagnostics(actionDiagnosticsDirectory(vm), data)
 		if err != nil {
 			return errors.Join(cause, err)
 		}
@@ -89,7 +96,7 @@ func diagnoseActionFailure(ctx context.Context, vm *guestVM, cause error) error 
 	if cause == nil || vm == nil {
 		return cause
 	}
-	return errors.Join(cause, saveLifecycleFailure(ctx, vm, os.TempDir()))
+	return errors.Join(cause, saveLifecycleFailure(ctx, vm, actionDiagnosticsDirectory(vm)))
 }
 
 // diagnoseNativeAction reads the protected executor view before guest cleanup.
@@ -148,7 +155,7 @@ func diagnoseNativeAction(ctx context.Context, vm *guestVM, actionID string, cau
 	if err != nil {
 		return errors.Join(cause, err)
 	}
-	path, err := saveGuestDiagnostics(os.TempDir(), data)
+	path, err := saveGuestDiagnostics(actionDiagnosticsDirectory(vm), data)
 	if err != nil {
 		return errors.Join(cause, err)
 	}

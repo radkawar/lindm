@@ -11,7 +11,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"lindm/internal/labexec"
 )
@@ -45,10 +48,11 @@ type assistanceBrowserConfig struct {
 }
 
 type assistanceBrowserReply struct {
-	ID     int             `json:"id"`
-	OK     bool            `json:"ok"`
-	Result json.RawMessage `json:"result"`
-	Error  json.RawMessage `json:"error"`
+	ID           int             `json:"id"`
+	OK           bool            `json:"ok"`
+	Result       json.RawMessage `json:"result"`
+	Error        json.RawMessage `json:"error"`
+	StartupStage string          `json:"startupStage"`
 }
 
 // maxAssistanceBrowserReply bounds one protocol line; replies carry only
@@ -77,9 +81,10 @@ func startAssistanceBrowser(ctx context.Context, repository, private string, cfg
 	if err != nil {
 		return nil, errors.Join(err, childStdin.Close(), stdin.Close())
 	}
-	// Framework diagnostics can echo filled credentials, so stderr is discarded;
-	// replies are the only channel the lane reads. Close owns the lifetime.
-	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/assistance.mjs"), path}, Dir: repository, Stdin: childStdin, Stdout: childStdout})
+	// Framework diagnostics can echo filled credentials, so raw stderr remains
+	// discarded. The bootstrap catches module-load failures before the runner's
+	// command loop and emits only bounded, allowlisted startup classifications.
+	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/assistance-bootstrap.mjs"), path}, Dir: repository, Stdin: childStdin, Stdout: childStdout})
 	if closeErr := errors.Join(childStdin.Close(), childStdout.Close()); err != nil || closeErr != nil {
 		if err == nil {
 			err = errors.Join(closeErr, process.Close())
@@ -131,31 +136,81 @@ func (b *assistanceBrowser) call(ctx context.Context, op string, args map[string
 	if err != nil {
 		return err
 	}
-	if _, err := b.stdin.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("send browser command %s: %w", op, err)
+	_, sendErr := b.stdin.Write(append(line, '\n'))
+	if sendErr != nil {
+		sendErr = fmt.Errorf("send browser command %s: %w", op, sendErr)
+		if op != "start" {
+			return sendErr
+		}
+		// A failed import/configuration may close stdin before the first write.
+		// Still drain its bounded diagnostic replies rather than losing the cause.
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	select {
-	case <-ctx.Done():
-		return errors.Join(fmt.Errorf("browser command %s: %w", op, ctx.Err()), b.Close())
-	case reply, ok := <-b.replies:
-		if !ok {
-			return fmt.Errorf("browser runner exited during %s: %v", op, b.waitErr)
-		}
-		if reply.ID != id {
-			return fmt.Errorf("browser runner replied out of order during %s", op)
-		}
-		if !reply.OK {
-			return fmt.Errorf("browser command %s failed: %s", op, reply.Error)
-		}
-		if result == nil {
+	phase, step := op, 0
+	if op == "start" {
+		phase = "start/node_start"
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.Join(fmt.Errorf("browser command %s: %w", phase, ctx.Err()), sendErr, b.Close())
+		case reply, ok := <-b.replies:
+			if !ok {
+				// EOF is not a process exit status. Close reaps the actual child
+				// and retains its nonzero outcome while stopping its descendants.
+				return errors.Join(fmt.Errorf("browser runner closed replies during %s", phase), sendErr, b.waitErr, b.Close())
+			}
+			if reply.StartupStage != "" {
+				next := assistanceBrowserStartupStep(reply.StartupStage)
+				if op != "start" || reply.ID != 0 || reply.OK || len(reply.Error) != 0 || len(reply.Result) != 0 || next <= step {
+					return errors.New("browser runner wrote an invalid startup stage")
+				}
+				// Strictly increasing known steps bound this stream to eight
+				// messages; arbitrary strings never become evidence.
+				step, phase = next, "start/"+reply.StartupStage
+				continue
+			}
+			if reply.ID != id && (op != "start" || reply.ID != 0 || reply.OK) {
+				return fmt.Errorf("browser runner replied out of order during %s", phase)
+			}
+			if !reply.OK {
+				return errors.Join(fmt.Errorf("browser command %s failed: %s", phase, reply.Error), sendErr)
+			}
+			if sendErr != nil {
+				return sendErr
+			}
+			if result == nil {
+				return nil
+			}
+			if err := json.Unmarshal(reply.Result, result); err != nil {
+				return fmt.Errorf("browser command %s returned invalid result: %w", phase, err)
+			}
 			return nil
 		}
-		if err := json.Unmarshal(reply.Result, result); err != nil {
-			return fmt.Errorf("browser command %s returned invalid result: %w", op, err)
-		}
-		return nil
+	}
+}
+
+func assistanceBrowserStartupStep(stage string) int {
+	switch stage {
+	case "module_load":
+		return 1
+	case "configuration":
+		return 2
+	case "chromium_launch":
+		return 3
+	case "browser_setup":
+		return 4
+	case "navigation":
+		return 5
+	case "authenticator":
+		return 6
+	case "enrollment":
+		return 7
+	case "sign_in":
+		return 8
+	default:
+		return 0
 	}
 }
 
@@ -170,7 +225,9 @@ func (b *assistanceBrowser) Close() error {
 	_, _ = b.stdin.Write([]byte(`{"op":"close"}` + "\n"))
 	_ = b.stdin.Close()
 	// Drain stray replies so the reader can observe EOF and finish.
-	replies, grace, killed := b.replies, time.After(20*time.Second), false
+	graceCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	replies, grace, killed := b.replies, graceCtx.Done(), false
 	var err error
 	for waiting := true; waiting; {
 		select {
@@ -186,12 +243,40 @@ func (b *assistanceBrowser) Close() error {
 		}
 	}
 	if !killed {
-		// Also stops a Chromium the runner left behind.
-		err = process.Close()
+		// EOF can precede the runner's exit(1). Observe the leader without
+		// reaping it, then stop descendants while its PGID cannot be recycled.
+		if exitErr := waitAssistanceBrowserExit(graceCtx, process.Pid()); exitErr != nil {
+			killed = true
+			err = errors.Join(exitErr, process.Close())
+		} else {
+			// Unlike forced Close, Wait must retain even a natural SIGKILL.
+			process.Signal(syscall.SIGKILL)
+			err = process.Wait()
+		}
 	}
 	err = errors.Join(err, b.stdout.Close())
 	if killed {
 		return errors.Join(errors.New("assistance browser runner required forced shutdown"), err)
 	}
 	return err
+}
+
+func waitAssistanceBrowserExit(ctx context.Context, pid int) error {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var info unix.Siginfo
+		err := unix.Waitid(unix.P_PID, pid, &info, unix.WEXITED|unix.WNOWAIT|unix.WNOHANG, nil)
+		if err != nil && !errors.Is(err, unix.EINTR) {
+			return fmt.Errorf("observe browser runner exit: %w", err)
+		}
+		if err == nil && info.Signo != 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait for browser runner exit: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }

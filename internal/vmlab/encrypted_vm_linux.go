@@ -39,6 +39,8 @@ type EncryptedVMOptions struct {
 	// InstallerLog, when set, names a new owner-only file receiving a bounded
 	// copy of the installer's serial console for diagnostics.
 	InstallerLog string
+	// DiagnosticsDir retains private failure observations outside VM teardown.
+	DiagnosticsDir string
 }
 
 // UnlockOutcome distinguishes observed boot success from merely submitting a key.
@@ -60,6 +62,7 @@ type EncryptedVM struct {
 	config         *ssh.ClientConfig
 	initialSecret  string
 	cacheDir       string
+	diagnosticsDir string
 	hardware       VMHardwareOptions
 	recoveryActive bool
 	persistentLock *os.File
@@ -150,7 +153,7 @@ func NewEncryptedVM(ctx context.Context, manifest *labv1.ImageManifest, options 
 	if err != nil {
 		return nil, err
 	}
-	v := &EncryptedVM{dir: dir, initialSecret: golden.Secret, firmware: golden.Firmware, cacheDir: options.CacheDir, hardware: hardware}
+	v := &EncryptedVM{dir: dir, initialSecret: golden.Secret, firmware: golden.Firmware, cacheDir: options.CacheDir, hardware: hardware, diagnosticsDir: options.DiagnosticsDir}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, v.Close())
@@ -359,7 +362,7 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 	if err != nil {
 		return err
 	}
-	v.guest = &guestVM{dir: v.dir, cmd: p.cmd, done: p.done, log: p.log, address: address, config: v.config, hardware: hardware, firmware: v.firmware, tpm: v.tpm}
+	v.guest = &guestVM{dir: v.dir, cmd: p.cmd, done: p.done, log: p.log, address: address, config: v.config, hardware: hardware, firmware: v.firmware, tpm: v.tpm, diagnosticsDir: v.diagnosticsDir}
 	return nil
 }
 

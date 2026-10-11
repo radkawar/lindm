@@ -511,6 +511,11 @@ The assistance prerequisite step provisions private SHA-256-pinned Node 24.21.0
 and package-lock-selected Playwright Chromium under `assistance-browser/`.
 It changes neither system packages nor global PATH; missing browser libraries
 are a prerequisite failure, not permission to install packages.
+Browser startup failures retain a bounded allowlisted stage and classification,
+including module loading before the command loop. Raw exceptions, page contents
+and credential-bearing framework stderr stay private; EOF is not a successful
+process exit. Cleanup observes the unreaped owned leader before stopping its
+process group and preserves its actual exit status.
 
 For the owner, use the printed
 `ssh -L ADMIN:localhost:ADMIN -L TURN:CONTROLLER_IP:TURN <user>@<controller-host>`
@@ -1306,6 +1311,11 @@ and a bounded 200-entry executor/relay journal tail before owned guest cleanup.
 Collection uses a fresh pinned SSH connection and the read-only `action-status`
 RPC, never a raw protected journal copy, key file or LUKS header. Failed probes
 are recorded explicitly in private mode-0600 JSON referenced by the failure.
+Use `vm device-actions -diagnostics DIR` to keep those files in a caller-owned
+directory, including after cold boots. SSH-native runs return that explicit
+directory before removing their remote state; the default temporary directory
+is not retained across remote teardown. Diagnostics remain private observations,
+not passing qualification evidence.
 Asynchronous signed-recovery staging failures log their nonsecret native or
 authority error so a resulting `OUTCOME_UNKNOWN` does not erase the diagnosis.
 Each status request owns a unique exclusive request filename, so a failed

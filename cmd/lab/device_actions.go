@@ -32,6 +32,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.Encrypted.CacheDir, "cache", ".cache/lab/images", "verified official image cache")
 	flags.StringVar(&options.Encrypted.GoldenDir, "golden-cache", ".cache/lab/encrypted", "private encrypted installer golden cache")
 	flags.StringVar(&options.Encrypted.WorkDir, "work-dir", "", "existing parent for private disposable VM state")
+	flags.StringVar(&options.Encrypted.DiagnosticsDir, "diagnostics", "", "private owned failure diagnostics parent; returned from SSH hosts")
 	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL original-device recovery, which installs entitled boot tooling in the disposable vendor guest")
 	flags.StringVar(&options.Encrypted.Firmware.Code, "firmware-code", "", "package-owned OVMF code")
 	flags.StringVar(&options.Encrypted.Firmware.Vars, "firmware-vars", "", "matching package-owned enrolled OVMF NVRAM template")
