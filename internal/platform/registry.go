@@ -106,6 +106,15 @@ var (
 		UpgradePrompt: "/etc/update-manager/release-upgrades",
 		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell", "mutter-common"},
 	}
+	// The 26.04 desktop ISO replaces gnome-terminal with Ptyxis and carries
+	// Mutter ABI 18; keep both choices separate from the GNOME 46 recipe.
+	ubuntuResoluteSession = LabSession{
+		Desktops: ubuntuSession.Desktops, GDMConfig: ubuntuSession.GDMConfig, Name: ubuntuSession.Name,
+		Terminal: []string{"ptyxis", "--new-window", "--"}, UpgradePrompt: ubuntuSession.UpgradePrompt,
+		Capture: slices.Concat(ubuntuSession.Capture, []string{"libmutter-18-0"}),
+		// GNOME's new --upgrade-user unit ignores gnome-initial-setup-done.
+		FirstLoginMarkers: []string{"gnome-initial-setup/upgrade-26.04-done"},
+	}
 	ubuntuGuest = LabGuest{
 		Initrd:       "/boot/initrd.img-%s",
 		Actions:      []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
@@ -244,7 +253,7 @@ var registry = []*Release{
 		// TSS2 libraries, but not tpm2-tools, whose tpm2 binary dracut's
 		// tpm2-tss module requires.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
-			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
+			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuResoluteSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
 		// Recovery sanitize is qualified through measured GRUB (recovery-*-grub-03):
 		// on the stock 105 MiB cloud ESP the owned UKI holds the vendor kernel plus
 		// the non-hostonly dracut initrd (72 MB), so UKI mode is refused natively

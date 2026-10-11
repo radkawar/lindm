@@ -111,11 +111,38 @@ func TestAssistanceCapturePackagesKeepCompositorABIReleaseSpecific(t *testing.T)
 	if !slices.Contains(noble, "libmutter-14-0") || !slices.Contains(noble, "mutter-common") {
 		t.Fatal("Ubuntu 24.04 compositor provenance is incomplete")
 	}
-	if slices.Contains(resolute, "libmutter-14-0") {
-		t.Fatal("Ubuntu 26.04 inherited an unavailable compositor ABI")
+	if !slices.Contains(resolute, "libmutter-18-0") || slices.Contains(resolute, "libmutter-14-0") || slices.Contains(noble, "libmutter-18-0") {
+		t.Fatal("Ubuntu compositor ABI provenance crossed release boundaries")
 	}
 	if !slices.Contains(ForManifest("fedora", "44").Lab.Session.Capture, "mutter") {
 		t.Fatal("Fedora compositor provenance is incomplete")
+	}
+}
+
+func TestAssistanceTerminalMatchesInstalledDesktop(t *testing.T) {
+	for _, test := range []struct {
+		version string
+		argv    []string
+	}{
+		{"24.04", []string{"gnome-terminal", "--"}},
+		{"26.04", []string{"ptyxis", "--new-window", "--"}},
+	} {
+		release := ForManifest("ubuntu", test.version)
+		if !release.Supported(Assistance) || !slices.Equal(release.Lab.Session.Terminal, test.argv) {
+			t.Errorf("%s assistance terminal = %v, want %v", release.Name, release.Lab.Session.Terminal, test.argv)
+		}
+	}
+}
+
+func TestDesktopFirstLoginMarkersMatchUpgradeUnitConditions(t *testing.T) {
+	// The new upgrade-login unit runs only when the original setup marker
+	// exists and this release-specific marker does not.
+	resolute := ForManifest("ubuntu", "26.04").Lab.Session.FirstLoginMarkers
+	if !slices.Equal(resolute, []string{"gnome-initial-setup/upgrade-26.04-done"}) {
+		t.Fatalf("upgrade welcome would cover assistance controls: markers = %v", resolute)
+	}
+	if noble := ForManifest("ubuntu", "24.04").Lab.Session.FirstLoginMarkers; len(noble) != 0 {
+		t.Fatalf("GNOME 46 inherited a different release's upgrade markers: %v", noble)
 	}
 }
 

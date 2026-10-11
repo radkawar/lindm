@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -214,7 +215,13 @@ chpasswd
 install -d -o "$u" -g "$u" -m 0700 /home/"$u"/.config
 printf 'yes\n' > /home/"$u"/.config/gnome-initial-setup-done
 chown "$u":"$u" /home/"$u"/.config/gnome-initial-setup-done
-` + desktop.autologin(release.Lab.Session)
+`
+	for _, marker := range release.Lab.Session.FirstLoginMarkers {
+		path := filepath.Join("/home", actionDesktopUser, ".config", marker)
+		script += `install -d -o "$u" -g "$u" -m 0700 ` + nativeQuote(filepath.Dir(path)) + "\n"
+		script += `install -o "$u" -g "$u" -m 0600 /dev/null ` + nativeQuote(path) + "\n"
+	}
+	script += desktop.autologin(release.Lab.Session)
 	password := []byte(actionDesktopUser + ":" + rand.Text() + "\n")
 	defer clear(password)
 	_, err = vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), bytes.NewReader(password))

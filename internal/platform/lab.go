@@ -200,6 +200,9 @@ type LabSession struct {
 	// UpgradePrompt is the update-manager file whose release-upgrade Prompt the
 	// lab sets to never, so its dialog cannot cover the session.
 	UpgradePrompt string
+	// FirstLoginMarkers are paths relative to the lab user's .config whose
+	// existence suppresses release-specific welcome units before autologin.
+	FirstLoginMarkers []string
 	// Capture are the assistance capture-stack packages recorded as evidence.
 	Capture []string
 }
