@@ -111,9 +111,11 @@ acceptance: acceptance-build
 # Local CI (basecamp/gh-signoff): run the gates on this machine, then post
 # green commit statuses for the pushed HEAD. gh-signoff refuses a dirty tree or
 # an unpushed commit, so a signoff always attests to exactly what is on GitHub.
+# Contexts: unit (make check) and integration (real PostgreSQL). `create`
+# keeps context names from colliding with gh-signoff command words.
 .PHONY: signoff signoff-acceptance
 signoff: check test-integration
-	gh signoff check integration
+	gh signoff create unit integration
 
 signoff-acceptance: acceptance
-	gh signoff acceptance
+	gh signoff create acceptance
