@@ -1888,6 +1888,21 @@
       "verified": true,
       "scope": "GNOME, split topology",
       "reference": "#ubuntu-26041-parity-records-2026-10-11"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "recovery-sanitize",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-ubuntu2604-20261011/arm64-desktop/ubuntu2604-arm64-recovery-nvme-grub-01.json",
+      "sha256": "d3a95a7b36efa409d26080dc1da923a91b78d5d0f7b3b44d5a048b13baf12972",
+      "recorded": "2026-10-11T19:16:50.861191840Z",
+      "revision": "bb7745f2cc567fc1ad4b240c64e1c4890e1669df-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "measured GRUB",
+      "reference": "#ubuntu-26041-parity-records-2026-10-11"
     }
   ]
 }

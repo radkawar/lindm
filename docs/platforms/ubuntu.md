@@ -105,8 +105,9 @@ journal, so the registry marks the console as silent (`CryptsetupConsole`), as f
 Debian 13 and Fedora. Encryption scenarios 1–5, compliance, live erase, report-loss
 and GDM lock/quarantine passed on this golden. The arm64 desktop ISO uses the same
 recipe on QEMU `virt` with AAVMF Secure Boot: GRUB on the EFI console, the kernel on
-PL011 `ttyAMA0`, virtio-gpu for GNOME; the same cells passed there. Recovery
-sanitize has no aarch64 record.
+PL011 `ttyAMA0`, virtio-gpu for GNOME; the same cells passed there. Measured-GRUB
+recovery sanitize passed on aarch64 NVMe; SATA is refused before boot because AAVMF
+has no AHCI driver.
 
 Recovery sanitize in owned-UKI mode is refused natively on the stock cloud image:
 the ordinary UKI built from the vendor kernel and the generic 72 MB dracut initrd
