@@ -20,7 +20,9 @@ import (
 var (
 	errFileUnsafe = errors.New("os_update_file_unsafe")
 	errFileSize   = errors.New("os_update_file_too_large")
-	errLockBusy   = errors.New("os_update_run_in_progress")
+	// ErrRunInProgress reports that a window, patch-now or status run, or an
+	// os.update.v1 provider effect, holds the run lock.
+	ErrRunInProgress = errors.New("os_update_run_in_progress")
 )
 
 // readProtected reads a root-owned regular file without following a final
@@ -131,14 +133,14 @@ func (r *Runner) unmarshalValidated(data []byte, message proto.Message) error {
 	return r.validator.Validate(message)
 }
 
-// lock holds the flock serializing the run, patch-now and status units.
+// lock holds the flock serializing the run, patch-now and status units and
+// the os.update.v1 provider's native effects.
 type lock struct{ file *os.File }
 
-// acquireLock polls a non-blocking flock until wait elapses. A blocking
-// flock could not be cancelled; the poll keeps the wait bounded. The lock
-// lives in a root-only 0700 directory (never the world-writable /run/lock),
-// so no unprivileged user can pre-create or hold it.
-func acquireLock(ctx context.Context, path string, wait time.Duration) (*lock, error) {
+// openLock opens the lock file. It lives in a root-only 0700 directory
+// (never the world-writable /run/lock), so no unprivileged user can
+// pre-create or hold it.
+func openLock(path string) (*os.File, error) {
 	dir := filepath.Dir(path)
 	if err := unix.Mkdir(dir, 0o700); err != nil && !errors.Is(err, unix.EEXIST) {
 		return nil, fmt.Errorf("create lock directory: %w", err)
@@ -160,26 +162,68 @@ func acquireLock(ctx context.Context, path string, wait time.Duration) (*lock, e
 		_ = file.Close()
 		return nil, errors.Join(errFileUnsafe, err)
 	}
+	return file, nil
+}
+
+// tryFlock makes one non-blocking attempt; contention is ErrRunInProgress.
+func tryFlock(file *os.File) error {
+	for {
+		err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, unix.EINTR):
+		case errors.Is(err, unix.EWOULDBLOCK):
+			return ErrRunInProgress
+		default:
+			return fmt.Errorf("flock: %w", err)
+		}
+	}
+}
+
+// acquireLock polls a non-blocking flock until wait elapses. A blocking
+// flock could not be cancelled; the poll keeps the wait bounded.
+func acquireLock(ctx context.Context, path string, wait time.Duration) (*lock, error) {
+	file, err := openLock(path)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		err := unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB)
+		err := tryFlock(file)
 		if err == nil {
 			return &lock{file: file}, nil
 		}
-		if !errors.Is(err, unix.EWOULDBLOCK) && !errors.Is(err, unix.EINTR) {
+		if !errors.Is(err, ErrRunInProgress) {
 			_ = file.Close()
-			return nil, fmt.Errorf("flock: %w", err)
+			return nil, err
 		}
 		select {
 		case <-ctx.Done():
 			_ = file.Close()
-			return nil, errLockBusy
+			return nil, ErrRunInProgress
 		case <-ticker.C:
 		}
 	}
 }
 
 func (l *lock) release() error { return l.file.Close() }
+
+// TryRunLock takes the run lock without waiting, for the os.update.v1
+// provider's effect: a native effect never overlaps a running package
+// transaction, and a run that starts meanwhile waits for the effect. The
+// returned function releases it.
+func TryRunLock(path string) (func() error, error) {
+	file, err := openLock(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := tryFlock(file); err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return file.Close, nil
+}

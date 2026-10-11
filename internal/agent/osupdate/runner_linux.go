@@ -492,7 +492,7 @@ func (r *Runner) Status(ctx context.Context) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, statusBudget)
 	defer cancel()
 	held, err := acquireLock(ctx, resource.OSUpdateLockPath, statusLockWait)
-	if errors.Is(err, errLockBusy) {
+	if errors.Is(err, ErrRunInProgress) {
 		// A running update publishes the status when it finishes.
 		return nil
 	}

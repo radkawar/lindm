@@ -1890,6 +1890,15 @@ Native findings, each fixed with a regression before these records:
   rendered timer passes the host's `systemd-analyze verify`, and its calendar
   elapses equal the runner gate's window starts
   (`TestRenderedUnitsPassSystemdVerify`, `TestTimerElapsesAreTheRunnerWindowStarts`).
+- x86_64 Fedora 44 (`diag/fedora44-x86_64-local-osupdate-s12.json`, SHA-256
+  `dec22973…93f4`): the server's periodic reconcile ran its helper while the
+  window run's `dnf5` transaction was upgrading the system. The post-effect
+  observation no longer matched, the ledger stayed `UNKNOWN` (fail-closed, no
+  resolution path), and `repeat-after-reboot` timed out. A provider effect now
+  takes the runner's lock without waiting before its ownership effect and holds
+  it to completion; contention is `NATIVE_BUSY` with no effect
+  (`TestApplyRefusesWhileAnUpdateRunHoldsTheLock`,
+  `TestGrantedResourceRefusedBusyBeforeGateIsNativeBusy`).
 
 Not proven by these records:
 

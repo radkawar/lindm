@@ -413,6 +413,12 @@ candidate override in place. It uses a private copy of `apt.conf.d` named by
 `Dir::Etc::parts` in a temporary `APT_CONFIG`. A later part or
 `/etc/apt/apt.conf` that keeps the value non-zero is refused before any effect
 ([provider](../../internal/agent/osupdateprovider/apt_candidate_linux.go)).
+A provider effect takes the runner's lock (`/run/lindm/os-update/run.lock`)
+without waiting, before its ownership effect begins, and holds it until the
+completion is recorded. While a window, patch-now or status run holds it, the
+change is refused `NATIVE_BUSY` with no effect and the server retries. A
+package transaction never races an effect, and a run that starts meanwhile
+waits for the effect to finish.
 
 The static `lindm-os-update.service` runs `lindm-agent os-update run` as root
 without a sandbox, because the package manager writes the whole system

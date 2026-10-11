@@ -15,6 +15,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/osupdateprovider"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/resource"
 )
@@ -284,7 +285,7 @@ func (s *Service) finishResourceAction(actionID string, result *resourcev1.Resou
 			next.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_EXPIRED
 		case errors.Is(operationErr, errResourceRejected), errors.Is(operationErr, errIdentityExpired), errors.Is(operationErr, errSessionRequired), errors.Is(operationErr, errSessionPending), errors.Is(operationErr, errRenewalPending), errors.Is(operationErr, journal.ErrResourceActionRejected):
 			next.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_AUTHORITY
-		case errors.Is(operationErr, packageprovider.ErrBusy):
+		case errors.Is(operationErr, packageprovider.ErrBusy), errors.Is(operationErr, osupdateprovider.ErrBusy):
 			// Refused before the start gate: no effect, retried by the server.
 			next.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY
 		default:

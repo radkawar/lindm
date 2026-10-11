@@ -23,10 +23,11 @@ const (
 	OSUpdateStateDir     = "/var/lib/lindm/os-update"
 	OSUpdateRunStatePath = OSUpdateStateDir + "/run.binpb"
 	OSUpdateStatusPath   = OSUpdateStateDir + "/status.binpb"
-	// flock serializing the run, patch-now and status units. It shares the
-	// root-only 0700 runtime directory with the patch-now request (never the
-	// world-writable /run/lock); the executor only ever writes the request
-	// leaf and ignores this file.
+	// flock serializing the run, patch-now and status units with the
+	// os.update.v1 provider's native effects (the executor takes it without
+	// waiting and refuses as busy). It shares the root-only 0700 runtime
+	// directory with the patch-now request (never the world-writable
+	// /run/lock).
 	OSUpdateLockPath = OSUpdatePatchNowDir + "/run.lock"
 )
 

@@ -29,6 +29,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/nativefile"
+	"lindm/internal/agent/osupdate"
 	"lindm/internal/protodata"
 	"lindm/internal/resource"
 )
@@ -40,7 +41,12 @@ var (
 	ErrMissingPrerequisite = errors.New("osupdateprovider: native_prerequisite_missing")
 	ErrConflict            = errors.New("osupdateprovider: ownership_or_native_precondition_conflict")
 	ErrOutcomeUnknown      = errors.New("osupdateprovider: native_outcome_unknown")
-	ErrNotConverged        = errors.Join(resource.ErrNotConverged, errors.New("osupdateprovider: policy_not_converged"))
+	// ErrBusy refuses an effect before the ownership effect begins while a
+	// window, patch-now or status run holds the run lock: a package
+	// transaction can upgrade the native tools and systemd and leave the timer
+	// transiently reload-pending. Nothing changed; the server retries.
+	ErrBusy         = errors.New("osupdateprovider: os_update_run_in_progress")
+	ErrNotConverged = errors.Join(resource.ErrNotConverged, errors.New("osupdateprovider: policy_not_converged"))
 )
 
 type Config struct {
@@ -81,8 +87,11 @@ type Provider struct {
 	aptPeriodic func(context.Context, []byte) (string, error)
 	boot        string
 	zoneinfo    string
-	mu          sync.Mutex
-	closed      bool
+	// runLock takes the runner's lock without waiting; Apply holds it from
+	// before the ownership effect until the completion is durable.
+	runLock func() (func() error, error)
+	mu      sync.Mutex
+	closed  bool
 }
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
@@ -155,6 +164,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	p.config.Platform = proto.CloneOf(config.Platform)
 	p.config.Ownership = proto.CloneOf(config.Ownership)
 	p.store = config.Journal
+	p.runLock = func() (func() error, error) { return osupdate.TryRunLock(resource.OSUpdateLockPath) }
 	p.aptPeriodic = func(ctx context.Context, candidate []byte) (string, error) {
 		return aptCandidatePeriodic(ctx, config.StateDirectory, candidate)
 	}
@@ -596,6 +606,14 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if !proto.Equal(plan.GetBackend(), p.backend) {
 		return nil, ErrConflict
 	}
+	release, err := p.runLock()
+	if errors.Is(err, osupdate.ErrRunInProgress) {
+		return nil, ErrBusy
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = release() }()
 	ledger, err := p.ledger(ctx)
 	if err != nil {
 		return nil, err
