@@ -60,6 +60,9 @@ type VMDispatchOptions struct {
 	ResourceExecutionOnly bool
 	// ResourceKinds selects connected lane kind groups; see resourceKindSelection.
 	ResourceKinds map[string]bool
+	// ReleaseUpgrade runs the connected profile across the vendor's in-place
+	// release upgrade (see exerciseReleaseUpgrade); it requires guest egress.
+	ReleaseUpgrade bool
 }
 
 type VMDispatchScenario struct {
@@ -107,6 +110,7 @@ type VMDispatchResult struct {
 	Resources              *VMResourceEvidence             `json:"resources,omitempty"`
 	RecoveryReadiness      *VMRecoveryReadinessEvidence    `json:"recovery_readiness,omitempty"`
 	Architecture           string                          `json:"architecture,omitempty"`
+	ReleaseUpgrade         *VMReleaseUpgradeEvidence       `json:"release_upgrade,omitempty"`
 }
 
 // DispatchVM uses the same native builders, authenticated package installers,
@@ -135,6 +139,16 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.ResourceKinds["local-admin"] && !options.LocalAuthority {
 		return nil, errors.New("the local-admin kind requires -local-authority for reveal step-up and approval")
 	}
+	budget := 50 * time.Minute
+	if options.ReleaseUpgrade {
+		if !options.Resources || options.ResourceExecutionOnly || options.Hardware == nil || !options.Hardware.AllowNetwork {
+			return nil, errors.New("release upgrade requires the connected resource phase and explicit guest egress (-allow-network) to the vendor archive")
+		}
+		if _, _, err := releaseUpgradePath(manifest); err != nil {
+			return nil, err
+		}
+		budget = releaseUpgradeBudget
+	}
 	format, err := NativePackageFormat(release)
 	if err != nil {
 		return nil, err
@@ -155,7 +169,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 	}()
 	parent := ctx
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 50*time.Minute+options.Hold)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), budget+options.Hold)
 	defer cancel()
 	stopParentCancellation := context.AfterFunc(parent, cancel)
 	defer stopParentCancellation()
@@ -466,6 +480,10 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		}
 		if firewall != nil {
 			firewall.rebootDevice = reboot
+		}
+		if options.ReleaseUpgrade {
+			err = exerciseReleaseUpgrade(ctx, packages, control, fixture, result, manifest, filepath.Join(filepath.Dir(options.CacheDir), "advisory-feeds"), reboot)
+			return result, err
 		}
 		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, reboot, awaitReboot)
 		return result, err

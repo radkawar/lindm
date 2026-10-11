@@ -112,6 +112,8 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
   policy_authority_changed:
     "Blocked: the admin who set this policy lost access. Set the policy again to resume.",
   escrow_unconfigured: "Blocked: secret storage isn't set up on the server.",
+  native_package_manager_busy:
+    "Waiting: another package manager (such as a release upgrade) was running. Nothing changed; it retries at the next check.",
 };
 
 // Server-recorded blocked or attention reasons; unknown reasons are shown verbatim.

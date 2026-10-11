@@ -40,6 +40,16 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if err := ValidateNativePlan(plan, manifest); err != nil {
 		return nil, err
 	}
+	// Another frontend (a release upgrade, unattended-upgrades) owns the
+	// database: refuse before ownership or native state is touched. A race
+	// lost after this point is still caught by the helper's own lock.
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+		if held, err := dpkgFrontendHeld(dpkgFrontendLock); err != nil {
+			return nil, err
+		} else if held {
+			return nil, ErrBusy
+		}
+	}
 	ledger, err := p.ledger(ctx, plan.GetRef())
 	if err != nil {
 		return nil, err

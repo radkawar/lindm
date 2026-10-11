@@ -43,6 +43,9 @@ type boundaryNative struct {
 	beforeEffect  func() error
 	planEntered   chan struct{}
 	releasePlan   chan struct{}
+	// refuse is returned before the effect gate, like a provider that finds
+	// another native frontend holding its lock.
+	refuse error
 }
 
 func (n *boundaryNative) Close() error { return nil }
@@ -131,6 +134,9 @@ func (n *boundaryNative) Apply(ctx context.Context, plan *resourcev1.ResourcePla
 			return nil, ctx.Err()
 		case <-n.releaseGate:
 		}
+	}
+	if n.refuse != nil {
+		return nil, n.refuse
 	}
 	if err := authorize(ctx); err != nil {
 		return nil, err

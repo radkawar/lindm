@@ -211,10 +211,13 @@ func parseDatabase(data []byte, ecosystem resourcev1.PackageEcosystem) (*databas
 	return db, nil
 }
 
-func (p *Provider) database(ctx context.Context) (*database, error) {
+func (p *Provider) database(ctx context.Context) (_ *database, resultErr error) {
 	var executable string
 	var args []string
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+		// Mid-transaction under another frontend's lock (pending dpkg
+		// updates, warnings) the database is busy, not damaged.
+		defer func() { resultErr = classifyDPKGBusy(resultErr) }()
 		executable = "/usr/bin/dpkg-query"
 		args = []string{"--show", "--showformat=${db:Status-Abbrev}\t${Package}\t${Version}\t${Architecture}\n"}
 		// dpkg-query can succeed against a missing/empty status database.

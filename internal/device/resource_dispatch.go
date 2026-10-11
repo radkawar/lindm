@@ -387,6 +387,10 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	return work, nil, nil
 }
 
+// resourceReasonNativeBusy is the server reason for a device-attested, effect-free
+// refusal because another native package frontend held the package lock.
+const resourceReasonNativeBusy = "native_package_manager_busy"
+
 func eligibleResource(rows []devicedb.ResourceAssignmentResource, now time.Time, interval time.Duration) (*policyv1.ProfileResource, error) {
 	dispositions := make(map[string]int16, len(rows))
 	desired := make(map[string]*policyv1.ProfileResource, len(rows))
@@ -404,6 +408,12 @@ func eligibleResource(rows []devicedb.ResourceAssignmentResource, now time.Time,
 			recheck = min(recheck, time.Duration(row.VerificationMaxAgeSeconds)*time.Second/2)
 		}
 		if disposition == 3 && (!row.LastVerifiedAt.Valid || !now.Before(row.LastVerifiedAt.Time.Add(recheck))) {
+			disposition = 1
+		}
+		// A native-busy hold (another package frontend, such as a release
+		// upgrade, owned the database) is retried one reconcile interval after
+		// the server recorded it; every other block waits for a new assignment.
+		if disposition == 5 && row.Reason == resourceReasonNativeBusy && row.ObservedAt.Valid && !now.Before(row.ObservedAt.Time.Add(interval)) {
 			disposition = 1
 		}
 		dispositions[resourceRefKey(item.GetDesired().GetRef())] = disposition

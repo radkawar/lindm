@@ -91,6 +91,9 @@ func Run(ctx context.Context, document *config.Document, transactionID, phase st
 		if resultErr != nil {
 			result.Outcome = agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED
 			result.Reason = "native_staging_failed"
+			if errors.Is(resultErr, packageprovider.ErrBusy) {
+				result.Reason = stagingReasonBusy
+			}
 		}
 		resultBytes, err := encodeRecord(result)
 		if err != nil {

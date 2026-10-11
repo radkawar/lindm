@@ -128,6 +128,14 @@ func TestRegistryConsistent(t *testing.T) {
 		if r.Supported(Advisories) && (len(r.Advisory.Feeds) == 0 || r.Advisory.Ecosystem == "") {
 			t.Errorf("%s: advisories without a feed", r.Key)
 		}
+		if r.Supported(ReleaseUpgrade) && r.UpgradeTo == "" {
+			t.Errorf("%s: release upgrade without an upgrade target", r.Key)
+		}
+		if r.UpgradeTo != "" {
+			if target, ok := Lookup(r.UpgradeTo); !ok || target.ID != r.ID || len(target.Advisory.Feeds) == 0 || !slices.Equal(target.Advisory.Feeds, r.Advisory.Feeds) || target.Codename == "" {
+				t.Errorf("%s: upgrade target %q is not a same-distribution row with the same advisory feed and a codename", r.Key, r.UpgradeTo)
+			}
+		}
 		for c := range r.Gates {
 			if !slices.Contains(Capabilities, c) || r.Supported(c) {
 				t.Errorf("%s: gate %q is unknown or contradicts Supports", r.Key, c)

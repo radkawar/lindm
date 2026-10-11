@@ -49,6 +49,9 @@ var (
 	ErrConflict       = errors.New("packageprovider: precondition conflict")
 	ErrOutcomeUnknown = errors.New("packageprovider: native outcome unknown")
 	ErrNotConverged   = errors.Join(resource.ErrNotConverged, errors.New("packageprovider: not converged"))
+	// ErrBusy means another native frontend (for example a distribution
+	// release upgrade) held dpkg's frontend lock before any effect.
+	ErrBusy = errors.New("packageprovider: native package manager busy")
 )
 
 // Config is constructor-only trusted execution context, not a second serialized

@@ -136,11 +136,7 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 	}
 	if operationErr != nil {
 		slog.Warn("resource preparation failed", "action_id", current.GetIntent().GetActionId(), "error", operationErr)
-		failure := agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
-		if errors.Is(operationErr, serviceprovider.ErrUnsupported) {
-			failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
-		}
-		if err := s.endResourcePreparation(ctx, loaded, current, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, failure); err != nil {
+		if err := s.endResourcePreparation(ctx, loaded, current, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, preparationFailure(operationErr)); err != nil {
 			return nil, err
 		}
 		return resourcePreparation(current), nil
@@ -171,6 +167,19 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 		return nil, err
 	}
 	return resourcePreparation(next), nil
+}
+
+// preparationFailure classifies an effect-free staging failure. A native
+// frontend holding the package lock (a release upgrade) is a retried hold.
+func preparationFailure(err error) agentv1.ResourceExecutionFailure {
+	switch {
+	case errors.Is(err, serviceprovider.ErrUnsupported):
+		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED
+	case errors.Is(err, packageprovider.ErrBusy):
+		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY
+	default:
+		return agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION
+	}
 }
 
 // Called under the authority lock. Current trust and signed wall deadline are

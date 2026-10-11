@@ -109,6 +109,10 @@ const (
 	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_INTERRUPTED   ResourceExecutionFailure = 8
 	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_SUPERSEDED    ResourceExecutionFailure = 9
 	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_POSTCONDITION ResourceExecutionFailure = 10
+	// Another native package frontend (for example a distribution release
+	// upgrade) held the package manager lock before any effect. Nothing changed;
+	// the server holds the resource and retries after the reconcile interval.
+	ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY ResourceExecutionFailure = 11
 )
 
 // Enum value maps for ResourceExecutionFailure.
@@ -125,6 +129,7 @@ var (
 		8:  "RESOURCE_EXECUTION_FAILURE_INTERRUPTED",
 		9:  "RESOURCE_EXECUTION_FAILURE_SUPERSEDED",
 		10: "RESOURCE_EXECUTION_FAILURE_POSTCONDITION",
+		11: "RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY",
 	}
 	ResourceExecutionFailure_value = map[string]int32{
 		"RESOURCE_EXECUTION_FAILURE_UNSPECIFIED":   0,
@@ -138,6 +143,7 @@ var (
 		"RESOURCE_EXECUTION_FAILURE_INTERRUPTED":   8,
 		"RESOURCE_EXECUTION_FAILURE_SUPERSEDED":    9,
 		"RESOURCE_EXECUTION_FAILURE_POSTCONDITION": 10,
+		"RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY":   11,
 	}
 )
 
@@ -2314,7 +2320,7 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"(RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN\x10\x06\x12$\n" +
 	" RESOURCE_EXECUTION_STATE_EXPIRED\x10\a\x12'\n" +
 	"#RESOURCE_EXECUTION_STATE_SUPERSEDED\x10\b\x12&\n" +
-	"\"RESOURCE_EXECUTION_STATE_PREPARING\x10\t*\xee\x03\n" +
+	"\"RESOURCE_EXECUTION_STATE_PREPARING\x10\t*\x9a\x04\n" +
 	"\x18ResourceExecutionFailure\x12*\n" +
 	"&RESOURCE_EXECUTION_FAILURE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fRESOURCE_EXECUTION_FAILURE_NONE\x10\x01\x12+\n" +
@@ -2327,7 +2333,8 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"&RESOURCE_EXECUTION_FAILURE_INTERRUPTED\x10\b\x12)\n" +
 	"%RESOURCE_EXECUTION_FAILURE_SUPERSEDED\x10\t\x12,\n" +
 	"(RESOURCE_EXECUTION_FAILURE_POSTCONDITION\x10\n" +
-	"*\xf9\x01\n" +
+	"\x12*\n" +
+	"&RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY\x10\v*\xf9\x01\n" +
 	"\x1eResourceAdmissionRefusalReason\x121\n" +
 	"-RESOURCE_ADMISSION_REFUSAL_REASON_UNSPECIFIED\x10\x00\x126\n" +
 	"2RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN\x10\x01\x128\n" +

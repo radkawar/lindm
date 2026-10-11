@@ -18,11 +18,14 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
+const dpkgFrontendLock = "/var/lib/dpkg/lock-frontend"
+
 // POSIX frontend locking follows dpkg's documented frontend protocol. The helper
 // retains this lock while each dpkg child takes its own inner database lock;
 // DPKG_FRONTEND_LOCKED=true delegates only the already-held frontend dimension.
+// Contention is ErrBusy: another frontend owns the database and nothing changed.
 func lockDPKGFrontend() (*os.File, error) {
-	fd, err := unix.Open("/var/lib/dpkg/lock-frontend", unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	fd, err := unix.Open(dpkgFrontendLock, unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -38,9 +41,43 @@ func lockDPKGFrontend() (*os.File, error) {
 	lock := unix.Flock_t{Type: unix.F_WRLCK, Whence: 0, Start: 0, Len: 0}
 	if err := unix.FcntlFlock(uintptr(fd), unix.F_SETLK, &lock); err != nil {
 		_ = unix.Close(fd)
-		return nil, fmt.Errorf("%w: dpkg frontend busy: %v", ErrConflict, err)
+		if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EACCES) {
+			return nil, fmt.Errorf("%w: dpkg frontend lock held: %v", ErrBusy, err)
+		}
+		return nil, fmt.Errorf("%w: dpkg frontend lock: %v", ErrConflict, err)
 	}
 	return os.NewFile(uintptr(fd), "dpkg frontend lock"), nil
+}
+
+// dpkgFrontendHeld reports whether another process holds the frontend write
+// lock at path. It only tests (F_GETLK); it takes and changes nothing, so a
+// read-only view of the dpkg database suffices.
+func dpkgFrontendHeld(path string) (bool, error) {
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	if errors.Is(err, unix.ENOENT) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = unix.Close(fd) }()
+	lock := unix.Flock_t{Type: unix.F_WRLCK, Whence: 0, Start: 0, Len: 0}
+	if err := unix.FcntlFlock(uintptr(fd), unix.F_GETLK, &lock); err != nil {
+		return false, err
+	}
+	return lock.Type != unix.F_UNLCK, nil
+}
+
+// classifyDPKGBusy turns a native failure observed while another frontend
+// holds the dpkg lock into ErrBusy; APT reports that contention only as text.
+func classifyDPKGBusy(err error) error {
+	if err == nil || errors.Is(err, ErrBusy) {
+		return err
+	}
+	if held, probe := dpkgFrontendHeld(dpkgFrontendLock); probe == nil && held {
+		return errors.Join(ErrBusy, err)
+	}
+	return err
 }
 
 type aptStep struct{ operation, name, architecture, version string }

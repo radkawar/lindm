@@ -214,6 +214,10 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			if status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNKNOWN {
 				reason = "verification_unknown"
 			}
+		case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED && status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY && status.GetStartedAt() == nil:
+			// Another native frontend owned the package database; nothing
+			// changed. The hold is retried after the reconcile interval.
+			disposition, reason = 5, resourceReasonNativeBusy
 		default:
 			disposition, reason = 4, "execution_failed"
 			if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
@@ -244,7 +248,11 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			return nil, mapErr(err)
 		}
 		if latest.ID == action.ID {
-			if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
+			if reason == resourceReasonNativeBusy {
+				if err := q.HoldResource(ctx, devicedb.HoldResourceParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Reason: reason, ObservedAt: timestamptz(now)}); err != nil {
+					return nil, mapErr(err)
+				}
+			} else if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
 				return nil, mapErr(err)
 			}
 			if disposition == 3 {

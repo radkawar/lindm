@@ -55,9 +55,32 @@ type AcceptanceFeedResult struct {
 // complete vendor exports, never curated records or the offline import path.
 // Fedora publishes RPM updateinfo, not CSAF; Red Hat's paired CSAF archives are
 // fetched separately. HTTP revalidation preserves vendor freshness on cache hits.
-func (f *AuthorityFixture) RefreshAcceptanceFeeds(ctx context.Context, cacheDirectory string, byteBudget int64, duration time.Duration) (result *AcceptanceFeedResult, resultErr error) {
-	if byteBudget <= 0 || duration <= 0 {
-		return nil, errors.New("positive feed size and duration budgets required")
+func (f *AuthorityFixture) RefreshAcceptanceFeeds(ctx context.Context, cacheDirectory string, byteBudget int64, duration time.Duration) (*AcceptanceFeedResult, error) {
+	var feeds []*advisoryv1.FeedSource
+	for _, feed := range []struct {
+		release string
+		source  *advisoryv1.FeedSource
+	}{
+		{"ubuntu-24.04", &advisoryv1.FeedSource{Id: "acceptance-ubuntu", Architecture: "amd64", Url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP, MaxAgeSeconds: 86400}},
+		{"fedora-44", &advisoryv1.FeedSource{Id: "acceptance-fedora", Architecture: "x86_64", Url: "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD, MaxAgeSeconds: 86400}},
+		{"rhel-9", &advisoryv1.FeedSource{Id: "acceptance-rhel", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800}},
+	} {
+		release, ok := platform.Lookup(feed.release)
+		if !ok {
+			return nil, fmt.Errorf("acceptance feed release %s is not in the platform registry", feed.release)
+		}
+		feed.source.Distro, feed.source.Release = release.ID, release.Version.Value
+		feeds = append(feeds, feed.source)
+	}
+	return f.RefreshVendorFeeds(ctx, cacheDirectory, byteBudget, duration, feeds)
+}
+
+// RefreshVendorFeeds configures exactly feeds (disabling any other configured
+// feed, as the server's own configuration does) and refreshes them through the
+// production pipeline with the revalidating, byte-bounded acceptance cache.
+func (f *AuthorityFixture) RefreshVendorFeeds(ctx context.Context, cacheDirectory string, byteBudget int64, duration time.Duration, feeds []*advisoryv1.FeedSource) (result *AcceptanceFeedResult, resultErr error) {
+	if byteBudget <= 0 || duration <= 0 || len(feeds) == 0 {
+		return nil, errors.New("vendor feeds and positive size and duration budgets required")
 	}
 	if err := os.MkdirAll(cacheDirectory, 0700); err != nil {
 		return nil, err
@@ -87,22 +110,7 @@ func (f *AuthorityFixture) RefreshAcceptanceFeeds(ctx context.Context, cacheDire
 	defer func() { result.Artifacts = cache.artifacts }()
 	client := *resources.HTTPClient
 	client.Transport = cache
-	cfg := &configv1.AdvisoryConfig{}
-	for _, feed := range []struct {
-		release string
-		source  *advisoryv1.FeedSource
-	}{
-		{"ubuntu-24.04", &advisoryv1.FeedSource{Id: "acceptance-ubuntu", Architecture: "amd64", Url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP, MaxAgeSeconds: 86400}},
-		{"fedora-44", &advisoryv1.FeedSource{Id: "acceptance-fedora", Architecture: "x86_64", Url: "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD, MaxAgeSeconds: 86400}},
-		{"rhel-9", &advisoryv1.FeedSource{Id: "acceptance-rhel", Architecture: "x86_64", PlatformStream: "standard", Url: "https://security.access.redhat.com/data/csaf/v2/", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES, MaxAgeSeconds: 604800}},
-	} {
-		release, ok := platform.Lookup(feed.release)
-		if !ok {
-			return result, fmt.Errorf("acceptance feed release %s is not in the platform registry", feed.release)
-		}
-		feed.source.Distro, feed.source.Release = release.ID, release.Version.Value
-		cfg.Feeds = append(cfg.Feeds, feed.source)
-	}
+	cfg := &configv1.AdvisoryConfig{Feeds: feeds}
 	service, err := advisory.New(ctx, pool, cfg, &client)
 	if err != nil {
 		return result, err

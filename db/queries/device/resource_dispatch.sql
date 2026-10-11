@@ -39,6 +39,11 @@ UPDATE resource_assignment_resources SET disposition = $3, reason = $4 WHERE ass
 -- name: SetAssignmentResourceVerification :exec
 UPDATE resource_assignment_resources SET last_verified_at = $3, observed_at = $4, drift_remediated = $5 WHERE assignment_id = $1 AND resource_id = $2;
 
+-- A device-observed transient native hold: BLOCKED with its reason, retried
+-- once the reconcile interval has passed since observed_at.
+-- name: HoldResource :exec
+UPDATE resource_assignment_resources SET disposition = 5, reason = $3, observed_at = $4 WHERE assignment_id = $1 AND resource_id = $2;
+
 -- name: MarkResourceReadOnlySuccess :exec
 UPDATE resource_actions SET read_only_success = true WHERE id = $1 AND closed_reason = 'result' AND octet_length(start_grant_envelope) = 0;
 

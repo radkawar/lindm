@@ -249,6 +249,29 @@ func (q *Queries) HasResourceWork(ctx context.Context, arg HasResourceWorkParams
 	return exists, err
 }
 
+const holdResource = `-- name: HoldResource :exec
+UPDATE resource_assignment_resources SET disposition = 5, reason = $3, observed_at = $4 WHERE assignment_id = $1 AND resource_id = $2
+`
+
+type HoldResourceParams struct {
+	AssignmentID uuid.UUID
+	ResourceID   uuid.UUID
+	Reason       string
+	ObservedAt   pgtype.Timestamptz
+}
+
+// A device-observed transient native hold: BLOCKED with its reason, retried
+// once the reconcile interval has passed since observed_at.
+func (q *Queries) HoldResource(ctx context.Context, arg HoldResourceParams) error {
+	_, err := q.db.Exec(ctx, holdResource,
+		arg.AssignmentID,
+		arg.ResourceID,
+		arg.Reason,
+		arg.ObservedAt,
+	)
+	return err
+}
+
 const insertAssignmentResource = `-- name: InsertAssignmentResource :exec
 INSERT INTO resource_assignment_resources(assignment_id, resource_id, resource_kind, canonical_key, position, document, depends_on, verification_max_age_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 `

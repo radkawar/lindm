@@ -210,7 +210,10 @@ type Release struct {
 	Variants []string
 	// Base is the Key of the release whose native tooling a derivative ships.
 	Base string
-	Tier Tier
+	// UpgradeTo is the Key of the release the vendor's supported in-place
+	// release upgrade reaches; empty when no upgrade path is modelled.
+	UpgradeTo string
+	Tier      Tier
 	// Page is the docs/platforms page describing the release.
 	Page          string
 	Family        Family

@@ -89,6 +89,12 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 	if err != nil {
 		return err
 	}
+	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+		// Staging is effect-free. While another frontend (a release upgrade)
+		// holds dpkg, its database moves and APT's install-time locks fail;
+		// any staging failure then is that busy state, retried later.
+		defer func() { resultErr = classifyDPKGBusy(resultErr) }()
+	}
 	if request.GetOriginalPin() != nil {
 		pin, contents, err := readPin(p.pinPath(request.GetDesired().GetRef()))
 		if err != nil {

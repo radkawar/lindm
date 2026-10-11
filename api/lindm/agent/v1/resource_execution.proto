@@ -184,6 +184,10 @@ enum ResourceExecutionFailure {
   RESOURCE_EXECUTION_FAILURE_INTERRUPTED = 8;
   RESOURCE_EXECUTION_FAILURE_SUPERSEDED = 9;
   RESOURCE_EXECUTION_FAILURE_POSTCONDITION = 10;
+  // Another native package frontend (for example a distribution release
+  // upgrade) held the package manager lock before any effect. Nothing changed;
+  // the server holds the resource and retries after the reconcile interval.
+  RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY = 11;
 }
 
 // Protected journal data, not an RPC response. Historical trust verifies accepted

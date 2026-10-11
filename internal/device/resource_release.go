@@ -109,6 +109,9 @@ func releaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
 		return "release_conflict", "outcome_unknown"
 	}
+	if status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY {
+		return "release_conflict", resourceReasonNativeBusy
+	}
 	return "release_conflict", "release_failed"
 }
 

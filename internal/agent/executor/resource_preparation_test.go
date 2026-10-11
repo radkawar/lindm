@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/packageprovider"
 	"lindm/internal/resource"
 )
 
@@ -28,6 +30,7 @@ type preparingNative struct {
 	artifact string
 	ready    atomic.Bool
 	corrupt  atomic.Bool
+	busy     atomic.Bool
 	polls    atomic.Int32
 	cancels  atomic.Int32
 	applies  atomic.Int32
@@ -52,6 +55,9 @@ func (n *preparingNative) Plan(ctx context.Context, desired *resourcev1.Resource
 			return nil, ctx.Err()
 		case <-n.release:
 		}
+	}
+	if n.busy.Load() {
+		return nil, fmt.Errorf("%w: staging under another frontend", packageprovider.ErrBusy)
 	}
 	if !n.ready.Load() {
 		return nil, resource.ErrPreparing
@@ -174,6 +180,28 @@ func TestResourcePreparationDurablePollRestartAndFreshChallenge(t *testing.T) {
 	}
 	if n.polls.Load() != polls || n.applies.Load() != 0 {
 		t.Fatal("prepared retry restaged or mutated")
+	}
+}
+
+// A staging refusal while another native frontend (a release upgrade) holds
+// dpkg is signed as NATIVE_BUSY: terminal, effect-free and never PRECONDITION.
+func TestResourcePreparationNativeBusyIsExplicitAndEffectFree(t *testing.T) {
+	f, n, intent := newPreparationFixture(t)
+	_, envelope := f.prepare(t, intent)
+	n.busy.Store(true)
+	response, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := response.Msg.GetStatus()
+	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED || status.GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY || status.GetPreparationOutcome().GetFailure() != agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY {
+		t.Fatalf("busy staging was not an explicit native-busy outcome: %v", status)
+	}
+	if status.GetStartedAt() != nil || status.GetBefore() != nil || status.GetVerification() != nil || n.applies.Load() != 0 || n.cancels.Load() != 1 {
+		t.Fatal("busy staging fabricated evidence, effect or skipped cleanup")
+	}
+	if _, attested := attestResource(t, f, status); !proto.Equal(attested.GetStatus(), status) {
+		t.Fatal("signed history lost the native-busy outcome")
 	}
 }
 

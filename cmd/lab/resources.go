@@ -29,7 +29,7 @@ func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer
 	record := flags.String("record", "", "new private evidence file with per-kind outcomes and SHA256 native records")
 	localAuthority := flags.Bool("local-authority", false, "isolated local password/WebAuthn authority instead of Keycloak")
 	kinds := flags.String("kinds", "packages,files", "connected kind groups: packages,files,accounts,sysctl,definitions,password,firewall,secret-password,local-admin,os-update (firewall boots a second probe-peer guest; secret-password and local-admin configure escrow custody and prove SSH password logins; local-admin requires -local-authority; os-update installs a real pending security update from the distribution repositories in a timer-opened window and awaits the policy's logind reboot)")
-	phase := flags.String("phase", "executor", "executor: signed native bootstrap without profile gate bypass; connected: real server assignment/release after qualification")
+	phase := flags.String("phase", "executor", "executor: signed native bootstrap without profile gate bypass; connected: real server assignment/release after qualification; release-upgrade: a converged packages/files/service/sysctl profile and both releases' vendor OSV feeds across the vendor's in-place release upgrade to the registry target (requires -allow-network; ignores -kinds)")
 	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -37,10 +37,13 @@ func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer
 	if flags.NArg() != 0 || *manifestPath == "" || *server == "" || *record == "" {
 		return errors.New("vm resources requires -manifest, -lindmd and -record; no positional arguments")
 	}
-	if *phase != "executor" && *phase != "connected" {
-		return errors.New("resource qualification phase must be executor or connected")
+	if *phase != "executor" && *phase != "connected" && *phase != "release-upgrade" {
+		return errors.New("resource qualification phase must be executor, connected or release-upgrade")
 	}
 	selected, err := vmlab.ResourceKindSelection(*kinds)
+	if *phase == "release-upgrade" {
+		selected, err = vmlab.ResourceKindSelection("packages,files,sysctl")
+	}
 	if err != nil {
 		return err
 	}
@@ -55,7 +58,7 @@ func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, LocalAuthority: *localAuthority, Resources: true, ResourceExecutionOnly: *phase == "executor", ResourceKinds: selected})
+	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, LocalAuthority: *localAuthority, Resources: true, ResourceExecutionOnly: *phase == "executor", ResourceKinds: selected, ReleaseUpgrade: *phase == "release-upgrade"})
 	if result != nil {
 		runErr = errors.Join(runErr, writeLabEvidence(stdout, *record, result))
 	}
