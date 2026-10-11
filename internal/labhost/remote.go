@@ -488,7 +488,11 @@ func removeFlag(args []string, name string) []string {
 	return out
 }
 
-func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time, revision, diffDigest string, relocated map[string]string) error {
+// annotateRemoteRecord adds host provenance to the private returned copy. Lanes
+// may finalize their remote record read-only (device-actions chmods it 0400)
+// and rsync preserves that mode, so the annotated copy replaces it by rename
+// rather than by writing through the read-only file.
+func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time, revision, diffDigest string, relocated map[string]string) (err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -517,7 +521,23 @@ func annotateRemoteRecord(path string, host *labv1.LabHost, start, end time.Time
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0600)
+	annotated, err := os.CreateTemp(filepath.Dir(path), ".annotated-")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, os.Remove(annotated.Name()))
+		}
+	}()
+	_, err = annotated.Write(append(data, '\n'))
+	if err == nil {
+		err = annotated.Sync()
+	}
+	if err = errors.Join(err, annotated.Close()); err != nil {
+		return err
+	}
+	return os.Rename(annotated.Name(), path)
 }
 
 func publishRecord(source, destination string) (err error) {

@@ -175,3 +175,42 @@ func TestAssistanceEvidenceReturnKeepsOwnerCredentialsRemote(t *testing.T) {
 		t.Fatalf("returned evidence directory is not private: %v, %v", info, err)
 	}
 }
+
+// vm device-actions finalizes its record 0400 and rsync -a preserves the mode;
+// the returned copy must still gain host provenance and be published
+// (debian12-arm64-dgx21-device-actions-encryption-01 was left on the host).
+func TestReadOnlyReturnedRecordIsAnnotated(t *testing.T) {
+	root := t.TempDir()
+	returned := filepath.Join(root, "returned-record.json")
+	if err := os.WriteFile(returned, []byte(`{"passed":true}`+"\n"), 0400); err != nil {
+		t.Fatal(err)
+	}
+	host := &labv1.LabHost{Name: "dgx21", Transport: "ssh", SshAlias: "dgx21", Runtime: "native"}
+	start := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
+	if err := annotateRemoteRecord(returned, host, start, start.Add(time.Minute), "5231542", "digest", nil); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(root, "evidence.json")
+	if err := publishRecord(returned, destination); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		Passed  bool `json:"passed"`
+		LabHost struct {
+			Name     string  `json:"name"`
+			Revision string  `json:"source_revision"`
+			Elapsed  float64 `json:"elapsed_seconds"`
+		} `json:"lab_host"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil || !record.Passed || record.LabHost.Name != "dgx21" || record.LabHost.Revision != "5231542" || record.LabHost.Elapsed != 60 {
+		t.Fatalf("annotated record = %s: %v", data, err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("annotation left temporary files: %v, %v", entries, err)
+	}
+}
