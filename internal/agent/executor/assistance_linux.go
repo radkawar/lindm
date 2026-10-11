@@ -35,7 +35,9 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[agent
 // sessionService is the SessionService handler for the session socket. The
 // caller is identified solely by the SO_PEERCRED UID recorded on its connection.
 type sessionService struct {
-	broker *assistanceBroker
+	broker        *assistanceBroker
+	reboots       rebootSessionProvider
+	rebootPrompts map[uint32]rebootPrompt
 }
 
 var _ agentv1connect.SessionServiceHandler = (*sessionService)(nil)
@@ -57,6 +59,11 @@ func (h *sessionService) SyncSession(ctx context.Context, req *connect.Request[a
 		return nil, rpcreason.Error(connect.CodeUnavailable, "logind_unavailable")
 	case err != nil:
 		return nil, mapError(err)
+	}
+	if h.reboots != nil {
+		if err := h.syncReboot(ctx, uid, req.Msg, response); err != nil {
+			return nil, mapError(err)
+		}
 	}
 	return noStore(response), nil
 }

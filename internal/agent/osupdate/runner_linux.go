@@ -109,23 +109,21 @@ func (r *Runner) loadPolicy() (*agentv1.OSUpdateRunPolicy, error) {
 	return policy, nil
 }
 
-// loadRunState returns the root-only state. A missing file starts empty. An
-// unreadable or invalid one also starts empty and is logged: the deferral
-// clock restarts, which only ever delays updates.
-func (r *Runner) loadRunState() *agentv1.OSUpdateRunState {
+// loadRunState returns the root-only state. A missing file starts empty.
+// Corruption is an error: discarding it could reset a reboot deadline or count.
+func (r *Runner) loadRunState() (*agentv1.OSUpdateRunState, error) {
 	state := &agentv1.OSUpdateRunState{FormatVersion: 1}
 	data, err := readProtected(resource.OSUpdateRunStatePath, runStateLimit)
 	if errors.Is(err, fs.ErrNotExist) {
-		return state
+		return state, nil
 	}
 	if err == nil {
 		loaded := &agentv1.OSUpdateRunState{}
 		if err = r.unmarshalValidated(data, loaded); err == nil {
-			return loaded
+			return loaded, nil
 		}
 	}
-	r.log.Warn("os-update run state discarded", "error", err)
-	return state
+	return nil, fmt.Errorf("os-update run state: %w", err)
 }
 
 // Run is the maintenance-window entrypoint (lindm-os-update.service).
@@ -224,7 +222,10 @@ func (r *Runner) recordOnly(ctx context.Context, spec runSpec, started time.Time
 	summary := r.summary(spec, started, result)
 	summary.Diagnostic = diagnostic
 	summary.FinishedAt = timestamppb.New(r.now())
-	state := r.loadRunState()
+	state, err := r.loadRunState()
+	if err != nil {
+		return err
+	}
 	state.LastRun = summary
 	if err := r.writeRunState(state); err != nil {
 		return err
@@ -241,6 +242,9 @@ func (r *Runner) recordOnly(ctx context.Context, spec runSpec, started time.Time
 // publish recomputes and writes the offline status for state. The caller
 // holds the run lock.
 func (r *Runner) publish(ctx context.Context, state *agentv1.OSUpdateRunState) error {
+	if err := r.reconcilePendingReboot(ctx, state); err != nil {
+		return err
+	}
 	native, err := detect(osReleasePaths, 0)
 	if err != nil {
 		return r.writeStatus(r.unavailable(reasonPlatform, state))
@@ -309,7 +313,10 @@ func (r *Runner) execute(ctx context.Context, spec runSpec, started time.Time) (
 	}
 	defer func() { err = errors.Join(err, held.release()) }()
 	summary := r.summary(spec, started, agentv1.PatchRunResult_PATCH_RUN_RESULT_UNSPECIFIED)
-	state := r.loadRunState()
+	state, err := r.loadRunState()
+	if err != nil {
+		return err
+	}
 	native, detectErr := detect(osReleasePaths, 0)
 	if detectErr == nil {
 		if rolling, ok := native.(*rollingBackend); ok {
@@ -466,13 +473,14 @@ func (r *Runner) native(ctx context.Context, native backend, spec runSpec, state
 	}
 	summary.RebootRequired = required
 	if !required {
+		state.Reboot = nil
 		return
 	}
 	if spec.reboot.GetMode() != resourcev1.OSUpdateRebootMode_OS_UPDATE_REBOOT_MODE_SCHEDULED {
 		summary.RebootReason = "policy_never"
 		return
 	}
-	users, message, err := r.requestReboot(ctx, spec, summary)
+	users, message, err := r.requestReboot(ctx, spec, state, summary)
 	if err != nil {
 		fail(&nativeFailure{reason: "native_power_failed", diagnostic: runnerDiagnostic(agentv1.PatchRunTool_PATCH_RUN_TOOL_LOGIND, agentv1.PatchRunPhase_PATCH_RUN_PHASE_REBOOT_SCHEDULE, "logind reboot schedule failed")})
 		r.log.Error("os-update reboot schedule failed", "error", err)
@@ -492,9 +500,18 @@ func (r *Runner) native(ctx context.Context, native backend, spec runSpec, state
 // session users to notify of an accepted schedule. The logind connection is
 // closed before it returns; a close error after an accepted schedule is only
 // logged, as the reboot is scheduled regardless.
-func (r *Runner) requestReboot(ctx context.Context, spec runSpec, summary *agentv1.PatchRunSummary) (users []sessionUser, message string, err error) {
+func (r *Runner) requestReboot(ctx context.Context, spec runSpec, state *agentv1.OSUpdateRunState, summary *agentv1.PatchRunSummary) (users []sessionUser, message string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, logindTimeout)
 	defer cancel()
+	now := r.now().Truncate(time.Second)
+	state.Reboot = rebootCycle(state.GetReboot(), spec.reboot, bootID(), now)
+	// An outstanding reboot retains the exact policy and deadline that
+	// authorized it; a later update cannot advertise an earlier deadline.
+	spec.reboot = state.GetReboot().GetPolicy()
+	deadline := state.GetReboot().GetDeadline().AsTime()
+	if err := r.writeRunState(state); err != nil {
+		return nil, "", err
+	}
 	bus, err := openLogind(ctx)
 	if err != nil {
 		return nil, "", err
@@ -513,6 +530,9 @@ func (r *Runner) requestReboot(ctx context.Context, spec runSpec, summary *agent
 	if err != nil {
 		return nil, "", err
 	}
+	if err := r.reconcileRebootState(state, power); err != nil {
+		return nil, "", err
+	}
 	switch {
 	case power.pending:
 		summary.RebootReason = "native_power_already_pending"
@@ -524,13 +544,38 @@ func (r *Runner) requestReboot(ctx context.Context, spec runSpec, summary *agent
 		summary.RebootReason = "native_power_inhibited"
 		return nil, "", nil
 	}
-	at := r.now().Add(time.Duration(spec.reboot.GetMaxDelayMinutes()) * time.Minute).Truncate(time.Second)
+	if !now.Before(deadline) {
+		summary.RebootReason = "reboot_deadline_elapsed"
+		return nil, "", nil
+	}
+	earliest := deadline
+	if spec.reboot.GetRebootWindow() != nil || spec.reboot.GetEmployeeDeferral() != nil {
+		earliest = now.Add(5 * time.Minute)
+	}
+	at, err := rebootInstant(spec.reboot.GetRebootWindow(), earliest, deadline)
+	if err != nil {
+		return nil, "", err
+	}
+	if at.IsZero() {
+		summary.RebootReason = "no_window_before_deadline"
+		return nil, "", nil
+	}
+	if window := spec.reboot.GetRebootWindow(); window != nil {
+		spec.zone, err = time.LoadLocation(window.GetTimeZone())
+		if err != nil {
+			return nil, "", err
+		}
+	}
 	message = rebootMessage(spec.reboot.GetNotice(), at, spec.zone)
-	if err := bus.scheduleReboot(ctx, message, at); err != nil {
+	attempt := &agentv1.OSUpdateRebootAttempt{RequestId: uuid.NewString(), ScheduledFor: timestamppb.New(at)}
+	if err := performRebootAttempt(ctx, state.GetReboot(), attempt, bus, message, func() error { return r.writeRunState(state) }, invalidateRebootStatus); err != nil {
 		return nil, "", err
 	}
 	scheduled = true
 	summary.RebootScheduledFor = timestamppb.New(at)
+	if employeeRebootNotice(state.GetReboot()) {
+		return nil, message, nil
+	}
 	users, listErr := bus.graphicalUsers(ctx)
 	if listErr != nil {
 		r.log.Warn("os-update session listing failed", "error", listErr)
@@ -540,7 +585,7 @@ func (r *Runner) requestReboot(ctx context.Context, spec runSpec, summary *agent
 }
 
 // Status recomputes the offline patch status (lindm-os-update-status.service).
-// It reads the run state but never changes it.
+// It may reconcile a pending native reboot attempt, but never replays its effect.
 func (r *Runner) Status(ctx context.Context) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, statusBudget)
 	defer cancel()
@@ -553,7 +598,11 @@ func (r *Runner) Status(ctx context.Context) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, held.release()) }()
-	return r.publish(ctx, r.loadRunState())
+	state, err := r.loadRunState()
+	if err != nil {
+		return err
+	}
+	return r.publish(ctx, state)
 }
 
 func bootID() string {
@@ -633,6 +682,10 @@ func (r *Runner) observe(ctx context.Context, native backend, state *agentv1.OSU
 		}
 	}
 	status.RebootScheduledFor = r.pendingReboot(ctx)
+	if reboot := state.GetReboot(); reboot != nil && reboot.GetBootId() == status.GetBootId() && status.GetRebootScheduledFor() != nil && status.GetRebootScheduledFor().AsTime().Equal(reboot.GetScheduledFor().AsTime()) {
+		status.RebootDeadline = reboot.GetDeadline()
+		status.RebootDeferralsUsed = reboot.GetDeferralsUsed()
+	}
 	return status, pending
 }
 

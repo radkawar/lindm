@@ -41,17 +41,17 @@ type AssistanceController struct {
 	control *vmControlPlane
 }
 
-func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (*AssistanceController, error) {
-	return openAssistanceController(ctx, repository, binary, "", address, host, enrollment)
+func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions, rebootPolicy bool) (*AssistanceController, error) {
+	return openAssistanceController(ctx, repository, binary, "", address, host, enrollment, rebootPolicy)
 }
 
 // OpenPersistentAssistanceController reopens the same database, accounts and
 // listeners before reconnecting the named remote VM.
 func OpenPersistentAssistanceController(ctx context.Context, repository, binary, stateDir string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (*AssistanceController, error) {
-	return openAssistanceController(ctx, repository, binary, stateDir, address, host, enrollment)
+	return openAssistanceController(ctx, repository, binary, stateDir, address, host, enrollment, false)
 }
 
-func openAssistanceController(ctx context.Context, repository, binary, stateDir string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (_ *AssistanceController, err error) {
+func openAssistanceController(ctx context.Context, repository, binary, stateDir string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions, rebootPolicy bool) (_ *AssistanceController, err error) {
 	var fixture *devlab.AuthorityFixture
 	if stateDir == "" {
 		fixture, err = devlab.OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, address, enrollment)
@@ -67,7 +67,12 @@ func openAssistanceController(ctx context.Context, repository, binary, stateDir 
 			err = errors.Join(err, controller.Close())
 		}
 	}()
-	delegation, err := fixture.ConfigureDeviceActions(ctx)
+	var delegation *agentv1.UpdateExecutionTrustRequest
+	if rebootPolicy {
+		delegation, err = fixture.ConfigureServiceDispatch(ctx)
+	} else {
+		delegation, err = fixture.ConfigureDeviceActions(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +215,12 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 			err = errors.Join(err, fixture.Close())
 		}
 	}()
-	delegation, err := fixture.ConfigureDeviceActions(ctx)
+	var delegation *agentv1.UpdateExecutionTrustRequest
+	if options.RebootPolicy != nil {
+		delegation, err = fixture.ConfigureServiceDispatch(ctx)
+	} else {
+		delegation, err = fixture.ConfigureDeviceActions(ctx)
+	}
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}

@@ -44,6 +44,7 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack (must match the cached golden)")
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
 	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
+	rebootPolicy := flags.Bool("reboot-policy", false, "qualify signed reboot windows and employee deferral on a disposable desktop; emits reboot-policy.json, not assistance qualification")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	name := flags.String("name", "", "persistent held demo name; Ctrl-C stops processes but keeps enrolled state")
 	destroy := flags.Bool("destroy", false, "destroy the named stopped demo, its VM and fixture")
@@ -54,6 +55,9 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.String("controller-address", "", "override the routed controller IPv4 address for an SSH-native split run")
 	flags.StringVar(&options.AdvisoryCache, "advisory-cache", "", "persistent revalidating feed cache for held demos; defaults to the configured lab work directory")
 	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if err := validateRebootPolicyFlags(*rebootPolicy, *hold, *name, *scenarios); err != nil {
 		return err
 	}
 	if *name != "" {
@@ -98,6 +102,10 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	if flags.NArg() != 0 || *manifestPath == "" || options.LabBinary == "" || options.LindmdBinary == "" || *evidence == "" {
 		return errors.New("vm assistance requires -manifest, -lab, -lindmd and -evidence NEW_DIRECTORY; no positional arguments")
+	}
+	if *rebootPolicy {
+		options.RebootPolicy = new(vmlab.VMRebootPolicyResult)
+		options.Scenarios = []string{}
 	}
 	if *scenarios != "" && !*hold {
 		return errors.New("vm assistance -scenarios requires -hold; a qualification record always runs every scenario")
@@ -147,6 +155,19 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	result, laneErr := vmlab.AssistanceVM(ctx, manifest, options)
 	if result == nil {
 		return laneErr
+	}
+	if options.RebootPolicy != nil {
+		proof := options.RebootPolicy
+		proof.Fixture = result
+		proof.Passed = laneErr == nil
+		if laneErr != nil {
+			proof.Failure = laneErr.Error()
+		}
+		record := filepath.Join(*evidence, "reboot-policy.json")
+		if err := writeLabEvidence(stdout, record, proof); err != nil {
+			return errors.Join(laneErr, err)
+		}
+		return errors.Join(laneErr, os.Chmod(record, 0o400))
 	}
 	record := filepath.Join(*evidence, "assistance.json")
 	if err := writeLabEvidence(stdout, record, result); err != nil {
@@ -230,4 +251,11 @@ func runVMAssistanceRespond(ctx context.Context, args []string, stdout, stderr i
 	}
 	_, err = fmt.Fprintf(stdout, "Guest screenshot after %s: %s\n", flags.Arg(0), shot)
 	return err
+}
+
+func validateRebootPolicyFlags(enabled, held bool, name, scenarios string) error {
+	if enabled && (held || name != "" || scenarios != "") {
+		return errors.New("-reboot-policy requires a disposable non-held fixture and no assistance scenarios")
+	}
+	return nil
 }

@@ -57,13 +57,16 @@ type Helper struct {
 	activeInterval time.Duration
 	lossTimeout    time.Duration
 
-	sessions    map[string]*session
-	tombstones  map[string]*session
-	tombOrder   []string
-	lastSuccess time.Time
-	failing     bool
-	boundLocal  string
-	group       sync.WaitGroup
+	sessions      map[string]*session
+	tombstones    map[string]*session
+	tombOrder     []string
+	lastSuccess   time.Time
+	failing       bool
+	boundLocal    string
+	group         sync.WaitGroup
+	reboot        *agentv1.OSUpdateRebootNotice
+	rebootNotice  Notice
+	rebootRequest *agentv1.OSUpdateRebootDeferralRequest
 }
 
 // New validates the collaborators. It refuses to construct a helper for
@@ -136,6 +139,7 @@ func (h *Helper) interval() time.Duration {
 }
 
 func (h *Helper) shutdown(base context.Context) {
+	h.closeRebootNotice(base)
 	h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "helper_stopped")
 	h.group.Wait()
 	h.closeLockWatch()
@@ -153,8 +157,9 @@ func (h *Helper) shutdown(base context.Context) {
 // parent of new session goroutines.
 func (h *Helper) syncOnce(ctx, sessionParent context.Context) {
 	h.drainLocks()
+	h.rebootAction()
 	call, cancel := context.WithTimeout(ctx, syncCallTimeout)
-	response, err := h.client.SyncSession(call, connect.NewRequest(&agentv1.SyncSessionRequest{Reports: h.reports()}))
+	response, err := h.client.SyncSession(call, connect.NewRequest(&agentv1.SyncSessionRequest{Reports: h.reports(), RebootDeferral: h.rebootRequest}))
 	cancel()
 	now := h.deps.clock()
 	if err != nil {
@@ -169,13 +174,18 @@ func (h *Helper) syncOnce(ctx, sessionParent context.Context) {
 		h.failing = false
 	}
 	h.lastSuccess = now
+	h.rebootRequest = nil
 	h.apply(sessionParent, response.Msg)
 }
 
 // syncFailed applies the loss rules: an authoritative refusal stops every
 // session immediately; transport failures stop them after lossTimeout.
 func (h *Helper) syncFailed(now time.Time, err error) {
+	h.closeRebootNotice(context.Background())
 	if !h.failing {
+		if h.rebootRequest != nil {
+			h.rebootUncertain()
+		}
 		h.logger.Warn("executor session sync failed", "err", err)
 		h.failing = true
 	}
@@ -213,6 +223,7 @@ func (h *Helper) lockEvents() <-chan string {
 // lockObserved ends every session on a lock request; a lost watch ends them
 // too, because a later lock could no longer be observed.
 func (h *Helper) lockObserved(detail string, ok bool) {
+	h.closeRebootNotice(context.Background())
 	if !ok {
 		h.logger.Warn("logind lock watch lost", "logind_session", h.lockSession)
 		h.closeLockWatch()
@@ -264,6 +275,7 @@ func (h *Helper) closeLockWatch() {
 // apply reconciles sessions with the executor's complete directive set.
 func (h *Helper) apply(parent context.Context, response *agentv1.SyncSessionResponse) {
 	local := response.GetLocalSession()
+	h.applyReboot(parent, response)
 	if local.GetUid() != h.uid {
 		h.logger.Error("executor bound a different uid; refusing directives", "uid", local.GetUid())
 		h.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "local_session_mismatch")

@@ -713,8 +713,15 @@ blindly replayed. See [native records](verification.md#ssh-login-banner).
   changed files. Release retains an unknown hold until its boot-image postcondition
   is proven, even if the native updater exits zero without rebuilding.
   See [module qualification and limits](verification.md#typed-kernel-module-blocklist).
-- A separate reboot window is not representable; only the update start window and
-  scheduled reboot delay are supported.
+- OS-update profiles carry an independent signed `rebootWindow` and bounded
+  `employeeDeferral` policy. Restart scheduling never stops an update transaction.
+  A deadline without an eligible restart instant is reported rather than bypassing
+  the window. Employee deferrals use the authenticated local desktop session,
+  retain the original pending-reboot policy/deadline across executor restarts and
+  later update policies, and cannot replace a foreign logind schedule. Accepted
+  schedules remain separate from unresolved native attempts; reconciliation never
+  replays a mutation. Assistance invalidates employee prompts.
+  Native qualification and its limits are recorded in `docs/verification.md`.
 - Remote assistance has one permission for view and control, not separate grants.
 - Advisory exceptions have reason/expiry but no two-human approval workflow.
 - SSH banner text now has a dispatchable banner-only typed resource, drift repair

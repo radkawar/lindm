@@ -109,10 +109,11 @@ func (x *SessionAssistanceReport) GetEndDetail() string {
 }
 
 type SyncSessionRequest struct {
-	state         protoimpl.MessageState     `protogen:"open.v1"`
-	Reports       []*SessionAssistanceReport `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState         `protogen:"open.v1"`
+	Reports        []*SessionAssistanceReport     `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	RebootDeferral *OSUpdateRebootDeferralRequest `protobuf:"bytes,2,opt,name=reboot_deferral,json=rebootDeferral,proto3" json:"reboot_deferral,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SyncSessionRequest) Reset() {
@@ -152,6 +153,13 @@ func (x *SyncSessionRequest) GetReports() []*SessionAssistanceReport {
 	return nil
 }
 
+func (x *SyncSessionRequest) GetRebootDeferral() *OSUpdateRebootDeferralRequest {
+	if x != nil {
+		return x.RebootDeferral
+	}
+	return nil
+}
+
 type SyncSessionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Directives for the caller's session only. A directive with terminate set
@@ -159,6 +167,7 @@ type SyncSessionResponse struct {
 	Directives []*AssistanceDirective `protobuf:"bytes,1,rep,name=directives,proto3" json:"directives,omitempty"`
 	// The local session the executor bound to this caller.
 	LocalSession  *AssistanceLocalSession `protobuf:"bytes,2,opt,name=local_session,json=localSession,proto3" json:"local_session,omitempty"`
+	Reboot        *OSUpdateRebootNotice   `protobuf:"bytes,3,opt,name=reboot,proto3" json:"reboot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -207,11 +216,18 @@ func (x *SyncSessionResponse) GetLocalSession() *AssistanceLocalSession {
 	return nil
 }
 
+func (x *SyncSessionResponse) GetReboot() *OSUpdateRebootNotice {
+	if x != nil {
+		return x.Reboot
+	}
+	return nil
+}
+
 var File_lindm_agent_v1_session_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\xa4\x05\n" +
+	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a\x1elindm/agent/v1/os_update.proto\"\xa4\x05\n" +
 	"\x17SessionAssistanceReport\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12G\n" +
@@ -223,14 +239,16 @@ const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"\n" +
 	"end_detail\x18\x06 \x01(\tB\x12\xbaH\x0fr\r\x18\x80\x022\b^[ -~]*$R\tendDetail:\xc7\x02\xbaH\xc3\x02\x1a\xc9\x01\n" +
 	"\x1fsession_assistance_report.offer\x127offer_sdp is required from OFFERED and absent before it\x1am(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)\x1au\n" +
-	"\x1dsession_assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\"a\n" +
+	"\x1dsession_assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\"\xb9\x01\n" +
 	"\x12SyncSessionRequest\x12K\n" +
-	"\areports\x18\x01 \x03(\v2'.lindm.agent.v1.SessionAssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\x04R\areports\"\xb9\x01\n" +
+	"\areports\x18\x01 \x03(\v2'.lindm.agent.v1.SessionAssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\x04R\areports\x12V\n" +
+	"\x0freboot_deferral\x18\x02 \x01(\v2-.lindm.agent.v1.OSUpdateRebootDeferralRequestR\x0erebootDeferral\"\xf7\x01\n" +
 	"\x13SyncSessionResponse\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\x04R\n" +
 	"directives\x12S\n" +
-	"\rlocal_session\x18\x02 \x01(\v2&.lindm.agent.v1.AssistanceLocalSessionB\x06\xbaH\x03\xc8\x01\x01R\flocalSession2h\n" +
+	"\rlocal_session\x18\x02 \x01(\v2&.lindm.agent.v1.AssistanceLocalSessionB\x06\xbaH\x03\xc8\x01\x01R\flocalSession\x12<\n" +
+	"\x06reboot\x18\x03 \x01(\v2$.lindm.agent.v1.OSUpdateRebootNoticeR\x06reboot2h\n" +
 	"\x0eSessionService\x12V\n" +
 	"\vSyncSession\x12\".lindm.agent.v1.SyncSessionRequest\x1a#.lindm.agent.v1.SyncSessionResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
@@ -248,27 +266,31 @@ func file_lindm_agent_v1_session_proto_rawDescGZIP() []byte {
 
 var file_lindm_agent_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lindm_agent_v1_session_proto_goTypes = []any{
-	(*SessionAssistanceReport)(nil), // 0: lindm.agent.v1.SessionAssistanceReport
-	(*SyncSessionRequest)(nil),      // 1: lindm.agent.v1.SyncSessionRequest
-	(*SyncSessionResponse)(nil),     // 2: lindm.agent.v1.SyncSessionResponse
-	(AssistancePhase)(0),            // 3: lindm.agent.v1.AssistancePhase
-	(AssistanceEndCause)(0),         // 4: lindm.agent.v1.AssistanceEndCause
-	(*AssistanceDirective)(nil),     // 5: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil),  // 6: lindm.agent.v1.AssistanceLocalSession
+	(*SessionAssistanceReport)(nil),       // 0: lindm.agent.v1.SessionAssistanceReport
+	(*SyncSessionRequest)(nil),            // 1: lindm.agent.v1.SyncSessionRequest
+	(*SyncSessionResponse)(nil),           // 2: lindm.agent.v1.SyncSessionResponse
+	(AssistancePhase)(0),                  // 3: lindm.agent.v1.AssistancePhase
+	(AssistanceEndCause)(0),               // 4: lindm.agent.v1.AssistanceEndCause
+	(*OSUpdateRebootDeferralRequest)(nil), // 5: lindm.agent.v1.OSUpdateRebootDeferralRequest
+	(*AssistanceDirective)(nil),           // 6: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil),        // 7: lindm.agent.v1.AssistanceLocalSession
+	(*OSUpdateRebootNotice)(nil),          // 8: lindm.agent.v1.OSUpdateRebootNotice
 }
 var file_lindm_agent_v1_session_proto_depIdxs = []int32{
 	3, // 0: lindm.agent.v1.SessionAssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
 	4, // 1: lindm.agent.v1.SessionAssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
 	0, // 2: lindm.agent.v1.SyncSessionRequest.reports:type_name -> lindm.agent.v1.SessionAssistanceReport
-	5, // 3: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	6, // 4: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	1, // 5: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
-	2, // 6: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 3: lindm.agent.v1.SyncSessionRequest.reboot_deferral:type_name -> lindm.agent.v1.OSUpdateRebootDeferralRequest
+	6, // 4: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	7, // 5: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	8, // 6: lindm.agent.v1.SyncSessionResponse.reboot:type_name -> lindm.agent.v1.OSUpdateRebootNotice
+	1, // 7: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
+	2, // 8: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
+	8, // [8:9] is the sub-list for method output_type
+	7, // [7:8] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_session_proto_init() }
@@ -277,6 +299,7 @@ func file_lindm_agent_v1_session_proto_init() {
 		return
 	}
 	file_lindm_agent_v1_assistance_proto_init()
+	file_lindm_agent_v1_os_update_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

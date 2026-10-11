@@ -2277,6 +2277,173 @@ Not proven by these records:
   pause, server availability budgets and release upgrades are not implemented by
   `os.update.v1`; the policy has no fields for them.
 
+##### Independent reboot window and employee deferral
+
+`lab vm assistance -reboot-policy` reuses the disposable graphical fixture but
+emits `reboot-policy.json`, never an assistance pass. It applies a signed OS-update
+profile through the real server, starts native updates from the owned timer,
+requires the distribution's actual reboot oracle, observes an independent reboot
+window, clicks the employee deferral through QMP on the real desktop, compares
+the protected count/deadline and native logind time across an executor restart,
+then awaits a changed boot without issuing a replacement reboot. Its image,
+package, server, native records and before/after desktop captures are SHA-256 bound.
+The lane refuses persistent/held demos before fixture access and preserves ordinary
+scheduler admission. Its disposable local or split controller uses the existing
+resource-dispatch signing fixture, admitted through the normal authority API;
+ordinary assistance retains its narrower device-action delegation.
+
+An up-to-date disposable desktop may legitimately finish an ALL update run without
+requiring a restart. That is correct product behaviour but cannot qualify these
+restart controls. If no native reboot is pending, this lane can reinstall the
+**exact installed running-kernel package set** through normal APT or DNF
+vendor verification. It retains the native transaction, package identities/versions before
+and after, authenticated source/signature output and SHA-256 evidence, and then
+requires the distribution's independent reboot-required oracle to be true.
+APT verifies signed repository metadata and package hashes; RPM additionally
+checks each downloaded package's native signature against its installed trust
+anchors. This does not imply an EFI/PE signature on Fedora's aarch64 DVD kernel.
+RPM's capability-name lookup is not a versioned-dependency query. The installed
+running-kernel providers are therefore selected with DNF's
+[`repoquery --installed --whatprovides`](https://dnf5.readthedocs.io/en/latest/commands/repoquery.8.html),
+preserving each exact installed identity, rather than passing a version relation
+to `rpm --whatprovides`.
+This is a package-created reboot prerequisite, **not a newer or security-version
+upgrade**. No marker is synthesized and no oracle is replaced; absence of a real
+native reboot requirement still prevents qualification.
+
+Long native waits do not extend console-session lifetimes. Before mandatory
+tracked grant/device cleanup, the fixture completes a new real owner login and
+requires the original account identity; revocation still needs its independent
+human approver. Existing expired-session logout semantics remain unchanged.
+`TestNativeCleanupRenewsExpiredOwnerWithoutChangingActor` ages only an isolated
+session's clock and exercises the real authentication and cleanup routes.
+
+The Ubuntu 24.04 arm64 run on 2026-10-11 **passed all four scenarios and mandatory
+cleanup** at source `9997e27735e5542193cd3e88fa4d4d01511e62bd`:
+`$HOME/.cache/lindm-org-reboot-20261011/ubuntu24-native-06/reboot-policy.json`,
+SHA-256 `f955a1f336558b3894c270a3127ba1b0cdbc54a2374488978aeeff1350ff59e9`.
+It used native aarch64 KVM on `dgx20`, the pinned encrypted Ubuntu
+24.04.5 image `f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb`,
+GNOME 46/Wayland, and enrolled Secure Boot. The built agent package was
+`ea6f5a439e7532d5b4e9d06840dad5e2c506f5e8f944094baa34ed595ee6ce5e`;
+the server was `1602973f1911253ba3d57bce04fca5f4433c26ef1915368b295058ac5ced8897`.
+APT reinstalled `linux-image-6.8.0-146-generic=6.8.0-146.146` without a version
+change, validating Ubuntu archive key `F6ECB3762474EDA9D21B7022871920D1991BC93C`
+and the downloaded DEB SHA-256
+`ee35dffd32c672d6b1814c0d9c8001c1656e06e718ebd5fb15565d0b7e51e418`.
+Transaction record `d9f9c5f6736259efdf100a8be15d7cffb6d9d57b6444bf3c4676bdf786bd2788`
+retains before/after versions and signatures; the independent native oracle
+changed from `no` to `yes`.
+
+Signed action `c5194a51-407b-44b9-9b82-b810842a2d67` installed the independent
+Europe/Berlin windows: updates at 21:50 CEST for 15 minutes and restarts at
+22:20 CEST for 90 minutes, with a 120-minute deadline and one five-minute deferral.
+The real timer started at 19:50:01 UTC and completed at 19:51:02 UTC.
+The actual desktop action moved logind's restart from 20:20 to 20:25 UTC,
+retained the 21:51:02 UTC deadline, exhausted the single deferral and survived an
+executor restart. The before/after captures were visually inspected:
+`guest-reboot-policy-before-deferral.png` SHA-256
+`866f5356a5ddea11b5f3d9bab6455888caf368f837181e4e3dc060a72d81b018`
+and `guest-reboot-policy-after-deferral.png` SHA-256
+`4e79dd4b0525e0044e79a100085fe71b3ed2f3e26f58f2b54eff498e9101e3ce`.
+The scheduled reboot changed boot `f080c029-2dc9-4fbd-b1c4-065fa97f3f18` to
+`18d010b0-a790-41ca-9e8e-5a2f71ae0cdc`; the lane finished at 20:27:19 UTC.
+The root receipt's `passed=true` covers this reboot-policy lane, not an
+assistance qualification: its nested desktop fixture remains `passed=false`
+and `native_qualified=false` preserves the physical-input, suspend and
+real-clock DST limitations.
+
+The Fedora 44 aarch64 run also **passed all four scenarios and mandatory cleanup**
+on 2026-10-11 at source `44ffc5de`:
+`$HOME/.cache/lindm-org-reboot-20261011/fedora44-native-07/reboot-policy.json`,
+SHA-256 `9bce6605aa2b73e968d96e04fd8fb01b26191d2866e2c57d078c469ec25c6b14`.
+Its native KVM guest on `dgx20` used GNOME 50/Wayland, **SELinux Enforcing**,
+and encrypted image
+`ba8372682294d0d76f79427cae1273d36891b192ac9bf0f0f9de4e97a7cbe218`.
+This is the maintained **non-Secure-Boot aarch64 tuple** (`AAVMF_VARS.fd`,
+setup mode, no enrolled keys); it makes no claim for the unsigned DVD kernel
+under enforced Secure Boot. The built agent RPM was
+`4adeb278faffdfbdd459935281a8584177f06d54cd6426953ee62044a3abac46`;
+the server digest matches the Ubuntu run above.
+
+DNF selected and reinstalled exactly
+`kernel-core-6.19.10-300.fc44.aarch64` from repository `fedora`, with unchanged
+version/release. Native `rpmkeys --checksig --verbose` verified fingerprint
+`36f612dcf27f7d1a48a835e4dbfcf71c6d9f90a6`, header and payload digests;
+the downloaded RPM SHA-256 was
+`ad5158d8538985eff19b3f36ba2ba1c64501810ea838c2a919a2837816c3f149`.
+Transaction record `c4f5a3bb584b272595060af19aec303cf8acb4e6dc977ac1073d42296ec08045`
+retains the enforcing posture and before/after package signatures.
+The independent native oracle changed from `no` to `yes`.
+
+Signed action `d01e00b3-d631-49ff-97e1-f19639ea3413` installed Europe/Berlin
+windows at 22:03 CEST for updates and 22:33 CEST for restarts, with the same
+15/90-minute durations, 120-minute deadline and one five-minute deferral.
+The native timer triggered at 20:03:03 UTC and the service completed at
+20:09:19 UTC. The real GNOME action moved logind from 20:33 to 20:38 UTC,
+preserved the 22:09:18 UTC deadline, exhausted the count and persisted across
+executor restart. The visually inspected before/after desktop captures have
+SHA-256 `45aa3ea0c71add017f44aa1455314fdac24210a39ec65945a8fc2152967f6fe4`
+and `532e12e5305987e58e8ca1b6718a15a03aad3f8281638b95315950a00958daa2`
+respectively, using the same filenames as Ubuntu.
+The scheduled reboot changed boot `1053d1a0-eaf1-41db-a527-8c26b94041a8` to
+`45a7cb6c-81cb-420e-b145-3682612fef3a`; the lane finished at 20:38:21 UTC.
+Its root pass and nested qualification flags have the same scope as Ubuntu's.
+
+Retained diagnostic receipts under
+`$HOME/.cache/lindm-org-reboot-20261011/` are **not overall native passes**:
+
+| Record                                  | Observed boundary                                                                                                                                                                                                                                  | SHA-256                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu24-native-04/reboot-policy.json` | Signed timer and ALL update completed, but the independent native oracle correctly remained `no`; no reboot prerequisite, deferral or scheduled restart was qualified.                                                                             | `1064120644617e68c3226cf55cb31a5dfd48495f40a8cefa975ad6c302576999` |
+| `ubuntu24-native-05/reboot-policy.json` | All four feature scenarios passed, including the real employee click and changed boot, but mandatory grant/device cleanup failed because the original owner session had expired. Source `ed1875ae` predates the cleanup and busy-click fixes.      | `314962c86facbc691f05629e209f649daad5357abc4baf7742dd11a02a53e459` |
+| `fedora44-native-04/reboot-policy.json` | Encrypted installer deadline, before any signed policy or employee scenario. This invocation selected the known unsupported enforced-Secure-Boot aarch64 tuple; see the vendor-kernel signature boundary under Fedora 44 aarch64 GNOME assistance. | `8d92bd3019e37f0f5f39e36002bc9695bad879754e319b7d28a37d57359bd8f8` |
+| `fedora44-native-05/reboot-policy.json` | Fixture prerequisite failed before policy effects because `rpm --whatprovides` was given a version relation rather than a capability name. Replaced by DNF's installed dependency query.                                                           | `4247c3a9f3c2f32247de5015cdafbc9581f25b20ef8b736c1dee8a5e434dd2c0` |
+| `fedora44-native-06/reboot-policy.json` | Retained the same failing native RPM query before any policy effects; this diagnostic is not a feature pass. The corrected query was exercised in `native-07`.                                                                                     | `4f000ed8b6ff255e6eba02c3383cc5a032537679944479dbaa3e85920cf846d3` |
+
+The Ubuntu `native-05` desktop captures show the real action changing 18:45 to
+18:50 UTC while retaining the 20:15:58 UTC deadline, then removing the exhausted
+deferral action. Their SHA-256 values are
+`8ecfbea40589ea46c509fbb9cb91f990bb5c2ed451409c88c4c7b9d119625524`
+(`guest-reboot-policy-before-deferral.png`) and
+`45c96d4fff2fb8c6cf1a7a1dcf7d4efc77836e06504ef5602301b778ba8abe56`
+(`guest-reboot-policy-after-deferral.png`). The accepted schedule produced boot
+`a184c489-1542-4cfe-ac9f-9c16b409a4ac` from
+`650e5296-fc45-4f16-9b8d-13f17823e7a1`; these observations do not override the
+receipt's failed cleanup verdict.
+
+Deterministic regression coverage includes exclusive window ends, an inclusive
+deadline, no eligible slot, cross-midnight windows, spring gaps, the first autumn
+fold only, bounded counts/durations, exact ambiguous-request replay, per-user
+prompt binding and assistance invalidation. Failure regressions retain the
+accepted schedule for unavailable native reads, new inhibitors, foreign schedules,
+explicit rejection, lost replies and interrupted state commits; cache invalidation
+precedes native mutation. Repeated policies retain the original outstanding
+deadline, patch-now-only enablement starts the employee socket, and follow-on
+native observations stay bound to their actual signed policy execution.
+These tests are not native evidence; physical input and real-clock DST changes
+remain separate qualification.
+
+The 2026-10-11 console review at source `9997e277` passed **176/176** captures,
+including the independent restart editor in light/dark at 1440×900 and 390×844.
+`~/.cache/lindm-org-reboot-20261011/ui-after-03/report.json` has SHA-256
+`8541c65ddf27fe9bf2aa836cc7ac2302cf0f66e74adb0cb8f1a3af514ee1bc0e`.
+Its contact sheet is `index.html`; the four full editor captures are
+`screenshots/profiles-os-update-{light,dark}-{desktop,mobile}-full.png`.
+The shared before review is `~/.cache/lindm-org-gaps-20261011/ui-before/`
+(`report.json` SHA-256
+`e5cef739767edf1e88a83198d7d41e1c2baf1da8f0c161d1b7ce02c23ce42655`);
+before editor captures are `screenshots/profiles-new-{light,dark}-{desktop,mobile}-full.png`.
+The old audit-event copy failure was corrected without a gate exception; the new
+editor's heading-order warning was corrected too. The unchanged desktop-sidebar
+landmark warning remains nonblocking in both before and after reports. These
+captures establish automated structure, copy, accessibility-gate and narrow-screen
+checks, not owner design approval or native employee interaction.
+The maintained `edit-sheet.html`, `edit-sheet.json`, `task-audit.html` and
+`annotations-template.json` in that directory are ready for the owner's pass:
+**awaiting owner edit pass**. The four full editor captures were also visually
+inspected; automated and agent inspection do not substitute for owner annotations.
+
 ### Capability matrix dimensions
 
 The executable manifest must express distro/vendor/minor, architecture/CPU baseline,

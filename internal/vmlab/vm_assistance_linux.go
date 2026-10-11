@@ -52,6 +52,9 @@ type VMAssistanceOptions struct {
 	PersistentDir string
 	FixtureDir    string
 	ExistingOwner bool
+	// RebootPolicy selects separate reboot qualification using this desktop
+	// fixture. It never qualifies remote assistance or a persistent demo.
+	RebootPolicy *VMRebootPolicyResult
 }
 
 // assistanceOperator is the console account the browser enrolls and signs in
@@ -79,6 +82,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	}
 	if options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("assistance lane requires an installer desktop, a lab display and signed-package egress")
+	}
+	if options.RebootPolicy != nil && (options.Hold != nil || options.PersistentDir != "") {
+		return nil, errors.New("reboot qualification refuses persistent or held desktops")
 	}
 	if options.PersistentDir != "" && (options.Hold == nil || options.FixtureDir == "") {
 		return nil, errors.New("persistent assistance requires hold and a persistent fixture directory")
@@ -116,7 +122,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		if err == nil {
 			err = verifyAssistanceEvidence(options.EvidenceDir, result)
 		}
-		result.Passed = err == nil
+		result.Passed = err == nil && options.RebootPolicy == nil
 		if err != nil {
 			result.Failure = err.Error()
 		}
@@ -285,6 +291,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
 	if _, err := screen.captureReference(ctx); err != nil {
 		return result, err
+	}
+	if options.RebootPolicy != nil {
+		return result, exerciseDesktopRebootPolicy(ctx, vm, screen, control, release, result, options.RebootPolicy)
 	}
 	result.Browser = &assistanceBrowserEvidence{Engine: "chromium", Username: assistanceOperator}
 	var scenarioErr error

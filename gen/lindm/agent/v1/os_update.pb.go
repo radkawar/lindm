@@ -773,6 +773,7 @@ type OSUpdateRunState struct {
 	// Packages with a pending update, first observation time; pruned when no
 	// update is pending for the package any more.
 	PendingSince  []*OSUpdateDeferralEntry `protobuf:"bytes,4,rep,name=pending_since,json=pendingSince,proto3" json:"pending_since,omitempty"`
+	Reboot        *OSUpdateRebootState     `protobuf:"bytes,5,opt,name=reboot,proto3" json:"reboot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -835,6 +836,338 @@ func (x *OSUpdateRunState) GetPendingSince() []*OSUpdateDeferralEntry {
 	return nil
 }
 
+func (x *OSUpdateRunState) GetReboot() *OSUpdateRebootState {
+	if x != nil {
+		return x.Reboot
+	}
+	return nil
+}
+
+// Root-only ownership of one logind schedule on one boot. Written before
+// scheduling; a mismatching native schedule is never adopted or replaced.
+type OSUpdateRebootState struct {
+	state             protoimpl.MessageState   `protogen:"open.v1"`
+	ScheduleId        string                   `protobuf:"bytes,1,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	BootId            string                   `protobuf:"bytes,2,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	Policy            *v1.OSUpdateRebootPolicy `protobuf:"bytes,3,opt,name=policy,proto3" json:"policy,omitempty"`
+	Deadline          *timestamppb.Timestamp   `protobuf:"bytes,4,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	ScheduledFor      *timestamppb.Timestamp   `protobuf:"bytes,5,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	DeferralsUsed     uint32                   `protobuf:"varint,6,opt,name=deferrals_used,json=deferralsUsed,proto3" json:"deferrals_used,omitempty"`
+	LastRequestId     string                   `protobuf:"bytes,7,opt,name=last_request_id,json=lastRequestId,proto3" json:"last_request_id,omitempty"`
+	PendingAttempt    *OSUpdateRebootAttempt   `protobuf:"bytes,8,opt,name=pending_attempt,json=pendingAttempt,proto3" json:"pending_attempt,omitempty"`
+	LastRequestReason string                   `protobuf:"bytes,9,opt,name=last_request_reason,json=lastRequestReason,proto3" json:"last_request_reason,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *OSUpdateRebootState) Reset() {
+	*x = OSUpdateRebootState{}
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateRebootState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateRebootState) ProtoMessage() {}
+
+func (x *OSUpdateRebootState) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateRebootState.ProtoReflect.Descriptor instead.
+func (*OSUpdateRebootState) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *OSUpdateRebootState) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootState) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootState) GetPolicy() *v1.OSUpdateRebootPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootState) GetDeadline() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Deadline
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootState) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootState) GetDeferralsUsed() uint32 {
+	if x != nil {
+		return x.DeferralsUsed
+	}
+	return 0
+}
+
+func (x *OSUpdateRebootState) GetLastRequestId() string {
+	if x != nil {
+		return x.LastRequestId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootState) GetPendingAttempt() *OSUpdateRebootAttempt {
+	if x != nil {
+		return x.PendingAttempt
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootState) GetLastRequestReason() string {
+	if x != nil {
+		return x.LastRequestReason
+	}
+	return ""
+}
+
+// An intent to change logind, not proof that it accepted the change. The prior
+// accepted schedule remains authoritative until native observation reconciles it.
+type OSUpdateRebootAttempt struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ScheduledFor     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	EmployeeDeferral bool                   `protobuf:"varint,3,opt,name=employee_deferral,json=employeeDeferral,proto3" json:"employee_deferral,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *OSUpdateRebootAttempt) Reset() {
+	*x = OSUpdateRebootAttempt{}
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateRebootAttempt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateRebootAttempt) ProtoMessage() {}
+
+func (x *OSUpdateRebootAttempt) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateRebootAttempt.ProtoReflect.Descriptor instead.
+func (*OSUpdateRebootAttempt) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *OSUpdateRebootAttempt) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootAttempt) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootAttempt) GetEmployeeDeferral() bool {
+	if x != nil {
+		return x.EmployeeDeferral
+	}
+	return false
+}
+
+// The helper submits the exact displayed schedule, never a caller-chosen time.
+type OSUpdateRebootDeferralRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScheduleId    string                 `protobuf:"bytes,1,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ScheduledFor  *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OSUpdateRebootDeferralRequest) Reset() {
+	*x = OSUpdateRebootDeferralRequest{}
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateRebootDeferralRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateRebootDeferralRequest) ProtoMessage() {}
+
+func (x *OSUpdateRebootDeferralRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateRebootDeferralRequest.ProtoReflect.Descriptor instead.
+func (*OSUpdateRebootDeferralRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *OSUpdateRebootDeferralRequest) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootDeferralRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootDeferralRequest) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+type OSUpdateRebootNotice struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	ScheduleId         string                 `protobuf:"bytes,1,opt,name=schedule_id,json=scheduleId,proto3" json:"schedule_id,omitempty"`
+	ScheduledFor       *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	Deadline           *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	DeferUntil         *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=defer_until,json=deferUntil,proto3" json:"defer_until,omitempty"`
+	DeferralsRemaining uint32                 `protobuf:"varint,5,opt,name=deferrals_remaining,json=deferralsRemaining,proto3" json:"deferrals_remaining,omitempty"`
+	Notice             string                 `protobuf:"bytes,6,opt,name=notice,proto3" json:"notice,omitempty"`
+	Reason             string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *OSUpdateRebootNotice) Reset() {
+	*x = OSUpdateRebootNotice{}
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OSUpdateRebootNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OSUpdateRebootNotice) ProtoMessage() {}
+
+func (x *OSUpdateRebootNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OSUpdateRebootNotice.ProtoReflect.Descriptor instead.
+func (*OSUpdateRebootNotice) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *OSUpdateRebootNotice) GetScheduleId() string {
+	if x != nil {
+		return x.ScheduleId
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootNotice) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootNotice) GetDeadline() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Deadline
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootNotice) GetDeferUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeferUntil
+	}
+	return nil
+}
+
+func (x *OSUpdateRebootNotice) GetDeferralsRemaining() uint32 {
+	if x != nil {
+		return x.DeferralsRemaining
+	}
+	return 0
+}
+
+func (x *OSUpdateRebootNotice) GetNotice() string {
+	if x != nil {
+		return x.Notice
+	}
+	return ""
+}
+
+func (x *OSUpdateRebootNotice) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 // Public patch-status inventory, computed offline from the native cache by
 // lindm-os-update-status.service or the runner and published unmodified.
 type PatchStatusObservation struct {
@@ -860,13 +1193,16 @@ type PatchStatusObservation struct {
 	DeferredUpdates uint32 `protobuf:"varint,13,opt,name=deferred_updates,json=deferredUpdates,proto3" json:"deferred_updates,omitempty"`
 	// An accepted logind reboot schedule currently pending.
 	RebootScheduledFor *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=reboot_scheduled_for,json=rebootScheduledFor,proto3" json:"reboot_scheduled_for,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Present only for a pending reboot owned by this boot's protected runner.
+	RebootDeadline      *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=reboot_deadline,json=rebootDeadline,proto3" json:"reboot_deadline,omitempty"`
+	RebootDeferralsUsed uint32                 `protobuf:"varint,16,opt,name=reboot_deferrals_used,json=rebootDeferralsUsed,proto3" json:"reboot_deferrals_used,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *PatchStatusObservation) Reset() {
 	*x = PatchStatusObservation{}
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -878,7 +1214,7 @@ func (x *PatchStatusObservation) String() string {
 func (*PatchStatusObservation) ProtoMessage() {}
 
 func (x *PatchStatusObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -891,7 +1227,7 @@ func (x *PatchStatusObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PatchStatusObservation.ProtoReflect.Descriptor instead.
 func (*PatchStatusObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PatchStatusObservation) GetObservedAt() *timestamppb.Timestamp {
@@ -992,6 +1328,20 @@ func (x *PatchStatusObservation) GetRebootScheduledFor() *timestamppb.Timestamp 
 	return nil
 }
 
+func (x *PatchStatusObservation) GetRebootDeadline() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RebootDeadline
+	}
+	return nil
+}
+
+func (x *PatchStatusObservation) GetRebootDeferralsUsed() uint32 {
+	if x != nil {
+		return x.RebootDeferralsUsed
+	}
+	return 0
+}
+
 type GetPatchStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1000,7 +1350,7 @@ type GetPatchStatusRequest struct {
 
 func (x *GetPatchStatusRequest) Reset() {
 	*x = GetPatchStatusRequest{}
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1362,7 @@ func (x *GetPatchStatusRequest) String() string {
 func (*GetPatchStatusRequest) ProtoMessage() {}
 
 func (x *GetPatchStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1025,7 +1375,7 @@ func (x *GetPatchStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPatchStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetPatchStatusRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{12}
 }
 
 type GetPatchStatusResponse struct {
@@ -1037,7 +1387,7 @@ type GetPatchStatusResponse struct {
 
 func (x *GetPatchStatusResponse) Reset() {
 	*x = GetPatchStatusResponse{}
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1049,7 +1399,7 @@ func (x *GetPatchStatusResponse) String() string {
 func (*GetPatchStatusResponse) ProtoMessage() {}
 
 func (x *GetPatchStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_os_update_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1062,7 +1412,7 @@ func (x *GetPatchStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPatchStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetPatchStatusResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_os_update_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetPatchStatusResponse) GetObservation() *PatchStatusObservation {
@@ -1129,13 +1479,50 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB*\xbaH'r%\x10\x01\x18\x80\x022\x1e^[A-Za-z0-9][A-Za-z0-9+._~-]*$R\x04name\x12?\n" +
 	"\farchitecture\x18\x02 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18@2\x10^[A-Za-z0-9_-]+$R\farchitecture\x12A\n" +
 	"\n" +
-	"first_seen\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tfirstSeen\"\x95\x02\n" +
+	"first_seen\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tfirstSeen\"\xd2\x02\n" +
 	"\x10OSUpdateRunState\x12.\n" +
 	"\x0eformat_version\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\rformatVersion\x12:\n" +
 	"\blast_run\x18\x02 \x01(\v2\x1f.lindm.agent.v1.PatchRunSummaryR\alastRun\x12=\n" +
 	"\flast_success\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vlastSuccess\x12V\n" +
 	"\rpending_since\x18\x04 \x03(\v2%.lindm.agent.v1.OSUpdateDeferralEntryB\n" +
-	"\xbaH\a\x92\x01\x04\x10\x80\x80\x01R\fpendingSince\"\xbc\t\n" +
+	"\xbaH\a\x92\x01\x04\x10\x80\x80\x01R\fpendingSince\x12;\n" +
+	"\x06reboot\x18\x05 \x01(\v2#.lindm.agent.v1.OSUpdateRebootStateR\x06reboot\"\xcf\a\n" +
+	"\x13OSUpdateRebootState\x12)\n" +
+	"\vschedule_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"scheduleId\x12!\n" +
+	"\aboot_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06bootId\x12G\n" +
+	"\x06policy\x18\x03 \x01(\v2'.lindm.resource.v1.OSUpdateRebootPolicyB\x06\xbaH\x03\xc8\x01\x01R\x06policy\x12>\n" +
+	"\bdeadline\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bdeadline\x12G\n" +
+	"\rscheduled_for\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\fscheduledFor\x12.\n" +
+	"\x0edeferrals_used\x18\x06 \x01(\rB\a\xbaH\x04*\x02\x18\n" +
+	"R\rdeferralsUsed\x123\n" +
+	"\x0flast_request_id\x18\a \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\rlastRequestId\x12N\n" +
+	"\x0fpending_attempt\x18\b \x01(\v2%.lindm.agent.v1.OSUpdateRebootAttemptR\x0ependingAttempt\x128\n" +
+	"\x13last_request_reason\x18\t \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x11lastRequestReason:\xa8\x03\xbaH\xa4\x03\x1a\xa1\x03\n" +
+	"\x1creboot_state.pending_attempt\x12Vpending reboot attempts stay within the retained deadline and employee deferral budget\x1a\xa8\x02!has(this.pending_attempt) || (this.pending_attempt.scheduled_for <= this.deadline && (!this.pending_attempt.employee_deferral || (this.pending_attempt.scheduled_for > this.scheduled_for && has(this.policy.employee_deferral) && this.deferrals_used < this.policy.employee_deferral.max_deferrals)))\"\xb6\x01\n" +
+	"\x15OSUpdateRebootAttempt\x12'\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12G\n" +
+	"\rscheduled_for\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\fscheduledFor\x12+\n" +
+	"\x11employee_deferral\x18\x03 \x01(\bR\x10employeeDeferral\"\xbc\x01\n" +
+	"\x1dOSUpdateRebootDeferralRequest\x12)\n" +
+	"\vschedule_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"scheduleId\x12'\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12G\n" +
+	"\rscheduled_for\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\fscheduledFor\"\x85\x03\n" +
+	"\x14OSUpdateRebootNotice\x12)\n" +
+	"\vschedule_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"scheduleId\x12G\n" +
+	"\rscheduled_for\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\fscheduledFor\x12>\n" +
+	"\bdeadline\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bdeadline\x12;\n" +
+	"\vdefer_until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"deferUntil\x128\n" +
+	"\x13deferrals_remaining\x18\x05 \x01(\rB\a\xbaH\x04*\x02\x18\n" +
+	"R\x12deferralsRemaining\x12 \n" +
+	"\x06notice\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x06notice\x12 \n" +
+	"\x06reason\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06reason\"\xbe\n" +
+	"\n" +
 	"\x16PatchStatusObservation\x12C\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"observedAt\x12$\n" +
@@ -1152,7 +1539,10 @@ const file_lindm_agent_v1_os_update_proto_rawDesc = "" +
 	"\blast_run\x18\v \x01(\v2\x1f.lindm.agent.v1.PatchRunSummaryR\alastRun\x12)\n" +
 	"\x10policy_installed\x18\f \x01(\bR\x0fpolicyInstalled\x124\n" +
 	"\x10deferred_updates\x18\r \x01(\rB\t\xbaH\x06*\x04\x18\xa0\x8d\x06R\x0fdeferredUpdates\x12L\n" +
-	"\x14reboot_scheduled_for\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x12rebootScheduledFor:\xee\x02\xbaH\xea\x02\x1a\xe7\x02\n" +
+	"\x14reboot_scheduled_for\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x12rebootScheduledFor\x12C\n" +
+	"\x0freboot_deadline\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x0erebootDeadline\x12;\n" +
+	"\x15reboot_deferrals_used\x18\x10 \x01(\rB\a\xbaH\x04*\x02\x18\n" +
+	"R\x13rebootDeferralsUsed:\xee\x02\xbaH\xea\x02\x1a\xe7\x02\n" +
 	"\x19patch_status.availability\x12Wavailable observations carry a backend, metadata time and boot; failures carry a reason\x1a\xf0\x01this.available ? (this.reason == '' && this.backend != 0 && has(this.metadata_refreshed_at) && this.boot_id != '' && this.pending_security_updates <= this.pending_updates && this.deferred_updates <= this.pending_updates) : this.reason != ''\"\x17\n" +
 	"\x15GetPatchStatusRequest\"j\n" +
 	"\x16GetPatchStatusResponse\x12P\n" +
@@ -1205,59 +1595,74 @@ func file_lindm_agent_v1_os_update_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_os_update_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_lindm_agent_v1_os_update_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_lindm_agent_v1_os_update_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_lindm_agent_v1_os_update_proto_goTypes = []any{
-	(PatchRunTrigger)(0),                 // 0: lindm.agent.v1.PatchRunTrigger
-	(PatchRunResult)(0),                  // 1: lindm.agent.v1.PatchRunResult
-	(PatchRunTool)(0),                    // 2: lindm.agent.v1.PatchRunTool
-	(PatchRunPhase)(0),                   // 3: lindm.agent.v1.PatchRunPhase
-	(*NativeOSUpdateProviderConfig)(nil), // 4: lindm.agent.v1.NativeOSUpdateProviderConfig
-	(*OSUpdateRunPolicy)(nil),            // 5: lindm.agent.v1.OSUpdateRunPolicy
-	(*OSUpdatePatchNowRequest)(nil),      // 6: lindm.agent.v1.OSUpdatePatchNowRequest
-	(*PatchRunDiagnostic)(nil),           // 7: lindm.agent.v1.PatchRunDiagnostic
-	(*PatchRunSummary)(nil),              // 8: lindm.agent.v1.PatchRunSummary
-	(*OSUpdateDeferralEntry)(nil),        // 9: lindm.agent.v1.OSUpdateDeferralEntry
-	(*OSUpdateRunState)(nil),             // 10: lindm.agent.v1.OSUpdateRunState
-	(*PatchStatusObservation)(nil),       // 11: lindm.agent.v1.PatchStatusObservation
-	(*GetPatchStatusRequest)(nil),        // 12: lindm.agent.v1.GetPatchStatusRequest
-	(*GetPatchStatusResponse)(nil),       // 13: lindm.agent.v1.GetPatchStatusResponse
-	(*v1.OSUpdateDesired)(nil),           // 14: lindm.resource.v1.OSUpdateDesired
-	(v1.UpdateSelection)(0),              // 15: lindm.resource.v1.UpdateSelection
-	(*v1.OSUpdateRebootPolicy)(nil),      // 16: lindm.resource.v1.OSUpdateRebootPolicy
-	(*timestamppb.Timestamp)(nil),        // 17: google.protobuf.Timestamp
-	(v1.OSUpdateBackend)(0),              // 18: lindm.resource.v1.OSUpdateBackend
+	(PatchRunTrigger)(0),                  // 0: lindm.agent.v1.PatchRunTrigger
+	(PatchRunResult)(0),                   // 1: lindm.agent.v1.PatchRunResult
+	(PatchRunTool)(0),                     // 2: lindm.agent.v1.PatchRunTool
+	(PatchRunPhase)(0),                    // 3: lindm.agent.v1.PatchRunPhase
+	(*NativeOSUpdateProviderConfig)(nil),  // 4: lindm.agent.v1.NativeOSUpdateProviderConfig
+	(*OSUpdateRunPolicy)(nil),             // 5: lindm.agent.v1.OSUpdateRunPolicy
+	(*OSUpdatePatchNowRequest)(nil),       // 6: lindm.agent.v1.OSUpdatePatchNowRequest
+	(*PatchRunDiagnostic)(nil),            // 7: lindm.agent.v1.PatchRunDiagnostic
+	(*PatchRunSummary)(nil),               // 8: lindm.agent.v1.PatchRunSummary
+	(*OSUpdateDeferralEntry)(nil),         // 9: lindm.agent.v1.OSUpdateDeferralEntry
+	(*OSUpdateRunState)(nil),              // 10: lindm.agent.v1.OSUpdateRunState
+	(*OSUpdateRebootState)(nil),           // 11: lindm.agent.v1.OSUpdateRebootState
+	(*OSUpdateRebootAttempt)(nil),         // 12: lindm.agent.v1.OSUpdateRebootAttempt
+	(*OSUpdateRebootDeferralRequest)(nil), // 13: lindm.agent.v1.OSUpdateRebootDeferralRequest
+	(*OSUpdateRebootNotice)(nil),          // 14: lindm.agent.v1.OSUpdateRebootNotice
+	(*PatchStatusObservation)(nil),        // 15: lindm.agent.v1.PatchStatusObservation
+	(*GetPatchStatusRequest)(nil),         // 16: lindm.agent.v1.GetPatchStatusRequest
+	(*GetPatchStatusResponse)(nil),        // 17: lindm.agent.v1.GetPatchStatusResponse
+	(*v1.OSUpdateDesired)(nil),            // 18: lindm.resource.v1.OSUpdateDesired
+	(v1.UpdateSelection)(0),               // 19: lindm.resource.v1.UpdateSelection
+	(*v1.OSUpdateRebootPolicy)(nil),       // 20: lindm.resource.v1.OSUpdateRebootPolicy
+	(*timestamppb.Timestamp)(nil),         // 21: google.protobuf.Timestamp
+	(v1.OSUpdateBackend)(0),               // 22: lindm.resource.v1.OSUpdateBackend
 }
 var file_lindm_agent_v1_os_update_proto_depIdxs = []int32{
-	14, // 0: lindm.agent.v1.OSUpdateRunPolicy.desired:type_name -> lindm.resource.v1.OSUpdateDesired
-	15, // 1: lindm.agent.v1.OSUpdatePatchNowRequest.selection:type_name -> lindm.resource.v1.UpdateSelection
-	16, // 2: lindm.agent.v1.OSUpdatePatchNowRequest.reboot_policy:type_name -> lindm.resource.v1.OSUpdateRebootPolicy
-	17, // 3: lindm.agent.v1.OSUpdatePatchNowRequest.requested_at:type_name -> google.protobuf.Timestamp
-	17, // 4: lindm.agent.v1.OSUpdatePatchNowRequest.not_after:type_name -> google.protobuf.Timestamp
+	18, // 0: lindm.agent.v1.OSUpdateRunPolicy.desired:type_name -> lindm.resource.v1.OSUpdateDesired
+	19, // 1: lindm.agent.v1.OSUpdatePatchNowRequest.selection:type_name -> lindm.resource.v1.UpdateSelection
+	20, // 2: lindm.agent.v1.OSUpdatePatchNowRequest.reboot_policy:type_name -> lindm.resource.v1.OSUpdateRebootPolicy
+	21, // 3: lindm.agent.v1.OSUpdatePatchNowRequest.requested_at:type_name -> google.protobuf.Timestamp
+	21, // 4: lindm.agent.v1.OSUpdatePatchNowRequest.not_after:type_name -> google.protobuf.Timestamp
 	2,  // 5: lindm.agent.v1.PatchRunDiagnostic.tool:type_name -> lindm.agent.v1.PatchRunTool
 	3,  // 6: lindm.agent.v1.PatchRunDiagnostic.phase:type_name -> lindm.agent.v1.PatchRunPhase
 	0,  // 7: lindm.agent.v1.PatchRunSummary.trigger:type_name -> lindm.agent.v1.PatchRunTrigger
-	17, // 8: lindm.agent.v1.PatchRunSummary.started_at:type_name -> google.protobuf.Timestamp
-	17, // 9: lindm.agent.v1.PatchRunSummary.finished_at:type_name -> google.protobuf.Timestamp
+	21, // 8: lindm.agent.v1.PatchRunSummary.started_at:type_name -> google.protobuf.Timestamp
+	21, // 9: lindm.agent.v1.PatchRunSummary.finished_at:type_name -> google.protobuf.Timestamp
 	1,  // 10: lindm.agent.v1.PatchRunSummary.result:type_name -> lindm.agent.v1.PatchRunResult
-	15, // 11: lindm.agent.v1.PatchRunSummary.selection:type_name -> lindm.resource.v1.UpdateSelection
-	17, // 12: lindm.agent.v1.PatchRunSummary.reboot_scheduled_for:type_name -> google.protobuf.Timestamp
+	19, // 11: lindm.agent.v1.PatchRunSummary.selection:type_name -> lindm.resource.v1.UpdateSelection
+	21, // 12: lindm.agent.v1.PatchRunSummary.reboot_scheduled_for:type_name -> google.protobuf.Timestamp
 	7,  // 13: lindm.agent.v1.PatchRunSummary.diagnostic:type_name -> lindm.agent.v1.PatchRunDiagnostic
-	17, // 14: lindm.agent.v1.OSUpdateDeferralEntry.first_seen:type_name -> google.protobuf.Timestamp
+	21, // 14: lindm.agent.v1.OSUpdateDeferralEntry.first_seen:type_name -> google.protobuf.Timestamp
 	8,  // 15: lindm.agent.v1.OSUpdateRunState.last_run:type_name -> lindm.agent.v1.PatchRunSummary
-	17, // 16: lindm.agent.v1.OSUpdateRunState.last_success:type_name -> google.protobuf.Timestamp
+	21, // 16: lindm.agent.v1.OSUpdateRunState.last_success:type_name -> google.protobuf.Timestamp
 	9,  // 17: lindm.agent.v1.OSUpdateRunState.pending_since:type_name -> lindm.agent.v1.OSUpdateDeferralEntry
-	17, // 18: lindm.agent.v1.PatchStatusObservation.observed_at:type_name -> google.protobuf.Timestamp
-	18, // 19: lindm.agent.v1.PatchStatusObservation.backend:type_name -> lindm.resource.v1.OSUpdateBackend
-	17, // 20: lindm.agent.v1.PatchStatusObservation.metadata_refreshed_at:type_name -> google.protobuf.Timestamp
-	17, // 21: lindm.agent.v1.PatchStatusObservation.last_successful_update:type_name -> google.protobuf.Timestamp
-	8,  // 22: lindm.agent.v1.PatchStatusObservation.last_run:type_name -> lindm.agent.v1.PatchRunSummary
-	17, // 23: lindm.agent.v1.PatchStatusObservation.reboot_scheduled_for:type_name -> google.protobuf.Timestamp
-	11, // 24: lindm.agent.v1.GetPatchStatusResponse.observation:type_name -> lindm.agent.v1.PatchStatusObservation
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	11, // 18: lindm.agent.v1.OSUpdateRunState.reboot:type_name -> lindm.agent.v1.OSUpdateRebootState
+	20, // 19: lindm.agent.v1.OSUpdateRebootState.policy:type_name -> lindm.resource.v1.OSUpdateRebootPolicy
+	21, // 20: lindm.agent.v1.OSUpdateRebootState.deadline:type_name -> google.protobuf.Timestamp
+	21, // 21: lindm.agent.v1.OSUpdateRebootState.scheduled_for:type_name -> google.protobuf.Timestamp
+	12, // 22: lindm.agent.v1.OSUpdateRebootState.pending_attempt:type_name -> lindm.agent.v1.OSUpdateRebootAttempt
+	21, // 23: lindm.agent.v1.OSUpdateRebootAttempt.scheduled_for:type_name -> google.protobuf.Timestamp
+	21, // 24: lindm.agent.v1.OSUpdateRebootDeferralRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	21, // 25: lindm.agent.v1.OSUpdateRebootNotice.scheduled_for:type_name -> google.protobuf.Timestamp
+	21, // 26: lindm.agent.v1.OSUpdateRebootNotice.deadline:type_name -> google.protobuf.Timestamp
+	21, // 27: lindm.agent.v1.OSUpdateRebootNotice.defer_until:type_name -> google.protobuf.Timestamp
+	21, // 28: lindm.agent.v1.PatchStatusObservation.observed_at:type_name -> google.protobuf.Timestamp
+	22, // 29: lindm.agent.v1.PatchStatusObservation.backend:type_name -> lindm.resource.v1.OSUpdateBackend
+	21, // 30: lindm.agent.v1.PatchStatusObservation.metadata_refreshed_at:type_name -> google.protobuf.Timestamp
+	21, // 31: lindm.agent.v1.PatchStatusObservation.last_successful_update:type_name -> google.protobuf.Timestamp
+	8,  // 32: lindm.agent.v1.PatchStatusObservation.last_run:type_name -> lindm.agent.v1.PatchRunSummary
+	21, // 33: lindm.agent.v1.PatchStatusObservation.reboot_scheduled_for:type_name -> google.protobuf.Timestamp
+	21, // 34: lindm.agent.v1.PatchStatusObservation.reboot_deadline:type_name -> google.protobuf.Timestamp
+	15, // 35: lindm.agent.v1.GetPatchStatusResponse.observation:type_name -> lindm.agent.v1.PatchStatusObservation
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_os_update_proto_init() }
@@ -1271,7 +1676,7 @@ func file_lindm_agent_v1_os_update_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_os_update_proto_rawDesc), len(file_lindm_agent_v1_os_update_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   10,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

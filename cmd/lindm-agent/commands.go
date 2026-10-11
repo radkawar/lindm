@@ -50,6 +50,7 @@ func serveExecutor(ctx context.Context, args []string) error {
 		ActionProviderFactory: func(store *journal.Store) (executor.DeviceActionProvider, error) {
 			return nativeActionProvider(doc.Proto.GetActionProvider(), store)
 		},
+		ActionProviderConfig:    doc.Proto.GetActionProvider(),
 		RecoveryBoot:            recoveryBootConfig(doc.Proto.GetRecoveryBoot()),
 		Updates:                 doc.Proto.GetUpdates(),
 		PackageProvider:         doc.Proto.GetPackageProvider(),

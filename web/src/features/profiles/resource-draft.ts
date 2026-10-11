@@ -66,7 +66,7 @@ export const resourceKinds = [
   {
     arm: "osUpdate",
     label: "OS update policy",
-    help: "Install security or all updates from the device's own signed repositories inside a weekly maintenance window, with optional deferral and a scheduled reboot. A window starting inside a daylight-saving transition hour, often between 01:00 and 03:00, does not open that day. Native automatic-update tools must already be installed.",
+    help: "Schedule update installation and decide when employees may defer a restart.",
   },
   {
     arm: "sessionPolicy",

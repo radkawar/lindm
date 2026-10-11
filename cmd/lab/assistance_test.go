@@ -260,3 +260,23 @@ func TestAssistanceNativeEnrollmentUsesGuestArchitecture(t *testing.T) {
 		t.Fatal("unsupported guest architecture silently selected a host package")
 	}
 }
+
+func TestRebootQualificationRejectsHeldFixturesBeforeOpeningThem(t *testing.T) {
+	for _, invalid := range [][]string{{"-hold"}, {"-name", "must-not-open"}, {"-scenarios", "view"}} {
+		args := append([]string{"vm", "assistance", "-reboot-policy"}, invalid...)
+		var output bytes.Buffer
+		// A nil host would panic if split setup reached host/fixture access.
+		if err := runSplitAssistance(t.Context(), nil, "", "", args, &output, &output); err == nil || !strings.Contains(err.Error(), "disposable non-held") {
+			t.Fatalf("split fixture opened for %v: %v", args, err)
+		}
+		if err := runVMAssistance(t.Context(), args[2:], &output, &output); err == nil || !strings.Contains(err.Error(), "disposable non-held") {
+			t.Fatalf("colocated fixture opened for %v: %v", args, err)
+		}
+	}
+	if err := validateRebootPolicyFlags(true, false, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRebootPolicyFlags(false, true, "existing", "view"); err != nil {
+		t.Fatal("ordinary assistance flags changed", err)
+	}
+}

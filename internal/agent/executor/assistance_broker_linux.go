@@ -57,6 +57,8 @@ type assistanceBroker struct {
 	validator  protovalidate.Validator
 	sessions   map[string]*assistanceSession
 	tombstones map[string]assistanceTombstone
+	// Every network sync carrying assistance invalidates employee reboot prompts.
+	rebootEpoch uint64
 }
 
 type assistanceSession struct {
@@ -134,6 +136,9 @@ func (b *assistanceBroker) syncNetwork(ctx context.Context, req *agentv1.SyncAss
 		present[id] = directive
 	}
 	b.mu.Lock()
+	if len(req.GetDirectives()) != 0 {
+		b.rebootEpoch++
+	}
 	now := b.clock()
 	b.applyDirectives(now, req.GetDirectives(), present)
 	b.expire(now)

@@ -24,6 +24,7 @@ import { taskWalkthroughs, taskAuditSheet } from "./review-journeys.mjs";
 import { reviewAuthorization } from "./review-authorization.mjs";
 import { reviewDirectoryAuthorization } from "./review-directory-authorization.mjs";
 import { reviewSSHBanner } from "./review-ssh-banner.mjs";
+import { reviewOSUpdate } from "./review-os-update.mjs";
 
 process.umask(0o077);
 
@@ -818,6 +819,18 @@ async function main() {
         screenshot,
       })),
     );
+    for (const entry of await reviewOSUpdate({
+      pages,
+      combos,
+      config,
+      screenshot,
+      axe,
+      probe,
+      settle,
+    })) {
+      summarize(entry);
+      report.results.push(entry);
+    }
     // Seeded sessions belong to the seeding owner and have ended. Request a
     // control-mode session through the device page as the signed-in owner, so the
     // live viewer (Take control and its disabled reason) is reviewed in every theme

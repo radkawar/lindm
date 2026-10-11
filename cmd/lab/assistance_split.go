@@ -96,6 +96,10 @@ func assistanceEnrollmentOptions(architecture, buildRepository string) (devlab.L
 }
 
 func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, buildRepository string, args []string, stdout, stderr io.Writer) (err error) {
+	rebootPolicy := assistanceFlag(args, "reboot-policy")
+	if err := validateRebootPolicyFlags(rebootPolicy, vmHolds(args), labhost.FlagValue(args, "name"), labhost.FlagValue(args, "scenarios")); err != nil {
+		return err
+	}
 	address, err := controllerAddress(ctx, host.SshAlias, labhost.FlagValue(args, "controller-address"))
 	if err != nil {
 		return err
@@ -120,7 +124,7 @@ func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, 
 		}
 		controller, err = vmlab.OpenPersistentAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), filepath.Join(root, "control-plane"), address, host.Name, enrollment)
 	} else {
-		controller, err = vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name, enrollment)
+		controller, err = vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name, enrollment, rebootPolicy)
 	}
 	if err != nil {
 		return err

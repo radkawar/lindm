@@ -22,6 +22,7 @@ import (
 type vmControlPlane struct {
 	session      *devlab.OwnerSession
 	approver     *devlab.ApprovalSession
+	openOwner    func(context.Context) (*devlab.OwnerSession, error)
 	openApprover func(context.Context) (*devlab.ApprovalSession, error)
 	fixture      *devlab.AgentFixture
 	grants       []*vmCreatedGrant
@@ -98,19 +99,20 @@ func openVMControlPlane(ctx context.Context, repoRoot string, isolated *devlab.A
 	if err != nil {
 		return nil, fmt.Errorf("read control-plane-bound agent fixture: %w", err)
 	}
-	var session *devlab.OwnerSession
-	if isolated == nil {
-		session, err = devlab.OpenOwnerSession(ctx, repoRoot)
-	} else {
-		session, err = isolated.OpenOwnerSession(ctx)
+	openOwner := func(ctx context.Context) (*devlab.OwnerSession, error) {
+		if isolated == nil {
+			return devlab.OpenOwnerSession(ctx, repoRoot)
+		}
+		return isolated.OpenOwnerSession(ctx)
 	}
+	session, err := openOwner(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// The independent human is unused until cleanup. Authenticating here would
 	// consume its idle-session lifetime during long native scenarios.
 	return &vmControlPlane{
-		session: session, fixture: fixture, devices: make(map[string]*vmTrackedDevice),
+		session: session, openOwner: openOwner, fixture: fixture, devices: make(map[string]*vmTrackedDevice),
 		openApprover: func(ctx context.Context) (*devlab.ApprovalSession, error) {
 			return devlab.OpenApprovalSession(ctx, repoRoot, isolated)
 		},
@@ -467,6 +469,23 @@ func (c *vmControlPlane) RevokeGrant(ctx context.Context, grantID string) error 
 	return errors.New("refusing to revoke a grant not created by this laboratory run")
 }
 
+// refreshOwner completes a real login before cleanup after a long native wait.
+// It cannot switch the run's actor or relax session/approval security lifetimes.
+func (c *vmControlPlane) refreshOwner(ctx context.Context) error {
+	fresh, err := c.openOwner(ctx)
+	if err != nil {
+		return vmControlPlaneError("authenticate laboratory cleanup owner", err)
+	}
+	if fresh.AccountID == "" || fresh.AccountID != c.session.AccountID {
+		return errors.Join(errors.New("laboratory cleanup owner identity changed"), fresh.Close(ctx))
+	}
+	previous := c.session
+	c.session = fresh
+	// Close already distinguishes expired/revoked sessions (HTTP 401) from
+	// logout failures. The new session, not the old cookie, authorizes cleanup.
+	return previous.Close(ctx)
+}
+
 // Close revokes grants (including their pending bound devices) and explicitly
 // tracked devices, then the real SSO session. Server records remain for audit.
 // Cleanup is detached from a canceled scenario and each phase is bounded.
@@ -475,8 +494,10 @@ func (c *vmControlPlane) Close(ctx context.Context) error {
 		return nil
 	}
 	base := context.WithoutCancel(ctx)
+	authenticate, cancelAuthenticate := context.WithTimeout(base, 45*time.Second)
+	result := c.refreshOwner(authenticate)
+	cancelAuthenticate()
 	cleanup, cancel := context.WithTimeout(base, 45*time.Second)
-	var result error
 	for _, grant := range c.grants {
 		if grant.revoked {
 			continue

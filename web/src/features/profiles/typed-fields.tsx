@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
 import { object, sameReference } from "./resource-draft";
 import { useProfilePickers } from "./field-pickers";
+import { OSUpdateFields } from "./os-update-fields";
 
 const labels: Record<string, string> = {
   nativeName: "Package name",
@@ -126,6 +127,9 @@ type Props = {
 // The generated descriptors remain the only field schema. This editor changes
 // one field at a time, retaining all other desired and profile metadata verbatim.
 export function TypedFields({ schema, value, onChange, id, references, disabled }: Props) {
+  if (schema.typeName === "lindm.resource.v1.OSUpdateDesired") {
+    return <OSUpdateFields value={value} onChange={onChange} id={id} disabled={disabled} />;
+  }
   const oneofs = schema.oneofs;
   function change(field: DescField, next: JsonValue | undefined) {
     const updated = { ...value };

@@ -432,11 +432,27 @@ message OSUpdateRebootPolicy {
     max_len: 256
     pattern: "^[^\\x00-\\x1f\\x7f]*$"
   }];
+  // Independent of the update start window. Absent permits any reboot time.
+  // No eligible instant before the deadline means no reboot is scheduled.
+  MaintenanceWindow reboot_window = 4;
+  // Absent disables employee deferral. The initial notice is at least five
+  // minutes; every accepted deferral stays inside the window and deadline.
+  OSUpdateRebootDeferral employee_deferral = 5;
   option (buf.validate.message).cel = {
     id: "os_update_reboot.delay"
-    message: "scheduled reboots need a 5..10080 minute delay; never-reboot policies carry no delay or notice"
-    expression: "this.mode == 2 ? this.max_delay_minutes >= 5u : (this.max_delay_minutes == 0u && this.notice == '')"
+    message: "scheduled reboots need a 5..10080 minute deadline; never-reboot policies carry no scheduling settings"
+    expression: "this.mode == 2 ? this.max_delay_minutes >= 5u : (this.max_delay_minutes == 0u && this.notice == '' && !has(this.reboot_window) && !has(this.employee_deferral))"
   };
+}
+message OSUpdateRebootDeferral {
+  uint32 max_deferrals = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 10
+  }];
+  uint32 delay_minutes = 2 [(buf.validate.field).uint32 = {
+    gte: 5
+    lte: 1440
+  }];
 }
 message RepositorySnapshot {
   ResourceRef repository = 1 [(buf.validate.field).required = true];

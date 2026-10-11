@@ -467,6 +467,31 @@ consulted. Missing cached metadata in the offline status reports
 [Verification](../verification.md#os-update-policy-patch-now-and-patch-status)
 records the native runs with SELinux enforcing.
 
+Independent `rebootWindow` and bounded `employeeDeferral` use the same protected
+runner state, logind scheduling and authenticated desktop-helper path described
+for Ubuntu. DNF remains configured with `reboot = never`; it cannot bypass the
+signed restart window. The executor's sandbox permits only the dedicated
+`/var/lib/lindm/os-update` state directory in addition to its existing writable
+paths. Fedora qualification must preserve enforcing SELinux and prove the actual
+GNOME notification action, native schedule change and subsequent changed boot,
+not inherit Ubuntu's desktop result. The dedicated `-reboot-policy` lane is
+documented in [verification](../verification.md#independent-reboot-window-and-employee-deferral).
+
+The 2026-10-11 Fedora 44 aarch64 GNOME 50/Wayland KVM run passed the signed
+independent-window, actual employee deferral, executor-restart persistence and
+scheduled-reboot scenarios, including mandatory fixture cleanup, with SELinux
+Enforcing. The notification moved the owned restart from 20:33 to 20:38 UTC,
+retained its 22:09:18 UTC deadline and removed the exhausted action; the accepted
+native schedule produced a changed boot. Receipt SHA-256:
+`9bce6605aa2b73e968d96e04fd8fb01b26191d2866e2c57d078c469ec25c6b14`.
+The prerequisite reinstalled the exact vendor-authenticated
+`kernel-core-6.19.10-300.fc44.aarch64` through DNF/RPM verification, without
+changing its version or synthesizing a reboot marker. This used the maintained
+non-Secure-Boot aarch64 firmware tuple, not the unsigned DVD kernel under
+enforced Secure Boot. The linked verification record binds package signatures,
+source, desktop captures and changed boot; physical input, suspend and real-clock
+DST remain unqualified.
+
 ## Device actions
 
 Encryption success does not imply power, desktop lock, account lock, quarantine

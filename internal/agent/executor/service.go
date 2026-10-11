@@ -26,6 +26,7 @@ import (
 	"lindm/internal/agent/actionprovider"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/agent/osupdate"
 	"lindm/internal/agent/serviceprovider"
 	"lindm/internal/agent/statefs"
 	"lindm/internal/agent/update"
@@ -158,12 +159,13 @@ type Config struct {
 	RequireRoot           bool
 	ActionProvider        DeviceActionProvider
 	ActionProviderFactory func(*journal.Store) (DeviceActionProvider, error)
+	ActionProviderConfig  *agentv1.DeviceActionProviderConfig
 	RecoveryBoot          *RecoveryBootConfig
 	Updates               *agentv1.AgentUpdateConfig
 	PackageProvider       *agentv1.NativePackageProviderConfig
 	NativeResources       NativeResourceProviders
-	// RemoteAssistance enables the session-helper socket in
-	// SessionRuntimeDirectory (default localrpc.DefaultSessionRuntimeDirectory).
+	// RemoteAssistance and OS-update/patch-now policies enable the session-helper
+	// socket in SessionRuntimeDirectory (default localrpc.DefaultSessionRuntimeDirectory).
 	RemoteAssistance        *agentv1.RemoteAssistanceConfig
 	SessionRuntimeDirectory string
 }
@@ -185,12 +187,20 @@ func Run(ctx context.Context, cfg Config) error {
 		NetworkUID: cfg.NetworkUID,
 		NetworkGID: cfg.NetworkGID,
 	}
-	if !cfg.RemoteAssistance.GetEnabled() {
+	if !cfg.sessionEnabled() {
 		return localrpc.Serve(ctx, listen, svc)
 	}
 	sessionDirectory := cfg.SessionRuntimeDirectory
 	if sessionDirectory == "" {
 		sessionDirectory = localrpc.DefaultSessionRuntimeDirectory
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	reboots, err := osupdate.New(osupdate.Config{Clock: time.Now, Logger: slog.Default(), Executable: executable})
+	if err != nil {
+		return err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -199,8 +209,8 @@ func Run(ctx context.Context, cfg Config) error {
 		defer close(sessionDone)
 		// Device management does not depend on the desktop socket. Without
 		// it, invitations end NO_ELIGIBLE_SESSION; the failure stays visible here.
-		if err := localrpc.ServeSession(ctx, localrpc.SessionListenConfig{Directory: sessionDirectory, NetworkUID: cfg.NetworkUID}, &sessionService{broker: svc.assistance}); err != nil {
-			slog.Error("remote assistance session socket stopped", "directory", sessionDirectory, "error", err)
+		if err := localrpc.ServeSession(ctx, localrpc.SessionListenConfig{Directory: sessionDirectory, NetworkUID: cfg.NetworkUID}, &sessionService{broker: svc.assistance, reboots: reboots}); err != nil {
+			slog.Error("employee session socket stopped", "directory", sessionDirectory, "error", err)
 		}
 	}()
 	err = localrpc.Serve(ctx, listen, svc)
@@ -560,6 +570,8 @@ func mapError(err error) error {
 		code, reason = connect.CodeDeadlineExceeded, "deadline_exceeded"
 	case errors.Is(err, errClosed):
 		code, reason = connect.CodeUnavailable, "executor_closed"
+	case errors.Is(err, osupdate.ErrRunInProgress):
+		code, reason = connect.CodeUnavailable, "os_update_run_in_progress"
 	case errors.Is(err, errResourceRejected):
 		code, reason = connect.CodePermissionDenied, "resource_execution_rejected"
 	case errors.Is(err, errResourceExpired):

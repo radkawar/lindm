@@ -219,6 +219,16 @@ export function DevicePatchStatus({ status }: { status: PatchStatusObservation |
                   unknown
                 )}
               </Fact>
+              {status.rebootDeadline && (
+                <>
+                  <Fact label="Restart deadline">
+                    <ObservedTime value={status.rebootDeadline} />
+                  </Fact>
+                  <Fact label="Employee deferrals used">
+                    {status.rebootDeferralsUsed.toLocaleString()}
+                  </Fact>
+                </>
+              )}
               <Fact label="Metadata refreshed">
                 {status.metadataRefreshedAt ? (
                   <ObservedTime value={status.metadataRefreshedAt} />

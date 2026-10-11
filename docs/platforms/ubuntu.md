@@ -616,12 +616,53 @@ Deferral is per package name and architecture. It counts calendar days in the
 window's zone from the window start at which the update was first seen pending.
 Patch now (below) ignores both window and deferral. systemd skips a window start
 that does not exist on a daylight-saving spring-forward day, so that day's
-window does not open. With reboot mode `SCHEDULED`, a required reboot becomes
-logind `SetWallMessage` plus `ScheduleShutdown("reboot", completion + max delay)`
-over the root-checked system bus. An existing schedule is never replaced, and a
-block inhibitor defers to the next run. Graphical users also get a desktop
-notification from a child running with their logind UID/GID against
-`/run/user/<uid>/bus`.
+window does not open. The independent optional `rebootWindow` uses the same IANA
+zone, spring-gap, first-fold and elapsed-duration rules. A running package
+transaction is never stopped at either window end. With reboot mode `SCHEDULED`,
+logind receives a reboot instant inside that window and no later than the first
+pending reboot's `maxDelayMinutes` deadline. With no restart window or employee
+deferral, the initial instant remains completion plus the maximum delay.
+Otherwise the first eligible instant is at least five minutes after completion.
+No eligible instant produces `no_window_before_deadline`; an expired deadline
+produces `reboot_deadline_elapsed`, never an out-of-window reboot.
+
+`employeeDeferral` authorizes 1–10 postponements of 5–1440 minutes each, bounded
+by that same deadline and the next eligible window instant. The installed
+`lindm-session.service` displays the action to an active, unlocked local graphical
+session. Its separate executor socket checks kernel peer credentials and logind;
+no caller-selected restart time is accepted. The protected runner state retains
+the accepted schedule and count separately from a durable pending native attempt.
+Fresh logind observation commits an accepted attempt or preserves the original
+schedule after rejection; an ambiguous reply is reconciled without replay.
+A clicked deferral that races the update/status lock receives a retryable error,
+not an acknowledgement. The helper reports “Restart deferral not confirmed”
+and retains the same request and session-bound prompt until the lock is free;
+the original native restart still applies meanwhile.
+Executor restarts retain the deadline, count and request identity. Later update
+policies do not rewrite an outstanding reboot's original policy or deadline.
+Another boot invalidates the notice. Corrupt state refuses execution rather than
+resetting the deadline. An existing foreign schedule, shutdown preparation or
+blocking inhibitor refuses deferral. Deferral invalidates cached patch status
+before its native effect, so inventory requests an offline refresh instead of
+reporting the old schedule/count for the cache lifetime. The employee socket is
+also enabled for `allow_patch_now` without scheduled OS-update management.
+Assistance admission invalidates employee prompts and blocks simultaneous
+deferral. Without employee deferral, graphical notifications still use the
+logind UID/GID child and `/run/user/<uid>/bus`; all scheduled reboots retain wall
+notices. Device patch status reports the owned restart deadline and used count.
+
+The Ubuntu 24.04.5 arm64 GNOME/Wayland native KVM lane passed on 2026-10-11
+with enrolled Secure Boot. Its signed independent windows scheduled 20:20 UTC;
+the actual employee notification action deferred to 20:25 UTC, preserved the
+21:51:02 UTC deadline across an executor restart and produced a changed boot.
+The prerequisite was a vendor-authenticated reinstall of the exact running
+`linux-image-6.8.0-146-generic=6.8.0-146.146`, not a newer/security-version upgrade
+or a synthetic reboot marker. The complete receipt, including successful
+mandatory grant/device cleanup, has SHA-256
+`f955a1f336558b3894c270a3127ba1b0cdbc54a2374488978aeeff1350ff59e9`;
+[verification](../verification.md#independent-reboot-window-and-employee-deferral)
+records the source, package, signature, real desktop captures and qualification
+boundaries. Real-clock DST and physical employee input remain unqualified.
 
 `lindm-os-update-status.service` (`PrivateNetwork=yes`) computes the patch
 status offline from the cache: pending security/total/deferred counts, the

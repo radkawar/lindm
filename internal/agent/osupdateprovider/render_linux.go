@@ -170,6 +170,11 @@ func renderFiles(zoneinfo string, desired *resourcev1.OSUpdateDesired, backend r
 	if err != nil {
 		return nil, nil, err
 	}
+	if window := desired.GetRebootPolicy().GetRebootWindow(); window != nil {
+		if _, err := calendarSpecs(zoneinfo, window); err != nil {
+			return nil, nil, err
+		}
+	}
 	policy, err := renderPolicy(desired)
 	if err != nil {
 		return nil, nil, err

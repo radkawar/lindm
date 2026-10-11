@@ -193,6 +193,54 @@ message OSUpdateRunState {
   // Packages with a pending update, first observation time; pruned when no
   // update is pending for the package any more.
   repeated OSUpdateDeferralEntry pending_since = 4 [(buf.validate.field).repeated.max_items = 16384];
+  OSUpdateRebootState reboot = 5;
+}
+
+// Root-only ownership of one logind schedule on one boot. Written before
+// scheduling; a mismatching native schedule is never adopted or replaced.
+message OSUpdateRebootState {
+  string schedule_id = 1 [(buf.validate.field).string.uuid = true];
+  string boot_id = 2 [(buf.validate.field).string.uuid = true];
+  lindm.resource.v1.OSUpdateRebootPolicy policy = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp deadline = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp scheduled_for = 5 [(buf.validate.field).required = true];
+  uint32 deferrals_used = 6 [(buf.validate.field).uint32.lte = 10];
+  string last_request_id = 7 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  OSUpdateRebootAttempt pending_attempt = 8;
+  string last_request_reason = 9 [(buf.validate.field).string.max_len = 128];
+  option (buf.validate.message).cel = {
+    id: "reboot_state.pending_attempt"
+    message: "pending reboot attempts stay within the retained deadline and employee deferral budget"
+    expression: "!has(this.pending_attempt) || (this.pending_attempt.scheduled_for <= this.deadline && (!this.pending_attempt.employee_deferral || (this.pending_attempt.scheduled_for > this.scheduled_for && has(this.policy.employee_deferral) && this.deferrals_used < this.policy.employee_deferral.max_deferrals)))"
+  };
+}
+
+// An intent to change logind, not proof that it accepted the change. The prior
+// accepted schedule remains authoritative until native observation reconciles it.
+message OSUpdateRebootAttempt {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp scheduled_for = 2 [(buf.validate.field).required = true];
+  bool employee_deferral = 3;
+}
+
+// The helper submits the exact displayed schedule, never a caller-chosen time.
+message OSUpdateRebootDeferralRequest {
+  string schedule_id = 1 [(buf.validate.field).string.uuid = true];
+  string request_id = 2 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp scheduled_for = 3 [(buf.validate.field).required = true];
+}
+
+message OSUpdateRebootNotice {
+  string schedule_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp scheduled_for = 2 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp deadline = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp defer_until = 4;
+  uint32 deferrals_remaining = 5 [(buf.validate.field).uint32.lte = 10];
+  string notice = 6 [(buf.validate.field).string.max_len = 256];
+  string reason = 7 [(buf.validate.field).string.max_len = 128];
 }
 
 // Public patch-status inventory, computed offline from the native cache by
@@ -225,6 +273,9 @@ message PatchStatusObservation {
   uint32 deferred_updates = 13 [(buf.validate.field).uint32.lte = 100000];
   // An accepted logind reboot schedule currently pending.
   google.protobuf.Timestamp reboot_scheduled_for = 14;
+  // Present only for a pending reboot owned by this boot's protected runner.
+  google.protobuf.Timestamp reboot_deadline = 15;
+  uint32 reboot_deferrals_used = 16 [(buf.validate.field).uint32.lte = 10];
   option (buf.validate.message).cel = {
     id: "patch_status.availability"
     message: "available observations carry a backend, metadata time and boot; failures carry a reason"

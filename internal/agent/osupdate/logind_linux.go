@@ -132,6 +132,7 @@ type powerState struct {
 	kind      string
 	scheduled time.Time
 	inhibited bool
+	preparing bool
 }
 
 type logindInhibitor struct {
@@ -164,6 +165,7 @@ func (l *logind) power(ctx context.Context) (powerState, error) {
 	// logind reports USEC_INFINITY or zero when nothing is scheduled.
 	hasTime := scheduled.Usec != 0 && scheduled.Usec != ^uint64(0)
 	state.pending = preparing || scheduled.Kind != "" || hasTime
+	state.preparing = preparing
 	state.kind = scheduled.Kind
 	if hasTime && scheduled.Usec <= uint64(1)<<62 {
 		state.scheduled = time.UnixMicro(int64(scheduled.Usec))

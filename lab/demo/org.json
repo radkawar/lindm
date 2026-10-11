@@ -314,8 +314,26 @@
                 },
                 "rebootPolicy": {
                   "mode": "OS_UPDATE_REBOOT_MODE_SCHEDULED",
-                  "maxDelayMinutes": 120,
-                  "notice": "Security updates require a restart. Save your work."
+                  "maxDelayMinutes": 360,
+                  "notice": "Security updates require a restart. Save your work.",
+                  "rebootWindow": {
+                    "timeZone": "Europe/London",
+                    "weekdays": [
+                      "WEEKDAY_MONDAY",
+                      "WEEKDAY_TUESDAY",
+                      "WEEKDAY_WEDNESDAY",
+                      "WEEKDAY_THURSDAY",
+                      "WEEKDAY_FRIDAY",
+                      "WEEKDAY_SATURDAY",
+                      "WEEKDAY_SUNDAY"
+                    ],
+                    "localStartMinute": 300,
+                    "durationMinutes": 120
+                  },
+                  "employeeDeferral": {
+                    "maxDeferrals": 2,
+                    "delayMinutes": 30
+                  }
                 }
               }
             },
@@ -934,8 +952,26 @@
                 },
                 "rebootPolicy": {
                   "mode": "OS_UPDATE_REBOOT_MODE_SCHEDULED",
-                  "maxDelayMinutes": 120,
-                  "notice": "Security updates require a restart. Save your work."
+                  "maxDelayMinutes": 360,
+                  "notice": "Security updates require a restart. Save your work.",
+                  "rebootWindow": {
+                    "timeZone": "Europe/London",
+                    "weekdays": [
+                      "WEEKDAY_MONDAY",
+                      "WEEKDAY_TUESDAY",
+                      "WEEKDAY_WEDNESDAY",
+                      "WEEKDAY_THURSDAY",
+                      "WEEKDAY_FRIDAY",
+                      "WEEKDAY_SATURDAY",
+                      "WEEKDAY_SUNDAY"
+                    ],
+                    "localStartMinute": 300,
+                    "durationMinutes": 120
+                  },
+                  "employeeDeferral": {
+                    "maxDeferrals": 2,
+                    "delayMinutes": 30
+                  }
                 }
               }
             },

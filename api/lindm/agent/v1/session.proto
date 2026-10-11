@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/os_update.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
 
@@ -51,6 +52,7 @@ message SessionAssistanceReport {
 
 message SyncSessionRequest {
   repeated SessionAssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 4];
+  OSUpdateRebootDeferralRequest reboot_deferral = 2;
 }
 
 message SyncSessionResponse {
@@ -59,4 +61,5 @@ message SyncSessionResponse {
   repeated AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 4];
   // The local session the executor bound to this caller.
   AssistanceLocalSession local_session = 2 [(buf.validate.field).required = true];
+  OSUpdateRebootNotice reboot = 3;
 }
