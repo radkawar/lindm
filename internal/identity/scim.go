@@ -151,7 +151,7 @@ func (s *Service) RotateSCIMCredential(ctx context.Context, request *authv1.Rota
 	if err := q.RotateSCIMCredential(ctx, identitydb.RotateSCIMCredentialParams{ID: connector.ID, CredentialHash: domainHash(scimCredentialDomain, secret)}); err != nil {
 		return nil, s.dbErr(err)
 	}
-	if err := s.insertAudit(ctx, q, &actor.ID, "identity.scim_credential_rotated", "scim/"+connector.ID, "dedicated connector credential replaced"); err != nil {
+	if err := s.insertSystemAudit(ctx, q, &actor.ID, "identity.scim_credential_rotated", "scim/"+connector.ID, "dedicated connector credential replaced"); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

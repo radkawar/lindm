@@ -473,7 +473,7 @@ func (s *Service) mintLocalAdminAction(ctx context.Context, principal devicePrin
 	if err := q.InsertDeviceAction(ctx, devicedb.InsertDeviceActionParams{ID: id, DeviceID: principal.DeviceID, GenerationID: principal.GenerationID, Capability: localAdminCapability, LuksUuids: []uuid.UUID{}, RequestID: requestID, RequestDigest: requestDigest, RequestDocument: document, ActorID: locked.ActorID, AuthorizationVersion: int64(authorization.Version()), IntentEnvelope: envelope, IntentDocument: intentBytes, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(expires)}); err != nil {
 		return false, mapErr(err)
 	}
-	if err := dispatchAudit(ctx, q, &locked.ActorID, "device_action.create", id, "local_admin_policy"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, &locked.ActorID, "device_action.create", id, "source", "local_admin_policy"); err != nil {
 		return false, mapErr(err)
 	}
 	if err := q.SetLocalAdminPolicyDue(ctx, devicedb.SetLocalAdminPolicyDueParams{DeviceID: principal.DeviceID, RotateDueAt: timestamptz(now.Add(localAdminRetryAfter)), UpdatedAt: timestamptz(now)}); err != nil {
@@ -530,7 +530,7 @@ func (s *Service) ingestLocalAdminEscrow(ctx context.Context, q *devicedb.Querie
 	if err := q.InsertLocalAdminPassword(ctx, devicedb.InsertLocalAdminPasswordParams{ActionID: action.ID, DeviceID: action.DeviceID, GenerationID: action.GenerationID, AccountName: planned.GetAccountName(), AccountUid: int64(planned.GetAccountUid())}); err != nil {
 		return err
 	}
-	return dispatchAudit(ctx, q, nil, "local_admin.escrow_store", action.ID, "verified_encrypted_local_admin_password")
+	return dispatchSystemAudit(ctx, q, nil, "local_admin.escrow_store", action.ID, "proof", "verified_encrypted_local_admin_password")
 }
 
 // settleLocalAdminPassword records whether the escrowed password is in effect

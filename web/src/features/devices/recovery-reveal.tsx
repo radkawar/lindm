@@ -216,7 +216,9 @@ export function RecoveryKeyReveal({ deviceId, actionId }: { deviceId: string; ac
         onChange={(event) => setReason(event.target.value)}
       />
       <Label htmlFor={`reveal-confirmation-${actionId}`}>Type the device ID to confirm</Label>
-      <p className="break-all font-mono text-xs text-muted-foreground">{deviceId}</p>
+      <p className="break-all text-xs text-muted-foreground">
+        <code className="font-mono">{deviceId}</code>
+      </p>
       <Input
         id={`reveal-confirmation-${actionId}`}
         value={confirmation}

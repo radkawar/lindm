@@ -37,7 +37,7 @@ func (s *Service) CreateEnrollmentApproval(ctx context.Context, tx pgx.Tx, autho
 	if err != nil {
 		return uuid.Nil, s.dbErr(err)
 	}
-	if err := s.insertAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
+	if err := s.insertSystemAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
 		return uuid.Nil, err
 	}
 	return row.ID, nil

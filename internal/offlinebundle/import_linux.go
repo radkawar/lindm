@@ -248,7 +248,7 @@ func (i *Importer) finish(ctx context.Context, conn *pgxpool.Conn, bundle *Bundl
 		}
 		return q.InsertBundleAudit(ctx, bundledb.InsertBundleAuditParams{
 			ID: uuid.New(), Action: "offline_bundle.imported", ResourceID: manifest.GetBundleId(),
-			Reason: fmt.Sprintf("Signed offline bundle sequence %d (release %s, %s custody) imported", manifest.GetSequence(), manifest.GetRelease().GetVersion(), manifest.GetCustody()),
+			Sequence: fmt.Sprint(manifest.GetSequence()), Release: manifest.GetRelease().GetVersion(), Custody: manifest.GetCustody(),
 		})
 	})
 }

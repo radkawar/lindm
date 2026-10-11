@@ -16,16 +16,29 @@ export function formatTimestamp(value: Timestamp | undefined): {
   return { local: localTime.format(date), utc: date.toISOString(), date };
 }
 
+// Relative age for past times and "in ..." for future ones such as expiry. A
+// future time is not clock skew: expiries and deadlines are legitimately ahead.
 export function freshnessLabel(date: Date, now: Date): string {
   const deltaMs = now.getTime() - date.getTime();
-  if (deltaMs < 0) return "browser clock is behind this server time";
-  const seconds = Math.floor(deltaMs / 1000);
+  const future = deltaMs < 0;
+  const seconds = Math.floor(Math.abs(deltaMs) / 1000);
   if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds} seconds ago`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 48) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
   const days = Math.floor(hours / 24);
-  return days === 1 ? "1 day ago" : `${days} days ago`;
+  const span =
+    seconds < 60
+      ? `${seconds} seconds`
+      : minutes < 60
+        ? minutes === 1
+          ? "1 minute"
+          : `${minutes} minutes`
+        : hours < 48
+          ? hours === 1
+            ? "1 hour"
+            : `${hours} hours`
+          : days === 1
+            ? "1 day"
+            : `${days} days`;
+  return future ? `in ${span}` : `${span} ago`;
 }

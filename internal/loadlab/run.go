@@ -151,6 +151,8 @@ type runner struct {
 	baseline      []*inventoryv1.Package
 	remote        *remoteGenerator
 	advisories    bool
+	// demo assigns console demo hosts by enrollment index; nil for capacity.
+	demo []*demoDevice
 }
 
 // prepare composes the same real authority, enrollment and inventory workload for
@@ -185,6 +187,10 @@ func (r *runner) prepare(ctx context.Context) (resultErr error) {
 	}()
 	if _, err := r.owner.Admin.UpdateExecutionAuthority(ctx, connect.NewRequest(&adminv1.UpdateExecutionAuthorityRequest{Update: update, Reason: "disposable capacity execution authority"})); err != nil {
 		return err
+	}
+	if r.demo != nil {
+		// SeedDemo publishes its own catalog instead of the capacity workload.
+		return r.initDevices(ctx, material.ExecutionRootJSON, material.BootstrapEnvelope, r.fixture.AdminAddress, r.fixture.DeviceAddress, r.baseline)
 	}
 	published, err := r.owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "disposable capacity service profile", Spec: &policyv1.ResourceProfile{Name: "Synthetic capacity workload", Resources: []*policyv1.ProfileResource{{ResourceId: uuid.NewString(), Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSTEMD_SERVICE, CanonicalKey: "capacity-synthetic.service"}, State: &resourcev1.ResourceDesiredState_SystemdService{SystemdService: &resourcev1.SystemdServiceDesired{Unit: "capacity-synthetic.service", Runtime: resourcev1.ServiceRuntimeState_SERVICE_RUNTIME_STATE_ACTIVE, Enablement: resourcev1.ServiceEnablement_SERVICE_ENABLEMENT_UNMANAGED}}}, Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RETAIN}, Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 1800, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}}}}}}))
 	if err != nil {

@@ -2,6 +2,7 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
@@ -32,8 +33,6 @@ export function IdentitySettings() {
           <dl className="grid gap-2 sm:grid-cols-2">
             <dt>Sign-in provider</dt>
             <dd>{settings.primarySource}</dd>
-            <dt>Issuer</dt>
-            <dd className="break-all">{settings.issuer}</dd>
             <dt>Upstream provider</dt>
             <dd>{settings.brokerEnabled ? settings.upstreamSource : "Not configured"}</dd>
             <dt>SCIM provisioning</dt>
@@ -83,6 +82,7 @@ export function IdentitySettings() {
             This is about your own account. If the check fails or is too old, you lose access until
             it succeeds.
           </p>
+          <TechnicalDetails items={[{ label: "Issuer", value: settings.issuer }]} />
         </>
       ) : null}
     </section>

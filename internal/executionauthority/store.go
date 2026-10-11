@@ -221,7 +221,7 @@ func (s *Store) initialize(ctx context.Context, q *authoritydb.Queries, cfg Conf
 	}
 	return q.InsertAudit(ctx, authoritydb.InsertAuditParams{
 		ID: uuid.New(), OccurredAt: stamp, Action: "execution_authority.initialize",
-		ResourceID: s.deploymentID.String(), Reason: "verified public bootstrap root pin",
+		ResourceID: s.deploymentID.String(), Context: "verified public bootstrap root pin",
 	})
 }
 

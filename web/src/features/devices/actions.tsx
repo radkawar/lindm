@@ -28,6 +28,22 @@ import {
 import { deviceActionsQueryOptions } from "./action-queries";
 import { Fact, ObservedTime } from "./observations";
 
+const failureLabels: Partial<Record<DeviceActionFailure, string>> = {
+  [DeviceActionFailure.PRECONDITION]: "The device wasn't ready for this action",
+  [DeviceActionFailure.UNSUPPORTED]: "Not supported on this device",
+  [DeviceActionFailure.NATIVE]: "The operating system reported an error",
+  [DeviceActionFailure.OBSERVATION]: "The device couldn't confirm the result",
+  [DeviceActionFailure.AUTHORITY]: "The device rejected the authorization",
+  [DeviceActionFailure.EXPIRED]: "Expired before it finished",
+  [DeviceActionFailure.INTERRUPTED]: "Interrupted before it finished",
+};
+
+// Server close reasons. "result" and "outcome_unknown" repeat the status badge.
+const closedReasonLabels: Record<string, string> = {
+  expired_unstarted: "Expired before the device started it",
+  recovery_result: "Closed by the recovery result",
+};
+
 export function DeviceLockRestriction({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, ""));
@@ -199,7 +215,9 @@ export function DeviceActionResult({
         <Fact label="Expires">
           <ObservedTime value={action.expiresAt} server />
         </Fact>
-        {action.closedReason ? <Fact label="Closed because">{action.closedReason}</Fact> : null}
+        {closedReasonLabels[action.closedReason] ? (
+          <Fact label="Closed because">{closedReasonLabels[action.closedReason]}</Fact>
+        ) : null}
       </dl>
       {linked ? (
         <Link
@@ -222,9 +240,10 @@ export function DeviceActionResult({
           <Fact label="Finished">
             <ObservedTime value={status.completedAt} />
           </Fact>
-          <Fact label="Failure">
-            {DeviceActionFailure[status.failure] ?? "Unknown failure code"}
-          </Fact>
+          {status.failure !== DeviceActionFailure.NONE &&
+          status.failure !== DeviceActionFailure.UNSPECIFIED ? (
+            <Fact label="Failure">{failureLabels[status.failure] ?? "Unknown failure"}</Fact>
+          ) : null}
           <Fact label="Supported on this device">
             {status.before?.supported ? "Yes" : "No"}
             {status.before?.reason ? `: ${status.before.reason}` : ""}
@@ -275,6 +294,11 @@ export function DeviceActionResult({
       <TechnicalDetails
         items={[
           { label: "Action ID", value: action.actionId },
+          { label: "Closed reason", value: action.closedReason },
+          {
+            label: "Failure code",
+            value: status ? DeviceActionFailure[status.failure] : undefined,
+          },
           { label: "Enrollment generation", value: String(action.enrollmentGeneration) },
           { label: "Revision", value: action.actionRevision.toString() },
           { label: "Boot ID before", value: status?.before?.bootId },

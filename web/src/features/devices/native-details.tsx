@@ -367,7 +367,10 @@ export function DeviceNativeDetails({
               rows={details.storage?.devices ?? []}
               showUnavailable={showUnavailable}
               columns={[
-                { header: "Name", render: (row) => row.name },
+                {
+                  header: "Name",
+                  render: (row) => <code className="font-mono">{row.name}</code>,
+                },
                 { header: "Type", field: (row) => row.type },
                 { header: "Parent", field: (row) => row.parent, optional: true },
                 { header: "Size (bytes)", field: (row) => row.sizeBytes },

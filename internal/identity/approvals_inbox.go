@@ -69,7 +69,7 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped inbox")
+		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped inbox")
 	})
 	if err != nil {
 		return nil, "", err
@@ -195,7 +195,7 @@ func (s *Service) CountPendingApprovals(ctx context.Context, actor uuid.UUID) (i
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped pending inbox count")
+		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped pending inbox count")
 	})
 	return count, err
 }

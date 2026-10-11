@@ -23,7 +23,7 @@ export function RpcError({
       <AlertDescription>
         <p>{presentation.message}</p>
         <p>{presentation.action}</p>
-        <details className="mt-2">
+        <details data-slot="support-details" className="mt-2">
           <summary className="cursor-pointer">Details for support</summary>
           <dl className="mt-2 grid gap-1 break-words text-xs">
             <div>

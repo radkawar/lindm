@@ -216,7 +216,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 		return advisorydb.AdvisoryEvaluation{}, err
 	}
 	if previousErr != nil || !bytes.Equal(previous.FindingDigest, e.FindingDigest) || previous.State != e.State || previous.Reason != e.Reason {
-		if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.findings.changed", ResourceID: deviceID.String(), Reason: "Device advisory evidence changed"}); err != nil {
+		if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.findings.changed", ResourceID: deviceID.String(), Context: "Device advisory evidence changed"}); err != nil {
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
 	}

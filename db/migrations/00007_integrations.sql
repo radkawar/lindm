@@ -258,9 +258,9 @@ BEGIN
       VALUES(p_assignment, item.resource_id, current_state, deadline)
       ON CONFLICT (assignment_id, resource_id) DO UPDATE SET state = EXCLUDED.state, stale_at = EXCLUDED.stale_at;
     IF previous_state IS DISTINCT FROM current_state THEN
-      INSERT INTO audit_events(actor_id, action, resource_id, reason)
+      INSERT INTO audit_events(actor_id, action, resource_id, details)
         VALUES(p_actor, 'compliance.state.changed', p_assignment::text || '/' || item.resource_id::text,
-          COALESCE(previous_state, 'unobserved') || '->' || current_state);
+          jsonb_build_object('previous_state', COALESCE(previous_state, 'unobserved'), 'state', current_state));
     END IF;
   END LOOP;
   UPDATE integration_compliance_states s SET stale_at = NULL WHERE s.assignment_id = p_assignment

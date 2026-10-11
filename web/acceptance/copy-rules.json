@@ -1,0 +1,40 @@
+{
+  "$comment": "Console copy rules enforced by `lab console review` on visible primary text. docs/engineering.md links here; this file is the maintained list. Patterns are JavaScript regular expressions matched case-insensitively unless flags say otherwise.",
+  "bannedTerms": [
+    { "term": "desired state", "pattern": "\\bdesired[ -]states?\\b" },
+    { "term": "owned changes", "pattern": "\\bowned changes?\\b" },
+    { "term": "ownership-safe release", "pattern": "\\bownership[ -]safe\\b" },
+    { "term": "generation", "pattern": "\\bgenerations?\\b" },
+    { "term": "catalog head", "pattern": "\\b(?:catalog|profile) heads?\\b" },
+    { "term": "disposition", "pattern": "\\bdispositions?\\b" },
+    { "term": "receipt", "pattern": "\\breceipts?\\b" },
+    { "term": "exact request", "pattern": "\\bexact requests?\\b" },
+    { "term": "native execution", "pattern": "\\bnative execution\\b" },
+    { "term": "request ID", "pattern": "\\brequest[ -]?ids?\\b" }
+  ],
+  "patterns": [
+    {
+      "name": "record or request UUID",
+      "pattern": "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b",
+      "flags": "i"
+    },
+    {
+      "name": "raw enum name",
+      "pattern": "\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b",
+      "flags": ""
+    },
+    {
+      "name": "raw snake_case code",
+      "pattern": "\\b[a-z]+(?:_[a-z]+)+\\b",
+      "flags": ""
+    }
+  ],
+  "excludedRegions": [
+    "[data-slot=\"technical-details\"]",
+    "[data-slot=\"support-details\"]",
+    "pre",
+    "code",
+    "kbd",
+    "samp"
+  ]
+}

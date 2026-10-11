@@ -425,7 +425,7 @@ func (s *Store) Activate(ctx context.Context, tx pgx.Tx, p identity.Principal, p
 		return nil, err
 	}
 	out.Preview = preview
-	return preview, saveReceipt(ctx, q, p, r.RequestId, "targeting.preview.activate", row.DeviceID.String(), r.Reason, r, out)
+	return preview, saveReceipt(ctx, q, p, r.RequestId, "targeting.preview.activate", row.DeviceID.String(), r.Reason, "", r, out)
 }
 
 // Eligible is a fresh pre-start fence, not permission to enlarge a pinned cohort.

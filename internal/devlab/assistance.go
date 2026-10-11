@@ -2,8 +2,13 @@ package devlab
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"math/big"
+	"net"
+	"net/netip"
 	"os"
+	"strconv"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -39,4 +44,80 @@ func (f *AuthorityFixture) ConfigureAssistance(ctx context.Context, assistance *
 		return err
 	}
 	return f.Restart(ctx)
+}
+
+// assistanceRelayPorts is the relay allocation range size; four allocations
+// per session suffice and lanes run one session at a time.
+const assistanceRelayPorts = 32
+
+// ReserveAssistanceRelay picks a free loopback TURN listener port (UDP and
+// TCP) and a free relay allocation range on relayAddress. VM guests reach the
+// loopback listener through QEMU's 10.0.2.2 host alias.
+func ReserveAssistanceRelay(relayAddress string) (*configv1.AssistanceConfig, error) {
+	address, err := netip.ParseAddr(relayAddress)
+	if err != nil || !address.Is4() || address.IsUnspecified() || address.IsMulticast() {
+		return nil, errors.New("assistance relay address must be a specific IPv4 address")
+	}
+	for range 20 {
+		listenerPort, err := reserveUDPAndTCPPort()
+		if err != nil {
+			return nil, err
+		}
+		offset, err := rand.Int(rand.Reader, big.NewInt(20000-assistanceRelayPorts))
+		if err != nil {
+			return nil, err
+		}
+		base := 40000 + int(offset.Int64())
+		if listenerPort >= base && listenerPort < base+assistanceRelayPorts || !udpRangeFree(address, base, assistanceRelayPorts) {
+			continue
+		}
+		return &configv1.AssistanceConfig{Relay: &configv1.AssistanceRelayConfig{
+			Listener:     &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(listenerPort)},
+			RelayAddress: address.String(),
+			RelayPortMin: uint32(base),
+			RelayPortMax: uint32(base + assistanceRelayPorts - 1),
+			// TCP lets a remote console reach the loopback listener through an
+			// SSH -L forward, which cannot carry UDP.
+			Urls:  []string{"turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=udp", "turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=tcp"},
+			Realm: "lindm-lab",
+		}}, nil
+	}
+	return nil, errors.New("no free assistance relay ports on the lab host")
+}
+
+func reserveUDPAndTCPPort() (int, error) {
+	for range 20 {
+		packet, err := net.ListenPacket("udp4", "127.0.0.1:0")
+		if err != nil {
+			return 0, err
+		}
+		local, ok := packet.LocalAddr().(*net.UDPAddr)
+		if !ok {
+			return 0, errors.Join(errors.New("relay listener probe is not UDP"), packet.Close())
+		}
+		port := local.Port
+		stream, streamErr := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		closeErr := packet.Close()
+		if streamErr == nil {
+			closeErr = errors.Join(closeErr, stream.Close())
+			return port, closeErr
+		}
+		if closeErr != nil {
+			return 0, closeErr
+		}
+	}
+	return 0, errors.New("no free assistance relay listener port")
+}
+
+func udpRangeFree(address netip.Addr, base, count int) bool {
+	for port := base; port < base+count; port++ {
+		packet, err := net.ListenPacket("udp4", netip.AddrPortFrom(address, uint16(port)).String())
+		if err != nil {
+			return false
+		}
+		if err := packet.Close(); err != nil {
+			return false
+		}
+	}
+	return true
 }

@@ -7,9 +7,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
-	"net"
-	"net/netip"
 	"os"
 	"slices"
 	"strconv"
@@ -18,7 +15,6 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
-	configv1 "lindm/gen/lindm/config/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/platform"
@@ -47,10 +43,6 @@ type VMAssistanceOptions struct {
 	// remote browser behind an SSH forward is, and requires a TCP relay pair.
 	ConsoleTURNTCP bool
 }
-
-// assistanceRelayPorts is the relay allocation range size; four allocations
-// per session suffice and the lane runs one session at a time.
-const assistanceRelayPorts = 32
 
 // assistanceOperator is the console account the browser enrolls and signs in
 // with; it creates, joins and answers every session.
@@ -130,7 +122,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err != nil {
 		return result, fmt.Errorf("configure isolated execution authority: %w", err)
 	}
-	assistance, err := reserveAssistanceRelay(options.RelayAddress)
+	assistance, err := devlab.ReserveAssistanceRelay(options.RelayAddress)
 	if err != nil {
 		return result, err
 	}
@@ -274,78 +266,6 @@ func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixtur
 	browser, err := startAssistanceBrowser(ctx, VMBuildRepository(options.Repository, options.BuildRepository), private, cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	return browser, err
-}
-
-// reserveAssistanceRelay picks a free loopback TURN listener port (UDP and
-// TCP) and a free relay allocation range on relayAddress. The guest reaches
-// the loopback listener through QEMU's 10.0.2.2 host alias.
-func reserveAssistanceRelay(relayAddress string) (*configv1.AssistanceConfig, error) {
-	address, err := netip.ParseAddr(relayAddress)
-	if err != nil || !address.Is4() || address.IsUnspecified() || address.IsMulticast() {
-		return nil, errors.New("assistance relay address must be a specific IPv4 address")
-	}
-	for range 20 {
-		listenerPort, err := reserveUDPAndTCPPort()
-		if err != nil {
-			return nil, err
-		}
-		offset, err := rand.Int(rand.Reader, big.NewInt(20000-assistanceRelayPorts))
-		if err != nil {
-			return nil, err
-		}
-		base := 40000 + int(offset.Int64())
-		if listenerPort >= base && listenerPort < base+assistanceRelayPorts || !udpRangeFree(address, base, assistanceRelayPorts) {
-			continue
-		}
-		return &configv1.AssistanceConfig{Relay: &configv1.AssistanceRelayConfig{
-			Listener:     &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(listenerPort)},
-			RelayAddress: address.String(),
-			RelayPortMin: uint32(base),
-			RelayPortMax: uint32(base + assistanceRelayPorts - 1),
-			// TCP lets a remote console reach the loopback listener through an
-			// SSH -L forward, which cannot carry UDP.
-			Urls:  []string{"turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=udp", "turn:localhost:" + strconv.Itoa(listenerPort) + "?transport=tcp"},
-			Realm: "lindm-lab",
-		}}, nil
-	}
-	return nil, errors.New("no free assistance relay ports on the lab host")
-}
-
-func reserveUDPAndTCPPort() (int, error) {
-	for range 20 {
-		packet, err := net.ListenPacket("udp4", "127.0.0.1:0")
-		if err != nil {
-			return 0, err
-		}
-		local, ok := packet.LocalAddr().(*net.UDPAddr)
-		if !ok {
-			return 0, errors.Join(errors.New("relay listener probe is not UDP"), packet.Close())
-		}
-		port := local.Port
-		stream, streamErr := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-		closeErr := packet.Close()
-		if streamErr == nil {
-			closeErr = errors.Join(closeErr, stream.Close())
-			return port, closeErr
-		}
-		if closeErr != nil {
-			return 0, closeErr
-		}
-	}
-	return 0, errors.New("no free assistance relay listener port")
-}
-
-func udpRangeFree(address netip.Addr, base, count int) bool {
-	for port := base; port < base+count; port++ {
-		packet, err := net.ListenPacket("udp4", netip.AddrPortFrom(address, uint16(port)).String())
-		if err != nil {
-			return false
-		}
-		if err := packet.Close(); err != nil {
-			return false
-		}
-	}
-	return true
 }
 
 // assistanceScenarioSpec is one end-to-end session and its required end path.

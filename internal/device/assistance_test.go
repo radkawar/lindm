@@ -2,10 +2,10 @@ package device
 
 import (
 	"errors"
+	"maps"
 	"net/netip"
 	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
 const (
@@ -64,12 +64,11 @@ func TestAssistanceSDPRequiresOneFingerprintAndRelayCandidates(t *testing.T) {
 	}
 }
 
-func TestAssistanceAuditIsCompactAndBounded(t *testing.T) {
-	if got := assistanceAudit("cause", "expired", "detail", "", "uid", "1000"); got != "cause=expired uid=1000" {
-		t.Fatalf("audit %q", got)
-	}
-	got := assistanceAudit("reason", strings.Repeat("é", 400))
-	if len(got) > assistanceAuditBytes || !utf8.ValidString(got) {
-		t.Fatalf("audit length %d valid=%v", len(got), utf8.ValidString(got))
+func TestAuditDetailsPreservesValues(t *testing.T) {
+	value := strings.Repeat("é", 400) + " user=not-a-field"
+	got := auditDetails("cause", "expired", "detail", value, "empty", "")
+	want := map[string]string{"cause": "expired", "detail": value}
+	if !maps.Equal(got, want) {
+		t.Fatalf("audit details %v, want %v", got, want)
 	}
 }

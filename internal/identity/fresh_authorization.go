@@ -147,7 +147,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 		if decision.Kind != accessOK || !Authorize(principal, permission) {
 			denied = ErrAuthorizationDenied
 			if snapshot.BreakGlass {
-				return s.insertAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "permission denied: "+string(permission))
+				return s.insertSystemAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "permission denied: "+string(permission))
 			}
 			return nil
 		}
@@ -160,7 +160,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 			deadline, err := q.ActiveBreakGlassDeadline(ctx, actorID)
 			if err != nil {
 				denied = ErrAuthorizationDenied
-				return s.insertAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "active emergency session required")
+				return s.insertSystemAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "active emergency session required")
 			}
 			if deadline.Time.Before(expires) {
 				expires = deadline.Time
@@ -203,7 +203,7 @@ func (s *Service) AuthorizeFresh(ctx context.Context, actorID uuid.UUID, permiss
 func (s *Service) LockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission) (result error) {
 	defer func() {
 		if result != nil && s != nil && authorization != nil && authorization.service == s && authorization.breakGlass {
-			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "worker authorization fence denied: "+string(permission)))
+			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "", "worker authorization fence denied: "+string(permission)))
 		}
 	}()
 	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(authorization.principal, permission) {

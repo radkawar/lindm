@@ -188,7 +188,12 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
         ]}
       />
       {grant.status === EnrollmentGrantStatus.ACTIVE ? (
-        <Button className="w-fit" variant="outline" onClick={() => setOpen(true)}>
+        <Button
+          className="w-fit"
+          variant="outline"
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
           Revoke code
         </Button>
       ) : null}

@@ -125,10 +125,11 @@ func (q *Queries) GetUpdate(ctx context.Context, requestDigest []byte) (Executio
 
 const insertAudit = `-- name: InsertAudit :exec
 
-INSERT INTO audit_events (id, occurred_at, actor_id, action, resource_id, reason)
+INSERT INTO audit_events (id, occurred_at, actor_id, action, resource_id, reason, details)
 VALUES (
     $1, $2, $3,
-    $4, $5, $6
+    $4, $5, $6,
+    jsonb_strip_nulls(jsonb_build_object('context', NULLIF($7::text, '')))
 )
 `
 
@@ -139,6 +140,7 @@ type InsertAuditParams struct {
 	Action     string
 	ResourceID string
 	Reason     string
+	Context    string
 }
 
 func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error {
@@ -149,6 +151,7 @@ func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error 
 		arg.Action,
 		arg.ResourceID,
 		arg.Reason,
+		arg.Context,
 	)
 	return err
 }

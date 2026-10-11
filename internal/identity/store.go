@@ -3,6 +3,7 @@ package identity
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -378,7 +379,7 @@ func (s *Service) revokeAndAudit(ctx context.Context, q *identitydb.Queries, id 
 		w.auditReason = reasonDisabled
 	}
 	if w.auditAction != "" && (w.auditAction != auditDisabled || !prevDeactivated || revoked > 0) {
-		return s.insertAudit(ctx, q, &id, w.auditAction, principalResource(id), w.auditReason)
+		return s.insertSystemAudit(ctx, q, &id, w.auditAction, principalResource(id), w.auditReason)
 	}
 	return nil
 }
@@ -519,7 +520,7 @@ func (s *Service) revokePrincipal(ctx context.Context, id uuid.UUID) error {
 		if n == 0 || dec.AuditAction == "" {
 			return nil
 		}
-		return s.insertAudit(ctx, q, &id, dec.AuditAction, principalResource(id), dec.AuditReason)
+		return s.insertSystemAudit(ctx, q, &id, dec.AuditAction, principalResource(id), dec.AuditReason)
 	})
 }
 
@@ -570,6 +571,17 @@ func (s *Service) insertAudit(ctx context.Context, q *identitydb.Queries, actor 
 		Action:     action,
 		ResourceID: resource,
 		Reason:     reason,
+	}))
+}
+
+// insertSystemAudit records generated context, not an operator-authored reason.
+func (s *Service) insertSystemAudit(ctx context.Context, q *identitydb.Queries, actor *uuid.UUID, action, resource, context string) error {
+	details, err := json.Marshal(map[string]string{"context": context})
+	if err != nil {
+		return err
+	}
+	return s.dbErr(q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{
+		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: resource, Details: details,
 	}))
 }
 
@@ -705,7 +717,7 @@ func (s *Service) persistAuthorization(ctx context.Context, q *identitydb.Querie
 	if err != nil {
 		return 0, s.dbErr(err)
 	}
-	if err := s.insertAudit(ctx, q, &row.ID, auditAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(row.AuthorizationRole, nextRole)); err != nil {
+	if err := s.insertSystemAudit(ctx, q, &row.ID, auditAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(row.AuthorizationRole, nextRole)); err != nil {
 		return 0, err
 	}
 	return version, nil

@@ -246,7 +246,7 @@ func TestAuthorizationOwnerPinInvalidatesAdminGrant(t *testing.T) {
 		if n != 1 {
 			t.Fatalf("owner pin affected %d principals", n)
 		}
-		return svc.insertAudit(ctx, q, &admin.actorID, auditOwnerBootstrapped, principalResource(admin.actorID), reasonInitialOwner)
+		return svc.insertSystemAudit(ctx, q, &admin.actorID, auditOwnerBootstrapped, principalResource(admin.actorID), reasonInitialOwner)
 	}
 	// Exercise the production pin query without a synthetic HTTP bootstrap.
 	tx, err := conn.Begin(ctx)

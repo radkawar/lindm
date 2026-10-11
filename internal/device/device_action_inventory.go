@@ -112,7 +112,7 @@ func (s *Service) ConfirmRefreshInventoryPublication(ctx context.Context, req *c
 	if err := q.SetDeviceActionInventoryReceipt(ctx, devicedb.SetDeviceActionInventoryReceiptParams{ID: id, InventoryReceiptEnvelope: envelope, InventoryReceiptDocument: document}); err != nil {
 		return nil, mapErr(err)
 	}
-	if err := dispatchAudit(ctx, q, nil, "device_action.inventory_published", id, "full_inventory_published"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "device_action.inventory_published", id, "status", "full_inventory_published"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -1251,16 +1251,21 @@ func (x *ReportSignedManifest) GetCertificateDer() [][]byte {
 
 // AuditChainRecord.payload contains this JSON shape. Preserve and hash the
 // original bytes; parsing is for display only, never chain reconstruction.
+// Includes target_device_id (nullable UUID) and details (string-valued JSON
+// object). Both are authenticated by the chain; device hostname is live display
+// context and is not part of the immutable audit row.
 type AuditEventPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=occurred_at,proto3" json:"occurred_at,omitempty"`
-	ActorId       string                 `protobuf:"bytes,3,opt,name=actor_id,proto3" json:"actor_id,omitempty"`
-	Action        string                 `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`
-	ResourceId    string                 `protobuf:"bytes,5,opt,name=resource_id,proto3" json:"resource_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OccurredAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=occurred_at,proto3" json:"occurred_at,omitempty"`
+	ActorId        string                 `protobuf:"bytes,3,opt,name=actor_id,proto3" json:"actor_id,omitempty"`
+	Action         string                 `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`
+	ResourceId     string                 `protobuf:"bytes,5,opt,name=resource_id,proto3" json:"resource_id,omitempty"`
+	Reason         string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	TargetDeviceId string                 `protobuf:"bytes,7,opt,name=target_device_id,proto3" json:"target_device_id,omitempty"`
+	Details        map[string]string      `protobuf:"bytes,8,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AuditEventPayload) Reset() {
@@ -1333,6 +1338,20 @@ func (x *AuditEventPayload) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *AuditEventPayload) GetTargetDeviceId() string {
+	if x != nil {
+		return x.TargetDeviceId
+	}
+	return ""
+}
+
+func (x *AuditEventPayload) GetDetails() map[string]string {
+	if x != nil {
+		return x.Details
+	}
+	return nil
 }
 
 // Report JSON arrays and CSV columns use these explicit snake-case field names.
@@ -1800,14 +1819,19 @@ const file_lindm_integrations_v1_reports_proto_rawDesc = "" +
 	"\bmanifest\x18\x01 \x01(\fR\bmanifest\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x12$\n" +
 	"\x0epublic_key_der\x18\x03 \x01(\fR\fpublicKeyDer\x12'\n" +
-	"\x0fcertificate_der\x18\x04 \x03(\fR\x0ecertificateDer\"\xcf\x01\n" +
+	"\x0fcertificate_der\x18\x04 \x03(\fR\x0ecertificateDer\"\x88\x03\n" +
 	"\x11AuditEventPayload\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
 	"\voccurred_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\voccurred_at\x12\x1a\n" +
 	"\bactor_id\x18\x03 \x01(\tR\bactor_id\x12\x16\n" +
 	"\x06action\x18\x04 \x01(\tR\x06action\x12 \n" +
 	"\vresource_id\x18\x05 \x01(\tR\vresource_id\x12\x16\n" +
-	"\x06reason\x18\x06 \x01(\tR\x06reason\"\x84\x04\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12*\n" +
+	"\x10target_device_id\x18\a \x01(\tR\x10target_device_id\x12O\n" +
+	"\adetails\x18\b \x03(\v25.lindm.integrations.v1.AuditEventPayload.DetailsEntryR\adetails\x1a:\n" +
+	"\fDetailsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x04\n" +
 	"\x12InventoryReportRow\x12\x1c\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\tdevice_id\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x14\n" +
@@ -1879,7 +1903,7 @@ func file_lindm_integrations_v1_reports_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_integrations_v1_reports_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_lindm_integrations_v1_reports_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_lindm_integrations_v1_reports_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_lindm_integrations_v1_reports_proto_goTypes = []any{
 	(ReportKind)(0),                        // 0: lindm.integrations.v1.ReportKind
 	(ReportFormat)(0),                      // 1: lindm.integrations.v1.ReportFormat
@@ -1902,12 +1926,13 @@ var file_lindm_integrations_v1_reports_proto_goTypes = []any{
 	(*InventoryReportRow)(nil),             // 18: lindm.integrations.v1.InventoryReportRow
 	(*ComplianceReportRow)(nil),            // 19: lindm.integrations.v1.ComplianceReportRow
 	(*FindingsReportRow)(nil),              // 20: lindm.integrations.v1.FindingsReportRow
-	(*timestamppb.Timestamp)(nil),          // 21: google.protobuf.Timestamp
+	nil,                                    // 21: lindm.integrations.v1.AuditEventPayload.DetailsEntry
+	(*timestamppb.Timestamp)(nil),          // 22: google.protobuf.Timestamp
 }
 var file_lindm_integrations_v1_reports_proto_depIdxs = []int32{
 	0,  // 0: lindm.integrations.v1.ReportSchedule.kind:type_name -> lindm.integrations.v1.ReportKind
 	1,  // 1: lindm.integrations.v1.ReportSchedule.format:type_name -> lindm.integrations.v1.ReportFormat
-	21, // 2: lindm.integrations.v1.ReportSchedule.next_run_at:type_name -> google.protobuf.Timestamp
+	22, // 2: lindm.integrations.v1.ReportSchedule.next_run_at:type_name -> google.protobuf.Timestamp
 	11, // 3: lindm.integrations.v1.CreateAuditExportResponse.artifact:type_name -> lindm.integrations.v1.ReportArtifact
 	2,  // 4: lindm.integrations.v1.UpsertReportScheduleRequest.schedule:type_name -> lindm.integrations.v1.ReportSchedule
 	2,  // 5: lindm.integrations.v1.UpsertReportScheduleResponse.schedule:type_name -> lindm.integrations.v1.ReportSchedule
@@ -1915,37 +1940,38 @@ var file_lindm_integrations_v1_reports_proto_depIdxs = []int32{
 	11, // 7: lindm.integrations.v1.ListReportArtifactsResponse.artifacts:type_name -> lindm.integrations.v1.ReportArtifact
 	0,  // 8: lindm.integrations.v1.ReportArtifact.kind:type_name -> lindm.integrations.v1.ReportKind
 	1,  // 9: lindm.integrations.v1.ReportArtifact.format:type_name -> lindm.integrations.v1.ReportFormat
-	21, // 10: lindm.integrations.v1.ReportArtifact.created_at:type_name -> google.protobuf.Timestamp
-	21, // 11: lindm.integrations.v1.ReportArtifact.expires_at:type_name -> google.protobuf.Timestamp
+	22, // 10: lindm.integrations.v1.ReportArtifact.created_at:type_name -> google.protobuf.Timestamp
+	22, // 11: lindm.integrations.v1.ReportArtifact.expires_at:type_name -> google.protobuf.Timestamp
 	16, // 12: lindm.integrations.v1.ReportArtifact.signed_manifest:type_name -> lindm.integrations.v1.ReportSignedManifest
 	16, // 13: lindm.integrations.v1.DownloadReportArtifactResponse.signed_manifest:type_name -> lindm.integrations.v1.ReportSignedManifest
 	0,  // 14: lindm.integrations.v1.ReportManifest.kind:type_name -> lindm.integrations.v1.ReportKind
 	1,  // 15: lindm.integrations.v1.ReportManifest.format:type_name -> lindm.integrations.v1.ReportFormat
-	21, // 16: lindm.integrations.v1.ReportManifest.created_at:type_name -> google.protobuf.Timestamp
-	21, // 17: lindm.integrations.v1.AuditEventPayload.occurred_at:type_name -> google.protobuf.Timestamp
-	21, // 18: lindm.integrations.v1.InventoryReportRow.enrolled_at:type_name -> google.protobuf.Timestamp
-	21, // 19: lindm.integrations.v1.InventoryReportRow.last_seen_at:type_name -> google.protobuf.Timestamp
-	21, // 20: lindm.integrations.v1.InventoryReportRow.host_received_at:type_name -> google.protobuf.Timestamp
-	21, // 21: lindm.integrations.v1.InventoryReportRow.snapshot_received_at:type_name -> google.protobuf.Timestamp
-	21, // 22: lindm.integrations.v1.ComplianceReportRow.last_verified_at:type_name -> google.protobuf.Timestamp
-	21, // 23: lindm.integrations.v1.ComplianceReportRow.observed_at:type_name -> google.protobuf.Timestamp
-	21, // 24: lindm.integrations.v1.FindingsReportRow.evaluated_at:type_name -> google.protobuf.Timestamp
-	21, // 25: lindm.integrations.v1.FindingsReportRow.inventory_at:type_name -> google.protobuf.Timestamp
-	3,  // 26: lindm.integrations.v1.ReportService.CreateAuditExport:input_type -> lindm.integrations.v1.CreateAuditExportRequest
-	5,  // 27: lindm.integrations.v1.ReportService.UpsertReportSchedule:input_type -> lindm.integrations.v1.UpsertReportScheduleRequest
-	7,  // 28: lindm.integrations.v1.ReportService.ListReportSchedules:input_type -> lindm.integrations.v1.ListReportSchedulesRequest
-	9,  // 29: lindm.integrations.v1.ReportService.ListReportArtifacts:input_type -> lindm.integrations.v1.ListReportArtifactsRequest
-	12, // 30: lindm.integrations.v1.ReportService.DownloadReportArtifact:input_type -> lindm.integrations.v1.DownloadReportArtifactRequest
-	4,  // 31: lindm.integrations.v1.ReportService.CreateAuditExport:output_type -> lindm.integrations.v1.CreateAuditExportResponse
-	6,  // 32: lindm.integrations.v1.ReportService.UpsertReportSchedule:output_type -> lindm.integrations.v1.UpsertReportScheduleResponse
-	8,  // 33: lindm.integrations.v1.ReportService.ListReportSchedules:output_type -> lindm.integrations.v1.ListReportSchedulesResponse
-	10, // 34: lindm.integrations.v1.ReportService.ListReportArtifacts:output_type -> lindm.integrations.v1.ListReportArtifactsResponse
-	13, // 35: lindm.integrations.v1.ReportService.DownloadReportArtifact:output_type -> lindm.integrations.v1.DownloadReportArtifactResponse
-	31, // [31:36] is the sub-list for method output_type
-	26, // [26:31] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	22, // 16: lindm.integrations.v1.ReportManifest.created_at:type_name -> google.protobuf.Timestamp
+	22, // 17: lindm.integrations.v1.AuditEventPayload.occurred_at:type_name -> google.protobuf.Timestamp
+	21, // 18: lindm.integrations.v1.AuditEventPayload.details:type_name -> lindm.integrations.v1.AuditEventPayload.DetailsEntry
+	22, // 19: lindm.integrations.v1.InventoryReportRow.enrolled_at:type_name -> google.protobuf.Timestamp
+	22, // 20: lindm.integrations.v1.InventoryReportRow.last_seen_at:type_name -> google.protobuf.Timestamp
+	22, // 21: lindm.integrations.v1.InventoryReportRow.host_received_at:type_name -> google.protobuf.Timestamp
+	22, // 22: lindm.integrations.v1.InventoryReportRow.snapshot_received_at:type_name -> google.protobuf.Timestamp
+	22, // 23: lindm.integrations.v1.ComplianceReportRow.last_verified_at:type_name -> google.protobuf.Timestamp
+	22, // 24: lindm.integrations.v1.ComplianceReportRow.observed_at:type_name -> google.protobuf.Timestamp
+	22, // 25: lindm.integrations.v1.FindingsReportRow.evaluated_at:type_name -> google.protobuf.Timestamp
+	22, // 26: lindm.integrations.v1.FindingsReportRow.inventory_at:type_name -> google.protobuf.Timestamp
+	3,  // 27: lindm.integrations.v1.ReportService.CreateAuditExport:input_type -> lindm.integrations.v1.CreateAuditExportRequest
+	5,  // 28: lindm.integrations.v1.ReportService.UpsertReportSchedule:input_type -> lindm.integrations.v1.UpsertReportScheduleRequest
+	7,  // 29: lindm.integrations.v1.ReportService.ListReportSchedules:input_type -> lindm.integrations.v1.ListReportSchedulesRequest
+	9,  // 30: lindm.integrations.v1.ReportService.ListReportArtifacts:input_type -> lindm.integrations.v1.ListReportArtifactsRequest
+	12, // 31: lindm.integrations.v1.ReportService.DownloadReportArtifact:input_type -> lindm.integrations.v1.DownloadReportArtifactRequest
+	4,  // 32: lindm.integrations.v1.ReportService.CreateAuditExport:output_type -> lindm.integrations.v1.CreateAuditExportResponse
+	6,  // 33: lindm.integrations.v1.ReportService.UpsertReportSchedule:output_type -> lindm.integrations.v1.UpsertReportScheduleResponse
+	8,  // 34: lindm.integrations.v1.ReportService.ListReportSchedules:output_type -> lindm.integrations.v1.ListReportSchedulesResponse
+	10, // 35: lindm.integrations.v1.ReportService.ListReportArtifacts:output_type -> lindm.integrations.v1.ListReportArtifactsResponse
+	13, // 36: lindm.integrations.v1.ReportService.DownloadReportArtifact:output_type -> lindm.integrations.v1.DownloadReportArtifactResponse
+	32, // [32:37] is the sub-list for method output_type
+	27, // [27:32] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_lindm_integrations_v1_reports_proto_init() }
@@ -1959,7 +1985,7 @@ func file_lindm_integrations_v1_reports_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_integrations_v1_reports_proto_rawDesc), len(file_lindm_integrations_v1_reports_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

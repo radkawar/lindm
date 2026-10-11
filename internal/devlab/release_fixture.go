@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/gen/lindm/integrations/v1/integrationsv1connect"
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	"lindm/gen/lindm/releasemanagement/v1/releasemanagementv1connect"
 	updatev1 "lindm/gen/lindm/update/v1"
@@ -66,13 +67,26 @@ func (f *AuthorityFixture) PublishMeasuredRecoveryArtifact(ctx context.Context, 
 }
 
 func (s *OwnerSession) ReleaseManagement() releasemanagementv1connect.ReleaseManagementServiceClient {
-	return releasemanagementv1connect.NewReleaseManagementServiceClient(s.client, s.origin, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+	return releasemanagementv1connect.NewReleaseManagementServiceClient(s.client, s.origin, s.consoleOption())
+}
+
+// Integrations and Reports reach the optional services with this session's cookie and CSRF token.
+func (s *OwnerSession) Integrations() integrationsv1connect.IntegrationServiceClient {
+	return integrationsv1connect.NewIntegrationServiceClient(s.client, s.origin, s.consoleOption())
+}
+
+func (s *OwnerSession) Reports() integrationsv1connect.ReportServiceClient {
+	return integrationsv1connect.NewReportServiceClient(s.client, s.origin, s.consoleOption())
+}
+
+func (s *OwnerSession) consoleOption() connect.ClientOption {
+	return connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			req.Header().Set("Origin", s.origin)
 			req.Header().Set("X-CSRF-Token", s.csrf)
 			return next(ctx, req)
 		}
-	})))
+	}))
 }
 
 func closeReleaseSession(owner *OwnerSession) error {

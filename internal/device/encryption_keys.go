@@ -86,7 +86,7 @@ func (s *Service) RegisterEncryptionKey(ctx context.Context, req *connect.Reques
 			}
 			return nil
 		}
-		return insertAudit(ctx, q, nil, actionDeviceEncryptionKeyRegistered, principal.GenerationID.String(), hex.EncodeToString(keyID))
+		return insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: actionDeviceEncryptionKeyRegistered, ResourceID: principal.GenerationID.String(), TargetDeviceID: &principal.DeviceID}, auditDetails("key_sha256", hex.EncodeToString(keyID)))
 	})
 	if err != nil {
 		return nil, mapErr(err)

@@ -423,6 +423,13 @@ func TestRolloutAutomaticPromotionRetainsCanaryAdmission(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	var auditReason, auditContext string
+	if err := f.pool.QueryRow(t.Context(), "SELECT reason, details->>'context' FROM audit_events WHERE action='targeting.rollout.control' AND resource_id=$1", id.String()).Scan(&auditReason, &auditContext); err != nil {
+		t.Fatal(err)
+	}
+	if auditReason != "" || auditContext != "Automatic promotion after verified health and soak" {
+		t.Fatalf("automatic promotion fabricated operator reason: reason=%q context=%q", auditReason, auditContext)
+	}
 	preview := f.preview(t)
 	if len(preview.Candidates) != 1 || preview.Candidates[0].Match != included {
 		t.Fatal("promotion stopped management of an already admitted canary")

@@ -807,8 +807,8 @@ export function DeviceActionForm({
                   {liveTargets.map((entry) => (
                     <div key={entry.key} className="grid gap-2 rounded-md border p-3">
                       <p className="text-sm">
-                        {entry.selection.name} · {entry.selection.model} ·{" "}
-                        {entry.selection.encryption}
+                        <code className="font-mono">{entry.selection.name}</code> ·{" "}
+                        {entry.selection.model} · {entry.selection.encryption}
                       </p>
                       <StorageTargetView target={entry.selection.target} />
                       {!isStillObserved(entry) ? (
@@ -1054,7 +1054,7 @@ export function DeviceActionForm({
                 <div className="grid gap-2">
                   <Label htmlFor={`${prefix}-confirm`}>
                     Type {detail.data?.device?.hostname ? "hostname" : "device ID"}{" "}
-                    {confirmationName} to confirm
+                    <code className="font-mono">{confirmationName}</code> to confirm
                   </Label>
                   <Input
                     id={`${prefix}-confirm`}
@@ -1282,7 +1282,8 @@ export function DeviceActionForm({
               <DialogHeader>
                 <DialogTitle>Refresh inventory</DialogTitle>
                 <DialogDescription>
-                  Ask {confirmationName} to send a fresh inventory.
+                  Ask {detail.data?.device?.hostname.trim() || "Unnamed device"} to send a fresh
+                  inventory.
                 </DialogDescription>
               </DialogHeader>
               <DeviceActionForm

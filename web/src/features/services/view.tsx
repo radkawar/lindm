@@ -65,6 +65,11 @@ export function DeviceResources({
   const state = useQuery(resourceStateQueryOptions(lifetime, deviceId));
   const failure = state.error ? toRpcFailure(state.error) : null;
   const assignment = state.data?.assignment;
+  const actor = !assignment?.actorId.trim()
+    ? "the system"
+    : assignment.actorId === principal.id
+      ? "you"
+      : "another administrator";
   return (
     <Card className="min-w-0" aria-busy={state.isFetching}>
       <CardHeader>
@@ -106,9 +111,8 @@ export function DeviceResources({
                     {assignment.profileName} (revision {assignment.revisionNumber.toString()})
                   </p>
                   <p className="break-words text-muted-foreground">
-                    Assigned by {assignment.actorId} on{" "}
-                    {formatTimestamp(assignment.assignedAt).local}. Checked every{" "}
-                    {Math.round(assignment.reconcileIntervalSeconds / 60)} minutes.
+                    Assigned by {actor} on {formatTimestamp(assignment.assignedAt).local}. Checked
+                    every {Math.round(assignment.reconcileIntervalSeconds / 60)} minutes.
                   </p>
                   <p className="whitespace-pre-wrap break-words text-muted-foreground">
                     Reason: {assignment.reason}
@@ -118,15 +122,18 @@ export function DeviceResources({
                 <>
                   <p>None. The profile was removed.</p>
                   <p className="whitespace-pre-wrap break-words text-muted-foreground">
-                    Removed by {assignment.actorId} on{" "}
-                    {formatTimestamp(assignment.assignedAt).local}. Reason: {assignment.reason}
+                    Removed by {actor} on {formatTimestamp(assignment.assignedAt).local}. Reason:{" "}
+                    {assignment.reason}
                   </p>
                 </>
               ) : (
                 <p>No profile assigned.</p>
               )}
               <TechnicalDetails
-                items={[{ label: "Assignment ID", value: assignment?.assignmentId }]}
+                items={[
+                  { label: "Assignment ID", value: assignment?.assignmentId },
+                  { label: "Actor ID", value: assignment?.actorId },
+                ]}
               />
             </div>
             {state.data.resources.length ? (

@@ -193,7 +193,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 			if _, err := q.InsertDeviceActionEscrow(ctx, devicedb.InsertDeviceActionEscrowParams{ActionID: id, BindingDocument: canonical, KeyID: sealed.KeyID, WrappedKey: sealed.WrappedKey, Ciphertext: sealed.Ciphertext, SecretSha256: sealed.SecretSHA256}); err != nil {
 				return nil, mapErr(err)
 			}
-			if err := dispatchAudit(ctx, q, nil, "device_action.escrow_store", id, "verified_encrypted_recovery"); err != nil {
+			if err := dispatchSystemAudit(ctx, q, nil, "device_action.escrow_store", id, "proof", "verified_encrypted_recovery"); err != nil {
 				return nil, mapErr(err)
 			}
 		} else if err != nil {
@@ -256,7 +256,7 @@ func (s *Service) ReportDeviceActionResult(ctx context.Context, req *connect.Req
 			return nil, mapErr(err)
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "device_action.result", id, "verified_device_attestation"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "device_action.result", id, "proof", "verified_device_attestation"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

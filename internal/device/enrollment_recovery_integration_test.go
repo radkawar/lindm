@@ -140,7 +140,7 @@ func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
 	}
 	var state, generationState, reason string
 	var epoch int64
-	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT reason FROM audit_events WHERE action='device.recovery_hold' AND resource_id=d.id::text) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID).Scan(&state, &generationState, &epoch, &reason); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT details->>'cause' FROM audit_events WHERE action='device.recovery_hold' AND reason='' AND resource_id=d.id::text) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID).Scan(&state, &generationState, &epoch, &reason); err != nil {
 		t.Fatal(err)
 	}
 	if state != stateRecoveryHold || generationState != stateRecoveryHold || epoch != 2 || reason != "conflicting_installation_identity" {

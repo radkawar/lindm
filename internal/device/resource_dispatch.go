@@ -367,7 +367,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	if err := storeResourceSecrets(ctx, q, &head.ActorID, id, secrets); err != nil {
 		return nil, nil, err
 	}
-	if err := dispatchAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "resource_assignment"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "source", "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
 	action, err = q.LockResourceAction(ctx, id)

@@ -47,7 +47,7 @@ function DeviceDetailRoute() {
         <DeviceResources
           deviceId={deviceId}
           emptyAction={
-            <Button onClick={assignProfile}>
+            <Button aria-haspopup="dialog" onClick={assignProfile}>
               <Plus aria-hidden="true" /> Assign profile
             </Button>
           }

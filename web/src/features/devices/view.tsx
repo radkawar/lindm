@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import {
   Dialog,
   DialogContent,
@@ -110,7 +111,7 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
           search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
           className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline"
         >
-          {device.hostname.trim() || "Hostname not reported"}
+          {device.hostname.trim() || "Unnamed device"}
         </Link>
       );
     case "state":
@@ -188,7 +189,7 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
         </>
       );
     case "id":
-      return <span className="font-mono text-xs">{device.id}</span>;
+      return <TechnicalDetails items={[{ label: "Device ID", value: device.id }]} />;
   }
 }
 
@@ -488,7 +489,7 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
               ref={triggerRef}
               size="icon-sm"
               variant="ghost"
-              aria-label={`Actions for ${device.hostname || device.id}`}
+              aria-label={`Actions for ${device.hostname.trim() || "Unnamed device"}`}
             />
           }
         >
@@ -497,6 +498,7 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuItem
             variant="destructive"
+            aria-haspopup="dialog"
             onClick={() => {
               setVisited(true);
               setOpen(true);
@@ -509,7 +511,7 @@ function DeviceRevokeDialog({ device, children }: { device: Device; children: Re
       {visited ? (
         <DialogContent keepMounted finalFocus={triggerRef} className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Revoke {device.hostname || "device"}</DialogTitle>
+            <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
             <DialogDescription>
               Another admin must approve before this device is removed from lindm.
             </DialogDescription>

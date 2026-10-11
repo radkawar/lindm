@@ -137,12 +137,14 @@ type assistanceScenarioEvidence struct {
 }
 
 type assistanceAuditEvidence struct {
-	ID         string    `json:"id"`
-	OccurredAt time.Time `json:"occurred_at"`
-	ActorID    string    `json:"actor_id,omitempty"`
-	Action     string    `json:"action"`
-	SessionID  string    `json:"session_id"`
-	Reason     string    `json:"reason"`
+	ID             string            `json:"id"`
+	OccurredAt     time.Time         `json:"occurred_at"`
+	ActorID        string            `json:"actor_id,omitempty"`
+	Action         string            `json:"action"`
+	SessionID      string            `json:"session_id"`
+	Reason         string            `json:"reason"`
+	TargetDeviceID string            `json:"target_device_id"`
+	Details        map[string]string `json:"details"`
 }
 
 // assistanceEvidence writes artifacts into one exclusively created directory

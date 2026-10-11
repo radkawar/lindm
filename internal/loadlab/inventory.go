@@ -28,6 +28,7 @@ type pendingInventoryUpload struct {
 	manifest     *devicev1.PackageSnapshotManifest
 	hostAccepted bool
 	begun        bool
+	batches      [][]byte
 	nextBatch    int
 }
 
@@ -72,8 +73,11 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		now := stamp()
 		d.hostSequence++
 		d.packageSequence++
-		host := r.historicalHost
-		if index != 0 || host == nil {
+		host, data, backend := r.historicalHost, r.packages, "dpkg-query"
+		switch {
+		case d.demo != nil:
+			host, data, backend = d.demo.observation(r.historicalHost, d.boot, now), d.demo.packages, d.demo.backend
+		case index != 0 || host == nil:
 			// The simulator reports the registry's Ubuntu 24.04 identity.
 			release, ok := platform.Lookup("ubuntu-24.04")
 			if !ok {
@@ -84,7 +88,8 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		}
 		d.inventoryUpload = &pendingInventoryUpload{
 			host:     &devicev1.ReportHostObservationRequest{EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, Sequence: d.hostSequence, Observation: host},
-			manifest: &devicev1.PackageSnapshotManifest{SnapshotId: id.String(), CreatedAt: now, EnrollmentGeneration: d.generation, Sequence: d.packageSequence, StartedAt: now, FinishedAt: now, Backend: "dpkg-query", Batches: r.packages.descriptors},
+			manifest: &devicev1.PackageSnapshotManifest{SnapshotId: id.String(), CreatedAt: now, EnrollmentGeneration: d.generation, Sequence: d.packageSequence, StartedAt: now, FinishedAt: now, Backend: backend, Batches: data.descriptors},
+			batches:  data.batches,
 		}
 		r.inventoryCycles.Add(1)
 		d.lastInventory = time.Now()
@@ -106,9 +111,9 @@ func (r *runner) inventory(ctx context.Context, d *simulatedDevice, index int) e
 		}
 		pending.begun = true
 	}
-	for pending.nextBatch < len(r.packages.batches) {
+	for pending.nextBatch < len(pending.batches) {
 		index := pending.nextBatch
-		if _, err := d.client.PutPackageBatch(ctx, connect.NewRequest(&devicev1.PutPackageBatchRequest{EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, SnapshotId: pending.manifest.GetSnapshotId(), BatchIndex: uint32(index), Batch: r.packages.batches[index]})); err != nil {
+		if _, err := d.client.PutPackageBatch(ctx, connect.NewRequest(&devicev1.PutPackageBatchRequest{EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, SnapshotId: pending.manifest.GetSnapshotId(), BatchIndex: uint32(index), Batch: pending.batches[index]})); err != nil {
 			return err
 		}
 		pending.nextBatch++

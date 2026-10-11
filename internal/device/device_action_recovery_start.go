@@ -211,7 +211,7 @@ func (s *Service) AuthorizeRecoveryStart(ctx context.Context, req *connect.Reque
 		if err := q.SetDeviceActionGrant(ctx, devicedb.SetDeviceActionGrantParams{ID: row.ActionID, ChallengeProof: req.Msg.GetRequestProof(), ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: timestamptz(now)}); err != nil {
 			return nil, mapErr(err)
 		}
-		if err := dispatchAudit(ctx, q, &action.ActorID, "device_action.recovery_start", action.ID, "fresh_two_human_recovery_authority"); err != nil {
+		if err := dispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_start", action.ID, "authority", "fresh_two_human_recovery_authority"); err != nil {
 			return nil, mapErr(err)
 		}
 		if err := s.identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {

@@ -3,7 +3,7 @@ import { ConnectError } from "@connectrpc/connect";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   AnswerAssistanceSessionRequestSchema,
@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useExactRequest } from "@/hooks/use-exact-request";
 import { usePrincipal } from "@/hooks/use-permissions";
@@ -123,9 +124,11 @@ function remainingLabel(milliseconds: number): string {
 
 export function AssistanceViewerPage({
   deviceId,
+  deviceName,
   sessionId,
 }: {
   deviceId: string;
+  deviceName: string;
   sessionId: string;
 }) {
   const lifetime = useAuthLifetime();
@@ -168,7 +171,7 @@ export function AssistanceViewerPage({
         </Link>
         <span aria-hidden="true">/</span>
         <Link to="/devices/$deviceId" params={{ deviceId }} className="underline">
-          {deviceId}
+          {deviceName}
         </Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">Remote assistance</span>
@@ -181,6 +184,13 @@ export function AssistanceViewerPage({
             <StopButton sessionId={sessionId} deviceId={deviceId} />
           ) : null
         }
+      />
+      <TechnicalDetails
+        items={[
+          { label: "Device ID", value: deviceId },
+          { label: "Session ID", value: sessionId },
+          { label: "Operator ID", value: session?.operatorId },
+        ]}
       />
       {query.error ? (
         <RpcError failure={toRpcFailure(query.error)} title="Couldn't load session" />
@@ -258,19 +268,18 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
           <Fact label="Ended">
             <TimeCell value={session.endedAt} />
           </Fact>
-          <div className="sm:col-span-2 lg:col-span-4">
-            <Fact label="Reason">{session.reason}</Fact>
-          </div>
+          <Fact label="Reason" className="sm:col-span-2 lg:col-span-4">
+            {session.reason}
+          </Fact>
           {ended ? (
-            <div className="sm:col-span-2 lg:col-span-4">
-              <Fact label="End cause">{endCauseText(session)}</Fact>
-            </div>
+            <Fact label="End cause" className="sm:col-span-2 lg:col-span-4">
+              {endCauseText(session)}
+            </Fact>
           ) : null}
         </dl>
         {!ended ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            Remaining time uses this browser's clock against the server's hard limit; the device and
-            server end the session on their own clocks.
+            Remaining time is an estimate from this browser&apos;s clock.
           </p>
         ) : null}
       </CardContent>
@@ -278,9 +287,17 @@ function SessionStatus({ session }: { session: AssistanceSession }) {
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="min-w-0">
+    <div className={className ? `min-w-0 ${className}` : "min-w-0"}>
       <dt className="mb-1 text-muted-foreground">{label}</dt>
       <dd className="break-words">{children}</dd>
     </div>
@@ -355,6 +372,7 @@ function AssistanceConnection({
   const [controlOn, setControlOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const controlReasonId = useId();
 
   useEffect(() => {
     if (!armed) return;
@@ -557,6 +575,18 @@ function AssistanceConnection({
     !ended &&
     link.stage === "idle" &&
     (session.state === AssistanceState.ANSWERED || session.state === AssistanceState.ACTIVE);
+  // Why Take control is unavailable; shown next to the disabled button.
+  const controlBlocked = !controlRequested
+    ? ""
+    : ended
+      ? "The session has ended, so control is no longer available."
+      : !session.controlGranted
+        ? session.state === AssistanceState.ACTIVE
+          ? "The user allowed viewing only, so you can't control this session."
+          : "Control is available after the user accepts and allows it."
+        : !controlAvailable
+          ? "Control is available once the screen connects."
+          : "";
 
   return (
     <Card>
@@ -571,12 +601,11 @@ function AssistanceConnection({
             </span>
             {controlRequested ? (
               <Button
-                variant={capturing ? "default" : "outline"}
-                aria-pressed={capturing}
                 disabled={!controlAvailable || ended}
+                aria-describedby={controlBlocked ? controlReasonId : undefined}
                 onClick={() => setControlOn((current) => !current)}
               >
-                {capturing ? "Control on" : "Control off"}
+                {capturing ? "Release control" : "Take control"}
               </Button>
             ) : null}
           </span>
@@ -624,9 +653,9 @@ function AssistanceConnection({
             The connection was lost. The session will end.
           </p>
         ) : null}
-        {controlRequested && !session.controlGranted && session.state === AssistanceState.ACTIVE ? (
-          <p className="text-sm text-muted-foreground">
-            The user allowed viewing only, so you can't control this session.
+        {controlBlocked ? (
+          <p id={controlReasonId} className="text-sm text-muted-foreground">
+            {controlBlocked}
           </p>
         ) : null}
         <div
@@ -654,6 +683,10 @@ function AssistanceConnection({
           {!stream ? (
             <p className="absolute inset-0 grid place-items-center text-sm text-white/70">
               {ended ? "Session ended" : "No video yet"}
+            </p>
+          ) : controlAvailable && !capturing ? (
+            <p className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit rounded-md bg-black/70 px-3 py-1.5 text-sm text-white">
+              Click Take control to use the mouse and keyboard
             </p>
           ) : null}
         </div>

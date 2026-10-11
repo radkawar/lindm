@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -255,25 +256,19 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 	}
 	limit := pageLimit(req.Msg.GetPageSize())
 	q := devicedb.New(s.pool)
-	var (
-		rows []devicedb.AuditEvent
-		err  error
-	)
-	if req.Msg.GetPageToken() == "" {
-		rows, err = q.ListAuditEventsFirst(ctx, limit+1)
-	} else {
+	params := devicedb.ListAuditEventsParams{RowLimit: limit + 1}
+	if req.Msg.GetPageToken() != "" {
 		var when time.Time
 		var id uuid.UUID
+		var err error
 		when, id, err = decodeCursor(req.Msg.GetPageToken())
 		if err != nil {
 			return nil, mapErr(err)
 		}
-		rows, err = q.ListAuditEventsAfter(ctx, devicedb.ListAuditEventsAfterParams{
-			CursorOccurredAt: timestamptz(when),
-			CursorID:         id,
-			RowLimit:         limit + 1,
-		})
+		params.CursorOccurredAt = timestamptz(when)
+		params.CursorID = &id
 	}
+	rows, err := q.ListAuditEvents(ctx, params)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -296,13 +291,24 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 		if !ok {
 			return nil, errInternalState
 		}
+		var details map[string]string
+		if err := json.Unmarshal(row.Details, &details); err != nil {
+			return nil, errInternalState
+		}
+		var targetDeviceID *string
+		if row.TargetDeviceID != nil {
+			targetDeviceID = new(row.TargetDeviceID.String())
+		}
 		events = append(events, &adminv1.AuditEvent{
-			Id:         row.ID.String(),
-			OccurredAt: timestamppb.New(occurred),
-			ActorId:    generationString(row.ActorID),
-			Action:     row.Action,
-			ResourceId: row.ResourceID,
-			Reason:     row.Reason,
+			Id:             row.ID.String(),
+			OccurredAt:     timestamppb.New(occurred),
+			ActorId:        generationString(row.ActorID),
+			Action:         row.Action,
+			ResourceId:     row.ResourceID,
+			Reason:         row.Reason,
+			TargetDeviceId: targetDeviceID,
+			DeviceHostname: row.DeviceHostname,
+			Details:        details,
 		})
 	}
 	return connect.NewResponse(&adminv1.ListAuditEventsResponse{Events: events, NextPageToken: next}), nil

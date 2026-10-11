@@ -68,7 +68,7 @@ export function EnrollmentView() {
             <p className="text-sm text-muted-foreground">
               You'll get the install and enroll commands for apt or dnf.
             </p>
-            <Button className="w-fit" onClick={() => setMethod("grant")}>
+            <Button className="w-fit" aria-haspopup="dialog" onClick={() => setMethod("grant")}>
               Create one-time code
             </Button>
           </CardContent>
@@ -86,7 +86,11 @@ export function EnrollmentView() {
             <p className="text-sm text-muted-foreground">
               You'll get an installer snippet. Add the token at install time, not to a saved image.
             </p>
-            <Button className="w-fit" onClick={() => setMethod("provisioning")}>
+            <Button
+              className="w-fit"
+              aria-haspopup="dialog"
+              onClick={() => setMethod("provisioning")}
+            >
               Create provisioning token
             </Button>
           </CardContent>

@@ -101,7 +101,7 @@ func (s *Service) deviceActionReceipt(ctx context.Context, principal devicePrinc
 	if err := q.SetDeviceActionEscrowReceipt(ctx, devicedb.SetDeviceActionEscrowReceiptParams{ID: id, EscrowReceiptEnvelope: envelope}); err != nil {
 		return nil, mapErr(err)
 	}
-	if err := dispatchAudit(ctx, q, nil, "device_action.escrow_receipt", id, "durable_escrow_committed"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "device_action.escrow_receipt", id, "status", "durable_escrow_committed"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

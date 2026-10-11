@@ -160,6 +160,8 @@ func verifyAuditRows(reader io.Reader, manifest, checkpoint *integrationsv1.Repo
 		binary.BigEndian.PutUint64(bigEndian[:], record.GetSequence())
 		_, _ = hash.Write(bigEndian[:])
 		_, _ = hash.Write(previous)
+		// Authenticate the complete stored JSON, including target_device_id and
+		// details. Never rebuild these bytes from a parsed display projection.
 		_, _ = hash.Write(record.GetPayload())
 		if !bytes.Equal(hash.Sum(nil), record.GetRowHash()) {
 			return errors.New("reports: audit row hash mismatch")

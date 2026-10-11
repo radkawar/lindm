@@ -134,10 +134,11 @@ open in a dialog from the page action that names them (for example, Assign profi
 Console copy is written for administrators, not for engineers. It is outcome-first,
 concise, sentence case and names the operator's next action ("Assignment saved. The
 device applies it at its next check-in."). Primary UI text (titles, descriptions,
-labels, badges, buttons, toasts and alerts) must not use internal model terms such
-as desired state, owned changes, ownership-safe release, generation, catalog head,
-disposition, receipt, exact request or native execution, and never shows request
-IDs, record UUIDs or raw enum names. Identifiers, sequences, hashes, protocol
+labels, badges, buttons, toasts and alerts) must not use internal model terms
+(for example desired state, generation or receipt) and never shows request IDs,
+record UUIDs or raw enum names. The maintained banned-term list and identifier
+patterns are in [`web/acceptance/copy-rules.json`](../web/acceptance/copy-rules.json);
+`lab console review` enforces them. Identifiers, sequences, hashes, protocol
 values and server/device clock distinctions live only in a collapsed `TechnicalDetails`
 disclosure (or `RpcError` "Details for support"), with values selectable for copy.
 Exceptions are values the operator must type or copy to act, such as a shown-once
@@ -159,6 +160,18 @@ enrollment is not a claim of device health. Status text remains visible independ
 of color; optional dots are decorative. The five semantic tones have light/dark
 tokens, separate from the preset's blue action and neutral chart palette. Keep
 the preset's zero radius, bundled font and theme parity.
+
+Audit reasons contain only the operator's supplied explanation, unchanged; events
+without an operator reason store an empty string. Server-generated context belongs
+in the audit row's structured `details` object, with the device UUID in
+`target_device_id`. Assistance records `mode` (`view` or `control`) and
+`duration_seconds` separately from consent, fingerprint and end-cause details.
+The audit console resolves the device's current hostname server-side and links it
+to the device page, falling back to "Unnamed device"; mode and duration read
+"View"/"Control" and "15 min". UUIDs and other protocol context remain in Details.
+Audit exports hash the exact PostgreSQL JSON bytes of the complete immutable row,
+including `target_device_id` and `details`; current hostname is display context,
+not historical evidence. Preserve original payload bytes when verifying the chain.
 
 RPC presentation uses the Connect code and `Lindm-Reason` together. Known missing
 capabilities or inventory are neutral; stale data, permission and re-authentication
@@ -407,6 +420,65 @@ The SSH worker has its own process group: Ctrl-C cancels the controller, closes
 the worker's stdin lease, and waits for VM/fixture teardown before collecting
 evidence. A failed SSH existence check is a transport failure, never proof that
 the evidence is absent or permission to delete the remote run.
+
+Console UI review: `make ui-review` replaces the manual console review. It builds the embedded console
+and runs `lab console review -lindmd artifacts/bin/lindmd -evidence NEW_DIR` from the
+checkout under review (needs running development PostgreSQL, protected dev trust
+and Playwright Chromium from `make browser-baseline`). The command opens the same
+isolated console fixture with `-demo` data, issues a one-time enrollment for
+`console-owner`, and drives `web/acceptance/review.mjs`, which enrolls and signs in
+through the real password and WebAuthn flow (CDP virtual authenticator). Credentials
+stay in a private 0600 file that is removed afterwards; the report is redacted and
+screenshots mask sensitive and password fields. `lab console -demo` serves the same
+seeded fleet interactively.
+
+The demo seed (`loadlab.SeedDemo`) is deterministic and uses only product RPCs on
+the isolated fixture: synthetic-labelled Ubuntu, Fedora, RHEL and Debian devices
+that are enrolled, pending approval, compliance-stale and revoked (with approval);
+encrypted, unencrypted and unknown roots, with an escrowed key; three profiles whose
+assignments are compliant, drifting and failed; advisory findings from the checked-in
+feed fixtures served by a fixture-owned loopback origin, with one accepted risk;
+lock, refresh, escrow-rotate and a wipe awaiting approval; a completed control-mode
+and a declined assistance session; a one-time code, an automatic provisioning token,
+a group, rollout, secret, webhook, report schedule and audit export. Contact-stale
+devices need 24 hours of silence and are not seeded; the one-time code expires
+after 15 minutes and the pending wipe's action after 10. `-host-observation FILE`
+replays a captured host on one demo device. The route device (`ubuntu-ws-01`) keeps
+checking in while the fixture runs, so remote assistance can be requested from it;
+no user answers, so requested sessions stay waiting.
+
+The runner reads every route from `web/src/routeTree.gen.ts`. Parameterised routes use
+the seeded IDs; `$kind` expands to every complex device action. A route the run cannot
+render (missing seed value, redirect or route error) fails it, so new pages are
+covered by adding their seed. Each tab of a page with a tab list is a separate
+capture. Every route and tab is checked in light and dark at 1440x900 and 390x844,
+each starting from scroll position zero:
+
+- viewport and full-page screenshots;
+- layout: no horizontal overflow, no overlapping controls or text, and on desktop the
+  sidebar column spans the document;
+- axe-core (exact-pinned dev dependency, WCAG 2.2 AA and best-practice rules): no
+  serious or critical violations, including inside each opened dialog;
+- keyboard: the skip link is the first stop and lands in main content, Tab reaches
+  every focusable control with a visible focus change that nothing covers, and every
+  control or menu item declaring `aria-haspopup="dialog"` opens a named dialog that
+  takes focus, traps Tab and Shift+Tab when modal, closes on Escape and returns focus;
+- copy: `copy-rules.json` applied to visible text, placeholders, labels and titles,
+  excluding `TechnicalDetails`, `RpcError` support details and `pre`/`code`/`kbd`.
+
+Once per theme and viewport it also checks the Control-K and Command-K palette
+(open, search, Escape, focus restore) and saves device details to raise a real
+toast that must be styled and on screen. Controls that open dialogs must declare
+`aria-haspopup="dialog"` so the review exercises them. The review also requests a
+control-mode assistance session from the device page as the signed-in owner and
+reviews the live viewer in every theme and viewport: **Take control** must be
+present, and while it is disabled a visible reason must be linked with
+`aria-describedby`. The evidence directory holds
+`report.json` (per route, theme and viewport results) and `index.html`, a contact
+sheet with each route's four captures side by side. Any finding exits nonzero and
+prints one line per finding. Fix findings in `web/src`; never relax a rule or exclude
+an element to get a pass. The only acceptable exception is a documented upstream
+library defect, recorded here with its cited reason.
 
 Organize `web/src` around working product features:
 

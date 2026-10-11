@@ -234,7 +234,7 @@ func (s *Service) AuthorizeResourceStart(ctx context.Context, req *connect.Reque
 	if err := q.SetResourceGrant(ctx, devicedb.SetResourceGrantParams{ID: id, ChallengeProof: req.Msg.GetChallengeProof(), StartGrantEnvelope: envelope, StartAuthorizedAt: timestamptz(now)}); err != nil {
 		return nil, mapErr(err)
 	}
-	if err := dispatchAudit(ctx, q, &head.ActorID, "resource_action.start", id, "fresh_actor_authorization"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.start", id, "authority", "fresh_actor_authorization"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := s.identity.LockAuthorization(ctx, tx, approval, identity.PermissionAssignResources); err != nil {

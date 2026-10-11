@@ -231,7 +231,9 @@ export function LocalAdminPasswordReveal({
         onChange={(event) => setReason(event.target.value)}
       />
       <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>Type the device ID to confirm</Label>
-      <p className="break-all font-mono text-xs text-muted-foreground">{deviceId}</p>
+      <p className="break-all text-xs text-muted-foreground">
+        <code className="font-mono">{deviceId}</code>
+      </p>
       <Input
         id={`laps-reveal-confirmation-${actionId}`}
         value={confirmation}

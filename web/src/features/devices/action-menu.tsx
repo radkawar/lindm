@@ -60,7 +60,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
           {simple.map((value) => (
-            <DropdownMenuItem key={value} onClick={() => setKind(value)}>
+            <DropdownMenuItem key={value} aria-haspopup="dialog" onClick={() => setKind(value)}>
               {actionLabels[value]}
             </DropdownMenuItem>
           ))}
@@ -84,6 +84,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
+                aria-haspopup="dialog"
                 onClick={() => {
                   setRevokeVisited(true);
                   setRevokeOpen(true);
@@ -105,7 +106,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
           <DialogContent finalFocus={trigger} className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>{actionLabels[kind]}</DialogTitle>
-              <DialogDescription>{device.hostname || "This device"}</DialogDescription>
+              <DialogDescription>{device.hostname.trim() || "Unnamed device"}</DialogDescription>
             </DialogHeader>
             <DeviceActionForm
               key={kind}
@@ -131,7 +132,7 @@ export function DeviceActionMenu({ device, revoke }: { device: Device; revoke?: 
             className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
           >
             <DialogHeader>
-              <DialogTitle>Revoke {device.hostname || "device"}</DialogTitle>
+              <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
               <DialogDescription>
                 Another admin must approve before this device is removed from lindm.
               </DialogDescription>

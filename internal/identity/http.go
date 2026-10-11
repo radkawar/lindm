@@ -62,7 +62,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			return
 		}
 		if principal.BreakGlass {
-			if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_used", principal.IncidentReason); err != nil {
+			if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_used", principal.IncidentReason, ""); err != nil {
 				writeStatus(w, http.StatusServiceUnavailable)
 				return
 			}
@@ -70,7 +70,7 @@ func (s *Service) RequireSession(next http.Handler) http.Handler {
 			w = response
 			defer func() {
 				if response.status >= http.StatusBadRequest {
-					if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "protected request denied"); err != nil {
+					if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "", "protected request denied"); err != nil {
 						slog.Error("identity emergency denial audit failed")
 					}
 				}

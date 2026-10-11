@@ -325,7 +325,7 @@ func (s *Service) AuthorizeDeviceActionStart(ctx context.Context, req *connect.R
 			return nil, mapErr(err)
 		}
 	}
-	if err := dispatchAudit(ctx, q, &action.ActorID, "device_action.start", id, "fresh_authorization"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, &action.ActorID, "device_action.start", id, "authority", "fresh_authorization"); err != nil {
 		return nil, mapErr(err)
 	}
 	if consumption != nil {

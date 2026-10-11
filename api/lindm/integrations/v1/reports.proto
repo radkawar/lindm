@@ -181,6 +181,9 @@ message ReportSignedManifest {
 
 // AuditChainRecord.payload contains this JSON shape. Preserve and hash the
 // original bytes; parsing is for display only, never chain reconstruction.
+// Includes target_device_id (nullable UUID) and details (string-valued JSON
+// object). Both are authenticated by the chain; device hostname is live display
+// context and is not part of the immutable audit row.
 message AuditEventPayload {
   string id = 1;
   google.protobuf.Timestamp occurred_at = 2 [json_name = "occurred_at"];
@@ -188,6 +191,8 @@ message AuditEventPayload {
   string action = 4;
   string resource_id = 5 [json_name = "resource_id"];
   string reason = 6;
+  string target_device_id = 7 [json_name = "target_device_id"];
+  map<string, string> details = 8;
 }
 
 // Report JSON arrays and CSV columns use these explicit snake-case field names.

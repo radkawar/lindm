@@ -126,7 +126,7 @@ type HAAdminSummary struct {
 
 type haDevice struct {
 	*simulatedDevice
-	restart *pendingRestart
+	restart *pendingDeviceAction
 }
 
 type restartRecord struct {

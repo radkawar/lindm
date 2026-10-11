@@ -17,7 +17,10 @@ export function TechnicalDetails({
   const shown = items.filter((item) => item.value !== undefined && item.value !== "");
   if (shown.length === 0 && !children) return null;
   return (
-    <details className={cn("text-xs text-muted-foreground", className)}>
+    <details
+      data-slot="technical-details"
+      className={cn("text-xs text-muted-foreground", className)}
+    >
       <summary className="w-fit cursor-pointer py-1">{summary}</summary>
       <dl className="mt-2 grid gap-1 break-all">
         {shown.map((item) => (

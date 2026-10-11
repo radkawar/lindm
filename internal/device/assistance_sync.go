@@ -169,7 +169,7 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 		}
 		row.State, row.PromptedAt = assistancePrompted, params.PromptedAt
 		row.LocalUsername, row.LocalUid, row.LocalLogindSession, row.LocalSessionType, row.LocalDesktop = params.LocalUsername, params.LocalUid, params.LocalLogindSession, params.LocalSessionType, params.LocalDesktop
-		if err := dispatchAudit(ctx, q, nil, "assistance.prompt", row.ID, assistanceAudit(append(assistanceLocalAudit(*row), "desktop", row.LocalDesktop)...)); err != nil {
+		if err := recordAssistanceAudit(ctx, q, nil, "assistance.prompt", *row, "", append(assistanceLocalAudit(*row), "desktop", row.LocalDesktop)...); err != nil {
 			return err
 		}
 	case local.GetUsername() != row.LocalUsername || int64(local.GetUid()) != row.LocalUid || local.GetLogindSessionId() != row.LocalLogindSession || local.GetSessionType() != row.LocalSessionType:
@@ -188,8 +188,8 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 			return err
 		}
 		row.State, row.ConsentedAt, row.ControlGranted, row.OfferSdp, row.OfferFingerprint = assistanceOffered, timestamptz(now), control, report.GetOfferSdp(), fingerprint
-		details := append([]string{"mode", assistanceModeName(row.Mode), "control_granted", boolText(control)}, assistanceLocalAudit(*row)...)
-		if err := dispatchAudit(ctx, q, nil, "assistance.consent", row.ID, assistanceAudit(append(details, "offer", fingerprint)...)); err != nil {
+		details := append([]string{"control_granted", boolText(control)}, assistanceLocalAudit(*row)...)
+		if err := recordAssistanceAudit(ctx, q, nil, "assistance.consent", *row, "", append(details, "offer", fingerprint)...); err != nil {
 			return err
 		}
 	}
@@ -202,7 +202,7 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 			return err
 		}
 		row.State, row.StartedAt = assistanceActive, timestamptz(now)
-		return dispatchAudit(ctx, q, nil, "assistance.start", row.ID, assistanceAudit("control_granted", boolText(row.ControlGranted)))
+		return recordAssistanceAudit(ctx, q, nil, "assistance.start", *row, "", "control_granted", boolText(row.ControlGranted))
 	case assistanceOffered:
 		// Connected without the operator's authenticated answer.
 		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONNECTION_FAILED, "active_before_answer", false)

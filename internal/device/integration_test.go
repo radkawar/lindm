@@ -231,7 +231,7 @@ func assertSecretAbsent(t *testing.T, ctx context.Context, conn *pgx.Conn, secre
 		SELECT count(*) FROM (
 			SELECT reason AS value FROM enrollment_grants
 			UNION ALL SELECT revoke_reason FROM enrollment_grants
-			UNION ALL SELECT reason FROM audit_events
+			UNION ALL SELECT reason || details::text FROM audit_events
 			UNION ALL SELECT encode(token_hash, 'escape') FROM enrollment_grants
 			UNION ALL SELECT encode(request_digest, 'escape') FROM device_admin_requests
 		) rows

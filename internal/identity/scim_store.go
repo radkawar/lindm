@@ -100,7 +100,7 @@ func (s *Service) createSCIM(ctx context.Context, q *identitydb.Queries, connect
 	if err != nil {
 		return identitydb.ScimResource{}, err
 	}
-	return row, s.insertAudit(ctx, q, nil, "identity.scim_created", "scim/"+connectorID+"/"+id.String(), kind)
+	return row, s.insertSystemAudit(ctx, q, nil, "identity.scim_created", "scim/"+connectorID+"/"+id.String(), kind)
 }
 
 func (s *Service) updateSCIM(ctx context.Context, q *identitydb.Queries, connector scimConnector, row identitydb.ScimResource, document scimDocument, deleted bool) (identitydb.ScimResource, error) {
@@ -165,7 +165,7 @@ func (s *Service) updateSCIM(ctx context.Context, q *identitydb.Queries, connect
 	if deleted {
 		action = "identity.scim_deleted"
 	}
-	return updated, s.insertAudit(ctx, q, nil, action, "scim/"+row.ConnectorID+"/"+row.ID.String(), row.ResourceType)
+	return updated, s.insertSystemAudit(ctx, q, nil, action, "scim/"+row.ConnectorID+"/"+row.ID.String(), row.ResourceType)
 }
 
 // The principal lock is shared with login, observations and worker dispatch.
@@ -191,7 +191,7 @@ func (s *Service) scimLifecycle(ctx context.Context, q *identitydb.Queries, id u
 	if active {
 		reason = "reactivated; authoritative refresh required"
 	}
-	return s.insertAudit(ctx, q, &id, "identity.scim_lifecycle", principalResource(id), reason)
+	return s.insertSystemAudit(ctx, q, &id, "identity.scim_lifecycle", principalResource(id), reason)
 }
 
 func replaceSCIMMembers(ctx context.Context, q *identitydb.Queries, group identitydb.ScimResource, members []any) error {

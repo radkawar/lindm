@@ -50,6 +50,7 @@ type AuthorityFixture struct {
 	local            *localAuthority
 	releasePublisher *releaseupdate.Publisher
 	ha               *haTopology
+	demo             *consoleDemoOrigin
 }
 
 type authorityFixtureMode uint8
@@ -441,6 +442,10 @@ func (f *AuthorityFixture) Close() error {
 	}
 	f.closed = true
 	err := f.stop()
+	if f.demo != nil {
+		err = errors.Join(err, f.demo.close())
+		f.demo = nil
+	}
 	if f.process != nil || f.ha != nil && f.ha.running() {
 		// Never drop a database or unlink credentials still used by a live child.
 		return errors.Join(err, fmt.Errorf("isolated lindmd has not exited; owned database %s and resources %s retained", f.DatabaseName, f.directory))

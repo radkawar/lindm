@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -381,14 +382,19 @@ export function DashboardView() {
                               : "Action"}
                         </span>
                         <ActionRecord action={action} />
+                        <TechnicalDetails
+                          items={[
+                            { label: "Action ID", value: action.actionId },
+                            { label: "Closed reason", value: action.closedReason },
+                          ]}
+                        />
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <Link
                           to="/devices/$deviceId"
                           params={{ deviceId: action.deviceId }}
                           search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
-                          className="max-w-full truncate underline-offset-4 hover:text-foreground hover:underline"
-                          title={action.deviceId}
+                          className="inline-flex min-h-6 items-center underline-offset-4 hover:text-foreground hover:underline"
                         >
                           Open device
                         </Link>
@@ -659,10 +665,7 @@ function Unavailable({ section }: { section: string }) {
 function ActionRecord({ action }: { action: FleetRecentAction }) {
   return (
     <Tooltip>
-      <TooltipTrigger
-        className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="Server action record details"
-      >
+      <TooltipTrigger className="inline-flex min-h-6 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <StatusBadge
           status={action.outcomeUnknown ? "warning" : action.closedAt ? "neutral" : "info"}
         >
@@ -680,13 +683,11 @@ function ActionRecord({ action }: { action: FleetRecentAction }) {
       <TooltipContent className="max-w-sm">
         <div className="grid gap-1 break-all">
           <p>Expires {formatTimestamp(action.expiresAt).local}</p>
-          {action.closedReason ? <p>{action.closedReason}</p> : null}
           {action.closedAt ? (
             <p>Closed {formatTimestamp(action.closedAt).local}</p>
           ) : action.startAuthorizedAt ? (
             <p>Started {formatTimestamp(action.startAuthorizedAt).local}</p>
           ) : null}
-          <p className="font-mono text-xs">Action ID {action.actionId}</p>
         </div>
       </TooltipContent>
     </Tooltip>

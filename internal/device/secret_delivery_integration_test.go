@@ -179,9 +179,9 @@ func TestServiceSecretDeliverySealsBoundMaterial(t *testing.T) {
 	if replay.GetActionId() != work.GetActionId() || !bytes.Equal(replay.GetIntentEnvelope(), work.GetIntentEnvelope()) || len(replay.GetSealedSecrets()) != 1 || !bytes.Equal(replay.GetSealedSecrets()[0], work.GetSealedSecrets()[0]) {
 		t.Fatal("retry did not return the exact stored delivery")
 	}
-	var reason string
-	if err := f.pool.QueryRow(t.Context(), "SELECT reason FROM audit_events WHERE action='secret.delivered' AND resource_id=$1", work.GetActionId()).Scan(&reason); err != nil || reason != "secret "+ref.GetSecretId()+" version 1" {
-		t.Fatalf("delivery audit = %q, %v", reason, err)
+	var reason, secretID, version string
+	if err := f.pool.QueryRow(t.Context(), "SELECT reason, details->>'secret_id', details->>'version' FROM audit_events WHERE action='secret.delivered' AND resource_id=$1", work.GetActionId()).Scan(&reason, &secretID, &version); err != nil || reason != "" || secretID != ref.GetSecretId() || version != "1" {
+		t.Fatalf("delivery audit reason=%q secret=%q version=%q, %v", reason, secretID, version, err)
 	}
 	if rowsContain(t, f, deliveredSHA512) {
 		t.Fatal("persisted rows contain plaintext secret material")

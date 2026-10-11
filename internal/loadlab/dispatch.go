@@ -100,9 +100,9 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 	if intent.GetDeviceId() != d.id || intent.GetEnrollmentGeneration() != d.generation || intent.GetActionId() != work.GetActionId() {
 		return nil, errors.New("service intent identity mismatch")
 	}
-	// The fixture assigns one resource to each selected device. Its monotonic
-	// sequence rejects old actions without retaining every periodic action ID.
-	if intent.GetResourceSequence() <= d.serviceSequence {
+	// Each resource's monotonic sequence rejects old actions without retaining
+	// every periodic action ID.
+	if intent.GetResourceSequence() <= d.serviceSequences[serviceKey(intent.GetDesired().GetRef())] {
 		return nil, errors.New("server redelivered completed simulated service sequence")
 	}
 	now := time.Now()
@@ -117,6 +117,15 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 			Backend:           &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "synthetic", ProviderVersion: "loadlab-synthetic", Product: &resourcev1.PlatformProduct{OsId: "synthetic", Product: "protocol load fixture", Version: "1", Architecture: "synthetic"}},
 		},
 		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: native},
+	}
+	if d.demo != nil {
+		status, err := d.demo.immediateResult(intent, digest[:], before)
+		if err != nil {
+			return nil, err
+		}
+		if status != nil {
+			return &pendingService{work: work, intent: intent, status: status}, nil
+		}
 	}
 	desiredDigest, err := resource.DesiredDigest(intent.GetDesired())
 	if err != nil {
@@ -182,6 +191,11 @@ func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendin
 			return err
 		}
 	}
+	if d.demo != nil && d.demo.service == serviceFails {
+		p.status.State, p.status.Failure = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE
+		p.status.StartedAt, p.status.CompletedAt = timestamppb.New(now), stamp()
+		return nil
+	}
 	after := proto.CloneOf(p.status.GetBefore())
 	after.GetSystemdService().ActiveState = "active"
 	after.Metadata.ObservedAt = stamp()
@@ -210,7 +224,8 @@ func (r *runner) reportService(ctx context.Context, d *simulatedDevice) error {
 	if !reported.Msg.GetClosed() {
 		return errors.New("terminal simulated action was not closed")
 	}
-	d.serviceSequence = p.intent.GetResourceSequence()
+	d.serviceSequences[serviceKey(p.intent.GetDesired().GetRef())] = p.intent.GetResourceSequence()
+	d.serviceReports++
 	if p.status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 		if len(d.completed) == 0 {
 			r.completedDevices.Add(1)
@@ -221,4 +236,8 @@ func (r *runner) reportService(ctx context.Context, d *simulatedDevice) error {
 	}
 	d.pending = nil
 	return nil
+}
+
+func serviceKey(ref *resourcev1.ResourceRef) string {
+	return ref.GetKind().String() + "/" + ref.GetCanonicalKey()
 }

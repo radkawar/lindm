@@ -94,7 +94,7 @@ func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal,
 	if err != nil {
 		return nil, err
 	}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.put", id.String(), r.Reason, r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.put", id.String(), r.Reason, "", r, out)
 }
 
 type member struct {
@@ -242,6 +242,14 @@ func (s *Store) RefreshRollout(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bo
 	return false, nil
 }
 func (s *Store) ControlRollout(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ControlRolloutRequest) (*adminv1.ControlRolloutResponse, error) {
+	return s.controlRollout(ctx, tx, p, perm, r, false)
+}
+
+func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ControlRolloutRequest, automatic bool) (*adminv1.ControlRolloutResponse, error) {
+	auditReason, auditContext := r.GetReason(), ""
+	if automatic {
+		auditReason, auditContext = "", r.GetReason()
+	}
 	if err := s.validate(r); err != nil {
 		return nil, err
 	}
@@ -296,7 +304,7 @@ func (s *Store) ControlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 			if err != nil {
 				return nil, err
 			}
-			return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), r.Reason, r, out)
+			return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), auditReason, auditContext, r, out)
 		}
 		if !ready {
 			return nil, ErrNotReady
@@ -326,7 +334,7 @@ func (s *Store) ControlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 	if err != nil {
 		return nil, err
 	}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), r.Reason, r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), auditReason, auditContext, r, out)
 }
 func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListRolloutsRequest) (*adminv1.ListRolloutsResponse, error) {
 	if err := s.validate(r); err != nil {
@@ -385,7 +393,7 @@ func (s *Store) PromoteAutomatic(ctx context.Context, tx pgx.Tx, p identity.Prin
 	if state.Rollout.Rings[state.RingIndex].ManualPromotion {
 		return nil, ErrNotReady
 	}
-	out, err := s.ControlRollout(ctx, tx, p, perm, &adminv1.ControlRolloutRequest{RequestId: uuid.NewString(), RolloutId: id.String(), ExpectedRevision: state.Revision, Operation: adminv1.ControlRolloutRequest_OPERATION_PROMOTE, Reason: "Automatic promotion after verified health and soak"})
+	out, err := s.controlRollout(ctx, tx, p, perm, &adminv1.ControlRolloutRequest{RequestId: uuid.NewString(), RolloutId: id.String(), ExpectedRevision: state.Revision, Operation: adminv1.ControlRolloutRequest_OPERATION_PROMOTE, Reason: "Automatic promotion after verified health and soak"}, true)
 	if err != nil {
 		return nil, err
 	}

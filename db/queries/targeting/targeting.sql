@@ -40,7 +40,8 @@ SELECT method, digest, response FROM targeting_requests WHERE actor_id=$1 AND re
 INSERT INTO targeting_requests(actor_id,request_id,method,digest,response) VALUES ($1,$2,$3,$4,$5);
 
 -- name: TargetingAudit :exec
-INSERT INTO audit_events(id,occurred_at,actor_id,action,resource_id,reason) VALUES ($1,clock_timestamp(),$2,$3,$4,$5);
+INSERT INTO audit_events(id,occurred_at,actor_id,action,resource_id,reason,details)
+VALUES ($1,clock_timestamp(),$2,$3,$4,$5,jsonb_strip_nulls(jsonb_build_object('context',NULLIF(sqlc.arg('context')::text,''))));
 
 -- name: GetDynamicGroup :one
 SELECT id,revision,definition FROM dynamic_target_groups WHERE id=$1;

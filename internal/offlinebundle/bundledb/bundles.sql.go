@@ -57,15 +57,18 @@ func (q *Queries) GetBundleImport(ctx context.Context, sequence int64) (GetBundl
 }
 
 const insertBundleAudit = `-- name: InsertBundleAudit :exec
-INSERT INTO audit_events(id, actor_id, action, resource_id, reason)
-VALUES($1, NULL, $2, $3, $4)
+INSERT INTO audit_events(id, actor_id, action, resource_id, details)
+VALUES($1, NULL, $2, $3,
+  jsonb_build_object('sequence', $4::text, 'release', $5::text, 'custody', $6::text))
 `
 
 type InsertBundleAuditParams struct {
 	ID         uuid.UUID
 	Action     string
 	ResourceID string
-	Reason     string
+	Sequence   string
+	Release    string
+	Custody    string
 }
 
 func (q *Queries) InsertBundleAudit(ctx context.Context, arg InsertBundleAuditParams) error {
@@ -73,7 +76,9 @@ func (q *Queries) InsertBundleAudit(ctx context.Context, arg InsertBundleAuditPa
 		arg.ID,
 		arg.Action,
 		arg.ResourceID,
-		arg.Reason,
+		arg.Sequence,
+		arg.Release,
+		arg.Custody,
 	)
 	return err
 }

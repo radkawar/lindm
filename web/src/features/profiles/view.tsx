@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import {
   Table,
   TableBody,
@@ -188,7 +189,14 @@ export function ProfilesView({
                       "Unknown"
                     )}
                   </TableCell>
-                  <TableCell className="break-all">{profile.actorId.trim() || "Unknown"}</TableCell>
+                  <TableCell>
+                    {!profile.actorId.trim()
+                      ? "The system"
+                      : profile.actorId === principal.id
+                        ? "You"
+                        : "Another administrator"}
+                    <TechnicalDetails items={[{ label: "Publisher ID", value: profile.actorId }]} />
+                  </TableCell>
                 </TableRow>
               );
             })}

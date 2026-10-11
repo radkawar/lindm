@@ -253,7 +253,7 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 		if err != nil {
 			return s.dbErr(err)
 		}
-		if err := s.insertAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
+		if err := s.insertSystemAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
 			return err
 		}
 		projection, err = q.GetApprovalProjection(ctx, row.ID)
@@ -410,7 +410,7 @@ func (s *Service) LockAndConsumeApproval(ctx context.Context, tx pgx.Tx, pair *A
 		return ErrAuthorizationExpired
 	}
 	actor := pair.requester.ActorID()
-	return s.insertAudit(ctx, q, &actor, "approval.consumed", row.ID.String(), row.Action)
+	return s.insertSystemAudit(ctx, q, &actor, "approval.consumed", row.ID.String(), row.Action)
 }
 
 func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, approve bool, reason string, scope ApprovalScope) (*adminv1.Approval, error) {

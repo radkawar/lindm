@@ -87,7 +87,7 @@ func (s *Service) BootstrapLocalOwner(ctx context.Context, username string) (Enr
 		if _, err = q.MarkDeploymentInitialized(ctx, &enrollment.AccountID); err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &enrollment.AccountID, auditOwnerBootstrapped, principalResource(enrollment.AccountID), reasonInitialOwner)
+		return s.insertSystemAudit(ctx, q, &enrollment.AccountID, auditOwnerBootstrapped, principalResource(enrollment.AccountID), reasonInitialOwner)
 	})
 	return enrollment, err
 }
@@ -142,7 +142,7 @@ func (s *Service) invalidateLocalAccount(ctx context.Context, q *identitydb.Quer
 		return s.dbErr(err)
 	}
 	if revoked > 0 {
-		if err := s.insertAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "local account authority or credentials changed"); err != nil {
+		if err := s.insertSystemAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "local account authority or credentials changed"); err != nil {
 			return err
 		}
 	}

@@ -35,8 +35,8 @@ func (s *Service) publishStream(ctx context.Context, source *advisoryv1.FeedSour
 	return s.publishStreamReason(ctx, source, started, vendorPublicationReason, producer)
 }
 
-// publishStreamReason is publishStream with the audit reason recorded for the
-// publication; an older started time than the current checked_at is a no-op.
+// publishStreamReason records publication provenance in structured audit context;
+// an older started time than the current checked_at is a no-op.
 func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.FeedSource, started time.Time, reason string, producer func(context.Context, func(*advisoryv1.Advisory) error, func() error) (*advisoryv1.FeedDocument, error)) (err error) {
 	if source == nil || producer == nil {
 		return ErrInvalid
@@ -139,7 +139,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	if updated != 1 {
 		return ErrConflict
 	}
-	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.feed.ingested", ResourceID: source.GetId(), Reason: reason}); err != nil {
+	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.feed.ingested", ResourceID: source.GetId(), Context: reason}); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {

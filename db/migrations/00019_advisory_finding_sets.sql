@@ -69,9 +69,9 @@ UPDATE advisory_exceptions x SET finding_key = encode(substring(sha256(
         convert_to(f.package_name, 'UTF8') || '\x00'::bytea || convert_to(f.installed_version, 'UTF8') || '\x00'::bytea ||
         convert_to(f.architecture, 'UTF8')) FROM 1 FOR 16), 'hex')::uuid
     FROM advisory_findings f WHERE f.id = x.finding_id AND f.device_id = x.device_id;
-INSERT INTO audit_events (id, actor_id, action, resource_id, reason)
+INSERT INTO audit_events (id, actor_id, action, resource_id, details)
 SELECT gen_random_uuid(), NULL, 'advisory.exception.migration_removed', x.device_id::text,
-       'Advisory exception without a current finding could not be converted to a finding-set key'
+       jsonb_build_object('context', 'Advisory exception without a current finding could not be converted to a finding-set key')
 FROM advisory_exceptions x WHERE x.finding_key IS NULL;
 DELETE FROM advisory_exceptions WHERE finding_key IS NULL;
 ALTER TABLE advisory_exceptions DROP CONSTRAINT advisory_exceptions_pkey;

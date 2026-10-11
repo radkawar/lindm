@@ -373,7 +373,7 @@ function ApprovalCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="break-words font-semibold">
           {effect}
-          {approval.deviceId ? ` on ${approval.deviceHostname.trim() || "unnamed device"}` : ""}
+          {approval.deviceId ? ` on ${approval.deviceHostname.trim() || "Unnamed device"}` : ""}
         </h2>
         <StatusBadge
           status={
@@ -402,7 +402,7 @@ function ApprovalCard({
                 search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                 className="underline underline-offset-4"
               >
-                {approval.deviceHostname.trim() || "Device name unavailable"}
+                {approval.deviceHostname.trim() || "Unnamed device"}
               </Link>
             ) : approval.payload.case === "activateTargetPreview" ? (
               "Assignment rollout"

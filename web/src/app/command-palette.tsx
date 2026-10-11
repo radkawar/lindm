@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { MonitorIcon, SearchIcon } from "lucide-react";
@@ -28,6 +28,7 @@ export function CommandPalette({
   lifetime: AuthLifetime;
 }) {
   const [open, setOpen] = useState(false);
+  const returnFocus = useRef<HTMLElement | null>(null);
   const router = useRouter();
   const devices = useQuery({
     ...devicesQueryOptions(lifetime, { pageSize: 200, pageToken: "", filter: "" }),
@@ -37,6 +38,9 @@ export function CommandPalette({
     function onKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && !active.closest('[role="dialog"]'))
+          returnFocus.current = active;
         setOpen((value) => !value);
       }
     }
@@ -49,8 +53,12 @@ export function CommandPalette({
         variant="outline"
         size="sm"
         className="gap-2 text-muted-foreground"
-        onClick={() => setOpen(true)}
+        onClick={(event) => {
+          returnFocus.current = event.currentTarget;
+          setOpen(true);
+        }}
         aria-label="Search pages and devices (Control or Command K)"
+        aria-haspopup="dialog"
       >
         <SearchIcon />
         <span className="hidden sm:inline">Search console</span>
@@ -59,6 +67,7 @@ export function CommandPalette({
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
+        finalFocus={returnFocus}
         title="Search console"
         description="Find a page or a device. Use arrow keys to choose and Enter to open."
         className="sm:max-w-xl"
@@ -85,45 +94,38 @@ export function CommandPalette({
                 </CommandItem>
               ))}
             </CommandGroup>
-            {canPermission(principal, "fleet.read") ? (
-              <>
-                {devices.isPending ? (
-                  <p className="px-3 py-2 text-xs text-muted-foreground" role="status">
-                    Loading device search…
-                  </p>
-                ) : null}
-                {devices.isError ? (
-                  <RpcError
-                    failure={toRpcFailure(devices.error)}
-                    title="Device search unavailable"
-                  />
-                ) : null}
-                {!devices.isError && devices.data ? (
-                  <CommandGroup heading="Devices · first 200 authorized devices">
-                    {devices.data.devices.map((device) => (
-                      <CommandItem
-                        key={device.id}
-                        value={`${device.hostname} ${device.id}`}
-                        onSelect={() => {
-                          setOpen(false);
-                          void router.navigate({
-                            to: "/devices/$deviceId",
-                            params: { deviceId: device.id },
-                          });
-                        }}
-                      >
-                        <MonitorIcon />
-                        <span className="min-w-0 truncate">
-                          {device.hostname || "Unnamed device"}
-                          <span className="ml-2 text-xs text-muted-foreground">{device.id}</span>
-                        </span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                ) : null}
-              </>
+            {canPermission(principal, "fleet.read") && !devices.isError && devices.data ? (
+              <CommandGroup heading="Devices · first 200 authorized devices">
+                {devices.data.devices.map((device) => (
+                  <CommandItem
+                    key={device.id}
+                    value={`${device.hostname} ${device.id}`}
+                    onSelect={() => {
+                      setOpen(false);
+                      void router.navigate({
+                        to: "/devices/$deviceId",
+                        params: { deviceId: device.id },
+                      });
+                    }}
+                  >
+                    <MonitorIcon />
+                    <span className="min-w-0 truncate">
+                      {device.hostname.trim() || "Unnamed device"}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             ) : null}
           </CommandList>
+          {/* Status and errors stay outside the listbox, which may only contain options. */}
+          {canPermission(principal, "fleet.read") && devices.isPending ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground" role="status">
+              Loading device search…
+            </p>
+          ) : null}
+          {canPermission(principal, "fleet.read") && devices.isError ? (
+            <RpcError failure={toRpcFailure(devices.error)} title="Device search unavailable" />
+          ) : null}
           <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
             <span>↑ ↓ Navigate · Enter Open · Esc Close</span>
             <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>

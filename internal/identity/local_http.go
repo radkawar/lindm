@@ -236,7 +236,7 @@ func (s *Service) handleUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		if err := s.invalidateLocalAccount(r.Context(), q, id, role); err != nil {
 			return err
 		}
-		return s.insertAudit(r.Context(), q, &actor.ID, "identity.local_account_updated", principalResource(id), "sessions and pending authority revoked")
+		return s.insertSystemAudit(r.Context(), q, &actor.ID, "identity.local_account_updated", principalResource(id), "sessions and pending authority revoked")
 	})
 	if err != nil {
 		writeStatus(w, accountStatus(err))
@@ -264,7 +264,7 @@ func (s *Service) handleResetAccount(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return s.insertAudit(r.Context(), q, &actor.ID, "identity.local_credentials_reset", principalResource(id), "credentials, sessions and pending authority revoked")
+		return s.insertSystemAudit(r.Context(), q, &actor.ID, "identity.local_credentials_reset", principalResource(id), "credentials, sessions and pending authority revoked")
 	})
 	if err != nil {
 		writeStatus(w, accountStatus(err))

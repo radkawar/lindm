@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { AssistanceViewerPage } from "@/features/assistance/viewer";
+import { deviceQueryOptions } from "@/features/devices/queries";
+import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/assistance/$sessionId")({
@@ -22,10 +25,13 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/assist
 
 function AssistanceViewerRoute() {
   const { deviceId, sessionId } = Route.useParams();
+  const lifetime = useAuthLifetime();
+  const device = useQuery(deviceQueryOptions(lifetime, deviceId));
   return (
     <AssistanceViewerPage
       key={`${deviceId}:${sessionId}`}
       deviceId={deviceId}
+      deviceName={(!device.error && device.data?.device?.hostname.trim()) || "Unnamed device"}
       sessionId={sessionId}
     />
   );

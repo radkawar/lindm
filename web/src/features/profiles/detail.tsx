@@ -215,7 +215,13 @@ export function ProfileDetailView({
                     published.local
                   )}
                 </Fact>
-                <Fact label="Published by">{record.actorId.trim() || "Unknown"}</Fact>
+                <Fact label="Published by">
+                  {!record.actorId.trim()
+                    ? "The system"
+                    : record.actorId === principal.id
+                      ? "You"
+                      : "Another administrator"}
+                </Fact>
                 <Fact label="Settings">{record.spec.resources.length}</Fact>
                 <Fact label="Description">
                   {record.spec.description.trim() || "No description"}
@@ -226,6 +232,7 @@ export function ProfileDetailView({
                 items={[
                   { label: "Profile ID", value: profileId },
                   { label: "Revision ID", value: record.revisionId },
+                  { label: "Publisher ID", value: record.actorId },
                   { label: "Spec SHA-256", value: formatSha256(record.specSha256) },
                 ]}
               />

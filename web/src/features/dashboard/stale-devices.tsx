@@ -109,7 +109,7 @@ export function StaleDevices({
                       search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                       className="truncate text-sm font-medium underline-offset-4 hover:underline"
                     >
-                      {device.hostname || "Unnamed device"}
+                      {device.hostname.trim() || "Unnamed device"}
                     </Link>
                     <span className="text-xs text-muted-foreground">
                       Last check-in {formatTimestamp(device.lastSeenAt).local}

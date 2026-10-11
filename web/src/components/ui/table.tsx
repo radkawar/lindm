@@ -5,8 +5,28 @@ import * as React from "react";
 import { cn } from "cn";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
+  const container = React.useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = React.useState(false);
+  React.useEffect(() => {
+    const node = container.current;
+    if (!node) return;
+    const update = () => setScrollable(node.scrollWidth > node.clientWidth);
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    if (node.firstElementChild) observer.observe(node.firstElementChild);
+    update();
+    return () => observer.disconnect();
+  }, []);
+  // lindm: a horizontally scrolling table must be reachable and scrollable by keyboard.
   return (
-    <div data-slot="table-container" className="relative w-full min-w-0 overflow-x-auto">
+    <div
+      ref={container}
+      data-slot="table-container"
+      tabIndex={scrollable ? 0 : undefined}
+      role={scrollable ? "region" : undefined}
+      aria-label={scrollable ? (props["aria-label"] ?? "Scrollable table") : undefined}
+      className="relative w-full min-w-0 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring"
+    >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}

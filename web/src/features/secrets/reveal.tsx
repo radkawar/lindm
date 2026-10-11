@@ -232,7 +232,7 @@ export function SecretReveal({ secretId, version }: { secretId: string; version:
         </div>
       </TechnicalDetails>
       <Label htmlFor={`${idPrefix}-confirmation`}>
-        Type <span className="break-all font-mono">{secretId}</span> to confirm
+        Type <code className="break-all font-mono">{secretId}</code> to confirm
       </Label>
       <Input
         id={`${idPrefix}-confirmation`}

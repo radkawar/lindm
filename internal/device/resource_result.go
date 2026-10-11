@@ -273,7 +273,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			}
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "resource_action.result", id, "verified_device_attestation"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "resource_action.result", id, "proof", "verified_device_attestation"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -419,7 +419,7 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 			return nil, mapErr(err)
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "resource_action.preparation_cancel", action.ID, "executor_never_prepared"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "resource_action.preparation_cancel", action.ID, "status", "executor_never_prepared"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

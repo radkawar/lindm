@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -101,7 +102,7 @@ func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[device
 		if err := q.CountRenewalIssuance(ctx, principal.GenerationID); err != nil {
 			return err
 		}
-		if err := insertAudit(ctx, q, nil, actionDeviceRenew, principal.DeviceID.String(), hex.EncodeToString(issued.Fingerprint)); err != nil {
+		if err := insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: actionDeviceRenew, ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, auditDetails("certificate_sha256", hex.EncodeToString(issued.Fingerprint))); err != nil {
 			return err
 		}
 		pemBytes, expires = issued.PEM, issued.NotAfter

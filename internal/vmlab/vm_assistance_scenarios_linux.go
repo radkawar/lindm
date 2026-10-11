@@ -398,7 +398,7 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 			if !strings.HasPrefix(event.GetAction(), "assistance.") || sessions[event.GetResourceId()] == nil {
 				continue
 			}
-			rows = append(rows, assistanceAuditEvidence{ID: event.GetId(), OccurredAt: event.GetOccurredAt().AsTime(), ActorID: event.GetActorId(), Action: event.GetAction(), SessionID: event.GetResourceId(), Reason: event.GetReason()})
+			rows = append(rows, assistanceAuditEvidence{ID: event.GetId(), OccurredAt: event.GetOccurredAt().AsTime(), ActorID: event.GetActorId(), Action: event.GetAction(), SessionID: event.GetResourceId(), Reason: event.GetReason(), TargetDeviceID: event.GetTargetDeviceId(), Details: event.GetDetails()})
 		}
 		token = response.Msg.GetNextPageToken()
 		if token == "" {
@@ -406,10 +406,10 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 		}
 	}
 	for _, scenario := range scenarios {
-		actions := map[string]string{}
+		actions := map[string]map[string]string{}
 		for _, row := range rows {
 			if row.SessionID == scenario.SessionID {
-				actions[row.Action] = row.Reason
+				actions[row.Action] = row.Details
 			}
 		}
 		for _, action := range assistanceAuditExpectations[scenario.Name] {
@@ -417,7 +417,7 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 				return rows, fmt.Errorf("scenario %s lacks audit %s", scenario.Name, action)
 			}
 		}
-		if end, ok := actions["assistance.end"]; !ok || !slices.Contains(strings.Fields(end), "cause="+scenario.ExpectedCause) {
+		if end, ok := actions["assistance.end"]; !ok || end["cause"] != scenario.ExpectedCause {
 			return rows, fmt.Errorf("scenario %s lacks assistance.end with cause=%s", scenario.Name, scenario.ExpectedCause)
 		}
 		if scenario.ExpectedCause == assistanceCauseText(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED) {

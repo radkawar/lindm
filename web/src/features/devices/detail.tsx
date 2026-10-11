@@ -182,7 +182,7 @@ export function DeviceDetailView({
           </Button>
           {device ? <DeviceActionMenu device={device} revoke={revoke?.(device)} /> : null}
           {device && canPermission(principal, "resources.assign") ? (
-            <Button onClick={() => setAssignOpen(true)}>
+            <Button aria-haspopup="dialog" onClick={() => setAssignOpen(true)}>
               <Plus aria-hidden="true" /> Assign profile
             </Button>
           ) : null}
@@ -281,7 +281,8 @@ export function DeviceDetailView({
                         <ul className="space-y-1">
                           {disks.map((disk) => (
                             <li key={disk.name}>
-                              {disk.name}: <NumberValue field={disk.sizeBytes} unit="bytes" />
+                              <code className="font-mono">{disk.name}</code>:{" "}
+                              <NumberValue field={disk.sizeBytes} unit="bytes" />
                             </li>
                           ))}
                         </ul>

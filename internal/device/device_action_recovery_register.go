@@ -241,7 +241,7 @@ func (s *Service) RegisterDeviceActionRecovery(ctx context.Context, req *connect
 	if err := q.MarkDeviceActionOutcomeUnknown(ctx, id); err != nil {
 		return nil, mapErr(err)
 	}
-	if err := dispatchAudit(ctx, q, &action.ActorID, "device_action.recovery_handoff", id, "fresh_two_human_boot_authority"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_handoff", id, "authority", "fresh_two_human_boot_authority"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := s.identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {

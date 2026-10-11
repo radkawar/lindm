@@ -243,7 +243,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 		t.Fatal(err)
 	}
 	var audit string
-	if err := f.svc.pool.QueryRow(t.Context(), "SELECT string_agg(action || reason,' ') FROM audit_events").Scan(&audit); err != nil {
+	if err := f.svc.pool.QueryRow(t.Context(), "SELECT string_agg(action || reason || details::text,' ') FROM audit_events").Scan(&audit); err != nil {
 		t.Fatal(err)
 	}
 	for _, payload := range [][]byte{encoded, stored.Ciphertext, stored.WrappedKey, result.GetAttestationEnvelope(), resumed.GetEscrowReceiptEnvelope(), []byte(audit)} {

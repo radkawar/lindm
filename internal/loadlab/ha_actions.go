@@ -21,11 +21,11 @@ import (
 // are retryable laboratory faults; these are lane failures.
 var errProtocolViolation = errors.New("ha: protocol violation")
 
-// pendingRestart is the simulated executor journal entry for one restart. The
-// challenge and proof are retained before start so a lost reply never causes a
-// second challenge, and execution is recorded before the report so a lost
-// report never causes a second restart.
-type pendingRestart struct {
+// pendingDeviceAction is the simulated executor journal entry for one device
+// action. The challenge and proof are retained before start so a lost reply
+// never causes a second challenge, and execution is recorded before the report
+// so a lost report never causes a second effect.
+type pendingDeviceAction struct {
 	work      *devicev1.DeviceActionWork
 	intent    *agentv1.DeviceActionIntent
 	challenge *agentv1.DeviceActionChallenge
@@ -123,39 +123,57 @@ func (h *haRun) restartAction(ctx context.Context, d *haDevice) error {
 // finishRestart attests the terminal journal state with the current nonce.
 func (h *haRun) finishRestart(ctx context.Context, d *haDevice, state agentv1.DeviceActionState) error {
 	p := d.restart
-	now := time.Now().UTC()
-	stamp := timestamppb.New(now)
+	completed := stamp()
 	digest := sha256.Sum256(p.work.GetIntentEnvelope())
 	status := &agentv1.DeviceActionStatus{ActionId: p.intent.GetActionId(), IntentSha256: digest[:], State: state, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE,
-		AcceptedAt: p.plan.GetBefore().GetObservedAt(), CompletedAt: stamp, Before: p.plan.GetBefore()}
+		AcceptedAt: p.plan.GetBefore().GetObservedAt(), CompletedAt: completed, Before: p.plan.GetBefore()}
 	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		status.StartedAt = timestamppb.New(p.startedAt)
-		status.Verification = &agentv1.DeviceActionVerification{Verified: true, BootId: p.newBoot, After: &agentv1.DeviceActionObservation{ObservedAt: stamp, Supported: true, BootId: p.newBoot}}
+		status.Verification = &agentv1.DeviceActionVerification{Verified: true, BootId: p.newBoot, After: &agentv1.DeviceActionObservation{ObservedAt: completed, Supported: true, BootId: p.newBoot}}
 	} else {
 		status.Failure = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_EXPIRED
 	}
-	attestation := &agentv1.DeviceActionAttestation{DeploymentId: p.intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, ActionRevision: 1,
-		Nonce: p.work.GetResultNonce(), IssuedAt: stamp, ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: status}
-	envelope, err := h.authority.Sign(ctx, attestation, d.key)
+	if err := h.attestDeviceAction(ctx, d.simulatedDevice, p, status, 1); err != nil {
+		return err
+	}
+	return h.reportRestart(ctx, d)
+}
+
+// attestDeviceAction signs status with the current work nonce as the exact
+// replayable report; revisions advance only for a later journal state.
+func (r *runner) attestDeviceAction(ctx context.Context, d *simulatedDevice, p *pendingDeviceAction, status *agentv1.DeviceActionStatus, revision uint64) error {
+	now := time.Now().UTC()
+	attestation := &agentv1.DeviceActionAttestation{DeploymentId: p.intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, SessionEpoch: d.epoch, ActionRevision: revision,
+		Nonce: p.work.GetResultNonce(), IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: status}
+	envelope, err := r.authority.Sign(ctx, attestation, d.key)
 	if err != nil {
 		return err
 	}
 	p.report = &devicev1.ReportDeviceActionResultRequest{SessionEpoch: d.epoch, ActionId: p.intent.GetActionId(), AttestationEnvelope: envelope, CertificatePem: d.certificate}
 	p.reportEnd = attestation.GetExpiresAt().AsTime()
-	return h.reportRestart(ctx, d)
+	return nil
 }
 
-func (h *haRun) prepareRestart(ctx context.Context, d *haDevice, work *devicev1.DeviceActionWork) (*pendingRestart, error) {
-	intent, err := h.verifier.VerifyDeviceActionIntent(ctx, d.root, d.delegation, work.GetIntentEnvelope(), time.Now())
+func (h *haRun) prepareRestart(ctx context.Context, d *haDevice, work *devicev1.DeviceActionWork) (*pendingDeviceAction, error) {
+	return h.prepareDeviceAction(ctx, d.simulatedDevice, work, func(intent *agentv1.DeviceActionIntent, _ *agentv1.DeviceActionPlan) bool {
+		return intent.GetSpec().GetRestart() != nil
+	})
+}
+
+// prepareDeviceAction verifies the signed intent, lets plan record the
+// simulated native preflight (false rejects the intent), and signs the
+// executor's challenge over it.
+func (r *runner) prepareDeviceAction(ctx context.Context, d *simulatedDevice, work *devicev1.DeviceActionWork, plan func(*agentv1.DeviceActionIntent, *agentv1.DeviceActionPlan) bool) (*pendingDeviceAction, error) {
+	intent, err := r.verifier.VerifyDeviceActionIntent(ctx, d.root, d.delegation, work.GetIntentEnvelope(), time.Now())
 	if err != nil {
 		return nil, errors.Join(errProtocolViolation, err)
 	}
-	if intent.GetDeviceId() != d.id || intent.GetEnrollmentGeneration() != d.generation || intent.GetActionId() != work.GetActionId() || intent.GetSpec().GetRestart() == nil {
-		return nil, errors.Join(errProtocolViolation, errors.New("restart intent identity mismatch"))
-	}
 	now := time.Now().UTC().Add(-time.Second)
-	plan := &agentv1.DeviceActionPlan{ActionId: intent.GetActionId(), Spec: intent.GetSpec(), Before: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(now), Supported: true, BootId: d.boot}}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(plan)
+	native := &agentv1.DeviceActionPlan{ActionId: intent.GetActionId(), Spec: intent.GetSpec(), Before: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(now), Supported: true, BootId: d.boot}}
+	if intent.GetDeviceId() != d.id || intent.GetEnrollmentGeneration() != d.generation || intent.GetActionId() != work.GetActionId() || !plan(intent, native) {
+		return nil, errors.Join(errProtocolViolation, errors.New("device action intent identity mismatch"))
+	}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(native)
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +185,13 @@ func (h *haRun) prepareRestart(ctx context.Context, d *haDevice, work *devicev1.
 	}
 	challenge := &agentv1.DeviceActionChallenge{DeploymentId: intent.GetDeploymentId(), DeviceId: d.id, EnrollmentGeneration: d.generation, ActionId: intent.GetActionId(),
 		ActionSequence: intent.GetActionSequence(), RecoveryEpoch: intent.GetRecoveryEpoch(), IntentSha256: intentDigest[:], SpecSha256: intent.GetSpecSha256(),
-		NativePlanSha256: planDigest[:], NativePlan: plan, Nonce: nonce, BootId: d.boot, ExecutorIncarnation: d.incarnation,
+		NativePlanSha256: planDigest[:], NativePlan: native, Nonce: nonce, BootId: d.boot, ExecutorIncarnation: d.incarnation,
 		IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(30 * time.Second))}
-	proof, err := h.authority.Sign(ctx, challenge, d.key)
+	proof, err := r.authority.Sign(ctx, challenge, d.key)
 	if err != nil {
 		return nil, err
 	}
-	return &pendingRestart{work: work, intent: intent, challenge: challenge, proof: proof, plan: plan}, nil
+	return &pendingDeviceAction{work: work, intent: intent, challenge: challenge, proof: proof, plan: native}, nil
 }
 
 func (h *haRun) reportRestart(ctx context.Context, d *haDevice) error {

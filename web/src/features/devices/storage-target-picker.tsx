@@ -127,7 +127,13 @@ export function ObservedStorageTargetPicker({
         </p>
       )}
       <div>
-        <Button type="button" variant="outline" disabled={disabled} onClick={onRefresh}>
+        <Button
+          type="button"
+          variant="outline"
+          aria-haspopup="dialog"
+          disabled={disabled}
+          onClick={onRefresh}
+        >
           Refresh inventory
         </Button>
       </div>

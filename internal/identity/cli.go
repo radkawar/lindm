@@ -136,7 +136,7 @@ func (s *Service) handleCLIApprovalPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if principal.BreakGlass && s.breakGlass.GetConsoleOnly() {
-		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "CLI forbidden by console-only policy"); err != nil {
+		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "", "CLI forbidden by console-only policy"); err != nil {
 			writeStatus(w, http.StatusServiceUnavailable)
 			return
 		}
@@ -168,7 +168,7 @@ func (s *Service) handleCLIApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if principal.BreakGlass && s.breakGlass.GetConsoleOnly() {
-		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "CLI forbidden by console-only policy"); err != nil {
+		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "", "CLI forbidden by console-only policy"); err != nil {
 			writeStatus(w, http.StatusServiceUnavailable)
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
@@ -151,7 +152,7 @@ func storeResourceSecrets(ctx context.Context, q *devicedb.Queries, actor *uuid.
 		if err := q.InsertResourceActionSecret(ctx, devicedb.InsertResourceActionSecretParams{ActionID: action, Ordinal: int16(i), SecretID: secret, Version: int64(version), RecipientKeySha256: binding.GetRecipientKeySha256(), Sealed: delivery.sealed}); err != nil {
 			return err
 		}
-		if err := dispatchAudit(ctx, q, actor, secretDeliveredAuditEvent, action, fmt.Sprintf("secret %s version %d", secret, version)); err != nil {
+		if err := dispatchSystemAudit(ctx, q, actor, secretDeliveredAuditEvent, action, "secret_id", secret.String(), "version", strconv.FormatUint(version, 10)); err != nil {
 			return err
 		}
 	}

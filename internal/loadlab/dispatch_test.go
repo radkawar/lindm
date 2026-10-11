@@ -265,7 +265,7 @@ func newReplayFixture(t *testing.T) *replayFixture {
 	rootKey := replayKey(t)
 	root := &agentv1.ExecutionRoot{DeploymentId: uuid.NewString(), Version: 1, Threshold: 1, Keys: []*agentv1.ExecutionKey{replayExecutionKey(t, rootKey)}, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(24 * time.Hour))}
 	f := &replayFixture{t: t, r: &runner{authority: authority, metrics: &measurements{}}, planKey: replayKey(t), startKey: replayKey(t)}
-	f.d = &simulatedDevice{id: uuid.NewString(), generation: uuid.NewString(), boot: uuid.NewString(), incarnation: uuid.NewString(), epoch: 1, key: replayKey(t), root: root, completed: make(map[string]bool)}
+	f.d = &simulatedDevice{id: uuid.NewString(), generation: uuid.NewString(), boot: uuid.NewString(), incarnation: uuid.NewString(), epoch: 1, key: replayKey(t), root: root, completed: make(map[string]bool), serviceSequences: make(map[string]uint64)}
 	rootJSON, err := protojson.Marshal(root)
 	if err != nil {
 		t.Fatal(err)

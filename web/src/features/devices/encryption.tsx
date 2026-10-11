@@ -58,6 +58,10 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
       }
     }
   }
+  const volumeOptions = [...volumes].sort().map((uuid, index) => ({
+    value: uuid,
+    label: `Volume ${index + 1}`,
+  }));
   return (
     <Card>
       <CardHeader>
@@ -73,10 +77,13 @@ export function DeviceEncryptionPanel({ deviceId }: { deviceId: string }) {
             id={`encryption-volume-${deviceId}`}
             value={luksUuid}
             onValueChange={setLuksUuid}
-            options={[
-              { value: "", label: "Most recent records (any volume)" },
-              ...[...volumes].sort().map((uuid) => ({ value: uuid, label: uuid })),
-            ]}
+            options={[{ value: "", label: "Most recent records (any volume)" }, ...volumeOptions]}
+          />
+          <TechnicalDetails
+            items={volumeOptions.map((volume) => ({
+              label: `${volume.label} LUKS UUID`,
+              value: volume.value,
+            }))}
           />
           {historyFailure ? (
             <RpcError failure={historyFailure} title="Couldn't load volume history">

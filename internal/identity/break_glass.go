@@ -33,7 +33,7 @@ func (s *Service) terminateEmergencySessions(ctx context.Context) error {
 			if err = s.bumpLocalAuthorization(ctx, q, id, principal.AuthorizationRole); err != nil {
 				return s.dbErr(err)
 			}
-			return s.insertAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "authentication service restarted; emergency policy re-established")
+			return s.insertSystemAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "authentication service restarted; emergency policy re-established")
 		}); err != nil {
 			return err
 		}
@@ -41,12 +41,15 @@ func (s *Service) terminateEmergencySessions(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) emergencyAudit(ctx context.Context, id uuid.UUID, action, reason string) error {
+func (s *Service) emergencyAudit(ctx context.Context, id uuid.UUID, action, reason, systemContext string) error {
 	auditCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	// No actor FK acquisition here: worker denials may hold the principal lock in
 	// an outer transaction which must remain free to roll back. Immutable actor ID
 	// remains in resource_id, and the audit independently commits the denial.
+	if systemContext != "" {
+		return s.insertSystemAudit(auditCtx, identitydb.New(s.pool), nil, action, principalResource(id), systemContext)
+	}
 	return s.insertAudit(auditCtx, identitydb.New(s.pool), nil, action, principalResource(id), reason)
 }
 

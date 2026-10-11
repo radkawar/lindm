@@ -166,13 +166,21 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
               {finding.exception ? (
                 <div className="space-y-2 border bg-muted/30 p-3 text-sm">
                   <p>
-                    {accepted ? "Risk accepted" : "Acceptance expired"} by{" "}
-                    {finding.exception.actorId}. {accepted ? "Expires" : "Expired"}{" "}
+                    Risk accepted by{" "}
+                    {!finding.exception.actorId.trim()
+                      ? "the system"
+                      : finding.exception.actorId === principal.id
+                        ? "you"
+                        : "another administrator"}
+                    . {accepted ? "Acceptance expires" : "Acceptance expired"}{" "}
                     {formatTimestamp(finding.exception.expiresAt).local}.
                   </p>
                   <p className="whitespace-pre-wrap break-words">
                     Reason: {finding.exception.reason}
                   </p>
+                  <TechnicalDetails
+                    items={[{ label: "Actor ID", value: finding.exception.actorId }]}
+                  />
                 </div>
               ) : null}
               {finding.reason !== "source_record_rejected" &&

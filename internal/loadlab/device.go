@@ -39,9 +39,14 @@ type simulatedDevice struct {
 	rootDigest, delegationDigest         []byte
 	completed                            map[string]bool
 	pending                              *pendingService
-	serviceSequence                      uint64
-	inventoryUpload                      *pendingInventoryUpload
-	lastInventory                        time.Time
+	// serviceSequences retains the last executed sequence per resource ref;
+	// serviceReports counts every admitted terminal service report.
+	serviceSequences map[string]uint64
+	serviceReports   int
+	inventoryUpload  *pendingInventoryUpload
+	lastInventory    time.Time
+	// demo selects a console demo host and executor results; nil for capacity.
+	demo *demoDevice
 }
 
 func (r *runner) transport(address string, certificate *tls.Certificate) *http.Transport {
@@ -94,7 +99,10 @@ func (r *runner) assign(ctx context.Context, index int, id string) error {
 	return nil
 }
 func (r *runner) enrollDevice(ctx context.Context, index int, secret string) (d *simulatedDevice, resultErr error) {
-	d = &simulatedDevice{boot: uuid.NewString(), incarnation: uuid.NewString(), installation: uuid.NewString(), root: r.bootstrap.Root, rootDigest: r.rootDigest, completed: make(map[string]bool)}
+	d = &simulatedDevice{boot: uuid.NewString(), incarnation: uuid.NewString(), installation: uuid.NewString(), root: r.bootstrap.Root, rootDigest: r.rootDigest, completed: make(map[string]bool), serviceSequences: make(map[string]uint64)}
+	if index < len(r.demo) {
+		d.demo = r.demo[index]
+	}
 	defer func() {
 		if resultErr != nil {
 			d.close()

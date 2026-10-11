@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,11 +44,13 @@ func recordAgentUpdate(ctx context.Context, q *devicedb.Queries, principal devic
 	}
 	if len(digest) != 0 && !bytes.Equal(digest, previous.EventDigest) {
 		id := uuid.New()
-		reason := "reported update phase=" + status.GetPhase()
+		details := auditDetails("phase", status.GetPhase())
 		if diagnostic := status.GetNativeDiagnostic(); diagnostic != nil {
-			reason = fmt.Sprintf("reported native failure manager=%s phase=%s exit_code=%d", diagnostic.GetManager(), diagnostic.GetPhase(), diagnostic.GetExitCode())
+			details["manager"] = diagnostic.GetManager()
+			details["native_phase"] = diagnostic.GetPhase()
+			details["exit_code"] = strconv.FormatInt(int64(diagnostic.GetExitCode()), 10)
 		}
-		if err := q.InsertAuditEvent(ctx, devicedb.InsertAuditEventParams{ID: id, Action: "device.agent_update.reported", ResourceID: principal.DeviceID.String(), Reason: reason}); err != nil {
+		if err := insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: id, Action: "device.agent_update.reported", ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, details); err != nil {
 			return err
 		}
 		if err := q.InsertAgentUpdateEvent(ctx, devicedb.InsertAgentUpdateEventParams{ID: id, GenerationID: principal.GenerationID, SessionEpoch: int64(epoch), Status: encoded, ReceivedAt: timestamptz(now)}); err != nil {

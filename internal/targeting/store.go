@@ -157,7 +157,7 @@ func receipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, 
 	}
 	return true, proto.Unmarshal(row.Response, response)
 }
-func saveReceipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id, method, resource, reason string, request, response proto.Message) error {
+func saveReceipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id, method, resource, reason, auditContext string, request, response proto.Message) error {
 	b, err := encoded(request)
 	if err != nil {
 		return err
@@ -169,7 +169,7 @@ func saveReceipt(ctx context.Context, q *targetingdb.Queries, p identity.Princip
 	if err = q.InsertTargetingRequest(ctx, targetingdb.InsertTargetingRequestParams{ActorID: p.ID, RequestID: uuid.MustParse(id), Method: method, Digest: digest(method, b), Response: out}); err != nil {
 		return err
 	}
-	return q.TargetingAudit(ctx, targetingdb.TargetingAuditParams{ID: uuid.New(), ActorID: &p.ID, Action: method, ResourceID: resource, Reason: reason})
+	return q.TargetingAudit(ctx, targetingdb.TargetingAuditParams{ID: uuid.New(), ActorID: &p.ID, Action: method, ResourceID: resource, Reason: reason, Context: auditContext})
 }
 
 func (s *Store) PutDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.PutDynamicGroupRequest) (*adminv1.PutDynamicGroupResponse, error) {
@@ -215,7 +215,7 @@ func (s *Store) PutDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Princ
 		return nil, err
 	}
 	out.Group = group
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.group.put", group.GroupId, r.Reason, r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.group.put", group.GroupId, r.Reason, "", r, out)
 }
 func (s *Store) ListDynamicGroups(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListDynamicGroupsRequest) (*adminv1.ListDynamicGroupsResponse, error) {
 	if err := s.validate(r); err != nil {
@@ -296,7 +296,7 @@ func (s *Store) PutAssignment(ctx context.Context, tx pgx.Tx, p identity.Princip
 		return nil, err
 	}
 	out.Assignment = &policyv1.TargetCandidate{Assignment: proto.CloneOf(r.Assignment), Revision: r.ExpectedRevision + 1, ActorId: p.ID.String()}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.assignment.put", id.String(), r.Reason, r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.assignment.put", id.String(), r.Reason, "", r, out)
 }
 func (s *Store) ListAssignments(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListTargetAssignmentsRequest) (*adminv1.ListTargetAssignmentsResponse, error) {
 	if err := s.validate(r); err != nil {

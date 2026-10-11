@@ -290,7 +290,7 @@ func TestSecretStoreLifecycleAndIdempotency(t *testing.T) {
 
 	// No plaintext anywhere in durable state or metadata responses.
 	var stored [][]byte
-	rows, err := f.pool.Query(t.Context(), "SELECT binding_document || wrapped_key || ciphertext || convert_to(key_id || reason, 'UTF8') FROM managed_secret_versions UNION ALL SELECT convert_to(action || resource_id || reason, 'UTF8') FROM audit_events UNION ALL SELECT convert_to(display_name, 'UTF8') FROM managed_secrets")
+	rows, err := f.pool.Query(t.Context(), "SELECT binding_document || wrapped_key || ciphertext || convert_to(key_id || reason, 'UTF8') FROM managed_secret_versions UNION ALL SELECT convert_to(action || resource_id || reason || details::text, 'UTF8') FROM audit_events UNION ALL SELECT convert_to(display_name, 'UTF8') FROM managed_secrets")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -190,5 +191,5 @@ func holdClonedIdentity(ctx context.Context, q *devicedb.Queries, principal devi
 	if err := q.HoldGeneration(ctx, principal.GenerationID); err != nil {
 		return err
 	}
-	return insertAudit(ctx, q, nil, actionDeviceRecoveryHold, principal.DeviceID.String(), reason)
+	return insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: actionDeviceRecoveryHold, ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, auditDetails("cause", reason))
 }

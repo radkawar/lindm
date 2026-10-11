@@ -175,7 +175,7 @@ func assertAuditCount(t *testing.T, ctx context.Context, conn *pgx.Conn, princip
 func auditCount(t *testing.T, ctx context.Context, conn *pgx.Conn, principal uuid.UUID, reason string) int {
 	t.Helper()
 	var n int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE resource_id = $1 AND reason = $2`, principalResource(principal), reason).Scan(&n); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE resource_id = $1 AND reason = '' AND details->>'context' = $2`, principalResource(principal), reason).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
 	return n

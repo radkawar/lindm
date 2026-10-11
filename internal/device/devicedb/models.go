@@ -45,15 +45,6 @@ type AssistanceSession struct {
 	AnswerFingerprint  string
 }
 
-type AuditEvent struct {
-	ID         uuid.UUID
-	OccurredAt pgtype.Timestamptz
-	ActorID    *uuid.UUID
-	Action     string
-	ResourceID string
-	Reason     string
-}
-
 type DeviceAction struct {
 	ID                       uuid.UUID
 	DeviceID                 uuid.UUID

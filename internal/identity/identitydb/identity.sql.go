@@ -289,13 +289,14 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 }
 
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
-INSERT INTO audit_events (id, actor_id, action, resource_id, reason)
+INSERT INTO audit_events (id, actor_id, action, resource_id, reason, details)
 VALUES (
   $1,
   $2,
   $3,
   $4,
-  $5
+  $5,
+  COALESCE($6::jsonb, '{}'::jsonb)
 )
 `
 
@@ -305,6 +306,7 @@ type InsertAuditEventParams struct {
 	Action     string
 	ResourceID string
 	Reason     string
+	Details    []byte
 }
 
 func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) error {
@@ -314,6 +316,7 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 		arg.Action,
 		arg.ResourceID,
 		arg.Reason,
+		arg.Details,
 	)
 	return err
 }

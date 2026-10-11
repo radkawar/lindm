@@ -13,27 +13,18 @@ import (
 )
 
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
-INSERT INTO audit_events (
-    id,
-    actor_id,
-    action,
-    resource_id,
-    reason
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5
-)
+INSERT INTO audit_events (id, actor_id, action, resource_id, reason, target_device_id, details)
+VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::jsonb, '{}'::jsonb))
 `
 
 type InsertAuditEventParams struct {
-	ID         uuid.UUID
-	ActorID    *uuid.UUID
-	Action     string
-	ResourceID string
-	Reason     string
+	ID             uuid.UUID
+	ActorID        *uuid.UUID
+	Action         string
+	ResourceID     string
+	Reason         string
+	TargetDeviceID *uuid.UUID
+	Details        []byte
 }
 
 func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventParams) error {
@@ -43,79 +34,49 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 		arg.Action,
 		arg.ResourceID,
 		arg.Reason,
+		arg.TargetDeviceID,
+		arg.Details,
 	)
 	return err
 }
 
-const listAuditEventsAfter = `-- name: ListAuditEventsAfter :many
-SELECT
-    id,
-    occurred_at,
-    actor_id,
-    action,
-    resource_id,
-    reason
-FROM audit_events
-WHERE (occurred_at, id) < ($1::timestamptz, $2::uuid)
-ORDER BY occurred_at DESC, id DESC
+const listAuditEvents = `-- name: ListAuditEvents :many
+SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.target_device_id, a.details, COALESCE(d.hostname, '')::text AS device_hostname
+FROM audit_events a
+LEFT JOIN devices d ON d.id = a.target_device_id
+WHERE $1::uuid IS NULL
+   OR (a.occurred_at, a.id) < ($2::timestamptz, $1::uuid)
+ORDER BY a.occurred_at DESC, a.id DESC
 LIMIT $3::int
 `
 
-type ListAuditEventsAfterParams struct {
+type ListAuditEventsParams struct {
+	CursorID         *uuid.UUID
 	CursorOccurredAt pgtype.Timestamptz
-	CursorID         uuid.UUID
 	RowLimit         int32
 }
 
-func (q *Queries) ListAuditEventsAfter(ctx context.Context, arg ListAuditEventsAfterParams) ([]AuditEvent, error) {
-	rows, err := q.db.Query(ctx, listAuditEventsAfter, arg.CursorOccurredAt, arg.CursorID, arg.RowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []AuditEvent{}
-	for rows.Next() {
-		var i AuditEvent
-		if err := rows.Scan(
-			&i.ID,
-			&i.OccurredAt,
-			&i.ActorID,
-			&i.Action,
-			&i.ResourceID,
-			&i.Reason,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type ListAuditEventsRow struct {
+	ID             uuid.UUID
+	OccurredAt     pgtype.Timestamptz
+	ActorID        *uuid.UUID
+	Action         string
+	ResourceID     string
+	Reason         string
+	TargetDeviceID *uuid.UUID
+	Details        []byte
+	DeviceHostname string
 }
 
-const listAuditEventsFirst = `-- name: ListAuditEventsFirst :many
-SELECT
-    id,
-    occurred_at,
-    actor_id,
-    action,
-    resource_id,
-    reason
-FROM audit_events
-ORDER BY occurred_at DESC, id DESC
-LIMIT $1::int
-`
-
-func (q *Queries) ListAuditEventsFirst(ctx context.Context, rowLimit int32) ([]AuditEvent, error) {
-	rows, err := q.db.Query(ctx, listAuditEventsFirst, rowLimit)
+func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error) {
+	rows, err := q.db.Query(ctx, listAuditEvents, arg.CursorID, arg.CursorOccurredAt, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AuditEvent{}
+	items := []ListAuditEventsRow{}
 	for rows.Next() {
-		var i AuditEvent
+		var i ListAuditEventsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OccurredAt,
@@ -123,6 +84,9 @@ func (q *Queries) ListAuditEventsFirst(ctx context.Context, rowLimit int32) ([]A
 			&i.Action,
 			&i.ResourceID,
 			&i.Reason,
+			&i.TargetDeviceID,
+			&i.Details,
+			&i.DeviceHostname,
 		); err != nil {
 			return nil, err
 		}

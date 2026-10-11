@@ -20,5 +20,6 @@ SET state = 'imported', imported_at = clock_timestamp()
 WHERE sequence = sqlc.arg('sequence') AND manifest_sha256 = sqlc.arg('manifest_sha256') AND state = 'importing';
 
 -- name: InsertBundleAudit :exec
-INSERT INTO audit_events(id, actor_id, action, resource_id, reason)
-VALUES(sqlc.arg('id'), NULL, sqlc.arg('action'), sqlc.arg('resource_id'), sqlc.arg('reason'));
+INSERT INTO audit_events(id, actor_id, action, resource_id, details)
+VALUES(sqlc.arg('id'), NULL, sqlc.arg('action'), sqlc.arg('resource_id'),
+  jsonb_build_object('sequence', sqlc.arg('sequence')::text, 'release', sqlc.arg('release')::text, 'custody', sqlc.arg('custody')::text));

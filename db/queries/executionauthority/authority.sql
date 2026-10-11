@@ -82,8 +82,9 @@ UPDATE execution_authority SET
 WHERE id = true;
 -- name: InsertAudit :exec
 
-INSERT INTO audit_events (id, occurred_at, actor_id, action, resource_id, reason)
+INSERT INTO audit_events (id, occurred_at, actor_id, action, resource_id, reason, details)
 VALUES (
     sqlc.arg('id'), sqlc.arg('occurred_at'), sqlc.narg('actor_id'),
-    sqlc.arg('action'), sqlc.arg('resource_id'), sqlc.arg('reason')
+    sqlc.arg('action'), sqlc.arg('resource_id'), sqlc.arg('reason'),
+    jsonb_strip_nulls(jsonb_build_object('context', NULLIF(sqlc.arg('context')::text, '')))
 );

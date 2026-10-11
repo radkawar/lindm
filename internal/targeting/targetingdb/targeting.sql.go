@@ -660,7 +660,8 @@ func (q *Queries) TargetStaticGroupExists(ctx context.Context, id uuid.UUID) (bo
 }
 
 const targetingAudit = `-- name: TargetingAudit :exec
-INSERT INTO audit_events(id,occurred_at,actor_id,action,resource_id,reason) VALUES ($1,clock_timestamp(),$2,$3,$4,$5)
+INSERT INTO audit_events(id,occurred_at,actor_id,action,resource_id,reason,details)
+VALUES ($1,clock_timestamp(),$2,$3,$4,$5,jsonb_strip_nulls(jsonb_build_object('context',NULLIF($6::text,''))))
 `
 
 type TargetingAuditParams struct {
@@ -669,6 +670,7 @@ type TargetingAuditParams struct {
 	Action     string
 	ResourceID string
 	Reason     string
+	Context    string
 }
 
 func (q *Queries) TargetingAudit(ctx context.Context, arg TargetingAuditParams) error {
@@ -678,6 +680,7 @@ func (q *Queries) TargetingAudit(ctx context.Context, arg TargetingAuditParams) 
 		arg.Action,
 		arg.ResourceID,
 		arg.Reason,
+		arg.Context,
 	)
 	return err
 }

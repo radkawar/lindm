@@ -773,7 +773,7 @@ func activateIfPending(ctx context.Context, q *devicedb.Queries, device devicedb
 	if err := q.ActivateGeneration(ctx, *device.CurrentGenerationID); err != nil {
 		return "", err
 	}
-	if err := insertAudit(ctx, q, nil, actionDeviceActivate, device.ID.String(), "activated"); err != nil {
+	if err := insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: actionDeviceActivate, ResourceID: device.ID.String(), TargetDeviceID: &device.ID}, auditDetails("status", "activated")); err != nil {
 		return "", err
 	}
 	return stateActive, nil

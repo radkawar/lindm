@@ -96,7 +96,7 @@ func (s *Service) beginLocalLogin(ctx context.Context, request *authv1.LocalLogi
 			if !s.localPrimary {
 				action = "identity.break_glass_denied"
 			}
-			return s.insertAudit(ctx, q, &account.ID, action, principalResource(account.ID), "local authentication denied")
+			return s.insertSystemAudit(ctx, q, &account.ID, action, principalResource(account.ID), "local authentication denied")
 		}
 		user, err := s.localUser(ctx, q, account)
 		if err != nil {
@@ -207,7 +207,7 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 			if !s.localPrimary {
 				action = "identity.break_glass_denied"
 			}
-			resultErr = errors.Join(resultErr, s.emergencyAudit(failureCtx, ceremony.AccountID, action, "WebAuthn ceremony denied"))
+			resultErr = errors.Join(resultErr, s.emergencyAudit(failureCtx, ceremony.AccountID, action, "", "WebAuthn ceremony denied"))
 		}
 	}()
 	stored, session, err := restoreCeremony(ceremony, request)
@@ -261,7 +261,7 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 					return s.dbErr(err)
 				}
 			}
-			return s.insertAudit(ctx, q, &account.ID, "identity.local_mfa_denied", principalResource(account.ID), "WebAuthn verification denied")
+			return s.insertSystemAudit(ctx, q, &account.ID, "identity.local_mfa_denied", principalResource(account.ID), "WebAuthn verification denied")
 		}
 		data, err := json.Marshal(credential)
 		if err != nil {

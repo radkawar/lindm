@@ -96,12 +96,17 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 		t.Fatalf("heartbeat/checking/restart duplicated failure: count=%d err=%v", count, err)
 	}
 	var eventBytes []byte
-	if err := f.conn.QueryRow(f.ctx, "SELECT e.status FROM device_agent_update_events e JOIN audit_events a ON a.id=e.id WHERE e.generation_id=$1 AND a.action='device.agent_update.reported'", f.principal.GenerationID).Scan(&eventBytes); err != nil {
+	var auditReason, targetDeviceID string
+	var details map[string]string
+	if err := f.conn.QueryRow(f.ctx, "SELECT e.status, a.reason, a.target_device_id::text, a.details FROM device_agent_update_events e JOIN audit_events a ON a.id=e.id WHERE e.generation_id=$1 AND a.action='device.agent_update.reported'", f.principal.GenerationID).Scan(&eventBytes, &auditReason, &targetDeviceID, &details); err != nil {
 		t.Fatal(err)
 	}
 	event := new(agentv1.AgentUpdateStatus)
 	if err := proto.Unmarshal(eventBytes, event); err != nil || !proto.Equal(event, status) {
 		t.Fatalf("full audit-linked diagnostic lost: %v", err)
+	}
+	if auditReason != "" || targetDeviceID != f.deviceID || details["phase"] != status.GetPhase() || details["manager"] != status.GetNativeDiagnostic().GetManager() || details["native_phase"] != status.GetNativeDiagnostic().GetPhase() {
+		t.Fatalf("agent update invented reason or lost structured diagnostic: reason=%q target=%q details=%v", auditReason, targetDeviceID, details)
 	}
 	f.now = f.now.Add(time.Second)
 	installed := proto.CloneOf(checking)

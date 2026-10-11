@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"crypto"
+	"encoding/json"
 	"time"
 
 	"connectrpc.com/connect"
@@ -47,6 +48,33 @@ func insertAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, act
 		ResourceID: resourceID,
 		Reason:     reason,
 	})
+}
+
+// auditDetails preserves separate machine-readable values without inventing an
+// operator reason. Empty optional values are omitted.
+func auditDetails(pairs ...string) map[string]string {
+	details := make(map[string]string, len(pairs)/2)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		if pairs[i+1] != "" {
+			details[pairs[i]] = pairs[i+1]
+		}
+	}
+	return details
+}
+
+func insertDetailedAudit(ctx context.Context, q *devicedb.Queries, event devicedb.InsertAuditEventParams, details map[string]string) error {
+	encoded, err := json.Marshal(details)
+	if err != nil {
+		return err
+	}
+	event.Details = encoded
+	return q.InsertAuditEvent(ctx, event)
+}
+
+func dispatchSystemAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action string, id uuid.UUID, pairs ...string) error {
+	return insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
+		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: id.String(),
+	}, auditDetails(pairs...))
 }
 
 func (s *Service) storeCertificate(ctx context.Context, q *devicedb.Queries, deviceID, generation uuid.UUID, pub crypto.PublicKey, now time.Time) (*issuedCert, error) {

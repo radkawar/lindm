@@ -150,7 +150,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 		if err := q.SetRecoveryCheckpoint(ctx, devicedb.SetRecoveryCheckpointParams{ActionID: row.ActionID, CheckpointDocument: document, CheckpointSha256: digest, CheckpointSequence: int64(checkpoint.GetSequence()), CheckpointReceiptEnvelope: envelope, JournalDocument: journalDocument, EffectCommitted: effect, StoredAt: timestamptz(now)}); err != nil {
 			return nil, mapErr(err)
 		}
-		if err := dispatchAudit(ctx, q, nil, "device_action.recovery_checkpoint", row.ActionID, checkpoint.GetPhase().String()); err != nil {
+		if err := dispatchSystemAudit(ctx, q, nil, "device_action.recovery_checkpoint", row.ActionID, "phase", checkpoint.GetPhase().String()); err != nil {
 			return nil, mapErr(err)
 		}
 		response = &recoveryv1.CheckpointRecoveryActionResponse{CheckpointSha256: digest, Sequence: checkpoint.GetSequence(), ReceiptEnvelope: envelope}
@@ -274,7 +274,7 @@ func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request
 			return nil, mapErr(err)
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "device_action.recovery_result", row.ActionID, "verified_action_scoped_proof"); err != nil {
+	if err := dispatchSystemAudit(ctx, q, nil, "device_action.recovery_result", row.ActionID, "proof", "verified_action_scoped_proof"); err != nil {
 		return nil, mapErr(err)
 	}
 	response.Closed = !unknown

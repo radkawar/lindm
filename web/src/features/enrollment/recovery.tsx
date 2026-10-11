@@ -94,9 +94,9 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
             Once used, the device's old credentials stop working. Clones must enroll as new devices.
           </AlertDescription>
         </Alert>
-        <p className="break-all text-sm">Device: {device.hostname || "Unnamed device"}</p>
+        <p className="break-all text-sm">Device: {device.hostname.trim() || "Unnamed device"}</p>
         <p className="break-all text-sm">
-          Device ID (needed to confirm): <span className="font-mono">{device.id}</span>
+          Device ID (needed to confirm): <code className="font-mono">{device.id}</code>
         </p>
         {allowed ? (
           <form

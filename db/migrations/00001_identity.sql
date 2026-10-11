@@ -169,6 +169,10 @@ CREATE TABLE audit_events (
   action text NOT NULL,
   resource_id text NOT NULL,
   reason text NOT NULL DEFAULT '',
+  -- Device identity is retained even if the device is no longer present.
+  target_device_id uuid NULL,
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT audit_events_details_object CHECK (jsonb_typeof(details) = 'object' AND octet_length(details::text) <= 8192),
   CONSTRAINT audit_events_action_len CHECK (char_length(action) BETWEEN 1 AND 128),
   CONSTRAINT audit_events_resource_len CHECK (char_length(resource_id) BETWEEN 1 AND 512),
   CONSTRAINT audit_events_reason_len CHECK (char_length(reason) <= 512)

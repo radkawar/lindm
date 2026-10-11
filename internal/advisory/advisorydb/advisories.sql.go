@@ -578,8 +578,9 @@ func (q *Queries) GetAdvisoryFindingSet(ctx context.Context, arg GetAdvisoryFind
 }
 
 const insertAdvisoryAudit = `-- name: InsertAdvisoryAudit :exec
-INSERT INTO audit_events(id,actor_id,action,resource_id,reason)
-VALUES($1,$2,$3,$4,$5)
+INSERT INTO audit_events(id,actor_id,action,resource_id,reason,details)
+VALUES($1,$2,$3,$4,$5,
+  jsonb_strip_nulls(jsonb_build_object('context', NULLIF($6::text, ''))))
 `
 
 type InsertAdvisoryAuditParams struct {
@@ -588,6 +589,7 @@ type InsertAdvisoryAuditParams struct {
 	Action     string
 	ResourceID string
 	Reason     string
+	Context    string
 }
 
 func (q *Queries) InsertAdvisoryAudit(ctx context.Context, arg InsertAdvisoryAuditParams) error {
@@ -597,6 +599,7 @@ func (q *Queries) InsertAdvisoryAudit(ctx context.Context, arg InsertAdvisoryAud
 		arg.Action,
 		arg.ResourceID,
 		arg.Reason,
+		arg.Context,
 	)
 	return err
 }

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -14,6 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TechnicalDetails } from "@/components/ui/technical-details";
+import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
@@ -31,6 +34,7 @@ export function AuditView({
   onSearch: (next: { pageSize: PageSize; pageToken: string }) => void;
 }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const list = useQuery(auditQueryOptions(lifetime, pageSize, pageToken));
   const pagination = useListPagination({ pageSize, pageToken }, onSearch);
   const failure = list.error ? toRpcFailure(list.error) : null;
@@ -80,9 +84,14 @@ export function AuditView({
             <TableRow>
               <TableHead>When</TableHead>
               <TableHead>Action</TableHead>
-              <TableHead>Resource</TableHead>
               <TableHead>Who</TableHead>
               <TableHead>Reason</TableHead>
+              <TableHead>Device</TableHead>
+              <TableHead>Mode</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>
+                <span className="sr-only">Details</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -99,17 +108,60 @@ export function AuditView({
                       "Not recorded"
                     )}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {event.action.trim() || "Not recorded"}
+                  <TableCell>
+                    {event.action.trim()
+                      ? // Recorded codes such as "device.agent_update.reported" read as text.
+                        event.action
+                          .trim()
+                          .replace(/[._]+/g, " ")
+                          .replace(/^./, (first) => first.toUpperCase())
+                      : "Not recorded"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {event.resourceId.trim() || "Not recorded"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {event.actorId.trim() || "Unknown"}
+                  <TableCell>
+                    {!event.actorId.trim()
+                      ? "System"
+                      : event.actorId === principal.id
+                        ? "You"
+                        : "Another administrator"}
                   </TableCell>
                   <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
                     {event.reason.trim() || "Not recorded"}
+                  </TableCell>
+                  <TableCell>
+                    {event.targetDeviceId ? (
+                      <Link
+                        to="/devices/$deviceId"
+                        params={{ deviceId: event.targetDeviceId }}
+                        className="underline underline-offset-4 hover:text-primary"
+                      >
+                        {event.deviceHostname.trim() || "Unnamed device"}
+                      </Link>
+                    ) : (
+                      "Not recorded"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {event.details.mode === "view"
+                      ? "View"
+                      : event.details.mode === "control"
+                        ? "Control"
+                        : "Not recorded"}
+                  </TableCell>
+                  <TableCell>{auditDuration(event.details.duration_seconds)}</TableCell>
+                  <TableCell>
+                    <TechnicalDetails
+                      items={[
+                        { label: "Action code", value: event.action.trim() },
+                        { label: "Resource ID", value: event.resourceId.trim() },
+                        { label: "Actor ID", value: event.actorId.trim() },
+                        { label: "Event ID", value: event.id },
+                        { label: "Device ID", value: event.targetDeviceId ?? "" },
+                        ...Object.entries(event.details).map(([label, value]) => ({
+                          label,
+                          value,
+                        })),
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -131,4 +183,13 @@ export function AuditView({
       </div>
     </section>
   );
+}
+
+function auditDuration(value: string | undefined): string {
+  const seconds = Number(value);
+  if (!value || !Number.isSafeInteger(seconds) || seconds <= 0) return "Not recorded";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (!minutes) return `${remainder} sec`;
+  return remainder ? `${minutes} min ${remainder} sec` : `${minutes} min`;
 }

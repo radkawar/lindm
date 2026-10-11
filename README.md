@@ -70,6 +70,7 @@ is on port 18445. Development ports are loopback-only.
 | `make test-integration`   | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas                                                                                    |
 | `make signoff`            | Local CI: in a clean worktree of the pushed HEAD run `check` and `test-integration` (shared dev fixture), then post `signoff/unit` and `signoff/integration` for that SHA |
 | `make signoff-acceptance` | Same clean-worktree flow for the release acceptance gate, then post `signoff/acceptance`                                                                                  |
+| `make ui-review`          | Seed a demo console, sign in through the real flow and review every route (screenshots, layout, axe, keyboard, copy); see `docs/engineering.md`                           |
 | `make dev-check`          | Check runtime database TLS and actual OIDC/directory access                                                                                                               |
 | `make dev-trust`          | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                                         |
 | `make dev-down`           | Stop this checkout's lab services while preserving credentials and volumes                                                                                                |

@@ -199,13 +199,14 @@ SET pinned_role = 'owner',
 WHERE id = sqlc.arg(id) AND pinned_role = '';
 
 -- name: InsertAuditEvent :exec
-INSERT INTO audit_events (id, actor_id, action, resource_id, reason)
+INSERT INTO audit_events (id, actor_id, action, resource_id, reason, details)
 VALUES (
   sqlc.arg(id),
   sqlc.narg(actor_id),
   sqlc.arg(action),
   sqlc.arg(resource_id),
-  sqlc.arg(reason)
+  sqlc.arg(reason),
+  COALESCE(sqlc.narg(details)::jsonb, '{}'::jsonb)
 );
 
 -- name: SetPrincipalAuthorization :one

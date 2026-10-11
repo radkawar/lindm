@@ -40,7 +40,7 @@ export function DeviceActionPage({
         </Link>
         <span aria-hidden="true">/</span>
         <Link to="/devices/$deviceId" params={{ deviceId }} className="underline">
-          {device?.hostname || deviceId}
+          {device?.hostname.trim() || "Unnamed device"}
         </Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">{title}</span>
@@ -56,7 +56,7 @@ export function DeviceActionPage({
             </CardHeader>
             <CardContent className="grid gap-3">
               <dl className="grid gap-3 break-all text-sm sm:grid-cols-2">
-                <Fact label="Hostname">{device.hostname || "Not reported"}</Fact>
+                <Fact label="Hostname">{device.hostname.trim() || "Unnamed device"}</Fact>
                 <Fact label="Operating system">
                   {[device.osId, device.osVersion].filter(Boolean).join(" ") || "Not reported"}
                 </Fact>

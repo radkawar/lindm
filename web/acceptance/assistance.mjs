@@ -141,8 +141,8 @@ const commands = {
     return driver.page.evaluate(observeMedia, SURFACE);
   },
   async control() {
-    await ui.click({ role: "button", text: "Control off" });
-    await ui.wait({ role: "button", text: "Control on" });
+    await ui.click({ role: "button", text: "Take control" });
+    await ui.wait({ role: "button", text: "Release control" });
     return {};
   },
   async click(args) {

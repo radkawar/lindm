@@ -156,19 +156,32 @@ func wantReason(t *testing.T, err error, code connect.Code, reason string) {
 
 func (f *assistanceFixture) auditActions(t *testing.T, id string) []string {
 	t.Helper()
-	rows, err := f.conn.Query(f.ctx, "SELECT action, reason FROM audit_events WHERE resource_id=$1 ORDER BY occurred_at, action", id)
+	rows, err := f.conn.Query(f.ctx, "SELECT action, reason, target_device_id::text, details FROM audit_events WHERE resource_id=$1 ORDER BY occurred_at, action", id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer rows.Close()
 	var actions []string
 	for rows.Next() {
-		var action, reason string
-		if err := rows.Scan(&action, &reason); err != nil {
+		var action, reason, deviceID string
+		var details map[string]string
+		if err := rows.Scan(&action, &reason, &deviceID, &details); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(reason, "a=candidate") || strings.Contains(reason, "v=0") {
-			t.Fatalf("audit %s leaked SDP: %q", action, reason)
+		if deviceID != f.deviceID {
+			t.Fatalf("audit %s target %q, want %q", action, deviceID, f.deviceID)
+		}
+		if action == "assistance.request" {
+			if reason != "printer driver support" {
+				t.Fatalf("request lost operator reason: %q", reason)
+			}
+		} else if reason != "" {
+			t.Fatalf("audit %s invented operator reason %q", action, reason)
+		}
+		for key, value := range details {
+			if strings.Contains(value, "a=candidate") || strings.Contains(value, "v=0") {
+				t.Fatalf("audit %s leaked SDP in %s", action, key)
+			}
 		}
 		actions = append(actions, action)
 	}
@@ -294,13 +307,13 @@ func TestAssistanceLifecycleHappyPath(t *testing.T) {
 	if got := f.auditActions(t, id); !slices.Equal(got, want) {
 		t.Fatalf("audit actions %v, want %v", got, want)
 	}
-	var consent string
-	if err := f.conn.QueryRow(f.ctx, "SELECT reason FROM audit_events WHERE resource_id=$1 AND action='assistance.consent'", id).Scan(&consent); err != nil {
+	var consent map[string]string
+	if err := f.conn.QueryRow(f.ctx, "SELECT details FROM audit_events WHERE resource_id=$1 AND action='assistance.consent'", id).Scan(&consent); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"mode=control", "control_granted=true", "user=alice", "uid=1000", "session=3"} {
-		if !strings.Contains(consent, field) {
-			t.Fatalf("consent audit %q lacks %s", consent, field)
+	for key, value := range map[string]string{"mode": "control", "duration_seconds": "1800", "control_granted": "true", "user": "alice", "uid": "1000", "session": "3"} {
+		if consent[key] != value {
+			t.Fatalf("consent audit %v: %s = %q, want %q", consent, key, consent[key], value)
 		}
 	}
 	listed, err := f.svc.ListAssistanceSessions(f.ownerCtx, connect.NewRequest(&adminv1.ListAssistanceSessionsRequest{DeviceId: f.deviceID}))
@@ -462,4 +475,54 @@ func TestAssistanceDeviceIdentityChecks(t *testing.T) {
 			t.Fatalf("declined %v", got)
 		}
 	})
+}
+
+func TestAssistanceAuditReasonAndStructuredList(t *testing.T) {
+	f := newAssistanceFixture(t, 0)
+	request := f.createRequest(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 900, "alice")
+	request.Reason = "Help the user: " + strings.Repeat("é", 400)
+	created, err := f.svc.CreateAssistanceSession(f.creatorCtx, connect.NewRequest(request))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hostname string
+	if err := f.conn.QueryRow(f.ctx, "SELECT hostname FROM devices WHERE id=$1", f.deviceID).Scan(&hostname); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	found := false
+	token := ""
+	for {
+		page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{PageSize: 1, PageToken: token}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, event := range page.Msg.GetEvents() {
+			if seen[event.GetId()] {
+				t.Fatalf("duplicate audit event %s across pages", event.GetId())
+			}
+			seen[event.GetId()] = true
+			if event.GetResourceId() != created.Msg.GetSession().GetId() {
+				continue
+			}
+			found = true
+			if event.GetReason() != request.GetReason() || event.GetTargetDeviceId() != f.deviceID || event.GetDeviceHostname() != hostname {
+				t.Fatalf("audit lost reason or target: %v", event)
+			}
+			details := event.GetDetails()
+			if details["mode"] != "view" || details["duration_seconds"] != "900" || details["target"] != "alice" {
+				t.Fatalf("audit lost structured request context: %v", details)
+			}
+			if _, duplicated := details["reason"]; duplicated {
+				t.Fatal("operator reason duplicated into generated context")
+			}
+		}
+		token = page.Msg.GetNextPageToken()
+		if token == "" {
+			break
+		}
+	}
+	if !found {
+		t.Fatal("assistance request missing from audit API")
+	}
 }

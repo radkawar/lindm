@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,7 +26,6 @@ const (
 	assistanceUnreachable     = 30 * time.Second
 	assistanceOnlineWindow    = 2 * time.Minute
 	assistanceEndedDelivery   = 2 * time.Minute
-	assistanceAuditBytes      = 512
 
 	assistanceRequested = int16(adminv1.AssistanceState_ASSISTANCE_STATE_REQUESTED)
 	assistancePrompted  = int16(adminv1.AssistanceState_ASSISTANCE_STATE_PROMPTED)
@@ -68,7 +66,7 @@ func endAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.Assis
 	row.State, row.EndedAt, row.EndCause, row.EndDetail, row.DeviceEnded = assistanceEnded, timestamptz(now), int16(cause), detail, deviceEnded
 	row.OfferSdp, row.AnswerSdp = "", ""
 	*revoked = append(*revoked, *row)
-	return dispatchAudit(ctx, q, actor, "assistance.end", row.ID, assistanceAudit("cause", assistanceCauseName(cause), "detail", detail))
+	return recordAssistanceAudit(ctx, q, actor, "assistance.end", *row, "", "cause", assistanceCauseName(cause), "detail", detail)
 }
 
 // enforceAssistance applies the server-side deadlines to an open session:
@@ -217,31 +215,16 @@ func sha256Fingerprint(value string) bool {
 	return true
 }
 
-// assistanceAudit renders compact key=value audit details, omitting empty
-// values and truncating at the audit column bound. Callers never pass SDP or
-// relay credentials.
-func assistanceAudit(pairs ...string) string {
-	var b strings.Builder
-	for i := 0; i+1 < len(pairs); i += 2 {
-		if pairs[i+1] == "" {
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteByte(' ')
-		}
-		b.WriteString(pairs[i])
-		b.WriteByte('=')
-		b.WriteString(pairs[i+1])
-	}
-	text := b.String()
-	if len(text) <= assistanceAuditBytes {
-		return text
-	}
-	cut := assistanceAuditBytes
-	for cut > 0 && !utf8.RuneStart(text[cut]) {
-		cut--
-	}
-	return text[:cut]
+// recordAssistanceAudit separates operator-authored reasons from server context.
+// Callers never pass SDP, relay credentials or other secrets.
+func recordAssistanceAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action string, row devicedb.AssistanceSession, reason string, pairs ...string) error {
+	details := auditDetails(pairs...)
+	details["mode"] = assistanceModeName(row.Mode)
+	details["duration_seconds"] = strconv.FormatInt(int64(row.EndsAt.Time.Sub(row.CreatedAt.Time)/time.Second), 10)
+	return insertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
+		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: row.ID.String(),
+		Reason: reason, TargetDeviceID: &row.DeviceID,
+	}, details)
 }
 
 func assistanceModeName(mode int16) string {

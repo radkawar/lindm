@@ -23,9 +23,9 @@ import (
 
 func TestAuditExportIndependentVerificationAndCheckpoints(t *testing.T) {
 	s, ctx, pool, actor := reportFixture(t)
-	q := reportdb.New(pool)
+	target := uuid.New()
 	for i := 0; i < 5; i++ {
-		if err := q.InsertReportAudit(ctx, reportdb.InsertReportAuditParams{ActorID: &actor, Action: "report.test", ResourceID: uuid.NewString(), Reason: "independent chain evidence"}); err != nil {
+		if _, err := pool.Exec(ctx, `INSERT INTO audit_events(actor_id,action,resource_id,reason,target_device_id,details) VALUES($1,'report.test',$2,'independent chain evidence',$3,'{"mode":"view","duration_seconds":"900"}')`, actor, uuid.NewString(), target); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -72,6 +72,7 @@ func TestAuditExportIndependentVerificationAndCheckpoints(t *testing.T) {
 	previous := make([]byte, 32)
 	var sequence uint64
 	scanner := bufio.NewScanner(bytes.NewReader(content))
+	structured := false
 	for scanner.Scan() {
 		record := &integrationsv1.AuditChainRecord{}
 		if err := protojson.Unmarshal(scanner.Bytes(), record); err != nil {
@@ -91,10 +92,35 @@ func TestAuditExportIndependentVerificationAndCheckpoints(t *testing.T) {
 		if !bytes.Equal(digest[:], record.RowHash) {
 			t.Fatal("independent row hash mismatch")
 		}
+		payload := new(integrationsv1.AuditEventPayload)
+		if err := protojson.Unmarshal(record.GetPayload(), payload); err != nil {
+			t.Fatalf("decode documented audit payload: %v", err)
+		}
+		if payload.GetAction() == "report.test" {
+			structured = true
+			if payload.GetTargetDeviceId() != target.String() || payload.GetDetails()["mode"] != "view" || payload.GetDetails()["duration_seconds"] != "900" || payload.GetReason() != "independent chain evidence" {
+				t.Fatalf("structured audit fields missing from authenticated payload: %v", payload)
+			}
+			for _, change := range [][2]string{{target.String(), uuid.NewString()}, {"900", "901"}, {"view", "control"}} {
+				tampered := proto.CloneOf(record)
+				tampered.Payload = bytes.Replace(record.Payload, []byte(change[0]), []byte(change[1]), 1)
+				line, err := protojson.Marshal(tampered)
+				if err != nil {
+					t.Fatal(err)
+				}
+				archive := bytes.Replace(content, scanner.Bytes(), line, 1)
+				if err := verifyAuditRows(bytes.NewReader(archive), manifest, nil); err == nil || err.Error() != "reports: audit row hash mismatch" {
+					t.Fatalf("structured field tampering did not fail chain verification: %v", err)
+				}
+			}
+		}
 		previous = record.RowHash
 	}
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
+	}
+	if !structured {
+		t.Fatal("export omitted structured audit event")
 	}
 	if sequence != 2 || sequence != manifest.FinalSequence || !bytes.Equal(previous, manifest.FinalHash) {
 		t.Fatal("independent final checkpoint mismatch")
