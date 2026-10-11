@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/assistance.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
 import "lindm/agent/v1/execution_trust.proto";
@@ -105,6 +106,10 @@ service ExecutorService {
   // Status reports durable lifecycle facts. It does not report transport
   // reachability or any secret, grant, private key, or signed envelope.
   rpc Status(StatusRequest) returns (StatusResponse);
+  // SyncAssistance applies the server's complete assistance directives and
+  // returns the device-observed state. Local identities come from logind and
+  // kernel peer credentials, not from a session helper.
+  rpc SyncAssistance(SyncAssistanceRequest) returns (SyncAssistanceResponse);
 }
 
 message PrepareBootstrapRequest {

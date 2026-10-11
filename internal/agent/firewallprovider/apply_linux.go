@@ -215,11 +215,14 @@ func commitNative(ctx context.Context, config *agentv1.NativeFirewallProviderCon
 		}
 	}
 	after, _, err := connection.observe(compiled.name)
-	if err != nil || !nativeEqual(after, compiled.snapshot()) {
+	if err != nil {
 		return errors.Join(ErrOutcomeUnknown, err)
 	}
+	if !nativeEqual(after, compiled.snapshot()) {
+		return fmt.Errorf("%w: applied table %s reads back differently", ErrOutcomeUnknown, compiled.name)
+	}
 	if len(target.GetFirewall().GetRules()) != 0 && len(target.GetFirewall().GetRules()[0].GetRawExpressionsSha256()) != 0 && !rawExpressionsMatch(after.GetRules(), target.GetFirewall().GetRules()) {
-		return ErrOutcomeUnknown
+		return fmt.Errorf("%w: applied table %s raw expressions differ", ErrOutcomeUnknown, compiled.name)
 	}
 	if afterKernel != nil {
 		if err := afterKernel(ctx); err != nil {
@@ -320,7 +323,7 @@ func replayStateValid(state *agentv1.FirewallPersistentState, zone string, confi
 		return err
 	}
 	if state.GetPhase() != agentv1.FirewallPersistencePhase_FIREWALL_PERSISTENCE_PHASE_COMMITTED {
-		return ErrOutcomeUnknown
+		return fmt.Errorf("%w: persisted zone transaction is %s, not committed", ErrOutcomeUnknown, state.GetPhase())
 	}
 	if state.GetDesired().GetZoneId() != zone || !bytes.Equal(state.GetConfigurationSha256(), configuration) {
 		return ErrConflict

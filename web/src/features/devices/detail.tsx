@@ -58,6 +58,7 @@ export function DeviceDetailView({
   history,
   compliance,
   revoke,
+  assistance,
 }: {
   deviceId: string;
   search: PackageSearch;
@@ -67,6 +68,8 @@ export function DeviceDetailView({
   history: ReactNode;
   compliance: ReactNode;
   revoke?: (device: Device) => ReactNode;
+  // Optional remote assistance card, composed by the route; shown on the Actions tab.
+  assistance?: ReactNode;
 }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
@@ -661,7 +664,10 @@ export function DeviceDetailView({
             className="space-y-4"
           >
             {activeTab === "actions" ? (
-              <DeviceActionsPanel key={`actions:${deviceId}`} deviceId={deviceId} />
+              <>
+                <DeviceActionsPanel key={`actions:${deviceId}`} deviceId={deviceId} />
+                {assistance}
+              </>
             ) : null}
           </section>
           <section

@@ -72,12 +72,12 @@ func TestMissingModuleReturnsTypedPackageWithoutMutation(t *testing.T) {
 	}
 }
 func TestRefusesCrossDistroManagerGuessing(t *testing.T) {
-	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "debian", Version: "13"}, {OsId: "ubuntu", Version: "22.04"}, {OsId: "fedora", Version: "43"}, {OsId: "rhel", Version: "10.2"}} {
+	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "debian", Version: "13"}, {OsId: "ubuntu", Version: "22.04"}, {OsId: "fedora", Version: "43"}, {OsId: "rhel", Version: "10.2"}, {OsId: "almalinux", Version: "9.7"}, {OsId: "rocky", Version: "9.8"}} {
 		if productSupported(platform) {
 			t.Fatalf("unqualified native manager guessed: %v", platform)
 		}
 	}
-	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "ubuntu", Version: "24.04"}, {OsId: "fedora", Version: "44"}} {
+	for _, platform := range []*resourcev1.PlatformProduct{{OsId: "ubuntu", Version: "24.04"}, {OsId: "fedora", Version: "44"}, {OsId: "rhel", Version: "9.8"}, {OsId: "almalinux", Version: "9.8"}} {
 		if !productSupported(platform) {
 			t.Fatal(platform)
 		}

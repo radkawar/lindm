@@ -18,6 +18,7 @@ import (
 	"lindm/db"
 	"lindm/internal/advisory"
 	"lindm/internal/agent/buildinfo"
+	"lindm/internal/assistrelay"
 	"lindm/internal/config"
 	"lindm/internal/device"
 	"lindm/internal/executionauthority"
@@ -117,6 +118,13 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return fmt.Errorf("initialize recovery artifact verification: %w", err)
 	}
+	var relay *assistrelay.Relay
+	if assistance := resources.Proto.GetAssistance(); assistance != nil {
+		relay, err = assistrelay.New(assistance, time.Now, slog.Default())
+		if err != nil {
+			return fmt.Errorf("initialize assistance relay: %w", err)
+		}
+	}
 	devices, err := device.New(pool, device.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
@@ -134,6 +142,7 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
 		EnrollmentInstructions:       enrollmentInstructions(resources),
+		Assistance:                   relay,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize device service: %w", err)
@@ -245,14 +254,25 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if err != nil {
 		return errors.Join(fmt.Errorf("bind device listener: %w", err), adminListener.Close())
 	}
+	var relayServer *assistrelay.Server
+	if relay != nil {
+		relayServer, err = relay.Listen(ctx)
+		if err != nil {
+			return errors.Join(err, adminListener.Close(), deviceListener.Close())
+		}
+	}
 	profiling, err := newProfiler(ctx, resources.Proto.GetProfiling())
 	if err != nil {
-		return errors.Join(err, adminListener.Close(), deviceListener.Close())
+		err = errors.Join(err, adminListener.Close(), deviceListener.Close())
+		if relayServer != nil {
+			err = errors.Join(err, relayServer.Close())
+		}
+		return err
 	}
 
 	workerContext, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
-	stopped := make(chan error, 3)
+	stopped := make(chan error, 4)
 	go func() { stopped <- serve(admin, adminListener) }()
 	go func() { stopped <- serve(deviceServer, deviceListener) }()
 	slog.Info("control plane ready", "admin", admin.Addr, "device", deviceServer.Addr)
@@ -260,6 +280,14 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	if profiling != nil {
 		remaining++
 		go func() { stopped <- profiling.run(workerContext) }()
+	}
+	if relayServer != nil {
+		// The relay serves until shutdown; closing it ends every allocation.
+		remaining++
+		go func() {
+			<-workerContext.Done()
+			stopped <- relayServer.Close()
+		}()
 	}
 	// Background jobs never stop the process: the supervisor retries failures
 	// and is joined before the pool closes.

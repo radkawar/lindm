@@ -4,7 +4,15 @@ import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-const featureNames = ["auth", "devices", "enrollment", "audit", "profiles", "secrets"];
+const featureNames = [
+  "auth",
+  "devices",
+  "enrollment",
+  "audit",
+  "profiles",
+  "secrets",
+  "assistance",
+];
 const compositionImports = {
   group: ["@/app/**", "@/routes/**", "**/app/**", "**/routes/**"],
   message: "Application composition and routes depend on features, not the reverse.",

@@ -153,7 +153,7 @@ func TestAcquisitionTLSAndPrivateReceipt(t *testing.T) {
 	if err := client.authenticate(ctx, token); err != nil {
 		t.Fatal(err)
 	}
-	image, err := client.Discover(ctx, "9.8")
+	image, err := client.Discover(ctx, "9.8", "x86_64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestAcquisitionRejectsIntegrityAndDestinationChanges(t *testing.T) {
 				fixture.duplicate = true
 			}
 			fixture.mu.Unlock()
-			image, err := client.Discover(ctx, "9.8")
+			image, err := client.Discover(ctx, "9.8", "x86_64")
 			dir := t.TempDir()
 			if err == nil {
 				_, _, err = client.Download(ctx, image, dir)
@@ -291,8 +291,13 @@ func TestTokenRequiresPrivateRegularOwnedFile(t *testing.T) {
 func TestMalformedVersionCannotChangeAPIDestination(t *testing.T) {
 	client, _ := fixtureClient(t, new(acquisitionFixture))
 	for _, version := range []string{"9.8/../../systems", "9.8?token=secret", "9.08", "11.0", "latest", "9.-1"} {
-		if _, err := client.Discover(context.Background(), version); err == nil {
+		if _, err := client.Discover(context.Background(), version, "x86_64"); err == nil {
 			t.Fatalf("accepted %q", version)
+		}
+	}
+	for _, architecture := range []string{"", "arm64", "x86_64/../../systems", "s390x"} {
+		if _, err := client.Discover(context.Background(), "9.8", architecture); err == nil {
+			t.Fatalf("accepted architecture %q", architecture)
 		}
 	}
 }

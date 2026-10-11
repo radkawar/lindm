@@ -83,6 +83,8 @@ const (
 	PermissionQuarantineDevice         Permission = "actions.quarantine"
 	PermissionManageSecrets            Permission = "secrets.manage"
 	PermissionRevealSecrets            Permission = "secrets.reveal"
+	// Graphical remote assistance: create, join, answer and stop sessions.
+	PermissionRunRemoteAssistance Permission = "remote_assistance.run"
 
 	RoleOwner    = "owner"
 	RoleAdmin    = "admin"

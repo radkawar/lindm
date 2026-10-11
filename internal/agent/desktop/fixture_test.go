@@ -1,0 +1,461 @@
+package desktop
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+)
+
+const (
+	testUID       = 1000
+	testSessionID = "0b8a3f3e-6c62-4a43-9c52-2f1b2d0f8a10"
+	testOffer     = "v=0\r\na=fingerprint:sha-256 AA\r\na=candidate:1 1 udp 1 192.0.2.1 3478 typ relay raddr 0.0.0.0 rport 0\r\n"
+	testAnswer    = "v=0\r\na=fingerprint:sha-256 BB\r\na=candidate:1 1 udp 1 192.0.2.2 3478 typ relay raddr 0.0.0.0 rport 0\r\n"
+)
+
+// fakeClock is a manually advanced clock.
+type fakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *fakeClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+type fakeNotice struct {
+	notification Notification
+	result       chan string
+	closed       chan struct{}
+	closeOnce    sync.Once
+}
+
+func (n *fakeNotice) Result() <-chan string { return n.result }
+
+func (n *fakeNotice) Close(context.Context) error {
+	n.closeOnce.Do(func() { close(n.closed) })
+	return nil
+}
+
+func (n *fakeNotice) isClosed() bool {
+	select {
+	case <-n.closed:
+		return true
+	default:
+		return false
+	}
+}
+
+type fakeNotifier struct {
+	capabilities []string
+	err          error
+	posted       chan *fakeNotice
+}
+
+func newFakeNotifier() *fakeNotifier {
+	return &fakeNotifier{capabilities: []string{"actions", "body"}, posted: make(chan *fakeNotice, 32)}
+}
+
+func (n *fakeNotifier) Capabilities(context.Context) ([]string, error) {
+	return n.capabilities, n.err
+}
+
+func (n *fakeNotifier) Notify(_ context.Context, notification Notification) (Notice, error) {
+	notice := &fakeNotice{notification: notification, result: make(chan string, 1), closed: make(chan struct{})}
+	n.posted <- notice
+	return notice, nil
+}
+
+// next returns the next posted notification with summary.
+func (n *fakeNotifier) next(t *testing.T, summary string) *fakeNotice {
+	t.Helper()
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case notice := <-n.posted:
+			if notice.notification.Summary == summary {
+				return notice
+			}
+		case <-timeout:
+			t.Fatalf("no %q notification", summary)
+			return nil
+		}
+	}
+}
+
+type fakeGrant struct {
+	control  bool
+	closed   chan struct{}
+	mu       sync.Mutex
+	injected []InputEvent
+	closes   int
+}
+
+func (g *fakeGrant) Stream() Stream          { return Stream{NodeID: 42, Width: 1920, Height: 1080} }
+func (g *fakeGrant) ControlGranted() bool    { return g.control }
+func (g *fakeGrant) Closed() <-chan struct{} { return g.closed }
+
+func (g *fakeGrant) OpenPipeWire(context.Context) (*os.File, error) {
+	return os.Open(os.DevNull)
+}
+
+func (g *fakeGrant) Inject(_ context.Context, event InputEvent) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.injected = append(g.injected, event)
+	return nil
+}
+
+func (g *fakeGrant) Close(context.Context) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.closes++
+	return nil
+}
+
+func (g *fakeGrant) snapshot() ([]InputEvent, int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return append([]InputEvent(nil), g.injected...), g.closes
+}
+
+type fakePortal struct {
+	grant  *fakeGrant
+	err    error
+	block  bool
+	mu     sync.Mutex
+	modes  []agentv1.AssistanceMode
+	opened chan struct{}
+}
+
+func (p *fakePortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (Grant, error) {
+	p.mu.Lock()
+	p.modes = append(p.modes, mode)
+	p.mu.Unlock()
+	if p.opened != nil {
+		p.opened <- struct{}{}
+	}
+	if p.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	if p.err != nil {
+		return nil, p.err
+	}
+	return p.grant, nil
+}
+
+func (p *fakePortal) openCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.modes)
+}
+
+type fakeCapture struct {
+	packets   chan []byte
+	closed    chan struct{}
+	closeOnce sync.Once
+}
+
+func (c *fakeCapture) ReadPacket(buf []byte) (int, error) {
+	select {
+	case packet, ok := <-c.packets:
+		if !ok {
+			return 0, io.EOF
+		}
+		return copy(buf, packet), nil
+	case <-c.closed:
+		return 0, io.EOF
+	}
+}
+
+func (c *fakeCapture) Close() error {
+	c.closeOnce.Do(func() { close(c.closed) })
+	return nil
+}
+
+type fakeCapturer struct {
+	capture *fakeCapture
+	err     error
+}
+
+func newFakeCapturer() *fakeCapturer {
+	packets := make(chan []byte, 4)
+	packets <- []byte{0x80, 96, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0xAA}
+	return &fakeCapturer{capture: &fakeCapture{packets: packets, closed: make(chan struct{})}}
+}
+
+func (c *fakeCapturer) Start(_ context.Context, request CaptureRequest) (Capture, error) {
+	if request.PipeWire == nil {
+		return nil, errors.New("missing pipewire")
+	}
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.capture, nil
+}
+
+type fakePeer struct {
+	config    PeerConfig
+	offer     string
+	connected chan struct{}
+	failed    chan struct{}
+	input     chan []byte
+	mu        sync.Mutex
+	answers   []string
+	written   int
+	closes    int
+}
+
+func (p *fakePeer) Offer(context.Context) (string, error) { return p.offer, nil }
+
+func (p *fakePeer) Answer(sdp string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.answers = append(p.answers, sdp)
+	return nil
+}
+
+func (p *fakePeer) WriteRTP([]byte) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.written++
+	return nil
+}
+
+func (p *fakePeer) Connected() <-chan struct{} { return p.connected }
+func (p *fakePeer) Failed() <-chan struct{}    { return p.failed }
+
+func (p *fakePeer) Input() <-chan []byte {
+	if !p.config.Input {
+		return nil
+	}
+	return p.input
+}
+
+func (p *fakePeer) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.closes++
+	return nil
+}
+
+func (p *fakePeer) state() (answers []string, closes int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.answers...), p.closes
+}
+
+type fakePeers struct {
+	peer *fakePeer
+	mu   sync.Mutex
+	made []PeerConfig
+}
+
+func newFakePeers() *fakePeers {
+	return &fakePeers{peer: &fakePeer{
+		offer:     testOffer,
+		connected: make(chan struct{}),
+		failed:    make(chan struct{}),
+		input:     make(chan []byte, 16),
+	}}
+}
+
+func (f *fakePeers) NewPeer(config PeerConfig) (Peer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.made = append(f.made, config)
+	f.peer.config = config
+	return f.peer, nil
+}
+
+// fakeClient is the executor's SessionService.
+type fakeClient struct {
+	mu       sync.Mutex
+	respond  func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error)
+	requests []*agentv1.SyncSessionRequest
+}
+
+func (c *fakeClient) SyncSession(_ context.Context, request *connect.Request[agentv1.SyncSessionRequest]) (*connect.Response[agentv1.SyncSessionResponse], error) {
+	c.mu.Lock()
+	c.requests = append(c.requests, request.Msg)
+	respond := c.respond
+	c.mu.Unlock()
+	response, err := respond(request.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(response), nil
+}
+
+func (c *fakeClient) set(respond func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.respond = respond
+}
+
+type harness struct {
+	t        *testing.T
+	helper   *Helper
+	clock    *fakeClock
+	client   *fakeClient
+	notifier *fakeNotifier
+	portal   *fakePortal
+	capturer *fakeCapturer
+	peers    *fakePeers
+	ctx      context.Context
+}
+
+func newHarness(t *testing.T) *harness {
+	t.Helper()
+	h := &harness{
+		t:        t,
+		clock:    &fakeClock{now: time.Now()},
+		client:   &fakeClient{},
+		notifier: newFakeNotifier(),
+		portal:   &fakePortal{grant: &fakeGrant{closed: make(chan struct{})}},
+		capturer: newFakeCapturer(),
+		peers:    newFakePeers(),
+		ctx:      t.Context(),
+	}
+	h.client.set(h.directives())
+	helper, err := newHelper(Config{
+		Client:   h.client,
+		Notifier: h.notifier,
+		Portal:   h.portal,
+		Capturer: h.capturer,
+		Peers:    h.peers,
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}, testUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	helper.deps.clock = h.clock.Now
+	helper.deps.repostInterval = 10 * time.Millisecond
+	helper.deps.captureGrace = 10 * time.Millisecond
+	helper.lastSuccess = h.clock.Now()
+	h.helper = helper
+	t.Cleanup(func() {
+		helper.endAll(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "test_done")
+		helper.group.Wait()
+	})
+	return h
+}
+
+func localSession() *agentv1.AssistanceLocalSession {
+	return &agentv1.AssistanceLocalSession{Username: "alice", Uid: testUID, LogindSessionId: "2", SessionType: "wayland", Desktop: "GNOME"}
+}
+
+func invitation(mode agentv1.AssistanceMode, consent, ends time.Duration) *agentv1.AssistanceInvitation {
+	now := time.Now()
+	return &agentv1.AssistanceInvitation{
+		SessionId:       testSessionID,
+		Mode:            mode,
+		Reason:          "printer <setup> & drivers",
+		OperatorDisplay: "Olga Operator",
+		ConsentDeadline: timestamppb.New(now.Add(consent)),
+		EndsAt:          timestamppb.New(now.Add(ends)),
+		IceServers:      []*agentv1.AssistanceIceServer{{Urls: []string{"turn:192.0.2.1:3478?transport=udp"}, Username: "u", Credential: "c"}},
+	}
+}
+
+// directives returns a responder handing out the given directives.
+func (h *harness) directives(directives ...*agentv1.AssistanceDirective) func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error) {
+	return func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error) {
+		return &agentv1.SyncSessionResponse{Directives: directives, LocalSession: localSession()}, nil
+	}
+}
+
+// sync runs one executor exchange with the given directives.
+func (h *harness) sync(directives ...*agentv1.AssistanceDirective) {
+	h.t.Helper()
+	h.client.set(h.directives(directives...))
+	h.helper.syncOnce(h.ctx, context.WithoutCancel(h.ctx))
+}
+
+// report returns the helper's current report for the test session.
+func (h *harness) report() *agentv1.SessionAssistanceReport {
+	s, ok := h.helper.sessions[testSessionID]
+	if !ok {
+		return nil
+	}
+	report, _ := s.report()
+	return report
+}
+
+// waitPhase polls until the test session reaches phase.
+func (h *harness) waitPhase(phase agentv1.AssistancePhase) *agentv1.SessionAssistanceReport {
+	h.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if report := h.report(); report != nil && report.GetPhase() == phase {
+			return report
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	h.t.Fatalf("session did not reach %s; last report %v", phase, h.report())
+	return nil
+}
+
+// waitEnded waits for ENDED and for the session goroutine's cleanup.
+func (h *harness) waitEnded(cause agentv1.AssistanceEndCause) *agentv1.SessionAssistanceReport {
+	h.t.Helper()
+	s := h.helper.sessions[testSessionID]
+	report := h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED)
+	if report.GetEndCause() != cause {
+		h.t.Fatalf("end cause = %s (%s), want %s", report.GetEndCause(), report.GetEndDetail(), cause)
+	}
+	select {
+	case <-s.done:
+	case <-time.After(5 * time.Second):
+		h.t.Fatal("session cleanup did not finish")
+	}
+	return report
+}
+
+// offered drives a fresh invitation to OFFERED by allowing the prompt.
+func (h *harness) offered(directive *agentv1.AssistanceDirective) *agentv1.SessionAssistanceReport {
+	h.t.Helper()
+	h.sync(directive)
+	prompt := h.notifier.next(h.t, "Remote assistance request")
+	h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED)
+	prompt.result <- actionAllow
+	return h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED)
+}
+
+func (c *fakeClient) last() *agentv1.SyncSessionRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.requests[len(c.requests)-1]
+}
+
+func (c *fakeClient) sawPhase(phase agentv1.AssistancePhase) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, request := range c.requests {
+		for _, report := range request.GetReports() {
+			if report.GetPhase() == phase {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -235,23 +235,8 @@ func (p *Provider) database(ctx context.Context) (*database, error) {
 		executable = "/usr/bin/rpm"
 		// RPM 6 removed the SHA-1 HDRID alias; SHA256HEADER exists since 4.14.
 		args = []string{"--query", "--all", "--queryformat", "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{INSTALLTIME}\t%{INSTALLTID}\t%{SHA256HEADER}\n"}
-		var found bool
-		for _, path := range []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite"} {
-			info, err := os.Stat(path)
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if !info.Mode().IsRegular() || info.Size() == 0 {
-				return nil, errors.New("packageprovider: invalid RPM database")
-			}
-			found = true
-			break
-		}
-		if !found {
-			return nil, errors.New("packageprovider: RPM database unavailable")
+		if _, err := rpmDatabase(); err != nil {
+			return nil, err
 		}
 	}
 	result, err := p.run(ctx, executable, args, "/", nil)
@@ -262,6 +247,26 @@ func (p *Provider) database(ctx context.Context) (*database, error) {
 		return nil, fmt.Errorf("packageprovider: native database probe warned; snapshot is not complete: %s", firstLine(result.stderr))
 	}
 	return parseDatabase(result.stdout, p.ecosystem)
+}
+
+// rpmDatabase locates the native RPM database directory: RPM 4.16+ SQLite under
+// /usr/lib/sysimage/rpm (Fedora, EL10) or /var/lib/rpm (EL9), or EL8's
+// Berkeley DB. A missing or empty database is never authoritative absence.
+func rpmDatabase() (string, error) {
+	for _, path := range []string{"/usr/lib/sysimage/rpm/rpmdb.sqlite", "/var/lib/rpm/rpmdb.sqlite", "/var/lib/rpm/Packages"} {
+		info, err := os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if !info.Mode().IsRegular() || info.Size() == 0 {
+			return "", errors.New("packageprovider: invalid RPM database")
+		}
+		return filepath.Dir(path), nil
+	}
+	return "", errors.New("packageprovider: RPM database unavailable")
 }
 
 // firstLine bounds native diagnostics carried in local errors.

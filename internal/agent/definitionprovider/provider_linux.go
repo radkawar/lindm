@@ -120,7 +120,18 @@ func nativeContext(ctx context.Context, config NativeConfig) (*Provider, error) 
 			return nil, err
 		}
 	}
-	if config.Platform.GetOsId() != "ubuntu" && config.Platform.GetOsId() != "fedora" && config.Platform.GetOsId() != "debian" {
+	// Ubuntu 24.04 and Fedora 44 were qualified on systemd 255 and newer; EL 9
+	// ships systemd 252 for its whole life, whose timer and unit-file D-Bus
+	// interface and systemd-analyze verify options this provider uses.
+	minimum := 255
+	switch config.Platform.GetOsId() {
+	case "ubuntu", "fedora", "debian":
+	case "rhel", "almalinux":
+		if !strings.HasPrefix(config.Platform.GetVersion(), "9.") {
+			return nil, ErrUnsupported
+		}
+		minimum = 252
+	default:
 		return nil, ErrUnsupported
 	}
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
@@ -131,7 +142,7 @@ func nativeContext(ctx context.Context, config NativeConfig) (*Provider, error) 
 	if !canonicalID(bootID) {
 		return nil, ErrUnsupported
 	}
-	manager, err := openBus(ctx)
+	manager, err := openBus(ctx, minimum)
 	if err != nil {
 		return nil, err
 	}

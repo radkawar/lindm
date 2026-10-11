@@ -252,3 +252,31 @@ func TestExpiredNativeSetDoesNotClaimQuarantineActive(t *testing.T) {
 		t.Fatalf("expired kernel set falsely reported restrictive: %v", err)
 	}
 }
+
+// nft 1.1 and later (Fedora 44) print a typeof set's key as the typeof
+// expression, not "integer". Parsing failed after the kernel effect, so every
+// real quarantine on Fedora ended OUTCOME_UNKNOWN and rolled itself back.
+func TestQuarantineSetKeyAcceptsBothNativeJSONForms(t *testing.T) {
+	const chains = `{"chain":{"hook":"input","policy":"accept"}},{"chain":{"hook":"output","policy":"accept"}},{"chain":{"hook":"forward","policy":"accept"}},{"rule":{"expr":[{"drop":null}]}},{"rule":{"expr":[{"drop":null}]}},{"rule":{"expr":[{"drop":null}]}}`
+	for _, tc := range []struct {
+		name, key string
+		valid     bool
+	}{
+		{"nft 1.0 datatype", `"integer"`, true},
+		{"nft 1.1 typeof", `{"typeof":{"numgen":{"mode":"inc","mod":1,"offset":0}}}`, true},
+		{"random numgen", `{"typeof":{"numgen":{"mode":"random","mod":1,"offset":0}}}`, false},
+		{"other typeof", `{"typeof":{"meta":{"key":"mark"}}}`, false},
+		{"other datatype", `"ipv4_addr"`, false},
+	} {
+		p := &Provider{run: func(context.Context, nativeRequest) ([]byte, error) {
+			return []byte(`{"nftables":[{"set":{"name":"active","type":` + tc.key + `,"flags":["timeout"],"elem":[{"elem":{"val":0,"timeout":300,"expires":299}}]}},` + chains + `]}`), nil
+		}}
+		active, _, err := p.quarantineActive(context.Background(), "lindm_q_fixture")
+		if tc.valid && (err != nil || !active) {
+			t.Fatalf("%s: live action-owned set not recognized: %v", tc.name, err)
+		}
+		if !tc.valid && !errors.Is(err, ErrConflict) {
+			t.Fatalf("%s: foreign set key accepted: %v", tc.name, err)
+		}
+	}
+}

@@ -1,0 +1,67 @@
+//go:build linux
+
+package executor
+
+import (
+	"context"
+	"errors"
+
+	"connectrpc.com/connect"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/gen/lindm/agent/v1/agentv1connect"
+	"lindm/internal/agent/localrpc"
+)
+
+// WithRemoteAssistance applies device remote-assistance policy. Absent or
+// disabled policy ends every invitation with DISABLED.
+func WithRemoteAssistance(config *agentv1.RemoteAssistanceConfig) Option {
+	return func(s *Service) { s.assistanceEnabled = config.GetEnabled() }
+}
+
+// SyncAssistance is the network process's relay of the server's complete
+// assistance directives. Reports carry local identities only from logind.
+func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[agentv1.SyncAssistanceRequest]) (*connect.Response[agentv1.SyncAssistanceResponse], error) {
+	ctx, cancel := s.bounded(ctx)
+	defer cancel()
+	response, err := s.assistance.syncNetwork(ctx, req.Msg)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return noStore(response), nil
+}
+
+// sessionService is the SessionService handler for the session socket. The
+// caller is identified solely by the SO_PEERCRED UID recorded on its connection.
+type sessionService struct {
+	broker *assistanceBroker
+}
+
+var _ agentv1connect.SessionServiceHandler = (*sessionService)(nil)
+
+func (h *sessionService) SyncSession(ctx context.Context, req *connect.Request[agentv1.SyncSessionRequest]) (*connect.Response[agentv1.SyncSessionResponse], error) {
+	uid, ok := localrpc.PeerUID(ctx)
+	if !ok {
+		return nil, assistanceDenied(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	ctx, cancel := context.WithTimeout(ctx, rpcTimeout)
+	defer cancel()
+	response, err := h.broker.syncSession(ctx, uid, req.Msg)
+	switch {
+	case errors.Is(err, errNoGraphicalSession):
+		return nil, assistanceDenied(connect.CodePermissionDenied, "no_graphical_session")
+	case errors.Is(err, errAmbiguousGraphicalSession):
+		return nil, assistanceDenied(connect.CodePermissionDenied, "ambiguous_graphical_session")
+	case errors.Is(err, errLogindUnavailable):
+		return nil, assistanceDenied(connect.CodeUnavailable, "logind_unavailable")
+	case err != nil:
+		return nil, mapError(err)
+	}
+	return noStore(response), nil
+}
+
+func assistanceDenied(code connect.Code, reason string) error {
+	out := connect.NewError(code, errors.New(reason))
+	out.Meta().Set("Lindm-Reason", reason)
+	return out
+}

@@ -24,9 +24,10 @@ import (
 // application success. Actual kernel behavior is covered in the isolated test;
 // installed persistence and packet proof are separate VM qualification fixtures.
 type memoryOwnership struct {
-	ledger *agentv1.ResourceOwnershipLedger
-	owner  *agentv1.ResourceOwnershipBinding
-	action string
+	ledger   *agentv1.ResourceOwnershipLedger
+	owner    *agentv1.ResourceOwnershipBinding
+	action   string
+	resolved int
 }
 
 func (m *memoryOwnership) LoadResourceOwnership(context.Context, string, string, string, *resourcev1.ResourceRef) (*agentv1.ResourceOwnershipLedger, error) {
@@ -51,6 +52,16 @@ func (m *memoryOwnership) BeginResourceOwnershipEffect(_ context.Context, action
 func (m *memoryOwnership) CompleteResourceOwnershipEffect(_ context.Context, _ string, _ int64, after *agentv1.ResourceOwnershipSnapshot) (*agentv1.ResourceOwnershipLedger, error) {
 	m.ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED
 	m.ledger.LastApplied = proto.CloneOf(after)
+	m.ledger.Revision++
+	return proto.CloneOf(m.ledger), nil
+}
+func (m *memoryOwnership) ResolveResourceOwnershipEffect(_ context.Context, _, _, _ string, _ *resourcev1.ResourceRef, revision int64, effect string, observed *agentv1.ResourceOwnershipSnapshot, _ bool) (*agentv1.ResourceOwnershipLedger, error) {
+	if m.ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN || m.ledger.GetRevision() != uint64(revision) || m.ledger.GetEffectActionId() != effect {
+		return nil, journal.ErrResourceOwnershipConflict
+	}
+	m.resolved++
+	m.ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED
+	m.ledger.LastApplied = proto.CloneOf(observed)
 	m.ledger.Revision++
 	return proto.CloneOf(m.ledger), nil
 }
@@ -107,6 +118,71 @@ func TestDurableUnknownPrecedesFinalAuthorityAndPreventsReplay(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatal("planning retried native transaction")
+	}
+}
+
+// A helper killed after its kernel batch leaves the ledger UNKNOWN. Without
+// resolution every later plan failed outcome-unknown, so the zone could never
+// again be reconciled or released even after the guard's exact rollback. Only
+// the guard's terminal record of that exact transaction, with native state
+// equal to the image it left in force, resolves it; the batch is never retried.
+func TestInterruptedEffectResolvesOnlyFromExactGuardCustody(t *testing.T) {
+	p, store, before, desired := providerFixture(t)
+	plan, err := p.Plan(t.Context(), desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request *agentv1.NativeResourceTransactionRequest
+	p.config.NativeApply = func(ctx context.Context, r *agentv1.NativeResourceTransactionRequest, gate func(context.Context) error) error {
+		request = proto.CloneOf(r)
+		if err := gate(ctx); err != nil {
+			return err
+		}
+		return errors.New("helper killed after the kernel batch")
+	}
+	if _, err := p.Apply(t.Context(), plan, func(context.Context) error { return nil }); !errors.Is(err, ErrOutcomeUnknown) {
+		t.Fatalf("interrupted apply: %v", err)
+	}
+	p.config.ActionID = uuid.NewString()
+	applied := appliedSnapshot(t, p, before, desired)
+	current := before
+	p.config.NativeRead = func(context.Context, *resourcev1.ResourceObservation) (*agentv1.ResourceOwnershipSnapshot, error) {
+		result := proto.CloneOf(current)
+		result.Observation.Metadata.ObservedAt = timestamppb.Now()
+		return result, nil
+	}
+	if _, err := p.Plan(t.Context(), desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrOutcomeUnknown) || store.resolved != 0 {
+		t.Fatalf("resolved without guard custody: %v", err)
+	}
+	record := &agentv1.ConnectivityGuardRecord{Request: request}
+	p.config.GuardOutcome = func(context.Context) (*agentv1.ConnectivityGuardRecord, error) { return proto.CloneOf(record), nil }
+	for _, tc := range []struct {
+		name   string
+		phase  agentv1.ConnectivityGuardPhase
+		action string
+		native *agentv1.ResourceOwnershipSnapshot
+	}{
+		{"worker not terminal", agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_APPLIED, request.GetActionId(), before},
+		{"failed inverse", agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_CONFLICT, request.GetActionId(), before},
+		{"slot reused by another transaction", agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_ROLLED_BACK, uuid.NewString(), before},
+		{"rollback not in force", agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_ROLLED_BACK, request.GetActionId(), applied},
+		{"commit not in force", agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_COMMITTED, request.GetActionId(), before},
+	} {
+		record.Phase, record.Request.ActionId, current = tc.phase, tc.action, tc.native
+		if _, err := p.Plan(t.Context(), desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE); !errors.Is(err, ErrOutcomeUnknown) || store.resolved != 0 {
+			t.Fatalf("%s resolved the interrupted effect: %v", tc.name, err)
+		}
+	}
+	record.Phase, record.Request.ActionId, current = agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_ROLLED_BACK, request.GetActionId(), before
+	next, err := p.Plan(t.Context(), desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
+	if err != nil {
+		t.Fatalf("exact rolled-back custody did not resolve: %v", err)
+	}
+	if store.resolved != 1 || store.ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED || !targetMatches(store.ledger.GetLastApplied(), before) {
+		t.Fatal("resolution did not record the observed rolled-back state")
+	}
+	if next.GetFirewallZone().GetGeneration() != p.config.ActionID || next.GetFirewallZone().GetGeneration() == request.GetActionId() || next.GetFirewallZone().GetChange() != resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_CREATE {
+		t.Fatal("resolution did not yield a fresh plan for the new action")
 	}
 }
 func TestChangedNativeStateRejectsBeforeAuthority(t *testing.T) {

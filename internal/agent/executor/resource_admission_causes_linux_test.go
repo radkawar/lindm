@@ -15,6 +15,7 @@ import (
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/serviceprovider"
@@ -30,9 +31,12 @@ func TestAdmissionRefusalClassifiesOnlyBoundedProviderCauses(t *testing.T) {
 		{agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED,
 			[]error{serviceprovider.ErrBaselineUnknown, definitionprovider.ErrBaselineUnknown}},
 		{agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED,
-			[]error{serviceprovider.ErrUnsupported, accountprovider.ErrUnsupported, definitionprovider.ErrUnsupported, encryptionprovider.ErrUnsupported, fileprovider.ErrUnsupported, firewallprovider.ErrUnsupported, packageprovider.ErrUnsupported, passwordprovider.ErrUnsupported, sysctlprovider.ErrUnsupported}},
+			[]error{serviceprovider.ErrUnsupported, accountprovider.ErrUnsupported, definitionprovider.ErrUnsupported, encryptionprovider.ErrUnsupported, fileprovider.ErrUnsupported, firewallprovider.ErrUnsupported, packageprovider.ErrUnsupported, passwordprovider.ErrUnsupported, sysctlprovider.ErrUnsupported,
+				// A foreign POSIX ACL observed through the shared native file
+				// boundary was retried forever as an internal error.
+				fmt.Errorf("%w: cannot preserve security xattr %q", nativefile.ErrUnsupported, "system.posix_acl_access")}},
 		{agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION,
-			[]error{serviceprovider.ErrConflict, accountprovider.ErrConflict, accountprovider.ErrUnsafe, definitionprovider.ErrConflict, definitionprovider.ErrProtected, encryptionprovider.ErrConflict, fileprovider.ErrConflict, fileprovider.ErrUnsafePath, firewallprovider.ErrConflict, packageprovider.ErrConflict, passwordprovider.ErrConflict, passwordprovider.ErrAccessGuard, passwordprovider.ErrMissingModule, sysctlprovider.ErrConflict, journal.ErrResourceOwnershipConflict, journal.ErrResourceOwnershipDrift}},
+			[]error{serviceprovider.ErrConflict, accountprovider.ErrConflict, accountprovider.ErrUnsafe, definitionprovider.ErrConflict, definitionprovider.ErrProtected, encryptionprovider.ErrConflict, fileprovider.ErrConflict, fileprovider.ErrUnsafePath, nativefile.ErrConflict, nativefile.ErrUnsafePath, firewallprovider.ErrConflict, packageprovider.ErrConflict, passwordprovider.ErrConflict, passwordprovider.ErrAccessGuard, passwordprovider.ErrMissingModule, sysctlprovider.ErrConflict, journal.ErrResourceOwnershipConflict, journal.ErrResourceOwnershipDrift}},
 	} {
 		for _, cause := range group.causes {
 			reason, failure, ok := resourceAdmissionCause(fmt.Errorf("bounded native preflight: %w", cause))

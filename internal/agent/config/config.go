@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/localrpc"
 	"lindm/internal/custody"
 	"lindm/internal/protodata"
 )
@@ -47,6 +48,9 @@ type Document struct {
 	NetworkGID       uint32
 	// Resolved local authority namespaces excluded from generic file profiles.
 	ProtectedPaths []string
+	// SessionRuntimeDirectory holds the session-helper socket. It is empty
+	// unless remote assistance is enabled.
+	SessionRuntimeDirectory string
 }
 
 // Load decodes configuration, requires a root-owned file with non-replaceable
@@ -107,6 +111,15 @@ func load(path string, rootOwner bool) (*Document, error) {
 	if err := distinctDirectories(stateDir, runtimeDir, spoolDir); err != nil {
 		return nil, err
 	}
+	var sessionDir string
+	if assistance := cfg.GetRemoteAssistance(); assistance.GetEnabled() {
+		if sessionDir, err = canonicalDirectory(sessionRuntimeDirectory(base, assistance)); err != nil {
+			return nil, fmt.Errorf("session runtime directory: %w", err)
+		}
+		if err := distinctDirectories(stateDir, runtimeDir, spoolDir, sessionDir); err != nil {
+			return nil, err
+		}
+	}
 	protectedPaths, err := resourceProtectedPaths(base, cfg, stateDir, runtimeDir, spoolDir)
 	if err != nil {
 		return nil, err
@@ -120,16 +133,17 @@ func load(path string, rootOwner bool) (*Document, error) {
 		return nil, err
 	}
 	return &Document{
-		Proto:            cfg,
-		StateDirectory:   stateDir,
-		ProtectedPaths:   protectedPaths,
-		RuntimeDirectory: runtimeDir,
-		SpoolDirectory:   spoolDir,
-		SocketName:       cfg.GetSocketName(),
-		SocketPath:       socket,
-		NetworkUser:      name,
-		NetworkUID:       uid,
-		NetworkGID:       gid,
+		Proto:                   cfg,
+		StateDirectory:          stateDir,
+		ProtectedPaths:          protectedPaths,
+		RuntimeDirectory:        runtimeDir,
+		SpoolDirectory:          spoolDir,
+		SessionRuntimeDirectory: sessionDir,
+		SocketName:              cfg.GetSocketName(),
+		SocketPath:              socket,
+		NetworkUser:             name,
+		NetworkUID:              uid,
+		NetworkGID:              gid,
 	}, nil
 }
 
@@ -138,6 +152,15 @@ func resolve(base, path string) string {
 		return filepath.Clean(path)
 	}
 	return filepath.Clean(filepath.Join(base, path))
+}
+
+// sessionRuntimeDirectory is the configured or packaged session-helper socket
+// directory, before canonical-path checks.
+func sessionRuntimeDirectory(base string, assistance *agentv1.RemoteAssistanceConfig) string {
+	if configured := assistance.GetSessionRuntimeDirectory(); configured != "" {
+		return resolve(base, configured)
+	}
+	return localrpc.DefaultSessionRuntimeDirectory
 }
 
 func canonicalDirectory(path string) (string, error) {

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/assistance.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// SessionService is the executor's per-user desktop API on the separate
+// session socket. The caller is identified only by SO_PEERCRED and must own
+// exactly one active, local, unlocked logind graphical session. It never
+// accepts privileged commands, file paths or identity claims.
+service SessionService {
+  // SyncSession exchanges the helper's complete observed state for the
+  // directives addressed to the caller's active graphical session.
+  rpc SyncSession(SyncSessionRequest) returns (SyncSessionResponse);
+}
+
+// SessionAssistanceReport is a helper observation. Local identity fields are
+// absent by design; the executor adds them from kernel and logind facts.
+message SessionAssistanceReport {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistancePhase phase = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      3,
+      4,
+      5
+    ]
+  }];
+  string offer_sdp = 3 [(buf.validate.field).string.max_len = 16384];
+  bool control_granted = 4;
+  AssistanceEndCause end_cause = 5 [(buf.validate.field).enum.defined_only = true];
+  string end_detail = 6 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[ -~]*$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "session_assistance_report.offer"
+    message: "offer_sdp is required from OFFERED and absent before it"
+    expression: "(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)"
+  };
+  option (buf.validate.message).cel = {
+    id: "session_assistance_report.end"
+    message: "end_cause is required exactly when ENDED"
+    expression: "(this.phase == 5) == (this.end_cause != 0)"
+  };
+}
+
+message SyncSessionRequest {
+  repeated SessionAssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 4];
+}
+
+message SyncSessionResponse {
+  // Directives for the caller's session only. A directive with terminate set
+  // must stop capture and input immediately.
+  repeated AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 4];
+  // The local session the executor bound to this caller.
+  AssistanceLocalSession local_session = 2 [(buf.validate.field).required = true];
+}

@@ -28,7 +28,8 @@ Group=root
 # That owned drop-in retains PrivateDevices and binds/allows exact block nodes,
 # mapper control and configured TPM only; it also bounds provider capabilities.
 # Never disable PrivateDevices or allow all block devices to enable an action.
-# UMask=0077. The executor must chmod the socket to 0660 after bind.
+# UMask=0077. The executor must chmod the socket to 0660 after bind; the
+# remote-assistance session socket in /run/lindm-session is chmodded to 0666.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
@@ -57,7 +58,7 @@ MemorySwapMax=0
 LimitCORE=0
 WorkingDirectory=/var/lib/lindm/executor
 ReadOnlyPaths=/var
-ReadWritePaths=/var/lib/lindm/executor /run/lindm
+ReadWritePaths=/var/lib/lindm/executor /run/lindm /run/lindm-session
 InaccessiblePaths=/var/lib/lindm/agent
 Restart=on-failure
 RestartSec=5s

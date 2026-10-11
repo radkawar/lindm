@@ -61,11 +61,8 @@ func ParseVersionlock(data []byte) (Versionlock, error) {
 // VersionlockMarker is the comment binding an entry to one lindm resource key.
 func VersionlockMarker(canonicalKey string) string { return "lindm:" + canonicalKey }
 
-// VersionlockClaims reports whether the shared document already locks name:
-// lindm's own entry for canonicalKey or any entry whose pattern matches it.
-// Entries for other packages are not this package's pin. An unreadable
-// document fails closed.
-func VersionlockClaims(contents []byte, canonicalKey, name string) bool {
+// versionlockTOMLClaims is VersionlockClaims for DNF5's TOML document.
+func versionlockTOMLClaims(contents []byte, canonicalKey, name string) bool {
 	document, err := ParseVersionlock(contents)
 	if err != nil {
 		return true

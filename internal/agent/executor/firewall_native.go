@@ -11,6 +11,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/connectivityguard"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/nativehelper"
 )
@@ -44,6 +45,11 @@ func (s *Service) openFirewallResource(ctx context.Context, intent *agentv1.Reso
 			}
 			holder.evidence = proto.CloneOf(result.GetFirewallEvidence())
 			return result.GetFirewallAllow(), result.GetFirewallDeny(), nil
+		},
+		// The executor's read-only view of the supervisor's root custody; only
+		// an exact terminal record of an interrupted effect resolves UNKNOWN.
+		GuardOutcome: func(context.Context) (*agentv1.ConnectivityGuardRecord, error) {
+			return connectivityguard.Outcome(connectivityguard.StateDirectory)
 		},
 	})
 	if err != nil {

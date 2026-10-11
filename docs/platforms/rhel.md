@@ -13,6 +13,11 @@ Pinned x86_64 inputs are
 [`rhel-10.2-x86_64.json`](../../lab/images/rhel-10.2-x86_64.json).
 RHEL 9.8 uses vendor-authenticated catalog SHA-256 provenance, not an OpenPGP cloud
 image signature ([manifest:8-14](../../lab/images/rhel-9.8-x86_64.json#L8-L14)).
+The vendor aarch64 KVM image is pinned as
+[`rhel-9.8-aarch64.json`](../../lab/images/rhel-9.8-aarch64.json), acquired with
+`lab images redhat fetch -version 9.8 -arch aarch64` (same authenticated catalog
+checksum mode; the receipt schema now admits `x86_64` and `aarch64`). It runs on
+the arm64 Sparks lab hosts and keeps independent results from x86_64.
 
 ## Packaging, signing, repositories, paths and LSM
 
@@ -100,8 +105,136 @@ rejects immutable OS markers
 ([`update/native_linux.go:111-147`](../../internal/agent/update/native_linux.go#L111-L147)).
 The RHEL service lifecycle records below prove their particular native agent
 upgrade, not every package resource or an interrupted self-update campaign.
-DNF4 must not silently inherit a Fedora DNF5 stored/replayed transaction contract.
-The upcoming generic DNF5 package-provider work is not a qualified RHEL backend.
+
+### Package resources (DNF4)
+
+RHEL 9/10 package resources use their own DNF4 backend (`BACKEND_DNF4`), never
+DNF5's stored/replayed transaction contract. The platform only selects which
+generation is acceptable (`rhel`, `almalinux`, `rocky` → DNF4 4.7.0 or newer,
+Fedora → DNF5); the installed manager must identify itself as that generation.
+The DNF4 CLI cannot run under the executor's read-only `/var`: even `dnf
+--version` builds an RPM database sack that opens `/var/log/hawkey.log` before
+`--setopt=logdir` applies, and exits 1. DNF4 is therefore identified through the
+`dnf` module imported by exactly the interpreter the native `/usr/bin/dnf`
+entrypoint (a symlink to `dnf-3`) names, which also reports the native
+versionlock plugin state
+([`dnf4_linux.go`](../../internal/agent/packageprovider/dnf4_linux.go)).
+
+Transactions use the fixed embedded
+[DNF4 Python API adapter](../../internal/agent/packageprovider/dnf4_transaction.py),
+run with `-I` under exactly the interpreter named by the native `/usr/bin/dnf`
+shebang (`/usr/bin/python3.9` on EL9, `/usr/libexec/platform-python` on EL8).
+It never reads ambient `dnf.conf`, drop-ins or repositories, and loads no plugin
+except the native versionlock plugin. Staging is asynchronous like DNF5's:
+`resolve` refreshes the approved repository (`repo_gpgcheck`) and declares exact
+download sizes, `stage` re-resolves with non-expiring metadata, downloads into
+the transaction directory and writes the same closed `transaction.json` shape the
+Go provider already verifies (NEVRA, action, reason, repository, package path).
+DNF4 refuses package downloads under `cacheonly`, so the stage phase pins
+metadata expiry instead. The read-only staging sandbox cannot open
+`/var/lib/dnf/history.sqlite` (libdnf's `Swdb` writes on open), so staging
+resolves against a private consistent SQLite snapshot of it, which preserves
+inherited install reasons. Before the signed start permit is consumed, a
+`check` phase replays the staged bundle from local RPMs alone (`@commandline`
+repository, dependencies chosen by the solver) and requires the identical
+NEVRA/action/reason set; `apply` repeats that check after the lock is written
+and runs the native RPM transaction.
+
+Signatures are checked four times: every staged RPM against the approved key
+only and against system RPM trust (`rpmkeys --checksig`, as for DNF5), by DNF's
+`package_signature_check` in both stage and replay, and by RPM itself during the
+transaction because the adapter sets `%_pkgverify_level all`. The approved key
+must already be imported into system RPM trust.
+
+Exact versions are persisted as an owned entry in the DNF4 versionlock plugin's
+list `/etc/dnf/plugins/versionlock.list`: a `# lindm:<resource key>` comment
+immediately followed by `name-epoch:version-release.arch`. Other lines are kept
+byte for byte; an unmarked entry that can select the package (any NEVRA, NEVR,
+NEV, NA or NAME reading, globs included) is an external pin that requires
+adoption or is refused; a marker whose entry an operator replaced is orphaned
+and never claims the following line. Because the list only has native effect
+through the plugin, an exact version requires `python3-dnf-plugin-versionlock`
+enabled with exactly that list (probed through the plugin's own configuration
+at provider start); without it exact versions are `unsupported`. Staging sees
+the candidate list through the read-only bind already used for DNF5; the list
+is a packaged configuration file, so an empty rendering truncates rather than
+deletes it.
+
+Scriptlets run under RPM's SELinux plugin: the transient apply unit runs in
+`unconfined_service_t`, which the targeted policy allows to transition into
+`rpm_script_t` (`allow unconfined_service_t rpm_script_t:process transition`),
+and the apply unit keeps `NoNewPrivileges=` off for that exec transition.
+
+Qualified natively on registered RHEL 9.8 aarch64 (vendor KVM image acquired with
+`lab images redhat fetch -arch aarch64`, maintained registration with explicit
+user egress, all ten package scenarios, SELinux Enforcing, scriptlets observed in
+`rpm_script_t`): see
+[verification](../verification.md#native-packages-on-el-dnf4-python-api-backend).
+Not exercised on RHEL: x86_64, RHEL 10, EUS/E4S streams, module streams,
+`Weak Dependency` and obsoleting transactions (refused by policy, not exercised),
+and the DNF4 path without the versionlock plugin (exact versions are refused).
+
+## Host resource providers (EL 9)
+
+Managed files, local groups and users, sysctl, systemd timers and drop-ins,
+password policy and firewall zones use the same providers as Fedora. Their
+platform gates accept `rhel` and `almalinux` only with an EL 9 `VERSION_ID`;
+Rocky Linux and EL 8/10 are refused as unqualified. Password policy pins the
+exact product (`rhel`/`almalinux` 9.8) and native releases observed there:
+libpwquality 1.4.4, pam 1.5.1 (its `pam_pwhistory` reads
+`/etc/security/pwhistory.conf`, `remember`, `enforce_for_root` and `file`) and
+authselect 1.2.6 ([`version_linux.go`](../../internal/agent/passwordprovider/version_linux.go)).
+
+Native quirks the providers handle:
+
+- **Accounts.** EL 9's shadow-utils 4.9 takes the SELinux label of a rewritten
+  `/etc/passwd`, `shadow`, `group` or `gshadow` from the `--prefix` path, so the
+  private account root under `/var/lib/lindm` produced `var_run_t` databases:
+  `sudo` then failed with "User not known to the underlying authentication
+  module" and `sshd` could no longer read `passwd`. EL 9's `chage` also has no
+  `--prefix`, and in a bare chroot it aborts (`avc_running` assertion) or reports
+  "Permission denied". On EL 9 every shadow tool therefore chroots (`--root`)
+  into an account root holding the exact host `/etc` bind, the private mail-spool
+  scratch, the host procfs (non-recursive bind, with the `ProtectKernelTunables=`
+  and `ProtectKernelLogs=` paths repeated read-only or inaccessible inside it),
+  selinuxfs (already writable under `ProtectKernelTunables=`), a read-only `/usr`
+  and the `/bin -> usr/bin` link, so the tools label the real `/etc` paths
+  (`passwd_file_t`, `shadow_t`) and their own login-shell check sees the host
+  shells ([`prefix_linux.go`](../../internal/agent/accountprovider/prefix_linux.go),
+  [`resource_linux.go`](../../internal/agent/nativehelper/resource_linux.go)).
+  Ubuntu and Fedora keep `--prefix`.
+- **Timers and drop-ins.** EL 9 ships systemd 252 (its manager `Version` is
+  `252-67.el9_8…`, without a dot); the provider's systemd floor is 252 on EL 9
+  and 255 elsewhere.
+- **Password policy.** The provider only manages authselect-owned stacks. The
+  RHEL 9.8 KVM guest image (and AlmaLinux 9.8 GenericCloud) ship the pam
+  package's own `system-auth`/`password-auth` with no authselect selection
+  (`authselect check` exits 2, "No existing configuration detected"); a policy
+  assigned there is refused as `unsupported` with no native change. An
+  installer-provisioned host has a selection; the lane proves the refusal, then
+  runs `authselect select sssd --force` (the vendor default, `pam_sss.so` from the
+  installed `sssd-client`) and qualifies the managed path. EL 9 profiles live in
+  `/usr/share/authselect/default` (`minimal`, `sssd`, `winbind`; there is no
+  Fedora `local` profile) and authselect 1.2.6 has no `opt-out`.
+- **Firewall zones.** Neither image installs firewalld or nftables; the lane
+  installs both from the vendor repositories and keeps firewalld active. Boot
+  restoration (`lindm-firewall-restore.service`) failed on both images in two
+  ways the provider now handles
+  ([`netlink_linux.go`](../../internal/agent/firewallprovider/netlink_linux.go)):
+  firewalld, also ordered `Before=network-pre.target`, moved the nftables
+  generation under the restore batch, and the kernel refused it (`ERESTART` on
+  `BATCH_BEGIN`, surfaced by the netlink library as a receive error) before
+  applying anything — the provider now re-observes and retries that batch (at
+  most three attempts, only while lindm's own table is unchanged); and the EL 9
+  5.14 kernel acknowledged a `NEWRULE` of the restore batch twice while modules
+  autoloaded at boot — a repeated success for an object of the batch is now
+  accepted (the applied table is verified by read-back as before) and the socket
+  is replaced after every batch so late repeats cannot be read as replies to the
+  next query. Both had been reported as an unknown outcome, which left the
+  persisted zone `PENDING` and failed the unit.
+
+Evidence and the unproven remainder are in
+[verification](../verification.md#host-resource-providers-on-el-9).
 
 ## Encryption and recovery
 

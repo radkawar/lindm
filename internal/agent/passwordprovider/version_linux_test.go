@@ -29,6 +29,14 @@ func TestNativeModuleVersionSemanticsAreClosed(t *testing.T) {
 		{"fedora", "45", "1.7.2-1.fc45", 2, false},
 		{"debian", "13", "1.4.5-1", 1, false},
 		{"fedora", "44", "1.7.2-3.fc44", 0, false},
+		// EL 9.8 ships libpwquality 1.4.4 and pam 1.5.1; neither Fedora's nor a
+		// neighbouring EL minor's releases may stand in for them.
+		{"almalinux", "9.8", "1.4.4-8.el9", 1, true},
+		{"rhel", "9.8", "1.5.1-28.el9_8.1", 3, true},
+		{"rhel", "9.8", "1.4.5-15.fc44", 1, false},
+		{"almalinux", "9.8", "1.7.2-3.fc44", 2, false},
+		{"almalinux", "9.7", "1.5.1-26.el9", 2, false},
+		{"rocky", "9.8", "1.4.4-8.el9", 1, false},
 	} {
 		if got := moduleVersionSupported(&resourcev1.PlatformProduct{OsId: tc.os, Version: tc.release}, tc.feature, tc.version); got != tc.want {
 			t.Errorf("%s %s feature %d version %s = %t", tc.os, tc.release, tc.feature, tc.version, got)
@@ -50,6 +58,7 @@ func TestPackageObservationUsesFixedReadOnlyQueries(t *testing.T) {
 	}{
 		{"ubuntu", "24.04", "libpam-modules", "/usr/bin/dpkg-query", "ii \t1.5.3-5ubuntu5.4\n", "1.5.3-5ubuntu5.4", []string{"-W", "-f=${db:Status-Abbrev}\t${Version}\n", "libpam-modules:" + runtime.GOARCH}},
 		{"fedora", "44", "pam", "/usr/bin/rpm", "1.7.2-3.fc44\n", "1.7.2-3.fc44", []string{"-q", "--qf", "%{VERSION}-%{RELEASE}\n", "pam." + rpmArch}},
+		{"rhel", "9.8", "libpwquality", "/usr/bin/rpm", "1.4.4-8.el9\n", "1.4.4-8.el9", []string{"-q", "--qf", "%{VERSION}-%{RELEASE}\n", "libpwquality." + rpmArch}},
 	} {
 		calls := 0
 		run := func(_ context.Context, path string, args ...string) ([]byte, error) {
@@ -83,11 +92,16 @@ func TestPackageObservationRejectsMissingAndAmbiguousVersions(t *testing.T) {
 
 func TestNativeManagerVersionsMatchSupportedTransactionSemantics(t *testing.T) {
 	for _, tc := range []struct {
-		os, output string
-		want       bool
-	}{{"fedora", "1.7.1-1.fc44", true}, {"fedora", "1.8.0-1.fc44", false}, {"ubuntu", "ii \t1.5.3-5ubuntu5.4", true}, {"ubuntu", "ii \t1.6.1-1", false}} {
+		os, release, output string
+		want                bool
+	}{
+		{"fedora", "44", "1.7.1-1.fc44", true}, {"fedora", "44", "1.8.0-1.fc44", false},
+		{"ubuntu", "24.04", "ii \t1.5.3-5ubuntu5.4", true}, {"ubuntu", "24.04", "ii \t1.6.1-1", false},
+		// EL 9 authselect 1.2 has its own profile set and CLI; 1.7 semantics differ.
+		{"almalinux", "9.8", "1.2.6-3.el9", true}, {"rhel", "9.8", "1.7.1-1.fc44", false}, {"rhel", "10.1", "1.5.0-8.el10", false},
+	} {
 		run := func(context.Context, string, ...string) ([]byte, error) { return []byte(tc.output), nil }
-		_, err := managerVersion(context.Background(), &resourcev1.PlatformProduct{OsId: tc.os}, run)
+		_, err := managerVersion(context.Background(), &resourcev1.PlatformProduct{OsId: tc.os, Version: tc.release}, run)
 		if tc.want && err != nil || !tc.want && !errors.Is(err, ErrUnsupported) {
 			t.Fatalf("manager %s version %q accepted=%t err=%v", tc.os, tc.output, tc.want, err)
 		}

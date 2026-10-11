@@ -19,16 +19,16 @@ hashes, failures and later continuations. The
 must be checked before advertising a capability. Connected and air-gapped deployments,
 desktop editions, CPU baselines and physical hardware qualify independently.
 
-| Family guide                                | Target branches and architecture                                                   | Recorded status and boundary                                                                                                                                                |
-| ------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Ubuntu](ubuntu.md)                         | 24.04/26.04 LTS; x86_64 desktop/server, aarch64 server; 22.04 legacy separately    | Native x86_64 packaged/service/trust evidence, selected 24.04 encryption/actions and ARM inventory; not whole-family or physical certification.                             |
-| [Debian](debian.md)                         | 13 and 12 LTS; x86_64 desktop/server, aarch64 server                               | Signed installer path; Debian 12/13 native ARM inventory, lifecycle/trust and dispatch records. Desktop, encryption and other cells remain separate.                        |
-| [Fedora](fedora.md)                         | 43/44 while upstream-supported; x86_64 desktop/server, aarch64 server              | Fedora44 ARM DNF5 inventory, CPU/source and session applicability passed; selected lifecycle/service/encryption/action records. Other cells require separate evidence.      |
-| [RHEL](rhel.md)                             | 9/10 supported minors; x86_64 and vendor aarch64 server; 8 legacy separately       | RHEL9.8 current DNF4 inventory passed; 9.8/10.2 x86_64 registered lifecycle/trust/dispatch recorded with SELinux enforcing. Entitlement and architecture are not inherited. |
-| [AlmaLinux and Rocky Linux](alma-rocky.md)  | Separate 9/10 current-minor rows; x86_64/aarch64 server; 8 legacy separately       | Signed image acquisition and selected native comparisons; each distribution/version/lifecycle continuation stands alone.                                                    |
-| [openSUSE and SUSE boundaries](opensuse.md) | Leap 16.0 and pinned Tumbleweed, x86_64; SLES 15 SP7/16 and SLED 15 SP7 separately | Image acquisition and maintained zypper paths do not establish a passing complete lifecycle. ARM acquisition is not automatic expansion of the launch matrix.               |
-| [Arch Linux](arch.md)                       | Pinned rolling snapshot, x86_64                                                    | Native inventory recorded; signed package installation reached but lifecycle/dispatch not qualified. Arch Linux ARM is a separate derivative.                               |
-| [Fedora Atomic and NixOS](atomic-nixos.md)  | Silverblue/Kinoite and NixOS 26.05/successor, x86_64                               | Required native deployment/generation models; mutable RPM/DEB implementations do not qualify them.                                                                          |
+| Family guide                                | Target branches and architecture                                                   | Recorded status and boundary                                                                                                                                                                                                      |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Ubuntu](ubuntu.md)                         | 24.04/26.04 LTS; x86_64 desktop/server, aarch64 server; 22.04 legacy separately    | Native x86_64 packaged/service/trust evidence, selected 24.04 encryption/actions and ARM inventory; not whole-family or physical certification.                                                                                   |
+| [Debian](debian.md)                         | 13 and 12 LTS; x86_64 desktop/server, aarch64 server                               | Signed installer path; Debian 12/13 native ARM inventory, lifecycle/trust and dispatch records. Desktop, encryption and other cells remain separate.                                                                              |
+| [Fedora](fedora.md)                         | 43/44 while upstream-supported; x86_64 desktop/server, aarch64 server              | Fedora44 ARM DNF5 inventory, CPU/source and session applicability passed; selected lifecycle/service/encryption/action records. Other cells require separate evidence.                                                            |
+| [RHEL](rhel.md)                             | 9/10 supported minors; x86_64 and vendor aarch64 server; 8 legacy separately       | RHEL9.8 current DNF4 inventory passed; 9.8/10.2 x86_64 registered lifecycle/trust/dispatch recorded with SELinux enforcing; 9.8 aarch64 registered DNF4 package resources passed. Entitlement and architecture are not inherited. |
+| [AlmaLinux and Rocky Linux](alma-rocky.md)  | Separate 9/10 current-minor rows; x86_64/aarch64 server; 8 legacy separately       | Signed image acquisition and selected native comparisons; AlmaLinux 9.8/10.2 aarch64 DNF4 package resources passed, 8.10 blocked (systemd 239). Each distribution/version/lifecycle continuation stands alone.                    |
+| [openSUSE and SUSE boundaries](opensuse.md) | Leap 16.0 and pinned Tumbleweed, x86_64; SLES 15 SP7/16 and SLED 15 SP7 separately | Image acquisition and maintained zypper paths do not establish a passing complete lifecycle. ARM acquisition is not automatic expansion of the launch matrix.                                                                     |
+| [Arch Linux](arch.md)                       | Pinned rolling snapshot, x86_64                                                    | Native inventory recorded; signed package installation reached but lifecycle/dispatch not qualified. Arch Linux ARM is a separate derivative.                                                                                     |
+| [Fedora Atomic and NixOS](atomic-nixos.md)  | Silverblue/Kinoite and NixOS 26.05/successor, x86_64                               | Required native deployment/generation models; mutable RPM/DEB implementations do not qualify them.                                                                                                                                |
 
 The versions and architecture allocation above come from
 `docs/verification.md:155-175`; detailed native continuations in that ledger take
@@ -69,6 +69,14 @@ precedence over any older summary table. Server-host qualification is a separate
   evidence of a distribution defect or license to invent an identifier. Stable
   targeting, encryption slots, Secure Boot and TPM observations each need independent
   native evidence; see [stable storage selection](../verification.md#stable-storage-selection).
+- **Desktop assistance needs a real session and the portal.** The session helper
+  is a per-user systemd unit. It is authorized only by `SO_PEERCRED` plus a local,
+  active, unlocked logind graphical session. It captures only through the XDG
+  ScreenCast/RemoteDesktop portals with PipeWire and GStreamer. Each page lists its
+  qualified desktop/portal versions and GStreamer package names. A desktop without
+  the portal, notification actions or GStreamer elements ends sessions
+  `UNAVAILABLE`; it is never a silent X11 capture. See
+  [architecture](../architecture.md#implemented-assistance-path).
 - **Recovery capacity is a prerequisite.** In-band recovery requires room for the
   qualified signed image. Do not resize an ESP, delete vendor boot files or replace
   the qualified kernel to turn an unsupported cell green; see

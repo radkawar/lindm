@@ -40,19 +40,29 @@ const (
 	maxNativeBytes    = 1024 * 1024
 )
 
-type nativeConn struct{ conn *netlink.Conn }
+type nativeConn struct {
+	conn     *netlink.Conn
+	deadline time.Time
+}
 
 func openNetlink(ctx context.Context) (*nativeConn, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	conn, err := netlink.Dial(unix.NETLINK_NETFILTER, nil)
-	if err != nil {
-		return nil, err
-	}
 	deadline := time.Now().Add(10 * time.Second)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
+	}
+	conn, err := dialNetlink(deadline)
+	if err != nil {
+		return nil, err
+	}
+	return &nativeConn{conn: conn, deadline: deadline}, nil
+}
+func dialNetlink(deadline time.Time) (*netlink.Conn, error) {
+	conn, err := netlink.Dial(unix.NETLINK_NETFILTER, nil)
+	if err != nil {
+		return nil, err
 	}
 	if err := conn.SetDeadline(deadline); err != nil {
 		return nil, errors.Join(err, conn.Close())
@@ -63,7 +73,20 @@ func openNetlink(ctx context.Context) (*nativeConn, error) {
 	if err := conn.SetWriteBuffer(maxNativeBytes); err != nil {
 		return nil, errors.Join(err, conn.Close())
 	}
-	return &nativeConn{conn: conn}, nil
+	return conn, nil
+}
+
+// redial replaces the socket after a batch: a batch replayed by the kernel for
+// module autoloading can leave late duplicate acknowledgments queued, which must
+// not be read as replies to the following observation.
+func (n *nativeConn) redial() error {
+	conn, err := dialNetlink(n.deadline)
+	if err != nil {
+		return err
+	}
+	old := n.conn
+	n.conn = conn
+	return old.Close()
 }
 func (n *nativeConn) close() error { return n.conn.Close() }
 func objectMessage(kind uint16, flags netlink.HeaderFlags, attrs []netlink.Attribute) (netlink.Message, error) {
@@ -458,7 +481,41 @@ func replacementMessages(before *agentv1.FirewallNativeSnapshot, target *compile
 	}
 	return messages, nil
 }
+
+// errGenerationChanged reports that the kernel refused a whole batch because
+// the ruleset generation moved after the snapshot (NFNL_BATCH_GENID). The
+// kernel checks it before the first object message, so nothing was applied.
+var errGenerationChanged = errors.New("firewallprovider: ruleset generation changed")
+
+// maxGenerationAttempts bounds batches refused by foreign generation bumps,
+// such as firewalld starting or reloading beside the boot restoration.
+const maxGenerationAttempts = 3
+
 func (n *nativeConn) replace(before *agentv1.FirewallNativeSnapshot, target *compiledTable) error {
+	for attempt := 1; ; attempt++ {
+		err := n.sendReplacement(before, target)
+		if redialErr := n.redial(); redialErr != nil {
+			return errors.Join(ErrOutcomeUnknown, err, redialErr)
+		}
+		if !errors.Is(err, errGenerationChanged) {
+			return err
+		}
+		if attempt == maxGenerationAttempts {
+			return fmt.Errorf("%w: %w", ErrConflict, err)
+		}
+		// Another writer changed some table. Retry the identical atomic batch only
+		// while lindm's own table still has exactly the observed state.
+		fresh, _, err := n.observe(before.GetTable())
+		if err != nil {
+			return err
+		}
+		if !nativeEqual(fresh, before) {
+			return ErrConflict
+		}
+		before = fresh
+	}
+}
+func (n *nativeConn) sendReplacement(before *agentv1.FirewallNativeSnapshot, target *compiledTable) error {
 	messages, err := replacementMessages(before, target)
 	if err != nil {
 		return err
@@ -485,24 +542,71 @@ func (n *nativeConn) replace(before *agentv1.FirewallNativeSnapshot, target *com
 	if err != nil {
 		return errors.Join(ErrOutcomeUnknown, err)
 	}
-	pending := make(map[uint32]bool, len(messages))
-	for _, m := range sent[1 : len(sent)-1] {
-		pending[m.Header.Sequence] = true
-	}
-	for len(pending) != 0 {
-		acks, err := n.conn.Receive()
+	acks := newBatchAcks(sent)
+	for acks.remaining != 0 {
+		replies, err := n.conn.Receive()
 		if err != nil {
-			return errors.Join(ErrOutcomeUnknown, err)
+			return receiveFailure(err, acks.remaining != len(messages))
 		}
-		if len(acks) == 0 {
+		if len(replies) == 0 {
 			return ErrOutcomeUnknown
 		}
-		for _, ack := range acks {
-			if !pending[ack.Header.Sequence] || ack.Header.Type != netlink.Error || len(ack.Data) < 4 || binary.NativeEndian.Uint32(ack.Data[:4]) != 0 {
-				return fmt.Errorf("%w: invalid batch acknowledgment", ErrOutcomeUnknown)
+		for _, reply := range replies {
+			if err := acks.accept(reply); err != nil {
+				return err
 			}
-			delete(pending, ack.Header.Sequence)
 		}
 	}
 	return nil
+}
+
+// receiveFailure classifies an error while reading a batch's acknowledgments.
+// The netlink library reports a nonzero acknowledgment as a receive error.
+// nfnetlink answers a stale NFNL_BATCH_GENID with ERESTART on BATCH_BEGIN before
+// processing any object, so ERESTART ahead of every object acknowledgment is
+// effect-free; anything else may have been applied.
+func receiveFailure(err error, acknowledged bool) error {
+	if errors.Is(err, unix.ERESTART) && !acknowledged {
+		return errGenerationChanged
+	}
+	return errors.Join(ErrOutcomeUnknown, err)
+}
+
+// batchAcks tracks the object acknowledgments of one sent batch (BATCH_BEGIN
+// and BATCH_END are not acknowledged). A kernel that replays the batch after
+// autoloading a module (observed at boot on EL 9's 5.14 kernel) acknowledges an
+// object twice; the repeat is accepted because the applied table is verified
+// independently by read-back. Anything else leaves the outcome unknown.
+type batchAcks struct {
+	objects    map[uint32]bool // sequence -> already acknowledged
+	begin, end uint32
+	remaining  int
+}
+
+func newBatchAcks(sent []netlink.Message) *batchAcks {
+	a := &batchAcks{objects: make(map[uint32]bool, len(sent)-2), begin: sent[0].Header.Sequence, end: sent[len(sent)-1].Header.Sequence, remaining: len(sent) - 2}
+	for _, m := range sent[1 : len(sent)-1] {
+		a.objects[m.Header.Sequence] = false
+	}
+	return a
+}
+
+func (a *batchAcks) accept(ack netlink.Message) error {
+	if ack.Header.Type != netlink.Error || len(ack.Data) < 4 {
+		return fmt.Errorf("%w: invalid batch acknowledgment type %d sequence %d", ErrOutcomeUnknown, ack.Header.Type, ack.Header.Sequence)
+	}
+	code := int32(binary.NativeEndian.Uint32(ack.Data[:4]))
+	acknowledged, object := a.objects[ack.Header.Sequence]
+	if object && code == 0 {
+		if !acknowledged {
+			a.objects[ack.Header.Sequence] = true
+			a.remaining--
+		}
+		return nil
+	}
+	var kind, flags uint16
+	if len(ack.Data) >= 20 {
+		kind, flags = binary.NativeEndian.Uint16(ack.Data[8:10]), binary.NativeEndian.Uint16(ack.Data[10:12])
+	}
+	return fmt.Errorf("%w: batch acknowledgment errno %d for request type %#x flags %#x sequence %d (batch %d..%d)", ErrOutcomeUnknown, -code, kind, flags, ack.Header.Sequence, a.begin, a.end)
 }

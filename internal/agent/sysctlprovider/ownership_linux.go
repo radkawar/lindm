@@ -59,7 +59,7 @@ func releaseMatches(current, last *agentv1.ResourceOwnershipSnapshot, dimensions
 	for _, dimension := range dimensions {
 		switch dimension {
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE:
-			if a.Value == nil || b.Value == nil || a.GetValue() != b.GetValue() || !bytes.Equal(a.GetNativeIdentitySha256(), b.GetNativeIdentitySha256()) {
+			if a.Value == nil || b.Value == nil || a.GetValue() != b.GetValue() || !journal.SysctlValueIdentityMatches(current, last) {
 				return false
 			}
 		case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE:

@@ -235,6 +235,39 @@ needs the `action-sandbox` exception described in
 paths are qualified on Ubuntu 24.04 aarch64 with SSH password logins
 ([secret delivery and local-admin records](../verification.md#secret-delivered-password-hash-and-managed-local-admin-password)).
 
+Local accounts: approved adoption of an existing local user or group is
+dispatched. Adoption owns only the managed dimensions (for example shell,
+password lock, aging, GID or additive members), and release restores their
+recorded baseline; a lock keeps the existing shadow hash, so unlocking restores
+it unchanged. A desired UID held by another, unmanaged account is refused, and so
+is an owned account deleted and recreated outside lindm under the same name with
+another UID (a reused native identity, for reconcile and release alike). lindm
+keeps no tombstone for released UIDs: after release the shadow tools may assign
+the UID to another name, and the home preserved on release stays owned by that
+number (not exercised natively).
+
+Sysctl persistence survives a real reboot: `systemd-sysctl` applies the owned
+stanza at boot, the post-boot observation converges without a start grant and
+reports reboot persistence, and release after the reboot restores the baseline.
+A live value's native identity is boot-scoped; across a boot it remains lindm's
+only while the owned stanza is byte-identical and still the effective source.
+`net.*` keys are per network namespace: lindm manages the host (PID 1)
+namespace, which the executor observes and the helper joins for `net.*` keys
+(no `PrivateNetwork=`); other namespaces, such as containers', are never
+managed. `net.ipv4.ip_forward` is the exercised `net.*` key; a namespace created
+while it was managed started with the host's IPv4 value (the record shows `1`),
+which lindm neither tracks nor restores there.
+
+Timers fire natively: an interval timer runs its target service
+(`OnActiveSec=` then `OnUnitActiveSec=`), and a daily UTC calendar timer runs it
+at its minute; with `Persistent=no` a missed calendar time is not caught up.
+
+Managed files have no ACL dimension, and the provider preserves only `user.*`
+and `security.selinux` extended attributes, so it fails closed: a file with a
+POSIX access ACL is not adopted, and no file is created where a directory's
+default ACL would be inherited. Both are signed `UNSUPPORTED_NATIVE` refusals;
+`getfacl`, content and the directory stay unchanged.
+
 Firewall zones are a dedicated `inet lindm_z_<zone>` nftables table written over
 netlink at priority 10 (the agent does not run the `nft` CLI). Native records for
 the two-guest lane exist (see
@@ -250,9 +283,34 @@ restart. The server's `connectivity_probes` must equal the device targets, and a
 dedicated unenrolled peer runs `lindm-connectivity-probe.service` with a TLS leaf
 from the enrollment transport CA. Probe targets are static root policy, so a
 zone released to absence still needs an independent deny for each DENY target;
-the lab uses its own priority-100 table that drops only those exact tuples. The
-24.04 cloud image has UFW installed but inactive; coexistence with an active UFW
-ruleset is not exercised. Native findings: `/proc/1/ns/net` is ptrace-gated for
+the lab uses its own priority-100 table that drops only those exact tuples.
+
+Coexistence with an active UFW (the 24.04 cloud image ships it inactive; the
+lane enables it with only SSH and the oracle ports allowed before any zone
+exists) is native-qualified on aarch64. UFW's iptables-nft `ip filter` and `ip6
+filter` tables (priority 0) stay byte-identical, with handles, across every lindm
+operation (zone create, reconcile, quarantine, drift, crash and release). Only
+the deliberate `ufw reload` and the reboot recreate them; the reload leaves the
+zone table's objects and handles unchanged, and after both a fresh verification
+converges. The
+real signed quarantine action's `lindm_q_<action>` table (priority -10) is final:
+the peer's TCP 8080/8081/8083 time out and UDP egress gets `EPERM`, while SSH
+from the slirp gateway, loopback to the controller and DNS to the explicit
+`10.0.2.3` still work; the zone table is untouched. The server issues no zone
+work while the device is quarantined (`device_quarantined`); after the signed
+release the withheld verification converges and the zone behaves exactly as
+before. Quarantine admits loopback only from its `127.0.0.1` endpoint, so the
+systemd-resolved stub (`127.0.0.53`) is unreachable while quarantined: names
+resolve only from `/etc/hosts` (the lab adds the Debian `127.0.1.1` hostname line
+for `sudo`) or by explicit queries to a configured DNS server. An external rule
+added to, or an owned rule deleted from, the zone table is refused with a signed
+precondition failure and never overwritten; removing the added rule converges
+again, and a deleted rule is restored only by boot replay. A helper killed after
+the kernel batch ends `OUTCOME_UNKNOWN`; the supervisor restores the exact prior
+table and committed file, and the next signed reconcile resolves ownership from
+that rollback and applies a new generation
+([verification](../verification.md#firewall-zone-create-restore-coexistence--two-guest-probe-lane)).
+Native findings: `/proc/1/ns/net` is ptrace-gated for
 the capability-bounded helper, guard and restore units, so the host-namespace
 check compares per-namespace `/proc/<pid>/net/dev` entries; the 6.8 kernel reads
 back boolean bitwise expressions with an explicit `NFTA_BITWISE_OP=0`, which the
@@ -265,7 +323,7 @@ remaining graphical sessions to acknowledge `LockedHint`; acknowledgment is not
 physical desktop visibility or boot lock. Termination is irreversible. The lab's
 Ubuntu GNOME setup uses `/etc/gdm3/custom.conf`, `gdm3` and session `ubuntu`; KDE needs
 its own observation ([sessions](../../internal/agent/actionprovider/sessions_linux.go#L38),
-[lock evidence](../../internal/agent/actionprovider/network_linux.go#L229),
+[lock evidence](../../internal/agent/actionprovider/network_linux.go#L257),
 [GDM recipe](../../internal/vmlab/encrypted_installer_linux.go#L232)).
 
 Power operations inspect native capability, pending schedules and inhibitors; they
@@ -273,11 +331,60 @@ do not replace an existing schedule or fall back to inhibitor-bypassing calls
 ([power provider](../../internal/agent/actionprovider/power_linux.go#L172)).
 Nftables quarantine uses an automatically expiring kernel active-set fence; transport
 loss remains unknown, not successful containment/reachability proof
-([network provider](../../internal/agent/actionprovider/network_linux.go#L232)).
+([network provider](../../internal/agent/actionprovider/network_linux.go#L260)).
 Use the exact Ubuntu24 power/refresh and device-action evidence in
 [verification](../verification.md); service dispatch alone does not qualify account
 lock, desktop lock, encryption, recovery or wipe. Destructive targets require fresh
 inventory, exact signed identity and separately authorized provisioning.
+
+## Desktop session helper and remote assistance
+
+The package installs the user unit `/usr/lib/systemd/user/lindm-session.service`.
+Configure runs `systemctl --global enable`, so the unit starts with
+`graphical-session.target` at the next graphical login. The user manager reaches
+that target in the GDM GNOME/Wayland session (observed active in the 24.04
+autologin session).
+
+The executor serves `/run/lindm-session/session.sock` only when
+`/etc/lindm/executor.json` sets `remote_assistance.enabled`. The packaged default
+is disabled. The tmpfiles directory is `root:root` 0755.
+
+The DEB declares these as `Recommends`, not hard dependencies, so server installs
+stay lean:
+
+- `gstreamer1.0-pipewire`, which provides `pipewiresrc`.
+- `gstreamer1.0-plugins-good`, which provides `vp8enc`, `rtpvp8pay` and
+  `rtpstreampay`.
+- `gstreamer1.0-tools`, which provides `gst-launch-1.0`.
+
+The helper checks all eight elements with `gst-inspect-1.0`. If any is missing it
+ends the session as `UNAVAILABLE` with detail `gst_element_missing:<name>`. There
+is no X11 or screenshot fallback.
+
+The 24.04 desktop golden used for qualification had these components:
+
+- GNOME 46.0.
+- xdg-desktop-portal 1.18.4 and xdg-desktop-portal-gnome 46.2, with ScreenCast v5
+  (source types and cursor modes 7) and RemoteDesktop v2 (device types 7).
+- GStreamer 1.24.2.
+- gnome-shell notifications with the `actions` capability.
+
+In the RemoteDesktop dialog, keyboard and pointer access is the **Allow Remote
+Interaction** switch, which is off by default. Sharing without it grants view only.
+
+When the screen locks, GNOME 46 closes the portal session before logind sets
+`LockedHint`. The executor's five-second portal-close settle window records
+`SESSION_LOCKED`.
+
+The first login on the golden shows the release-upgrade prompt, and idle lock is
+enabled after five minutes. The lab disables both for the session; the product does
+not change them.
+
+Qualified: emulated x86_64 GNOME/Wayland consent, view, control, operator and local
+stop, decline, portal cancel and lock termination, with audit, in
+[`ubuntu24-assistance-06`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
+Not qualified: KDE/Kubuntu, X11 and Ubuntu 26.04 desktop, physical displays,
+multi-user seats and ARM desktops.
 
 ## Advisory feeds
 

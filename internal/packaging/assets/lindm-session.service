@@ -1,0 +1,30 @@
+[Unit]
+Description=Lindm remote assistance session helper
+# Per-user helper for the local graphical session. It never runs as root and
+# holds no device authority: the root executor identifies it by SO_PEERCRED
+# and logind. Every remote session still needs the user's explicit consent.
+PartOf=graphical-session.target
+After=graphical-session.target
+# No socket condition: the executor may create /run/lindm-session/session.sock
+# after login (boot race, restart or policy change); the helper keeps polling.
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/lindm/lindm-agent session
+Restart=on-failure
+RestartSec=5s
+# Seccomp-based restrictions that an unprivileged user manager can apply.
+# MemoryDenyWriteExecute is absent: GStreamer's ORC generates code at runtime.
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+LimitCORE=0
+
+[Install]
+WantedBy=graphical-session.target

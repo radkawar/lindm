@@ -79,3 +79,24 @@ func TestExecutableSelectsNativeManagerNotDistribution(t *testing.T) {
 		t.Fatalf("absence hidden: %v", err)
 	}
 }
+
+// Native EL entrypoints name their own interpreter; adapters must run under
+// exactly that one, never an arbitrary command line. The isolated adapter
+// already implies -s, the only option EL10's entrypoint passes.
+func TestInterpreterIsTheNativeEntrypointShebang(t *testing.T) {
+	for entrypoint, want := range map[string]string{
+		"#!/usr/bin/python3.9\nimport dnf.cli.main\n":    "/usr/bin/python3.9",
+		"#!/usr/libexec/platform-python\nimport sys\n":   "/usr/libexec/platform-python",
+		"#!/usr/bin/python3\n# -*- coding: utf-8 -*-\n":  "/usr/bin/python3",
+		"#! /usr/bin/python3 -s\n# The dnf executable\n": "/usr/bin/python3",
+	} {
+		if got, err := Interpreter([]byte(entrypoint)); err != nil || got != want {
+			t.Fatalf("%q = %q, %v", entrypoint, got, err)
+		}
+	}
+	for _, entrypoint := range []string{"", "#!/usr/bin/python3.9", "#!/usr/bin/env python3\n", "#!/usr/bin/python3 -E\n", "#!/usr/bin/python3 -s -u\n", "#!/tmp/python3.9\n", "#!/usr/bin/python3.x\n", "#!\n", "import dnf\n"} {
+		if got, err := Interpreter([]byte(entrypoint)); err == nil {
+			t.Fatalf("%q accepted as %q", entrypoint, got)
+		}
+	}
+}

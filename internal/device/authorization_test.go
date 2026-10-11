@@ -99,6 +99,14 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"RequestLocalAdminPasswordRotation": {identity.PermissionManageSecrets, admins, false},
 		"GetLocalAdminPasswordStatus":       {identity.PermissionReadFleet, readers, false},
 		"RevealLocalAdminPassword":          {identity.PermissionRevealSecrets, admins, false},
+		// Join/Answer additionally require the creating operator; scoped grants
+		// are exercised by the assistance integration tests.
+		"CreateAssistanceSession": {identity.PermissionRunRemoteAssistance, admins, false},
+		"ListAssistanceSessions":  {identity.PermissionReadFleet, readers, false},
+		"GetAssistanceSession":    {identity.PermissionReadFleet, readers, false},
+		"JoinAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
+		"AnswerAssistanceSession": {identity.PermissionRunRemoteAssistance, admins, false},
+		"StopAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
 	}
 }
 

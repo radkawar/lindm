@@ -49,7 +49,7 @@ func ExecuteNative(ctx context.Context, config NativeConfig, request *agentv1.Na
 	if err := CheckNative(ctx, config); err != nil {
 		return err
 	}
-	if err := validateAccountRoot(config.AccountRoot); err != nil {
+	if err := validateAccountRoot(config.AccountRoot, ChrootAccountRoot(config.Platform)); err != nil {
 		return err
 	}
 	return executeNative(ctx, config, request, beforeEffect, runNative, func() (*localDB, error) { return readDatabase(config.NativeDigest) })
@@ -159,7 +159,7 @@ func executeNative(ctx context.Context, config NativeConfig, r *agentv1.NativeRe
 			}
 		}
 	}
-	options, err := nativeToolOptions(ctx, run, commands)
+	options, err := nativeToolOptions(ctx, run, commands, ChrootAccountRoot(config.Platform))
 	if err != nil {
 		return err
 	}

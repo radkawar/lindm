@@ -118,7 +118,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		arch = manifestArch
 	}
 	memory := uint32(2048)
-	if clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" {
+	if clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" {
 		memory = 4096
 	}
 	cfg, err := labhost.Load()
@@ -198,7 +198,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions":
+	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.

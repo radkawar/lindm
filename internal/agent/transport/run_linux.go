@@ -64,6 +64,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	defer stopManagement()
 	stopUpdates := startAgentUpdates(ctx, executor)
 	defer stopUpdates()
+	stopAssistance := startAssistance(ctx, executor, r.authorityGate)
+	defer stopAssistance()
 	for {
 		if err := ctx.Err(); err != nil {
 			return r.stopped()

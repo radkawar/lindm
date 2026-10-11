@@ -101,10 +101,32 @@ const passwordFixtureScript = `set -eu
 . /etc/os-release
 case "$ID" in
  ubuntu) DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-pwquality libpwquality-tools ;;
- fedora) rpm -q libpwquality pam ;;
+ fedora|rhel|almalinux) rpm -q libpwquality pam authselect ;;
 esac
 command -v pwscore
 `
+
+// EL 9 cloud images (RHEL and AlmaLinux 9.8) ship the pam package's own stacks
+// with no authselect selection. The provider refuses that unmanaged stack; the
+// lane then selects the vendor sssd profile, as an installer-provisioned EL host
+// has, before qualifying the managed path.
+const passwordUnmanagedProbe = `. /etc/os-release
+case "$ID" in
+ rhel|almalinux) if authselect current --raw >/dev/null 2>&1; then echo managed; else echo unmanaged; fi ;;
+ *) echo managed ;;
+esac
+`
+
+const passwordSelectAuthselectScript = `set -eu
+authselect select sssd --force
+authselect check
+`
+
+// unmanagedStackOracle records the unmanaged stacks byte for byte and requires
+// that no authselect selection appeared.
+func unmanagedStackOracle(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
+	return resourceOracle(ctx, vm, "native-unmanaged-pam-stack", "if authselect current --raw; then exit 1; fi; ls -l /etc/pam.d/system-auth /etc/pam.d/password-auth; sha256sum /etc/pam.d/system-auth /etc/pam.d/password-auth /etc/security/pwquality.conf")
+}
 
 func resourcePasswordDesired(minLength uint32) *resourcev1.ResourceDesiredState {
 	policy := &resourcev1.PasswordPolicyDesired{MinLength: proto.Uint32(minLength), MinClasses: proto.Uint32(3)}
@@ -122,7 +144,7 @@ const (
 // native configuration, and the distribution's PAM password stack.
 func passwordOracle(minLength uint32) func(context.Context, *guestVM) (VMResourceNativeRecord, error) {
 	return func(ctx context.Context, vm *guestVM) (VMResourceNativeRecord, error) {
-		stack := ". /etc/os-release; case \"$ID\" in ubuntu) stack=/etc/pam.d/common-password ;; fedora) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
+		stack := ". /etc/os-release; case \"$ID\" in ubuntu) stack=/etc/pam.d/common-password ;; fedora|rhel|almalinux) stack=/etc/pam.d/system-auth ;; esac; grep -E '^password[[:space:]].*pam_pwquality[.]so' \"$stack\"; "
 		command := stack + "printf '%s\\n' " + passwordLongCandidate + " | pwscore; "
 		if minLength > 12 {
 			command += "if printf '%s\\n' " + passwordShortCandidate + " | pwscore; then exit 1; fi; printf 'short-rejected\\n'; "
@@ -146,6 +168,21 @@ func exerciseResourcePassword(ctx context.Context, packages *nativeGuestPackages
 	if err := enablePasswordProvider(ctx, packages, session.id); err != nil {
 		return err
 	}
+	names := []string{"quality-baseline-rejects-short", "quality-reconcile-length", "repeat", "release-restores-defaults"}
+	probe, err := r.vm.run(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(passwordUnmanagedProbe), nil, 4096, time.Minute)
+	if err != nil {
+		return fmt.Errorf("probe PAM stack manager: %w", err)
+	}
+	if strings.TrimSpace(string(probe)) == "unmanaged" {
+		r.fresh()
+		if err := resourceRefusalStep(ctx, r, evidence, "unmanaged-pam-stack-refused", resourcePasswordDesired(14), resourceAdoptionPolicy(), withVM(r.vm, unmanagedStackOracle)); err != nil {
+			return err
+		}
+		if err := lifecycleCommand(ctx, r.vm, "select vendor authselect sssd profile", passwordSelectAuthselectScript); err != nil {
+			return err
+		}
+		names = append([]string{"unmanaged-pam-stack-refused"}, names...)
+	}
 	r.fresh()
 	if err := resourceStep(ctx, r, evidence, "quality-baseline-rejects-short", resourcePasswordDesired(14), resourceAdoptionPolicy(), false, withVM(r.vm, passwordOracle(14))); err != nil {
 		return err
@@ -160,5 +197,5 @@ func exerciseResourcePassword(ctx context.Context, packages *nativeGuestPackages
 		return err
 	}
 	evidence.Unproven = []string{"history, aging and faillock lockout dimensions and interactive PAM password change are not exercised"}
-	return qualifyResourceEvidence(evidence, []string{"quality-baseline-rejects-short", "quality-reconcile-length", "repeat", "release-restores-defaults"})
+	return qualifyResourceEvidence(evidence, names)
 }

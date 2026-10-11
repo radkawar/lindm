@@ -138,6 +138,8 @@ type Service struct {
 	nativeResources       NativeResourceProviders
 	updates               *update.Engine
 	updateHold            bool
+	assistanceEnabled     bool
+	assistance            *assistanceBroker
 }
 
 var _ agentv1connect.ExecutorServiceHandler = (*Service)(nil)
@@ -156,6 +158,10 @@ type Config struct {
 	Updates               *agentv1.AgentUpdateConfig
 	PackageProvider       *agentv1.NativePackageProviderConfig
 	NativeResources       NativeResourceProviders
+	// RemoteAssistance enables the session-helper socket in
+	// SessionRuntimeDirectory (default localrpc.DefaultSessionRuntimeDirectory).
+	RemoteAssistance        *agentv1.RemoteAssistanceConfig
+	SessionRuntimeDirectory string
 }
 
 // Run serves the executor until ctx is canceled. Cancellation exits without
@@ -164,17 +170,39 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.RequireRoot && os.Geteuid() != 0 {
 		return errors.New("executor requires root")
 	}
-	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates), WithPackageProvider(cfg.PackageProvider), WithNativeResourceProviders(cfg.NativeResources))
+	svc, err := New(ctx, cfg.StateDirectory, WithActionProvider(cfg.ActionProvider), WithActionProviderFactory(cfg.ActionProviderFactory), WithRecoveryBootConfig(cfg.RecoveryBoot), WithAgentUpdates(cfg.Updates), WithPackageProvider(cfg.PackageProvider), WithNativeResourceProviders(cfg.NativeResources), WithRemoteAssistance(cfg.RemoteAssistance))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = svc.Close() }()
-	return localrpc.Serve(ctx, localrpc.ListenConfig{
+	listen := localrpc.ListenConfig{
 		Directory:  cfg.RuntimeDirectory,
 		SocketName: cfg.SocketName,
 		NetworkUID: cfg.NetworkUID,
 		NetworkGID: cfg.NetworkGID,
-	}, svc)
+	}
+	if !cfg.RemoteAssistance.GetEnabled() {
+		return localrpc.Serve(ctx, listen, svc)
+	}
+	sessionDirectory := cfg.SessionRuntimeDirectory
+	if sessionDirectory == "" {
+		sessionDirectory = localrpc.DefaultSessionRuntimeDirectory
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	sessionDone := make(chan struct{})
+	go func() {
+		defer close(sessionDone)
+		// Device management does not depend on the desktop socket. Without
+		// it, invitations end NO_ELIGIBLE_SESSION; the failure stays visible here.
+		if err := localrpc.ServeSession(ctx, localrpc.SessionListenConfig{Directory: sessionDirectory, NetworkUID: cfg.NetworkUID}, &sessionService{broker: svc.assistance}); err != nil {
+			slog.Error("remote assistance session socket stopped", "directory", sessionDirectory, "error", err)
+		}
+	}()
+	err = localrpc.Serve(ctx, listen, svc)
+	cancel()
+	<-sessionDone
+	return err
 }
 
 // New locks the state directory and opens an existing journal, or remains
@@ -240,6 +268,11 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 	svc.cancelPreparation = svc.cancelPackagePreparation
 	for _, opt := range opts {
 		opt(svc)
+	}
+	svc.assistance, err = newAssistanceBroker(svc.assistanceEnabled, svc.now, actionprovider.ReadLogindSessions)
+	if err != nil {
+		_ = svc.Close()
+		return nil, err
 	}
 	svc.workerContext, svc.workerCancel = context.WithCancel(context.Background())
 	svc.incarnation, err = newID()

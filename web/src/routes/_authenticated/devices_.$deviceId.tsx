@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DeviceFindings } from "@/features/advisories/device-findings";
+import { DeviceAssistanceCard } from "@/features/assistance/panel";
 import { DeviceActionHistory } from "@/features/devices/actions";
 import { DeviceDetailView } from "@/features/devices/detail";
 import { deviceQueryOptions } from "@/features/devices/queries";
@@ -54,6 +55,7 @@ function DeviceDetailRoute() {
       findings={<DeviceFindings deviceId={deviceId} />}
       history={<DeviceActionHistory deviceId={deviceId} />}
       revoke={(device) => <RevokeApprovalRequest deviceId={device.id} />}
+      assistance={<DeviceAssistanceCard deviceId={deviceId} />}
     />
   );
 }

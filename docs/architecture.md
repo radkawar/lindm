@@ -1610,3 +1610,89 @@ off by default and not a launch guarantee; adding it requires explicit recording
 consent, encryption, retention/legal rules and product approval. L09/L12/L16 must
 prove the actual UI, input effects, identity isolation, local termination, relay-only
 operation and network interruption on real graphical sessions.
+
+### Implemented assistance path
+
+The implementation keeps every hop on an authenticated, idempotent state exchange.
+Each side sends its complete current state, never a stream of events:
+
+1. The operator calls `AdminService.CreateAssistanceSession` with a mode
+   (`VIEW` or `CONTROL`), reason and duration of at most 30 minutes. This needs
+   `remote_assistance.run`, fresh authorization and device scope. The device must
+   be active and seen within two minutes. At most one non-ended session may exist
+   per device, and a deployment-wide admission cap applies. The row in
+   `assistance_sessions` binds the operator, device, mode, reason, the 120-second
+   consent deadline and the hard `ends_at`.
+2. The network process polls `DeviceService.SyncAssistance` (session-epoch fenced,
+   mTLS) every 15 seconds with ±10% jitter, and every second while any session is
+   open. It relays the server directives to the executor through
+   `ExecutorService.SyncAssistance` and returns the executor's reports.
+3. The root executor keeps an in-memory broker. A restart loses its sessions and
+   fails closed: a still-running helper that reports a live session the restarted
+   broker never delivered is told to terminate. When
+   `AgentConfig.remote_assistance.enabled` is set, the executor also serves
+   `SessionService` on `/run/lindm-session/session.sock` (directory `root:root`
+   0755, socket 0666). That socket is separate from the executor socket.
+   - It authorizes each call by `SO_PEERCRED` and refuses UID 0, the network
+     account and group-0 peers.
+   - It reads logind over the pinned root system bus. The caller must have exactly
+     one session with `Class=user`, `Type=wayland|x11`, `Remote=false`,
+     `Active=true` and `LockedHint=false`.
+   - The executor, not the helper, stamps the user, UID, logind session ID, type
+     and desktop on every report.
+   - The first helper to report `PROMPTED` claims an invitation and binds it. Only
+     that session receives it from then on. A target username, when set, must
+     match.
+4. `lindm-agent session` runs as the user through the user unit
+   `lindm-session.service` (`WantedBy=graphical-session.target`). It shows a
+   critical, non-expiring desktop notification with explicit **Allow** and
+   **Decline** actions. Only the `allow` action consents.
+   - After **Allow** it opens the XDG ScreenCast portal (view) or the
+     RemoteDesktop+ScreenCast portal (control). On GNOME, keyboard and pointer
+     access is a separate switch in that dialog, off by default. If the user
+     shares without enabling it, the session runs view-only.
+   - The PipeWire remote is passed to `gst-launch-1.0` (`pipewiresrc` → VP8 →
+     RTP), and the RTP packets are forwarded into a pion WebRTC peer.
+   - The helper offers, non-trickle and relay-only, and the browser answers. A
+     data channel exists only for granted control. Its bounded JSON input events
+     (at most 256 bytes and 240 per second) become portal
+     `NotifyPointerMotionAbsolute`, `NotifyPointerButton`,
+     `NotifyPointerAxisDiscrete` and `NotifyKeyboardKeycode` calls. Pressed keys
+     and buttons are released at the end.
+5. Both SDPs travel only through authenticated RPCs. The server accepts exactly
+   one `a=fingerprint:sha-256` line and only `typ relay` candidates, and records
+   both fingerprints. Only the creating operator can join (offer plus console
+   TURN credentials) and answer, once.
+6. Media is DTLS-SRTP end to end through the relay embedded in `lindmd`
+   (`internal/assistrelay`, pion/turn). Both ends use `iceTransportPolicy=relay`,
+   so the peers' network addresses are never exchanged.
+   - The relay accepts TURN REST credentials,
+     `<expiry>:<session>:<device|console>` with an HMAC-SHA1 password under a
+     per-process random secret. Expiry is `ends_at`.
+   - It permits peers only on its own relay allocations, so it is never an open
+     proxy.
+   - It refuses credentials of ended sessions and closes their allocations.
+
+Termination sources and recorded causes:
+
+| Trigger                                                                                                                                      | Recorded cause                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Operator stop                                                                                                                                | `OPERATOR_STOPPED`                                             |
+| The notification's **Stop sharing** action                                                                                                   | `USER_STOPPED`                                                 |
+| The desktop's own sharing indicator, or the portal session closing                                                                           | `PORTAL_CLOSED`                                                |
+| Decline, or cancelling the portal dialog                                                                                                     | `DECLINED`                                                     |
+| Lock                                                                                                                                         | `SESSION_LOCKED`                                               |
+| Logout, session change, or the helper missing for 10 s                                                                                       | `SESSION_ENDED`                                                |
+| Consent deadline passing                                                                                                                     | `CONSENT_TIMEOUT` (or `NO_ELIGIBLE_SESSION` with no helper)    |
+| `ends_at` passing                                                                                                                            | `EXPIRED` (each of server, executor and helper uses its clock) |
+| No directive at the executor for 30 s, the server not hearing from the device for 30 s, or the executor unreachable from the helper for 30 s | `AUTHORIZATION_LOST`                                           |
+| Peer connection failure                                                                                                                      | `CONNECTION_FAILED`                                            |
+
+Audit rows `assistance.request`, `.prompt`, `.consent`, `.join`, `.answer`,
+`.start`, `.stop` and `.end` record the IDs, mode, control grant, local user and
+session, and cause. They never record screen content, SDP or credentials.
+
+The embedded relay is single-instance: its credentials are not verifiable by another
+replica. There is no TURN-over-TLS or TCP relay allocation (RFC 6062). There is no
+extension: a longer session needs a new invitation and fresh consent. KDE, X11 and
+older desktop versions are not qualified (see `verification.md`).

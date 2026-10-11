@@ -294,3 +294,15 @@ func Status(directory string) (*agentv1.ConnectivityGuardRecord, error) {
 	defer func() { _ = lock.Close() }()
 	return s.load()
 }
+
+// Outcome reads the retained record without the record lock, so the executor
+// can read it through its read-only view of /var. It is evidence for resolving
+// an interrupted effect's local ownership, never admission or replay authority.
+func Outcome(directory string) (*agentv1.ConnectivityGuardRecord, error) {
+	s, err := openStore(directory)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = s.close() }()
+	return s.load()
+}

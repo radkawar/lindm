@@ -21,7 +21,7 @@ func sysctlOwnershipSnapshotValid(snapshot *agentv1.ResourceOwnershipSnapshot) b
 		return false
 	}
 	file := private.GetState()
-	path := fmt.Sprintf("/etc/sysctl.d/60-lindm-%x.conf", sha256.Sum256([]byte(o.GetKey())))
+	path := sysctlStanzaPath(o.GetKey())
 	if file == nil || file.GetPath() != path || !proto.Equal(file, o.GetPersistenceFileState()) || !proto.Equal(file.GetFile(), o.GetOwnedPersistenceFile()) || file.GetExists() != (private.Content != nil) || file.GetExists() != (file.GetFile() != nil) || len(file.GetAncestrySha256()) != 32 || len(file.GetNativeIdentitySha256()) != 32 || !bytes.Equal(file.GetSecurityMetadataSha256(), nativefile.XattrDigest(private.GetXattrs())) {
 		return false
 	}
@@ -62,7 +62,7 @@ func sysctlOwnershipDimensionMatches(left, right *agentv1.ResourceOwnershipSnaps
 	}
 	switch dimension {
 	case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE:
-		return a.GetValue() == b.GetValue() && bytes.Equal(a.GetNativeIdentitySha256(), b.GetNativeIdentitySha256())
+		return a.GetValue() == b.GetValue() && SysctlValueIdentityMatches(left, right)
 	case agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE:
 		return proto.Equal(left.GetSysctlPersistence(), right.GetSysctlPersistence())
 	default:
@@ -71,4 +71,31 @@ func sysctlOwnershipDimensionMatches(left, right *agentv1.ResourceOwnershipSnaps
 }
 func sysctlOwnershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapshot *agentv1.ResourceOwnershipSnapshot) bool {
 	return intent.GetDesired().GetSysctl() != nil && intent.GetOwnership().GetPolicy().GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION && sysctlOwnershipSnapshotValid(snapshot)
+}
+
+func sysctlStanzaPath(key string) string {
+	return fmt.Sprintf("/etc/sysctl.d/60-lindm-%x.conf", sha256.Sum256([]byte(key)))
+}
+
+// SysctlValueIdentityMatches reports whether two observations of a live sysctl
+// value name the same owned kernel setting. Within one boot its native identity
+// (boot, key and, for net.* keys, the network namespace) must be equal. A
+// reboot necessarily changes that identity; the value then remains the owner's
+// only if the owned stanza systemd-sysctl applies at boot is byte-identical
+// (content, inode, metadata) and is still the effective persistent source.
+// Callers compare the values themselves.
+func SysctlValueIdentityMatches(left, right *agentv1.ResourceOwnershipSnapshot) bool {
+	a, b := left.GetObservation().GetSysctl(), right.GetObservation().GetSysctl()
+	if a == nil || b == nil || a.GetKey() != b.GetKey() {
+		return false
+	}
+	if bytes.Equal(a.GetNativeIdentitySha256(), b.GetNativeIdentitySha256()) {
+		return true
+	}
+	before, after := left.GetObservation().GetMetadata().GetBootId(), right.GetObservation().GetMetadata().GetBootId()
+	path := sysctlStanzaPath(a.GetKey())
+	return before != "" && after != "" && before != after &&
+		left.GetSysctlPersistence().GetState().GetExists() && proto.Equal(left.GetSysctlPersistence(), right.GetSysctlPersistence()) &&
+		a.GetPersistentSource() == path && b.GetPersistentSource() == path && !a.GetPersistenceConflict() && !b.GetPersistenceConflict() &&
+		a.PersistentValue != nil && a.GetPersistentValue() == b.GetPersistentValue()
 }

@@ -28,6 +28,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	"lindm/internal/advisory"
+	"lindm/internal/assistrelay"
 	"lindm/internal/config"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/escrow"
@@ -91,6 +92,9 @@ type Config struct {
 	RequireReleaseCompatibility bool
 	ServerRelease               string
 	ServerProtocol              uint32
+	// Assistance is nil when remote assistance is not configured; Create, Join
+	// and Answer then fail with assistance_unconfigured.
+	Assistance *assistrelay.Relay
 }
 
 // Service implements the admin, enrollment, and device RPC surfaces.
@@ -119,6 +123,7 @@ type Service struct {
 	serverRelease          string
 	serverProtocol         uint32
 	enrollmentInstructions *adminv1.GetEnrollmentInstructionsResponse
+	assistance             *assistrelay.Relay
 }
 
 var (
@@ -221,6 +226,10 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 			&adminv1.SetLocalAdminPasswordPolicyRequest{}, &adminv1.RemoveLocalAdminPasswordPolicyRequest{},
 			&adminv1.RequestLocalAdminPasswordRotationRequest{}, &adminv1.GetLocalAdminPasswordStatusRequest{},
 			&adminv1.RevealLocalAdminPasswordRequest{},
+			&adminv1.CreateAssistanceSessionRequest{}, &adminv1.ListAssistanceSessionsRequest{},
+			&adminv1.GetAssistanceSessionRequest{}, &adminv1.JoinAssistanceSessionRequest{},
+			&adminv1.AnswerAssistanceSessionRequest{}, &adminv1.StopAssistanceSessionRequest{},
+			&devicev1.SyncAssistanceRequest{}, &devicev1.SyncAssistanceResponse{},
 			&devicev1.GetDeviceActionWorkRequest{},
 			&devicev1.AuthorizeDeviceActionStartRequest{},
 			&devicev1.ReportDeviceActionResultRequest{},
@@ -301,6 +310,7 @@ func New(pool *pgxpool.Pool, cfg Config) (*Service, error) {
 		serverRelease:          cfg.ServerRelease,
 		serverProtocol:         cfg.ServerProtocol,
 		enrollmentInstructions: instructions,
+		assistance:             cfg.Assistance,
 	}, nil
 }
 

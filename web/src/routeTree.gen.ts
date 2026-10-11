@@ -30,6 +30,7 @@ import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets_.$secretId'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryEnrollmentRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery-enrollment'
 import { Route as AuthenticatedDevicesDeviceIdActionsActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.actions.$actionId'
+import { Route as AuthenticatedDevicesDeviceIdAssistanceSessionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.assistance.$sessionId'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery.$actionId'
 import { Route as AuthenticatedDevicesDeviceIdActionsNewKindRouteImport } from './routes/_authenticated/devices_.$deviceId_.actions.new.$kind'
 
@@ -144,6 +145,12 @@ const AuthenticatedDevicesDeviceIdActionsActionIdRoute =
     path: '/devices/$deviceId/actions/$actionId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute =
+  AuthenticatedDevicesDeviceIdAssistanceSessionIdRouteImport.update({
+    id: '/devices_/$deviceId_/assistance/$sessionId',
+    path: '/devices/$deviceId/assistance/$sessionId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDevicesDeviceIdRecoveryActionIdRoute =
   AuthenticatedDevicesDeviceIdRecoveryActionIdRouteImport.update({
     id: '/devices_/$deviceId_/recovery/$actionId',
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
+  '/devices/$deviceId/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
   '/devices/$deviceId/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
   '/devices/$deviceId/actions/new/$kind': typeof AuthenticatedDevicesDeviceIdActionsNewKindRoute
 }
@@ -202,6 +210,7 @@ export interface FileRoutesByTo {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
+  '/devices/$deviceId/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
   '/devices/$deviceId/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
   '/devices/$deviceId/actions/new/$kind': typeof AuthenticatedDevicesDeviceIdActionsNewKindRoute
 }
@@ -228,6 +237,7 @@ export interface FileRoutesById {
   '/_authenticated/secrets_/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/_authenticated/devices_/$deviceId_/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/_authenticated/devices_/$deviceId_/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
+  '/_authenticated/devices_/$deviceId_/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
   '/_authenticated/devices_/$deviceId_/recovery/$actionId': typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
   '/_authenticated/devices_/$deviceId_/actions/new/$kind': typeof AuthenticatedDevicesDeviceIdActionsNewKindRoute
 }
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
+    | '/devices/$deviceId/assistance/$sessionId'
     | '/devices/$deviceId/recovery/$actionId'
     | '/devices/$deviceId/actions/new/$kind'
   fileRoutesByTo: FileRoutesByTo
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
+    | '/devices/$deviceId/assistance/$sessionId'
     | '/devices/$deviceId/recovery/$actionId'
     | '/devices/$deviceId/actions/new/$kind'
   id:
@@ -303,6 +315,7 @@ export interface FileRouteTypes {
     | '/_authenticated/secrets_/$secretId'
     | '/_authenticated/devices_/$deviceId_/recovery-enrollment'
     | '/_authenticated/devices_/$deviceId_/actions/$actionId'
+    | '/_authenticated/devices_/$deviceId_/assistance/$sessionId'
     | '/_authenticated/devices_/$deviceId_/recovery/$actionId'
     | '/_authenticated/devices_/$deviceId_/actions/new/$kind'
   fileRoutesById: FileRoutesById
@@ -462,6 +475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDevicesDeviceIdActionsActionIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/devices_/$deviceId_/assistance/$sessionId': {
+      id: '/_authenticated/devices_/$deviceId_/assistance/$sessionId'
+      path: '/devices/$deviceId/assistance/$sessionId'
+      fullPath: '/devices/$deviceId/assistance/$sessionId'
+      preLoaderRoute: typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/devices_/$deviceId_/recovery/$actionId': {
       id: '/_authenticated/devices_/$deviceId_/recovery/$actionId'
       path: '/devices/$deviceId/recovery/$actionId'
@@ -498,6 +518,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSecretsSecretIdRoute: typeof AuthenticatedSecretsSecretIdRoute
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute: typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   AuthenticatedDevicesDeviceIdActionsActionIdRoute: typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
+  AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute: typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
   AuthenticatedDevicesDeviceIdRecoveryActionIdRoute: typeof AuthenticatedDevicesDeviceIdRecoveryActionIdRoute
   AuthenticatedDevicesDeviceIdActionsNewKindRoute: typeof AuthenticatedDevicesDeviceIdActionsNewKindRoute
 }
@@ -523,6 +544,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute,
   AuthenticatedDevicesDeviceIdActionsActionIdRoute:
     AuthenticatedDevicesDeviceIdActionsActionIdRoute,
+  AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute:
+    AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute,
   AuthenticatedDevicesDeviceIdRecoveryActionIdRoute:
     AuthenticatedDevicesDeviceIdRecoveryActionIdRoute,
   AuthenticatedDevicesDeviceIdActionsNewKindRoute:

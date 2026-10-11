@@ -518,6 +518,42 @@ listener trust, default credentials, unsupported schemas and unsafe production T
 Readiness covers DB/migration/key/artifact availability; liveness does not depend on
 a remote IdP being online. Metrics/admin diagnostics are private and authenticated.
 
+### Remote assistance relay
+
+Graphical assistance is optional. It is enabled by `ServerConfig.assistance`, and
+without that section the server refuses requests with `assistance_unconfigured`.
+`lindmd` embeds the relay-only TURN service; it has no public STUN/TURN dependency.
+
+- `relay.listener`: the TURN UDP and TCP listener (for example port 3478). It
+  must not overlap the admin, device or profiling listener.
+- `relay.relay_address`, `relay_port_min` and `relay_port_max`: the specific IPv4
+  address and UDP port range that relay allocations bind and advertise. Peers may
+  send only to allocations on this address, so the relay is not an open proxy.
+- `relay.urls`: the exact `turn:` URIs given to devices and consoles. Both must
+  reach the listener, and both peers must reach the relay address through it.
+- `max_concurrent_sessions`: the admission budget, default 16 and at most 256.
+  Each credential may hold at most 8 allocations, and the relay as a whole at most
+  `2 × 8 × max_concurrent_sessions`.
+
+Firewalls must admit the listener ports and the relay UDP range from managed
+desktops and operator browsers only. Media is DTLS-SRTP end to end; the relay sees
+ciphertext and fingerprints, not screen content.
+
+Credentials are TURN REST HMACs under a per-process random secret, valid until the
+session's `ends_at`. They are never stored. A restart invalidates them and ends
+live sessions, which recover only by a new invitation.
+
+There is no per-session bandwidth cap. The encoder targets about 2.5 Mbit/s of
+VP8 at 15 frames per second; size the relay range and uplink for
+`max_concurrent_sessions` concurrent streams.
+
+TURN-over-TLS, RFC 6062 TCP allocations and cross-replica credential
+verification are not implemented. The replicated topology therefore cannot offer
+assistance until a shared or external relay contract exists.
+
+Managed devices also need `AgentConfig.remote_assistance.enabled`. The packaged
+executor configuration leaves it disabled.
+
 ### Native single-host installation
 
 The `lindmd` DEB/RPM contains the embedded-console executable at `/usr/bin/lindmd`,

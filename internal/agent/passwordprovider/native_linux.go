@@ -144,7 +144,8 @@ func digestMessage(m proto.Message) ([]byte, error) {
 	return h[:], nil
 }
 func productSupported(p *resourcev1.PlatformProduct) bool {
-	return (p.GetOsId() == "ubuntu" && p.GetVersion() == "24.04") || (p.GetOsId() == "fedora" && p.GetVersion() == "44")
+	_, ok := pinnedVersions(p)
+	return ok
 }
 func checkPlatform(p *resourcev1.PlatformProduct) error {
 	if !productSupported(p) {
@@ -246,7 +247,7 @@ func inspectManager(ctx context.Context, platform *resourcev1.PlatformProduct, r
 	state := &managerState{stacks: make(map[string][]byte)}
 	graph := sha256.New()
 	profileHash := sha256.New()
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		if _, err := run(ctx, "/usr/bin/authselect", "check"); err != nil {
 			return nil, fmt.Errorf("%w: authselect stack integrity: %v", ErrUnsupported, err)
 		}
@@ -387,14 +388,14 @@ func inspectManager(ctx context.Context, platform *resourcev1.PlatformProduct, r
 	if err != nil {
 		return nil, err
 	}
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		for _, f := range state.features {
 			if !slices.Contains(active, f) {
 				return nil, ErrUnsupported
 			}
 		}
 	}
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		for name, stack := range state.stacks {
 			features, err := inspectStacks(map[string][]byte{name: stack})
 			if err != nil {
@@ -518,7 +519,7 @@ func inspectStacks(stacks map[string][]byte) ([]agentv1.PasswordNativeFeature, e
 	return active, nil
 }
 func moduleDirectory(platform *resourcev1.PlatformProduct) string {
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		return "/usr/lib64/security/"
 	}
 	switch runtime.GOARCH {

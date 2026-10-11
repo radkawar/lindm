@@ -22,7 +22,7 @@ import (
 
 func (p *Provider) pinPath(ref *resourcev1.ResourceRef) string {
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		return "/etc/dnf/versionlock.toml"
+		return dnf.VersionlockPathFor(p.manager)
 	}
 	digest := sha256.Sum256([]byte(ref.GetCanonicalKey()))
 	return "/etc/apt/preferences.d/lindm-" + hex.EncodeToString(digest[:])
@@ -47,8 +47,9 @@ func readPin(path string) (*resourcev1.FileIdentity, []byte, error) {
 }
 
 // pinClaimsPackage reports an existing native pin for this package. An APT pin
-// file is per package; DNF's versionlock is one shared file whose entries for
-// other packages are not this package's pin. An unreadable document fails closed.
+// file is per package; DNF's versionlock (DNF5 TOML or the DNF4 plugin list) is
+// one shared document whose entries for other packages are not this package's
+// pin. An unreadable document fails closed.
 func pinClaimsPackage(ref *resourcev1.ResourceRef, o *resourcev1.NativePackageObservation) bool {
 	if o.GetPinFile() == nil {
 		return false
@@ -56,7 +57,7 @@ func pinClaimsPackage(ref *resourcev1.ResourceRef, o *resourcev1.NativePackageOb
 	if o.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return true
 	}
-	return dnf.VersionlockClaims(o.GetPinContents(), ref.GetCanonicalKey(), o.GetPackage().GetNativeName())
+	return dnf.VersionlockClaims(o.GetPinFile().GetPath(), o.GetPinContents(), ref.GetCanonicalKey(), o.GetPackage().GetNativeName())
 }
 
 func aptPin(d *resourcev1.NativePackageDesired) []byte {
@@ -104,15 +105,49 @@ func renderDNFPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesire
 	}
 	return data, nil
 }
-func (p *Provider) renderPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) ([]byte, error) {
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
-		return aptPin(d), nil
+
+// dnf4LockEntry is the plugin's own exact NEVRA lock form with an explicit
+// architecture (the plugin's add command writes "*" for every architecture).
+func dnf4LockEntry(d *resourcev1.NativePackageDesired) string {
+	if d.GetExact() == nil || d.GetPresence() != resourcev1.Presence_PRESENCE_PRESENT {
+		return ""
 	}
-	return renderDNFPin(ref, d, current)
+	return d.GetPackage().GetNativeName() + "-" + nativeVersion(d.GetExact()) + "." + d.GetPackage().GetArchitecture()
 }
-func pinMatches(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) bool {
-	if d.GetPackage().GetEcosystem() == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
+func (p *Provider) renderPin(ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) ([]byte, error) {
+	switch {
+	case p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB:
+		return aptPin(d), nil
+	case p.manager == dnf.DNF4:
+		entry := dnf4LockEntry(d)
+		if entry != "" && !p.versionlock {
+			return nil, fmt.Errorf("%w: exact DNF4 version requires the enabled native versionlock plugin", ErrUnsupported)
+		}
+		pin, err := dnf.RenderVersionlockList(current, ref.GetCanonicalKey(), d.GetPackage().GetNativeName(), entry)
+		if err != nil {
+			return nil, err
+		}
+		if len(pin) > maxPin {
+			return nil, errors.New("packageprovider: native pin capacity")
+		}
+		return pin, nil
+	default:
+		return renderDNFPin(ref, d, current)
+	}
+}
+func pinMatches(backend resourcev1.Backend, ref *resourcev1.ResourceRef, d *resourcev1.NativePackageDesired, current []byte) bool {
+	switch backend {
+	case resourcev1.Backend_BACKEND_APT:
 		return bytes.Equal(aptPin(d), current)
+	case resourcev1.Backend_BACKEND_DNF4:
+		owned, ok := dnf.VersionlockListOwned(current, ref.GetCanonicalKey(), d.GetPackage().GetNativeName())
+		if !ok {
+			return false
+		}
+		if entry := dnf4LockEntry(d); entry != "" {
+			return len(owned) == 1 && owned[0] == entry
+		}
+		return len(owned) == 0
 	}
 	document, err := dnf.ParseVersionlock(current)
 	if err != nil {
@@ -157,7 +192,7 @@ func (p *Provider) applyPin(plan *resourcev1.ResourcePlan) error {
 	if !proto.Equal(current, before.GetPinFile()) || !bytes.Equal(contents, before.GetPinContents()) {
 		return fmt.Errorf("%w: native pin changed before replacement", ErrConflict)
 	}
-	if len(native.GetPinContents()) == 0 {
+	if len(native.GetPinContents()) == 0 && p.manager != dnf.DNF4 {
 		return removeFile(path)
 	}
 	if strings.ContainsAny(path, "\x00\r\n") {
@@ -166,12 +201,19 @@ func (p *Provider) applyPin(plan *resourcev1.ResourcePlan) error {
 	if native.GetPinMode() == 0 || native.GetPinMode()&0022 != 0 {
 		return errors.New("packageprovider: unsafe native pin mode")
 	}
+	// The DNF4 plugin's list is a packaged configuration file it requires to
+	// exist; an empty rendering empties it rather than deleting it.
 	return atomicFile(path, native.GetPinContents(), os.FileMode(native.GetPinMode()))
 }
 
-func pinProjection(contents []byte) []byte {
-	if len(contents) == 0 {
-		return []byte("version = \"1.0\"\n")
+// pinProjection is the candidate lock document visible to staging. An empty
+// rendering still projects a valid document of the generation's format.
+func pinProjection(backend resourcev1.Backend, contents []byte) []byte {
+	if len(contents) != 0 {
+		return bytes.Clone(contents)
 	}
-	return bytes.Clone(contents)
+	if backend == resourcev1.Backend_BACKEND_DNF4 {
+		return []byte("\n")
+	}
+	return []byte("version = \"1.0\"\n")
 }

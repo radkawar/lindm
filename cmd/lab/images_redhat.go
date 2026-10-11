@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -25,11 +26,12 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 		return runRedHatRegistrationCommand(ctx, args[0], args[1:], stdout, stderr)
 	}
 	if len(args) == 0 || (args[0] != "discover" && args[0] != "fetch") {
-		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat inventory -token-file FILE; lab images redhat cleanup -token-file FILE -confirm-delete-lab-registrations [-legacy-consumer-uuid UUID]; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
+		return errors.New("usage: lab images redhat {discover|fetch} -version MINOR [-arch x86_64|aarch64] -token-file FILE [-cache DIR] [-manifest NEW_FILE]; lab images redhat inventory -token-file FILE; lab images redhat cleanup -token-file FILE -confirm-delete-lab-registrations [-legacy-consumer-uuid UUID]; explicit supported RHEL minors include 9.8 and 10.2; fetch requires a new manifest file; offline checking uses lab images verify")
 	}
 	flags := flag.NewFlagSet("images redhat "+args[0], flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	version := flags.String("version", "", "explicit supported RHEL 9 or 10 minor (for example 9.8 or 10.2), x86_64 KVM qcow2 only")
+	version := flags.String("version", "", "explicit supported RHEL 9 or 10 minor (for example 9.8 or 10.2), KVM qcow2 only")
+	architecture := flags.String("arch", "x86_64", "vendor image architecture: x86_64 or aarch64")
 	token := flags.String("token-file", "", "current-user-owned mode-0600 Red Hat offline-token file; never pass a token value")
 	cache := flags.String("cache", ".cache/lab/images", "dedicated digest-addressed image cache")
 	manifestPath := flags.String("manifest", "", "new mode-0600 protobuf JSON manifest (required for fetch)")
@@ -58,7 +60,7 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 		return err
 	}
 	defer client.Close()
-	image, err := client.Discover(ctx, *version)
+	image, err := client.Discover(ctx, *version, *architecture)
 	if err != nil {
 		return err
 	}
@@ -76,8 +78,8 @@ func runRedHatImages(ctx context.Context, args []string, stdout, stderr io.Write
 		return err
 	}
 	manifest := &labv1.ImageManifest{
-		Id:           "rhel-" + image.Version + "-kvm-x86-64",
-		Distribution: "rhel", Version: image.Version, Architecture: "x86_64", Edition: "KVM Guest Image",
+		Id:           "rhel-" + image.Version + "-kvm-" + strings.ReplaceAll(image.Architecture, "_", "-"),
+		Distribution: "rhel", Version: image.Version, Architecture: image.Architecture, Edition: "KVM Guest Image",
 		Release: image.Published.Format(time.RFC3339Nano), ImageFilename: image.Filename,
 		ImageUrl: image.DownloadURL(), ChecksumUrl: image.MetadataURL(), Sha256: image.SHA256,
 		ImageSizeBytes: receipt.ImageSizeBytes, ChecksumMode: labv1.ChecksumMode_CHECKSUM_MODE_VENDOR_AUTHENTICATED,

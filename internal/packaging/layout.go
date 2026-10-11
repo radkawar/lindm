@@ -45,10 +45,12 @@ const (
 	firewallRestoreUnit   = "lindm-firewall-restore.service"
 	connectivityGuardUnit = "lindm-connectivity-guard.service"
 	connectivityProbeUnit = "lindm-connectivity-probe.service"
-	sysusersPath          = "/usr/lib/sysusers.d/lindm.conf"
-	tmpfilesPath          = "/usr/lib/tmpfiles.d/lindm.conf"
-	copyrightPath         = "/usr/share/doc/lindm-agent/copyright"
-	purposeText           = "development-package-signing\n"
+	// sessionUnit is the per-user remote-assistance helper (systemd user unit).
+	sessionUnit   = "lindm-session.service"
+	sysusersPath  = "/usr/lib/sysusers.d/lindm.conf"
+	tmpfilesPath  = "/usr/lib/tmpfiles.d/lindm.conf"
+	copyrightPath = "/usr/share/doc/lindm-agent/copyright"
+	purposeText   = "development-package-signing\n"
 )
 
 //go:embed assets/*

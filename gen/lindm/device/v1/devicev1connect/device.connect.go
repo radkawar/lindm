@@ -87,6 +87,9 @@ const (
 	// DeviceServiceConfirmRefreshInventoryPublicationProcedure is the fully-qualified name of the
 	// DeviceService's ConfirmRefreshInventoryPublication RPC.
 	DeviceServiceConfirmRefreshInventoryPublicationProcedure = "/lindm.device.v1.DeviceService/ConfirmRefreshInventoryPublication"
+	// DeviceServiceSyncAssistanceProcedure is the fully-qualified name of the DeviceService's
+	// SyncAssistance RPC.
+	DeviceServiceSyncAssistanceProcedure = "/lindm.device.v1.DeviceService/SyncAssistance"
 )
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
@@ -116,6 +119,8 @@ type DeviceServiceClient interface {
 	ReportDeviceActionResult(context.Context, *connect.Request[v1.ReportDeviceActionResultRequest]) (*connect.Response[v1.ReportDeviceActionResultResponse], error)
 	RegisterDeviceActionRecovery(context.Context, *connect.Request[v1.RegisterDeviceActionRecoveryRequest]) (*connect.Response[v1.RegisterDeviceActionRecoveryResponse], error)
 	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
+	// SyncAssistance exchanges complete assistance state; see assistance.proto.
+	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
 }
 
 // NewDeviceServiceClient constructs a client for the lindm.device.v1.DeviceService service. By
@@ -237,6 +242,12 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("ConfirmRefreshInventoryPublication")),
 			connect.WithClientOptions(opts...),
 		),
+		syncAssistance: connect.NewClient[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse](
+			httpClient,
+			baseURL+DeviceServiceSyncAssistanceProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("SyncAssistance")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -260,6 +271,7 @@ type deviceServiceClient struct {
 	reportDeviceActionResult           *connect.Client[v1.ReportDeviceActionResultRequest, v1.ReportDeviceActionResultResponse]
 	registerDeviceActionRecovery       *connect.Client[v1.RegisterDeviceActionRecoveryRequest, v1.RegisterDeviceActionRecoveryResponse]
 	confirmRefreshInventoryPublication *connect.Client[v1.ConfirmRefreshInventoryPublicationRequest, v1.ConfirmRefreshInventoryPublicationResponse]
+	syncAssistance                     *connect.Client[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -353,6 +365,11 @@ func (c *deviceServiceClient) ConfirmRefreshInventoryPublication(ctx context.Con
 	return c.confirmRefreshInventoryPublication.CallUnary(ctx, req)
 }
 
+// SyncAssistance calls lindm.device.v1.DeviceService.SyncAssistance.
+func (c *deviceServiceClient) SyncAssistance(ctx context.Context, req *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
+	return c.syncAssistance.CallUnary(ctx, req)
+}
+
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
@@ -380,6 +397,8 @@ type DeviceServiceHandler interface {
 	ReportDeviceActionResult(context.Context, *connect.Request[v1.ReportDeviceActionResultRequest]) (*connect.Response[v1.ReportDeviceActionResultResponse], error)
 	RegisterDeviceActionRecovery(context.Context, *connect.Request[v1.RegisterDeviceActionRecoveryRequest]) (*connect.Response[v1.RegisterDeviceActionRecoveryResponse], error)
 	ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error)
+	// SyncAssistance exchanges complete assistance state; see assistance.proto.
+	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
 }
 
 // NewDeviceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -497,6 +516,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("ConfirmRefreshInventoryPublication")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServiceSyncAssistanceHandler := connect.NewUnaryHandler(
+		DeviceServiceSyncAssistanceProcedure,
+		svc.SyncAssistance,
+		connect.WithSchema(deviceServiceMethods.ByName("SyncAssistance")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DeviceServiceAcquireSessionProcedure:
@@ -535,6 +560,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceRegisterDeviceActionRecoveryHandler.ServeHTTP(w, r)
 		case DeviceServiceConfirmRefreshInventoryPublicationProcedure:
 			deviceServiceConfirmRefreshInventoryPublicationHandler.ServeHTTP(w, r)
+		case DeviceServiceSyncAssistanceProcedure:
+			deviceServiceSyncAssistanceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -614,4 +641,8 @@ func (UnimplementedDeviceServiceHandler) RegisterDeviceActionRecovery(context.Co
 
 func (UnimplementedDeviceServiceHandler) ConfirmRefreshInventoryPublication(context.Context, *connect.Request[v1.ConfirmRefreshInventoryPublicationRequest]) (*connect.Response[v1.ConfirmRefreshInventoryPublicationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.SyncAssistance is not implemented"))
 }

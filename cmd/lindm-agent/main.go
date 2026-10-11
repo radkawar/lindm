@@ -21,6 +21,7 @@ const usage = `Usage: lindm-agent inspect
        lindm-agent verify-bootstrap -root FILE -bundle FILE
        lindm-agent executor
        lindm-agent run
+       lindm-agent session [-socket FILE]
        lindm-agent bootstrap -root FILE -bundle FILE -grant FILE
        lindm-agent bootstrap -root FILE -bundle FILE -provisioning-token-file FILE
        lindm-agent offline-export -root FILE -bundle FILE -file AUTHORIZATION -out REQUEST
@@ -70,6 +71,9 @@ is root-only and reads an owner unlock credential from a protected stdin pipe,
 never argv or a plaintext file. Bytes are exact; do not append a newline.
 recovery-run is the signed recovery image's root-only entrypoint. It cannot enroll,
 serve general device/admin operations, or start without fresh online authority.
+session is the unprivileged per-user remote-assistance helper (systemd user unit
+lindm-session.service). It refuses root, verifies the session socket peer is root,
+and uses only the caller's session bus, desktop portal and notifications.
 version prints the packaging version and a newline.
 `
 
@@ -95,6 +99,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return inventoryObserveCommand(ctx, args[1:], output)
 	case "run":
 		return serveNetwork(ctx, args[1:])
+	case "session":
+		return sessionCommand(ctx, args[1:])
 	case "bootstrap":
 		return bootstrapCommand(ctx, args[1:])
 	case "offline-export", "offline-import":

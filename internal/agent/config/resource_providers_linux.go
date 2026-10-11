@@ -18,6 +18,9 @@ func resourceProtectedPaths(base string, cfg *agentv1.AgentConfig, state, runtim
 	if recovery := cfg.GetRecoveryBoot(); recovery != nil {
 		paths = append(paths, recovery.GetStateDirectory(), recovery.GetEspDirectory(), filepath.Dir(recovery.GetImageFile()), filepath.Dir(recovery.GetSignerCertificateFile()))
 	}
+	if assistance := cfg.GetRemoteAssistance(); assistance.GetEnabled() {
+		paths = append(paths, sessionRuntimeDirectory(base, assistance))
+	}
 	if protected := cfg.GetActionProvider().GetProtectedStateDirectory(); protected != "" {
 		paths = append(paths, resolve(base, protected))
 	}

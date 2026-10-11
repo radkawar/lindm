@@ -26,14 +26,14 @@ func missingModule(platform *resourcev1.PlatformProduct, feature agentv1.Passwor
 	name := modulePackageName(platform, feature)
 	ecosystem := resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB
 	arch := nativePackageArchitecture(platform)
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
 	}
 	return &PrerequisiteError{Package: &resourcev1.PackageIdentity{Ecosystem: ecosystem, NativeName: name, Architecture: arch}, Module: moduleName(feature), Cause: cause}
 }
 func nativePackageArchitecture(platform *resourcev1.PlatformProduct) string {
 	arch := runtime.GOARCH
-	if platform.GetOsId() == "fedora" {
+	if authselectProduct(platform) {
 		switch arch {
 		case "amd64":
 			return "x86_64"

@@ -35,6 +35,9 @@ func buildDEB(ctx context.Context, work, payload, version string, arch Architect
 	if len(p.units) != 0 {
 		dependencies = "Depends: systemd\n"
 	}
+	if len(p.debRecommends) != 0 {
+		dependencies += "Recommends: " + strings.Join(p.debRecommends, ", ") + "\n"
+	}
 	text := fmt.Sprintf("Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: Lindm Packaging <packaging@lindm.invalid>\nSection: admin\nPriority: optional\n%sInstalled-Size: %d\nDescription: %s\n %s\n", p.name, version, arch.Debian, dependencies, size, p.summary, strings.ReplaceAll(p.description, "\n", "\n "))
 	if err := writeFile(filepath.Join(control, "control"), []byte(text), 0o644, epoch); err != nil {
 		return Artifact{}, err

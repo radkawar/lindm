@@ -18,6 +18,7 @@ import (
 	"lindm/internal/agent/fileprovider"
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/journal"
+	"lindm/internal/agent/nativefile"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/passwordprovider"
 	"lindm/internal/agent/serviceprovider"
@@ -116,15 +117,19 @@ func resourceAdmissionCause(err error) (agentv1.ResourceAdmissionRefusalReason, 
 		return unspecified, none, false
 	case errors.Is(err, serviceprovider.ErrBaselineUnknown), errors.Is(err, definitionprovider.ErrBaselineUnknown):
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, true
+	// nativefile is the shared protected file boundary of the file provider:
+	// metadata it cannot preserve (POSIX ACLs, capabilities) is refused before
+	// any effect, exactly like the provider's own unsupported preflight.
 	case errors.Is(err, serviceprovider.ErrUnsupported), errors.Is(err, accountprovider.ErrUnsupported),
 		errors.Is(err, definitionprovider.ErrUnsupported), errors.Is(err, encryptionprovider.ErrUnsupported),
 		errors.Is(err, fileprovider.ErrUnsupported), errors.Is(err, firewallprovider.ErrUnsupported),
 		errors.Is(err, packageprovider.ErrUnsupported), errors.Is(err, passwordprovider.ErrUnsupported),
-		errors.Is(err, sysctlprovider.ErrUnsupported):
+		errors.Is(err, sysctlprovider.ErrUnsupported), errors.Is(err, nativefile.ErrUnsupported):
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, true
 	case errors.Is(err, serviceprovider.ErrConflict), errors.Is(err, accountprovider.ErrConflict), errors.Is(err, accountprovider.ErrUnsafe),
 		errors.Is(err, definitionprovider.ErrConflict), errors.Is(err, definitionprovider.ErrProtected),
 		errors.Is(err, encryptionprovider.ErrConflict), errors.Is(err, fileprovider.ErrConflict), errors.Is(err, fileprovider.ErrUnsafePath),
+		errors.Is(err, nativefile.ErrConflict), errors.Is(err, nativefile.ErrUnsafePath),
 		errors.Is(err, firewallprovider.ErrConflict), errors.Is(err, packageprovider.ErrConflict),
 		errors.Is(err, passwordprovider.ErrConflict), errors.Is(err, passwordprovider.ErrAccessGuard), errors.Is(err, passwordprovider.ErrMissingModule),
 		errors.Is(err, sysctlprovider.ErrConflict), errors.Is(err, journal.ErrResourceOwnershipConflict), errors.Is(err, journal.ErrResourceOwnershipDrift):

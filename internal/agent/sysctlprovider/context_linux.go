@@ -18,7 +18,14 @@ func nativeBackend(ctx context.Context, platform *resourcev1.PlatformProduct) (*
 	if err := validateMessage(platform); err != nil {
 		return nil, err
 	}
-	if platform.GetOsId() != "ubuntu" && platform.GetOsId() != "fedora" {
+	switch platform.GetOsId() {
+	case "ubuntu", "fedora":
+	case "rhel", "almalinux":
+		// Of Enterprise Linux only EL 9 is qualified.
+		if !strings.HasPrefix(platform.GetVersion(), "9.") {
+			return nil, ErrUnsupported
+		}
+	default:
 		return nil, ErrUnsupported
 	}
 	for _, marker := range []string{"/run/ostree-booted", "/etc/NIXOS", "/etc/transactional-update.conf"} {

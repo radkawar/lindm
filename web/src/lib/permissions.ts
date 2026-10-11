@@ -12,6 +12,7 @@ export const permissionLabels: Record<string, string> = {
   "inventory.manage": "Manage inventory",
   "recovery_keys.read": "Reveal recovery keys",
   "remote_execution.run": "Run remote actions",
+  "remote_assistance.run": "Run remote assistance",
   "scripts.run": "Run scripts",
   "destructive.execute": "Run destructive actions",
   "approvals.manage": "Review approvals",

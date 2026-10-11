@@ -34,7 +34,7 @@ func testSocketPathLifecycle(t *testing.T, networkGID uint32) {
 		t.Fatal(err)
 	}
 	defer func() { _ = dir.Close() }()
-	socket, err := listenSocket(dir, "executor.sock", networkGID)
+	socket, err := listenSocket(dir, "executor.sock", executorAccess(networkGID))
 	if err != nil {
 		t.Fatalf("bind real pathname socket: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestSocketCleanupPreservesReplacementPathname(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = dir.Close() }()
-	socket, err := listenSocket(dir, "executor.sock", uint32(os.Getegid()))
+	socket, err := listenSocket(dir, "executor.sock", executorAccess(uint32(os.Getegid())))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestSocketUsesRetainedRuntimeDirectory(t *testing.T) {
 	if err := os.Mkdir(directory, 0755); err != nil {
 		t.Fatal(err)
 	}
-	socket, err := listenSocket(dir, "executor.sock", uint32(os.Getegid()))
+	socket, err := listenSocket(dir, "executor.sock", executorAccess(uint32(os.Getegid())))
 	if err != nil {
 		t.Fatalf("listen through retained directory: %v", err)
 	}

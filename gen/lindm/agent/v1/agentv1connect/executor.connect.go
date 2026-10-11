@@ -125,6 +125,9 @@ const (
 	ExecutorServiceGetAgentUpdateProcedure = "/lindm.agent.v1.ExecutorService/GetAgentUpdate"
 	// ExecutorServiceStatusProcedure is the fully-qualified name of the ExecutorService's Status RPC.
 	ExecutorServiceStatusProcedure = "/lindm.agent.v1.ExecutorService/Status"
+	// ExecutorServiceSyncAssistanceProcedure is the fully-qualified name of the ExecutorService's
+	// SyncAssistance RPC.
+	ExecutorServiceSyncAssistanceProcedure = "/lindm.agent.v1.ExecutorService/SyncAssistance"
 )
 
 // ExecutorServiceClient is a client for the lindm.agent.v1.ExecutorService service.
@@ -206,6 +209,10 @@ type ExecutorServiceClient interface {
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
+	// SyncAssistance applies the server's complete assistance directives and
+	// returns the device-observed state. Local identities come from logind and
+	// kernel peer credentials, not from a session helper.
+	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
 }
 
 // NewExecutorServiceClient constructs a client for the lindm.agent.v1.ExecutorService service. By
@@ -405,6 +412,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("Status")),
 			connect.WithClientOptions(opts...),
 		),
+		syncAssistance: connect.NewClient[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse](
+			httpClient,
+			baseURL+ExecutorServiceSyncAssistanceProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("SyncAssistance")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -441,6 +454,7 @@ type executorServiceClient struct {
 	exchangeAgentUpdate          *connect.Client[v1.ExchangeAgentUpdateRequest, v1.ExchangeAgentUpdateResponse]
 	getAgentUpdate               *connect.Client[v1.GetAgentUpdateRequest, v1.GetAgentUpdateResponse]
 	status                       *connect.Client[v1.StatusRequest, v1.StatusResponse]
+	syncAssistance               *connect.Client[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse]
 }
 
 // PrepareBootstrap calls lindm.agent.v1.ExecutorService.PrepareBootstrap.
@@ -598,6 +612,11 @@ func (c *executorServiceClient) Status(ctx context.Context, req *connect.Request
 	return c.status.CallUnary(ctx, req)
 }
 
+// SyncAssistance calls lindm.agent.v1.ExecutorService.SyncAssistance.
+func (c *executorServiceClient) SyncAssistance(ctx context.Context, req *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
+	return c.syncAssistance.CallUnary(ctx, req)
+}
+
 // ExecutorServiceHandler is an implementation of the lindm.agent.v1.ExecutorService service.
 type ExecutorServiceHandler interface {
 	// PrepareBootstrap validates supplied trust, or returns the existing pending
@@ -677,6 +696,10 @@ type ExecutorServiceHandler interface {
 	// Status reports durable lifecycle facts. It does not report transport
 	// reachability or any secret, grant, private key, or signed envelope.
 	Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error)
+	// SyncAssistance applies the server's complete assistance directives and
+	// returns the device-observed state. Local identities come from logind and
+	// kernel peer credentials, not from a session helper.
+	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
 }
 
 // NewExecutorServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -872,6 +895,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("Status")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceSyncAssistanceHandler := connect.NewUnaryHandler(
+		ExecutorServiceSyncAssistanceProcedure,
+		svc.SyncAssistance,
+		connect.WithSchema(executorServiceMethods.ByName("SyncAssistance")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.agent.v1.ExecutorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ExecutorServicePrepareBootstrapProcedure:
@@ -936,6 +965,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceGetAgentUpdateHandler.ServeHTTP(w, r)
 		case ExecutorServiceStatusProcedure:
 			executorServiceStatusHandler.ServeHTTP(w, r)
+		case ExecutorServiceSyncAssistanceProcedure:
+			executorServiceSyncAssistanceHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1067,4 +1098,8 @@ func (UnimplementedExecutorServiceHandler) GetAgentUpdate(context.Context, *conn
 
 func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Request[v1.StatusRequest]) (*connect.Response[v1.StatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.Status is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.SyncAssistance is not implemented"))
 }

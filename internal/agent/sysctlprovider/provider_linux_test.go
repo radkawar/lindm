@@ -154,6 +154,29 @@ func TestReleaseRefusesRuntimeIdentityAndPersistentDrift(t *testing.T) {
 		t.Fatal("private baseline not restored")
 	}
 }
+
+// Release after a reboot was refused because the live value's boot-scoped
+// identity changed although the owned stanza had re-applied it at boot.
+func TestReleaseAfterRebootRestoresBaseline(t *testing.T) {
+	_, store, current, desired := fixtureProvider(t)
+	baseline := proto.CloneOf(*current)
+	last := persistentFixture(*current, "20")
+	store.ledger = &agentv1.ResourceOwnershipLedger{Owner: store.owner, Baseline: baseline, LastApplied: last, OwnedDimensions: []agentv1.ResourceOwnedDimension{agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_PERSISTENCE}}
+	rebooted := proto.CloneOf(last)
+	rebooted.Observation.Metadata.BootId = "8d2f1c44-0a51-4f0e-9a43-6b1f3c2e7d90"
+	rebooted.GetObservation().GetSysctl().NativeIdentitySha256[0]++
+	target, err := targetSnapshot(desired.GetSysctl(), rebooted, store.ledger, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE)
+	if err != nil {
+		t.Fatalf("release after reboot refused: %v", err)
+	}
+	if target.GetSysctlPersistence().GetState().GetExists() || target.GetObservation().GetSysctl().GetValue() != "60" {
+		t.Fatal("private baseline not restored after reboot")
+	}
+	rebooted.SysctlPersistence.Content = append(rebooted.SysctlPersistence.Content, '#')
+	if _, err := targetSnapshot(desired.GetSysctl(), rebooted, store.ledger, resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE); !errors.Is(err, ErrConflict) {
+		t.Fatal("reboot excused an external stanza edit")
+	}
+}
 func TestReleaseInverseIgnoresObservationTimestampNotState(t *testing.T) {
 	_, store, current, desired := fixtureProvider(t)
 	last := proto.CloneOf(*current)

@@ -145,7 +145,10 @@ func exercisePackageDrift(ctx context.Context, r *resourceDispatch, rpm resource
 	evidence.Scenarios = append(evidence.Scenarios, VMResourceScenario{Name: "external-pin-drift-release-refused", StartedAt: time.Now().UTC(), Action: action})
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	path := "/etc/dnf/versionlock.toml"
-	if !rpm.rpm {
+	switch {
+	case rpm.dnf4:
+		path = dnf4VersionlockList
+	case !rpm.rpm:
 		digest := sha256.Sum256([]byte(desired.GetRef().GetCanonicalKey()))
 		path = fmt.Sprintf("/etc/apt/preferences.d/lindm-%x", digest)
 	}

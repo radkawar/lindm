@@ -69,19 +69,9 @@ func helperProvider(ctx context.Context, stateDirectory string, request *agentv1
 		}
 	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		selected, err := dnf.Executable(os.Stat)
-		if err != nil {
+		if _, err := p.selectDNF(ctx, directory); err != nil {
 			return nil, "", err
 		}
-		result, err := p.run(ctx, selected, dnf.VersionArgs(directory), "/", nil)
-		if err != nil {
-			return nil, "", err
-		}
-		manager, err := dnf.ParseVersion(result.stdout)
-		if err != nil || !manager.AtLeast(dnf.DNF5, minimumDNF5) {
-			return nil, "", fmt.Errorf("%w: native DNF5 %s or newer required", ErrUnsupported, minimumDNF5)
-		}
-		p.managerPath = selected
 	}
 	return p, directory, nil
 }
@@ -98,7 +88,7 @@ func PrepareNative(ctx context.Context, stateDirectory string, request *agentv1.
 		return err
 	}
 	if request.GetOriginalPin() != nil {
-		pin, contents, err := readPin("/etc/dnf/versionlock.toml")
+		pin, contents, err := readPin(p.pinPath(request.GetDesired().GetRef()))
 		if err != nil {
 			return err
 		}
@@ -311,7 +301,7 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 	}
 	if request.GetOriginalPin() != nil {
 		digest := sha256.Sum256(request.GetCandidatePinContents())
-		if !bytes.Equal(digest[:], manifest.GetCandidatePinSha256()) || !bytes.Equal(request.GetCandidatePinContents(), pinProjection(plan.GetNativePackage().GetPinContents())) {
+		if !bytes.Equal(digest[:], manifest.GetCandidatePinSha256()) || !bytes.Equal(request.GetCandidatePinContents(), pinProjection(plan.GetBackend().GetBackend(), plan.GetNativePackage().GetPinContents())) {
 			return ErrConflict
 		}
 	}
@@ -374,6 +364,8 @@ func ExecuteNative(ctx context.Context, stateDirectory string, request *agentv1.
 					break
 				}
 			}
+		} else if p.manager == dnf.DNF4 {
+			_, err = p.dnf4(ctx, "apply", directory, p.versionlock)
 		} else {
 			_, err = p.dnf(ctx, directory, []string{"--cacheonly", "replay", filepath.Join(directory, "transaction")})
 		}
@@ -461,6 +453,15 @@ func (p *Provider) checkStagedArtifacts(ctx context.Context, directory string, r
 		}
 		if !proto.Equal(&resourcev1.PackageTransactionManifest{Entries: entries}, &resourcev1.PackageTransactionManifest{Entries: manifest.GetEntries()}) {
 			return ErrConflict
+		}
+		if p.manager == dnf.DNF4 && len(transaction.RPMs) != 0 {
+			// The staged bundle must replay to the identical transaction from
+			// local packages alone before authority is consumed. The original
+			// lock list is unchanged since staging resolved against its
+			// candidate, which is applied only after the permit.
+			if _, err := p.dnf4(ctx, "check", directory, false); err != nil {
+				return fmt.Errorf("packageprovider: staged DNF4 transaction no longer replays: %w", err)
+			}
 		}
 		return nil
 	}

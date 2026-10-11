@@ -151,14 +151,15 @@ func transientProperties(directory, transactionID, phase string) []unitProperty 
 func (bus *nativeBus) start(ctx context.Context, directory string, request *agentv1.NativePackageTransactionRequest, phase string) error {
 	properties := transientProperties(directory, request.GetTransactionId(), phase)
 	if phase == "prepare" && request.CandidatePinContents != nil {
-		// The fixed existing destination is custody-checked immediately before
-		// launch. Only the staging unit sees the candidate lock; the host does not.
+		// The fixed existing destination (DNF5 versionlock.toml or the DNF4
+		// plugin list) is custody-checked immediately before launch. Only the
+		// staging unit sees the candidate lock; the host does not.
 		properties = append(properties, unitProperty{Name: "BindReadOnlyPaths", Value: dbus.MakeVariant([]struct {
 			Source        string
 			Destination   string
 			IgnoreMissing bool
 			Flags         uint64
-		}{{filepath.Join(directory, "candidate-versionlock.toml"), "/etc/dnf/versionlock.toml", false, 0}})})
+		}{{filepath.Join(directory, candidatePinName), request.GetOriginalPin().GetPath(), false, 0}})})
 	}
 	return bus.startUnit(ctx, unitName(request.GetTransactionId(), phase), properties)
 }

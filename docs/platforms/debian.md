@@ -161,11 +161,11 @@ lock, encryption or sanitize qualification.
 The shared session provider uses authenticated root-owned logind over the fixed
 system bus; lock acknowledgment is not physical desktop visibility
 ([session provider](../../internal/agent/actionprovider/sessions_linux.go#L38),
-[evidence semantics](../../internal/agent/actionprovider/network_linux.go#L229)).
+[evidence semantics](../../internal/agent/actionprovider/network_linux.go#L257)).
 Power checks native capabilities, schedules and inhibitors without an unsafe fallback
 ([power](../../internal/agent/actionprovider/power_linux.go#L172)). Nftables quarantine
 has kernel expiry and reports lost management delivery as unknown
-([quarantine](../../internal/agent/actionprovider/network_linux.go#L232)).
+([quarantine](../../internal/agent/actionprovider/network_linux.go#L260)).
 None of those implementation paths supplies missing Debian GNOME/KDE/GDM or native
 action evidence. Preserve authorization, exact target identity and irreversible-effect
 warnings rather than using Ubuntu's action pass as a Debian substitute.

@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AssistanceMode is the capability requested by the operator. CONTROL also
+// requires a separately visible local keyboard/pointer grant; the local user
+// may still grant only viewing.
+enum AssistanceMode {
+  ASSISTANCE_MODE_UNSPECIFIED = 0;
+  ASSISTANCE_MODE_VIEW = 1;
+  ASSISTANCE_MODE_CONTROL = 2;
+}
+
+// AssistancePhase is the device-observed lifecycle. Phases only advance and
+// ENDED is terminal.
+enum AssistancePhase {
+  ASSISTANCE_PHASE_UNSPECIFIED = 0;
+  // The executor holds the invitation; no eligible helper has shown it yet.
+  ASSISTANCE_PHASE_PENDING = 1;
+  // The consent prompt is visible in the local graphical session.
+  ASSISTANCE_PHASE_PROMPTED = 2;
+  // Product consent and the portal grant exist; offer_sdp is ready.
+  ASSISTANCE_PHASE_OFFERED = 3;
+  // The DTLS-SRTP peer connection is established.
+  ASSISTANCE_PHASE_ACTIVE = 4;
+  ASSISTANCE_PHASE_ENDED = 5;
+}
+
+// AssistanceEndCause records why a session ended. It is audit data, not an
+// error code.
+enum AssistanceEndCause {
+  ASSISTANCE_END_CAUSE_UNSPECIFIED = 0;
+  // The local user declined the product prompt or cancelled the portal dialog.
+  ASSISTANCE_END_CAUSE_DECLINED = 1;
+  ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT = 2;
+  ASSISTANCE_END_CAUSE_OPERATOR_STOPPED = 3;
+  // The local user used the product stop control.
+  ASSISTANCE_END_CAUSE_USER_STOPPED = 4;
+  // The portal session closed, including the desktop's own sharing indicator.
+  ASSISTANCE_END_CAUSE_PORTAL_CLOSED = 5;
+  ASSISTANCE_END_CAUSE_SESSION_LOCKED = 6;
+  // Logout, UID/session change or loss of the session helper.
+  ASSISTANCE_END_CAUSE_SESSION_ENDED = 7;
+  // The hard maximum duration elapsed.
+  ASSISTANCE_END_CAUSE_EXPIRED = 8;
+  // Fresh authorization was not observed within the reauthorization window.
+  ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST = 9;
+  ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION = 10;
+  // Portal, PipeWire, encoder or relay capability was unavailable.
+  ASSISTANCE_END_CAUSE_UNAVAILABLE = 11;
+  ASSISTANCE_END_CAUSE_CONNECTION_FAILED = 12;
+  // Device policy does not enable remote assistance.
+  ASSISTANCE_END_CAUSE_DISABLED = 13;
+}
+
+message AssistanceIceServer {
+  repeated string urls = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4
+    items: {
+      string: {
+        max_len: 256
+        pattern: "^turns?:[^\\s]+$"
+      }
+    }
+  }];
+  string username = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string credential = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+}
+
+// AssistanceInvitation is the server-authorized, single-use support request.
+message AssistanceInvitation {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceMode mode = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  string operator_display = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  // The local user must consent before this instant.
+  google.protobuf.Timestamp consent_deadline = 5 [(buf.validate.field).required = true];
+  // Hard maximum; extension requires a new invitation and fresh consent.
+  google.protobuf.Timestamp ends_at = 6 [(buf.validate.field).required = true];
+  // Empty selects the user of the active local graphical session.
+  string target_username = 7 [(buf.validate.field).string.pattern = "^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$"];
+  // Relay-only ICE configuration with per-session credentials.
+  repeated AssistanceIceServer ice_servers = 8 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4
+  }];
+}
+
+// AssistanceDirective is the authority's complete desired state for one
+// session. Receivers apply it idempotently.
+message AssistanceDirective {
+  AssistanceInvitation invitation = 1 [(buf.validate.field).required = true];
+  string answer_sdp = 2 [(buf.validate.field).string.max_len = 16384];
+  bool terminate = 3;
+  AssistanceEndCause terminate_cause = 4 [(buf.validate.field).enum.defined_only = true];
+}
+
+// AssistanceLocalSession identifies the consenting local session. The
+// executor derives it from kernel peer credentials and logind; a session
+// helper never supplies it.
+message AssistanceLocalSession {
+  string username = 1 [(buf.validate.field).string.pattern = "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"];
+  uint32 uid = 2;
+  string logind_session_id = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9_.-]+$"
+  }];
+  string session_type = 4 [(buf.validate.field).string = {
+    in: [
+      "wayland",
+      "x11"
+    ]
+  }];
+  string desktop = 5 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[ -~]*$"
+  }];
+}
+
+// AssistanceReport is the device's complete observed state for one session.
+message AssistanceReport {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistancePhase phase = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string offer_sdp = 3 [(buf.validate.field).string.max_len = 16384];
+  bool control_granted = 4;
+  AssistanceEndCause end_cause = 5 [(buf.validate.field).enum.defined_only = true];
+  string end_detail = 6 [(buf.validate.field).string = {
+    max_len: 256
+    pattern: "^[ -~]*$"
+  }];
+  AssistanceLocalSession local_session = 7;
+  option (buf.validate.message).cel = {
+    id: "assistance_report.offer"
+    message: "offer_sdp is required from OFFERED and absent before it"
+    expression: "(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_report.end"
+    message: "end_cause is required exactly when ENDED"
+    expression: "(this.phase == 5) == (this.end_cause != 0)"
+  };
+}
+
+message SyncAssistanceRequest {
+  repeated AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 8];
+}
+message SyncAssistanceResponse {
+  repeated AssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 8];
+}
+
+// RemoteAssistanceConfig is device policy. Disabled devices end every
+// invitation with DISABLED and do not open the session socket.
+message RemoteAssistanceConfig {
+  bool enabled = 1;
+  // Directory for the session-helper socket; defaults to /run/lindm-session.
+  string session_runtime_directory = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.(lindm.validation.v1.file_reference) = true
+  ];
+}

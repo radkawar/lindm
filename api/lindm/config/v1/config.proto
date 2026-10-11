@@ -91,6 +91,8 @@ message ServerConfig {
   // Independent native firewall probe peers, provisioned by the server operator.
   // The enrolled device endpoint only confirms these exact external targets.
   repeated lindm.agent.v1.ConnectivityProbeTarget connectivity_probes = 22 [(buf.validate.field).repeated.max_items = 32];
+  // Absent: remote assistance is not configured and requests are refused.
+  AssistanceConfig assistance = 24;
   // Offline bundle import authority and the served native repository root.
   // Absent disables `lindmd bundle-import` and the /offline/ handler.
   OfflineBundleConfig offline_bundles = 23;
@@ -505,7 +507,7 @@ message BreakGlassPolicy {
   // This allowlist always applies, including when console_only is true.
   repeated string allowed_permissions = 1 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 23,
+    (buf.validate.field).repeated.max_items = 24,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -520,6 +522,7 @@ message BreakGlassPolicy {
         "inventory.manage",
         "recovery_keys.read",
         "remote_execution.run",
+        "remote_assistance.run",
         "scripts.run",
         "destructive.execute",
         "approvals.manage",
@@ -545,4 +548,50 @@ message BreakGlassPolicy {
     }
   ];
   bool require_incident_reason = 4 [(buf.validate.field).bool.const = true];
+}
+
+// AssistanceConfig enables built-in graphical remote assistance with the
+// embedded relay-only TURN service. Media is DTLS-SRTP end to end; the relay
+// forwards ciphertext only between its own allocations.
+message AssistanceConfig {
+  AssistanceRelayConfig relay = 1 [(buf.validate.field).required = true];
+  // Admission bound for non-ended sessions; zero selects 16.
+  uint32 max_concurrent_sessions = 2 [(buf.validate.field).uint32.lte = 256];
+}
+
+message AssistanceRelayConfig {
+  // UDP and TCP TURN listener.
+  ListenerConfig listener = 1 [(buf.validate.field).required = true];
+  // Address relay allocations bind and advertise. Peers may only reach other
+  // allocations on this address.
+  string relay_address = 2 [(buf.validate.field).string.ip = true];
+  uint32 relay_port_min = 3 [(buf.validate.field).uint32 = {
+    gte: 1024
+    lte: 65535
+  }];
+  uint32 relay_port_max = 4 [(buf.validate.field).uint32 = {
+    gte: 1024
+    lte: 65535
+  }];
+  // TURN URIs advertised to devices and consoles, e.g. turn:relay.example:3478?transport=udp.
+  repeated string urls = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4
+    items: {
+      string: {
+        max_len: 256
+        pattern: "^turn:[^\\s]+$"
+      }
+    }
+  }];
+  string realm = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[A-Za-z0-9.-]+$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_relay.ports"
+    message: "relay_port_min must not exceed relay_port_max"
+    expression: "this.relay_port_min <= this.relay_port_max"
+  };
 }

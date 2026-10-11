@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/assistance.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// AssistanceState is the server lifecycle of one support invitation.
+enum AssistanceState {
+  ASSISTANCE_STATE_UNSPECIFIED = 0;
+  // Created; the device has not yet shown the prompt.
+  ASSISTANCE_STATE_REQUESTED = 1;
+  // The consent prompt is visible to the bound local user.
+  ASSISTANCE_STATE_PROMPTED = 2;
+  // The local user consented and the device offer is ready for the operator.
+  ASSISTANCE_STATE_OFFERED = 3;
+  // The requesting operator answered; the peers are connecting.
+  ASSISTANCE_STATE_ANSWERED = 4;
+  ASSISTANCE_STATE_ACTIVE = 5;
+  ASSISTANCE_STATE_ENDED = 6;
+}
+
+message AssistanceSession {
+  string id = 1;
+  string device_id = 2;
+  string operator_id = 3;
+  string operator_display = 4;
+  lindm.agent.v1.AssistanceMode mode = 5;
+  string reason = 6;
+  AssistanceState state = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp consent_deadline = 9;
+  google.protobuf.Timestamp ends_at = 10;
+  google.protobuf.Timestamp consented_at = 11;
+  google.protobuf.Timestamp started_at = 12;
+  google.protobuf.Timestamp ended_at = 13;
+  lindm.agent.v1.AssistanceEndCause end_cause = 14;
+  string end_detail = 15;
+  // Whether the local user granted keyboard/pointer control.
+  bool control_granted = 16;
+  lindm.agent.v1.AssistanceLocalSession local_session = 17;
+  // DTLS certificate fingerprints bound by the authenticated signaling exchange.
+  string offer_fingerprint = 18;
+  string answer_fingerprint = 19;
+  string target_username = 20;
+}
+
+message CreateAssistanceSessionRequest {
+  string request_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string device_id = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  lindm.agent.v1.AssistanceMode mode = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Zero selects the 30-minute default maximum.
+  uint32 max_duration_seconds = 5 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).uint32 = {
+      gte: 60
+      lte: 1800
+    }
+  ];
+  // Empty targets the user of the device's active local graphical session.
+  string target_username = 6 [(buf.validate.field).string.pattern = "^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$"];
+}
+message CreateAssistanceSessionResponse {
+  AssistanceSession session = 1;
+}
+
+message ListAssistanceSessionsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 100];
+  string page_token = 3 [(buf.validate.field).string.max_len = 512];
+}
+message ListAssistanceSessionsResponse {
+  repeated AssistanceSession sessions = 1;
+  string next_page_token = 2;
+}
+
+message GetAssistanceSessionRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetAssistanceSessionResponse {
+  AssistanceSession session = 1;
+}
+
+// JoinAssistanceSession returns the device offer and fresh relay credentials
+// only to the operator who created the invitation, only while OFFERED.
+message JoinAssistanceSessionRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message JoinAssistanceSessionResponse {
+  AssistanceSession session = 1;
+  string offer_sdp = 2;
+  repeated lindm.agent.v1.AssistanceIceServer ice_servers = 3;
+}
+
+message AnswerAssistanceSessionRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  string answer_sdp = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message AnswerAssistanceSessionResponse {
+  AssistanceSession session = 1;
+}
+
+message StopAssistanceSessionRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message StopAssistanceSessionResponse {
+  AssistanceSession session = 1;
+}

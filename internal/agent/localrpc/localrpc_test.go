@@ -57,7 +57,7 @@ func (h *recordingHandler) Status(ctx context.Context, _ *connect.Request[agentv
 	h.capture(ctx)
 	return connect.NewResponse(&agentv1.StatusResponse{}), nil
 }
-func (h *recordingHandler) capture(ctx context.Context) { h.uid, h.ok = peerUID(ctx) }
+func (h *recordingHandler) capture(ctx context.Context) { h.uid, h.ok = PeerUID(ctx) }
 
 func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 	if err := authorize(agentv1connect.ExecutorServiceStatusProcedure, 50, 40); err == nil {
@@ -101,6 +101,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		agentv1connect.ExecutorServiceGetAgentUpdateProcedure,
 		agentv1connect.ExecutorServicePrepareEncryptionKeyProcedure,
 		agentv1connect.ExecutorServiceAcknowledgeEncryptionKeyProcedure,
+		agentv1connect.ExecutorServiceSyncAssistanceProcedure,
 	} {
 		for _, uid := range []uint32{0, 40} {
 			if err := authorize(procedure, uid, 40); err != nil {

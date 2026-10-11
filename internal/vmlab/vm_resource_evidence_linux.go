@@ -30,9 +30,12 @@ type VMResourceScenario struct {
 	Release         *adminv1.ResourceRelease         `json:"release,omitempty"`
 	ExecutorStatus  *agentv1.ResourceExecutionStatus `json:"executor_status,omitempty"`
 	ExecutorHistory []vmServiceAttestationPhase      `json:"authenticated_executor_history,omitempty"`
-	Native          []VMResourceNativeRecord         `json:"native_records"`
-	Passed          bool                             `json:"passed"`
-	Failure         string                           `json:"failure,omitempty"`
+	// DeviceActions are real server-dispatched device actions (for example a
+	// quarantine during a firewall zone) whose root and server states agree.
+	DeviceActions []*actionDispatchEvidence `json:"device_actions,omitempty"`
+	Native        []VMResourceNativeRecord  `json:"native_records"`
+	Passed        bool                      `json:"passed"`
+	Failure       string                    `json:"failure,omitempty"`
 }
 
 type VMResourceKindEvidence struct {
@@ -82,7 +85,7 @@ func qualifyResourceEvidence(kind *VMResourceKindEvidence, required []string) er
 	}
 	for index, name := range required {
 		scenario := &kind.Scenarios[index]
-		if scenario.Name != name || !scenario.Passed || scenario.Failure != "" || scenario.StartedAt.IsZero() || scenario.FinishedAt.Before(scenario.StartedAt) || len(scenario.Native) == 0 || (scenario.Action == nil && scenario.Release == nil && scenario.ExecutorStatus == nil) {
+		if scenario.Name != name || !scenario.Passed || scenario.Failure != "" || scenario.StartedAt.IsZero() || scenario.FinishedAt.Before(scenario.StartedAt) || len(scenario.Native) == 0 || (scenario.Action == nil && scenario.Release == nil && scenario.ExecutorStatus == nil && len(scenario.DeviceActions) == 0) {
 			return fmt.Errorf("native resource scenario %s lacks completed signed and independent evidence", name)
 		}
 		if scenario.ExecutorStatus != nil && (len(scenario.ExecutorHistory) == 0 || scenario.ExecutorStatus.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED) {
@@ -93,6 +96,11 @@ func qualifyResourceEvidence(kind *VMResourceKindEvidence, required []string) er
 		}
 		if scenario.Release != nil && scenario.Release.GetState() != "released" && scenario.Release.GetState() != "release_conflict" {
 			return fmt.Errorf("native resource scenario %s lacks a terminal release", name)
+		}
+		for _, action := range scenario.DeviceActions {
+			if action == nil || action.ActionID == "" || action.RootState != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED.String() || action.ServerState != action.RootState {
+				return fmt.Errorf("native resource scenario %s lacks a server-accepted device action", name)
+			}
 		}
 		for _, record := range scenario.Native {
 			digest := sha256.Sum256(record.Bytes)

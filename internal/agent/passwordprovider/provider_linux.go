@@ -85,7 +85,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		return nil, err
 	}
 	backend := resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE
-	if config.Platform.GetOsId() == "fedora" {
+	if authselectProduct(config.Platform) {
 		backend = resourcev1.Backend_BACKEND_AUTHSELECT
 	}
 	version, err := managerVersion(ctx, config.Platform, runNative)

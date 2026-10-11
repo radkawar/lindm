@@ -1,0 +1,15 @@
+{
+  "id":  "rhel-9.8-kvm-aarch64",
+  "distribution":  "rhel",
+  "version":  "9.8",
+  "architecture":  "aarch64",
+  "edition":  "KVM Guest Image",
+  "release":  "2026-05-12T14:26:28Z",
+  "imageFilename":  "rhel-9.8-aarch64-kvm.qcow2",
+  "imageUrl":  "https://api.access.redhat.com/management/v1/images/5f9d524f9bb42e02eea24842c3ba621355515b1ce0a4fe6aa729c33706a5f384/download",
+  "checksumUrl":  "https://api.access.redhat.com/management/v1/images/rhel/9.8/aarch64",
+  "sha256":  "5f9d524f9bb42e02eea24842c3ba621355515b1ce0a4fe6aa729c33706a5f384",
+  "imageSizeBytes":  "1288044544",
+  "checksumMode":  "CHECKSUM_MODE_VENDOR_AUTHENTICATED",
+  "releaseProvenanceUrl":  "https://api.access.redhat.com/management/v1/images/rhel/9.8/aarch64"
+}

@@ -37,6 +37,22 @@ func TestFileProviderExcludesCustomSigningKeyParent(t *testing.T) {
 	}
 }
 
+func TestFileProviderExcludesEnabledSessionRuntimeDirectory(t *testing.T) {
+	root := t.TempDir()
+	session := filepath.Join(root, "session")
+	cfg := &agentv1.AgentConfig{
+		FileProvider:     &agentv1.NativeFileProviderConfig{AllowedRoots: []string{session}},
+		RemoteAssistance: &agentv1.RemoteAssistanceConfig{Enabled: true, SessionRuntimeDirectory: session},
+	}
+	if _, err := resourceProtectedPaths(filepath.Join(root, "config"), cfg, filepath.Join(root, "state"), filepath.Join(root, "run"), filepath.Join(root, "spool")); err == nil {
+		t.Fatal("session socket namespace allowed")
+	}
+	cfg.RemoteAssistance.Enabled = false
+	if _, err := resourceProtectedPaths(filepath.Join(root, "config"), cfg, filepath.Join(root, "state"), filepath.Join(root, "run"), filepath.Join(root, "spool")); err != nil {
+		t.Fatalf("disabled assistance protected its unused directory: %v", err)
+	}
+}
+
 func TestRootConfigurationParentDoesNotRejectDisabledFiles(t *testing.T) {
 	root := t.TempDir()
 	if _, err := resourceProtectedPaths("/", &agentv1.AgentConfig{}, filepath.Join(root, "state"), filepath.Join(root, "run"), filepath.Join(root, "spool")); err != nil {

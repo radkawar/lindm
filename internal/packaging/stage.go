@@ -42,6 +42,9 @@ func stagePayload(work string, binary *os.File, epoch int64, p product) (string,
 		return "", nil, "", err
 	}
 	dirs := append([]string{"usr/bin", "usr/lib/systemd/system", "usr/lib/tmpfiles.d", "usr/lib/sysusers.d"}, p.dirs...)
+	if len(p.userUnits) != 0 {
+		dirs = append(dirs, "usr/lib/systemd/user")
+	}
 	for _, dir := range dirs {
 		if err := mkdir(filepath.Join(root, dir), epoch); err != nil {
 			return "", nil, "", err

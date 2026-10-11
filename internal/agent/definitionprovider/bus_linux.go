@@ -51,7 +51,7 @@ type systemdBus struct {
 
 var _ nativeManager = (*systemdBus)(nil)
 
-func openBus(ctx context.Context) (_ nativeManager, err error) {
+func openBus(ctx context.Context, minimum int) (_ nativeManager, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	raw, err := (&net.Dialer{}).DialContext(ctx, "unix", "/run/dbus/system_bus_socket")
@@ -107,18 +107,28 @@ func openBus(ctx context.Context) (_ nativeManager, err error) {
 	}
 	// Version strings may carry a distro suffix; native properties and verify
 	// independently fail closed when a requested facility is unavailable.
-	parts := strings.Fields(b.version)
-	if len(parts) == 0 {
-		return nil, ErrUnsupported
-	}
-	major, err := strconv.Atoi(strings.SplitN(parts[0], ".", 2)[0])
-	if err != nil || major < 255 {
-		return nil, fmt.Errorf("%w: systemd 255 or newer required", ErrUnsupported)
+	major, err := systemdMajor(b.version)
+	if err != nil || major < minimum {
+		return nil, fmt.Errorf("%w: systemd %d or newer required", ErrUnsupported, minimum)
 	}
 	if err := socket.SetDeadline(time.Time{}); err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+// systemdMajor reads the leading release number of the manager's Version:
+// "255.4-1ubuntu8" and "258.1-1.fc44" carry a dot, EL's "252-67.el9_8" does not.
+func systemdMajor(version string) (int, error) {
+	parts := strings.Fields(version)
+	if len(parts) == 0 {
+		return 0, ErrUnsupported
+	}
+	end := strings.IndexFunc(parts[0], func(r rune) bool { return r < '0' || r > '9' })
+	if end < 0 {
+		end = len(parts[0])
+	}
+	return strconv.Atoi(parts[0][:end])
 }
 func (b *systemdBus) Version() string { return b.version }
 func (b *systemdBus) Close() error {

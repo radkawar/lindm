@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/update.proto";
+import "lindm/device/v1/assistance.proto";
 import "lindm/device/v1/device_actions.proto";
 import "lindm/device/v1/inventory_refresh.proto";
 import "lindm/device/v1/service_dispatch.proto";
@@ -39,6 +40,8 @@ service DeviceService {
   rpc ReportDeviceActionResult(ReportDeviceActionResultRequest) returns (ReportDeviceActionResultResponse);
   rpc RegisterDeviceActionRecovery(RegisterDeviceActionRecoveryRequest) returns (RegisterDeviceActionRecoveryResponse);
   rpc ConfirmRefreshInventoryPublication(ConfirmRefreshInventoryPublicationRequest) returns (ConfirmRefreshInventoryPublicationResponse);
+  // SyncAssistance exchanges complete assistance state; see assistance.proto.
+  rpc SyncAssistance(SyncAssistanceRequest) returns (SyncAssistanceResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {

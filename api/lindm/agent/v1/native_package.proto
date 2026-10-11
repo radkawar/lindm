@@ -42,14 +42,15 @@ message NativePackageTransactionRequest {
     lte: 4294967296
   }];
   bytes intent_sha256 = 14 [(buf.validate.field).bytes.len = 32];
-  // PREPARE-only read-only projection at the fixed native DNF5 versionlock path.
+  // PREPARE-only read-only projection at the fixed native versionlock path:
+  // DNF5's versionlock.toml or the DNF4 versionlock plugin's list.
   optional bytes candidate_pin_contents = 15 [(buf.validate.field).bytes.max_len = 32768];
   optional bytes candidate_pin_sha256 = 16 [(buf.validate.field).bytes.len = 32];
   lindm.resource.v1.FileIdentity original_pin = 17;
   option (buf.validate.message).cel = {
     id: "native_package_helper.pin_projection"
     message: "pin projection binds existing native RPM versionlock evidence and exact candidate bytes"
-    expression: "has(this.candidate_pin_contents) == has(this.candidate_pin_sha256) && has(this.candidate_pin_contents) == has(this.original_pin) && (!has(this.original_pin) || (this.desired.native_package.package.ecosystem == 2 && this.original_pin.path == '/etc/dnf/versionlock.toml'))"
+    expression: "has(this.candidate_pin_contents) == has(this.candidate_pin_sha256) && has(this.candidate_pin_contents) == has(this.original_pin) && (!has(this.original_pin) || (this.desired.native_package.package.ecosystem == 2 && this.original_pin.path in ['/etc/dnf/versionlock.toml', '/etc/dnf/plugins/versionlock.list']))"
   };
   option (buf.validate.message).cel = {
     id: "native_package_helper.request_kind"

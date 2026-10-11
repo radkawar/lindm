@@ -11,13 +11,13 @@ import (
 )
 
 func TestBuiltInPermissionMatrix(t *testing.T) {
-	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets}
+	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionRunRemoteAssistance}
 	for _, test := range []struct {
 		role   string
 		grants []Permission
 	}{
 		{RoleOwner, all},
-		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets}},
+		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionRunRemoteAssistance}},
 		{RoleOperator, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionManageProfiles, PermissionAssignResources}},
 		{RoleHelpdesk, []Permission{PermissionReadFleet, PermissionManageEnrollment}},
 		{RoleAuditor, []Permission{PermissionReadFleet, PermissionReadAudit}},

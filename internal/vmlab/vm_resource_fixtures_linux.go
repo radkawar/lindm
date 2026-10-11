@@ -39,11 +39,18 @@ case "$ID:$VERSION_ID" in
  fedora:44) dnf5 install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 python3-libdnf5 attr curl
   # The provider requires the maintained DNF5 (>= 5.4.6.0) release update.
   dnf5 upgrade -y dnf5 libdnf5 libdnf5-cli python3-libdnf5 ;;
- *) echo 'resource lane requires Ubuntu 24.04 or Fedora 44' >&2; exit 1 ;;
+ rhel:9.*|almalinux:9.*|rocky:9.*|rhel:10.*|almalinux:10.*|rocky:10.*)
+  # DNF4 exact pins require the native versionlock plugin; vendor repositories
+  # (registered RHEL or the derivative's own mirrors) supply the build tools.
+  dnf install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python3 attr curl acl python3-dnf-plugin-versionlock ;;
+ almalinux:8.*|rocky:8.*)
+  # EL8 DNF4 runs on platform-python 3.6; the fixture server needs Python 3.7+.
+  dnf install -y rpm-build rpm-sign createrepo_c gnupg2 openssl python39 attr curl acl python3-dnf-plugin-versionlock ;;
+ *) echo 'resource lane requires Ubuntu 24.04, Fedora 44 or an EL 8/9/10 DNF4 platform' >&2; exit 1 ;;
 esac
 case "$ID" in
  ubuntu) DEB_ARCH=$(dpkg --print-architecture) ;;
- fedora) RPM_ARCH=$(rpm --eval '%{_arch}') ;;
+ *) RPM_ARCH=$(rpm --eval '%{_arch}') ;;
 esac
 mkdir -m 0700 gnupg
 export GNUPGHOME="$PWD/gnupg"
@@ -52,7 +59,7 @@ gpg --batch --armor --export > repository.asc
 gpg --batch --export > repository.gpg
 # Root provisions the approved signer into system RPM trust; the provider
 # refuses RPM sources whose key is absent there.
-if [ "$ID" = fedora ]; then rpmkeys --import repository.asc; fi
+if [ "$ID" != ubuntu ]; then rpmkeys --import repository.asc; fi
 gpg --batch --with-colons --list-keys > keys.colons
 mkdir -m 0700 wrong-gnupg
 gpg --homedir "$PWD/wrong-gnupg" --batch --pinentry-mode loopback --passphrase '' --quick-generate-key 'Wrong disposable signer <wrong@invalid>' rsa3072 sign 1d
@@ -63,7 +70,7 @@ openssl req -x509 -newkey rsa:3072 -nodes -keyout https.key -out https.crt -days
 chmod 0600 https.key
 case "$ID" in
  ubuntu) install -m 0644 https.crt /usr/local/share/ca-certificates/lindm-resource-lab.crt; update-ca-certificates ;;
- fedora) install -m 0644 https.crt /etc/pki/ca-trust/source/anchors/lindm-resource-lab.crt; update-ca-trust ;;
+ *) install -m 0644 https.crt /etc/pki/ca-trust/source/anchors/lindm-resource-lab.crt; update-ca-trust ;;
 esac
 mkdir repo
 for version in 1.0 2.0; do
@@ -130,6 +137,7 @@ EOF
 /usr/bin/$name
 %post
 printf '%s\n' '$version-1 configure' >> /var/lib/lindm-resource-lab/maintainer.log
+if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then printf 'scriptlet-context %s\n' "\$(id -Z)" >> /var/lib/lindm-resource-lab/maintainer.log; fi
 if test '$name' = lindm-resource-crash && test -e /var/lib/lindm-resource-lab/interrupt; then
  printf 'entered\n' >> /var/lib/lindm-resource-lab/interrupt.log
  sleep 300
@@ -162,7 +170,23 @@ server.socket = context.wrap_socket(server.socket, server_side=True)
 server.serve_forever()
 PY
 if command -v restorecon >/dev/null 2>&1; then restorecon -RF /var/lib/lindm-resource-lab /etc/lindm-resource-lab; test "$(getenforce)" = Enforcing; fi
-systemd-run --unit=lindm-resource-repository --property=Type=exec /usr/bin/python3 /var/lib/lindm-resource-lab/serve.py
+SERVE_PYTHON=/usr/bin/python3
+if [ -x /usr/bin/python3.9 ] && [ "$ID" != fedora ] && [ "$ID" != ubuntu ]; then SERVE_PYTHON=/usr/bin/python3.9; fi
+# An installed, enabled unit (not a transient one) keeps the signed repository
+# available after the sysctl and firewall lanes' real guest reboots, which run
+# before the package interruption scenario.
+cat > /etc/systemd/system/lindm-resource-repository.service <<UNIT
+[Unit]
+Description=Disposable signed lindm resource lab repository
+After=network-online.target
+[Service]
+Type=exec
+ExecStart=$SERVE_PYTHON /var/lib/lindm-resource-lab/serve.py
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now lindm-resource-repository.service
 curl --fail --retry 10 --retry-connrefused --retry-delay 1 https://127.0.0.1:18449/ -o /dev/null
 `
 

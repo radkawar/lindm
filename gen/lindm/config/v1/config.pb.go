@@ -70,6 +70,8 @@ type ServerConfig struct {
 	// Independent native firewall probe peers, provisioned by the server operator.
 	// The enrolled device endpoint only confirms these exact external targets.
 	ConnectivityProbes []*v11.ConnectivityProbeTarget `protobuf:"bytes,22,rep,name=connectivity_probes,json=connectivityProbes,proto3" json:"connectivity_probes,omitempty"`
+	// Absent: remote assistance is not configured and requests are refused.
+	Assistance *AssistanceConfig `protobuf:"bytes,24,opt,name=assistance,proto3" json:"assistance,omitempty"`
 	// Offline bundle import authority and the served native repository root.
 	// Absent disables `lindmd bundle-import` and the /offline/ handler.
 	OfflineBundles *OfflineBundleConfig `protobuf:"bytes,23,opt,name=offline_bundles,json=offlineBundles,proto3" json:"offline_bundles,omitempty"`
@@ -257,6 +259,13 @@ func (x *ServerConfig) GetEnrollmentInstructions() *EnrollmentInstructionsConfig
 func (x *ServerConfig) GetConnectivityProbes() []*v11.ConnectivityProbeTarget {
 	if x != nil {
 		return x.ConnectivityProbes
+	}
+	return nil
+}
+
+func (x *ServerConfig) GetAssistance() *AssistanceConfig {
+	if x != nil {
+		return x.Assistance
 	}
 	return nil
 }
@@ -2056,11 +2065,155 @@ func (x *BreakGlassPolicy) GetRequireIncidentReason() bool {
 	return false
 }
 
+// AssistanceConfig enables built-in graphical remote assistance with the
+// embedded relay-only TURN service. Media is DTLS-SRTP end to end; the relay
+// forwards ciphertext only between its own allocations.
+type AssistanceConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Relay *AssistanceRelayConfig `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
+	// Admission bound for non-ended sessions; zero selects 16.
+	MaxConcurrentSessions uint32 `protobuf:"varint,2,opt,name=max_concurrent_sessions,json=maxConcurrentSessions,proto3" json:"max_concurrent_sessions,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *AssistanceConfig) Reset() {
+	*x = AssistanceConfig{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceConfig) ProtoMessage() {}
+
+func (x *AssistanceConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceConfig.ProtoReflect.Descriptor instead.
+func (*AssistanceConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *AssistanceConfig) GetRelay() *AssistanceRelayConfig {
+	if x != nil {
+		return x.Relay
+	}
+	return nil
+}
+
+func (x *AssistanceConfig) GetMaxConcurrentSessions() uint32 {
+	if x != nil {
+		return x.MaxConcurrentSessions
+	}
+	return 0
+}
+
+type AssistanceRelayConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// UDP and TCP TURN listener.
+	Listener *ListenerConfig `protobuf:"bytes,1,opt,name=listener,proto3" json:"listener,omitempty"`
+	// Address relay allocations bind and advertise. Peers may only reach other
+	// allocations on this address.
+	RelayAddress string `protobuf:"bytes,2,opt,name=relay_address,json=relayAddress,proto3" json:"relay_address,omitempty"`
+	RelayPortMin uint32 `protobuf:"varint,3,opt,name=relay_port_min,json=relayPortMin,proto3" json:"relay_port_min,omitempty"`
+	RelayPortMax uint32 `protobuf:"varint,4,opt,name=relay_port_max,json=relayPortMax,proto3" json:"relay_port_max,omitempty"`
+	// TURN URIs advertised to devices and consoles, e.g. turn:relay.example:3478?transport=udp.
+	Urls          []string `protobuf:"bytes,5,rep,name=urls,proto3" json:"urls,omitempty"`
+	Realm         string   `protobuf:"bytes,6,opt,name=realm,proto3" json:"realm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceRelayConfig) Reset() {
+	*x = AssistanceRelayConfig{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceRelayConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceRelayConfig) ProtoMessage() {}
+
+func (x *AssistanceRelayConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceRelayConfig.ProtoReflect.Descriptor instead.
+func (*AssistanceRelayConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *AssistanceRelayConfig) GetListener() *ListenerConfig {
+	if x != nil {
+		return x.Listener
+	}
+	return nil
+}
+
+func (x *AssistanceRelayConfig) GetRelayAddress() string {
+	if x != nil {
+		return x.RelayAddress
+	}
+	return ""
+}
+
+func (x *AssistanceRelayConfig) GetRelayPortMin() uint32 {
+	if x != nil {
+		return x.RelayPortMin
+	}
+	return 0
+}
+
+func (x *AssistanceRelayConfig) GetRelayPortMax() uint32 {
+	if x != nil {
+		return x.RelayPortMax
+	}
+	return 0
+}
+
+func (x *AssistanceRelayConfig) GetUrls() []string {
+	if x != nil {
+		return x.Urls
+	}
+	return nil
+}
+
+func (x *AssistanceRelayConfig) GetRealm() string {
+	if x != nil {
+		return x.Realm
+	}
+	return ""
+}
+
 var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xfe\x1b\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc1\x1c\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -2088,7 +2241,10 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\tprofiling\x18\x13 \x01(\v2 .lindm.config.v1.ProfilingConfigR\tprofiling\x12W\n" +
 	"\x12release_repository\x18\x14 \x01(\v2(.lindm.config.v1.ReleaseRepositoryConfigR\x11releaseRepository\x12f\n" +
 	"\x17enrollment_instructions\x18\x15 \x01(\v2-.lindm.config.v1.EnrollmentInstructionsConfigR\x16enrollmentInstructions\x12b\n" +
-	"\x13connectivity_probes\x18\x16 \x03(\v2'.lindm.agent.v1.ConnectivityProbeTargetB\b\xbaH\x05\x92\x01\x02\x10 R\x12connectivityProbes\x12M\n" +
+	"\x13connectivity_probes\x18\x16 \x03(\v2'.lindm.agent.v1.ConnectivityProbeTargetB\b\xbaH\x05\x92\x01\x02\x10 R\x12connectivityProbes\x12A\n" +
+	"\n" +
+	"assistance\x18\x18 \x01(\v2!.lindm.config.v1.AssistanceConfigR\n" +
+	"assistance\x12M\n" +
 	"\x0foffline_bundles\x18\x17 \x01(\v2$.lindm.config.v1.OfflineBundleConfigR\x0eofflineBundles:\x89\x0e\xbaH\x85\x0e\x1a\xb2\x01\n" +
 	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x82\x02\n" +
 	"\x1bprofiling.distinct_listener\x12&profiling must use a separate listener\x1a\xba\x01!has(this.profiling) || ((!has(this.admin_listener) || this.profiling.listener != this.admin_listener) && (!has(this.device_listener) || this.profiling.listener != this.device_listener))\x1a\x8f\x01\n" +
@@ -2247,14 +2403,25 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"providerId\x12$\n" +
 	"\x06issuer\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x06issuer\x12$\n" +
 	"\asubject\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\xc8\x05\n" +
-	"\x10BreakGlassPolicy\x12\xf0\x03\n" +
-	"\x13allowed_permissions\x18\x01 \x03(\tB\xbe\x03\xbaH\xba\x03\x92\x01\xb6\x03\b\x01\x10\x17\x18\x01\"\xad\x03r\xaa\x03R\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\xdf\x05\n" +
+	"\x10BreakGlassPolicy\x12\x87\x04\n" +
+	"\x13allowed_permissions\x18\x01 \x03(\tB\xd5\x03\xbaH\xd1\x03\x92\x01\xcd\x03\b\x01\x10\x18\x18\x01\"\xc4\x03r\xc1\x03R\n" +
 	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
-	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x15remote_assistance.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
 	"\fconsole_only\x18\x02 \x01(\bR\vconsoleOnly\x12]\n" +
 	"\x14max_session_lifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xc8\x01\x01\xaa\x01\a\"\x03\b\x90\x1c*\x00R\x12maxSessionLifetime\x12?\n" +
-	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReasonB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
+	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReason\"\x9a\x01\n" +
+	"\x10AssistanceConfig\x12D\n" +
+	"\x05relay\x18\x01 \x01(\v2&.lindm.config.v1.AssistanceRelayConfigB\x06\xbaH\x03\xc8\x01\x01R\x05relay\x12@\n" +
+	"\x17max_concurrent_sessions\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\x80\x02R\x15maxConcurrentSessions\"\xd6\x03\n" +
+	"\x15AssistanceRelayConfig\x12C\n" +
+	"\blistener\x18\x01 \x01(\v2\x1f.lindm.config.v1.ListenerConfigB\x06\xbaH\x03\xc8\x01\x01R\blistener\x12,\n" +
+	"\rrelay_address\x18\x02 \x01(\tB\a\xbaH\x04r\x02p\x01R\frelayAddress\x122\n" +
+	"\x0erelay_port_min\x18\x03 \x01(\rB\f\xbaH\t*\a\x18\xff\xff\x03(\x80\bR\frelayPortMin\x122\n" +
+	"\x0erelay_port_max\x18\x04 \x01(\rB\f\xbaH\t*\a\x18\xff\xff\x03(\x80\bR\frelayPortMax\x124\n" +
+	"\x04urls\x18\x05 \x03(\tB \xbaH\x1d\x92\x01\x1a\b\x01\x10\x04\"\x14r\x12\x18\x80\x022\r^turn:[^\\s]+$R\x04urls\x122\n" +
+	"\x05realm\x18\x06 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18\x80\x012\x10^[A-Za-z0-9.-]+$R\x05realm:x\xbaHu\x1as\n" +
+	"\x16assistance_relay.ports\x12-relay_port_min must not exceed relay_port_max\x1a*this.relay_port_min <= this.relay_port_maxB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
 
 var (
 	file_lindm_config_v1_config_proto_rawDescOnce sync.Once
@@ -2268,7 +2435,7 @@ func file_lindm_config_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_config_v1_config_proto_rawDescData
 }
 
-var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*ServerConfig)(nil),                  // 0: lindm.config.v1.ServerConfig
 	(*EnrollmentInstructionsConfig)(nil),  // 1: lindm.config.v1.EnrollmentInstructionsConfig
@@ -2298,10 +2465,12 @@ var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*SCIMConnector)(nil),                 // 25: lindm.config.v1.SCIMConnector
 	(*SCIMCorrelation)(nil),               // 26: lindm.config.v1.SCIMCorrelation
 	(*BreakGlassPolicy)(nil),              // 27: lindm.config.v1.BreakGlassPolicy
-	(*v1.AuthorizationPolicy)(nil),        // 28: lindm.auth.v1.AuthorizationPolicy
-	(*v11.ConnectivityProbeTarget)(nil),   // 29: lindm.agent.v1.ConnectivityProbeTarget
-	(*v12.FeedSource)(nil),                // 30: lindm.advisory.v1.FeedSource
-	(*durationpb.Duration)(nil),           // 31: google.protobuf.Duration
+	(*AssistanceConfig)(nil),              // 28: lindm.config.v1.AssistanceConfig
+	(*AssistanceRelayConfig)(nil),         // 29: lindm.config.v1.AssistanceRelayConfig
+	(*v1.AuthorizationPolicy)(nil),        // 30: lindm.auth.v1.AuthorizationPolicy
+	(*v11.ConnectivityProbeTarget)(nil),   // 31: lindm.agent.v1.ConnectivityProbeTarget
+	(*v12.FeedSource)(nil),                // 32: lindm.advisory.v1.FeedSource
+	(*durationpb.Duration)(nil),           // 33: google.protobuf.Duration
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	12, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
@@ -2315,33 +2484,36 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	27, // 8: lindm.config.v1.ServerConfig.break_glass:type_name -> lindm.config.v1.BreakGlassPolicy
 	7,  // 9: lindm.config.v1.ServerConfig.advisories:type_name -> lindm.config.v1.AdvisoryConfig
 	8,  // 10: lindm.config.v1.ServerConfig.integrations:type_name -> lindm.config.v1.IntegrationsConfig
-	28, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
+	30, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
 	9,  // 12: lindm.config.v1.ServerConfig.escrow:type_name -> lindm.config.v1.EscrowConfig
 	13, // 13: lindm.config.v1.ServerConfig.profiling:type_name -> lindm.config.v1.ProfilingConfig
 	4,  // 14: lindm.config.v1.ServerConfig.release_repository:type_name -> lindm.config.v1.ReleaseRepositoryConfig
 	1,  // 15: lindm.config.v1.ServerConfig.enrollment_instructions:type_name -> lindm.config.v1.EnrollmentInstructionsConfig
-	29, // 16: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
-	5,  // 17: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
-	2,  // 18: lindm.config.v1.EnrollmentInstructionsConfig.apt_repository:type_name -> lindm.config.v1.EnrollmentAPTRepositoryConfig
-	3,  // 19: lindm.config.v1.EnrollmentInstructionsConfig.dnf_repository:type_name -> lindm.config.v1.EnrollmentDNFRepositoryConfig
-	6,  // 20: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
-	30, // 21: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
-	12, // 22: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	18, // 23: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
-	19, // 24: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
-	20, // 25: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
-	21, // 26: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
-	22, // 27: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
-	24, // 28: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
-	23, // 29: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
-	25, // 30: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
-	26, // 31: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
-	31, // 32: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	31, // 16: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
+	28, // 17: lindm.config.v1.ServerConfig.assistance:type_name -> lindm.config.v1.AssistanceConfig
+	5,  // 18: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
+	2,  // 19: lindm.config.v1.EnrollmentInstructionsConfig.apt_repository:type_name -> lindm.config.v1.EnrollmentAPTRepositoryConfig
+	3,  // 20: lindm.config.v1.EnrollmentInstructionsConfig.dnf_repository:type_name -> lindm.config.v1.EnrollmentDNFRepositoryConfig
+	6,  // 21: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
+	32, // 22: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
+	12, // 23: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	18, // 24: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
+	19, // 25: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
+	20, // 26: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
+	21, // 27: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
+	22, // 28: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
+	24, // 29: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
+	23, // 30: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
+	25, // 31: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
+	26, // 32: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
+	33, // 33: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	29, // 34: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
+	12, // 35: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }
@@ -2366,7 +2538,7 @@ func file_lindm_config_v1_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_config_v1_config_proto_rawDesc), len(file_lindm_config_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

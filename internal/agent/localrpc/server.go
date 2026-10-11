@@ -40,16 +40,6 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 	if handler == nil || cfg.NetworkUID == 0 || cfg.NetworkGID == 0 || cfg.SocketName == "" {
 		return errors.New("invalid executor listener")
 	}
-	dir, err := openRuntimeDirectory(cfg.Directory)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = dir.Close() }()
-	owned, err := listenSocket(dir, cfg.SocketName, cfg.NetworkGID)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = owned.close() }()
 	compiled, err := protovalidate.New(protovalidate.WithMessages(
 		&agentv1.PrepareBootstrapRequest{},
 		&agentv1.InstallEnrollmentRequest{},
@@ -81,6 +71,7 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.ExchangeAgentUpdateRequest{},
 		&agentv1.GetAgentUpdateRequest{},
 		&agentv1.StatusRequest{},
+		&agentv1.SyncAssistanceRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
 		return err
@@ -95,8 +86,22 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 	limited := http.MaxBytesHandler(rpc, maxMessageBytes+maxMessageOverhead)
 	mux := http.NewServeMux()
 	mux.Handle(path, &peerGate{networkUID: cfg.NetworkUID, next: limited, slots: make(chan struct{}, maxInFlight)})
+	return serveSocket(ctx, cfg.Directory, cfg.SocketName, executorAccess(cfg.NetworkGID), mux)
+}
+
+func serveSocket(ctx context.Context, directory, name string, access socketAccess, handler http.Handler) error {
+	dir, err := openRuntimeDirectory(directory)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dir.Close() }()
+	owned, err := listenSocket(dir, name, access)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = owned.close() }()
 	server := &http.Server{
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       20 * time.Second,
 		WriteTimeout:      20 * time.Second,
@@ -128,7 +133,7 @@ type peerGate struct {
 }
 
 func (g *peerGate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	uid, ok := peerUID(r.Context())
+	uid, ok := PeerUID(r.Context())
 	if !ok {
 		writeDenied(w, r, connect.CodeUnauthenticated, "unauthenticated")
 		return
@@ -138,14 +143,18 @@ func (g *peerGate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeDenied(w, r, connect.CodePermissionDenied, "permission_denied")
 		return
 	}
+	admit(w, r, g.slots, g.next)
+}
+
+func admit(w http.ResponseWriter, r *http.Request, slots chan struct{}, next http.Handler) {
 	select {
-	case g.slots <- struct{}{}:
-		defer func() { <-g.slots }()
+	case slots <- struct{}{}:
+		defer func() { <-slots }()
 	default:
 		writeDenied(w, r, connect.CodeResourceExhausted, "resource_exhausted")
 		return
 	}
-	g.next.ServeHTTP(w, r)
+	next.ServeHTTP(w, r)
 }
 
 func authorize(procedure string, uid, networkUID uint32) error {
@@ -177,7 +186,8 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceCommitDeviceActionRecoveryProcedure ||
 		procedure == agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetAgentUpdateProcedure ||
-		procedure == agentv1connect.ExecutorServiceStatusProcedure
+		procedure == agentv1connect.ExecutorServiceStatusProcedure ||
+		procedure == agentv1connect.ExecutorServiceSyncAssistanceProcedure
 	if !known || uid != 0 && (uid != networkUID || rootOnly) {
 		return errors.New("permission denied")
 	}
@@ -199,7 +209,9 @@ func connContext(ctx context.Context, conn net.Conn) context.Context {
 	return context.WithValue(ctx, peerKey{}, peerCred{uid: uid, ok: true})
 }
 
-func peerUID(ctx context.Context) (uint32, bool) {
+// PeerUID returns the SO_PEERCRED UID the kernel recorded when the local
+// connection serving ctx was established. ok is false for any other context.
+func PeerUID(ctx context.Context) (uint32, bool) {
 	cred, _ := ctx.Value(peerKey{}).(peerCred)
 	return cred.uid, cred.ok
 }

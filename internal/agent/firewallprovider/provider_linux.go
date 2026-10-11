@@ -57,12 +57,17 @@ type Config struct {
 	// Receipts must come from fresh, independently observed allow/deny traffic.
 	// Absence is explicitly UNKNOWN, never a successful synthetic packet probe.
 	NativeProbe func(context.Context, *resourcev1.FirewallZoneDesired, *resourcev1.ResourceObservation) (*resourcev1.ProbeReceipt, *resourcev1.ProbeReceipt, error)
+	// GuardOutcome reads the connectivity guard's retained record. Absent, an
+	// interrupted effect stays OUTCOME_UNKNOWN; present, only its exact terminal
+	// custody for that effect can resolve the ledger (see resolveInterrupted).
+	GuardOutcome func(context.Context) (*agentv1.ConnectivityGuardRecord, error)
 }
 type ownershipStore interface {
 	LoadResourceOwnership(context.Context, string, string, string, *resourcev1.ResourceRef) (*agentv1.ResourceOwnershipLedger, error)
 	ClaimResourceOwnership(context.Context, string, int64, *agentv1.ResourceOwnershipSnapshot) (*agentv1.ResourceOwnershipLedger, error)
 	BeginResourceOwnershipEffect(context.Context, string, int64, *agentv1.ResourceOwnershipSnapshot, []agentv1.ResourceOwnedDimension) (*agentv1.ResourceOwnershipLedger, error)
 	CompleteResourceOwnershipEffect(context.Context, string, int64, *agentv1.ResourceOwnershipSnapshot) (*agentv1.ResourceOwnershipLedger, error)
+	ResolveResourceOwnershipEffect(context.Context, string, string, string, *resourcev1.ResourceRef, int64, string, *agentv1.ResourceOwnershipSnapshot, bool) (*agentv1.ResourceOwnershipLedger, error)
 }
 type Provider struct {
 	config  Config
@@ -102,7 +107,7 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 			return nil, err
 		}
 	}
-	if config.Platform.GetOsId() != "ubuntu" && config.Platform.GetOsId() != "fedora" {
+	if id := config.Platform.GetOsId(); id != "ubuntu" && id != "fedora" && ((id != "rhel" && id != "almalinux") || !strings.HasPrefix(config.Platform.GetVersion(), "9.")) {
 		return nil, ErrUnsupported
 	}
 	for _, marker := range []string{"/run/ostree-booted", "/etc/NIXOS"} {
@@ -346,6 +351,11 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 	if err != nil {
 		return nil, err
 	}
+	if ledger.GetState() == agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN {
+		if ledger, err = p.resolveInterrupted(ctx, ledger, before); err != nil {
+			return nil, err
+		}
+	}
 	if err := acquisitionAllowed(p.config.Ownership, before, ledger, operation); err != nil {
 		return nil, err
 	}
@@ -354,6 +364,46 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 		return nil, err
 	}
 	return p.makePlan(desired, operation, before, target, ledger)
+}
+
+// resolveInterrupted ends an UNKNOWN ledger, before any new plan, only from the
+// connectivity guard's terminal record of that exact interrupted transaction:
+// ROLLED_BACK (the supervisor stopped the worker and restored the protected
+// before-image) with native state equal to that image, or COMMITTED with native
+// state equal to its target. The journal additionally requires the effect's own
+// action to be terminal. Anything else, including a guard slot reused by a
+// later transaction, stays OUTCOME_UNKNOWN; nothing is replayed or retried.
+func (p *Provider) resolveInterrupted(ctx context.Context, ledger *agentv1.ResourceOwnershipLedger, current *agentv1.ResourceOwnershipSnapshot) (*agentv1.ResourceOwnershipLedger, error) {
+	if p.config.GuardOutcome == nil || ledger.GetEffectActionId() == "" || ledger.GetBeforeEffect() == nil || current.GetFirewall().GetConflict() || !sameOwner(p.config.Ownership, ledger.GetOwner()) {
+		return nil, ErrOutcomeUnknown
+	}
+	record, err := p.config.GuardOutcome(ctx)
+	if err != nil {
+		return nil, errors.Join(ErrOutcomeUnknown, err)
+	}
+	request := record.GetRequest()
+	if request.GetActionId() != ledger.GetEffectActionId() || !proto.Equal(request.GetPlan().GetRef(), ledger.GetRef()) || !proto.Equal(request.GetBefore(), ledger.GetBeforeEffect()) {
+		return nil, ErrOutcomeUnknown
+	}
+	committed := false
+	switch record.GetPhase() {
+	case agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_ROLLED_BACK:
+		if !targetMatches(current, request.GetBefore()) {
+			return nil, ErrOutcomeUnknown
+		}
+	case agentv1.ConnectivityGuardPhase_CONNECTIVITY_GUARD_PHASE_COMMITTED:
+		if !targetMatches(current, request.GetTarget()) {
+			return nil, ErrOutcomeUnknown
+		}
+		committed = true
+	default:
+		return nil, ErrOutcomeUnknown
+	}
+	resolved, err := p.store.ResolveResourceOwnershipEffect(ctx, p.config.DeploymentID, p.config.DeviceID, p.config.EnrollmentGeneration, ledger.GetRef(), int64(ledger.GetRevision()), ledger.GetEffectActionId(), current, committed)
+	if err != nil {
+		return nil, errors.Join(ErrOutcomeUnknown, err)
+	}
+	return resolved, nil
 }
 func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, beforeEffect func(context.Context) error) (*resourcev1.ResourceVerification, error) {
 	p.gate.Lock()

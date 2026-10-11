@@ -37,16 +37,17 @@ const (
 // Image is a selected upstream catalog row, not a serialized local configuration.
 // The private download locator is never returned or persisted.
 type Image struct {
-	Filename  string
-	SHA256    string
-	Version   string
-	Published time.Time
-	Entitled  bool
+	Filename     string
+	SHA256       string
+	Version      string
+	Architecture string
+	Published    time.Time
+	Entitled     bool
 }
 
 // MetadataURL identifies the authenticated vendor publication without credentials.
 func (i Image) MetadataURL() string {
-	return apiOrigin + "/management/v1/images/rhel/" + i.Version + "/x86_64"
+	return apiOrigin + "/management/v1/images/rhel/" + i.Version + "/" + i.Architecture
 }
 
 // DownloadURL is the stable checksum-addressed API locator, not the signed CDN URL.
@@ -165,15 +166,19 @@ func (c *Client) ensureBearer(ctx context.Context) error {
 	return nil
 }
 
-// Discover selects exactly one official x86_64 KVM qcow2 image for an explicit
-// minor version. An absent entitlement is reported, never bypassed.
-func (c *Client) Discover(ctx context.Context, version string) (Image, error) {
+// Discover selects exactly one official KVM qcow2 image for an explicit minor
+// version and architecture (x86_64 or aarch64). An absent entitlement is
+// reported, never bypassed.
+func (c *Client) Discover(ctx context.Context, version, architecture string) (Image, error) {
 	major, minor, ok := strings.Cut(version, ".")
 	n, err := strconv.ParseUint(minor, 10, 32)
 	if !ok || (major != "9" && major != "10") || err != nil || strconv.FormatUint(n, 10) != minor {
 		return Image{}, errors.New("redhatimages: version must be an explicit RHEL 9 or 10 minor, for example 9.8 or 10.2")
 	}
-	selected := Image{Version: version}
+	if architecture != "x86_64" && architecture != "aarch64" {
+		return Image{}, errors.New("redhatimages: architecture must be x86_64 or aarch64")
+	}
+	selected := Image{Version: version, Architecture: architecture}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	resp, err := c.api(ctx, selected.MetadataURL())
@@ -199,7 +204,7 @@ func (c *Client) Discover(ctx context.Context, version string) (Image, error) {
 	}
 	matches := 0
 	for _, row := range catalog.Body {
-		if row.Filename != "rhel-"+version+"-x86_64-kvm.qcow2" || row.Arch != "x86_64" {
+		if row.Filename != "rhel-"+version+"-"+architecture+"-kvm.qcow2" || row.Arch != architecture {
 			continue
 		}
 		matches++
@@ -337,7 +342,7 @@ func (c *Client) Download(ctx context.Context, image Image, directory string) (_
 	if size <= 0 || size > imageLimit {
 		return "", nil, errors.New("redhatimages: CDN must publish an exact positive image size within 16 GiB")
 	}
-	receipt := &labv1.VendorImageReceipt{ImageFilename: image.Filename, Sha256: image.SHA256, ImageSizeBytes: uint64(size), Version: image.Version, Architecture: "x86_64", PublishedAt: timestamppb.New(image.Published), AcquiredAt: timestamppb.New(c.now()), MetadataUrl: image.MetadataURL()}
+	receipt := &labv1.VendorImageReceipt{ImageFilename: image.Filename, Sha256: image.SHA256, ImageSizeBytes: uint64(size), Version: image.Version, Architecture: image.Architecture, PublishedAt: timestamppb.New(image.Published), AcquiredAt: timestamppb.New(c.now()), MetadataUrl: image.MetadataURL()}
 	if err := c.validator.Validate(receipt); err != nil {
 		return "", nil, fmt.Errorf("redhatimages: invalid acquisition receipt: %w", err)
 	}

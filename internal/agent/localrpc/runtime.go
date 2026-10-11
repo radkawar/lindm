@@ -63,15 +63,28 @@ func openRuntimeDirectory(directory string) (*os.File, error) {
 	return os.NewFile(uintptr(fd), absolute), nil
 }
 
-func runtimeAllows(info unix.Stat_t, networkGID uint32) bool {
-	if os.Geteuid() != 0 {
-		return true
-	}
-	perm := info.Mode & 0777
-	if perm&0001 != 0 {
-		return true
-	}
-	return perm&0010 != 0 && info.Gid == networkGID
+// socketAccess is the pathname policy for one listener when the process runs
+// as root. Non-root processes (tests) keep their own group and need no traversal.
+type socketAccess struct {
+	mode uint32
+	gid  uint32
+	// traversable reports whether the retained directory lets intended peers reach the socket.
+	traversable func(unix.Stat_t) bool
+}
+
+// executorAccess limits the executor socket to root and the network group.
+func executorAccess(networkGID uint32) socketAccess {
+	return socketAccess{mode: 0660, gid: networkGID, traversable: func(info unix.Stat_t) bool {
+		perm := info.Mode & 0777
+		return perm&0001 != 0 || perm&0010 != 0 && info.Gid == networkGID
+	}}
+}
+
+// sessionAccess lets every local user connect; SO_PEERCRED and logind decide.
+func sessionAccess() socketAccess {
+	return socketAccess{mode: 0666, gid: 0, traversable: func(info unix.Stat_t) bool {
+		return info.Mode&0001 != 0
+	}}
 }
 
 type ownedSocket struct {
@@ -82,7 +95,7 @@ type ownedSocket struct {
 	ino      uint64
 }
 
-func listenSocket(dir *os.File, name string, networkGID uint32) (_ *ownedSocket, resultErr error) {
+func listenSocket(dir *os.File, name string, access socketAccess) (_ *ownedSocket, resultErr error) {
 	if name == "" || name == "." || name == ".." || name != filepath.Base(name) || strings.ContainsAny(name, "/\x00") {
 		return nil, errRuntimeUnsafe
 	}
@@ -93,8 +106,8 @@ func listenSocket(dir *os.File, name string, networkGID uint32) (_ *ownedSocket,
 	if err := unix.Fstat(int(dir.Fd()), &info); err != nil {
 		return nil, err
 	}
-	if !runtimeAllows(info, networkGID) {
-		return nil, errors.New("runtime directory is not traversable by the network account")
+	if os.Geteuid() == 0 && !access.traversable(info) {
+		return nil, errors.New("runtime directory is not traversable by the intended peers")
 	}
 	if err := prepareSocket(int(dir.Fd()), name, directory); err != nil {
 		return nil, err
@@ -131,7 +144,7 @@ func listenSocket(dir *os.File, name string, networkGID uint32) (_ *ownedSocket,
 	}()
 	mode, gid := uint32(0600), named.Gid
 	if os.Geteuid() == 0 {
-		mode, gid = 0660, networkGID
+		mode, gid = access.mode, access.gid
 		if err := unix.Fchownat(namedFD, "", 0, int(gid), unix.AT_EMPTY_PATH); err != nil {
 			return nil, err
 		}

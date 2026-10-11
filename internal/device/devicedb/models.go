@@ -9,6 +9,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AssistanceSession struct {
+	ID                 uuid.UUID
+	DeviceID           uuid.UUID
+	GenerationID       uuid.UUID
+	RequestID          uuid.UUID
+	RequestDigest      []byte
+	OperatorID         uuid.UUID
+	OperatorDisplay    string
+	Mode               int16
+	Reason             string
+	TargetUsername     string
+	State              int16
+	CreatedAt          pgtype.Timestamptz
+	ConsentDeadline    pgtype.Timestamptz
+	EndsAt             pgtype.Timestamptz
+	PromptedAt         pgtype.Timestamptz
+	ConsentedAt        pgtype.Timestamptz
+	AnsweredAt         pgtype.Timestamptz
+	StartedAt          pgtype.Timestamptz
+	EndedAt            pgtype.Timestamptz
+	EndCause           int16
+	EndDetail          string
+	DeviceSyncedAt     pgtype.Timestamptz
+	DeviceEnded        bool
+	ControlGranted     bool
+	LocalUsername      string
+	LocalUid           int64
+	LocalLogindSession string
+	LocalSessionType   string
+	LocalDesktop       string
+	OfferSdp           string
+	OfferFingerprint   string
+	AnswerSdp          string
+	AnswerFingerprint  string
+}
+
 type AuditEvent struct {
 	ID         uuid.UUID
 	OccurredAt pgtype.Timestamptz

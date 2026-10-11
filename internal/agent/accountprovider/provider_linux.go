@@ -270,7 +270,7 @@ func (p *Provider) plan(ctx context.Context, d *resourcev1.ResourceDesiredState,
 	if err != nil {
 		return nil, err
 	}
-	if _, err = nativeToolOptions(ctx, p.run, commands); err != nil {
+	if _, err = nativeToolOptions(ctx, p.run, commands, ChrootAccountRoot(p.config.Platform)); err != nil {
 		return nil, err
 	}
 	return plan, nil

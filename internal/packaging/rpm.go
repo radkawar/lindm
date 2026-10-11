@@ -111,6 +111,9 @@ if [ "$1" -eq 0 ] && [ -d /run/systemd/system ]; then
 fi
 `, p.lifecycle, p.lifecycle)
 	}
+	for _, recommended := range p.rpmRecommends {
+		dependencies += "Recommends: " + recommended + "\n"
+	}
 	spec := fmt.Sprintf(`Name: %s
 Version: %s
 Release: %s

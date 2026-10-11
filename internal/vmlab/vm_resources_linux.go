@@ -31,6 +31,9 @@ type resourceDispatch struct {
 	device, head, profile, resource, revision string
 	// diagnostics optionally adds lane-specific failure context.
 	diagnostics func(context.Context) []VMResourceNativeRecord
+	// reboot performs a real guest reboot and reopens the control-plane
+	// forwards; it is nil outside the connected resource lane.
+	reboot func(context.Context) error
 }
 
 func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.ResourceDesiredState, ownership *resourcev1.OwnershipPolicy) error {
@@ -149,8 +152,17 @@ func resourceCreatePolicy() *resourcev1.OwnershipPolicy {
 	return &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED}
 }
 
-// resourcePackaging selects the guest's native package format and architecture.
-type resourcePackaging struct{ rpm, arm bool }
+// resourcePackaging selects the guest's native package format, architecture
+// and, for RPM, the native DNF generation (EL DNF4 versus Fedora DNF5).
+type resourcePackaging struct{ rpm, arm, dnf4 bool }
+
+func newResourcePackaging(distribution, architecture string) resourcePackaging {
+	el := distribution == "rhel" || distribution == "almalinux" || distribution == "rocky"
+	return resourcePackaging{rpm: distribution == "fedora" || el, arm: architecture == "arm64", dnf4: el}
+}
+
+// dnf4VersionlockList is the native DNF4 versionlock plugin's lock list.
+const dnf4VersionlockList = "/etc/dnf/plugins/versionlock.list"
 
 // nativeArch is the package manager's own architecture name.
 func (p resourcePackaging) nativeArch() string {
@@ -223,10 +235,16 @@ func packageOracle(ctx context.Context, vm *guestVM, rpm resourcePackaging, vers
 	command := ""
 	if rpm.rpm {
 		command = "rpm -q --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\\n' " + resourceDependencyName + "; "
-		if present {
+		switch {
+		case present && rpm.dnf4:
+			command += "test \"$(rpm -q --qf '%{VERSION}' " + resourcePackageName + ")\" = " + nativeQuote(version) + "; rpm -q --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\\n' " + resourcePackageName + "; " + dnf4PinOracle(rpm, version)
+		case present:
 			command += "test \"$(rpm -q --qf '%{VERSION}' " + resourcePackageName + ")\" = " + nativeQuote(version) + "; rpm -q --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE} %{ARCH}\\n' " + resourcePackageName + "; python3 -c " + nativeQuote("import tomllib; d=tomllib.load(open('/etc/dnf/versionlock.toml','rb')); p=[p for p in d['packages'] if p['name']=='"+resourcePackageName+"']; assert len(p)==1; assert any(c['key']=='evr' and c['comparator']=='=' and c['value']=='0:"+version+"-1' for c in p[0]['conditions'])") + "; cat /etc/dnf/versionlock.toml; "
-		} else {
+		default:
 			command += "if rpm -q " + resourcePackageName + "; then exit 1; fi; "
+			if rpm.dnf4 {
+				command += "if grep -F " + nativeQuote("# lindm:rpm/"+resourcePackageName+"/") + " " + dnf4VersionlockList + "; then exit 1; fi; cat " + dnf4VersionlockList + "; "
+			}
 		}
 	} else {
 		command = "dpkg-query -W -f='${Package} ${Version} ${Architecture} ${db:Status-Status}\\n' " + resourceDependencyName + "; test \"$(dpkg-query -W -f='${db:Status-Status}' " + resourceDependencyName + ")\" = installed; "
@@ -238,9 +256,35 @@ func packageOracle(ctx context.Context, vm *guestVM, rpm resourcePackaging, vers
 	}
 	if present {
 		command += "test \"$(/usr/bin/lindm-resource-proof)\" = " + nativeQuote(version) + "; /usr/bin/lindm-resource-proof; "
+		if rpm.dnf4 {
+			// RPM's SELinux plugin labels payload files and runs scriptlets
+			// in rpm_script_t from the DNF4 adapter's service domain.
+			command += "matchpathcon -V /usr/bin/lindm-resource-proof; ls -Z /usr/bin/lindm-resource-proof; grep -E '^scriptlet-context [a-z_]+:[a-z_]+:rpm_script_t:' " + resourceFixtureRoot + "/maintainer.log; "
+		}
 	}
 	command += "cat " + resourceFixtureRoot + "/maintainer.log; printf 'dependency-retained\\n'"
 	return resourceOracle(ctx, vm, "native-package-db-pin-readiness-maintainer", command)
+}
+
+// dnf4PinOracle proves lindm's marked exact entry exists and that the native
+// DNF4 CLI, through its own versionlock plugin, refuses to resolve to the other
+// version that the signed lab repository demonstrably offers. The plugin only
+// filters resolving commands (list/info ignore locks), so the oracle asks for
+// the upgrade or downgrade with --assumeno, with and without the plugin.
+func dnf4PinOracle(rpm resourcePackaging, version string) string {
+	other, op := "2.0", "upgrade"
+	if version == "2.0" {
+		other, op = "1.0", "downgrade"
+	}
+	entry := resourcePackageName + "-0:" + version + "-1." + rpm.nativeArch()
+	repo := "--repofrompath=lindm-oracle,https://127.0.0.1:18449 --repo=lindm-oracle --setopt=lindm-oracle.gpgcheck=1 --setopt=lindm-oracle.repo_gpgcheck=1 --setopt=lindm-oracle.gpgkey=file://" + resourceFixtureRoot + "/repository.asc"
+	// Metadata age lines are timing, not evidence; repeated oracles must match.
+	resolve := "dnf --assumeno " + repo + " " + op + " " + resourcePackageName
+	untimed := " 2>&1 | grep -v '^Last metadata expiration check' || true"
+	return "grep -Fx " + nativeQuote("# lindm:rpm/"+resourcePackageName+"/"+rpm.nativeArch()) + " " + dnf4VersionlockList + "; grep -Fx " + nativeQuote(entry) + " " + dnf4VersionlockList + "; cat " + dnf4VersionlockList + "; " +
+		"dnf -q versionlock list; dnf -q -y " + repo + " makecache >/dev/null 2>&1; " +
+		"unlocked=$(" + resolve + " --disableplugin=versionlock" + untimed + "); printf 'unlocked %s: %s\\n' " + op + " \"$unlocked\"; printf '%s\\n' \"$unlocked\" | grep -F " + nativeQuote(other+"-1") + "; " +
+		"locked=$(" + resolve + untimed + "); printf 'locked %s: %s\\n' " + op + " \"$locked\"; if printf '%s\\n' \"$locked\" | grep -F " + nativeQuote(other+"-1") + "; then exit 1; fi; "
 }
 
 func fileOracle(ctx context.Context, vm *guestVM, name, content string, exists bool) (VMResourceNativeRecord, error) {
@@ -256,14 +300,14 @@ func fileOracle(ctx context.Context, vm *guestVM, name, content string, exists b
 	return resourceOracle(ctx, vm, "native-file-content-mode-uid-gid-xattrs-selinux", command)
 }
 
-func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane) error {
+func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackages, control *vmControlPlane, result *VMDispatchResult, selected map[string]bool, firewall *firewallLane, reboot func(context.Context) error) error {
 	vm := packages.vm
 	if result.Resources == nil {
 		result.Resources = newVMResourceEvidence()
 	}
 	result.Resources.ExecutionPath = "connected-server-assignment-release"
-	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString()}
-	rpm := resourcePackaging{rpm: result.Distribution == "fedora", arm: result.Architecture == "arm64"}
+	r := &resourceDispatch{vm: vm, control: control, device: result.DeviceID, profile: uuid.NewString(), resource: uuid.NewString(), reboot: reboot}
+	rpm := newResourcePackaging(result.Distribution, result.Architecture)
 	kinds := result.Resources.Kinds
 	if selected["packages"] {
 		if err := exerciseResourcePackages(ctx, r, rpm, &kinds[0]); err != nil {
@@ -396,7 +440,7 @@ func exerciseResourcePackages(ctx context.Context, r *resourceDispatch, rpm reso
 }
 
 func exerciseResourceFiles(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence) error {
-	names := []string{"create", "reconcile", "repeat", "release-created-file", "approved-adoption", "restore-adopted-baseline", "external-edit-release-refused"}
+	names := []string{"create", "reconcile", "repeat", "release-created-file", "approved-adoption", "restore-adopted-baseline", "external-edit-release-refused", "foreign-acl-adoption-refused", "inherited-default-acl-create-refused"}
 	for index, content := range []string{"first\n", "second\n", "second\n"} {
 		evidence.Scenarios = append(evidence.Scenarios, VMResourceScenario{Name: names[index], StartedAt: time.Now().UTC()})
 		s := &evidence.Scenarios[len(evidence.Scenarios)-1]
@@ -488,6 +532,9 @@ func exerciseResourceFiles(ctx context.Context, r *resourceDispatch, evidence *V
 	s.Native = []VMResourceNativeRecord{before, after}
 	s.Passed = true
 	s.FinishedAt = time.Now().UTC()
+	if err := exerciseResourceFileACLs(ctx, r, evidence); err != nil {
+		return err
+	}
 	evidence.Unproven = nil
 	return qualifyResourceEvidence(evidence, names)
 }

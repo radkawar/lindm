@@ -84,18 +84,40 @@ func TestManagedFileHelperOnlyReceivesSelectedParent(t *testing.T) {
 
 func TestLocalAccountHelperUsesExplicitIsolatedPrefix(t *testing.T) {
 	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
-	plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: "lindm-native-test"}, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: &resourcev1.LocalUserDesired{Name: "lindm-native-test"}}}}
-	values := unitValues(t, directory, plan, nil, nil)
-	if !slices.Equal(unitValue[[]string](t, values, "ReadWritePaths"), []string{directory, filepath.Join(directory, "account-root", "etc")}) || values["ProtectHome"] != "read-only" {
-		t.Fatal("native account manager received host home/database write scope instead of the pinned prefix")
-	}
-	bindings := unitValue[[]struct {
-		Source        string
-		Destination   string
-		IgnoreMissing bool
-		Flags         uint64
-	}](t, values, "BindPaths")
-	if len(bindings) != 1 || bindings[0].Source != "/etc" || bindings[0].Destination != filepath.Join(directory, "account-root", "etc") || bindings[0].IgnoreMissing {
-		t.Fatal("native account database bind was not exact and mandatory")
+	root := filepath.Join(directory, "account-root")
+	for _, tc := range []struct {
+		product *resourcev1.PlatformProduct
+		chroot  bool
+	}{
+		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false},
+		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
+	} {
+		plan := &resourcev1.ResourcePlan{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: "lindm-native-test"}, Backend: &resourcev1.BackendSelection{Product: tc.product}, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: &resourcev1.LocalUserDesired{Name: "lindm-native-test"}}}}
+		values := unitValues(t, directory, plan, nil, nil)
+		if !slices.Equal(unitValue[[]string](t, values, "ReadWritePaths"), []string{directory, filepath.Join(root, "etc")}) || values["ProtectHome"] != "read-only" || values["ProtectKernelTunables"] != true {
+			t.Fatalf("%s: native account manager received host home/database write scope instead of the pinned root", tc.product.GetOsId())
+		}
+		want := []bindPath{{"/etc", filepath.Join(root, "etc"), false, 0}}
+		if tc.chroot {
+			// Non-recursive host procfs and selinuxfs binds for the chrooted
+			// shadow tools, with the kernel tunables kept read-only inside.
+			want = append(want, bindPath{"/proc", filepath.Join(root, "proc"), false, 0}, bindPath{"/sys/fs/selinux", filepath.Join(root, "sys/fs/selinux"), false, 0})
+			readOnly := unitValue[[]string](t, values, "ReadOnlyPaths")
+			if !slices.Contains(readOnly, "-"+filepath.Join(root, "proc/sys")) || !slices.Contains(readOnly, "-"+filepath.Join(root, "proc/sysrq-trigger")) || !slices.Equal(unitValue[[]string](t, values, "InaccessiblePaths"), []string{"-" + filepath.Join(root, "proc/kmsg")}) {
+				t.Fatalf("%s: bound procfs exposes writable kernel tunables or logs", tc.product.GetOsId())
+			}
+			if !slices.Equal(unitValue[[]bindPath](t, values, "BindReadOnlyPaths"), []bindPath{{"/usr", filepath.Join(root, "usr"), false, 0}}) {
+				t.Fatalf("%s: host /usr was not bound read-only for the tools' shell check", tc.product.GetOsId())
+			}
+		} else if _, ok := values["ReadOnlyPaths"]; ok {
+			t.Fatalf("%s: prefix product received chroot-only mounts", tc.product.GetOsId())
+		} else if _, ok := values["BindReadOnlyPaths"]; ok {
+			t.Fatalf("%s: prefix product received chroot-only mounts", tc.product.GetOsId())
+		}
+		if !slices.Equal(unitValue[[]bindPath](t, values, "BindPaths"), want) {
+			t.Fatalf("%s: native account binds were not exact and mandatory: %v", tc.product.GetOsId(), values["BindPaths"])
+		}
 	}
 }

@@ -20,6 +20,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
 
 type dnfRPM struct {
@@ -119,8 +120,10 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 	if d.GetPresence() == resourcev1.Presence_PRESENCE_ABSENT {
 		command = "remove"
 	}
-	if _, err := p.dnf(ctx, directory, []string{"makecache", "--refresh"}); err != nil {
-		return nil, nil, err
+	if p.manager == dnf.DNF5 {
+		if _, err := p.dnf(ctx, directory, []string{"makecache", "--refresh"}); err != nil {
+			return nil, nil, err
+		}
 	}
 	resolved, declared, err := p.resolveDNFSizes(ctx, directory, command, d)
 	if err != nil {
@@ -144,6 +147,10 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		declarations[entry.FileName] = downloadDeclaration{size: entry.DownloadSize}
 	}
 	if err := boundedDownload(ctx, directory, declarations, func(downloadContext context.Context) error {
+		if p.manager == dnf.DNF4 {
+			_, err := p.dnf4(downloadContext, "stage", directory, p.versionlock, command, dnfSpec(d))
+			return err
+		}
 		_, err := p.dnf(downloadContext, directory, []string{command, "--store=" + filepath.Join(directory, "transaction"), dnfSpec(d)})
 		return err
 	}); err != nil {
@@ -175,16 +182,16 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		return nil, nil, err
 	}
 	metadata, err := snapshotDirectory(filepath.Join(directory, "cache"))
-	if err != nil {
+	if err != nil && p.manager == dnf.DNF5 {
 		// Removal may not require repository metadata. Refresh the approved
 		// repository explicitly rather than fabricating an empty source revision.
 		if _, refreshErr := p.dnf(ctx, directory, []string{"makecache", "--refresh"}); refreshErr != nil {
 			return nil, nil, errors.Join(err, refreshErr)
 		}
 		metadata, err = snapshotDirectory(filepath.Join(directory, "cache"))
-		if err != nil {
-			return nil, nil, err
-		}
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 	snapshot := &resourcev1.RepositorySnapshot{Repository: sourceRef(source), MetadataSha256: metadata, SignerSha256: [][]byte{signer}}
 	entries, err := p.dnfEntries(ctx, directory, transaction, d, db, source, snapshot)

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package lindm.device.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/agent/v1/assistance.proto";
+
+option go_package = "lindm/gen/lindm/device/v1;devicev1";
+
+// SyncAssistanceRequest reports the device's complete observed state for each
+// assistance session it knows. Reports are idempotent state, not events.
+message SyncAssistanceRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  repeated lindm.agent.v1.AssistanceReport reports = 2 [(buf.validate.field).repeated.max_items = 8];
+}
+
+// SyncAssistanceResponse carries the complete desired state for every open
+// session of this device and recently ended sessions the device has not
+// confirmed. A session absent from directives is not authorized.
+message SyncAssistanceResponse {
+  repeated lindm.agent.v1.AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 8];
+}

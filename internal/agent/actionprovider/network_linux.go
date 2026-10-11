@@ -3,6 +3,7 @@
 package actionprovider
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -101,6 +102,33 @@ func (p *Provider) quarantineTables(ctx context.Context) (map[string]bool, error
 	return result, nil
 }
 
+// quarantineSetKey accepts the fixed numgen key in both native JSON forms:
+// nft 1.0 prints a typeof set's key as its datatype ("integer"); nft 1.1 and
+// later (Fedora 44) print the typeof expression itself. Anything else is not
+// the action-owned set.
+func quarantineSetKey(raw json.RawMessage) bool {
+	var datatype string
+	if json.Unmarshal(raw, &datatype) == nil {
+		return datatype == "integer"
+	}
+	var key struct {
+		Typeof struct {
+			Numgen struct {
+				Mode   string `json:"mode"`
+				Mod    uint32 `json:"mod"`
+				Offset uint32 `json:"offset"`
+			} `json:"numgen"`
+		} `json:"typeof"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&key) != nil {
+		return false
+	}
+	numgen := key.Typeof.Numgen
+	return numgen.Mode == "inc" && numgen.Mod == 1 && numgen.Offset == 0
+}
+
 func (p *Provider) quarantineActive(ctx context.Context, table string) (bool, []byte, error) {
 	out, err := p.run(ctx, nativeRequest{command: nft, args: []string{"--json", "list", "table", "inet", table}})
 	if err != nil {
@@ -117,14 +145,14 @@ func (p *Provider) quarantineActive(ctx context.Context, table string) (bool, []
 		if raw, exists := entry["set"]; exists {
 			var set struct {
 				Name     string            `json:"name"`
-				Type     string            `json:"type"`
+				Type     json.RawMessage   `json:"type"`
 				Flags    []string          `json:"flags"`
 				Elements []json.RawMessage `json:"elem"`
 			}
 			if err := json.Unmarshal(raw, &set); err != nil {
 				return false, nil, err
 			}
-			if set.Name != "active" || set.Type != "integer" || !slices.Contains(set.Flags, "timeout") {
+			if set.Name != "active" || !quarantineSetKey(set.Type) || !slices.Contains(set.Flags, "timeout") {
 				return false, nil, ErrConflict
 			}
 			active = len(set.Elements) == 1

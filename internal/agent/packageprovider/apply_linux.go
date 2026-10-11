@@ -116,7 +116,7 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 	if manifest.GetOriginalPin() != nil {
 		request.OriginalPin = proto.CloneOf(manifest.GetOriginalPin())
 		request.CandidatePinSha256 = bytes.Clone(manifest.GetCandidatePinSha256())
-		request.CandidatePinContents = pinProjection(plan.GetNativePackage().GetPinContents())
+		request.CandidatePinContents = pinProjection(plan.GetBackend().GetBackend(), plan.GetNativePackage().GetPinContents())
 	}
 	consumed := false
 	gate := func(effectContext context.Context) error {

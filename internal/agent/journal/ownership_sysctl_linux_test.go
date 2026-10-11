@@ -80,3 +80,52 @@ func TestSysctlJournalRequiresAdoptionAndPersistentIntent(t *testing.T) {
 		t.Fatal("persistent desired dimension rejected")
 	}
 }
+
+// A reboot changes every live value identity. Release after a reboot was
+// refused as drift although systemd-sysctl had applied the owned stanza.
+func TestSysctlJournalValueSurvivesRebootOnlyThroughOwnedStanza(t *testing.T) {
+	last := sysctlOwnershipFixture()
+	last.Observation.Metadata = &resourcev1.ObservationMetadata{BootId: "boot-a"}
+	o := last.GetObservation().GetSysctl()
+	path := o.GetPersistenceFileState().GetPath()
+	content := []byte(o.GetKey() + " = 60\n")
+	digest := sha256.Sum256(content)
+	last.SysctlPersistence.Content = content
+	last.SysctlPersistence.State.Exists = true
+	last.SysctlPersistence.State.File = &resourcev1.FileIdentity{Path: path, Device: 1, Inode: 2, Mode: 0o644, Sha256: digest[:]}
+	o.PersistenceFileState = proto.CloneOf(last.SysctlPersistence.State)
+	o.OwnedPersistenceFile = proto.CloneOf(last.SysctlPersistence.State.File)
+	o.PersistentValue, o.PersistentSource = proto.String("60"), proto.String(path)
+	if !sysctlOwnershipSnapshotValid(last) {
+		t.Fatal("owned persistent fixture rejected")
+	}
+	rebooted := proto.CloneOf(last)
+	rebooted.Observation.Metadata.BootId = "boot-b"
+	rebooted.GetObservation().GetSysctl().NativeIdentitySha256[0]++
+	if !sysctlOwnershipDimensionMatches(last, rebooted, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE) {
+		t.Fatal("value applied at boot from the unchanged owned stanza lost ownership")
+	}
+	for name, change := range map[string]func(*agentv1.ResourceOwnershipSnapshot){
+		"same boot":       func(s *agentv1.ResourceOwnershipSnapshot) { s.Observation.Metadata.BootId = "boot-a" },
+		"changed value":   func(s *agentv1.ResourceOwnershipSnapshot) { s.GetObservation().GetSysctl().Value = proto.String("61") },
+		"replaced stanza": func(s *agentv1.ResourceOwnershipSnapshot) { s.SysctlPersistence.State.File.Inode++ },
+		"overridden source": func(s *agentv1.ResourceOwnershipSnapshot) {
+			s.GetObservation().GetSysctl().PersistentSource = proto.String("/etc/sysctl.d/99-local.conf")
+		},
+		"conflicting later": func(s *agentv1.ResourceOwnershipSnapshot) { s.GetObservation().GetSysctl().PersistenceConflict = true },
+	} {
+		bad := proto.CloneOf(rebooted)
+		change(bad)
+		if sysctlOwnershipDimensionMatches(last, bad, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE) {
+			t.Fatalf("%s: live value attributed to the owner", name)
+		}
+	}
+	runtime := sysctlOwnershipFixture()
+	runtime.Observation.Metadata = &resourcev1.ObservationMetadata{BootId: "boot-a"}
+	after := proto.CloneOf(runtime)
+	after.Observation.Metadata.BootId = "boot-b"
+	after.GetObservation().GetSysctl().NativeIdentitySha256[0]++
+	if sysctlOwnershipDimensionMatches(runtime, after, agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSCTL_VALUE) {
+		t.Fatal("runtime-only value survived a reboot")
+	}
+}

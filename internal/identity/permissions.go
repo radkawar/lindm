@@ -35,6 +35,7 @@ var permissionTable = []struct {
 	{PermissionQuarantineDevice, []string{RoleOwner, RoleAdmin}},
 	{PermissionManageSecrets, []string{RoleOwner, RoleAdmin}},
 	{PermissionRevealSecrets, []string{RoleOwner, RoleAdmin}},
+	{PermissionRunRemoteAssistance, []string{RoleOwner, RoleAdmin}},
 }
 
 func knownPermission(permission Permission) bool {

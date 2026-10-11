@@ -89,6 +89,43 @@ Fedora DNF5 update or package-resource evidence does not qualify these vendors'
 DNF4 transaction behavior. Each derivative/minor needs its own signature rejection,
 upgrade, reboot, removal/reinstall, recovery and interruption records.
 
+Package resources use the same DNF4 backend as RHEL (Python API adapter,
+asynchronous staging, owned versionlock-plugin entries, four signature checks
+and RPM's SELinux scriptlet transition); see
+[RHEL package resources](rhel.md#package-resources-dnf4). The provider accepts
+`almalinux` and `rocky` with an installed DNF4 4.7.0 or newer; the adapter
+falls back to a transactional `iterdump` history snapshot for EL8's
+platform-python 3.6, which lacks SQLite's online backup API. Exact versions need
+`python3-dnf-plugin-versionlock` (not installed in the AlmaLinux 9.8 cloud
+image; the resource lane installs it from the vendor repository).
+
+All ten connected package scenarios passed natively on AlmaLinux 9.8 and 10.2
+aarch64 with SELinux Enforcing (EL10's entrypoint is `#! /usr/bin/python3 -s`;
+`-s` is implied by the adapter's isolated mode). AlmaLinux 8.10 aarch64 is
+**blocked**: its systemd 239 rejects the package helper's transient unit
+(`ProtectKernelLogs=`; `Type=exec` and `RestrictSUIDSGID=` are also newer) before
+any native effect, although DNF4 4.7.0 on platform-python 3.6 completed the
+adapter phases in a scratch guest. Records and the diagnosis are in
+[verification](../verification.md#native-packages-on-el-dnf4-python-api-backend).
+Rocky Linux and x86_64 derivatives are not exercised.
+
+## Host resource providers
+
+Managed files, local groups and users, sysctl, systemd timers and drop-ins,
+password policy and firewall zones accept `almalinux` (and `rhel`) only with an
+EL 9 `VERSION_ID`; password policy pins AlmaLinux 9.8 exactly. Rocky Linux,
+AlmaLinux 8 and 10 are refused as unqualified. The AlmaLinux 9.8 GenericCloud
+image has the same native stack as RHEL 9.8 (shadow-utils 4.9-16, systemd 252,
+authselect 1.2.6, pam 1.5.1, libpwquality 1.4.4, SELinux Enforcing, no
+firewalld/nftables, pam-package stacks without an authselect selection), so the
+EL 9 quirks in [RHEL host resource providers](rhel.md#host-resource-providers-el-9)
+apply unchanged: chrooted shadow tools, the systemd 252 floor, refusal of an
+unmanaged PAM stack before `authselect select sssd`, and the boot-restoration
+handling of a concurrent nftables generation change and of repeated
+acknowledgments. Records are in
+[verification](../verification.md#host-resource-providers-on-el-9); AlmaLinux
+records are derivative evidence, not RHEL qualification.
+
 ## Encryption and recovery
 
 Do not inherit Fedora or Ubuntu LUKS2, cryptsetup, TPM, Secure Boot or recovery

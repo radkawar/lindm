@@ -73,6 +73,33 @@ func VersionArgs(logDirectory string) []string {
 	return []string{"--noplugins", "--setopt=logdir=" + logDirectory, "--version"}
 }
 
+// Interpreter returns the Python interpreter named by the native DNF4
+// entrypoint's own shebang (#!/usr/bin/python3.9 on EL9, platform-python on
+// EL8, "#! /usr/bin/python3 -s" on EL10), so API adapters run under exactly the
+// interpreter that owns the native dnf module. Only fixed system interpreter
+// paths qualify; the only accepted option is -s, which the adapter's -I
+// (isolated mode) already implies.
+func Interpreter(entrypoint []byte) (string, error) {
+	line, _, found := bytes.Cut(entrypoint, []byte{'\n'})
+	command, ok := strings.CutPrefix(string(line), "#!")
+	if !found || !ok {
+		return "", errors.New("dnf: native entrypoint has no interpreter line")
+	}
+	fields := strings.Fields(command)
+	if len(fields) == 0 || len(fields) > 2 || len(fields) == 2 && fields[1] != "-s" {
+		return "", errors.New("dnf: unsupported native interpreter")
+	}
+	interpreter := fields[0]
+	if interpreter == "/usr/libexec/platform-python" || interpreter == "/usr/bin/python3" {
+		return interpreter, nil
+	}
+	minor, ok := strings.CutPrefix(interpreter, "/usr/bin/python3.")
+	if !ok || len(minor) == 0 || len(minor) > 3 || strings.Trim(minor, "0123456789") != "" {
+		return "", errors.New("dnf: unsupported native interpreter")
+	}
+	return interpreter, nil
+}
+
 // ParseVersion reads the native LC_ALL=C --version identity line. Subsequent
 // library/plugin diagnostics are bounded but are not a manager identity. The
 // caller owns bounded execution, stderr handling and exit-status verification.

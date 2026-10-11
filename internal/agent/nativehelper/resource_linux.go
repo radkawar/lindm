@@ -90,7 +90,7 @@ func LaunchResource(ctx context.Context, stateDirectory string, input *agentv1.N
 		return nil, err
 	}
 	if kind := request.GetPlan().GetRef().GetKind(); kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER || kind == resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_GROUP {
-		if err := prepareAccountRoot(directory); err != nil {
+		if err := prepareAccountRoot(directory, accountprovider.ChrootAccountRoot(request.GetPlan().GetBackend().GetProduct())); err != nil {
 			return nil, err
 		}
 	}
@@ -259,7 +259,7 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 		switch request.GetPlan().GetBackend().GetProduct().GetOsId() {
 		case "ubuntu":
 			paths = append(paths, "/usr/share/pam-configs", "/var/lib/pam", "/var/cache/debconf")
-		case "fedora":
+		case "fedora", "rhel", "almalinux":
 			paths = append(paths, "/var/lib/authselect")
 		default:
 			return nil, errors.New("native_password_platform_not_supported")
@@ -288,12 +288,19 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 	properties = setProperty(properties, "RestrictSUIDSGID", true)
 	properties = setProperty(properties, "NoNewPrivileges", true)
 	if accountRoot != "" {
-		properties = setProperty(properties, "BindPaths", []struct {
-			Source        string
-			Destination   string
-			IgnoreMissing bool
-			Flags         uint64
-		}{{"/etc", filepath.Join(accountRoot, "etc"), false, 0}})
+		properties = setProperty(properties, "BindPaths", accountRootBinds(accountRoot, request.GetPlan().GetBackend().GetProduct()))
+		if accountprovider.ChrootAccountRoot(request.GetPlan().GetBackend().GetProduct()) {
+			// The bound procfs lacks the unit's own ProtectKernelTunables and
+			// ProtectKernelLogs overmounts; repeat them inside the account root.
+			readOnly := make([]string, 0, len(protectedProcEntries))
+			for _, entry := range protectedProcEntries {
+				readOnly = append(readOnly, "-"+filepath.Join(accountRoot, "proc", entry))
+			}
+			properties = setProperty(properties, "ReadOnlyPaths", readOnly)
+			properties = setProperty(properties, "InaccessiblePaths", []string{"-" + filepath.Join(accountRoot, "proc", "kmsg")})
+			// The tools' own login-shell check resolves the host shells there.
+			properties = setProperty(properties, "BindReadOnlyPaths", []bindPath{{"/usr", filepath.Join(accountRoot, "usr"), false, 0}})
+		}
 	}
 	properties = setProperty(properties, "MemoryMax", uint64(512<<20))
 	properties = setProperty(properties, "TasksMax", uint64(64))
@@ -304,7 +311,30 @@ func resourceProperties(directory string, request *agentv1.NativeResourceTransac
 	return properties, nil
 }
 
-func prepareAccountRoot(directory string) error {
+// protectedProcEntries are the procfs paths systemd's ProtectKernelTunables
+// makes read-only.
+var protectedProcEntries = []string{"acpi", "apm", "asound", "bus", "fs", "irq", "kallsyms", "kcore", "latency_stats", "mtrr", "scsi", "sys", "sysrq-trigger", "timer_list"}
+
+type bindPath struct {
+	Source        string
+	Destination   string
+	IgnoreMissing bool
+	Flags         uint64
+}
+
+// accountRootBinds exposes the host /etc to the account helper; a chroot
+// product (see accountprovider.ChrootAccountRoot) also needs the host procfs
+// for SELinux file-creation contexts and selinuxfs for chage's access check.
+// Neither is recursive, so no other mount below them is exposed.
+func accountRootBinds(accountRoot string, platform *resourcev1.PlatformProduct) []bindPath {
+	binds := []bindPath{{"/etc", filepath.Join(accountRoot, "etc"), false, 0}}
+	if accountprovider.ChrootAccountRoot(platform) {
+		binds = append(binds, bindPath{"/proc", filepath.Join(accountRoot, "proc"), false, 0}, bindPath{"/sys/fs/selinux", filepath.Join(accountRoot, "sys", "fs", "selinux"), false, 0})
+	}
+	return binds
+}
+
+func prepareAccountRoot(directory string, chroot bool) error {
 	parent, err := statefs.OpenDirectory(directory)
 	if err != nil {
 		return err
@@ -325,6 +355,18 @@ func prepareAccountRoot(directory string) error {
 	// when the distribution default asks for one; keep that in private scratch.
 	for _, path := range []string{"var", "var/spool", "var/spool/mail", "var/mail"} {
 		if err := unix.Mkdirat(root, path, 0755); err != nil && !errors.Is(err, unix.EEXIST) {
+			return err
+		}
+	}
+	if chroot {
+		// Mount points for the host procfs, selinuxfs and /usr binds, and EL's
+		// merged /bin link.
+		for _, path := range []string{"proc", "sys", "sys/fs", "sys/fs/selinux", "usr"} {
+			if err := unix.Mkdirat(root, path, 0755); err != nil && !errors.Is(err, unix.EEXIST) {
+				return err
+			}
+		}
+		if err := unix.Symlinkat("usr/bin", root, "bin"); err != nil && !errors.Is(err, unix.EEXIST) {
 			return err
 		}
 	}

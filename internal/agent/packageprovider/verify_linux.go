@@ -65,7 +65,7 @@ func packageVerification(plan *resourcev1.ResourcePlan, after *resourcev1.Resour
 	databaseMatches := nativeMatches(desired, observed.GetRecord())
 	exactMatches := desired.GetExact() == nil || !observed.GetInstalled() || proto.Equal(desired.GetExact(), observed.GetRecord().GetVersion())
 	approved := !observed.GetInstalled() || observed.GetRecord().GetProvenanceKnown() && proto.Equal(observed.GetRecord().GetSource(), desired.GetRepository())
-	pin := pinMatches(plan.GetRef(), desired, observed.GetPinContents())
+	pin := pinMatches(plan.GetBackend().GetBackend(), plan.GetRef(), desired, observed.GetPinContents())
 	if plan.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
 		// Release verifies the executor-computed inverse, never the original
 		// desired state that is deliberately no longer managed.
@@ -177,7 +177,7 @@ func ValidateNativePlan(plan *resourcev1.ResourcePlan, manifest *resourcev1.Pack
 		if !proto.Equal(manifest.GetOriginalPin(), plan.GetBefore().GetNativePackage().GetPinFile()) {
 			return ErrConflict
 		}
-		digest := sha256.Sum256(pinProjection(plan.GetNativePackage().GetPinContents()))
+		digest := sha256.Sum256(pinProjection(plan.GetBackend().GetBackend(), plan.GetNativePackage().GetPinContents()))
 		if !bytes.Equal(digest[:], manifest.GetCandidatePinSha256()) {
 			return ErrConflict
 		}

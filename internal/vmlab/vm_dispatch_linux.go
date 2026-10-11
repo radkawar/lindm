@@ -108,6 +108,28 @@ type VMDispatchResult struct {
 	Architecture           string                          `json:"architecture,omitempty"`
 }
 
+// resourceLanePlatform lists the images whose native fixture builder and
+// oracles exist: APT, DNF5 and the EL DNF4 generation (RHEL 9/10, AlmaLinux and
+// Rocky 8/9/10).
+func resourceLanePlatform(manifest *labv1.ImageManifest) bool {
+	version := manifest.GetVersion()
+	switch manifest.GetDistribution() {
+	case "ubuntu":
+		return version == "24.04"
+	case "fedora":
+		return version == "44"
+	case "almalinux", "rocky":
+		if strings.HasPrefix(version, "8.") {
+			return true
+		}
+		fallthrough
+	case "rhel":
+		return strings.HasPrefix(version, "9.") || strings.HasPrefix(version, "10.")
+	default:
+		return false
+	}
+}
+
 // DispatchVM uses the same native builders, authenticated package installers,
 // isolated server/database and enrollment helpers as the lifecycle lane. All
 // execution authority after trust admission comes from the real server/relay.
@@ -118,9 +140,8 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 	if options.ResourceExecutionOnly && !options.Resources {
 		return nil, errors.New("direct resource execution requires the resource lane")
 	}
-	if options.Resources && (options.PowerActions || options.Hold != 0 ||
-		((manifest.GetDistribution() != "ubuntu" || manifest.GetVersion() != "24.04") && (manifest.GetDistribution() != "fedora" || manifest.GetVersion() != "44"))) {
-		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04 or Fedora 44, without power actions or console hold")
+	if options.Resources && (options.PowerActions || options.Hold != 0 || !resourceLanePlatform(manifest)) {
+		return nil, errors.New("native resource lane requires disposable Ubuntu 24.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9 or 10, without power actions or console hold")
 	}
 	if (options.ResourceKinds["secret-password"] || options.ResourceKinds["local-admin"]) && (!options.Resources || options.ResourceExecutionOnly) {
 		return nil, errors.New("secret delivery and managed local-admin kinds require the connected resource phase")
@@ -423,25 +444,28 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 		return result, err
 	}
 	if options.Resources {
-		if firewall != nil {
-			firewall.rebootDevice = func(ctx context.Context) error {
-				boot, err := firewallBootID(ctx, vm)
-				if err != nil {
-					return err
-				}
-				err = closeLifecycleForwards(forwards)
-				forwards = nil
-				if err != nil {
-					return err
-				}
-				if err := rebootLifecycleGuest(ctx, vm, boot); err != nil {
-					return err
-				}
-				forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
+		// A deliberate guest reboot closes and reopens the control-plane
+		// forwards; firewall restore and sysctl persistence cross real boots.
+		reboot := func(ctx context.Context) error {
+			boot, err := firewallBootID(ctx, vm)
+			if err != nil {
 				return err
 			}
+			err = closeLifecycleForwards(forwards)
+			forwards = nil
+			if err != nil {
+				return err
+			}
+			if err := rebootLifecycleGuest(ctx, vm, boot); err != nil {
+				return err
+			}
+			forwards, err = openLifecycleForwards(ctx, vm, [2]string{fixture.AdminAddress, fixture.DeviceAddress})
+			return err
 		}
-		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall)
+		if firewall != nil {
+			firewall.rebootDevice = reboot
+		}
+		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, reboot)
 		return result, err
 	}
 	if options.PowerActions {

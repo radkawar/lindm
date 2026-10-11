@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
 
 //go:embed dnf_resolve.py
@@ -185,9 +186,15 @@ func parseAPTDownloadDeclarations(output []byte) (map[string]downloadDeclaration
 	return declarations, total, nil
 }
 func (p *Provider) resolveDNFSizes(ctx context.Context, directory, operation string, d *resourcev1.NativePackageDesired) (*dnfResolved, uint64, error) {
-	result, err := p.run(ctx, "/usr/bin/python3", []string{"-I", "-c", dnfResolver, directory, operation, dnfSpec(d)}, "/", nil)
+	var result nativeResult
+	var err error
+	if p.manager == dnf.DNF4 {
+		result, err = p.dnf4(ctx, "resolve", directory, p.versionlock, operation, dnfSpec(d))
+	} else {
+		result, err = p.run(ctx, "/usr/bin/python3", []string{"-I", "-c", dnfResolver, directory, operation, dnfSpec(d)}, "/", nil)
+	}
 	if err != nil {
-		return nil, 0, fmt.Errorf("packageprovider: python3-libdnf5 native resolver prerequisite: %w", err)
+		return nil, 0, fmt.Errorf("packageprovider: native %s Python resolver prerequisite: %w", p.manager, err)
 	}
 	decoder := json.NewDecoder(bytes.NewReader(result.stdout))
 	decoder.DisallowUnknownFields()

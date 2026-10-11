@@ -228,7 +228,7 @@ func TestNativeAccountRootOptionSelectedBeforeEffects(t *testing.T) {
 		}
 		return []byte("  -P, --prefix PREFIX_DIR\\n"), nil
 	}
-	options, err := nativeToolOptions(context.Background(), run, commands)
+	options, err := nativeToolOptions(context.Background(), run, commands, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,8 +241,42 @@ func TestNativeAccountRootOptionSelectedBeforeEffects(t *testing.T) {
 	}
 	_, err = nativeToolOptions(context.Background(), func(context.Context, []byte, string, ...string) ([]byte, error) {
 		return []byte("unsupported native interface"), nil
-	}, commands)
+	}, commands, false)
 	if !errors.Is(err, ErrUnsupported) {
 		t.Fatal("missing containment interface was silently accepted")
+	}
+}
+
+// EL 9 shadow-utils labels a --prefix database from the prefixed path, so a
+// chroot product must chroot every tool and never fall back to --prefix.
+func TestChrootProductUsesRootForEveryTool(t *testing.T) {
+	for _, tc := range []struct {
+		platform *resourcev1.PlatformProduct
+		want     bool
+	}{
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "9.8"}, true},
+		{&resourcev1.PlatformProduct{OsId: "almalinux", Version: "9.8"}, true},
+		{&resourcev1.PlatformProduct{OsId: "rhel", Version: "10.1"}, false},
+		{&resourcev1.PlatformProduct{OsId: "rocky", Version: "9.8"}, false},
+		{&resourcev1.PlatformProduct{OsId: "fedora", Version: "44"}, false},
+		{&resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}, false},
+	} {
+		if got := ChrootAccountRoot(tc.platform); got != tc.want {
+			t.Fatalf("%v chroot=%t", tc.platform, got)
+		}
+	}
+	commands := []command{{tool: "/usr/sbin/useradd", args: []string{"--", "alice"}}, {tool: "/usr/bin/chage", args: []string{"--maxdays", "90", "--", "alice"}}}
+	both := func(context.Context, []byte, string, ...string) ([]byte, error) {
+		return []byte("  -P, --prefix PREFIX_DIR\n  -R, --root CHROOT_DIR\n"), nil
+	}
+	options, err := nativeToolOptions(context.Background(), both, commands, true)
+	if err != nil || options["/usr/sbin/useradd"] != "--root" || options["/usr/bin/chage"] != "--root" {
+		t.Fatalf("chroot product selected %v: %v", options, err)
+	}
+	prefixOnly := func(context.Context, []byte, string, ...string) ([]byte, error) {
+		return []byte("  -P, --prefix PREFIX_DIR\n"), nil
+	}
+	if _, err := nativeToolOptions(context.Background(), prefixOnly, commands, true); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("chroot product fell back to a mislabeling --prefix: %v", err)
 	}
 }

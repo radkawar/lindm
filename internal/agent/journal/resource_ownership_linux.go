@@ -66,6 +66,84 @@ func (s *Store) CompleteResourceOwnershipEffect(ctx context.Context, actionID st
 	return s.mutateResourceOwnership(ctx, actionID, expectedRevision, after, nil, ownershipComplete)
 }
 
+// ResolveResourceOwnershipEffect ends an UNKNOWN ledger from exact observation.
+// The interrupted effect action must itself be terminal OUTCOME_UNKNOWN, so no
+// executor worker still runs it. The caller must hold independent terminal
+// custody for that exact effect: today only the firewall provider, whose
+// connectivity guard records an exact rollback or commit of the interrupted
+// transaction, may call it. Owner and claim lineage are unchanged; resolution
+// records observed native truth and authorizes no native effect or replay.
+// committed resolves an interrupted release to RELEASED; otherwise APPLIED.
+func (s *Store) ResolveResourceOwnershipEffect(ctx context.Context, deploymentID, deviceID, generation string, ref *resourcev1.ResourceRef, expectedRevision int64, effectActionID string, observed *agentv1.ResourceOwnershipSnapshot, committed bool) (*agentv1.ResourceOwnershipLedger, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil {
+		return nil, ErrClosed
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if resource.ValidateRef(ref) != nil || expectedRevision <= 0 || expectedRevision == math.MaxInt64 || effectActionID == "" {
+		return nil, ErrResourceOwnershipConflict
+	}
+	if err := s.validateOwnershipSnapshot(observed, ref); err != nil {
+		return nil, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, resourceActionWriteError(ctx)
+	}
+	defer func() { _ = tx.Rollback() }()
+	q := s.queries.WithTx(tx)
+	key := journaldb.ReadResourceOwnershipParams{DeploymentID: deploymentID, DeviceID: deviceID, EnrollmentGeneration: generation, Kind: int64(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey()}
+	ledger, err := s.loadResourceOwnership(ctx, q, key)
+	if err != nil {
+		return nil, err
+	}
+	if ledger.GetRevision() != uint64(expectedRevision) {
+		return nil, ErrConflict
+	}
+	if ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN || ledger.GetEffectActionId() != effectActionID || ledger.GetBeforeEffect() == nil {
+		return nil, ErrResourceOwnershipConflict
+	}
+	row, err := q.ReadResourceAction(ctx, effectActionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrResourceOwnershipConflict
+	}
+	if err != nil {
+		return nil, stateReadError(ctx)
+	}
+	action, _, err := s.checkedResourceAction(ctx, q, row)
+	if err != nil {
+		return nil, err
+	}
+	intent := action.GetIntent()
+	if action.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN || !resource.RefEqual(intent.GetDesired().GetRef(), ref) || intent.GetDeploymentId() != deploymentID || intent.GetDeviceId() != deviceID || intent.GetEnrollmentGeneration() != generation {
+		return nil, ErrResourceOwnershipConflict
+	}
+	ledger.LastApplied = proto.CloneOf(observed)
+	ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED
+	if committed && intent.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE {
+		ledger.State = agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED
+	}
+	ledger.Revision = uint64(expectedRevision + 1)
+	encoded, err := s.encodeResourceOwnership(ledger)
+	if err != nil {
+		return nil, err
+	}
+	changed, err := q.ReplaceResourceOwnership(ctx, journaldb.ReplaceResourceOwnershipParams{Record: encoded, DeploymentID: key.DeploymentID, DeviceID: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Kind: key.Kind, CanonicalKey: key.CanonicalKey, Revision: expectedRevision})
+	if err != nil {
+		return nil, resourceActionWriteError(ctx)
+	}
+	if changed != 1 {
+		return nil, ErrConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, resourceActionWriteError(ctx)
+	}
+	return ledger, nil
+}
+
 type ownershipTransition uint8
 
 const (
@@ -141,7 +219,13 @@ func (s *Store) mutateResourceOwnership(ctx context.Context, actionID string, ex
 				return nil, stateReadError(ctx)
 			}
 			if history != 0 {
-				return nil, ErrResourceOwnershipUnknown
+				effect, err := s.historicalEffect(ctx, q, key)
+				if err != nil {
+					return nil, err
+				}
+				if effect {
+					return nil, ErrResourceOwnershipUnknown
+				}
 			}
 		}
 		ledger = &agentv1.ResourceOwnershipLedger{FormatVersion: 1, InstallationId: s.installationID, DeploymentId: key.DeploymentID, DeviceId: key.DeviceID, EnrollmentGeneration: key.EnrollmentGeneration, Ref: proto.CloneOf(ref), Baseline: proto.CloneOf(snapshot), State: agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_CLAIMED}
@@ -399,8 +483,9 @@ func ownershipAcquisitionAllowed(intent *agentv1.ResourceExecutionIntent, snapsh
 }
 
 // nativePinClaimed reports an existing pin for this package. An APT pin file is
-// per package; DNF's versionlock is one shared file whose entries for other
-// packages do not make this package's creation an adoption.
+// per package; DNF's versionlock (DNF5 TOML or the DNF4 plugin list) is one
+// shared document whose entries for other packages do not make this package's
+// creation an adoption.
 func nativePinClaimed(observation *resourcev1.ResourceObservation) bool {
 	pkg := observation.GetNativePackage()
 	if pkg.GetPinFile() == nil {
@@ -409,7 +494,7 @@ func nativePinClaimed(observation *resourcev1.ResourceObservation) bool {
 	if pkg.GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
 		return true
 	}
-	return dnf.VersionlockClaims(pkg.GetPinContents(), observation.GetRef().GetCanonicalKey(), pkg.GetPackage().GetNativeName())
+	return dnf.VersionlockClaims(pkg.GetPinFile().GetPath(), pkg.GetPinContents(), observation.GetRef().GetCanonicalKey(), pkg.GetPackage().GetNativeName())
 }
 
 // A new enrollment cannot adopt away an unreleased native owner from an older
@@ -433,6 +518,36 @@ func (s *Store) rejectOtherGenerationOwnership(ctx context.Context, q *journaldb
 		}
 		if ledger.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_RELEASED {
 			return ErrResourceOwnershipConflict
+		}
+	}
+}
+
+// historicalEffect reports whether an earlier action on key without a ledger
+// may have changed native state. ResourceOwnershipHistoricalEffects counts every
+// non-read-only terminal action; an admission refusal made before a native plan
+// existed is among them although it never consumed a start grant. A FAILED
+// action with no start grant envelope and no start time had no native effect
+// attempt, so it cannot hide an unrecorded baseline. Anything started counts.
+func (s *Store) historicalEffect(ctx context.Context, q *journaldb.Queries, key journaldb.ReadResourceOwnershipParams) (bool, error) {
+	for cursor := ""; ; {
+		row, err := q.NextResourceAction(ctx, cursor)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, stateReadError(ctx)
+		}
+		cursor = row.ActionID
+		if row.DeploymentID != key.DeploymentID || row.DeviceID != key.DeviceID || row.EnrollmentGeneration != key.EnrollmentGeneration || row.Kind != key.Kind || row.CanonicalKey != key.CanonicalKey ||
+			row.ReadOnlyTerminal != 0 || row.State < int64(agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING) || row.State > int64(agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN) {
+			continue
+		}
+		record, err := s.decodeResourceAction(row)
+		if err != nil {
+			return false, err
+		}
+		if record.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED || len(record.GetStartGrantEnvelope()) != 0 || record.GetStartedAt() != nil {
+			return true, nil
 		}
 	}
 }

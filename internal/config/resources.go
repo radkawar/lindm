@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/assistrelay"
 	"lindm/internal/escrow"
 	"lindm/internal/pki"
 )
@@ -75,6 +77,20 @@ func InventoryBudget(cfg *configv1.ServerConfig) (int64, error) {
 		return 0, errors.New("inventory_budget_bytes is outside the admitted range")
 	}
 	return int64(value), nil
+}
+
+// listenersOverlap reports whether binding both listeners would conflict on a
+// shared port: same address, or either side binds every address.
+func listenersOverlap(a, b *configv1.ListenerConfig) bool {
+	if a.GetPort() != b.GetPort() {
+		return false
+	}
+	first, errFirst := netip.ParseAddr(a.GetAddress())
+	second, errSecond := netip.ParseAddr(b.GetAddress())
+	if errFirst != nil || errSecond != nil {
+		return true
+	}
+	return first.Unmap() == second.Unmap() || first.IsUnspecified() || second.IsUnspecified()
 }
 
 // Resolve loads the runtime dependencies needed by a control-plane process.
@@ -160,6 +176,17 @@ func (d *Document) Resolve() (*Resources, error) {
 		result.OfflineBundleDirectory = reference(base, bundles.GetDirectory())
 		result.OfflineBundleSigningPublicKey = reference(base, bundles.GetSigningPublicKeyFile())
 		result.OfflineBundleReleasePublicKey = reference(base, bundles.GetReleaseAttestationPublicKeyFile())
+	}
+	if assistance := cfg.GetAssistance(); assistance != nil {
+		if err := assistrelay.Validate(assistance); err != nil {
+			return nil, fmt.Errorf("invalid assistance configuration: %w", err)
+		}
+		relay := assistance.GetRelay().GetListener()
+		for _, other := range []*configv1.ListenerConfig{cfg.GetAdminListener(), cfg.GetDeviceListener(), cfg.GetProfiling().GetListener()} {
+			if other != nil && listenersOverlap(relay, other) {
+				return nil, errors.New("assistance relay listener must not overlap the administrative, device or profiling listener")
+			}
+		}
 	}
 
 	if err := d.authenticationSecrets(result); err != nil {

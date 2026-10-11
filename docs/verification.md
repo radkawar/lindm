@@ -1027,6 +1027,8 @@ dispatch); Leap's cell also has the same x86_64 lanes, and Arch's
 `N` now includes the same x86_64 lanes. The generic-executor resource cells (files,
 accounts, sysctl, timers/drop-ins, password policy, packages) are aarch64 records
 listed under [the executor cutover](#generic-resource-executor-cutover-phase-2).
+`N98a` marks registered RHEL 9.8 aarch64 connected records
+([EL 9 host providers](#host-resource-providers-on-el-9)).
 Rocky/AlmaLinux ARM records are derivative rows, not RHEL evidence, and nothing
 here covers desktop workflows.
 Exact builds and observed limits are in the
@@ -1036,13 +1038,13 @@ Exact builds and observed limits are in the
 | ------------------------------------------------- | ---- | ---------- | -------- | ---- | ------------ | --------------- | -------------- | ------------- |
 | Host and native package inventory                 | I    | N24, N26   | N43, N44 | S    | Na Deb, Leap | N Arch; Na TW   | S              | S             |
 | Systemd service state                             | I    | N24        | N44      | S    | Na Deb, Leap | N Arch; Na TW   | S*             | S*            |
-| Device local accounts/groups                      | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
+| Device local accounts/groups                      | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
 | Sudo policy                                       | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | SSH configuration                                 | S    | S          | S        | S    | S            | S               | S*             | S*            |
-| Session/password settings                         | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
-| Managed files                                     | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
-| Kernel sysctl                                     | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
-| Systemd timers and drop-ins                       | I    | N24        | N44      | S    | S            | S               | S*             | S*            |
+| Session/password settings                         | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
+| Managed files                                     | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
+| Kernel sysctl                                     | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
+| Systemd timers and drop-ins                       | I    | N24        | N44      | N98a | S            | S               | S*             | S*            |
 | Firewall                                          | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Time synchronization                              | S    | S          | S        | S    | S            | S               | S*             | S*            |
 | Trust stores                                      | S    | S          | S        | S    | S            | S               | S*             | S*            |
@@ -1143,15 +1145,15 @@ assignment, signed intent/challenge/start grant, the protected executor and an
 independent native oracle. All records are under
 `$HOME/.cache/lindm-resourceproviders3-20261010/`:
 
-| Kind (ownership exercised)                                                                                                                                      | Ubuntu 24.04 record | Fedora 44 record | Not exercised                                                     |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ---------------- | ----------------------------------------------------------------- |
-| Native package (create, restore; exact version, absence, dependency retention, pin drift, wrong signer, unavailable version, interrupted effect without replay) | `pkgfile-q2`        | `pkgfile-q2`     | Any-version and DNF4; repositories other than one signed fixture  |
-| Managed file (create, approved adoption, restore)                                                                                                               | `pkgfile-q2`        | `pkgfile-q2`     | ACLs, other filesystems                                           |
-| Local group (create, restore)                                                                                                                                   | `host-q2`           | `host-q2`        | Adoption of existing groups                                       |
-| Local user (create, restore)                                                                                                                                    | `host-q2`           | `host-q2`        | UID reuse, adoption (hash delivery: `secrets-q5`/`secrets-q6`)    |
-| Sysctl (approved adoption, restore)                                                                                                                             | `host-q2`           | `host-q2`        | Persistence across a guest reboot; `net.*` keys                   |
-| Systemd timer and drop-in (create, restore)                                                                                                                     | `host-q2`           | `host-q2`        | Calendar timers firing                                            |
-| Password policy (approved adoption, restore)                                                                                                                    | `password-q2`       | `password-q2`    | History, aging, faillock lockout, interactive PAM password change |
+| Kind (ownership exercised)                                                                                                                                      | Ubuntu 24.04 record       | Fedora 44 record          | Not exercised                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| Native package (create, restore; exact version, absence, dependency retention, pin drift, wrong signer, unavailable version, interrupted effect without replay) | `pkgfile-q2`              | `pkgfile-q2`              | Any-version; repositories other than one signed fixture (EL DNF4: own section below) |
+| Managed file (create, approved adoption, restore; POSIX ACL refusal)                                                                                            | `pkgfile-q2`, `files-hk3` | `pkgfile-q2`, `files-hk3` | Desired ACLs (no such field); filesystems other than ext4/btrfs                      |
+| Local group (create, approved adoption, restore)                                                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | —                                                                                    |
+| Local user (create, approved adoption, restore; UID collision and reused identity refused)                                                                      | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Released-UID reuse by another name (hash delivery: `secrets-q5`/`secrets-q6`)        |
+| Sysctl (approved adoption, restore; reboot persistence, `net.ipv4.ip_forward`)                                                                                  | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Runtime-only values across a reboot; non-host network namespaces                     |
+| Systemd timer and drop-in (create, restore; interval and calendar timers firing)                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Missed calendar catch-up (`Persistent=no`), timers across reboot                     |
+| Password policy (approved adoption, restore)                                                                                                                    | `password-q2`             | `password-q2`             | History, aging, faillock lockout, interactive PAM password change                    |
 
 Record files are `<distro>-arm64-<host>-resources-<run>.json` (`ubuntu24-arm64-dgx20-…`,
 `fedora44-arm64-dgx21-…`) with these SHA-256 digests:
@@ -1164,6 +1166,51 @@ Record files are `<distro>-arm64-<host>-resources-<run>.json` (`ubuntu24-arm64-d
 | `fedora44-arm64-dgx21-resources-pkgfile-q2.json`  | `245ff01db65edb63146d6830cf22a5215c60c5ac41503bbd3354430f63fde8e5` |
 | `fedora44-arm64-dgx21-resources-host-q2.json`     | `4691d08fdca15fe9801821882fae10a661a83019f47098ec46320e88f6c145c5` |
 | `fedora44-arm64-dgx21-resources-password-q2.json` | `7ac9079e55219f71bad7ef193e5c6f988af606f683e7081556dde099be451e6f` |
+
+The `hk3` records extend those kinds. They were produced by the same lane from
+one immutable source snapshot (worktree `rc-lane-hk3`, base commit `efa78922`,
+tar digest `1edf6228…c377`), which already contained the APPROVED_ADOPTION
+qualification for local users and groups and the two product fixes below. They
+are under `$HOME/.cache/lindm-resourcecoverage-20261011/hostkinds/` (Ubuntu on
+`ubuntu-noble-20260926-arm64`, Fedora on `fedora-cloud-44-1.7-aarch64` with
+SELinux enforcing):
+
+| Record                                | SHA-256                                                            |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu24-arm64-dgx21-host-hk3.json`  | `021d5881d79e95cf39bff56167dcd39d8eeb153336d53a61d7a8c4baacd7829d` |
+| `fedora44-arm64-dgx21-host-hk3.json`  | `269528e3a2c8ce54b18afb30a7038fbb19636d13a724232e95ad8cc0da882f67` |
+| `ubuntu24-arm64-dgx20-files-hk3.json` | `ffee7580b34ad05d1e0363a3036f0d0514cfb264262b6db0ea8c78a6c2950f53` |
+| `fedora44-arm64-dgx20-files-hk3.json` | `17269737762148f2621d3b9aabda7288b2443f29d729fd99cc138ca3c8d9e067` |
+
+- Accounts: adoption of an existing group (GID change, additive member) and of
+  an existing user with a real random `$6$` hash (shell, lock, maximum age);
+  each release restores the recorded baseline byte for byte (passwd and group
+  lines, shadow aging fields, gshadow digest, memberships, home). The record
+  holds only the SHA-256 of the shadow hash, which stays equal under the lock.
+  Refusals (`hashed-password-refused` as `UNSUPPORTED`, `uid-collision-refused`
+  and `owned-identity-reuse-refused` as `PRECONDITION`) are device-signed
+  failures that never started; the account database digests are identical
+  before, after the refusal and after the clear's release. `hashed-password-refused`
+  predates secret delivery; delivered hashes are now qualified by the
+  `secrets-q5`/`secrets-q6` records, and the lane no longer runs that refusal.
+- Sysctl: `reboot-persists` is a real guest reboot (changed boot ID,
+  `systemd-sysctl` success) followed by a device observation without a start
+  grant that reports reboot persistence; `release-after-reboot-restores-prior`
+  then restores the pre-management value and removes the stanza.
+  `net.ipv4.ip_forward` is set, repeated and released in the host namespace.
+- Timers: an interval timer ran the inert target twice (distinct systemd
+  `INVOCATION_ID`s); after switching to a UTC calendar minute, the target ran
+  once at that minute and not between the switch and it.
+- Files: an access-ACL file is not adopted and a file is not created under a
+  default-ACL directory; `getfacl`, mode, content, inode change times and the
+  directory are identical before, after the refusal and after the clear.
+
+Product fixes these runs found: a POSIX ACL refused by the shared native file
+boundary was retried forever as an internal error instead of a signed refusal
+(the executor now classifies `nativefile` refusals); and release after a
+reboot was refused as drift because a live sysctl value's identity is
+boot-scoped (it now stays owned across a boot only while the owned stanza is
+unchanged and effective).
 
 Encryption compliance (create, restore; read-only finding, never a storage
 effect) passed `lab vm device-actions -scenario compliance` on x86_64 encrypted
@@ -1271,7 +1318,7 @@ local-admin policy form, bounds and rotation request. Local-admin reveal in the
 console needs real device escrow and was not exercised there; the API path is
 covered by the native records above.
 
-##### Firewall zone (create, restore) — two-guest probe lane
+##### Firewall zone (create, restore, coexistence) — two-guest probe lane
 
 `lab vm resources -phase connected -kinds firewall` boots the device and an
 independent probe-peer guest from the same verified image; each holds its own
@@ -1284,34 +1331,58 @@ Ed25519 proof key; the device, the peer and the server's `connectivity_probes`
 carry the same eight dual-stack INPUT TCP / OUTPUT UDP allow/deny targets, and
 the device enables the packaged guard and restore units. A lab-owned
 priority-100 table drops only the DENY tuples so the static deny experiments
-stay meaningful after release. Every converged step carries fresh signed peer
+stay meaningful after release. Before any zone exists the device activates its
+distribution's own firewall manager: UFW (iptables-nft `ip filter`/`ip6 filter`)
+on Ubuntu with SSH and the oracle ports allowed, firewalld (installed, default
+zone `public`, `inet firewalld`) on Fedora with the oracle ports opened. Root
+provisioning also enables the real quarantine action (management endpoints
+`127.0.0.1` and `10.0.2.2`, DNS `10.0.2.3`, 300 s kernel timer) and installs its
+`action-sandbox` drop-in. Every converged step carries fresh signed peer
 receipts and the controller's DSSE confirmation; each oracle is the device's own
 `nft -j list ruleset` plus TCP connections from the peer and UDP datagrams
-received by an independent peer witness.
+received by an independent peer witness. Every zone oracle also digests each
+foreign table with `nft -s -a list table` (stateless, with handles) and requires
+it unchanged since the last native-manager baseline (provisioning, the deliberate
+reload, the reboot).
 
-| Scenario                   | Native outcome                                                                                                   |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `zone-create-converged`    | Owned table at priority 10; peer reaches TCP 8080, 8081 filtered; UDP 5301 egress dropped (EPERM), 5300 received |
-| `repeat-no-start-grant`    | Verification-only action with fresh probes, no start grant                                                       |
-| `reconcile-rule-change`    | Added TCP 8083 accept becomes reachable from the peer                                                            |
-| `quarantine-precedence`    | A foreign priority -10 drop on 8080 stays final over the zone accept; after its removal verification converges   |
-| `reboot-restore`           | `lindm-firewall-restore.service` succeeds at boot, packets match, verification converges without a start grant   |
-| `release-restores-absence` | Owned table removed; 8081 and UDP 5301 reachable again                                                           |
+| Scenario                                      | Native outcome                                                                                                                                                                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `zone-create-converged`                       | Owned table at priority 10; peer reaches TCP 8080, 8081 filtered; UDP 5301 egress dropped (EPERM), 5300 received; native tables unchanged                                                                                                                                |
+| `repeat-no-start-grant`                       | Verification-only action with fresh probes, no start grant                                                                                                                                                                                                               |
+| `reconcile-rule-change`                       | Added TCP 8083 accept becomes reachable from the peer                                                                                                                                                                                                                    |
+| `native-manager-reload-preserves-zone`        | `ufw reload` / `firewall-cmd --reload` recreates the native tables; the zone's `nft -a -j` digest is identical before and after; verification converges without a start grant                                                                                            |
+| `real-quarantine-precedence`                  | Real signed quarantine (root and server `SUCCEEDED`): `lindm_q_<action>` at priority -10, peer TCP 8080/8081/8083 all filtered, UDP egress EPERM, explicit DNS to `10.0.2.3` answered, zone digest unchanged                                                             |
+| `quarantine-withholds-then-resumes-reconcile` | A new revision during quarantine gets no server work for 30 polls (`device_quarantined` in the relay journal), zone digest unchanged; after the signed release the withheld verification converges and the zone behaves as before                                        |
+| `external-rule-added-refused`                 | A rule added with `nft` to the zone's input chain: signed precondition refusal before any authority; the rule is retained                                                                                                                                                |
+| `external-rule-removed-converged`             | Removing that rule restores the exact table; verification converges without a start grant                                                                                                                                                                                |
+| `owned-rule-deleted-refused`                  | The owned IPv6 TCP 8080 accept deleted with `nft`: signed precondition refusal; the peer reaches 8080 over IPv4 only                                                                                                                                                     |
+| `reboot-restore`                              | `lindm-firewall-restore.service` replays the committed zone (repairing the deleted rule), packets match, verification converges without a start grant                                                                                                                    |
+| `helper-killed-after-kernel-batch`            | A lab watcher SIGKILLs `lindm-resource-<action>.service` within 15 ms of the batch removing 8083 (guard `APPLIED`, no confirmation); action `OUTCOME_UNKNOWN`; guard `ROLLED_BACK`; zone text and committed file identical; no trace or extra table; no replacement work |
+| `outcome-unknown-resolved-by-observation`     | The next revision resolves ownership from that rollback; a new action with a start grant applies a new generation (guard `COMMITTED` for it) and 8083 becomes filtered                                                                                                   |
+| `release-restores-absence`                    | Owned table removed; 8081 and UDP 5301 reachable again; every native table byte-identical (with handles) before and after                                                                                                                                                |
 
-Clean records (lindmd `d4b3edf90215f0d555d06f4838e5c9b68e0811071bd2f6ab6cbe8eb30aa030a6`,
-lab `4efa654f293c2f3b7d97ade2d5c60fd9915ad27fcf549fad25654705ca748bd3`, built from a
-tree that differs from the landed one only in the qualification table), under
-`$HOME/.cache/lindm-resourceproviders3-20261010/`:
+Records (lindmd `bfcb9e67ef0030627b84227682cda6820c4345f8513315f03ecaf3eea734791c`,
+lab `98f4583feb631ebe51a02305b26347afbc4085c4b4037810fb7889bae9cd29df` as embedded in
+the records; no instrumentation), under `$HOME/.cache/lindm-resourcecoverage-20261011/firewall/`:
 
-| Record                                    | SHA-256                                                            |
-| ----------------------------------------- | ------------------------------------------------------------------ |
-| `firewall-ubuntu2404-arm64-dgx20-q2.json` | `3a7e842c7b39a17f0bdf12448510a055566e0c9452d4b7249631da7582f51dda` |
-| `firewall-fedora44-arm64-dgx21-q2.json`   | `bb335f97639707ea4f599e58cfd013f224b0d366b09d0970742f8043d846edef` |
+| Record                            | SHA-256                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu2404-arm64-dgx21-fw3.json` | `052ad3c85705fb57682e18de69022817751f72d9a5854340ad5af43ca2fdeedf` |
+| `fedora44-arm64-dgx20-fw3.json`   | `0bb71257ea8d70a798509ae4fe4d7cbe86587590e1e352595c4c86c317245faa` |
 
-Not exercised: the real timed quarantine device action (a lab table imitates its
-priority), active UFW or firewalld rulesets (inactive on the Ubuntu image, not
-installed on the Fedora image), FORWARD probes, partitions, generation-CAS races,
-foreign drift, approved adoption and guard crash boundaries.
+The earlier six-scenario records (no native manager, a lab table at priority -10
+imitating quarantine) remain under `$HOME/.cache/lindm-resourceproviders3-20261010/`:
+`firewall-ubuntu2404-arm64-dgx20-q2.json`
+`3a7e842c7b39a17f0bdf12448510a055566e0c9452d4b7249631da7582f51dda` and
+`firewall-fedora44-arm64-dgx21-q2.json`
+`bb335f97639707ea4f599e58cfd013f224b0d366b09d0970742f8043d846edef`.
+
+Not exercised: FORWARD probes, partitions, generation-CAS races, approved
+adoption; crash windows other than the helper SIGKILL between the kernel batch
+and controller confirmation (guard arm, pending write, committed write, disarm,
+executor or supervisor restart, missed confirmation); quarantine kernel-timer
+expiry under a zone (it ends by the signed release); release of a drifted or
+still-unresolved zone; x86_64.
 
 Native findings fixed before these records: `/proc/1/ns/net` is ptrace-gated, so
 every capability-bounded firewall helper, the guard and the restore unit failed
@@ -1323,7 +1394,145 @@ foreign (outcome unknown). An observation directory listing resolved entries
 against a label instead of its path, so one retained observer blocked all later
 observations. The native worker took the guard record lock non-blockingly and
 failed when it met the supervisor's 100 ms recovery poll; it now waits within its
-deadline.
+deadline. Fedora 44's nftables 1.1.6 prints a `typeof` set key as the typeof
+expression, so every real quarantine there failed its read-back after the kernel
+effect, ended `OUTCOME_UNKNOWN` and rolled itself back
+(`fedora44-arm64-dgx20-fw1.json`,
+`16dac74cf1c6442bd7147d94eb0c76ff636bf87591371d68fc14e5a64fd923e6`); the parser now
+accepts both forms. A helper killed after its kernel batch left the ownership
+ledger UNKNOWN forever, so after the guard's exact rollback the zone could never
+be reconciled or released; the next signed plan now resolves it from the guard's
+terminal record of that exact transaction (see
+[engineering](engineering.md#dedicated-typed-firewall-zones)). Quarantine admits
+loopback only from its `127.0.0.1` endpoint, so the systemd-resolved stub is
+unreachable while quarantined and Ubuntu's `sudo` failed to resolve the hostname
+(`ubuntu2404-arm64-dgx21-fw1.json`,
+`6cab1d39ad80e16af52a52fefd36837e9114a4fe695e487be52707e5fca9ceac`); the lab adds
+the Debian `127.0.1.1` hostname line. This product behavior is unchanged.
+
+##### Native packages on EL (DNF4 Python API backend)
+
+The connected package lane (`lab vm resources -phase connected -kinds packages`)
+ran its ten scenarios unchanged from Ubuntu/Fedora — exact v1 with dependency and
+readiness, wrong signing key refused, unavailable exact version refused, exact v2
+upgrade, repeat without a start grant, owned absence, presence after absence,
+release retaining the dependency, external pin drift refusing release, and an
+interrupted running scriptlet that is never replayed — against the
+[DNF4 backend](platforms/rhel.md#package-resources-dnf4). The DNF4 oracle
+additionally requires the marked exact line in
+`/etc/dnf/plugins/versionlock.list`, the native `dnf` CLI resolving the other
+repository version without the versionlock plugin and refusing it with the
+plugin (`--assumeno upgrade|downgrade`; the plugin ignores non-resolving `list`),
+`matchpathcon -V` of the payload and a `%post` scriptlet that recorded its own
+SELinux context `system_u:system_r:rpm_script_t:s0`. SELinux stayed Enforcing.
+Records are under `$HOME/.cache/lindm-resourcecoverage-20261011/`:
+
+| Platform (aarch64, KVM on Sparks)      | Record                                 | SHA-256                                                            |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
+| RHEL 9.8 (registered, user egress)     | `rhel98-arm64-dgx21-packages-a5.json`  | `3d0b520490e43c4536d4a17fb63745747017aa5ecbe2ba96bef590d1fea04474` |
+| AlmaLinux 9.8                          | `alma98-arm64-dgx20-packages-a5b.json` | `28c47a472b0760385b029ac4f8206e929d8f27b410c3bd4aa07fe16c204e8101` |
+| AlmaLinux 10.2                         | `alma102-arm64-dgx21-packages-a7.json` | `9f22874f333a6a90abd6b3030901fbfc9acc6d2937d8ad0211ef292298181d5d` |
+| AlmaLinux 8.10 (**failed**, diagnosis) | `alma810-arm64-dgx20-packages-a7.json` | `ea08989820a1bf5365492a3c99fdcfcac34bce6fcf0527275f633948d6161893` |
+
+The RHEL 9.8 image is the vendor `rhel-9.8-aarch64-kvm.qcow2` (SHA-256
+`5f9d524f…f384`), acquired with the maintained `lab images redhat fetch -arch
+aarch64` path (vendor-authenticated checksum; pinned manifest
+[`rhel-9.8-aarch64.json`](../lab/images/rhel-9.8-aarch64.json)). The record's
+`redhat` block reports registration, native identity, authenticated repository
+metadata refresh, unregistration and owned activation-key deletion all true
+(run `lindm-lab-5748e60219113773077ffef2d09b26cb`, consumer
+`34fcdaed-b232-49cf-b6c8-796d964eea21`); `rpm-build`, `createrepo_c` and
+`python3-dnf-plugin-versionlock` came from the entitled AppStream. An earlier
+attempt interrupted from the controller left consumer
+`9bec2250-893e-412e-8f52-b05775ca09ae` registered; the maintained
+`lab images redhat cleanup` deleted it and a following inventory returned `[]`
+(`rhel98-a3-orphan-cleanup.json`).
+
+AlmaLinux 8.10 is a precise failure, not a pass: the fixture and DNF4 4.7.0 on
+platform-python 3.6 are ready (the adapter's resolve/stage/check/apply also
+completed in a scratch guest under equivalent unit sandboxes), but systemd 239
+refuses the package helper's transient unit (`Cannot set property
+ProtectKernelLogs`; `Type=exec` and `RestrictSUIDSGID=` are likewise newer than
+239). EL8 package resources stay blocked until the helper sandbox has an
+equivalent EL8 expression; the failure precedes any native effect.
+
+Native findings fixed before these records: the DNF4 CLI exits 1 under the
+executor's read-only `/var` even for `--version` (its RPM sack opens
+`/var/log/hawkey.log` before `--setopt=logdir` applies), so DNF4 is identified
+through the entrypoint interpreter's `dnf` module; EL ships `/usr/bin/dnf` as a
+symlink to `dnf-3` whose shebang is `#!/usr/bin/python3.9` (EL9),
+`#!/usr/libexec/platform-python` (EL8) or `#! /usr/bin/python3 -s` (EL10); libdnf
+opens `history.sqlite` read-write, so read-only staging resolves against a private
+snapshot; DNF4 refuses package downloads under `cacheonly`; and the fixture
+toolchain oracle assumed `dnf5`.
+
+##### Host resource providers on EL 9
+
+The connected host lanes (`lab vm resources -phase connected -kinds
+files,accounts,sysctl,definitions,password` and the two-guest `-kinds firewall`)
+ran their Ubuntu/Fedora scenarios unchanged on RHEL 9.8 and AlmaLinux 9.8
+aarch64 cloud guests with SELinux Enforcing, plus one EL scenario: password
+policy is first assigned to the image's unmanaged pam-package stack and must be
+refused before any effect (`unmanaged-pam-stack-refused`; byte-identical
+`system-auth`/`password-auth`/`pwquality.conf` before, after refusal and after
+clear), then the lane selects the vendor `sssd` authselect profile and qualifies
+the managed path. All four records come from one source snapshot (revision
+`efa78922`, working-diff SHA-256 `74246a3d…221e`, lindmd `5a430504…3a3054`, lab
+`f230b937…`); RHEL used the vendor KVM image `5f9d524f…f384` and AlmaLinux the
+GenericCloud image `15cf8257…`. Records are under
+`$HOME/.cache/lindm-resourcecoverage-20261011/elhost/`:
+
+| Record (aarch64, KVM on Sparks)                             | Kinds and scenarios                                                                                                   | SHA-256                                                            |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `rhel98-host-el12.json` (RHEL 9.8, registered, `dgx21`)     | files 9, groups 7, users 12, sysctl 8 (reboot, `net.ipv4.ip_forward`), timers/drop-ins 10 (firing), password policy 5 | `106fa76cecbc56c6f4112b074ff26c51162da63ab3ad8d6b033c45ea9d03d87c` |
+| `alma98-host-el12.json` (AlmaLinux 9.8, `dgx20`)            | same 51 scenarios                                                                                                     | `48d057dd4cec6ebac735720c114a15d12247765651a5c7aa80f61763b0456565` |
+| `rhel98-firewall-el12.json` (RHEL 9.8, registered, `dgx21`) | firewall zone 13, firewalld active                                                                                    | `aa140e905b1e26e3e7fa906b5c19fe425852c78541a4b73b36e4355d48009bf6` |
+| `alma98-firewall-el12.json` (AlmaLinux 9.8, `dgx20`)        | firewall zone 13, firewalld active                                                                                    | `368328a10db6a79d051818b2eddacf6810deb987fee0cbc02b65d71e3cba6fab` |
+
+Each RHEL record's `redhat` block reports registration, native identity,
+authenticated repository metadata refresh, unregistration and owned
+activation-key deletion all true (host: run
+`lindm-lab-fdf3eacf3dd99a5eab1785e62cfed311`, consumer
+`06377afb-0b75-4de4-ae39-78e2a080446b`; firewall: run
+`lindm-lab-c4077aec1778e0ea71a8a1a18d609810`, consumer
+`3819ddcb-1257-4fc0-8ca1-dea6bc44dbf6`); firewalld, nftables and the fixture
+toolchain came from the entitled repositories. AlmaLinux records are derivative
+evidence, not RHEL qualification.
+
+Native findings fixed before these records (diagnostic records in the same
+directory):
+
+- EL 9 shadow-utils 4.9 labels `--prefix` account databases from the prefixed
+  path (`var_run_t`); after `create-locked-home` `sudo` failed and the lane lost
+  the guest (`alma98-host-el1c.json`,
+  `edad1751529366a243eb369bc8c5bce66d1629fb698afca2ba373e190216bf2d`). EL 9 now
+  chroots the tools into an account root with the host procfs, selinuxfs and
+  read-only `/usr` ([RHEL quirks](platforms/rhel.md#host-resource-providers-el-9)).
+- The definition provider required systemd 255 and could not parse EL's
+  `252-67.el9_8…` manager version; EL 9's floor is 252.
+- An admission refusal recorded before a native plan (here the unmanaged PAM
+  stack, then its refused release) was counted as a historical effect, so every
+  later claim of the same key failed `resource_ownership_unknown`
+  (`alma98-defpw-el7.json`,
+  `28284090cf2ae46fa19476f1a8f5dabd38ddd90eb732777570a41f7fe4255845`). A FAILED
+  record without a start grant envelope and start time is now effect-free for
+  ownership history regardless of its plan; anything started still blocks
+  ([`historicalEffect`](../internal/agent/journal/resource_ownership_linux.go)).
+- Boot zone restoration failed beside firewalld: a generation refusal
+  (`ERESTART`) and repeated `NEWRULE` acknowledgments during module autoload
+  were both reported as unknown outcomes (`alma98-firewall-el8.json`,
+  `1927a5f6de095e900e25aee33bba8d57254af95fa09a14b832df7a1279443758`;
+  `rhel98-firewall-el11.json`,
+  `2b551ab0758f5c4a0f584ae84de2c7cf74a98a803fd8f00a455c80a2d449922c`). The
+  provider now retries refused batches, accepts repeated object successes and
+  replaces the socket after every batch; the race is not EL-specific.
+
+Not exercised on EL: Rocky Linux, EL 8 and 10, x86_64, password hash delivery
+(refused by design), history/aging/faillock password dimensions and interactive
+PAM password change, authselect profiles other than `sssd`, a host whose
+authselect selection predates enrollment, file ACLs beyond the refusals, timers
+across a reboot, FORWARD probes and the firewall crash windows listed in the
+records' `unproven` fields.
 
 ### Capability matrix dimensions
 
@@ -1348,12 +1557,12 @@ Compose are independent rows. Pin supported Docker Engine/Compose, PostgreSQL an
 host prerequisites in each manifest. Other endpoint platforms do not implicitly
 become supported server installation hosts.
 
-| Deployment                                                | Mandatory coverage                                                                                                                                           | Observed status                                                                                                                                                                                                                                                                                     |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Native server package/systemd                             | L01 installation/permissions/restart; L14 migration/upgrade/backup/restore/rotation; L16 complete isolated install/upgrade/restore; single-host L18 capacity | Ubuntu24 x86_64 signed install, explicit migration, LOCAL bootstrap, TLS/401, confinement, restart, same-schema upgrade, backup/destroy/restore and retained-data purge passed; rotation/stale-restore/Ubuntu26/air-gap/capacity remain                                                             |
-| OCI/Docker Compose single host                            | Same L01/L14/L16/single-host L18, with container volume ownership and image rollback independently observed                                                  | Docker 29.5.0 / Compose 5.1.3 boot, explicit migration, TLS and confinement passed; rollback/restore/capacity/rotation gates remain                                                                                                                                                                 |
-| Replicated API/workers + HA PostgreSQL + shared artifacts | L14 rolling upgrade/restore fences; L16 isolated HA topology; replicated L18 load/failover/queue fencing and artifact availability                           | Maintained `lab ha` passed 2026-10-11: replica crash mid-dispatch, synchronous-standby promotion and 0.1.0→0.1.1 rolling upgrade with zero duplicate or lost actions and single-leader jobs. Shared artifacts, worker-only processes, partitions, restore, replicated L18 load and 100k remain open |
-| Built-in assistance relay                                 | Local TURN and no-relay/direct variants, certificate/credential rotation and bandwidth limits; L09/L12/L16 consent/termination/relay-only behavior           | Planned, not qualified                                                                                                                                                                                                                                                                              |
+| Deployment                                                | Mandatory coverage                                                                                                                                           | Observed status                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native server package/systemd                             | L01 installation/permissions/restart; L14 migration/upgrade/backup/restore/rotation; L16 complete isolated install/upgrade/restore; single-host L18 capacity | Ubuntu24 x86_64 signed install, explicit migration, LOCAL bootstrap, TLS/401, confinement, restart, same-schema upgrade, backup/destroy/restore and retained-data purge passed; rotation/stale-restore/Ubuntu26/air-gap/capacity remain                                                                                         |
+| OCI/Docker Compose single host                            | Same L01/L14/L16/single-host L18, with container volume ownership and image rollback independently observed                                                  | Docker 29.5.0 / Compose 5.1.3 boot, explicit migration, TLS and confinement passed; rollback/restore/capacity/rotation gates remain                                                                                                                                                                                             |
+| Replicated API/workers + HA PostgreSQL + shared artifacts | L14 rolling upgrade/restore fences; L16 isolated HA topology; replicated L18 load/failover/queue fencing and artifact availability                           | Maintained `lab ha` passed 2026-10-11: replica crash mid-dispatch, synchronous-standby promotion and 0.1.0→0.1.1 rolling upgrade with zero duplicate or lost actions and single-leader jobs. Shared artifacts, worker-only processes, partitions, restore, replicated L18 load and 100k remain open                             |
+| Built-in assistance relay                                 | Local TURN and no-relay/direct variants, certificate/credential rotation and bandwidth limits; L09/L12/L16 consent/termination/relay-only behavior           | Embedded relay-only TURN in `lindmd`: single-host relayed consent/view/control/termination passed on emulated Ubuntu24 and Fedora44 GNOME/Wayland ([remote assistance](#built-in-graphical-remote-assistance-l09-l12)); relay rotation, bandwidth limits, multi-host/NAT, TLS-TURN, replicated and air-gapped L16 not qualified |
 
 Maintained implementation: `lab vm server` selects the pinned Ubuntu 24.04 image
 and qualifies signed package installation, explicit migration, LOCAL one-shot owner
@@ -3049,6 +3258,93 @@ sanitize semantics, power-loss behavior of an actual controller, or destruction
 of historical escrow/header/snapshot copies. Those exact hardware/firmware tuples
 remain separately attributable physical L15 gates below. A passed VM lane cannot
 silently promote an unqualified hardware method to supported sanitization.
+
+### Built-in graphical remote assistance (L09, L12)
+
+The maintained lane `lab vm assistance` boots a disposable clone of a cached
+encrypted GNOME golden. It builds and installs the signed agent package, enrolls
+the guest against an isolated `lindmd` with `ServerConfig.assistance` (the
+embedded relay), and enables `AgentConfig.remote_assistance` in the executor
+configuration. It then prepares GDM autologin for a password-enabled desktop user
+and requires `lindm-session.service` to be active in that user's manager.
+
+A real headless Chromium drives the real console. Local-user clicks are QMP
+absolute-pointer input, located from QMP screendumps. Every screenshot and journal
+excerpt is SHA-256 bound in a read-only `assistance.json` and re-verified before
+a pass.
+
+```sh
+lab vm assistance -host local \
+  -manifest lab/images/ubuntu-noble-encrypted-amd64.json \
+  -repo /path/to/initialized/fixture -build-repo . \
+  -lab artifacts/bin/lab -lindmd artifacts/bin/lindmd \
+  -cache .cache/lab/images -golden-cache .cache/lab/encrypted -require-cached-golden \
+  -work-dir /tmp/short -firmware-code /usr/share/OVMF/OVMF_CODE_4M.ms.fd \
+  -firmware-vars /usr/share/OVMF/OVMF_VARS_4M.ms.fd -firmware-package ovmf \
+  -firmware-version 2024.02-2ubuntu0.10 -secure-boot -evidence /new/absolute/dir
+```
+
+Use `-manifest lab/images/fedora-44-encrypted-x86_64.json` for Fedora. Keep
+`-work-dir` short, because QMP and VNC Unix socket paths must stay under 108 bytes.
+The lane runs five scenarios:
+
+| Scenario      | Path                                                                                                                                                                                                 | Required outcome                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| control       | CONTROL request → critical consent notification **Allow** → RemoteDesktop portal: enable **Allow Remote Interaction**, **Share** → console joins/answers → nonce typed in the viewer → operator Stop | `OPERATOR_STOPPED`; control granted; `lindm-input` channel; the guest terminal receives the nonce; gst capture stops |
+| view          | VIEW request → Allow → ScreenCast portal Share → **Stop** on the in-progress notification                                                                                                            | `USER_STOPPED` (`local_stop`); offer has no `m=application`; no data channel or control button                       |
+| decline       | **Decline** on the consent notification                                                                                                                                                              | `DECLINED` (`prompt_declined`); no consent audit row                                                                 |
+| portal-cancel | Allow, then **Cancel** in the portal dialog                                                                                                                                                          | `DECLINED` (`portal_cancelled`)                                                                                      |
+| lock          | Live VIEW session, then `loginctl lock-session`                                                                                                                                                      | `SESSION_LOCKED`                                                                                                     |
+
+The live scenarios also require all of the following:
+
+- At least 15 decoded frames in Chromium.
+- A selected ICE pair that is relay/relay under `iceTransportPolicy=relay`.
+- Binding to the GDM-autologin logind session.
+- Recorded offer and answer DTLS fingerprints.
+- A complete server state timeline.
+
+Audit rows are read through `ListAuditEvents`. Every run must show `request`,
+`prompt`, `consent`, `join`, `answer`, `start`, `stop` and `end` with the expected
+`cause=` for each session.
+
+Both runs below **passed** on 2026-10-11 from private worktree commit `0f5faf4`. Its
+feature diff against the shared-tree overlay baseline is `feature.diff`, SHA-256
+`f01d9ec17fcae3fdaf726bdb1536923123c4e15418e4e97cb2bf01165e68301b`. The lab binary
+(`f200c953…0a4c2`) and `lindmd` (`1dedd43b…c4a1`) were rebuilt from that commit
+with identical SHA-256, which `source-provenance.json` (SHA-256
+`a6db87f0f13e17ec4136971a82a68467b0a5841c0a27cc36be79e107b004a32c`) records. All
+files are under `$HOME/.cache/lindm-assistqual-20261011/`.
+
+| Record                                   | SHA-256                                                            | Native tuple                                                                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ubuntu24-assistance-06/assistance.json` | `70d5bb4bb1e76775c6aa3e8dd29b278bdfec55aa7eccbc51a07cc01da63cf152` | Ubuntu 24.04.5, GNOME 46.0 Wayland, xdg-desktop-portal 1.18.4 / -gnome 46.2, GStreamer 1.24.2; device `be7732c4-42f6-423c-9826-2755d948b7b2` |
+| `fedora44-assistance-03/assistance.json` | `6ea59f8908eb653f00e20d8c17843ce567d12f31f58f2909e410338fbf82e1be` | Fedora 44, GNOME 50.0 Wayland, xdg-desktop-portal 1.21.1 / -gnome 50.0, GStreamer 1.28.1; device `a59dc15a-4a9e-4cf2-be6c-a0e2dac6fc1a`      |
+
+The common runtime was x86_64 KVM/QEMU 8.2.2 with virtio-gpu, OVMF
+`2024.02-2ubuntu0.10` with Secure Boot enforced, swtpm and Chromium 156.0.8078.4.
+On both distributions the RemoteDesktop dialog shows **Allow Remote Interaction**
+off by default, so control is a second, separately visible local grant.
+
+An earlier Ubuntu run exposed a product race. GNOME 46 closes the portal session
+itself on lock, before logind sets `LockedHint`, so the session ended
+`PORTAL_CLOSED`. The executor now holds a helper-reported portal closure for five
+seconds, and a lock or logout seen in that window records `SESSION_LOCKED` or
+`SESSION_ENDED`. `TestAssistanceBrokerPortalCloseSettlesBehindLock` covers both
+outcomes.
+
+These runs do not qualify any of the following:
+
+- A human at a physical display, KDE, X11, older GNOME releases, multi-user or
+  shared seats, or suspend/resume.
+- Accessibility, or logout and helper-loss paths. Those are covered by broker race
+  tests only.
+- Network interruption, NAT or multi-host relay paths, TURN-over-TLS, bandwidth,
+  latency or video quality.
+- Air-gapped L16 operation, browsers other than Chromium, or replicated `lindmd`.
+
+The guest reached the relay through QEMU user networking at host loopback. GNOME
+idle lock was disabled in the lab session.
 
 ## 4. Scheduling and release gates
 

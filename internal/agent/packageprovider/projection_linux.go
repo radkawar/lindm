@@ -27,10 +27,11 @@ func ValidateStagingProjection(request *agentv1.NativePackageTransactionRequest)
 		}
 		return nil
 	}
-	if request.GetOperation() != agentv1.NativePackageHelperOperation_NATIVE_PACKAGE_HELPER_OPERATION_PREPARE || request.GetDesired().GetNativePackage().GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM || request.GetOriginalPin().GetPath() != "/etc/dnf/versionlock.toml" {
+	path := request.GetOriginalPin().GetPath()
+	if request.GetOperation() != agentv1.NativePackageHelperOperation_NATIVE_PACKAGE_HELPER_OPERATION_PREPARE || request.GetDesired().GetNativePackage().GetPackage().GetEcosystem() != resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM || (path != dnf.VersionlockPath && path != dnf.VersionlockListPath) {
 		return ErrConflict
 	}
-	identity, _, err := readPin("/etc/dnf/versionlock.toml")
+	identity, _, err := readPin(path)
 	if err != nil {
 		return err
 	}
@@ -40,6 +41,9 @@ func ValidateStagingProjection(request *agentv1.NativePackageTransactionRequest)
 	digest := sha256.Sum256(request.GetCandidatePinContents())
 	if !bytes.Equal(digest[:], request.GetCandidatePinSha256()) {
 		return ErrConflict
+	}
+	if path == dnf.VersionlockListPath {
+		return dnf.ValidateVersionlockList(request.GetCandidatePinContents())
 	}
 	_, err = dnf.ParseVersionlock(request.GetCandidatePinContents())
 	return err

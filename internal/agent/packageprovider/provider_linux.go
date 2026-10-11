@@ -1,12 +1,14 @@
 //go:build linux
 
-// Package packageprovider reconciles native APT and DNF5 packages on mutable
-// Debian/Ubuntu and Fedora systems. It never executes shell providers, invents
-// installed provenance, purges data, autoremoves dependencies, or downgrades.
-// Approved distro package scriptlets still run with native root privileges.
-// Plans bind complete staged solver artifacts and source/database snapshots.
-// Apply records UNKNOWN ownership before consuming signed beforeEffect authority;
-// a failed/uncertain transaction is observed, never automatically replayed.
+// Package packageprovider reconciles native APT, DNF5 and DNF4 packages on
+// mutable Debian/Ubuntu, Fedora and RHEL/AlmaLinux/Rocky systems. It never
+// executes shell providers, invents installed provenance, purges data,
+// autoremoves dependencies, or downgrades. Approved distro package scriptlets
+// still run with native root privileges. Plans bind complete staged solver
+// artifacts and source/database snapshots. Apply records UNKNOWN ownership
+// before consuming signed beforeEffect authority; a failed/uncertain
+// transaction is observed, never automatically replayed. DNF4 never inherits
+// DNF5 store/replay: it stages and replays through its own Python API adapter.
 package packageprovider
 
 import (
@@ -72,9 +74,17 @@ type Provider struct {
 	backend     *resourcev1.BackendSelection
 	ecosystem   resourcev1.PackageEcosystem
 	managerPath string
-	run         nativeRunner
-	gate        sync.Mutex
-	closed      bool
+	// manager, interpreter and versionlock describe the identified native DNF
+	// generation, the DNF4 entrypoint's own Python and whether the DNF4
+	// versionlock plugin natively enforces its fixed lock list.
+	manager     dnf.Kind
+	interpreter string
+	versionlock bool
+	// rpmdb is the located native RPM database directory.
+	rpmdb  string
+	run    nativeRunner
+	gate   sync.Mutex
+	closed bool
 }
 
 var validator = sync.OnceValues(func() (protovalidate.Validator, error) { return protovalidate.New() })
@@ -121,16 +131,11 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB
 		tool = "/usr/bin/apt-get"
 		backend = resourcev1.Backend_BACKEND_APT
-	case "fedora":
-		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
-		selected, err := dnf.Executable(os.Stat)
-		if err != nil {
-			return nil, err
-		}
-		tool = selected
-		backend = resourcev1.Backend_BACKEND_DNF5
 	default:
-		return nil, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
+		if _, ok := dnfGeneration(config.Platform.GetOsId()); !ok {
+			return nil, fmt.Errorf("%w: platform requires its qualified mutable backend", ErrUnsupported)
+		}
+		p.ecosystem = resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM
 	}
 	if err := p.checkPlatform(); err != nil {
 		return nil, err
@@ -157,25 +162,23 @@ func Open(ctx context.Context, config Config) (*Provider, error) {
 	if err := unix.Close(fd); err != nil {
 		return nil, err
 	}
-	versionArgs := []string{"--version"}
+	var version string
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		versionArgs = dnf.VersionArgs(p.state)
-	}
-	result, err := p.run(ctx, tool, versionArgs, "/", nil)
-	if err != nil {
-		return nil, err
-	}
-	p.managerPath = tool
-	version := strings.SplitN(strings.TrimSpace(string(result.stdout)), "\n", 2)[0]
-	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {
-		manager, err := dnf.ParseVersion(result.stdout)
+		manager, err := p.selectDNF(ctx, p.state)
 		if err != nil {
 			return nil, err
 		}
-		if !manager.AtLeast(dnf.DNF5, minimumDNF5) {
-			return nil, fmt.Errorf("%w: native DNF5 %s or newer required", ErrUnsupported, minimumDNF5)
+		version, backend = manager.Version, resourcev1.Backend_BACKEND_DNF5
+		if manager.Kind == dnf.DNF4 {
+			backend = resourcev1.Backend_BACKEND_DNF4
 		}
-		version = manager.Version
+	} else {
+		result, err := p.run(ctx, tool, []string{"--version"}, "/", nil)
+		if err != nil {
+			return nil, err
+		}
+		p.managerPath = tool
+		version = strings.SplitN(strings.TrimSpace(string(result.stdout)), "\n", 2)[0]
 	}
 	if version == "" || len(version) > 128 {
 		return nil, errors.New("packageprovider: invalid native backend version")
@@ -445,7 +448,7 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 		StagingExpiresAt: proto.CloneOf(expires), StagingMaxBytes: maximum, IntentSha256: bytes.Clone(p.config.IntentDigest),
 	}
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM && before.GetNativePackage().GetPinFile() != nil {
-		request.CandidatePinContents = pinProjection(pin)
+		request.CandidatePinContents = pinProjection(p.backend.GetBackend(), pin)
 		digest := sha256.Sum256(request.GetCandidatePinContents())
 		request.CandidatePinSha256 = digest[:]
 		request.OriginalPin = proto.CloneOf(before.GetNativePackage().GetPinFile())
@@ -522,7 +525,7 @@ func (p *Provider) nativeLockIdentity() string {
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {
 		return "dpkg:/var/lib/dpkg/lock-frontend:/var/lib/dpkg/lock"
 	}
-	return "rpm:/usr/lib/sysimage/rpm/.rpm.lock"
+	return "rpm:" + filepath.Join(p.rpmdb, ".rpm.lock")
 }
 func (p *Provider) nativeTransactionPath(directory string) string {
 	if p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB {

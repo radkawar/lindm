@@ -5,9 +5,11 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
@@ -172,6 +174,60 @@ func TestResourceOwnershipUnknownSurvivesRestartWithoutReplay(t *testing.T) {
 	}
 	if _, err := reopened.UpdateResourceAction(t.Context(), 3, 1, 2, serviceRunning(record)); !errors.Is(err, ErrResourceActionRejected) {
 		t.Fatalf("RUNNING transition replayed: %v", err)
+	}
+}
+
+// A provider with independent terminal custody of an interrupted effect may
+// resolve UNKNOWN from observation, but only once the effect's own action is
+// terminal, only for that effect and revision, and only once. Lineage stays.
+func TestResourceOwnershipUnknownResolvesOnlyAfterTerminalEffect(t *testing.T) {
+	f := newServiceJournalFixture(t)
+	record := queueOwnershipAction(t, f, f.record(t, 1, "owned.service", true))
+	before := ownershipSnapshot(record)
+	id := record.GetIntent().GetActionId()
+	if _, err := f.store.ClaimResourceOwnership(t.Context(), id, 0, before); err != nil {
+		t.Fatal(err)
+	}
+	ledger, err := f.store.BeginResourceOwnershipEffect(t.Context(), id, 1, before, []agentv1.ResourceOwnedDimension{agentv1.ResourceOwnedDimension_RESOURCE_OWNED_DIMENSION_SYSTEMD_RUNTIME})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolve := func(revision int64, effect string) (*agentv1.ResourceOwnershipLedger, error) {
+		return f.store.ResolveResourceOwnershipEffect(t.Context(), ledger.GetDeploymentId(), ledger.GetDeviceId(), ledger.GetEnrollmentGeneration(), ledger.GetRef(), revision, effect, before, false)
+	}
+	running := serviceRunning(record)
+	if _, err := f.store.UpdateResourceAction(t.Context(), 2, 1, 2, running); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolve(2, id); !errors.Is(err, ErrResourceOwnershipConflict) {
+		t.Fatalf("resolved while the interrupted effect may still run: %v", err)
+	}
+	unknown := proto.CloneOf(running)
+	unknown.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN
+	unknown.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_INTERRUPTED
+	unknown.CompletedAt = timestamppb.New(running.GetStartedAt().AsTime().Add(time.Second))
+	if _, err := f.store.UpdateResourceAction(t.Context(), 3, 1, 2, unknown); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolve(2, uuid.NewString()); !errors.Is(err, ErrResourceOwnershipConflict) {
+		t.Fatalf("another effect resolved this ledger: %v", err)
+	}
+	if _, err := resolve(1, id); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale revision resolved: %v", err)
+	}
+	resolved, err := resolve(2, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.GetState() != agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_APPLIED || resolved.GetRevision() != 3 || !proto.Equal(resolved.GetLastApplied(), before) || !proto.Equal(resolved.GetOwner(), ledger.GetOwner()) || resolved.GetClaimActionId() != ledger.GetClaimActionId() || !bytes.Equal(resolved.GetOwnerIntentEnvelope(), ledger.GetOwnerIntentEnvelope()) {
+		t.Fatal("resolution did not record exact observation under the unchanged lineage")
+	}
+	stored, err := f.store.LoadResourceOwnership(t.Context(), ledger.GetDeploymentId(), ledger.GetDeviceId(), ledger.GetEnrollmentGeneration(), ledger.GetRef())
+	if err != nil || !proto.Equal(stored, resolved) {
+		t.Fatalf("resolution was not durable: %v", err)
+	}
+	if _, err := resolve(3, id); !errors.Is(err, ErrResourceOwnershipConflict) {
+		t.Fatalf("resolved ledger resolved again: %v", err)
 	}
 }
 
@@ -365,5 +421,40 @@ func TestResourceOwnershipStableSourcesPermitRevisionChanges(t *testing.T) {
 	}
 	if !proto.Equal(pending.GetBaseline(), ledger.GetBaseline()) || !proto.Equal(pending.GetOwner(), next.GetIntent().GetOwnership()) {
 		t.Fatal("revision update lost original baseline or signed current source binding")
+	}
+}
+
+// An admission refusal before any native plan (an unmanaged native stack, a
+// refused release) consumed no start grant; it must not later masquerade as an
+// unrecorded effect that blocks the first real claim of the same key.
+func TestResourceOwnershipIgnoresRefusalBeforePlan(t *testing.T) {
+	f := newServiceJournalFixture(t)
+	if _, err := f.store.AcceptResourceAction(t.Context(), 1, 2, resourceAdmissionRecord(t, f, 1)); err != nil {
+		t.Fatal(err)
+	}
+	next := queueOwnershipAction(t, f, f.record(t, 2, "example.service", true))
+	if _, err := f.store.ClaimResourceOwnership(t.Context(), next.GetIntent().GetActionId(), 0, ownershipSnapshot(next)); err != nil {
+		t.Fatalf("effect-free refusal blocked the first claim: %v", err)
+	}
+}
+
+// A failure after the start grant was consumed may have changed native state.
+func TestResourceOwnershipStartedFailureRefused(t *testing.T) {
+	f := newServiceJournalFixture(t)
+	record := queueOwnershipAction(t, f, f.record(t, 1, "historical.service", true))
+	running := serviceRunning(record)
+	if _, err := f.store.UpdateResourceAction(t.Context(), 2, 1, 2, running); err != nil {
+		t.Fatal(err)
+	}
+	failed := proto.CloneOf(running)
+	failed.State = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED
+	failed.Failure = agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE
+	failed.CompletedAt = timestamppb.New(running.GetStartedAt().AsTime().Add(time.Second))
+	if _, err := f.store.UpdateResourceAction(t.Context(), 3, 1, 2, failed); err != nil {
+		t.Fatal(err)
+	}
+	next := queueOwnershipAction(t, f, f.record(t, 2, "historical.service", true))
+	if _, err := f.store.ClaimResourceOwnership(t.Context(), next.GetIntent().GetActionId(), 0, ownershipSnapshot(next)); !errors.Is(err, ErrResourceOwnershipUnknown) {
+		t.Fatalf("started failure lost its possible effect: %v", err)
 	}
 }

@@ -266,14 +266,28 @@ Both paths are qualified on Fedora 44 aarch64 with SELinux enforcing and SSH
 password logins
 ([secret delivery and local-admin records](../verification.md#secret-delivered-password-hash-and-managed-local-admin-password)).
 
+Local account adoption and refusals, sysctl reboot persistence and `net.*`
+namespace scope, timer firing and the POSIX ACL refusal behave as on
+[Ubuntu](ubuntu.md#resource-providers), with SELinux enforcing throughout. On
+the image's btrfs root an access ACL is the `system.posix_acl_access` attribute
+that the provider refuses to discard; other filesystems are not exercised.
+
 Firewall zones use the same dedicated `inet lindm_z_<zone>` netlink table, root
 provisioning, packaged guard/restore units, dedicated probe peer and static
 probe targets as on [Ubuntu](ubuntu.md#resource-providers); dispatch follows the
 server qualification table. The Fedora Cloud 44 aarch64 image does not install
-firewalld (`rpm -q firewalld` reports it absent in the record), so nothing was
-stopped or disabled; the lane opens its oracle and probe ports with
-`firewall-cmd` only when firewalld is active, and coexistence with an active
-firewalld ruleset is not exercised. NetworkManager owns the data link (a
+firewalld; the coexistence lane installs and enables it (default zone `public`,
+which then binds both NICs) before any zone exists and opens only the oracle
+ports in that zone. Its `inet firewalld` table (base chains at priority
+`filter + 10`, the same priority as the lindm zone; either order yields the same
+verdict because both must accept) stays byte-identical, with handles, across
+every lindm operation; `firewall-cmd --reload` recreates it without changing the
+zone table's objects or handles, and a fresh verification converges. The real
+quarantine action, the withheld reconciliation during quarantine, drift refusal
+and the interrupted-apply recovery behave as on
+[Ubuntu](ubuntu.md#resource-providers), here with SELinux enforcing
+([verification](../verification.md#firewall-zone-create-restore-coexistence--two-guest-probe-lane)).
+NetworkManager owns the data link (a
 MAC-matched keyfile). SELinux stayed enforcing; the packaged guard, restore and
 probe units needed no policy change. The 6.19 kernel needed the same two fixes
 as Ubuntu (ptrace-gated `/proc/1/ns/net`, explicit boolean bitwise operation on
@@ -283,6 +297,14 @@ read-back).
 
 Encryption success does not imply power, desktop lock, account lock, quarantine
 or sanitize success. Follow the per-action records in [verification](../verification.md#encryption-and-imperative-action-evidence-l10-l13-l15).
+Fedora 44 ships nftables 1.1.6, whose JSON prints a `typeof` set's key as the
+typeof expression rather than `integer`; the quarantine read-back accepts both
+forms, so the real quarantine action no longer ends `OUTCOME_UNKNOWN` and rolls
+itself back on Fedora. The quarantine/release cycle is native-exercised only in the
+firewall coexistence lane above; the device-action lane's quarantine record is
+Ubuntu's. Quarantine admits loopback only from its `127.0.0.1` endpoint, so the
+systemd-resolved stub's `127.0.0.53` replies are dropped while quarantined (the
+failed name lookup was observed on Ubuntu; on Fedora it follows from the same rules).
 The historical Fedora credential-helper SELinux denial used D-Bus forwarding of
 an SSH-session FIFO; the corrected lab uses a no-swap/no-core scope without
 relaxing policy. Failed record
@@ -290,6 +312,55 @@ relaxing policy. Failed record
 `14b3f2416533882ef77632d5cdf8fd4bf5ba2948dc6ebbdfe4ac3c0aa3c5a78e`,
 is not erase proof. Later action records, not this historical failure or encryption
 result, determine the current capability status.
+
+## Desktop session helper and remote assistance
+
+The package installs the user unit `/usr/lib/systemd/user/lindm-session.service`.
+Configure runs `systemctl --global enable`, so the unit starts with
+`graphical-session.target` at the next graphical login. The user manager reaches
+that target in the GDM GNOME/Wayland session (observed active in the Fedora 44
+autologin session).
+
+The executor serves `/run/lindm-session/session.sock` only when
+`/etc/lindm/executor.json` sets `remote_assistance.enabled`. The packaged default
+is disabled. The tmpfiles directory is `root:root` 0755.
+
+The RPM declares these as weak `Recommends`, not hard dependencies, so server
+installs stay lean:
+
+- `pipewire-gstreamer`, which provides `pipewiresrc`.
+- `gstreamer1-plugins-good`, which provides `vp8enc`, `rtpvp8pay` and
+  `rtpstreampay`.
+- `gstreamer1`, which provides `gst-launch-1.0` (installed under `/usr/sbin` on
+  Fedora 44; the helper resolves it through `PATH`).
+
+The helper checks all eight elements with `gst-inspect-1.0`. If any is missing it
+ends the session as `UNAVAILABLE` with detail `gst_element_missing:<name>`. There
+is no X11 or screenshot fallback.
+
+The Fedora 44 desktop golden used for qualification had these components:
+
+- GNOME 50.0.
+- xdg-desktop-portal 1.21.1 and xdg-desktop-portal-gnome 50.0, with ScreenCast v5
+  (source types and cursor modes 7) and RemoteDesktop v2 (device types 7).
+- GStreamer 1.28.1 (pipewire-gstreamer 1.6.2).
+- gnome-shell notifications with the `actions` capability.
+
+In the RemoteDesktop dialog, keyboard and pointer access is the **Allow Remote
+Interaction** switch, which is off by default. Sharing without it grants view only.
+
+On lock, the session ends `SESSION_LOCKED` through the same five-second
+portal-close settle window used for GNOME 46.
+
+The first login on the golden shows gnome-tour's welcome dialog and the overview,
+and idle lock is enabled. The lab disables both for the session; the product does
+not change them.
+
+Qualified: emulated x86_64 GNOME/Wayland consent, view, control, operator and local
+stop, decline, portal cancel and lock termination, with audit, in
+[`fedora44-assistance-03`](../verification.md#built-in-graphical-remote-assistance-l09-l12).
+Not qualified: KDE Plasma spin, X11, Fedora 43, Atomic desktops, physical
+displays, multi-user seats and ARM desktops.
 
 ## Advisory feeds
 

@@ -270,34 +270,73 @@ func createrepoStatus(ctx context.Context, work string) string {
 }
 
 func verifyUnits(ctx context.Context, work string, p product) (bool, bool, error) {
-	if len(p.units) == 0 {
+	if len(p.units) == 0 && len(p.userUnits) == 0 {
 		return true, false, nil
 	}
-	args := []string{"verify"}
-	for _, name := range p.units {
-		data, err := asset(name)
+	executableChecked := true
+	for _, scope := range []struct {
+		units []string
+		dir   string
+		user  bool
+	}{{p.units, "units-system", false}, {p.userUnits, "units-user", true}} {
+		if len(scope.units) == 0 {
+			continue
+		}
+		checked, err := verifyUnitScope(ctx, work, scope.dir, scope.units, scope.user)
 		if err != nil {
 			return false, false, err
 		}
-		path := filepath.Join(work, name)
+		executableChecked = executableChecked && checked
+	}
+	return true, executableChecked, nil
+}
+
+// verifyUnitScope runs systemd-analyze verify for one manager scope. A user
+// manager needs a runtime directory and also loads the host's user units,
+// whose %t sockets must fit sockaddr_un. A short private 0700 directory keeps
+// those host units quiet and the build independent of any login session.
+func verifyUnitScope(ctx context.Context, work, dir string, units []string, user bool) (_ bool, err error) {
+	scopeDir := filepath.Join(work, dir)
+	if err := os.Mkdir(scopeDir, 0o700); err != nil {
+		return false, err
+	}
+	args := []string{"verify"}
+	var env []string
+	if user {
+		var runtimeDir string
+		runtimeDir, err = os.MkdirTemp("", "unit-run-")
+		if err != nil {
+			return false, err
+		}
+		defer func() { err = errors.Join(err, os.RemoveAll(runtimeDir)) }()
+		args = []string{"--user", "verify"}
+		env = []string{"XDG_RUNTIME_DIR=" + runtimeDir}
+	}
+	for _, name := range units {
+		data, err := asset(name)
+		if err != nil {
+			return false, err
+		}
+		path := filepath.Join(scopeDir, name)
 		if err := writeFile(path, data, 0o644, DefaultSourceDateEpoch); err != nil {
-			return false, false, err
+			return false, err
 		}
 		args = append(args, path)
 	}
 	stdout, stderr, runErr := runTool(ctx, work, toolCmd{
-		Name:    "systemd-analyze",
-		Args:    args,
-		Timeout: 30 * time.Second,
+		Name:     "systemd-analyze",
+		Args:     args,
+		ExtraEnv: env,
+		Timeout:  30 * time.Second,
 	})
 	missing, classErr := classifyUnitOutput(string(stdout) + "\n" + string(stderr))
 	if classErr != nil {
-		return false, false, classErr
+		return false, classErr
 	}
 	if runErr != nil && !missing {
-		return false, false, fmt.Errorf("%w: systemd-analyze verify failed", ErrArtifact)
+		return false, fmt.Errorf("%w: systemd-analyze verify failed", ErrArtifact)
 	}
-	return true, runErr == nil && !missing, nil
+	return runErr == nil && !missing, nil
 }
 
 func classifyUnitOutput(output string) (bool, error) {

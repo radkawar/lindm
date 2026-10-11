@@ -214,7 +214,8 @@ func TestNativeHashedPasswordLifecycle(t *testing.T) {
 			recorded = append(recorded, strings.Join(args, " "))
 			return runNative(ctx, stdin, path, args...)
 		}
-		options, err := nativeToolOptions(t.Context(), run, commands)
+		// The test host is a --prefix (non-chroot) shadow-utils product.
+		options, err := nativeToolOptions(t.Context(), run, commands, false)
 		if err != nil {
 			t.Fatal(err)
 		}

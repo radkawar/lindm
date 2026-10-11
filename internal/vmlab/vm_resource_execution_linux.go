@@ -29,7 +29,7 @@ func exerciseSignedNativeResources(ctx context.Context, packages *nativeGuestPac
 	if err != nil {
 		return err
 	}
-	rpm := resourcePackaging{rpm: result.Distribution == "fedora", arm: result.Architecture == "arm64"}
+	rpm := newResourcePackaging(result.Distribution, result.Architecture)
 	for _, kind := range []struct {
 		index   int
 		desired []*resourcev1.ResourceDesiredState

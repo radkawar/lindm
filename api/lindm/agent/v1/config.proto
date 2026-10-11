@@ -4,6 +4,7 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/assistance.proto";
 import "lindm/agent/v1/connectivity_guard.proto";
 import "lindm/agent/v1/connectivity_probe_config.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
@@ -65,6 +66,8 @@ message AgentConfig {
   NativePasswordProviderConfig password_provider = 14;
   ConnectivityGuardConfig connectivity_guard = 15;
   ConnectivityProbeServerConfig connectivity_probe = 16;
+  // Absent or disabled: invitations end with DISABLED; no session socket.
+  RemoteAssistanceConfig remote_assistance = 17;
 }
 
 message NativePackageProviderConfig {

@@ -248,23 +248,21 @@ var File_lindm_lab_v1_redhat_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_redhat_proto_rawDesc = "" +
 	"\n" +
-	"\x19lindm/lab/v1/redhat.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd2\a\n" +
-	"\x12VendorImageReceipt\x12X\n" +
-	"\x0eimage_filename\x18\x01 \x01(\tB1\xbaH.r,\x18\xff\x012'^rhel-(9|10)\\.[0-9]+-x86_64-kvm\\.qcow2$R\rimageFilename\x12-\n" +
+	"\x19lindm/lab/v1/redhat.proto\x12\flindm.lab.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x97\b\n" +
+	"\x12VendorImageReceipt\x12b\n" +
+	"\x0eimage_filename\x18\x01 \x01(\tB;\xbaH8r6\x18\xff\x0121^rhel-(9|10)\\.[0-9]+-(x86_64|aarch64)-kvm\\.qcow2$R\rimageFilename\x12-\n" +
 	"\x06sha256\x18\x02 \x01(\tB\x15\xbaH\x12r\x102\x0e^[0-9a-f]{64}$R\x06sha256\x127\n" +
 	"\x10image_size_bytes\x18\x03 \x01(\x04B\r\xbaH\n" +
 	"2\b\x18\x80\x80\x80\x80@ \x00R\x0eimageSizeBytes\x121\n" +
-	"\aversion\x18\x04 \x01(\tB\x17\xbaH\x14r\x122\x10^(9|10)\\.[0-9]+$R\aversion\x121\n" +
-	"\farchitecture\x18\x05 \x01(\tB\r\xbaH\n" +
-	"r\b\n" +
-	"\x06x86_64R\farchitecture\x12E\n" +
+	"\aversion\x18\x04 \x01(\tB\x17\xbaH\x14r\x122\x10^(9|10)\\.[0-9]+$R\aversion\x12:\n" +
+	"\farchitecture\x18\x05 \x01(\tB\x16\xbaH\x13r\x11R\x06x86_64R\aaarch64R\farchitecture\x12E\n" +
 	"\fpublished_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vpublishedAt\x12C\n" +
 	"\vacquired_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"acquiredAt\x12.\n" +
-	"\fmetadata_url\x18\b \x01(\tB\v\xbaH\br\x06\x18\xc8\x01\x88\x01\x01R\vmetadataUrl:\xd7\x03\xbaH\xd3\x03\x1at\n" +
-	"\x19vendor_receipt.chronology\x120vendor publication must not postdate acquisition\x1a%this.published_at <= this.acquired_at\x1a\x8b\x01\n" +
-	"\x17vendor_receipt.filename\x12+filename must identify the exact RHEL minor\x1aCthis.image_filename == 'rhel-' + this.version + '-x86_64-kvm.qcow2'\x1a\xcc\x01\n" +
-	"\x16vendor_receipt.catalog\x12Fmetadata must identify the exact Red Hat RHEL version and architecture\x1ajthis.metadata_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/x86_64'\"\xe6\x02\n" +
+	"\fmetadata_url\x18\b \x01(\tB\v\xbaH\br\x06\x18\xc8\x01\x88\x01\x01R\vmetadataUrl:\x89\x04\xbaH\x85\x04\x1at\n" +
+	"\x19vendor_receipt.chronology\x120vendor publication must not postdate acquisition\x1a%this.published_at <= this.acquired_at\x1a\xaf\x01\n" +
+	"\x17vendor_receipt.filename\x12<filename must identify the exact RHEL minor and architecture\x1aVthis.image_filename == 'rhel-' + this.version + '-' + this.architecture + '-kvm.qcow2'\x1a\xda\x01\n" +
+	"\x16vendor_receipt.catalog\x12Fmetadata must identify the exact Red Hat RHEL version and architecture\x1axthis.metadata_url == 'https://api.access.redhat.com/management/v1/images/rhel/' + this.version + '/' + this.architecture\"\xe6\x02\n" +
 	"\x1dRedHatRegistrationCredentials\x12<\n" +
 	"\x0forganization_id\x18\x01 \x01(\tB\x13\xbaH\x10r\x0e\x10\x01\x18 2\b^[0-9]+$R\x0eorganizationId\x12F\n" +
 	"\x0eactivation_key\x18\x02 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^lindm-lab-[0-9a-f]{32}$R\ractivationKey\x12:\n" +

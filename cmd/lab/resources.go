@@ -17,7 +17,8 @@ import (
 func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm resources", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "pinned Ubuntu 24.04 or Fedora 44 amd64 image manifest")
+	manifestPath := flags.String("manifest", "", "pinned Ubuntu 24.04, Fedora 44 or RHEL/AlmaLinux/Rocky 9/10 image manifest")
+	redhatToken := flags.String("redhat-token-file", "", "protected Red Hat offline-token file; required for RHEL repository access (maintained registration, unregistration and activation-key deletion)")
 	server := flags.String("lindmd", "", "built real lindmd executable")
 	probe := flags.String("lab", "", "built lab executable; defaults to this executable")
 	repository := flags.String("repo", ".", "private checkout with running development dependencies")
@@ -54,7 +55,7 @@ func runVMResources(ctx context.Context, args []string, stdout, stderr io.Writer
 			return err
 		}
 	}
-	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, LocalAuthority: *localAuthority, Resources: true, ResourceExecutionOnly: *phase == "executor", ResourceKinds: selected})
+	result, runErr := vmlab.DispatchVM(ctx, manifest, vmlab.VMDispatchOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, DiagnosticsDir: *diagnostics, Hardware: hardware.options(), LabBinary: binary, LindmdBinary: *server, RedHatTokenFile: *redhatToken, LocalAuthority: *localAuthority, Resources: true, ResourceExecutionOnly: *phase == "executor", ResourceKinds: selected})
 	if result != nil {
 		runErr = errors.Join(runErr, writeLabEvidence(stdout, *record, result))
 	}

@@ -49,7 +49,7 @@ func ExecuteNative(ctx context.Context, config *agentv1.NativePasswordProviderCo
 		return nil, err
 	}
 	backend := resourcev1.Backend_BACKEND_PAM_AUTH_UPDATE
-	if plan.GetBackend().GetProduct().GetOsId() == "fedora" {
+	if authselectProduct(plan.GetBackend().GetProduct()) {
 		backend = resourcev1.Backend_BACKEND_AUTHSELECT
 	}
 	if plan.GetBackend().GetBackend() != backend {
@@ -166,7 +166,7 @@ func managerChangeSupported(ctx context.Context, platform *resourcev1.PlatformPr
 	if before.GetPasswordPolicy().GetManagerProfile() != target.GetPasswordPolicy().GetManagerProfile() {
 		return ErrConflict
 	}
-	if platform.GetOsId() != "fedora" || slices.Equal(before.GetPasswordPolicy().GetEnabledFeatures(), target.GetPasswordPolicy().GetEnabledFeatures()) {
+	if !authselectProduct(platform) || slices.Equal(before.GetPasswordPolicy().GetEnabledFeatures(), target.GetPasswordPolicy().GetEnabledFeatures()) {
 		return nil
 	}
 	var available []string
@@ -207,7 +207,7 @@ func changeManager(ctx context.Context, platform *resourcev1.PlatformProduct, be
 		if was == want {
 			continue
 		}
-		if platform.GetOsId() == "fedora" {
+		if authselectProduct(platform) {
 			name := authselectFeature(feature)
 			if name == "" {
 				return ErrUnsupported

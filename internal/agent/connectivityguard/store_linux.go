@@ -60,11 +60,14 @@ func (s *store) validate(m proto.Message) error {
 	return s.rules.Validate(m)
 }
 func (s *store) open(name string, create bool) (*os.File, error) {
+	return s.openAccess(name, create, unix.O_RDWR)
+}
+func (s *store) openAccess(name string, create bool, access int) (*os.File, error) {
 	exists, err := statefs.CheckFile(s.fd, name)
 	if err != nil {
 		return nil, err
 	}
-	flags := unix.O_RDWR | unix.O_CLOEXEC | unix.O_NOFOLLOW
+	flags := access | unix.O_CLOEXEC | unix.O_NOFOLLOW
 	if !exists {
 		if !create {
 			return nil, os.ErrNotExist
@@ -117,7 +120,8 @@ func (s *store) lockWorker(ctx context.Context, name string) (*os.File, error) {
 	}
 }
 func (s *store) load() (*agentv1.ConnectivityGuardRecord, error) {
-	f, err := s.open(recordName, false)
+	// save publishes by fsynced rename: a read-only descriptor sees one record.
+	f, err := s.openAccess(recordName, false, unix.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}

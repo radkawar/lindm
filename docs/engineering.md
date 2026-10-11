@@ -612,6 +612,18 @@ elapsed time, source revision and binary-diff SHA-256. Persistent image/golden c
 and slot identities are retained. A lost transport or failed evidence copy reports
 the exact retained run path instead of deleting evidence or guessing at live state.
 
+The arm64 hosts sit behind a management link that can drop briefly: on
+2026-10-11 dgx20 stopped answering SSH for several minutes without rebooting
+(uptime and guests intact), and lanes starting then failed at transport. Remote
+lanes should retry SSH **connection setup** (TCP connect, authentication, host-key
+check) with bounded exponential backoff, a small attempt cap and the lane's own
+deadline. Never retry an operation once the remote command may have started:
+staging copies, guest commands, registration, package or resource effects and
+cleanup are mutations, and a lost session there is reported with the retained run
+path, as above, not replayed. Interrupting the local controller of a remote lane
+kills the remote worker without guest cleanup; for registered RHEL lanes that
+leaves a hosted consumer that `lab images redhat cleanup` must delete.
+
 Source-building VM commands `vm dispatch`, `vm device-actions` and `vm updates`
 accept `-build-repo DIR` independently of `-repo DIR`. The latter remains the
 initialized development-fixture/trust root; the former selects only package,
@@ -2102,6 +2114,22 @@ packet proof. Only that confirmation permits COMMITTED state and ownership-ledge
 success. Timeout, helper death, or reboot causes the supervisor to restore only the
 exact recorded owned baseline; changed userdata, generation, or expression bytes
 refuse rollback rather than overwrite another actor.
+
+An interrupted transaction leaves its ownership ledger UNKNOWN. The next signed
+plan for the same owner resolves it only from the supervisor's terminal record of
+that exact transaction: ROLLED_BACK with the zone's kernel objects and persistent
+file equal to the protected before-image, or COMMITTED with them equal to its
+target, and only once the interrupted action is itself terminal
+OUTCOME_UNKNOWN. The executor reads that record through its read-only view of
+`/var`, without the record lock. Resolution records the observed state under the
+unchanged owner lineage; the interrupted action stays OUTCOME_UNKNOWN and is never
+retried, and a changed desired state is applied by the new action as a fresh
+generation under its own start grant. A missing, reused or non-terminal guard
+record, a failed inverse or any mismatch leaves the ledger UNKNOWN. An external
+edit of the zone's own table (an added or a deleted rule) is a conflict:
+reconciliation refuses before any authority with a signed precondition failure,
+release is refused, and nothing overwrites the edit. A deleted owned rule is
+recovered only by boot replay of the committed state.
 
 Persistence is the installed fixed `lindm-firewall-restore.service` and root-owned
 `/var/lib/lindm/firewall/<zone UUID>.pb`, not a claim about kernel state surviving

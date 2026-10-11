@@ -23,6 +23,7 @@ EXECUTOR_UNIT=lindm-executor.service
 AGENT_UNIT=lindm-agent.service
 FIREWALL_RESTORE_UNIT=lindm-firewall-restore.service
 CONNECTIVITY_GUARD_UNIT=lindm-connectivity-guard.service
+SESSION_USER_UNIT=lindm-session.service
 
 fail() {
 	printf 'lindm-agent: %s\n' "$1" >&2
@@ -106,6 +107,10 @@ configure() {
 	if [ -d /run ]; then
 		systemd-tmpfiles --create "$TMPFILES" || fail "systemd-tmpfiles failed"
 	fi
+	# The per-user remote-assistance helper is enabled for every graphical
+	# session; it starts only where the executor serves the session socket.
+	# --global edits only unit symlinks, so it needs no running manager.
+	systemctl --global enable "$SESSION_USER_UNIT" || fail "systemctl --global enable failed"
 	if systemd_running; then
 		systemctl daemon-reload || fail "systemctl daemon-reload failed"
 		# Firewall restoration and its rollback supervisor ship disabled; the
@@ -135,6 +140,7 @@ upgrade_stop() {
 remove_services() {
 	stop_units
 	disable_units
+	systemctl --global disable "$SESSION_USER_UNIT" || fail "systemctl --global disable failed"
 	if systemd_running; then
 		systemctl daemon-reload || fail "systemctl daemon-reload failed"
 	fi

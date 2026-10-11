@@ -65,8 +65,10 @@ type AgentConfig struct {
 	PasswordProvider  *NativePasswordProviderConfig  `protobuf:"bytes,14,opt,name=password_provider,json=passwordProvider,proto3" json:"password_provider,omitempty"`
 	ConnectivityGuard *ConnectivityGuardConfig       `protobuf:"bytes,15,opt,name=connectivity_guard,json=connectivityGuard,proto3" json:"connectivity_guard,omitempty"`
 	ConnectivityProbe *ConnectivityProbeServerConfig `protobuf:"bytes,16,opt,name=connectivity_probe,json=connectivityProbe,proto3" json:"connectivity_probe,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Absent or disabled: invitations end with DISABLED; no session socket.
+	RemoteAssistance *RemoteAssistanceConfig `protobuf:"bytes,17,opt,name=remote_assistance,json=remoteAssistance,proto3" json:"remote_assistance,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *AgentConfig) Reset() {
@@ -207,6 +209,13 @@ func (x *AgentConfig) GetConnectivityGuard() *ConnectivityGuardConfig {
 func (x *AgentConfig) GetConnectivityProbe() *ConnectivityProbeServerConfig {
 	if x != nil {
 		return x.ConnectivityProbe
+	}
+	return nil
+}
+
+func (x *AgentConfig) GetRemoteAssistance() *RemoteAssistanceConfig {
+	if x != nil {
+		return x.RemoteAssistance
 	}
 	return nil
 }
@@ -825,7 +834,8 @@ var File_lindm_agent_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a.lindm/agent/v1/connectivity_probe_config.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/native_password.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/resource/v1/software.proto\x1a&lindm/validation/v1/string_rules.proto\"\xd5\t\n" +
+	"\x1blindm/agent/v1/config.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a.lindm/agent/v1/connectivity_probe_config.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/native_password.proto\x1a$lindm/agent/v1/resource_native.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/resource/v1/software.proto\x1a&lindm/validation/v1/string_rules.proto\"\xaa\n" +
+	"\n" +
 	"\vAgentConfig\x122\n" +
 	"\x0fstate_directory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0estateDirectory\x126\n" +
 	"\x11runtime_directory\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10runtimeDirectory\x12=\n" +
@@ -844,7 +854,8 @@ const file_lindm_agent_v1_config_proto_rawDesc = "" +
 	"\x11firewall_provider\x18\r \x01(\v2,.lindm.agent.v1.NativeFirewallProviderConfigR\x10firewallProvider\x12Y\n" +
 	"\x11password_provider\x18\x0e \x01(\v2,.lindm.agent.v1.NativePasswordProviderConfigR\x10passwordProvider\x12V\n" +
 	"\x12connectivity_guard\x18\x0f \x01(\v2'.lindm.agent.v1.ConnectivityGuardConfigR\x11connectivityGuard\x12\\\n" +
-	"\x12connectivity_probe\x18\x10 \x01(\v2-.lindm.agent.v1.ConnectivityProbeServerConfigR\x11connectivityProbe\"\xce\x02\n" +
+	"\x12connectivity_probe\x18\x10 \x01(\v2-.lindm.agent.v1.ConnectivityProbeServerConfigR\x11connectivityProbe\x12S\n" +
+	"\x11remote_assistance\x18\x11 \x01(\v2&.lindm.agent.v1.RemoteAssistanceConfigR\x10remoteAssistance\"\xce\x02\n" +
 	"\x1bNativePackageProviderConfig\x12I\n" +
 	"\asources\x18\x01 \x03(\v2#.lindm.agent.v1.NativePackageSourceB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10 R\asources:\xe3\x01\xbaH\xdf\x01\x1a\xdc\x01\n" +
@@ -946,11 +957,12 @@ var file_lindm_agent_v1_config_proto_goTypes = []any{
 	(*NativePasswordProviderConfig)(nil),  // 12: lindm.agent.v1.NativePasswordProviderConfig
 	(*ConnectivityGuardConfig)(nil),       // 13: lindm.agent.v1.ConnectivityGuardConfig
 	(*ConnectivityProbeServerConfig)(nil), // 14: lindm.agent.v1.ConnectivityProbeServerConfig
-	(*v1.RepositoryDesired)(nil),          // 15: lindm.resource.v1.RepositoryDesired
-	(*StorageTarget)(nil),                 // 16: lindm.agent.v1.StorageTarget
-	(SanitizeMethod)(0),                   // 17: lindm.agent.v1.SanitizeMethod
-	(RecoveryCustody)(0),                  // 18: lindm.agent.v1.RecoveryCustody
-	(*timestamppb.Timestamp)(nil),         // 19: google.protobuf.Timestamp
+	(*RemoteAssistanceConfig)(nil),        // 15: lindm.agent.v1.RemoteAssistanceConfig
+	(*v1.RepositoryDesired)(nil),          // 16: lindm.resource.v1.RepositoryDesired
+	(*StorageTarget)(nil),                 // 17: lindm.agent.v1.StorageTarget
+	(SanitizeMethod)(0),                   // 18: lindm.agent.v1.SanitizeMethod
+	(RecoveryCustody)(0),                  // 19: lindm.agent.v1.RecoveryCustody
+	(*timestamppb.Timestamp)(nil),         // 20: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	3,  // 0: lindm.agent.v1.AgentConfig.action_provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
@@ -964,20 +976,21 @@ var file_lindm_agent_v1_config_proto_depIdxs = []int32{
 	12, // 8: lindm.agent.v1.AgentConfig.password_provider:type_name -> lindm.agent.v1.NativePasswordProviderConfig
 	13, // 9: lindm.agent.v1.AgentConfig.connectivity_guard:type_name -> lindm.agent.v1.ConnectivityGuardConfig
 	14, // 10: lindm.agent.v1.AgentConfig.connectivity_probe:type_name -> lindm.agent.v1.ConnectivityProbeServerConfig
-	2,  // 11: lindm.agent.v1.NativePackageProviderConfig.sources:type_name -> lindm.agent.v1.NativePackageSource
-	15, // 12: lindm.agent.v1.NativePackageSource.repository:type_name -> lindm.resource.v1.RepositoryDesired
-	4,  // 13: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
-	16, // 14: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
-	17, // 15: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
-	3,  // 16: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
-	18, // 17: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	19, // 18: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
-	18, // 19: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	15, // 11: lindm.agent.v1.AgentConfig.remote_assistance:type_name -> lindm.agent.v1.RemoteAssistanceConfig
+	2,  // 12: lindm.agent.v1.NativePackageProviderConfig.sources:type_name -> lindm.agent.v1.NativePackageSource
+	16, // 13: lindm.agent.v1.NativePackageSource.repository:type_name -> lindm.resource.v1.RepositoryDesired
+	4,  // 14: lindm.agent.v1.DeviceActionProviderConfig.targets:type_name -> lindm.agent.v1.QualifiedActionTarget
+	17, // 15: lindm.agent.v1.QualifiedActionTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	18, // 16: lindm.agent.v1.QualifiedActionTarget.native_sanitize_methods:type_name -> lindm.agent.v1.SanitizeMethod
+	3,  // 17: lindm.agent.v1.RecoveryRuntimeConfig.provider:type_name -> lindm.agent.v1.DeviceActionProviderConfig
+	19, // 18: lindm.agent.v1.RecoveryRuntimeConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	20, // 19: lindm.agent.v1.RecoveryRuntimeConfig.bootstrap_verified_at:type_name -> google.protobuf.Timestamp
+	19, // 20: lindm.agent.v1.RecoveryBootConfig.custody:type_name -> lindm.agent.v1.RecoveryCustody
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_config_proto_init() }
@@ -985,6 +998,7 @@ func file_lindm_agent_v1_config_proto_init() {
 	if File_lindm_agent_v1_config_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_assistance_proto_init()
 	file_lindm_agent_v1_connectivity_guard_proto_init()
 	file_lindm_agent_v1_connectivity_probe_config_proto_init()
 	file_lindm_agent_v1_device_action_recovery_proto_init()

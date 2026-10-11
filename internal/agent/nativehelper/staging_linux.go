@@ -105,11 +105,10 @@ func Stage(ctx context.Context, stateDirectory string, input *agentv1.NativePack
 		return false, err
 	}
 	if request.CandidatePinContents != nil {
-		const candidateName = "candidate-versionlock.toml"
-		if err := writeExclusive(directory, candidateName, request.GetCandidatePinContents()); err != nil && !errors.Is(err, os.ErrExist) {
+		if err := writeExclusive(directory, candidatePinName, request.GetCandidatePinContents()); err != nil && !errors.Is(err, os.ErrExist) {
 			return false, err
 		}
-		retained, err := readRecordBytes(directory, candidateName)
+		retained, err := readRecordBytes(directory, candidatePinName)
 		if err != nil {
 			return false, err
 		}
@@ -119,6 +118,10 @@ func Stage(ctx context.Context, stateDirectory string, input *agentv1.NativePack
 	}
 	return false, bus.start(ctx, directory, request, "prepare")
 }
+
+// candidatePinName holds the projected native lock document (DNF5 TOML or the
+// DNF4 plugin list) bound read-only over its original path during staging.
+const candidatePinName = "candidate-versionlock"
 
 func stagingLock(directory string) (func() error, error) {
 	fd, err := statefs.OpenDirectory(directory)

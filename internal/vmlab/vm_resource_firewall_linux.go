@@ -35,24 +35,30 @@ import (
 // slirp management NIC (SSH and the controller's loopback forward) is outside
 // the zone's root-approved interface boundary.
 const (
-	firewallDeviceMAC  = "52:54:00:77:00:10"
-	firewallPeerMAC    = "52:54:00:77:00:20"
-	firewallDevice4    = "192.168.77.10"
-	firewallPeer4      = "192.168.77.20"
-	firewallDevice6    = "fd77::10"
-	firewallPeer6      = "fd77::20"
-	firewallPeerPort   = 9443
-	firewallZoneID     = "6c1f8f0e-58f4-4f43-9a52-2f1e3b7d9a10"
-	firewallAllowPort  = 8080
-	firewallDenyPort   = 8081
-	firewallExtraPort  = 8083
-	firewallUDPAllow   = 5300
-	firewallUDPDeny    = 5301
-	firewallLabDir     = "/etc/lindm-lab-firewall"
-	firewallProbeDir   = "connectivity-probe"
-	firewallBaseline   = "lindm_lab_baseline"
-	firewallQuarantine = "lindm_lab_quarantine"
+	firewallDeviceMAC = "52:54:00:77:00:10"
+	firewallPeerMAC   = "52:54:00:77:00:20"
+	firewallDevice4   = "192.168.77.10"
+	firewallPeer4     = "192.168.77.20"
+	firewallDevice6   = "fd77::10"
+	firewallPeer6     = "fd77::20"
+	firewallPeerPort  = 9443
+	firewallZoneID    = "6c1f8f0e-58f4-4f43-9a52-2f1e3b7d9a10"
+	firewallAllowPort = 8080
+	firewallDenyPort  = 8081
+	firewallExtraPort = 8083
+	firewallUDPAllow  = 5300
+	firewallUDPDeny   = 5301
+	firewallLabDir    = "/etc/lindm-lab-firewall"
+	firewallProbeDir  = "connectivity-probe"
+	firewallBaseline  = "lindm_lab_baseline"
+	// The real quarantine action's root-pinned management endpoints are the
+	// slirp gateway (SSH) and loopback (the controller forward); slirp DNS is
+	// its only explicit DNS server. The kernel timer outlives every scenario.
+	firewallQuarantineDNS     = "10.0.2.3"
+	firewallQuarantineSeconds = 300
 )
+
+var firewallQuarantineManagement = []string{"127.0.0.1", "10.0.2.2"}
 
 // Probe source ports lie above Linux's default ephemeral range (32768–60999),
 // so the lab baseline's exact deny tuples never match an oracle connection.
@@ -69,6 +75,12 @@ type firewallLane struct {
 	authority *devlab.ConnectivityProbeAuthority
 	deviceIf  string
 	peerIf    string
+	// distro is the device's os-release ID. It selects the active native
+	// firewall manager the zone coexists with: UFW on Ubuntu, firewalld on Fedora.
+	distro string
+	// native maps every foreign nftables table (native manager and lab
+	// baseline) to the digest of its stateless, handle-inclusive listing.
+	native map[string]string
 	// rebootDevice reboots the device and reopens its controller forwards.
 	rebootDevice func(context.Context) error
 }
@@ -191,7 +203,7 @@ EOF
  networkctl reload
  networkctl reconfigure "$ifname"
  ;;
-fedora)
+fedora|rhel|almalinux)
  cat > /etc/NetworkManager/system-connections/lindm-lab-peer-link.nmconnection <<EOF
 [connection]
 id=lindm-lab-peer-link
@@ -449,12 +461,6 @@ func firewallBaselineRules(ifname string) string {
 	return b.String()
 }
 
-// firewallQuarantineRules imitates the action-owned quarantine shape: a
-// foreign inet table at priority -10 that drops the zone's allowed port.
-func firewallQuarantineRules(ifname string) string {
-	return fmt.Sprintf("table inet %s {\n chain input {\n  type filter hook input priority -10; policy accept;\n  iifname %q tcp dport %d drop\n }\n}\n", firewallQuarantine, ifname, firewallAllowPort)
-}
-
 const firewallLabUnits = `[Unit]
 Description=Disposable lindm lab deny-probe baseline (not lindm-owned)
 After=network-pre.target
@@ -480,9 +486,11 @@ ExecStart=/usr/bin/python3 ` + firewallLabDir + `/listener.py
 WantedBy=multi-user.target
 `
 
-// provisionDevice configures nic1, the lab baseline and oracle listener, then
-// root-provisions the firewall provider and connectivity guard and enables the
-// packaged guard and restore units before restarting the executor.
+// provisionDevice configures nic1, the lab baseline and oracle listener and
+// activates the distribution's own firewall manager before any zone exists. It
+// then root-provisions the firewall provider, the connectivity guard and the
+// quarantine action, and enables the packaged guard and restore units and the
+// action sandbox before restarting the executor.
 func (f *firewallLane) provisionDevice(ctx context.Context, vm *guestVM) ([]VMResourceNativeRecord, error) {
 	var err error
 	f.deviceIf, err = firewallConfigureLink(ctx, vm, firewallDeviceMAC, firewallDevice4, firewallDevice6)
@@ -502,13 +510,19 @@ func (f *firewallLane) provisionDevice(ctx context.Context, vm *guestVM) ([]VMRe
 			return nil, err
 		}
 	}
-	// Fedora keeps firewalld active (typed coexistence): its default zone
-	// admits only the oracle ports, so the lindm zone decides the probes.
+	// The native manager (UFW on Ubuntu, firewalld on Fedora) is active before
+	// the zone exists. It admits only SSH and the oracle ports, so the lindm zone
+	// decides the probes; its own tables are never lindm-owned.
 	script := `set -eu
 if ! command -v nft >/dev/null 2>&1; then
- export DEBIAN_FRONTEND=noninteractive
- apt-get install -y nftables >/dev/null 2>&1 || { apt-get update -q >/dev/null && apt-get install -y nftables >/dev/null; }
+ if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; apt-get install -y nftables >/dev/null 2>&1 || { apt-get update -q >/dev/null && apt-get install -y nftables >/dev/null; }
+ else dnf install -y nftables >/dev/null; fi
 fi
+# Quarantine admits loopback only from its 127.0.0.1 management endpoint, so
+# the systemd-resolved stub (127.0.0.53) is unreachable while quarantined; the
+# lab's sudo needs the local hostname in /etc/hosts (the Debian convention).
+getent -s files hosts "$(hostname)" >/dev/null || printf '127.0.1.1 %s\n' "$(hostname)" >> /etc/hosts
+` + firewallNativeManagerScript + `
 if systemctl is-active --quiet firewalld.service; then
  firewall-cmd --permanent --add-port=8080/tcp --add-port=8081/tcp --add-port=8083/tcp >/dev/null
  firewall-cmd --reload >/dev/null
@@ -518,9 +532,14 @@ systemctl enable --now lindm-lab-firewall-baseline.service lindm-lab-firewall-li
 i=0
 until test "$(ss -Hltn '( sport = :8080 or sport = :8081 or sport = :8083 )' | wc -l)" -ge 3; do i=$((i+1)); test "$i" -lt 60; sleep 0.5; done
 `
-	if err := lifecycleCommand(ctx, vm, "install lab firewall baseline and oracle listener", script); err != nil {
+	if err := lifecycleCommand(ctx, vm, "activate native firewall manager and install lab baseline and oracle listener", script); err != nil {
 		return nil, err
 	}
+	distro, err := vm.run(ctx, ". /etc/os-release; printf '%s' \"$ID\"", nil, 128, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	f.distro = string(distro)
 	config, err := readGuestAgentConfig(ctx, vm)
 	if err != nil {
 		return nil, err
@@ -528,20 +547,25 @@ until test "$(ss -Hltn '( sport = :8080 or sport = :8081 or sport = :8083 )' | w
 	selector := f.deviceSelector()
 	config.FirewallProvider = &agentv1.NativeFirewallProviderConfig{AllowedInterfaces: []*resourcev1.InterfaceSelector{selector}, ManagementEndpoints: []*agentv1.NativeFirewallEndpoint{{Address: firewallPeer4, Port: firewallPeerPort}}}
 	config.ConnectivityGuard = &agentv1.ConnectivityGuardConfig{Probes: cloneTargets(f.targets), ConfirmationPublicKey: append([]byte(nil), f.authority.ConfirmationPublicKey...)}
+	config.ActionProvider = &agentv1.DeviceActionProviderConfig{AllowQuarantine: true, ManagementEndpoints: slices.Clone(firewallQuarantineManagement), DnsServers: []string{firewallQuarantineDNS}, QuarantineSeconds: firewallQuarantineSeconds}
 	if err := writeGuestAgentConfig(ctx, vm, config); err != nil {
 		return nil, err
 	}
-	if err := lifecycleCommand(ctx, vm, "enable packaged firewall guard and restore", "systemctl enable lindm-firewall-restore.service; systemctl enable lindm-connectivity-guard.service; systemctl restart lindm-connectivity-guard.service; systemctl is-active --quiet lindm-connectivity-guard.service; systemctl restart lindm-executor.service"); err != nil {
+	if err := lifecycleCommand(ctx, vm, "enable packaged firewall guard, restore and quarantine sandbox", "systemctl enable lindm-firewall-restore.service; systemctl enable lindm-connectivity-guard.service; systemctl restart lindm-connectivity-guard.service; systemctl is-active --quiet lindm-connectivity-guard.service; "+packaging.BinaryPath+" action-sandbox -install; systemctl daemon-reload; systemctl restart lindm-executor.service"); err != nil {
 		return nil, err
 	}
 	if _, err := waitGuestExecutorReady(ctx, vm, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return nil, err
 	}
-	record, err := resourceOracle(ctx, vm, "firewall-device-provisioning", "printf 'ifname %s\\n' "+nativeQuote(f.deviceIf)+"; ip -o addr show dev "+nativeQuote(f.deviceIf)+"; cat /sys/class/net/"+f.deviceIf+"/addr_assign_type; systemctl show -p ActiveState -p UnitFileState lindm-connectivity-guard.service lindm-firewall-restore.service lindm-lab-firewall-baseline.service; readlink /etc/systemd/system/network-pre.target.wants/lindm-firewall-restore.service; sha256sum /usr/lib/systemd/system/lindm-firewall-restore.service; nft list table inet "+firewallBaseline+"; "+firewallHostFirewallEvidence+"; if test -e /sys/fs/selinux/enforce; then getenforce; fi")
+	record, err := resourceOracle(ctx, vm, "firewall-device-provisioning", "printf 'ifname %s\\n' "+nativeQuote(f.deviceIf)+"; ip -o addr show dev "+nativeQuote(f.deviceIf)+"; cat /sys/class/net/"+f.deviceIf+"/addr_assign_type; systemctl show -p ActiveState -p UnitFileState lindm-connectivity-guard.service lindm-firewall-restore.service lindm-lab-firewall-baseline.service; readlink /etc/systemd/system/network-pre.target.wants/lindm-firewall-restore.service; sha256sum /usr/lib/systemd/system/lindm-firewall-restore.service; cat /etc/systemd/system/lindm-executor.service.d/50-device-actions.conf; nft list table inet "+firewallBaseline+"; "+firewallHostFirewallEvidence+"; if test -e /sys/fs/selinux/enforce; then getenforce; fi")
 	if err != nil {
 		return nil, err
 	}
-	return []VMResourceNativeRecord{record}, nil
+	native, err := f.baselineNativeTables(ctx, vm, "native-manager-baseline")
+	if err != nil {
+		return nil, err
+	}
+	return []VMResourceNativeRecord{record, native}, nil
 }
 
 func (f *firewallLane) deviceSelector() *resourcev1.InterfaceSelector {
@@ -584,10 +608,13 @@ func (f *firewallLane) firewallZoneDesired(extra bool) *resourcev1.ResourceDesir
 }
 
 // firewallExpectation is the independent packet result the peer must observe.
+// quarantine names the real action-owned lindm_q_ table that must be present;
+// tcp6 optionally overrides tcp for the IPv6 peer address.
 type firewallExpectation struct {
 	zone       bool
-	quarantine bool
+	quarantine string
 	tcp        map[int]string
+	tcp6       map[int]string
 	udp        map[int]bool
 }
 
@@ -599,7 +626,7 @@ func firewallZoneTable() string {
 // distribution's own nft and reports only lindm-named tables and the table
 // list, so foreign firewalld state is bounded but still visible.
 const firewallRulesetOracle = `import json, subprocess, sys
-zone, extra, present, quarantine = sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1", sys.argv[4] == "1"
+zone, extra, present, quarantine = sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1", sys.argv[4]
 ruleset = json.loads(subprocess.run(["nft", "-j", "list", "ruleset"], check=True, capture_output=True).stdout)["nftables"]
 tables = sorted("%s %s" % (o["table"]["family"], o["table"]["name"]) for o in ruleset if "table" in o)
 owned = [o for o in ruleset if any(k in o and o[k].get("table", o[k].get("name", "")).startswith("lindm_") for k in ("table", "chain", "rule"))]
@@ -621,7 +648,8 @@ def values(node, found):
     return found
 matched = values([o["rule"]["expr"] for o in owned if "rule" in o and o["rule"]["table"] == zone], set())
 assert ("inet " + zone in tables) == present, "zone table presence"
-assert ("inet lindm_lab_quarantine" in tables) == quarantine, "quarantine table presence"
+held = [t for t in tables if t.startswith("inet lindm_q_")]
+assert held == ([] if quarantine == "-" else ["inet " + quarantine]), "action-owned quarantine tables %r" % held
 assert "inet lindm_lab_baseline" in tables, "lab deny baseline"
 if present:
     chains = {o["chain"]["name"]: o["chain"] for o in owned if "chain" in o and o["chain"]["table"] == zone}
@@ -681,7 +709,11 @@ func (f *firewallLane) oracle(vm *guestVM, expect firewallExpectation, extra boo
 			}
 			return "0"
 		}
-		ruleset, err := resourceOracle(ctx, vm, "nft", "python3 -c "+nativeQuote(firewallRulesetOracle)+" "+firewallZoneTable()+" "+flag(extra)+" "+flag(expect.zone)+" "+flag(expect.quarantine))
+		quarantine := expect.quarantine
+		if quarantine == "" {
+			quarantine = "-"
+		}
+		ruleset, err := resourceOracle(ctx, vm, "nft", "python3 -c "+nativeQuote(firewallRulesetOracle)+" "+firewallZoneTable()+" "+flag(extra)+" "+flag(expect.zone)+" "+nativeQuote(quarantine))
 		if err != nil {
 			return VMResourceNativeRecord{}, err
 		}
@@ -708,8 +740,12 @@ func (f *firewallLane) oracle(vm *guestVM, expect firewallExpectation, extra boo
 				return VMResourceNativeRecord{}, fmt.Errorf("malformed peer TCP oracle line %q", line)
 			}
 			port, err := strconv.Atoi(fields[2])
-			if err != nil || expect.tcp[port] != fields[3] {
-				return VMResourceNativeRecord{}, fmt.Errorf("peer observed %s, expected %s on port %s", line, expect.tcp[port], fields[2])
+			want := expect.tcp
+			if expect.tcp6 != nil && strings.Contains(fields[1], ":") {
+				want = expect.tcp6
+			}
+			if err != nil || want[port] != fields[3] {
+				return VMResourceNativeRecord{}, fmt.Errorf("peer observed %s, expected %s on port %s", line, want[port], fields[2])
 			}
 		}
 		nonce := "lindm-lab-" + uuid.NewString()
@@ -785,78 +821,46 @@ func exerciseResourceFirewall(ctx context.Context, r *resourceDispatch, f *firew
 	*fixtures = append(*fixtures, before)
 	zoneUDP := map[int]bool{firewallUDPAllow: true, firewallUDPDeny: false}
 	r.fresh()
-	if err := resourceStep(ctx, r, evidence, "zone-create-converged", f.firewallZoneDesired(false), resourceCreatePolicy(), false, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(false), udp: zoneUDP}, false)); err != nil {
+	if err := resourceStep(ctx, r, evidence, "zone-create-converged", f.firewallZoneDesired(false), resourceCreatePolicy(), false, f.coexisting(r.vm, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(false), udp: zoneUDP}, false))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "repeat-no-start-grant", f.firewallZoneDesired(false), resourceCreatePolicy(), true, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(false), udp: zoneUDP}, false)); err != nil {
+	if err := resourceStep(ctx, r, evidence, "repeat-no-start-grant", f.firewallZoneDesired(false), resourceCreatePolicy(), true, f.coexisting(r.vm, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(false), udp: zoneUDP}, false))); err != nil {
 		return err
 	}
-	if err := resourceStep(ctx, r, evidence, "reconcile-rule-change", f.firewallZoneDesired(true), resourceCreatePolicy(), false, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(true), udp: zoneUDP}, true)); err != nil {
+	if err := resourceStep(ctx, r, evidence, "reconcile-rule-change", f.firewallZoneDesired(true), resourceCreatePolicy(), false, f.coexisting(r.vm, f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(true), udp: zoneUDP}, true))); err != nil {
 		return err
 	}
-	if err := f.quarantineStep(ctx, r, evidence, zoneUDP); err != nil {
+	if err := f.nativeReloadStep(ctx, r, evidence, zoneUDP); err != nil {
 		return err
 	}
+	if err := f.quarantineSteps(ctx, r, evidence, zoneUDP); err != nil {
+		return err
+	}
+	if err := f.driftSteps(ctx, r, evidence, zoneUDP); err != nil {
+		return err
+	}
+	// Boot replay of the committed state is also the recovery path for the
+	// owned rule deleted by the previous drift scenario.
 	if err := f.rebootStep(ctx, r, evidence, zoneUDP); err != nil {
 		return err
 	}
-	if err := resourceReleaseStep(ctx, r, evidence, "release-restores-absence", f.firewallZoneDesired(true).GetRef(), f.oracle(r.vm, firewallExpectation{tcp: map[int]string{firewallAllowPort: "open", firewallDenyPort: "open", firewallExtraPort: "open"}, udp: map[int]bool{firewallUDPAllow: true, firewallUDPDeny: true}}, false)); err != nil {
+	if err := f.crashSteps(ctx, r, evidence, zoneUDP); err != nil {
+		return err
+	}
+	if err := f.releaseStep(ctx, r, evidence); err != nil {
 		return err
 	}
 	evidence.Unproven = []string{
-		"real timed quarantine device action not exercised; a lab-owned priority -10 drop table stands in for its precedence",
-		"FORWARD probes, partitions, generation-CAS races, foreign drift, approved adoption and guard crash boundaries not exercised",
+		"FORWARD probes, partitions, generation-CAS races and approved adoption not exercised",
+		"only the helper SIGKILL between the kernel batch and controller confirmation is exercised; guard arm, pending write, committed write and disarm windows, executor or supervisor restart and missed confirmation are not",
+		"quarantine kernel-timer expiry under a converged zone is not exercised; quarantine ends by the signed release action",
 	}
-	return qualifyResourceEvidence(evidence, []string{"zone-create-converged", "repeat-no-start-grant", "reconcile-rule-change", "quarantine-precedence", "reboot-restore", "release-restores-absence"})
-}
-
-// quarantineStep proves a foreign priority -10 drop stays final over the
-// zone's accept, then removes it and requires a fresh converged verification
-// (no start grant) with the zone's accept restored.
-func (f *firewallLane) quarantineStep(ctx context.Context, r *resourceDispatch, evidence *VMResourceKindEvidence, udp map[int]bool) error {
-	const name = "quarantine-precedence"
-	evidence.Scenarios = append(evidence.Scenarios, VMResourceScenario{Name: name, StartedAt: time.Now().UTC()})
-	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
-	fail := func(err error) error {
-		s.Failure = err.Error()
-		s.Native = append(s.Native, r.failureDiagnostics(ctx)...)
-		return fmt.Errorf("%s: %w", name, err)
-	}
-	if err := firewallUpload(ctx, r.vm, firewallLabDir+"/quarantine.nft", 0644, []byte(firewallQuarantineRules(f.deviceIf))); err != nil {
-		return fail(err)
-	}
-	if err := lifecycleCommand(ctx, r.vm, "install lab quarantine-priority drop", "nft -f "+firewallLabDir+"/quarantine.nft"); err != nil {
-		return fail(err)
-	}
-	quarantined := firewallOpen(true)
-	quarantined[firewallAllowPort] = "filtered"
-	held, err := f.oracle(r.vm, firewallExpectation{zone: true, quarantine: true, tcp: quarantined, udp: udp}, true)(ctx)
-	if err != nil {
-		return fail(err)
-	}
-	held.Name = "quarantine-held-" + held.Name
-	if err := lifecycleCommand(ctx, r.vm, "remove lab quarantine-priority drop", "nft delete table inet "+firewallQuarantine); err != nil {
-		return fail(err)
-	}
-	if err := r.assign(ctx, f.firewallZoneDesired(true), resourceCreatePolicy()); err != nil {
-		return fail(err)
-	}
-	action, err := r.action(ctx, false)
-	s.Action = action
-	if err != nil {
-		return fail(err)
-	}
-	if action.GetStartAuthorizedAt() != nil {
-		return fail(errors.New("verification after quarantine removal acquired a start grant"))
-	}
-	after, err := f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(true), udp: udp}, true)(ctx)
-	if err != nil {
-		return fail(err)
-	}
-	s.Native = []VMResourceNativeRecord{held, after}
-	s.FinishedAt = time.Now().UTC()
-	s.Passed = true
-	return nil
+	return qualifyResourceEvidence(evidence, []string{
+		"zone-create-converged", "repeat-no-start-grant", "reconcile-rule-change", "native-manager-reload-preserves-zone",
+		"real-quarantine-precedence", "quarantine-withholds-then-resumes-reconcile",
+		"external-rule-added-refused", "external-rule-removed-converged", "owned-rule-deleted-refused", "reboot-restore",
+		"helper-killed-after-kernel-batch", "outcome-unknown-resolved-by-observation", "release-restores-absence",
+	})
 }
 
 // rebootStep reboots the device: the packaged guard and restore units must
@@ -884,6 +888,12 @@ func (f *firewallLane) rebootStep(ctx context.Context, r *resourceDispatch, evid
 	if err != nil {
 		return fail(err)
 	}
+	// The native manager recreates its tables at boot; they become the new
+	// byte-identity baseline for the remaining scenarios.
+	native, err := f.baselineNativeTables(ctx, r.vm, "native-manager-after-boot")
+	if err != nil {
+		return fail(err)
+	}
 	booted, err := f.oracle(r.vm, firewallExpectation{zone: true, tcp: firewallOpen(true), udp: udp}, true)(ctx)
 	if err != nil {
 		return fail(err)
@@ -900,7 +910,7 @@ func (f *firewallLane) rebootStep(ctx context.Context, r *resourceDispatch, evid
 	if action.GetStartAuthorizedAt() != nil {
 		return fail(errors.New("verification of the restored zone acquired a start grant"))
 	}
-	s.Native = []VMResourceNativeRecord{restored, booted}
+	s.Native = []VMResourceNativeRecord{restored, native, booted}
 	s.FinishedAt = time.Now().UTC()
 	s.Passed = true
 	return nil
