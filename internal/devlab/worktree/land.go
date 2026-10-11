@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -308,20 +309,26 @@ func (l *Landing) String() string {
 	return fmt.Sprintf("landing %s since %s by %s (pid %d) from %s: %q, %d files: %s", state, l.StartedAt.Format(time.RFC3339), l.Owner, l.PID, l.Worktree, l.Message, len(l.Files), strings.Join(l.Files, " "))
 }
 
-// LockHolder reports whether some process holds the flock on path and the
-// holder it recorded. It never waits and never keeps the lock.
+// LockHolder reports whether a process holds the flock on path, naming the
+// actual holders from /proc/locks and, when present, the record they wrote
+// (diagnostic only: a holder that never rewrites it leaves an older record).
 func LockHolder(path string) (holder string, held bool, err error) {
-	file, err := os.OpenFile(path, os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
-	if errors.Is(err, os.ErrNotExist) {
-		return "", false, nil
-	}
+	holders, err := LockHolders(path)
 	if err != nil {
 		return "", false, err
 	}
-	defer func() { _ = file.Close() }()
-	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil {
-		return "", false, syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	var names []string
+	for _, h := range holders {
+		if !h.Waiting {
+			names = append(names, fmt.Sprintf("pid %d (%s)", h.PID, h.Command))
+		}
 	}
-	recorded, err := os.ReadFile(path)
-	return strings.TrimSpace(string(recorded)), true, err
+	if len(names) == 0 {
+		return "", false, nil
+	}
+	holder = strings.Join(names, ", ")
+	if recorded, err := os.ReadFile(path); err == nil && len(bytes.TrimSpace(recorded)) != 0 {
+		holder += "; record: " + strings.TrimSpace(string(recorded))
+	}
+	return holder, true, nil
 }

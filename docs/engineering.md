@@ -1712,12 +1712,19 @@ device execution or finer commercial authorization scopes.
 Private worktrees live in `<main>.worktrees/NAME` (here
 `~/dev/minor/lindm.worktrees`), never in the research-clone directory. `go run
 ./cmd/dev worktree add NAME [-base REV]` creates one detached at `REV` (default
-`HEAD`) and links the main checkout's `node_modules` only when `package.json` and
-`package-lock.json` are byte-identical; otherwise it runs `npm ci --ignore-scripts`
-in the worktree, because a shared install from another lockfile would test the
-wrong packages. `.tools` is not shared: `add` runs `make tools`, so the worktree's own
-Makefile pins the tools its hooks and gates use. `worktree list` shows HEAD, ahead/behind `main`, dirty state, newest
-mtime outside `node_modules` and allocated size. `worktree prune [-older-than D]
+`HEAD`) with its own `node_modules`: a hardlinked copy of the main checkout's
+install when `package.json` and `package-lock.json` are byte-identical, otherwise
+`npm ci --ignore-scripts --prefer-offline` from the shared npm cache. No checkout
+links another's `node_modules`. The retired symlink let `npm ci` in one worktree
+delete the install of every checkout. Installs are built in a staging directory
+beside their destination and published with an atomic exchange
+(`renameat2(RENAME_EXCHANGE)`), so readers see the old or the new tree and a failed
+install keeps the old one. `worktree own-node-modules [PATH...]` migrates
+worktrees still on a symlink (by default every registered one) without touching
+the link target. `.tools` is not shared: `add` runs `make tools`, so the worktree's
+own Makefile pins the tools its hooks and gates use. `worktree list` shows HEAD,
+ahead/behind `main`, dirty state, newest mtime outside `node_modules`, allocated
+size and whether `node_modules` is own, missing or a symlink. `worktree prune [-older-than D]
 [-dry-run] [-archive-dirty] [PATH...]` (default: every worktree under
 `<main>.worktrees`) removes clean worktrees whose HEAD is an ancestor of `main`.
 A dirty or diverged worktree is kept unless `-archive-dirty`, which first writes
@@ -1795,16 +1802,19 @@ touches `web/src` or `web/acceptance`, `make check-web` with
 `artifacts/`); `lab acceptance` accepts fewer than all three engines only with
 `-web-only`, so a release pass stays cross-browser), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
-restores the local branch and the checkout. Because every worktree links the
-shared `node_modules`, each landing first checks it with `npm ls` and reinstalls
-with `npm ci --ignore-scripts` when it drifts from `package-lock.json`; a landing
-that changes `package.json` or `package-lock.json` reinstalls after applying and
-before the gate, and again after a rollback. From apply until commit, rollback or
-refusal, `<main>/.git/lindm-landing.current` records the landing's owner, pid,
-worktree, message, files and start time; `go run ./cmd/dev status` prints it
-(flagged stale if no process holds the landing lock) together with HEAD against
-upstream, the landing and integration lock holders and uncommitted files, and
-`worktree audit` prints it first. `gate-commit` is the post-hoc full
+restores the local branch and the checkout. Each landing first checks the main
+checkout's `node_modules` with `npm ls` and, when it drifts from
+`package-lock.json`, reinstalls it with a staged `npm ci` that is published
+atomically. A landing that changes `package.json` or `package-lock.json`
+reinstalls after applying and before the gate, and again after a rollback. From
+apply until commit, rollback or refusal, `<main>/.git/lindm-landing.current`
+records the landing's owner, pid, worktree, message, files and start time.
+`go run ./cmd/dev status` prints that marker (flagged stale if no process holds
+the landing lock), HEAD against upstream, uncommitted files, and for the landing
+and integration locks the actual holder and blocked waiters read from
+`/proc/locks`. The record a holder writes into a lock file is diagnostic only
+and can be stale, since raw `flock` users never rewrite it. `worktree audit` also
+prints the landing marker first. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits any remaining change only
 when green.
 

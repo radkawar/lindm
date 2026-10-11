@@ -122,8 +122,8 @@ func runLand(args []string) (resultErr error) {
 }
 
 // syncNodeModules makes the shared checkout's node_modules match its
-// package-lock.json: npm ci when forced or when npm ls finds the install
-// missing, extraneous or mismatched against the lock.
+// package-lock.json: a staged npm ci, published atomically, when forced or
+// when npm ls finds the install missing, extraneous or mismatched.
 func syncNodeModules(ctx context.Context, root string, force bool) error {
 	if !force {
 		if err := labexec.Run(ctx, labexec.Command{Path: "npm", Args: []string{"ls", "--all", "--silent"}, Dir: root}); err == nil {
@@ -131,7 +131,9 @@ func syncNodeModules(ctx context.Context, root string, force bool) error {
 		}
 		fmt.Printf("land: %s/node_modules does not match package-lock.json; reinstalling\n", root)
 	}
-	if err := stream(ctx, root, nil, "npm", "ci", "--ignore-scripts"); err != nil {
+	// Staged and exchanged atomically: readers never see a partial tree and a
+	// failed install keeps the previous one.
+	if err := worktree.SyncNodeModules(ctx, root, os.Stdout); err != nil {
 		return fmt.Errorf("sync shared node_modules: %w", err)
 	}
 	return nil

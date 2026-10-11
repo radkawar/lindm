@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -17,13 +18,18 @@ import (
 	"lindm/internal/devlab/worktree"
 )
 
-const worktreeUsage = `Usage: go run ./cmd/dev worktree <add|list|audit|prune> [options]
+const worktreeUsage = `Usage: go run ./cmd/dev worktree <add|list|audit|prune|own-node-modules> [options]
 
   add NAME [-base REV]  Create <main>.worktrees/NAME detached at REV (default
-        HEAD), link the main checkout's node_modules when package.json and
-        package-lock.json match (otherwise npm ci there), print the path.
+        HEAD) with its own node_modules (a hardlinked copy of the main
+        checkout's when package.json and package-lock.json match, otherwise
+        npm ci --prefer-offline), print the path.
   list  Registered worktrees: path, HEAD, ahead/behind main, dirty, last
-        modified (newest file outside node_modules), allocated size.
+        modified (newest file outside node_modules), allocated size, and
+        whether node_modules is own, missing or a retired shared symlink.
+  own-node-modules [PATH...]  Replace symlinked node_modules (default: every
+        registered worktree that has one) with an own install, atomically;
+        the shared tree a link points at is never touched.
   audit [-all] [PATH...]  Classify every registered worktree (and extra PATHs)
         by whether main already holds its work, by content rather than commits:
         its change set (base..HEAD, staged, unstaged, untracked) per file is
@@ -54,8 +60,8 @@ func runWorktree(args []string) error {
 		return errors.New("a worktree command is required")
 	}
 	verb := args[0]
-	if verb != "add" && verb != "list" && verb != "audit" && verb != "prune" {
-		return fmt.Errorf("unknown worktree command %q; use worktree add|list|audit|prune", verb)
+	if verb != "add" && verb != "list" && verb != "audit" && verb != "prune" && verb != "own-node-modules" {
+		return fmt.Errorf("unknown worktree command %q; use worktree add|list|audit|prune|own-node-modules", verb)
 	}
 	flags := flag.NewFlagSet("worktree "+verb, flag.ContinueOnError)
 	root := flags.String("root", ".", "any checkout of the repository")
@@ -100,6 +106,8 @@ func runWorktree(args []string) error {
 		return listWorktrees(ctx, repo)
 	case "audit":
 		return auditWorktrees(ctx, repo, positional, *all)
+	case "own-node-modules":
+		return ownNodeModules(ctx, repo, positional)
 	}
 	return pruneWorktrees(ctx, repo, positional, worktree.PruneOptions{OlderThan: *olderThan, DryRun: *dryRun, ArchiveDirty: *archiveDirty, Now: time.Now()})
 }
@@ -110,17 +118,17 @@ func listWorktrees(ctx context.Context, repo *worktree.Repository) error {
 		return err
 	}
 	table := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
-	if _, err := fmt.Fprintln(table, "PATH\tHEAD\tAHEAD\tBEHIND\tDIRTY\tMODIFIED\tSIZE"); err != nil {
+	if _, err := fmt.Fprintln(table, "PATH\tHEAD\tAHEAD\tBEHIND\tDIRTY\tMODIFIED\tSIZE\tNODE_MODULES"); err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		row := fmt.Sprintf("%s\t%.12s\t-\t-\tmissing\t-\t-", entry.Path, entry.Head)
+		row := fmt.Sprintf("%s\t%.12s\t-\t-\tmissing\t-\t-\t-", entry.Path, entry.Head)
 		if !entry.Missing {
 			status, err := repo.Inspect(ctx, entry)
 			if err != nil {
-				row = fmt.Sprintf("%s\t%.12s\t-\t-\terror: %v\t-\t-", entry.Path, entry.Head, err)
+				row = fmt.Sprintf("%s\t%.12s\t-\t-\terror: %v\t-\t-\t%s", entry.Path, entry.Head, err, worktree.NodeModulesState(entry.Path))
 			} else {
-				row = fmt.Sprintf("%s\t%.12s\t%d\t%d\t%t\t%s\t%s", entry.Path, entry.Head, status.Ahead, status.Behind, status.Dirty, status.Modified.Format(time.DateTime), size(status.Bytes))
+				row = fmt.Sprintf("%s\t%.12s\t%d\t%d\t%t\t%s\t%s\t%s", entry.Path, entry.Head, status.Ahead, status.Behind, status.Dirty, status.Modified.Format(time.DateTime), size(status.Bytes), worktree.NodeModulesState(entry.Path))
 			}
 		}
 		if _, err := fmt.Fprintln(table, row); err != nil {
@@ -261,4 +269,31 @@ func auditWorktrees(ctx context.Context, repo *worktree.Repository, extra []stri
 	}
 	_, err = fmt.Printf("%s%s against %s %.12s; record %s\n", strings.Join(summary, ", "), hidden, worktree.Trunk, head, record)
 	return err
+}
+
+// ownNodeModules migrates worktrees off the retired shared node_modules
+// symlink, one at a time, reporting each result.
+func ownNodeModules(ctx context.Context, repo *worktree.Repository, targets []string) error {
+	if len(targets) == 0 {
+		entries, err := repo.List(ctx)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if !entry.Missing && strings.HasPrefix(worktree.NodeModulesState(entry.Path), "symlink") {
+				targets = append(targets, entry.Path)
+			}
+		}
+	}
+	var failed []error
+	for _, path := range targets {
+		if err := repo.InstallNodeModules(ctx, path, io.Discard); err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", path, err))
+			fmt.Printf("FAILED %s: %v\n", path, err)
+			continue
+		}
+		fmt.Printf("own    %s\n", path)
+	}
+	fmt.Printf("%d worktrees migrated, %d failed\n", len(targets)-len(failed), len(failed))
+	return errors.Join(failed...)
 }

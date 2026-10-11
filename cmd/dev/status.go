@@ -47,14 +47,24 @@ func runStatus(args []string) error {
 		return err
 	}
 	for _, lock := range []string{repo.LockPath(), filepath.Join(cache, "lindm-integration.lock")} {
-		holder, held, err := worktree.LockHolder(lock)
+		holders, err := worktree.LockHolders(lock)
 		if err != nil {
 			return err
 		}
-		if held {
-			fmt.Printf("lock %s held by %s\n", lock, holder)
-		} else {
-			fmt.Printf("lock %s free\n", lock)
+		state := "free"
+		var waiting int
+		for _, h := range holders {
+			if h.Waiting {
+				waiting++
+				continue
+			}
+			state = fmt.Sprintf("held by pid %d (%s)", h.PID, h.Command)
+		}
+		fmt.Printf("lock %s %s; %d blocked waiters\n", lock, state, waiting)
+		for _, h := range holders {
+			if h.Waiting {
+				fmt.Printf("  waiting: pid %d (%s)\n", h.PID, h.Command)
+			}
 		}
 	}
 	dirty, err := output(ctx, repo.Main, "git", "status", "--porcelain")

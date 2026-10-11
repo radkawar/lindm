@@ -59,8 +59,8 @@ func Open(ctx context.Context, dir string) (*Repository, error) {
 	return &Repository{Main: main, Root: main + ".worktrees", Archive: filepath.Join(cache, "lindm-worktree-archive")}, nil
 }
 
-// Add creates Root/name detached at rev, shares or installs node_modules and
-// installs the pinned .tools.
+// Add creates Root/name detached at rev, gives it its own node_modules
+// (InstallNodeModules) and installs the pinned .tools.
 // It returns the new path. Progress from npm goes to log.
 func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (string, error) {
 	if !namePattern.MatchString(name) {
@@ -78,7 +78,7 @@ func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (
 	if _, err := git(ctx, r.Main, "worktree", "add", "--detach", path, rev+"^{commit}"); err != nil {
 		return "", err
 	}
-	if err := r.shareNodeModules(ctx, path, log); err != nil {
+	if err := r.InstallNodeModules(ctx, path, log); err != nil {
 		return path, fmt.Errorf("node_modules for %s: %w", path, err)
 	}
 	// Commit hooks and gates use the checkout's own pinned .tools; a shared
@@ -87,36 +87,6 @@ func (r *Repository) Add(ctx context.Context, name, rev string, log io.Writer) (
 		return path, fmt.Errorf("make tools in %s: %w", path, err)
 	}
 	return path, nil
-}
-
-// shareNodeModules links the main checkout's install when both checkouts pin
-// identical package manifests; otherwise it installs privately, because a
-// shared tree resolved from another lockfile would test the wrong packages.
-func (r *Repository) shareNodeModules(ctx context.Context, path string, log io.Writer) error {
-	shared := filepath.Join(r.Main, "node_modules")
-	same := true
-	for _, file := range []string{"package.json", "package-lock.json"} {
-		ours, err := os.ReadFile(filepath.Join(path, file))
-		if err != nil {
-			return err
-		}
-		theirs, err := os.ReadFile(filepath.Join(r.Main, file))
-		if err != nil {
-			return err
-		}
-		same = same && bytes.Equal(ours, theirs)
-	}
-	if info, err := os.Stat(shared); same && err == nil && info.IsDir() {
-		_, err := fmt.Fprintf(log, "node_modules: shared with %s (identical package manifests)\n", r.Main)
-		return errors.Join(err, os.Symlink(shared, filepath.Join(path, "node_modules")))
-	}
-	if _, err := fmt.Fprintln(log, "node_modules: package manifests differ from the main checkout; installing privately"); err != nil {
-		return err
-	}
-	if err := labexec.Run(ctx, labexec.Command{Path: "npm", Args: []string{"ci", "--ignore-scripts"}, Dir: path, Stdout: log, Stderr: log}); err != nil {
-		return fmt.Errorf("npm ci: %w", err)
-	}
-	return nil
 }
 
 // Remove force-removes a worktree this package created, without prune checks.

@@ -36,7 +36,10 @@ func fixtureRepository(t *testing.T) *Repository {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Mkdir(filepath.Join(main, "node_modules"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(main, "node_modules", "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(main, "node_modules", "pkg", "index.js"), []byte("shared\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(main, "Makefile"), []byte("tools:\n\tmkdir -p .tools && touch .tools/installed\n"), 0o644); err != nil {
@@ -55,7 +58,7 @@ func fixtureRepository(t *testing.T) *Repository {
 	return repo
 }
 
-func TestAddSharesMatchingInstall(t *testing.T) {
+func TestAddGivesEachWorktreeItsOwnInstall(t *testing.T) {
 	repo := fixtureRepository(t)
 	path, err := repo.Add(context.Background(), "feature", "HEAD", io.Discard)
 	if err != nil {
@@ -64,8 +67,16 @@ func TestAddSharesMatchingInstall(t *testing.T) {
 	if path != filepath.Join(repo.Main+".worktrees", "feature") {
 		t.Fatalf("worktree at %s", path)
 	}
-	if target, err := os.Readlink(filepath.Join(path, "node_modules")); err != nil || target != filepath.Join(repo.Main, "node_modules") {
-		t.Fatalf("node_modules link %q: %v", target, err)
+	if state := NodeModulesState(path); state != "own" {
+		t.Fatalf("node_modules is %s", state)
+	}
+	// A hardlinked copy: same content, and removing the worktree's tree (as
+	// npm ci there does) leaves the main checkout's install intact.
+	if err := os.RemoveAll(filepath.Join(path, "node_modules")); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(filepath.Join(repo.Main, "node_modules", "pkg", "index.js")); err != nil || string(data) != "shared\n" {
+		t.Fatalf("main install damaged by removing a worktree's node_modules: %q %v", data, err)
 	}
 	if _, err := os.Stat(filepath.Join(path, ".tools", "installed")); err != nil {
 		t.Fatalf("pinned tools not installed in the worktree: %v", err)
