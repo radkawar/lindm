@@ -230,7 +230,33 @@ func quickGate(ctx context.Context, root string, files []string) error {
 			return err
 		}
 		fmt.Printf("land: race tests for %d touched and %d dependent packages\n", len(packages), len(affected)-len(packages))
-		return stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1"}, affected...)...)
+		if err := stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1"}, affected...)...); err != nil {
+			return err
+		}
+	}
+	if touchesConsole(files) {
+		return checkWeb(ctx, root)
+	}
+	return nil
+}
+
+// touchesConsole reports whether a landing changes the console or its
+// browser acceptance journey.
+func touchesConsole(files []string) bool {
+	return slices.ContainsFunc(files, func(file string) bool {
+		return strings.HasPrefix(file, "web/src/") || strings.HasPrefix(file, "web/acceptance/")
+	})
+}
+
+// checkWeb runs the real browser journey against a freshly built server with
+// the embedded console (make check-web), in Chromium only to keep the landing
+// gate bounded; release acceptance still covers every engine. Its evidence
+// goes to an ignored artifacts directory, so the shared checkout stays clean.
+func checkWeb(ctx context.Context, root string) error {
+	fmt.Println("land: console changed; running make check-web (Chromium, web-only)")
+	evidence := filepath.Join(root, "artifacts", "land-check-web-"+time.Now().UTC().Format("20060102T150405Z"))
+	if err := stream(ctx, root, nil, "make", "--no-print-directory", "check-web", "ACCEPTANCE_EVIDENCE="+evidence, "ACCEPTANCE_FLAGS=-engines chromium"); err != nil {
+		return fmt.Errorf("check-web (evidence %s): %w", evidence, err)
 	}
 	return nil
 }

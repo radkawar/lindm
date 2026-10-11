@@ -12,6 +12,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -109,6 +111,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	flags.BoolVar(&options.skipFeeds, "skip-feeds", false, "diagnostic only: omit feed refresh/exposure qualification; never a release pass")
 	flags.StringVar(&options.host, "host", "local", "configured native lab host")
 	flags.BoolVar(&options.webOnly, "web-only", false, "fast browser journey only; not a full release pass")
+	engines := flags.String("engines", strings.Join(acceptanceEngines, ","), "comma-separated browser engines; fewer than all requires -web-only")
 	flags.Int64Var(&options.feedBytes, "feed-byte-budget", 2<<30, "total vendor feed bytes, including digest-verified cache hits")
 	flags.DurationVar(&options.feedDuration, "feed-duration-budget", 15*time.Minute, "complete real vendor refresh deadline")
 	flags.StringVar(&options.golden, "golden-cache", ".cache/lab/encrypted", "verified encrypted installer golden cache")
@@ -125,7 +128,10 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	if options.webOnly && options.skipFeeds {
 		return errors.New("choose -web-only or -skip-feeds, not both")
 	}
-	var err error
+	selected, err := selectAcceptanceEngines(*engines, options.webOnly)
+	if err != nil {
+		return err
+	}
 	options.repository, err = filepath.Abs(options.repository)
 	if err != nil {
 		return err
@@ -194,7 +200,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	}
 	var chromium acceptanceBrowser
 	var chromiumConfig acceptanceBrowserConfig
-	for _, engine := range []string{"chromium", "webkit", "firefox"} {
+	for _, engine := range selected {
 		username := "acceptance-" + engine
 		enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, username)
 		if err != nil {
@@ -288,4 +294,27 @@ func acceptanceFileDigest(path string) (_ string, resultErr error) {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// acceptanceEngines are the browser engines a release pass must cover.
+var acceptanceEngines = []string{"chromium", "webkit", "firefox"}
+
+// selectAcceptanceEngines parses -engines. A release pass needs every engine;
+// only a -web-only run may cover fewer, e.g. Chromium alone as a landing gate.
+func selectAcceptanceEngines(list string, webOnly bool) ([]string, error) {
+	var selected []string
+	for engine := range strings.SplitSeq(list, ",") {
+		engine = strings.TrimSpace(engine)
+		if !slices.Contains(acceptanceEngines, engine) {
+			return nil, fmt.Errorf("unknown browser engine %q; choose from %s", engine, strings.Join(acceptanceEngines, ","))
+		}
+		if slices.Contains(selected, engine) {
+			return nil, fmt.Errorf("browser engine %q listed twice", engine)
+		}
+		selected = append(selected, engine)
+	}
+	if len(selected) != len(acceptanceEngines) && !webOnly {
+		return nil, errors.New("a release acceptance pass covers every browser engine; fewer engines require -web-only")
+	}
+	return selected, nil
 }

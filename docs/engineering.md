@@ -1774,8 +1774,12 @@ run for both tags and fmt on touched packages, buf when protos changed,
 prettier/markdownlint on touched docs and web files, a refusal of any added
 `db/migrations` file numbered at or below `main`'s highest (it names the number
 to rename to), `generate-docs -check`
-always, and race tests of the touched packages plus every module package whose
-build or tests import them, directly or transitively), commits exactly the touched files with MSG and pushes to `main`'s
+always, race tests of the touched packages plus every module package whose
+build or tests import them, directly or transitively, and, when the landing
+touches `web/src` or `web/acceptance`, `make check-web` with
+`lab acceptance -web-only -engines chromium` (evidence under ignored
+`artifacts/`); `lab acceptance` accepts fewer than all three engines only with
+`-web-only`, so a release pass stays cross-browser), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
 restores the local branch and the checkout. Because every worktree links the
 shared `node_modules`, each landing first checks it with `npm ls` and reinstalls
