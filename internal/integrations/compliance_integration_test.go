@@ -35,7 +35,7 @@ func TestComplianceEventsAtomicDependenciesAndStaleness(t *testing.T) {
 		complianceExec(t, ctx, pool, "INSERT INTO resource_assignment_resources(assignment_id,resource_id,resource_kind,canonical_key,position,document,depends_on) VALUES($1,$2,1,$3,$4,$5,$6)", assignment, resource, resource.String()+".service", index, []byte{1}, dependencies)
 	}
 	complianceExec(t, ctx, pool, "INSERT INTO resource_assignment_heads(generation_id,assignment_id) VALUES($1,$2)", generation, assignment)
-	complianceExec(t, ctx, pool, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'service_assignment.assign',$2,'assign')", actor, assignment.String())
+	complianceExec(t, ctx, pool, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'resource_assignment.assign',$2,'assign')", actor, assignment.String())
 	assertComplianceStates(t, ctx, pool, assignment, "unknown", 3)
 	var before int64
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM integration_events").Scan(&before); err != nil {
@@ -48,7 +48,7 @@ func TestComplianceEventsAtomicDependenciesAndStaleness(t *testing.T) {
 	if _, err := tx.Exec(ctx, "UPDATE resource_assignment_resources SET disposition=4 WHERE assignment_id=$1 AND resource_id=$2", assignment, root); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(ctx, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'service_assignment.update',$2,'rollback')", actor, assignment.String()); err != nil {
+	if _, err := tx.Exec(ctx, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'resource_assignment.update',$2,'rollback')", actor, assignment.String()); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Rollback(ctx); err != nil {
@@ -64,7 +64,7 @@ func TestComplianceEventsAtomicDependenciesAndStaleness(t *testing.T) {
 	}
 
 	complianceExec(t, ctx, pool, "UPDATE resource_assignment_resources SET disposition=4 WHERE assignment_id=$1 AND resource_id=$2", assignment, root)
-	complianceExec(t, ctx, pool, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'service_assignment.update',$2,'dependency failed')", actor, assignment.String())
+	complianceExec(t, ctx, pool, "INSERT INTO audit_events(actor_id,action,resource_id,reason) VALUES($1,'resource_assignment.update',$2,'dependency failed')", actor, assignment.String())
 	assertComplianceStates(t, ctx, pool, assignment, "attention", 3)
 	// A running dependency does not inherit attention: propagation traverses
 	// only pending nodes, matching the public Kahn-ordered state projection.

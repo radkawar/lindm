@@ -41,7 +41,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		return nil, invalid("invalid_service_assignment")
 	}
 	if s.identity == nil {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_authorization_unavailable")
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "resource_authorization_unavailable")
 	}
 	approval, err := s.identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionAssignResources)
 	if err != nil {
@@ -76,7 +76,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	}
 	digest := sha256.Sum256(encoded)
 	requestID, _ := uuid.Parse(req.Msg.GetRequestId())
-	previous, err := q.GetServiceAssignmentRequest(ctx, requestID)
+	previous, err := q.GetResourceAssignmentRequest(ctx, requestID)
 	if err == nil {
 		if previous.ActorID != actor.ID || !bytes.Equal(previous.RequestDigest, digest[:]) {
 			return nil, mapErr(errIdempotencyConflict)
@@ -100,19 +100,19 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 		return nil, mapErr(errDeviceRevoked)
 	}
 	generationID := *device.CurrentGenerationID
-	head, err := q.LockServiceAssignment(ctx, generationID)
+	head, err := q.LockResourceAssignment(ctx, generationID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, mapErr(err)
 	}
 	if (err == nil && head.ID.String() != req.Msg.GetExpectedAssignmentId()) || (errors.Is(err, pgx.ErrNoRows) && req.Msg.ExpectedAssignmentId != nil) {
-		return nil, rpcreason.Error(connect.CodeAborted, "service_assignment_conflict")
+		return nil, rpcreason.Error(connect.CodeAborted, "resource_assignment_conflict")
 	}
-	capacity, err := q.ServiceDispatchCapacity(ctx, generationID)
+	capacity, err := q.ResourceDispatchCapacity(ctx, generationID)
 	if err != nil {
 		return nil, mapErr(err)
 	}
 	if capacity.Assignments >= 65536 {
-		return nil, rpcreason.Error(connect.CodeResourceExhausted, "service_assignment_capacity")
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "resource_assignment_capacity")
 	}
 	now, err := dispatchClock(ctx, q)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, mapErr(err)
 	}
-	if err := q.InsertServiceAssignment(ctx, devicedb.InsertServiceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generationID, RequestID: requestID, RequestDigest: digest[:], ActorID: actor.ID, AuthorizationVersion: int64(approval.Version()), RevisionID: revisionID, Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: int32(assignment.GetReconcileIntervalSeconds())}); err != nil {
+	if err := q.InsertResourceAssignment(ctx, devicedb.InsertResourceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generationID, RequestID: requestID, RequestDigest: digest[:], ActorID: actor.ID, AuthorizationVersion: int64(approval.Version()), RevisionID: revisionID, Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: int32(assignment.GetReconcileIntervalSeconds())}); err != nil {
 		var pgerr *pgconn.PgError
 		if errors.As(err, &pgerr) && pgerr.Code == "23505" {
 			return nil, mapErr(errIdempotencyConflict)
@@ -180,10 +180,10 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 			return nil, mapErr(err)
 		}
 	}
-	if err := q.SetServiceAssignmentHead(ctx, devicedb.SetServiceAssignmentHeadParams{GenerationID: generationID, AssignmentID: id}); err != nil {
+	if err := q.SetResourceAssignmentHead(ctx, devicedb.SetResourceAssignmentHeadParams{GenerationID: generationID, AssignmentID: id}); err != nil {
 		return nil, mapErr(err)
 	}
-	action, err := q.GetOpenServiceAction(ctx, deviceID)
+	action, err := q.GetOpenResourceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
 		if err := closeUnstartedResourceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return nil, mapErr(err)
@@ -191,9 +191,9 @@ func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Reques
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, mapErr(err)
 	}
-	auditAction := "service_assignment.assign"
+	auditAction := "resource_assignment.assign"
 	if req.Msg.GetClear() {
-		auditAction = "service_assignment.clear"
+		auditAction = "resource_assignment.clear"
 	}
 	if err := dispatchAudit(ctx, q, &actor.ID, auditAction, id, req.Msg.GetReason()); err != nil {
 		return nil, mapErr(err)
@@ -241,7 +241,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 		return nil, mapErr(err)
 	}
 	if device.CurrentGenerationID != nil {
-		head, err := q.LockServiceAssignment(ctx, *device.CurrentGenerationID)
+		head, err := q.LockResourceAssignment(ctx, *device.CurrentGenerationID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, mapErr(err)
 		}
@@ -250,7 +250,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			if err := proto.Unmarshal(head.Document, response.Assignment); err != nil {
 				return nil, mapErr(errInternalState)
 			}
-			resources, err := q.ListServiceResources(ctx, head.ID)
+			resources, err := q.ListAssignmentResources(ctx, head.ID)
 			if err != nil {
 				return nil, mapErr(err)
 			}
@@ -280,7 +280,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 					}
 				}
 				dispositions[state.ResourceId] = state.Disposition
-				latest, err := q.LatestServiceAction(ctx, devicedb.LatestServiceActionParams{AssignmentID: head.ID, ResourceID: row.ResourceID})
+				latest, err := q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: head.ID, ResourceID: row.ResourceID})
 				if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 					return nil, mapErr(err)
 				}
@@ -296,7 +296,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 				response.Resources = append(response.Resources, state)
 			}
 		}
-		recent, err := q.RecentServiceActions(ctx, *device.CurrentGenerationID)
+		recent, err := q.RecentResourceActions(ctx, *device.CurrentGenerationID)
 		if err != nil {
 			return nil, mapErr(err)
 		}
@@ -328,7 +328,7 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 		return nil, mapErr(err)
 	}
 	if len(encoded) > maxMessageBytes || proto.Size(response) > maxMessageBytes {
-		return nil, rpcreason.Error(connect.CodeResourceExhausted, "service_state_response_capacity")
+		return nil, rpcreason.Error(connect.CodeResourceExhausted, "resource_state_response_capacity")
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, mapErr(err)
@@ -394,12 +394,12 @@ func resourceCompliance(row devicedb.ResourceAssignmentResource, state *adminv1.
 	return adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_COMPLIANT
 }
 
-func resourceActionSummary(action devicedb.ResourceAction) (*adminv1.ServiceActionSummary, error) {
+func resourceActionSummary(action devicedb.ResourceAction) (*adminv1.ResourceActionSummary, error) {
 	revision, err := resourceActionRevision(action)
 	if err != nil {
 		return nil, err
 	}
-	summary := &adminv1.ServiceActionSummary{ActionId: action.ID.String(), ResourceSequence: uint64(action.ResourceSequence), IssuedAt: protoTime(action.IssuedAt), ExpiresAt: protoTime(action.ExpiresAt), StartAuthorizedAt: protoTime(action.StartAuthorizedAt), ClosedReason: action.ClosedReason, ClosedAt: protoTime(action.ClosedAt), ActionRevision: revision, AttestedAt: protoTime(action.AttestedAt), ReceivedAt: protoTime(action.ReceivedAt)}
+	summary := &adminv1.ResourceActionSummary{ActionId: action.ID.String(), ResourceSequence: uint64(action.ResourceSequence), IssuedAt: protoTime(action.IssuedAt), ExpiresAt: protoTime(action.ExpiresAt), StartAuthorizedAt: protoTime(action.StartAuthorizedAt), ClosedReason: action.ClosedReason, ClosedAt: protoTime(action.ClosedAt), ActionRevision: revision, AttestedAt: protoTime(action.AttestedAt), ReceivedAt: protoTime(action.ReceivedAt)}
 	if len(action.StatusDocument) != 0 {
 		summary.Status = new(agentv1.ResourceExecutionStatus)
 		if err := proto.Unmarshal(action.StatusDocument, summary.Status); err != nil {

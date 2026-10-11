@@ -141,7 +141,7 @@ func (s *Service) ConnectivityConfirmationHandler(approved []*agentv1.Connectivi
 			reject(http.StatusBadRequest)
 			return
 		}
-		action, err := q.LockServiceAction(ctx, id)
+		action, err := q.LockResourceAction(ctx, id)
 		if err != nil || action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID || action.ClosedAt.Valid || action.ClosedReason != "" || len(action.StartGrantEnvelope) == 0 {
 			reject(http.StatusForbidden)
 			return

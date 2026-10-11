@@ -10,12 +10,12 @@ import type { ReactNode } from "react";
 import {
   ResourceCompliance,
   ResourceDisposition,
-  type ServiceActionSummary,
+  type ResourceActionSummary,
 } from "../../../gen/lindm/admin/v1/assignments_pb";
 import {
   ResourceExecutionFailure,
   ResourceExecutionState,
-} from "../../../gen/lindm/agent/v1/service_execution_pb";
+} from "../../../gen/lindm/agent/v1/resource_execution_pb";
 import type { SystemdServiceObservation } from "../../../gen/lindm/resource/v1/observations_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -400,7 +400,7 @@ function FailureNote({ failure }: { failure: ResourceExecutionFailure | undefine
   return <p className="mt-1">Problem: {enumLabel(ResourceExecutionFailure[failure])}</p>;
 }
 
-function ActionHistory({ action }: { action: ServiceActionSummary | undefined }) {
+function ActionHistory({ action }: { action: ResourceActionSummary | undefined }) {
   if (!action) return <p className="text-muted-foreground">No changes sent yet.</p>;
   const status = action.status;
   const checks =

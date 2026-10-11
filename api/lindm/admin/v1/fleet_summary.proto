@@ -44,7 +44,7 @@ message FleetOSSummary {
   uint64 other_devices = 2;
 }
 
-message FleetServiceComplianceSummary {
+message FleetResourceComplianceSummary {
   // Resource counts for current enrollment-generation assignment heads only.
   // Uses GetDeviceServiceState compliance semantics, including dependencies.
   uint64 total_resources = 1;
@@ -83,7 +83,7 @@ message FleetApprovalSummary {
 message FleetRecentAction {
   string action_id = 1;
   string device_id = 2;
-  // Present only for imperative device actions; service actions use unit.
+  // Present only for imperative device actions; resource actions use unit.
   string capability = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp expires_at = 5;
@@ -91,9 +91,9 @@ message FleetRecentAction {
   google.protobuf.Timestamp closed_at = 7;
   string closed_reason = 8;
   bool outcome_unknown = 9;
-  // "device" for imperative actions; "service" for service-resource actions.
+  // "device" for imperative actions; "resource" for resource actions.
   string kind = 10;
-  // Present only for service actions.
+  // Present only for resource actions.
   string resource_id = 11;
   string unit = 12;
 }
@@ -104,7 +104,7 @@ message GetFleetSummaryResponse {
   FleetLifecycleSummary lifecycle = 2;
   FleetContactSummary contact = 3;
   FleetOSSummary operating_systems = 4;
-  FleetServiceComplianceSummary service_compliance = 5;
+  FleetResourceComplianceSummary resource_compliance = 5;
   // Absent when the advisory service is unavailable, never an implied zero.
   FleetFindingSummary findings = 6;
   // Absent when identity is unavailable or the caller cannot view an inbox.

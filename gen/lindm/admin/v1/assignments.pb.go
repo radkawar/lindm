@@ -521,7 +521,7 @@ func (x *GetDeviceResourceStateRequest) GetDeviceId() string {
 	return ""
 }
 
-type ServiceActionSummary struct {
+type ResourceActionSummary struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ActionId          string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	ResourceSequence  uint64                 `protobuf:"varint,2,opt,name=resource_sequence,json=resourceSequence,proto3" json:"resource_sequence,omitempty"`
@@ -541,20 +541,20 @@ type ServiceActionSummary struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *ServiceActionSummary) Reset() {
-	*x = ServiceActionSummary{}
+func (x *ResourceActionSummary) Reset() {
+	*x = ResourceActionSummary{}
 	mi := &file_lindm_admin_v1_assignments_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ServiceActionSummary) String() string {
+func (x *ResourceActionSummary) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ServiceActionSummary) ProtoMessage() {}
+func (*ResourceActionSummary) ProtoMessage() {}
 
-func (x *ServiceActionSummary) ProtoReflect() protoreflect.Message {
+func (x *ResourceActionSummary) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_assignments_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -566,82 +566,82 @@ func (x *ServiceActionSummary) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ServiceActionSummary.ProtoReflect.Descriptor instead.
-func (*ServiceActionSummary) Descriptor() ([]byte, []int) {
+// Deprecated: Use ResourceActionSummary.ProtoReflect.Descriptor instead.
+func (*ResourceActionSummary) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_assignments_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ServiceActionSummary) GetActionId() string {
+func (x *ResourceActionSummary) GetActionId() string {
 	if x != nil {
 		return x.ActionId
 	}
 	return ""
 }
 
-func (x *ServiceActionSummary) GetResourceSequence() uint64 {
+func (x *ResourceActionSummary) GetResourceSequence() uint64 {
 	if x != nil {
 		return x.ResourceSequence
 	}
 	return 0
 }
 
-func (x *ServiceActionSummary) GetIssuedAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetIssuedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.IssuedAt
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetExpiresAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetStartAuthorizedAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetStartAuthorizedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StartAuthorizedAt
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetClosedReason() string {
+func (x *ResourceActionSummary) GetClosedReason() string {
 	if x != nil {
 		return x.ClosedReason
 	}
 	return ""
 }
 
-func (x *ServiceActionSummary) GetClosedAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetClosedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ClosedAt
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetStatus() *v1.ResourceExecutionStatus {
+func (x *ResourceActionSummary) GetStatus() *v1.ResourceExecutionStatus {
 	if x != nil {
 		return x.Status
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetActionRevision() uint64 {
+func (x *ResourceActionSummary) GetActionRevision() uint64 {
 	if x != nil {
 		return x.ActionRevision
 	}
 	return 0
 }
 
-func (x *ServiceActionSummary) GetAttestedAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetAttestedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AttestedAt
 	}
 	return nil
 }
 
-func (x *ServiceActionSummary) GetReceivedAt() *timestamppb.Timestamp {
+func (x *ResourceActionSummary) GetReceivedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ReceivedAt
 	}
@@ -657,8 +657,8 @@ type ResourceState struct {
 	// snake_case reason for PENDING/BLOCKED/ATTENTION; empty otherwise.
 	Reason string `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	// Most recent action for this resource under the current head.
-	LatestAction *ServiceActionSummary `protobuf:"bytes,6,opt,name=latest_action,json=latestAction,proto3" json:"latest_action,omitempty"`
-	Compliance   ResourceCompliance    `protobuf:"varint,7,opt,name=compliance,proto3,enum=lindm.admin.v1.ResourceCompliance" json:"compliance,omitempty"`
+	LatestAction *ResourceActionSummary `protobuf:"bytes,6,opt,name=latest_action,json=latestAction,proto3" json:"latest_action,omitempty"`
+	Compliance   ResourceCompliance     `protobuf:"varint,7,opt,name=compliance,proto3,enum=lindm.admin.v1.ResourceCompliance" json:"compliance,omitempty"`
 	// Server receive time of the latest successful native verification.
 	LastVerifiedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_verified_at,json=lastVerifiedAt,proto3" json:"last_verified_at,omitempty"`
 	// Device wall clock of that native observation; never used for scheduling.
@@ -732,7 +732,7 @@ func (x *ResourceState) GetReason() string {
 	return ""
 }
 
-func (x *ResourceState) GetLatestAction() *ServiceActionSummary {
+func (x *ResourceState) GetLatestAction() *ResourceActionSummary {
 	if x != nil {
 		return x.LatestAction
 	}
@@ -766,7 +766,7 @@ type DeviceResourceAction struct {
 	AssignmentId  string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
 	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
 	Ref           *v11.ResourceRef       `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
-	Action        *ServiceActionSummary  `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`
+	Action        *ResourceActionSummary `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -822,7 +822,7 @@ func (x *DeviceResourceAction) GetRef() *v11.ResourceRef {
 	return nil
 }
 
-func (x *DeviceResourceAction) GetAction() *ServiceActionSummary {
+func (x *DeviceResourceAction) GetAction() *ResourceActionSummary {
 	if x != nil {
 		return x.Action
 	}
@@ -1004,7 +1004,7 @@ var File_lindm_admin_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/agent/v1/service_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
+	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
 	"\x12ResourceAssignment\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1045,8 +1045,8 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"assignment\x18\x01 \x01(\v2\".lindm.admin.v1.ResourceAssignmentB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"assignment\"l\n" +
 	"\x1dGetDeviceResourceStateRequest\x12K\n" +
-	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\"\xe2\x04\n" +
-	"\x14ServiceActionSummary\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\"\xe3\x04\n" +
+	"\x15ResourceActionSummary\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12+\n" +
 	"\x11resource_sequence\x18\x02 \x01(\x04R\x10resourceSequence\x127\n" +
 	"\tissued_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\bissuedAt\x129\n" +
@@ -1061,7 +1061,7 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"attestedAt\x12;\n" +
 	"\vreceived_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"receivedAt\"\xa8\x04\n" +
+	"receivedAt\"\xa9\x04\n" +
 	"\rResourceState\x12\x1f\n" +
 	"\vresource_id\x18\x01 \x01(\tR\n" +
 	"resourceId\x12A\n" +
@@ -1069,20 +1069,20 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
 	"depends_on\x18\x03 \x03(\v2#.lindm.policy.v1.ResourceDependencyR\tdependsOn\x12E\n" +
 	"\vdisposition\x18\x04 \x01(\x0e2#.lindm.admin.v1.ResourceDispositionR\vdisposition\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\x12I\n" +
-	"\rlatest_action\x18\x06 \x01(\v2$.lindm.admin.v1.ServiceActionSummaryR\flatestAction\x12B\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12J\n" +
+	"\rlatest_action\x18\x06 \x01(\v2%.lindm.admin.v1.ResourceActionSummaryR\flatestAction\x12B\n" +
 	"\n" +
 	"compliance\x18\a \x01(\x0e2\".lindm.admin.v1.ResourceComplianceR\n" +
 	"compliance\x12D\n" +
 	"\x10last_verified_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\x0elastVerifiedAt\x12;\n" +
 	"\vobserved_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"observedAt\"\xcc\x01\n" +
+	"observedAt\"\xcd\x01\n" +
 	"\x14DeviceResourceAction\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\x120\n" +
-	"\x03ref\x18\x03 \x01(\v2\x1e.lindm.resource.v1.ResourceRefR\x03ref\x12<\n" +
-	"\x06action\x18\x04 \x01(\v2$.lindm.admin.v1.ServiceActionSummaryR\x06action\"\xab\x02\n" +
+	"\x03ref\x18\x03 \x01(\v2\x1e.lindm.resource.v1.ResourceRefR\x03ref\x12=\n" +
+	"\x06action\x18\x04 \x01(\v2%.lindm.admin.v1.ResourceActionSummaryR\x06action\"\xab\x02\n" +
 	"\x1eGetDeviceResourceStateResponse\x12B\n" +
 	"\n" +
 	"assignment\x18\x01 \x01(\v2\".lindm.admin.v1.ResourceAssignmentR\n" +
@@ -1139,7 +1139,7 @@ var file_lindm_admin_v1_assignments_proto_goTypes = []any{
 	(*ResourceAssignmentTarget)(nil),       // 4: lindm.admin.v1.ResourceAssignmentTarget
 	(*SetResourceAssignmentResponse)(nil),  // 5: lindm.admin.v1.SetResourceAssignmentResponse
 	(*GetDeviceResourceStateRequest)(nil),  // 6: lindm.admin.v1.GetDeviceResourceStateRequest
-	(*ServiceActionSummary)(nil),           // 7: lindm.admin.v1.ServiceActionSummary
+	(*ResourceActionSummary)(nil),          // 7: lindm.admin.v1.ResourceActionSummary
 	(*ResourceState)(nil),                  // 8: lindm.admin.v1.ResourceState
 	(*DeviceResourceAction)(nil),           // 9: lindm.admin.v1.DeviceResourceAction
 	(*GetDeviceResourceStateResponse)(nil), // 10: lindm.admin.v1.GetDeviceResourceStateResponse
@@ -1154,22 +1154,22 @@ var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	12, // 0: lindm.admin.v1.ResourceAssignment.assigned_at:type_name -> google.protobuf.Timestamp
 	4,  // 1: lindm.admin.v1.SetResourceAssignmentRequest.target:type_name -> lindm.admin.v1.ResourceAssignmentTarget
 	2,  // 2: lindm.admin.v1.SetResourceAssignmentResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
-	12, // 3: lindm.admin.v1.ServiceActionSummary.issued_at:type_name -> google.protobuf.Timestamp
-	12, // 4: lindm.admin.v1.ServiceActionSummary.expires_at:type_name -> google.protobuf.Timestamp
-	12, // 5: lindm.admin.v1.ServiceActionSummary.start_authorized_at:type_name -> google.protobuf.Timestamp
-	12, // 6: lindm.admin.v1.ServiceActionSummary.closed_at:type_name -> google.protobuf.Timestamp
-	13, // 7: lindm.admin.v1.ServiceActionSummary.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	12, // 8: lindm.admin.v1.ServiceActionSummary.attested_at:type_name -> google.protobuf.Timestamp
-	12, // 9: lindm.admin.v1.ServiceActionSummary.received_at:type_name -> google.protobuf.Timestamp
+	12, // 3: lindm.admin.v1.ResourceActionSummary.issued_at:type_name -> google.protobuf.Timestamp
+	12, // 4: lindm.admin.v1.ResourceActionSummary.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 5: lindm.admin.v1.ResourceActionSummary.start_authorized_at:type_name -> google.protobuf.Timestamp
+	12, // 6: lindm.admin.v1.ResourceActionSummary.closed_at:type_name -> google.protobuf.Timestamp
+	13, // 7: lindm.admin.v1.ResourceActionSummary.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	12, // 8: lindm.admin.v1.ResourceActionSummary.attested_at:type_name -> google.protobuf.Timestamp
+	12, // 9: lindm.admin.v1.ResourceActionSummary.received_at:type_name -> google.protobuf.Timestamp
 	14, // 10: lindm.admin.v1.ResourceState.desired:type_name -> lindm.resource.v1.ResourceDesiredState
 	15, // 11: lindm.admin.v1.ResourceState.depends_on:type_name -> lindm.policy.v1.ResourceDependency
 	0,  // 12: lindm.admin.v1.ResourceState.disposition:type_name -> lindm.admin.v1.ResourceDisposition
-	7,  // 13: lindm.admin.v1.ResourceState.latest_action:type_name -> lindm.admin.v1.ServiceActionSummary
+	7,  // 13: lindm.admin.v1.ResourceState.latest_action:type_name -> lindm.admin.v1.ResourceActionSummary
 	1,  // 14: lindm.admin.v1.ResourceState.compliance:type_name -> lindm.admin.v1.ResourceCompliance
 	12, // 15: lindm.admin.v1.ResourceState.last_verified_at:type_name -> google.protobuf.Timestamp
 	12, // 16: lindm.admin.v1.ResourceState.observed_at:type_name -> google.protobuf.Timestamp
 	16, // 17: lindm.admin.v1.DeviceResourceAction.ref:type_name -> lindm.resource.v1.ResourceRef
-	7,  // 18: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ServiceActionSummary
+	7,  // 18: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ResourceActionSummary
 	2,  // 19: lindm.admin.v1.GetDeviceResourceStateResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
 	8,  // 20: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
 	9,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction

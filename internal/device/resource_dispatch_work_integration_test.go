@@ -54,7 +54,7 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(changed))
 	dispatchError(t, err, connect.CodeAlreadyExists, "idempotency_conflict")
 	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(nil)))
-	dispatchError(t, err, connect.CodeAborted, "service_assignment_conflict")
+	dispatchError(t, err, connect.CodeAborted, "resource_assignment_conflict")
 	unknown := f.assignmentRequest(nil)
 	unknown.DeviceId = uuid.NewString()
 	_, err = f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(unknown))
@@ -142,7 +142,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	challenge := f.challenge(t, work)
 	challenge.IntentSha256 = make([]byte, sha256.Size)
 	_, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, challenge, f.key)}))
-	dispatchError(t, err, connect.CodePermissionDenied, "service_challenge_binding_rejected")
+	dispatchError(t, err, connect.CodePermissionDenied, "resource_challenge_binding_rejected")
 	for _, change := range []func(*agentv1.ResourceExecutionChallenge){
 		func(c *agentv1.ResourceExecutionChallenge) { c.Ref.CanonicalKey = "different.service" },
 		func(c *agentv1.ResourceExecutionChallenge) {
@@ -152,7 +152,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 		mismatch := f.challenge(t, work)
 		change(mismatch)
 		_, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, mismatch, f.key)}))
-		dispatchError(t, err, connect.CodePermissionDenied, "service_challenge_binding_rejected")
+		dispatchError(t, err, connect.CodePermissionDenied, "resource_challenge_binding_rejected")
 	}
 	startRequest, grant := f.start(t, work)
 	replay, err := f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(startRequest))
@@ -161,7 +161,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	}
 	other := f.challenge(t, work)
 	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, other, f.key)}))
-	dispatchError(t, err, connect.CodeAlreadyExists, "service_start_conflict")
+	dispatchError(t, err, connect.CodeAlreadyExists, "resource_start_conflict")
 	running := f.result(t, work, 2, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
 	admitted, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(running))
 	if err != nil || admitted.Msg.GetClosed() {
@@ -173,7 +173,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	}
 	consumed := f.result(t, work, 3, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
 	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(consumed))
-	dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
+	dispatchError(t, err, connect.CodePermissionDenied, "resource_result_nonce_rejected")
 	state, err := f.service.GetDeviceResourceState(f.adminCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 	for _, revision := range []uint64{1, 2} {
 		stale := f.result(t, work, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING, true)
 		_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(stale))
-		dispatchError(t, err, connect.CodeAlreadyExists, "service_result_conflict")
+		dispatchError(t, err, connect.CodeAlreadyExists, "resource_result_conflict")
 	}
 	success := f.result(t, work, 3, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED, true)
 	admitted, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(success))

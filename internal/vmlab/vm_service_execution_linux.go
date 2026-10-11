@@ -44,8 +44,8 @@ type vmServiceExecutionEvidence struct {
 	RunningCrashReconciled    bool                               `json:"running_crash_reconciled"`
 	// These signatures authenticate terminal history, not a fresh observation
 	// or a current authorization/compliance decision.
-	Attestations []vmServiceAttestationPhase   `json:"authenticated_history_attestations"`
-	ClockChecks  []*labv1.ServiceClockEvidence `json:"clock_checks"`
+	Attestations []vmServiceAttestationPhase    `json:"authenticated_history_attestations"`
+	ClockChecks  []*labv1.ResourceClockEvidence `json:"clock_checks"`
 
 	packages *nativeGuestPackages
 	verifier *devlab.ExecutionTrustExercise
@@ -74,7 +74,7 @@ type vmPreparedService struct {
 	envelope []byte
 	prepared *agentv1.PrepareResourceExecutionResponse
 	start    *agentv1.StartResourceExecutionRequest
-	clock    *labv1.ServiceClockEvidence
+	clock    *labv1.ResourceClockEvidence
 }
 
 const signedServiceDefinition = `[Unit]
@@ -423,7 +423,7 @@ func vmPrepareService(ctx context.Context, packages *nativeGuestPackages, signer
 	if err != nil {
 		return nil, err
 	}
-	result.clock = &labv1.ServiceClockEvidence{HostBefore: timestamppb.New(hostBefore), HostAfter: timestamppb.New(hostAfter), Challenge: proto.CloneOf(start.GetChallenge())}
+	result.clock = &labv1.ResourceClockEvidence{HostBefore: timestamppb.New(hostBefore), HostAfter: timestamppb.New(hostAfter), Challenge: proto.CloneOf(start.GetChallenge())}
 	result.start = &agentv1.StartResourceExecutionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}
 	return result, nil
 }

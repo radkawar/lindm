@@ -438,7 +438,7 @@ func (s *Service) mintLocalAdminAction(ctx context.Context, principal devicePrin
 	if count >= 262144 {
 		return false, nil
 	}
-	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: 1, CanonicalKey: "device.actions"})
+	sequence, err := q.NextResourceSequence(ctx, devicedb.NextResourceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: 1, CanonicalKey: "device.actions"})
 	if err != nil {
 		return false, mapErr(err)
 	}

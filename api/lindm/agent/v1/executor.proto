@@ -11,7 +11,7 @@ import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/inventory_refresh.proto";
 import "lindm/agent/v1/offline_enrollment.proto";
 import "lindm/agent/v1/recovery_readiness.proto";
-import "lindm/agent/v1/service_execution.proto";
+import "lindm/agent/v1/resource_execution.proto";
 import "lindm/agent/v1/update.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";

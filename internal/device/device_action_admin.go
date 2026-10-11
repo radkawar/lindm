@@ -186,7 +186,7 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 	if count >= 262144 {
 		return nil, rpcreason.Error(connect.CodeResourceExhausted, "device_action_capacity")
 	}
-	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: generationID, ResourceKind: 1, CanonicalKey: "device.actions"})
+	sequence, err := q.NextResourceSequence(ctx, devicedb.NextResourceSequenceParams{GenerationID: generationID, ResourceKind: 1, CanonicalKey: "device.actions"})
 	if err != nil {
 		return nil, mapErr(err)
 	}

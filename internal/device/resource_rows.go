@@ -52,11 +52,11 @@ func insertResourceRows(ctx context.Context, q *devicedb.Queries, assignment uui
 			dependencies[i] = id
 		}
 		id := ids[resourceRefKey(ref)]
-		if err := q.InsertServiceResource(ctx, devicedb.InsertServiceResourceParams{AssignmentID: assignment, ResourceID: id, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Position: int32(position), Document: encoded, DependsOn: dependencies, VerificationMaxAgeSeconds: int32(item.GetVerification().GetMaxAgeSeconds())}); err != nil {
+		if err := q.InsertAssignmentResource(ctx, devicedb.InsertAssignmentResourceParams{AssignmentID: assignment, ResourceID: id, ResourceKind: int16(ref.GetKind()), CanonicalKey: ref.GetCanonicalKey(), Position: int32(position), Document: encoded, DependsOn: dependencies, VerificationMaxAgeSeconds: int32(item.GetVerification().GetMaxAgeSeconds())}); err != nil {
 			return err
 		}
 		if reason := resourceDispatchUnsupported(item); reason != "" {
-			if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: 6, Reason: reason}); err != nil {
+			if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: 6, Reason: reason}); err != nil {
 				return err
 			}
 		}

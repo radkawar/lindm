@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: lindm/device/v1/service_dispatch.proto
+// source: lindm/device/v1/resource_dispatch.proto
 
 package devicev1
 
@@ -49,7 +49,7 @@ type ResourceWork struct {
 
 func (x *ResourceWork) Reset() {
 	*x = ResourceWork{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[0]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -61,7 +61,7 @@ func (x *ResourceWork) String() string {
 func (*ResourceWork) ProtoMessage() {}
 
 func (x *ResourceWork) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[0]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -74,7 +74,7 @@ func (x *ResourceWork) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceWork.ProtoReflect.Descriptor instead.
 func (*ResourceWork) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{0}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ResourceWork) GetActionId() string {
@@ -135,7 +135,7 @@ type GetResourceWorkRequest struct {
 
 func (x *GetResourceWorkRequest) Reset() {
 	*x = GetResourceWorkRequest{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -147,7 +147,7 @@ func (x *GetResourceWorkRequest) String() string {
 func (*GetResourceWorkRequest) ProtoMessage() {}
 
 func (x *GetResourceWorkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[1]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -160,7 +160,7 @@ func (x *GetResourceWorkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceWorkRequest.ProtoReflect.Descriptor instead.
 func (*GetResourceWorkRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{1}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetResourceWorkRequest) GetSessionEpoch() uint64 {
@@ -180,7 +180,7 @@ type GetResourceWorkResponse struct {
 
 func (x *GetResourceWorkResponse) Reset() {
 	*x = GetResourceWorkResponse{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -192,7 +192,7 @@ func (x *GetResourceWorkResponse) String() string {
 func (*GetResourceWorkResponse) ProtoMessage() {}
 
 func (x *GetResourceWorkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[2]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -205,7 +205,7 @@ func (x *GetResourceWorkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceWorkResponse.ProtoReflect.Descriptor instead.
 func (*GetResourceWorkResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{2}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetResourceWorkResponse) GetWork() *ResourceWork {
@@ -227,7 +227,7 @@ type AuthorizeResourceStartRequest struct {
 
 func (x *AuthorizeResourceStartRequest) Reset() {
 	*x = AuthorizeResourceStartRequest{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +239,7 @@ func (x *AuthorizeResourceStartRequest) String() string {
 func (*AuthorizeResourceStartRequest) ProtoMessage() {}
 
 func (x *AuthorizeResourceStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[3]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +252,7 @@ func (x *AuthorizeResourceStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeResourceStartRequest.ProtoReflect.Descriptor instead.
 func (*AuthorizeResourceStartRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{3}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AuthorizeResourceStartRequest) GetSessionEpoch() uint64 {
@@ -287,7 +287,7 @@ type AuthorizeResourceStartResponse struct {
 
 func (x *AuthorizeResourceStartResponse) Reset() {
 	*x = AuthorizeResourceStartResponse{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[4]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -299,7 +299,7 @@ func (x *AuthorizeResourceStartResponse) String() string {
 func (*AuthorizeResourceStartResponse) ProtoMessage() {}
 
 func (x *AuthorizeResourceStartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[4]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -312,7 +312,7 @@ func (x *AuthorizeResourceStartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeResourceStartResponse.ProtoReflect.Descriptor instead.
 func (*AuthorizeResourceStartResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{4}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AuthorizeResourceStartResponse) GetStartGrantEnvelope() []byte {
@@ -337,7 +337,7 @@ type ReportResourceResultRequest struct {
 
 func (x *ReportResourceResultRequest) Reset() {
 	*x = ReportResourceResultRequest{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[5]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -349,7 +349,7 @@ func (x *ReportResourceResultRequest) String() string {
 func (*ReportResourceResultRequest) ProtoMessage() {}
 
 func (x *ReportResourceResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[5]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -362,7 +362,7 @@ func (x *ReportResourceResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportResourceResultRequest.ProtoReflect.Descriptor instead.
 func (*ReportResourceResultRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{5}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ReportResourceResultRequest) GetSessionEpoch() uint64 {
@@ -410,7 +410,7 @@ type ResourcePreparationCancellation struct {
 
 func (x *ResourcePreparationCancellation) Reset() {
 	*x = ResourcePreparationCancellation{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -422,7 +422,7 @@ func (x *ResourcePreparationCancellation) String() string {
 func (*ResourcePreparationCancellation) ProtoMessage() {}
 
 func (x *ResourcePreparationCancellation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[6]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -435,7 +435,7 @@ func (x *ResourcePreparationCancellation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourcePreparationCancellation.ProtoReflect.Descriptor instead.
 func (*ResourcePreparationCancellation) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{6}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ResourcePreparationCancellation) GetIntentSha256() []byte {
@@ -462,7 +462,7 @@ type ReportResourceResultResponse struct {
 
 func (x *ReportResourceResultResponse) Reset() {
 	*x = ReportResourceResultResponse{}
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[7]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -474,7 +474,7 @@ func (x *ReportResourceResultResponse) String() string {
 func (*ReportResourceResultResponse) ProtoMessage() {}
 
 func (x *ReportResourceResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_device_v1_service_dispatch_proto_msgTypes[7]
+	mi := &file_lindm_device_v1_resource_dispatch_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -487,7 +487,7 @@ func (x *ReportResourceResultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportResourceResultResponse.ProtoReflect.Descriptor instead.
 func (*ReportResourceResultResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_device_v1_service_dispatch_proto_rawDescGZIP(), []int{7}
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ReportResourceResultResponse) GetClosed() bool {
@@ -497,11 +497,11 @@ func (x *ReportResourceResultResponse) GetClosed() bool {
 	return false
 }
 
-var File_lindm_device_v1_service_dispatch_proto protoreflect.FileDescriptor
+var File_lindm_device_v1_resource_dispatch_proto protoreflect.FileDescriptor
 
-const file_lindm_device_v1_service_dispatch_proto_rawDesc = "" +
+const file_lindm_device_v1_resource_dispatch_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/device/v1/service_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbc\x04\n" +
+	"'lindm/device/v1/resource_dispatch.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbc\x04\n" +
 	"\fResourceWork\x12%\n" +
 	"\taction_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bactionId\x124\n" +
 	"\x0fintent_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\bR\x0eintentEnvelope\x12;\n" +
@@ -535,19 +535,19 @@ const file_lindm_device_v1_service_dispatch_proto_rawDesc = "" +
 	"\x06closed\x18\x01 \x01(\bR\x06closedB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
-	file_lindm_device_v1_service_dispatch_proto_rawDescOnce sync.Once
-	file_lindm_device_v1_service_dispatch_proto_rawDescData []byte
+	file_lindm_device_v1_resource_dispatch_proto_rawDescOnce sync.Once
+	file_lindm_device_v1_resource_dispatch_proto_rawDescData []byte
 )
 
-func file_lindm_device_v1_service_dispatch_proto_rawDescGZIP() []byte {
-	file_lindm_device_v1_service_dispatch_proto_rawDescOnce.Do(func() {
-		file_lindm_device_v1_service_dispatch_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_lindm_device_v1_service_dispatch_proto_rawDesc), len(file_lindm_device_v1_service_dispatch_proto_rawDesc)))
+func file_lindm_device_v1_resource_dispatch_proto_rawDescGZIP() []byte {
+	file_lindm_device_v1_resource_dispatch_proto_rawDescOnce.Do(func() {
+		file_lindm_device_v1_resource_dispatch_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_lindm_device_v1_resource_dispatch_proto_rawDesc), len(file_lindm_device_v1_resource_dispatch_proto_rawDesc)))
 	})
-	return file_lindm_device_v1_service_dispatch_proto_rawDescData
+	return file_lindm_device_v1_resource_dispatch_proto_rawDescData
 }
 
-var file_lindm_device_v1_service_dispatch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_lindm_device_v1_service_dispatch_proto_goTypes = []any{
+var file_lindm_device_v1_resource_dispatch_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_lindm_device_v1_resource_dispatch_proto_goTypes = []any{
 	(*ResourceWork)(nil),                    // 0: lindm.device.v1.ResourceWork
 	(*GetResourceWorkRequest)(nil),          // 1: lindm.device.v1.GetResourceWorkRequest
 	(*GetResourceWorkResponse)(nil),         // 2: lindm.device.v1.GetResourceWorkResponse
@@ -558,7 +558,7 @@ var file_lindm_device_v1_service_dispatch_proto_goTypes = []any{
 	(*ReportResourceResultResponse)(nil),    // 7: lindm.device.v1.ReportResourceResultResponse
 	(*timestamppb.Timestamp)(nil),           // 8: google.protobuf.Timestamp
 }
-var file_lindm_device_v1_service_dispatch_proto_depIdxs = []int32{
+var file_lindm_device_v1_resource_dispatch_proto_depIdxs = []int32{
 	8, // 0: lindm.device.v1.ResourceWork.result_nonce_expires_at:type_name -> google.protobuf.Timestamp
 	0, // 1: lindm.device.v1.GetResourceWorkResponse.work:type_name -> lindm.device.v1.ResourceWork
 	6, // 2: lindm.device.v1.ReportResourceResultRequest.never_prepared:type_name -> lindm.device.v1.ResourcePreparationCancellation
@@ -569,26 +569,26 @@ var file_lindm_device_v1_service_dispatch_proto_depIdxs = []int32{
 	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_lindm_device_v1_service_dispatch_proto_init() }
-func file_lindm_device_v1_service_dispatch_proto_init() {
-	if File_lindm_device_v1_service_dispatch_proto != nil {
+func init() { file_lindm_device_v1_resource_dispatch_proto_init() }
+func file_lindm_device_v1_resource_dispatch_proto_init() {
+	if File_lindm_device_v1_resource_dispatch_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_service_dispatch_proto_rawDesc), len(file_lindm_device_v1_service_dispatch_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_resource_dispatch_proto_rawDesc), len(file_lindm_device_v1_resource_dispatch_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_lindm_device_v1_service_dispatch_proto_goTypes,
-		DependencyIndexes: file_lindm_device_v1_service_dispatch_proto_depIdxs,
-		MessageInfos:      file_lindm_device_v1_service_dispatch_proto_msgTypes,
+		GoTypes:           file_lindm_device_v1_resource_dispatch_proto_goTypes,
+		DependencyIndexes: file_lindm_device_v1_resource_dispatch_proto_depIdxs,
+		MessageInfos:      file_lindm_device_v1_resource_dispatch_proto_msgTypes,
 	}.Build()
-	File_lindm_device_v1_service_dispatch_proto = out.File
-	file_lindm_device_v1_service_dispatch_proto_goTypes = nil
-	file_lindm_device_v1_service_dispatch_proto_depIdxs = nil
+	File_lindm_device_v1_resource_dispatch_proto = out.File
+	file_lindm_device_v1_resource_dispatch_proto_goTypes = nil
+	file_lindm_device_v1_resource_dispatch_proto_depIdxs = nil
 }

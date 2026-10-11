@@ -48,7 +48,7 @@ func (s *Service) GetResourceWork(ctx context.Context, req *connect.Request[devi
 	}
 	if choice != nil {
 		if s.identity == nil {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_authorization_unavailable")
+			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "resource_authorization_unavailable")
 		}
 		approval, authorizationErr := s.identity.AuthorizeFresh(ctx, choice.ActorID, identity.PermissionAssignResources)
 		if authorizationErr != nil && !assignmentAuthorizationDenied(authorizationErr) {
@@ -73,7 +73,7 @@ func (s *Service) resourceWorkIdle(ctx context.Context, principal devicePrincipa
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := devicedb.New(tx)
-	pending, err := q.HasServiceWork(ctx, devicedb.HasServiceWorkParams{GenerationID: principal.GenerationID, DeviceID: principal.DeviceID})
+	pending, err := q.HasResourceWork(ctx, devicedb.HasResourceWorkParams{GenerationID: principal.GenerationID, DeviceID: principal.DeviceID})
 	if err != nil {
 		return false, err
 	}
@@ -156,11 +156,11 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 			authorizationErr = identity.ErrAuthorizationDenied
 		}
 	}
-	head, headErr := q.LockServiceAssignment(ctx, principal.GenerationID)
+	head, headErr := q.LockResourceAssignment(ctx, principal.GenerationID)
 	if headErr != nil && !errors.Is(headErr, pgx.ErrNoRows) {
 		return nil, nil, headErr
 	}
-	action, actionErr := q.GetOpenServiceAction(ctx, principal.DeviceID)
+	action, actionErr := q.GetOpenResourceAction(ctx, principal.DeviceID)
 	if actionErr != nil && !errors.Is(actionErr, pgx.ErrNoRows) {
 		return nil, nil, actionErr
 	}
@@ -220,7 +220,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		// Issued start authority may have caused an effect. Expiry, reassignment and
 		// actor revocation never manufacture a replacement for an unreported effect.
 		if action.GenerationID != principal.GenerationID {
-			return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "service_action_generation_pending")
+			return nil, nil, rpcreason.Error(connect.CodeFailedPrecondition, "resource_action_generation_pending")
 		}
 		work, err := issueResourceNonce(ctx, q, action, now)
 		if err != nil {
@@ -244,7 +244,7 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 	if !eligible {
 		return nil, nil, tx.Commit(ctx)
 	}
-	resources, err := q.ListServiceResources(ctx, head.ID)
+	resources, err := q.ListAssignmentResources(ctx, head.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -272,10 +272,10 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, &head, nil
 	}
 	if choice.ID != head.ID {
-		return nil, nil, rpcreason.Error(connect.CodeAborted, "service_assignment_conflict")
+		return nil, nil, rpcreason.Error(connect.CodeAborted, "resource_assignment_conflict")
 	}
 	if authorizationErr != nil || approval.Version() != uint64(head.AuthorizationVersion) {
-		if err := q.BlockServiceAssignment(ctx, devicedb.BlockServiceAssignmentParams{ID: head.ID, BlockedReason: "assignment_authority_changed"}); err != nil {
+		if err := q.BlockResourceAssignment(ctx, devicedb.BlockResourceAssignmentParams{ID: head.ID, BlockedReason: "assignment_authority_changed"}); err != nil {
 			return nil, nil, err
 		}
 		return nil, nil, tx.Commit(ctx)
@@ -301,19 +301,19 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, nil, tx.Commit(ctx)
 	}
 	if reason != "" {
-		if err := q.BlockServiceAssignment(ctx, devicedb.BlockServiceAssignmentParams{ID: head.ID, BlockedReason: reason}); err != nil {
+		if err := q.BlockResourceAssignment(ctx, devicedb.BlockResourceAssignmentParams{ID: head.ID, BlockedReason: reason}); err != nil {
 			return nil, nil, err
 		}
 		return nil, nil, tx.Commit(ctx)
 	}
-	capacity, err := q.ServiceDispatchCapacity(ctx, principal.GenerationID)
+	capacity, err := q.ResourceDispatchCapacity(ctx, principal.GenerationID)
 	if err != nil {
 		return nil, nil, err
 	}
 	if capacity.Actions >= 262144 {
-		return nil, nil, rpcreason.Error(connect.CodeResourceExhausted, "service_action_capacity")
+		return nil, nil, rpcreason.Error(connect.CodeResourceExhausted, "resource_action_capacity")
 	}
-	sequence, err := q.NextServiceSequence(ctx, devicedb.NextServiceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: int16(candidate.GetDesired().GetRef().GetKind()), CanonicalKey: candidate.GetDesired().GetRef().GetCanonicalKey()})
+	sequence, err := q.NextResourceSequence(ctx, devicedb.NextResourceSequenceParams{GenerationID: principal.GenerationID, ResourceKind: int16(candidate.GetDesired().GetRef().GetKind()), CanonicalKey: candidate.GetDesired().GetRef().GetCanonicalKey()})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,23 +354,23 @@ func (s *Service) getResourceWork(ctx context.Context, principal devicePrincipal
 		return nil, nil, err
 	}
 	resourceID, _ := uuid.Parse(candidate.GetResourceId())
-	if err := q.InsertServiceAction(ctx, devicedb.InsertServiceActionParams{ID: id, DeviceID: principal.DeviceID, GenerationID: principal.GenerationID, AssignmentID: source.ID, ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(expires)}); err != nil {
+	if err := q.InsertResourceAction(ctx, devicedb.InsertResourceActionParams{ID: id, DeviceID: principal.DeviceID, GenerationID: principal.GenerationID, AssignmentID: source.ID, ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(expires)}); err != nil {
 		return nil, nil, err
 	}
 	if release != nil {
 		if err := q.BindResourceReleaseAction(ctx, devicedb.BindResourceReleaseActionParams{ID: id, ReleaseID: &release.ID}); err != nil {
 			return nil, nil, err
 		}
-	} else if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: head.ID, ResourceID: resourceID, Disposition: 2}); err != nil {
+	} else if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: head.ID, ResourceID: resourceID, Disposition: 2}); err != nil {
 		return nil, nil, err
 	}
 	if err := storeResourceSecrets(ctx, q, &head.ActorID, id, secrets); err != nil {
 		return nil, nil, err
 	}
-	if err := dispatchAudit(ctx, q, &head.ActorID, "service_action.mint", id, "service_assignment"); err != nil {
+	if err := dispatchAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
-	action, err = q.LockServiceAction(ctx, id)
+	action, err = q.LockResourceAction(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -452,7 +452,7 @@ func closeUnstartedResourceAction(ctx context.Context, q *devicedb.Queries, acti
 		}
 		reason, disposition = action.ClosedReason, 2
 	} else {
-		if err := q.CloseServiceAction(ctx, devicedb.CloseServiceActionParams{ID: action.ID, ClosedAt: timestamptz(now), ClosedReason: reason}); err != nil {
+		if err := q.CloseResourceAction(ctx, devicedb.CloseResourceActionParams{ID: action.ID, ClosedAt: timestamptz(now), ClosedReason: reason}); err != nil {
 			return err
 		}
 		action.ClosedAt, action.ClosedReason = timestamptz(now), reason
@@ -460,7 +460,7 @@ func closeUnstartedResourceAction(ctx context.Context, q *devicedb.Queries, acti
 	if action.ReleaseID != nil {
 		return nil
 	}
-	return q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason})
+	return q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason})
 }
 
 func issueResourceNonce(ctx context.Context, q *devicedb.Queries, action devicedb.ResourceAction, now time.Time) (*devicev1.ResourceWork, error) {
@@ -474,14 +474,14 @@ func issueResourceNonce(ctx context.Context, q *devicedb.Queries, action deviced
 		return nil, err
 	}
 	expires := now.Add(time.Minute)
-	if err := q.SetServiceNonce(ctx, devicedb.SetServiceNonceParams{ID: action.ID, ResultNonce: nonce[:], NonceExpiresAt: timestamptz(expires)}); err != nil {
+	if err := q.SetResourceNonce(ctx, devicedb.SetResourceNonceParams{ID: action.ID, ResultNonce: nonce[:], NonceExpiresAt: timestamptz(expires)}); err != nil {
 		return nil, err
 	}
 	return &devicev1.ResourceWork{ActionId: action.ID.String(), IntentEnvelope: action.IntentEnvelope, StartGrantEnvelope: action.StartGrantEnvelope, ResultNonce: nonce[:], ResultNonceExpiresAt: timestamppb.New(expires), CancelPreparation: !action.ClosedAt.Valid && action.ClosedReason != "", SealedSecrets: sealed}, nil
 }
 
 func dispatchClock(ctx context.Context, q *devicedb.Queries) (time.Time, error) {
-	stamp, err := q.ServiceDispatchClock(ctx)
+	stamp, err := q.ResourceDispatchClock(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}

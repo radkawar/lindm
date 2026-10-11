@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -293,5 +295,26 @@ func TestQuarantineSetKeyAcceptsBothNativeJSONForms(t *testing.T) {
 		if !tc.valid && !errors.Is(err, ErrConflict) {
 			t.Fatalf("%s: foreign set key accepted: %v", tc.name, err)
 		}
+	}
+}
+
+// cryptsetup's invalid-LUKS refusal surfaces as *nativeexec.ExitError; the
+// zero-wipe proof must still recognise it rather than always failing closed.
+func TestVerifyNotLUKSAcceptsNativeexecRefusal(t *testing.T) {
+	_, exitErr := nativeexec.Run(t.Context(), nativeexec.Command{Path: "/usr/bin/sh", Args: []string{"-c", "exit 1"}, Timeout: 5 * time.Second, StdoutLimit: 1, StderrLimit: 1})
+	var exit *nativeexec.ExitError
+	if !errors.As(exitErr, &exit) {
+		t.Fatalf("fixture exit: %v", exitErr)
+	}
+	p := &Provider{run: func(context.Context, nativeRequest) ([]byte, error) {
+		return nil, fmt.Errorf("native %d failed: %w", cryptsetup, errors.Join(errNativeNotLUKS, exitErr))
+	}}
+	file, err := os.CreateTemp(t.TempDir(), "zeroed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if err := p.verifyNotLUKS(t.Context(), file); err != nil {
+		t.Fatalf("invalid-LUKS refusal not recognised: %v", err)
 	}
 }

@@ -155,12 +155,12 @@ func TestDispatchRejectsChangedStartGrant(t *testing.T) {
 
 func TestDispatchPreservesNonretryableReportError(t *testing.T) {
 	f := newReplayFixture(t)
-	f.reportFailure = replayRPCError(connect.CodePermissionDenied, "service_result_rejected")
+	f.reportFailure = replayRPCError(connect.CodePermissionDenied, "resource_result_rejected")
 	if err := f.r.dispatch(t.Context(), f.d); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("real rejection was reinterpreted: %v", err)
 	}
 	metrics := f.r.metrics.snapshot(false)["ReportResourceResult"]
-	if metrics.NonRetryableErrors != 1 || metrics.Reasons["service_result_rejected"] != 1 || f.r.completed.Load() != 0 || f.d.pending == nil {
+	if metrics.NonRetryableErrors != 1 || metrics.Reasons["resource_result_rejected"] != 1 || f.r.completed.Load() != 0 || f.d.pending == nil {
 		t.Fatal("real rejection or pending history was lost")
 	}
 }
@@ -330,7 +330,7 @@ func (f *replayFixture) AuthorizeResourceStart(ctx context.Context, req *connect
 		return nil, err
 	}
 	if len(f.challengeProof) != 0 && !bytes.Equal(f.challengeProof, req.Msg.GetChallengeProof()) {
-		return nil, replayRPCError(connect.CodeAlreadyExists, "service_start_conflict")
+		return nil, replayRPCError(connect.CodeAlreadyExists, "resource_start_conflict")
 	}
 	f.challengeProof = bytes.Clone(req.Msg.GetChallengeProof())
 	if f.authorizations == 1 && f.startFailure != nil && !f.loseStart {
@@ -359,7 +359,7 @@ func (f *replayFixture) ReportResourceResult(ctx context.Context, req *connect.R
 		return nil, f.reportFailure
 	}
 	if !time.Now().Before(f.work.GetResultNonceExpiresAt().AsTime()) {
-		return nil, replayRPCError(connect.CodePermissionDenied, "service_result_nonce_rejected")
+		return nil, replayRPCError(connect.CodePermissionDenied, "resource_result_nonce_rejected")
 	}
 	binding := &trust.ResourceAttestationBinding{DeploymentID: uuid.MustParse(f.intent.GetDeploymentId()), DeviceID: uuid.MustParse(f.d.id), EnrollmentGeneration: uuid.MustParse(f.d.generation), SessionEpoch: f.d.epoch, ActionID: uuid.MustParse(f.work.GetActionId()), IntentSHA256: sha256.Sum256(f.work.GetIntentEnvelope())}
 	copy(binding.Nonce[:], f.work.GetResultNonce())

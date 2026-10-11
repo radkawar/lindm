@@ -126,7 +126,7 @@ persists a generation-bound action/digest denial tombstone, returning
 Late preparation cannot bypass that tombstone. Queued or running effects cannot be
 canceled through this preparation-only API, and `RUNNING` recovery is read-only.
 
-The wire contract is in `api/lindm/agent/v1/service_execution.proto`; executor
+The wire contract is in `api/lindm/agent/v1/resource_execution.proto`; executor
 admission/polling is in `internal/agent/executor/resource_preparation.go`; durable
 fences and reservations are in `internal/agent/journal/resource_actions_linux.go`
 and `resource_preparation_linux.go`. Their deterministic regression tests cover

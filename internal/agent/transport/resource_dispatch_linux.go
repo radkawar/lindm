@@ -16,24 +16,24 @@ import (
 )
 
 const (
-	serviceActionsPerCycle = 4
-	serviceDispatchTimeout = 2 * time.Minute
-	servicePollTimeout     = 10 * time.Second
-	servicePollInterval    = 500 * time.Millisecond
+	resourceActionsPerCycle = 4
+	resourceDispatchTimeout = 2 * time.Minute
+	resourcePollTimeout     = 10 * time.Second
+	resourcePollInterval    = 500 * time.Millisecond
 )
 
 // dispatchServices relays exact signed bytes, not execution authority. Only the
 // executor can consume a grant and only the server can close an action. Neither
 // queue acceptance nor a historical signed result implies live compliance.
 func (m *managementLoop) dispatchServices(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, serviceDispatchTimeout)
+	ctx, cancel := context.WithTimeout(ctx, resourceDispatchTimeout)
 	defer cancel()
-	for range serviceActionsPerCycle {
-		work, err := m.serviceWork(ctx)
+	for range resourceActionsPerCycle {
+		work, err := m.resourceWork(ctx)
 		if err != nil || work == nil {
 			return err
 		}
-		closed, err := m.relayServiceAction(ctx, work)
+		closed, err := m.relayResourceAction(ctx, work)
 		if err != nil {
 			return fmt.Errorf("relay service action %s: %w", work.GetActionId(), err)
 		}
@@ -44,7 +44,7 @@ func (m *managementLoop) dispatchServices(ctx context.Context) error {
 	return nil
 }
 
-func (m *managementLoop) serviceWork(ctx context.Context) (*devicev1.ResourceWork, error) {
+func (m *managementLoop) resourceWork(ctx context.Context) (*devicev1.ResourceWork, error) {
 	authority, err := establish(ctx, m.executor, &m.cache, m.gate)
 	if err != nil {
 		return nil, fmt.Errorf("establish service work session: %w", err)
@@ -59,7 +59,7 @@ func (m *managementLoop) serviceWork(ctx context.Context) (*devicev1.ResourceWor
 	return response.GetWork(), nil
 }
 
-func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.ResourceWork) (bool, error) {
+func (m *managementLoop) relayResourceAction(ctx context.Context, work *devicev1.ResourceWork) (bool, error) {
 	if work.GetCancelPreparation() {
 		return m.reportResourceResult(ctx, work)
 	}
@@ -70,7 +70,7 @@ func (m *managementLoop) relayServiceAction(ctx context.Context, work *devicev1.
 		// existing/expired action may now be history. Lookup never consumes a
 		// new effect and must not invent another action or fresh challenge.
 		var err error
-		status, err = m.serviceStatus(ctx, work.GetActionId(), digest)
+		status, err = m.resourceStatus(ctx, work.GetActionId(), digest)
 		if err != nil {
 			return false, errors.Join(phaseErr, err)
 		}
@@ -97,7 +97,7 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 		return nil, fmt.Errorf("prepare service execution: %w", err)
 	}
 	status := prepared.GetStatus()
-	if err := checkServiceStatus(status, work.GetActionId(), digest); err != nil {
+	if err := checkResourceStatus(status, work.GetActionId(), digest); err != nil {
 		return nil, err
 	}
 	if status.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED {
@@ -132,7 +132,7 @@ func (m *managementLoop) prepareAndStartService(ctx context.Context, work *devic
 	if err != nil {
 		return nil, fmt.Errorf("start service execution: %w", err)
 	}
-	if err := checkServiceStatus(started.GetStatus(), work.GetActionId(), digest); err != nil {
+	if err := checkResourceStatus(started.GetStatus(), work.GetActionId(), digest); err != nil {
 		return nil, err
 	}
 	return started.GetStatus(), nil
@@ -149,14 +149,14 @@ func (m *managementLoop) cancelResourcePreparation(ctx context.Context, work *de
 		return nil, fmt.Errorf("invalid preparation cancellation: %w", err)
 	}
 	if response.GetStatus() != nil {
-		if err := checkServiceStatus(response.GetStatus(), work.GetActionId(), digest); err != nil {
+		if err := checkResourceStatus(response.GetStatus(), work.GetActionId(), digest); err != nil {
 			return nil, err
 		}
 	}
 	return response, nil
 }
 
-func checkServiceStatus(status *agentv1.ResourceExecutionStatus, actionID string, digest [sha256.Size]byte) error {
+func checkResourceStatus(status *agentv1.ResourceExecutionStatus, actionID string, digest [sha256.Size]byte) error {
 	if err := validateManagementMessage(status); err != nil {
 		return fmt.Errorf("invalid protected service status: %w", err)
 	}
@@ -166,33 +166,33 @@ func checkServiceStatus(status *agentv1.ResourceExecutionStatus, actionID string
 	return nil
 }
 
-func (m *managementLoop) serviceStatus(ctx context.Context, actionID string, digest [sha256.Size]byte) (*agentv1.ResourceExecutionStatus, error) {
+func (m *managementLoop) resourceStatus(ctx context.Context, actionID string, digest [sha256.Size]byte) (*agentv1.ResourceExecutionStatus, error) {
 	response, err := rpc(ctx, m.executor.GetResourceExecution, &agentv1.GetResourceExecutionRequest{ActionId: actionID})
 	if err != nil {
 		return nil, fmt.Errorf("get service execution: %w", err)
 	}
-	if err := checkServiceStatus(response.GetStatus(), actionID, digest); err != nil {
+	if err := checkResourceStatus(response.GetStatus(), actionID, digest); err != nil {
 		return nil, err
 	}
 	return response.GetStatus(), nil
 }
 
 func (m *managementLoop) pollResourceExecution(parent context.Context, actionID string, digest [sha256.Size]byte, status *agentv1.ResourceExecutionStatus) error {
-	ctx, cancel := context.WithTimeout(parent, servicePollTimeout)
+	ctx, cancel := context.WithTimeout(parent, resourcePollTimeout)
 	defer cancel()
-	for !serviceExecutionTerminal(status.GetState()) {
+	for !resourceExecutionTerminal(status.GetState()) {
 		var err error
-		status, err = m.serviceStatus(ctx, actionID, digest)
+		status, err = m.resourceStatus(ctx, actionID, digest)
 		if err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) && parent.Err() == nil {
 				return nil // Attest the current protected history after the bound.
 			}
 			return err
 		}
-		if serviceExecutionTerminal(status.GetState()) || status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
+		if resourceExecutionTerminal(status.GetState()) || status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
 			return nil
 		}
-		timer := time.NewTimer(servicePollInterval)
+		timer := time.NewTimer(resourcePollInterval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
@@ -203,7 +203,7 @@ func (m *managementLoop) pollResourceExecution(parent context.Context, actionID 
 	return nil
 }
 
-func serviceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
+func resourceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
 	switch state {
 	case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED,
 		agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED,
@@ -217,7 +217,7 @@ func serviceExecutionTerminal(state agentv1.ResourceExecutionState) bool {
 }
 
 func (m *managementLoop) reportResourceResult(ctx context.Context, work *devicev1.ResourceWork) (bool, error) {
-	fresh, err := m.serviceWork(ctx)
+	fresh, err := m.resourceWork(ctx)
 	if err != nil {
 		return false, err
 	}

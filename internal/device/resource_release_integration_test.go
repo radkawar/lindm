@@ -94,7 +94,7 @@ func TestResourceReleaseReassignmentRejectsOldStartAndDoesNotReleaseNewOwner(t *
 	work := f.work(t)
 	f.assign(t, proto.String(cleared.Msg.GetAssignment().GetAssignmentId()))
 	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(&devicev1.AuthorizeResourceStartRequest{SessionEpoch: 1, ActionId: work.GetActionId(), ChallengeProof: f.sign(t, f.challenge(t, work), f.key)}))
-	dispatchError(t, err, connect.CodeFailedPrecondition, "service_action_closed")
+	dispatchError(t, err, connect.CodeFailedPrecondition, "resource_action_closed")
 	next := f.intent(t, f.work(t))
 	if next.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
 		t.Fatal("reassigned resource was released")

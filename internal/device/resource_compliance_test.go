@@ -11,7 +11,7 @@ import (
 	"lindm/internal/device/devicedb"
 )
 
-func TestServiceComplianceFreshnessBoundary(t *testing.T) {
+func TestResourceComplianceFreshnessBoundary(t *testing.T) {
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	head := devicedb.ResourceAssignment{ReconcileIntervalSeconds: 300}
 	for _, test := range []struct {
@@ -32,7 +32,7 @@ func TestServiceComplianceFreshnessBoundary(t *testing.T) {
 			if got := resourceCompliance(row, state, head, now); got != test.want {
 				t.Fatalf("compliance=%s want=%s", got, test.want)
 			}
-			state.LatestAction = &adminv1.ServiceActionSummary{StartAuthorizedAt: timestamppb.New(now)}
+			state.LatestAction = &adminv1.ResourceActionSummary{StartAuthorizedAt: timestamppb.New(now)}
 			if got := resourceCompliance(row, state, head, now); got != adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION {
 				t.Fatalf("known drift masked by previous evidence: %s", got)
 			}
@@ -45,7 +45,7 @@ func TestResourcePreparationDoesNotInventCompliance(t *testing.T) {
 	head := devicedb.ResourceAssignment{ReconcileIntervalSeconds: 300}
 	state := &adminv1.ResourceState{
 		Disposition: adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS,
-		LatestAction: &adminv1.ServiceActionSummary{Status: &agentv1.ResourceExecutionStatus{
+		LatestAction: &adminv1.ResourceActionSummary{Status: &agentv1.ResourceExecutionStatus{
 			State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING,
 		}},
 	}

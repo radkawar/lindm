@@ -204,7 +204,7 @@ func exercisePackageInterruption(ctx context.Context, r *resourceDispatch, rpm r
 	s := &evidence.Scenarios[len(evidence.Scenarios)-1]
 	waitCtx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
-	var action *adminv1.ServiceActionSummary
+	var action *adminv1.ResourceActionSummary
 	notReached := func(err error) error {
 		s.Native = append(s.Native, executorDiagnostics(ctx, r.vm))
 		if state, err := r.vm.runResult(ctx, "sudo -n sh -c 'ls -lZ "+resourceFixtureRoot+"; cat "+resourceFixtureRoot+"/maintainer.log; systemctl --no-pager list-units --all \"lindm-*\"' 2>&1", nil, 64<<10, 30*time.Second); err == nil {

@@ -42,7 +42,7 @@ func pendingResourceRelease(ctx context.Context, q *devicedb.Queries, head devic
 		if source.DeviceID != head.DeviceID || source.GenerationID != head.GenerationID {
 			return nil, nil, devicedb.ResourceAssignment{}, errInternalState
 		}
-		rows, err := q.ListServiceResources(ctx, source.ID)
+		rows, err := q.ListAssignmentResources(ctx, source.ID)
 		if err != nil {
 			return nil, nil, devicedb.ResourceAssignment{}, err
 		}

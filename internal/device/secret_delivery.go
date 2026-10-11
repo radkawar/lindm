@@ -91,7 +91,7 @@ func waitResource(ctx context.Context, q *devicedb.Queries, assignment uuid.UUID
 		if row.Reason == reason {
 			return nil
 		}
-		return q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: row.Disposition, Reason: reason})
+		return q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: assignment, ResourceID: id, Disposition: row.Disposition, Reason: reason})
 	}
 	return errInternalState
 }

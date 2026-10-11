@@ -1325,7 +1325,7 @@ var File_lindm_agent_v1_resource_ownership_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_resource_ownership_proto_rawDesc = "" +
 	"\n" +
-	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a&lindm/agent/v1/service_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\x9f\x13\n" +
+	"'lindm/agent/v1/resource_ownership.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a$lindm/agent/v1/native_firewall.proto\x1a$lindm/agent/v1/private_custody.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a$lindm/resource/v1/observations.proto\x1a\x1dlindm/resource/v1/plans.proto\x1a lindm/resource/v1/resource.proto\"\x9f\x13\n" +
 	"\x19ResourceOwnershipSnapshot\x12P\n" +
 	"\vobservation\x18\x01 \x01(\v2&.lindm.resource.v1.ResourceObservationB\x06\xbaH\x03\xc8\x01\x01R\vobservation\x12@\n" +
 	"\x14managed_file_content\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x02H\x00R\x12managedFileContent\x88\x01\x01\x12G\n" +
@@ -1603,7 +1603,7 @@ func file_lindm_agent_v1_resource_ownership_proto_init() {
 	}
 	file_lindm_agent_v1_native_firewall_proto_init()
 	file_lindm_agent_v1_private_custody_proto_init()
-	file_lindm_agent_v1_service_execution_proto_init()
+	file_lindm_agent_v1_resource_execution_proto_init()
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[0].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[1].OneofWrappers = []any{}
 	file_lindm_agent_v1_resource_ownership_proto_msgTypes[2].OneofWrappers = []any{}

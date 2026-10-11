@@ -87,7 +87,7 @@ func TestServiceDispatchDeviceClockSkew(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(result))
-			dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
+			dispatchError(t, err, connect.CodePermissionDenied, "resource_result_nonce_rejected")
 		})
 	}
 }

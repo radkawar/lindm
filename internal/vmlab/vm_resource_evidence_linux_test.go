@@ -17,7 +17,7 @@ import (
 // qualification. They cannot open the launch gate or substitute for VM runs.
 func TestResourceEvidenceFailsClosedWithoutNativeRecords(t *testing.T) {
 	now := time.Now()
-	kind := &VMResourceKindEvidence{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, Scenarios: []VMResourceScenario{{Name: "install", StartedAt: now, FinishedAt: now, Passed: true, Action: &adminv1.ServiceActionSummary{}}}}
+	kind := &VMResourceKindEvidence{Kind: resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE, Scenarios: []VMResourceScenario{{Name: "install", StartedAt: now, FinishedAt: now, Passed: true, Action: &adminv1.ResourceActionSummary{}}}}
 	if err := qualifyResourceEvidence(kind, []string{"install"}); err == nil {
 		t.Fatal("server-only report was qualified")
 	}

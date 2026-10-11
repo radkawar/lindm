@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        (unknown)
-// source: lindm/agent/v1/service_execution.proto
+// source: lindm/agent/v1/resource_execution.proto
 
 package agentv1
 
@@ -79,11 +79,11 @@ func (x ResourceExecutionState) String() string {
 }
 
 func (ResourceExecutionState) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_service_execution_proto_enumTypes[0].Descriptor()
+	return file_lindm_agent_v1_resource_execution_proto_enumTypes[0].Descriptor()
 }
 
 func (ResourceExecutionState) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_service_execution_proto_enumTypes[0]
+	return &file_lindm_agent_v1_resource_execution_proto_enumTypes[0]
 }
 
 func (x ResourceExecutionState) Number() protoreflect.EnumNumber {
@@ -92,7 +92,7 @@ func (x ResourceExecutionState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ResourceExecutionState.Descriptor instead.
 func (ResourceExecutionState) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{0}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{0}
 }
 
 type ResourceExecutionFailure int32
@@ -152,11 +152,11 @@ func (x ResourceExecutionFailure) String() string {
 }
 
 func (ResourceExecutionFailure) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_service_execution_proto_enumTypes[1].Descriptor()
+	return file_lindm_agent_v1_resource_execution_proto_enumTypes[1].Descriptor()
 }
 
 func (ResourceExecutionFailure) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_service_execution_proto_enumTypes[1]
+	return &file_lindm_agent_v1_resource_execution_proto_enumTypes[1]
 }
 
 func (x ResourceExecutionFailure) Number() protoreflect.EnumNumber {
@@ -165,7 +165,7 @@ func (x ResourceExecutionFailure) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ResourceExecutionFailure.Descriptor instead.
 func (ResourceExecutionFailure) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{1}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{1}
 }
 
 type ResourceAdmissionRefusalReason int32
@@ -204,11 +204,11 @@ func (x ResourceAdmissionRefusalReason) String() string {
 }
 
 func (ResourceAdmissionRefusalReason) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_agent_v1_service_execution_proto_enumTypes[2].Descriptor()
+	return file_lindm_agent_v1_resource_execution_proto_enumTypes[2].Descriptor()
 }
 
 func (ResourceAdmissionRefusalReason) Type() protoreflect.EnumType {
-	return &file_lindm_agent_v1_service_execution_proto_enumTypes[2]
+	return &file_lindm_agent_v1_resource_execution_proto_enumTypes[2]
 }
 
 func (x ResourceAdmissionRefusalReason) Number() protoreflect.EnumNumber {
@@ -217,7 +217,7 @@ func (x ResourceAdmissionRefusalReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ResourceAdmissionRefusalReason.Descriptor instead.
 func (ResourceAdmissionRefusalReason) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{2}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{2}
 }
 
 // Plan-role DSSE payload application/vnd.lindm.execution-intent.v1+protobuf.
@@ -251,7 +251,7 @@ type ResourceExecutionIntent struct {
 
 func (x *ResourceExecutionIntent) Reset() {
 	*x = ResourceExecutionIntent{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[0]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -263,7 +263,7 @@ func (x *ResourceExecutionIntent) String() string {
 func (*ResourceExecutionIntent) ProtoMessage() {}
 
 func (x *ResourceExecutionIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[0]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -276,7 +276,7 @@ func (x *ResourceExecutionIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionIntent.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionIntent) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{0}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ResourceExecutionIntent) GetDeploymentId() string {
@@ -417,7 +417,7 @@ type ResourceExecutionPreparation struct {
 
 func (x *ResourceExecutionPreparation) Reset() {
 	*x = ResourceExecutionPreparation{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -429,7 +429,7 @@ func (x *ResourceExecutionPreparation) String() string {
 func (*ResourceExecutionPreparation) ProtoMessage() {}
 
 func (x *ResourceExecutionPreparation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[1]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -442,7 +442,7 @@ func (x *ResourceExecutionPreparation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionPreparation.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionPreparation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{1}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ResourceExecutionPreparation) GetDeadline() *timestamppb.Timestamp {
@@ -471,7 +471,7 @@ type ResourcePreparationOutcome struct {
 
 func (x *ResourcePreparationOutcome) Reset() {
 	*x = ResourcePreparationOutcome{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -483,7 +483,7 @@ func (x *ResourcePreparationOutcome) String() string {
 func (*ResourcePreparationOutcome) ProtoMessage() {}
 
 func (x *ResourcePreparationOutcome) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[2]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -496,7 +496,7 @@ func (x *ResourcePreparationOutcome) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourcePreparationOutcome.ProtoReflect.Descriptor instead.
 func (*ResourcePreparationOutcome) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{2}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ResourcePreparationOutcome) GetPreparation() *ResourceExecutionPreparation {
@@ -542,7 +542,7 @@ type ResourceExecutionChallenge struct {
 
 func (x *ResourceExecutionChallenge) Reset() {
 	*x = ResourceExecutionChallenge{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -554,7 +554,7 @@ func (x *ResourceExecutionChallenge) String() string {
 func (*ResourceExecutionChallenge) ProtoMessage() {}
 
 func (x *ResourceExecutionChallenge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[3]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -567,7 +567,7 @@ func (x *ResourceExecutionChallenge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionChallenge.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionChallenge) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{3}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ResourceExecutionChallenge) GetDeploymentId() string {
@@ -700,7 +700,7 @@ type ResourceExecutionStartGrant struct {
 
 func (x *ResourceExecutionStartGrant) Reset() {
 	*x = ResourceExecutionStartGrant{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +712,7 @@ func (x *ResourceExecutionStartGrant) String() string {
 func (*ResourceExecutionStartGrant) ProtoMessage() {}
 
 func (x *ResourceExecutionStartGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[4]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +725,7 @@ func (x *ResourceExecutionStartGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionStartGrant.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionStartGrant) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{4}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ResourceExecutionStartGrant) GetChallenge() *ResourceExecutionChallenge {
@@ -818,7 +818,7 @@ type ResourceExecutionRecord struct {
 
 func (x *ResourceExecutionRecord) Reset() {
 	*x = ResourceExecutionRecord{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +830,7 @@ func (x *ResourceExecutionRecord) String() string {
 func (*ResourceExecutionRecord) ProtoMessage() {}
 
 func (x *ResourceExecutionRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[5]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +843,7 @@ func (x *ResourceExecutionRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionRecord.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionRecord) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{5}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ResourceExecutionRecord) GetFormatVersion() uint32 {
@@ -1031,7 +1031,7 @@ type PrepareResourceExecutionRequest struct {
 
 func (x *PrepareResourceExecutionRequest) Reset() {
 	*x = PrepareResourceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1043,7 +1043,7 @@ func (x *PrepareResourceExecutionRequest) String() string {
 func (*PrepareResourceExecutionRequest) ProtoMessage() {}
 
 func (x *PrepareResourceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[6]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,7 +1056,7 @@ func (x *PrepareResourceExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareResourceExecutionRequest.ProtoReflect.Descriptor instead.
 func (*PrepareResourceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{6}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PrepareResourceExecutionRequest) GetIntentEnvelope() []byte {
@@ -1084,7 +1084,7 @@ type PrepareResourceExecutionResponse struct {
 
 func (x *PrepareResourceExecutionResponse) Reset() {
 	*x = PrepareResourceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1096,7 +1096,7 @@ func (x *PrepareResourceExecutionResponse) String() string {
 func (*PrepareResourceExecutionResponse) ProtoMessage() {}
 
 func (x *PrepareResourceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[7]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1109,7 +1109,7 @@ func (x *PrepareResourceExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareResourceExecutionResponse.ProtoReflect.Descriptor instead.
 func (*PrepareResourceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{7}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PrepareResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
@@ -1143,7 +1143,7 @@ type StartResourceExecutionRequest struct {
 
 func (x *StartResourceExecutionRequest) Reset() {
 	*x = StartResourceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1155,7 +1155,7 @@ func (x *StartResourceExecutionRequest) String() string {
 func (*StartResourceExecutionRequest) ProtoMessage() {}
 
 func (x *StartResourceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[8]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1168,7 +1168,7 @@ func (x *StartResourceExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartResourceExecutionRequest.ProtoReflect.Descriptor instead.
 func (*StartResourceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{8}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StartResourceExecutionRequest) GetActionId() string {
@@ -1194,7 +1194,7 @@ type StartResourceExecutionResponse struct {
 
 func (x *StartResourceExecutionResponse) Reset() {
 	*x = StartResourceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1206,7 +1206,7 @@ func (x *StartResourceExecutionResponse) String() string {
 func (*StartResourceExecutionResponse) ProtoMessage() {}
 
 func (x *StartResourceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[9]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1219,7 +1219,7 @@ func (x *StartResourceExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartResourceExecutionResponse.ProtoReflect.Descriptor instead.
 func (*StartResourceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{9}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StartResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
@@ -1238,7 +1238,7 @@ type GetResourceExecutionRequest struct {
 
 func (x *GetResourceExecutionRequest) Reset() {
 	*x = GetResourceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1250,7 +1250,7 @@ func (x *GetResourceExecutionRequest) String() string {
 func (*GetResourceExecutionRequest) ProtoMessage() {}
 
 func (x *GetResourceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[10]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1263,7 +1263,7 @@ func (x *GetResourceExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceExecutionRequest.ProtoReflect.Descriptor instead.
 func (*GetResourceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{10}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetResourceExecutionRequest) GetActionId() string {
@@ -1282,7 +1282,7 @@ type GetResourceExecutionResponse struct {
 
 func (x *GetResourceExecutionResponse) Reset() {
 	*x = GetResourceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1294,7 +1294,7 @@ func (x *GetResourceExecutionResponse) String() string {
 func (*GetResourceExecutionResponse) ProtoMessage() {}
 
 func (x *GetResourceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[11]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1307,7 +1307,7 @@ func (x *GetResourceExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceExecutionResponse.ProtoReflect.Descriptor instead.
 func (*GetResourceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{11}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetResourceExecutionResponse) GetStatus() *ResourceExecutionStatus {
@@ -1327,7 +1327,7 @@ type CancelResourcePreparationRequest struct {
 
 func (x *CancelResourcePreparationRequest) Reset() {
 	*x = CancelResourcePreparationRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1339,7 +1339,7 @@ func (x *CancelResourcePreparationRequest) String() string {
 func (*CancelResourcePreparationRequest) ProtoMessage() {}
 
 func (x *CancelResourcePreparationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[12]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1352,7 +1352,7 @@ func (x *CancelResourcePreparationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelResourcePreparationRequest.ProtoReflect.Descriptor instead.
 func (*CancelResourcePreparationRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{12}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CancelResourcePreparationRequest) GetActionId() string {
@@ -1381,7 +1381,7 @@ type CancelResourcePreparationResponse struct {
 
 func (x *CancelResourcePreparationResponse) Reset() {
 	*x = CancelResourcePreparationResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1393,7 @@ func (x *CancelResourcePreparationResponse) String() string {
 func (*CancelResourcePreparationResponse) ProtoMessage() {}
 
 func (x *CancelResourcePreparationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[13]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1406,7 @@ func (x *CancelResourcePreparationResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CancelResourcePreparationResponse.ProtoReflect.Descriptor instead.
 func (*CancelResourcePreparationResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{13}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CancelResourcePreparationResponse) GetStatus() *ResourceExecutionStatus {
@@ -1446,7 +1446,7 @@ type ResourceExecutionStatus struct {
 
 func (x *ResourceExecutionStatus) Reset() {
 	*x = ResourceExecutionStatus{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1458,7 +1458,7 @@ func (x *ResourceExecutionStatus) String() string {
 func (*ResourceExecutionStatus) ProtoMessage() {}
 
 func (x *ResourceExecutionStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[14]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1471,7 +1471,7 @@ func (x *ResourceExecutionStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionStatus.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{14}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ResourceExecutionStatus) GetActionId() string {
@@ -1581,7 +1581,7 @@ type ResourceActionRemediation struct {
 
 func (x *ResourceActionRemediation) Reset() {
 	*x = ResourceActionRemediation{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1593,7 +1593,7 @@ func (x *ResourceActionRemediation) String() string {
 func (*ResourceActionRemediation) ProtoMessage() {}
 
 func (x *ResourceActionRemediation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[15]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1606,7 +1606,7 @@ func (x *ResourceActionRemediation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceActionRemediation.ProtoReflect.Descriptor instead.
 func (*ResourceActionRemediation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{15}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ResourceActionRemediation) GetTarget() *StorageTarget {
@@ -1676,7 +1676,7 @@ type ResourceExecutionAttestation struct {
 
 func (x *ResourceExecutionAttestation) Reset() {
 	*x = ResourceExecutionAttestation{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1688,7 +1688,7 @@ func (x *ResourceExecutionAttestation) String() string {
 func (*ResourceExecutionAttestation) ProtoMessage() {}
 
 func (x *ResourceExecutionAttestation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[16]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1701,7 +1701,7 @@ func (x *ResourceExecutionAttestation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceExecutionAttestation.ProtoReflect.Descriptor instead.
 func (*ResourceExecutionAttestation) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{16}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResourceExecutionAttestation) GetDeploymentId() string {
@@ -1777,7 +1777,7 @@ type AttestResourceExecutionRequest struct {
 
 func (x *AttestResourceExecutionRequest) Reset() {
 	*x = AttestResourceExecutionRequest{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1789,7 +1789,7 @@ func (x *AttestResourceExecutionRequest) String() string {
 func (*AttestResourceExecutionRequest) ProtoMessage() {}
 
 func (x *AttestResourceExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[17]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1802,7 +1802,7 @@ func (x *AttestResourceExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestResourceExecutionRequest.ProtoReflect.Descriptor instead.
 func (*AttestResourceExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{17}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AttestResourceExecutionRequest) GetActionId() string {
@@ -1829,7 +1829,7 @@ type AttestResourceExecutionResponse struct {
 
 func (x *AttestResourceExecutionResponse) Reset() {
 	*x = AttestResourceExecutionResponse{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1841,7 +1841,7 @@ func (x *AttestResourceExecutionResponse) String() string {
 func (*AttestResourceExecutionResponse) ProtoMessage() {}
 
 func (x *AttestResourceExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[18]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1854,7 +1854,7 @@ func (x *AttestResourceExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttestResourceExecutionResponse.ProtoReflect.Descriptor instead.
 func (*AttestResourceExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{18}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AttestResourceExecutionResponse) GetAttestationEnvelope() []byte {
@@ -1885,7 +1885,7 @@ type ResourceOwnershipBinding struct {
 
 func (x *ResourceOwnershipBinding) Reset() {
 	*x = ResourceOwnershipBinding{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1897,7 +1897,7 @@ func (x *ResourceOwnershipBinding) String() string {
 func (*ResourceOwnershipBinding) ProtoMessage() {}
 
 func (x *ResourceOwnershipBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[19]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1910,7 +1910,7 @@ func (x *ResourceOwnershipBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnershipBinding.ProtoReflect.Descriptor instead.
 func (*ResourceOwnershipBinding) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{19}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ResourceOwnershipBinding) GetAssignmentId() string {
@@ -1952,7 +1952,7 @@ type ResourceOwnershipSource struct {
 
 func (x *ResourceOwnershipSource) Reset() {
 	*x = ResourceOwnershipSource{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1964,7 +1964,7 @@ func (x *ResourceOwnershipSource) String() string {
 func (*ResourceOwnershipSource) ProtoMessage() {}
 
 func (x *ResourceOwnershipSource) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[20]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1977,7 +1977,7 @@ func (x *ResourceOwnershipSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceOwnershipSource.ProtoReflect.Descriptor instead.
 func (*ResourceOwnershipSource) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{20}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ResourceOwnershipSource) GetProfileId() string {
@@ -2017,7 +2017,7 @@ type ResourceAdmissionRefusal struct {
 
 func (x *ResourceAdmissionRefusal) Reset() {
 	*x = ResourceAdmissionRefusal{}
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2029,7 +2029,7 @@ func (x *ResourceAdmissionRefusal) String() string {
 func (*ResourceAdmissionRefusal) ProtoMessage() {}
 
 func (x *ResourceAdmissionRefusal) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_agent_v1_service_execution_proto_msgTypes[21]
+	mi := &file_lindm_agent_v1_resource_execution_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2042,7 +2042,7 @@ func (x *ResourceAdmissionRefusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceAdmissionRefusal.ProtoReflect.Descriptor instead.
 func (*ResourceAdmissionRefusal) Descriptor() ([]byte, []int) {
-	return file_lindm_agent_v1_service_execution_proto_rawDescGZIP(), []int{21}
+	return file_lindm_agent_v1_resource_execution_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ResourceAdmissionRefusal) GetRef() *v1.ResourceRef {
@@ -2087,11 +2087,11 @@ func (x *ResourceAdmissionRefusal) GetNativeEvidenceUnavailable() bool {
 	return false
 }
 
-var File_lindm_agent_v1_service_execution_proto protoreflect.FileDescriptor
+var File_lindm_agent_v1_resource_execution_proto protoreflect.FileDescriptor
 
-const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
+const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/agent/v1/service_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/secret_delivery.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\"\xa2\x11\n" +
+	"'lindm/agent/v1/resource_execution.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/secret_delivery.proto\x1a\x1alindm/agent/v1/trust.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\"\xa2\x11\n" +
 	"\x17ResourceExecutionIntent\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12=\n" +
@@ -2335,20 +2335,20 @@ const file_lindm_agent_v1_service_execution_proto_rawDesc = "" +
 	".RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION\x10\x03B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
-	file_lindm_agent_v1_service_execution_proto_rawDescOnce sync.Once
-	file_lindm_agent_v1_service_execution_proto_rawDescData []byte
+	file_lindm_agent_v1_resource_execution_proto_rawDescOnce sync.Once
+	file_lindm_agent_v1_resource_execution_proto_rawDescData []byte
 )
 
-func file_lindm_agent_v1_service_execution_proto_rawDescGZIP() []byte {
-	file_lindm_agent_v1_service_execution_proto_rawDescOnce.Do(func() {
-		file_lindm_agent_v1_service_execution_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_service_execution_proto_rawDesc), len(file_lindm_agent_v1_service_execution_proto_rawDesc)))
+func file_lindm_agent_v1_resource_execution_proto_rawDescGZIP() []byte {
+	file_lindm_agent_v1_resource_execution_proto_rawDescOnce.Do(func() {
+		file_lindm_agent_v1_resource_execution_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_resource_execution_proto_rawDesc), len(file_lindm_agent_v1_resource_execution_proto_rawDesc)))
 	})
-	return file_lindm_agent_v1_service_execution_proto_rawDescData
+	return file_lindm_agent_v1_resource_execution_proto_rawDescData
 }
 
-var file_lindm_agent_v1_service_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lindm_agent_v1_service_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
-var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
+var file_lindm_agent_v1_resource_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_agent_v1_resource_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_lindm_agent_v1_resource_execution_proto_goTypes = []any{
 	(ResourceExecutionState)(0),               // 0: lindm.agent.v1.ResourceExecutionState
 	(ResourceExecutionFailure)(0),             // 1: lindm.agent.v1.ResourceExecutionFailure
 	(ResourceAdmissionRefusalReason)(0),       // 2: lindm.agent.v1.ResourceAdmissionRefusalReason
@@ -2388,7 +2388,7 @@ var file_lindm_agent_v1_service_execution_proto_goTypes = []any{
 	(*emptypb.Empty)(nil),                     // 36: google.protobuf.Empty
 	(*v1.OwnershipPolicy)(nil),                // 37: lindm.resource.v1.OwnershipPolicy
 }
-var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
+var file_lindm_agent_v1_resource_execution_proto_depIdxs = []int32{
 	25, // 0: lindm.agent.v1.ResourceExecutionIntent.not_before:type_name -> google.protobuf.Timestamp
 	25, // 1: lindm.agent.v1.ResourceExecutionIntent.expires_at:type_name -> google.protobuf.Timestamp
 	26, // 2: lindm.agent.v1.ResourceExecutionIntent.desired:type_name -> lindm.resource.v1.ResourceDesiredState
@@ -2453,16 +2453,16 @@ var file_lindm_agent_v1_service_execution_proto_depIdxs = []int32{
 	0,  // [0:57] is the sub-list for field type_name
 }
 
-func init() { file_lindm_agent_v1_service_execution_proto_init() }
-func file_lindm_agent_v1_service_execution_proto_init() {
-	if File_lindm_agent_v1_service_execution_proto != nil {
+func init() { file_lindm_agent_v1_resource_execution_proto_init() }
+func file_lindm_agent_v1_resource_execution_proto_init() {
+	if File_lindm_agent_v1_resource_execution_proto != nil {
 		return
 	}
 	file_lindm_agent_v1_connectivity_guard_proto_init()
 	file_lindm_agent_v1_device_actions_proto_init()
 	file_lindm_agent_v1_secret_delivery_proto_init()
 	file_lindm_agent_v1_trust_proto_init()
-	file_lindm_agent_v1_service_execution_proto_msgTypes[15].OneofWrappers = []any{
+	file_lindm_agent_v1_resource_execution_proto_msgTypes[15].OneofWrappers = []any{
 		(*ResourceActionRemediation_EscrowRotate)(nil),
 		(*ResourceActionRemediation_Tpm2Bind)(nil),
 	}
@@ -2470,18 +2470,18 @@ func file_lindm_agent_v1_service_execution_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_service_execution_proto_rawDesc), len(file_lindm_agent_v1_service_execution_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_resource_execution_proto_rawDesc), len(file_lindm_agent_v1_resource_execution_proto_rawDesc)),
 			NumEnums:      3,
 			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_lindm_agent_v1_service_execution_proto_goTypes,
-		DependencyIndexes: file_lindm_agent_v1_service_execution_proto_depIdxs,
-		EnumInfos:         file_lindm_agent_v1_service_execution_proto_enumTypes,
-		MessageInfos:      file_lindm_agent_v1_service_execution_proto_msgTypes,
+		GoTypes:           file_lindm_agent_v1_resource_execution_proto_goTypes,
+		DependencyIndexes: file_lindm_agent_v1_resource_execution_proto_depIdxs,
+		EnumInfos:         file_lindm_agent_v1_resource_execution_proto_enumTypes,
+		MessageInfos:      file_lindm_agent_v1_resource_execution_proto_msgTypes,
 	}.Build()
-	File_lindm_agent_v1_service_execution_proto = out.File
-	file_lindm_agent_v1_service_execution_proto_goTypes = nil
-	file_lindm_agent_v1_service_execution_proto_depIdxs = nil
+	File_lindm_agent_v1_resource_execution_proto = out.File
+	file_lindm_agent_v1_resource_execution_proto_goTypes = nil
+	file_lindm_agent_v1_resource_execution_proto_depIdxs = nil
 }

@@ -55,7 +55,7 @@ func newReadOnlyDispatchFixture(t *testing.T, release bool) (*dispatchFixture, *
 		if err := f.pool.QueryRow(t.Context(), "SELECT id FROM resource_releases WHERE source_assignment_id=$1 AND resource_id=$2 AND superseding_assignment_id=$3", head.GetAssignmentId(), resourceID, cleared.Msg.GetAssignment().GetAssignmentId()).Scan(&releaseID); err != nil {
 			t.Fatal(err)
 		}
-		sequence, err := q.NextServiceSequence(t.Context(), devicedb.NextServiceSequenceParams{GenerationID: f.principal.GenerationID, ResourceKind: int16(intent.GetDesired().GetRef().GetKind()), CanonicalKey: intent.GetDesired().GetRef().GetCanonicalKey()})
+		sequence, err := q.NextResourceSequence(t.Context(), devicedb.NextResourceSequenceParams{GenerationID: f.principal.GenerationID, ResourceKind: int16(intent.GetDesired().GetRef().GetKind()), CanonicalKey: intent.GetDesired().GetRef().GetCanonicalKey()})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,13 +70,13 @@ func newReadOnlyDispatchFixture(t *testing.T, release bool) (*dispatchFixture, *
 			t.Fatal(err)
 		}
 		now := time.Now().UTC()
-		if err := q.InsertServiceAction(t.Context(), devicedb.InsertServiceActionParams{ID: actionID, DeviceID: f.principal.DeviceID, GenerationID: f.principal.GenerationID, AssignmentID: uuid.MustParse(head.GetAssignmentId()), ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(intent.GetExpiresAt().AsTime())}); err != nil {
+		if err := q.InsertResourceAction(t.Context(), devicedb.InsertResourceActionParams{ID: actionID, DeviceID: f.principal.DeviceID, GenerationID: f.principal.GenerationID, AssignmentID: uuid.MustParse(head.GetAssignmentId()), ResourceID: resourceID, ResourceSequence: sequence, IntentEnvelope: envelope, IntentDocument: document, IssuedAt: timestamptz(now), ExpiresAt: timestamptz(intent.GetExpiresAt().AsTime())}); err != nil {
 			t.Fatal(err)
 		}
 		if err := q.BindResourceReleaseAction(t.Context(), devicedb.BindResourceReleaseActionParams{ID: actionID, ReleaseID: &releaseID}); err != nil {
 			t.Fatal(err)
 		}
-		action, err := q.GetServiceAction(t.Context(), actionID)
+		action, err := q.GetResourceAction(t.Context(), actionID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +168,7 @@ func TestResourceReadOnlyNativeFindingsPersistWithoutStartAuthority(t *testing.T
 
 func TestResourceReadOnlyReleaseDoesNotContributeCompliance(t *testing.T) {
 	f, work := newReadOnlyDispatchFixture(t, true)
-	action, err := devicedb.New(f.pool).GetServiceAction(t.Context(), uuid.MustParse(work.GetActionId()))
+	action, err := devicedb.New(f.pool).GetResourceAction(t.Context(), uuid.MustParse(work.GetActionId()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestResourceReadOnlyReleaseDoesNotContributeCompliance(t *testing.T) {
 	if release.GetState() != "released" || release.GetCompletedAt() == nil || release.GetSourceAssignmentId() != action.AssignmentID.String() || release.GetSupersedingAssignmentId() != f.intent(t, work).GetDesiredRevision() {
 		t.Fatalf("read-only release lost its source/head association or completion: %v", release)
 	}
-	var result *adminv1.ServiceActionSummary
+	var result *adminv1.ResourceActionSummary
 	for _, recent := range state.GetRecentActions() {
 		if recent.GetAction().GetActionId() == work.GetActionId() {
 			result = recent.GetAction()

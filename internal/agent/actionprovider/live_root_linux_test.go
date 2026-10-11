@@ -7,10 +7,11 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"lindm/internal/agent/nativeexec"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -93,10 +94,8 @@ func TestLiveRootEffectOrdersGatePoweroffAllHeadersAndSurvivesNetworkLoss(t *tes
 				handles = append(handles, &targetHandle{file: file, qualification: qualified})
 				plan.CryptoEraseTargets = append(plan.CryptoEraseTargets, &agentv1.CryptoEraseTargetPlan{Target: qualified.GetTarget(), LuksHeaderBytes: 64 << 10})
 			}
-			var exit *exec.ExitError
-			if err := exec.CommandContext(t.Context(), "/usr/bin/false").Run(); !errors.As(err, &exit) {
-				t.Fatalf("fixture exit: %v", err)
-			}
+			// The native runner reports exits as *nativeexec.ExitError.
+			exit := &nativeexec.ExitError{Program: "cryptsetup", Code: 1}
 			consumed, armed, erases := false, false, 0
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()

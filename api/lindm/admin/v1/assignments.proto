@@ -4,7 +4,7 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
-import "lindm/agent/v1/service_execution.proto";
+import "lindm/agent/v1/resource_execution.proto";
 import "lindm/policy/v1/profile.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/resource.proto";
@@ -107,7 +107,7 @@ enum ResourceCompliance {
   RESOURCE_COMPLIANCE_STALE = 5;
 }
 
-message ServiceActionSummary {
+message ResourceActionSummary {
   string action_id = 1;
   uint64 resource_sequence = 2;
   google.protobuf.Timestamp issued_at = 3;
@@ -132,7 +132,7 @@ message ResourceState {
   // snake_case reason for PENDING/BLOCKED/ATTENTION; empty otherwise.
   string reason = 5;
   // Most recent action for this resource under the current head.
-  ServiceActionSummary latest_action = 6;
+  ResourceActionSummary latest_action = 6;
   ResourceCompliance compliance = 7;
   // Server receive time of the latest successful native verification.
   google.protobuf.Timestamp last_verified_at = 8;
@@ -145,7 +145,7 @@ message DeviceResourceAction {
   string assignment_id = 1;
   string resource_id = 2;
   lindm.resource.v1.ResourceRef ref = 3;
-  ServiceActionSummary action = 4;
+  ResourceActionSummary action = 4;
 }
 
 message GetDeviceResourceStateResponse {

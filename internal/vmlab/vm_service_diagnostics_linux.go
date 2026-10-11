@@ -98,7 +98,7 @@ func serviceJournalProjection(data []byte, action string) ([]byte, error) {
 		}
 		message := strings.ToLower(entry["MESSAGE"])
 		reasons := make([]string, 0)
-		for _, reason := range []string{"service_result_conflict", "deadline_exceeded", "context deadline exceeded", "permission_denied", "outcome_unknown", "interrupted", "agent_release_unsupported"} {
+		for _, reason := range []string{"resource_result_conflict", "deadline_exceeded", "context deadline exceeded", "permission_denied", "outcome_unknown", "interrupted", "agent_release_unsupported"} {
 			if strings.Contains(message, reason) {
 				reasons = append(reasons, reason)
 			}

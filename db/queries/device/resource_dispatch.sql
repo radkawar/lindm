@@ -1,74 +1,74 @@
 -- An empty poll may finish at this snapshot. Any head or open action requires
 -- the normal locked dispatch path, including its fresh actor authorization.
--- name: HasServiceWork :one
+-- name: HasResourceWork :one
 SELECT EXISTS (
     SELECT 1 FROM resource_assignment_heads h WHERE h.generation_id = sqlc.arg('generation_id')
     UNION ALL
     SELECT 1 FROM resource_actions a WHERE a.device_id = sqlc.arg('device_id') AND a.closed_at IS NULL
 );
 
--- name: GetServiceAssignment :one
+-- name: GetResourceAssignment :one
 SELECT a.* FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1;
 
--- name: LockServiceAssignment :one
+-- name: LockResourceAssignment :one
 SELECT a.* FROM resource_assignments a JOIN resource_assignment_heads h ON h.assignment_id = a.id WHERE h.generation_id = $1 FOR UPDATE OF h, a;
 
--- name: GetServiceAssignmentRequest :one
+-- name: GetResourceAssignmentRequest :one
 SELECT * FROM resource_assignments WHERE request_id = $1;
 
--- name: InsertServiceAssignment :exec
+-- name: InsertResourceAssignment :exec
 INSERT INTO resource_assignments(id, device_id, generation_id, request_id, request_digest, actor_id, authorization_version, revision_id, document, assigned_at, reconcile_interval_seconds)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
 
--- name: SetServiceAssignmentHead :exec
+-- name: SetResourceAssignmentHead :exec
 INSERT INTO resource_assignment_heads(generation_id, assignment_id) VALUES ($1,$2)
 ON CONFLICT (generation_id) DO UPDATE SET assignment_id = EXCLUDED.assignment_id;
 
--- name: BlockServiceAssignment :exec
+-- name: BlockResourceAssignment :exec
 UPDATE resource_assignments SET blocked_reason = $2 WHERE id = $1;
 
--- name: InsertServiceResource :exec
+-- name: InsertAssignmentResource :exec
 INSERT INTO resource_assignment_resources(assignment_id, resource_id, resource_kind, canonical_key, position, document, depends_on, verification_max_age_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
 
--- name: ListServiceResources :many
+-- name: ListAssignmentResources :many
 SELECT * FROM resource_assignment_resources WHERE assignment_id = $1 ORDER BY position;
 
--- name: SetServiceResourceDisposition :exec
+-- name: SetAssignmentResourceDisposition :exec
 UPDATE resource_assignment_resources SET disposition = $3, reason = $4 WHERE assignment_id = $1 AND resource_id = $2;
 
--- name: SetServiceResourceVerification :exec
+-- name: SetAssignmentResourceVerification :exec
 UPDATE resource_assignment_resources SET last_verified_at = $3, observed_at = $4, drift_remediated = $5 WHERE assignment_id = $1 AND resource_id = $2;
 
--- name: MarkServiceReadOnlySuccess :exec
+-- name: MarkResourceReadOnlySuccess :exec
 UPDATE resource_actions SET read_only_success = true WHERE id = $1 AND closed_reason = 'result' AND octet_length(start_grant_envelope) = 0;
 
--- name: PruneServiceReadOnlySuccesses :exec
+-- name: PruneResourceReadOnlySuccesses :exec
 DELETE FROM resource_actions WHERE id IN (
     SELECT a.id FROM resource_actions a WHERE a.generation_id = $1 AND a.read_only_success
     ORDER BY a.issued_at DESC, a.id DESC OFFSET 256
 );
 
--- name: NextServiceSequence :one
+-- name: NextResourceSequence :one
 INSERT INTO resource_sequences(generation_id, resource_kind, canonical_key, sequence) VALUES ($1,$2,$3,1)
 ON CONFLICT (generation_id, resource_kind, canonical_key) DO UPDATE SET sequence = resource_sequences.sequence + 1 RETURNING sequence;
 
--- name: GetOpenServiceAction :one
+-- name: GetOpenResourceAction :one
 SELECT * FROM resource_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDATE;
 
--- name: GetServiceAction :one
+-- name: GetResourceAction :one
 SELECT * FROM resource_actions WHERE id = $1;
 
--- name: LockServiceAction :one
+-- name: LockResourceAction :one
 SELECT * FROM resource_actions WHERE id = $1 FOR UPDATE;
 
--- name: LatestServiceAction :one
+-- name: LatestResourceAction :one
 SELECT * FROM resource_actions WHERE assignment_id = $1 AND resource_id = $2 ORDER BY resource_sequence DESC LIMIT 1;
 
--- name: InsertServiceAction :exec
+-- name: InsertResourceAction :exec
 INSERT INTO resource_actions(id, device_id, generation_id, assignment_id, resource_id, resource_sequence, intent_envelope, intent_document, issued_at, expires_at)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
 
--- name: CloseServiceAction :exec
+-- name: CloseResourceAction :exec
 UPDATE resource_actions SET closed_at = $2, closed_reason = $3 WHERE id = $1 AND closed_at IS NULL;
 
 -- Cancellation retains the one-open-action fence until the executor reports
@@ -77,23 +77,23 @@ UPDATE resource_actions SET closed_at = $2, closed_reason = $3 WHERE id = $1 AND
 UPDATE resource_actions SET closed_reason = $2
 WHERE id = $1 AND closed_at IS NULL AND closed_reason = '' AND octet_length(start_grant_envelope) = 0;
 
--- name: SetServiceNonce :exec
+-- name: SetResourceNonce :exec
 UPDATE resource_actions SET result_nonce = $2, nonce_expires_at = $3 WHERE id = $1;
 
--- name: SetServiceGrant :exec
+-- name: SetResourceGrant :exec
 UPDATE resource_actions SET challenge_proof = $2, start_grant_envelope = $3, start_authorized_at = $4 WHERE id = $1;
 
--- name: SetServiceResult :exec
+-- name: SetResourceResult :exec
 UPDATE resource_actions SET action_revision = $2, attestation_envelope = $3, attestation_certificate = $4, status_document = $5, attested_at = $6, received_at = $7, result_nonce = '', nonce_expires_at = NULL WHERE id = $1;
 
--- name: ServiceDispatchClock :one
+-- name: ResourceDispatchClock :one
 SELECT clock_timestamp()::timestamptz;
 
--- name: ServiceDispatchCapacity :one
+-- name: ResourceDispatchCapacity :one
 SELECT (SELECT count(*) FROM resource_assignments a WHERE a.generation_id = $1)::bigint AS assignments,
        (SELECT count(*) FROM resource_actions w WHERE w.generation_id = $1 AND NOT w.read_only_success)::bigint AS actions;
 
--- name: RecentServiceActions :many
+-- name: RecentResourceActions :many
 SELECT * FROM resource_actions WHERE generation_id = $1 ORDER BY issued_at DESC, id DESC LIMIT 50;
 
 -- name: RecordResourceReleases :exec

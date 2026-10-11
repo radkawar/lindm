@@ -175,7 +175,7 @@ func passScenario(s *VMResourceScenario, records ...VMResourceNativeRecord) {
 
 // verifyUnchanged republishes the same desired state and requires a converged
 // verification that acquired no start grant.
-func (f *firewallLane) verifyUnchanged(ctx context.Context, r *resourceDispatch, extra bool) (*adminv1.ServiceActionSummary, error) {
+func (f *firewallLane) verifyUnchanged(ctx context.Context, r *resourceDispatch, extra bool) (*adminv1.ResourceActionSummary, error) {
 	if err := r.assign(ctx, f.firewallZoneDesired(extra), resourceCreatePolicy()); err != nil {
 		return nil, err
 	}

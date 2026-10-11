@@ -330,7 +330,7 @@ func (x *FleetOSSummary) GetOtherDevices() uint64 {
 	return 0
 }
 
-type FleetServiceComplianceSummary struct {
+type FleetResourceComplianceSummary struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Resource counts for current enrollment-generation assignment heads only.
 	// Uses GetDeviceServiceState compliance semantics, including dependencies.
@@ -346,20 +346,20 @@ type FleetServiceComplianceSummary struct {
 	sizeCache         protoimpl.SizeCache
 }
 
-func (x *FleetServiceComplianceSummary) Reset() {
-	*x = FleetServiceComplianceSummary{}
+func (x *FleetResourceComplianceSummary) Reset() {
+	*x = FleetResourceComplianceSummary{}
 	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FleetServiceComplianceSummary) String() string {
+func (x *FleetResourceComplianceSummary) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FleetServiceComplianceSummary) ProtoMessage() {}
+func (*FleetResourceComplianceSummary) ProtoMessage() {}
 
-func (x *FleetServiceComplianceSummary) ProtoReflect() protoreflect.Message {
+func (x *FleetResourceComplianceSummary) ProtoReflect() protoreflect.Message {
 	mi := &file_lindm_admin_v1_fleet_summary_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -371,54 +371,54 @@ func (x *FleetServiceComplianceSummary) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FleetServiceComplianceSummary.ProtoReflect.Descriptor instead.
-func (*FleetServiceComplianceSummary) Descriptor() ([]byte, []int) {
+// Deprecated: Use FleetResourceComplianceSummary.ProtoReflect.Descriptor instead.
+func (*FleetResourceComplianceSummary) Descriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *FleetServiceComplianceSummary) GetTotalResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetTotalResources() uint64 {
 	if x != nil {
 		return x.TotalResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetCompliantResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetCompliantResources() uint64 {
 	if x != nil {
 		return x.CompliantResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetDriftRemediatedResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetDriftRemediatedResources() uint64 {
 	if x != nil {
 		return x.DriftRemediatedResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetAttentionResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetAttentionResources() uint64 {
 	if x != nil {
 		return x.AttentionResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetStaleResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetStaleResources() uint64 {
 	if x != nil {
 		return x.StaleResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetUnknownResources() uint64 {
+func (x *FleetResourceComplianceSummary) GetUnknownResources() uint64 {
 	if x != nil {
 		return x.UnknownResources
 	}
 	return 0
 }
 
-func (x *FleetServiceComplianceSummary) GetUnassignedDevices() uint64 {
+func (x *FleetResourceComplianceSummary) GetUnassignedDevices() uint64 {
 	if x != nil {
 		return x.UnassignedDevices
 	}
@@ -574,7 +574,7 @@ type FleetRecentAction struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ActionId string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	DeviceId string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	// Present only for imperative device actions; service actions use unit.
+	// Present only for imperative device actions; resource actions use unit.
 	Capability        string                 `protobuf:"bytes,3,opt,name=capability,proto3" json:"capability,omitempty"`
 	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	ExpiresAt         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
@@ -582,9 +582,9 @@ type FleetRecentAction struct {
 	ClosedAt          *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=closed_at,json=closedAt,proto3" json:"closed_at,omitempty"`
 	ClosedReason      string                 `protobuf:"bytes,8,opt,name=closed_reason,json=closedReason,proto3" json:"closed_reason,omitempty"`
 	OutcomeUnknown    bool                   `protobuf:"varint,9,opt,name=outcome_unknown,json=outcomeUnknown,proto3" json:"outcome_unknown,omitempty"`
-	// "device" for imperative actions; "service" for service-resource actions.
+	// "device" for imperative actions; "resource" for resource actions.
 	Kind string `protobuf:"bytes,10,opt,name=kind,proto3" json:"kind,omitempty"`
-	// Present only for service actions.
+	// Present only for resource actions.
 	ResourceId    string `protobuf:"bytes,11,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
 	Unit          string `protobuf:"bytes,12,opt,name=unit,proto3" json:"unit,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -708,11 +708,11 @@ func (x *FleetRecentAction) GetUnit() string {
 type GetFleetSummaryResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Database transaction time for fleet, contact, service and finding counts.
-	ObservedAt        *timestamppb.Timestamp         `protobuf:"bytes,1,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	Lifecycle         *FleetLifecycleSummary         `protobuf:"bytes,2,opt,name=lifecycle,proto3" json:"lifecycle,omitempty"`
-	Contact           *FleetContactSummary           `protobuf:"bytes,3,opt,name=contact,proto3" json:"contact,omitempty"`
-	OperatingSystems  *FleetOSSummary                `protobuf:"bytes,4,opt,name=operating_systems,json=operatingSystems,proto3" json:"operating_systems,omitempty"`
-	ServiceCompliance *FleetServiceComplianceSummary `protobuf:"bytes,5,opt,name=service_compliance,json=serviceCompliance,proto3" json:"service_compliance,omitempty"`
+	ObservedAt         *timestamppb.Timestamp          `protobuf:"bytes,1,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	Lifecycle          *FleetLifecycleSummary          `protobuf:"bytes,2,opt,name=lifecycle,proto3" json:"lifecycle,omitempty"`
+	Contact            *FleetContactSummary            `protobuf:"bytes,3,opt,name=contact,proto3" json:"contact,omitempty"`
+	OperatingSystems   *FleetOSSummary                 `protobuf:"bytes,4,opt,name=operating_systems,json=operatingSystems,proto3" json:"operating_systems,omitempty"`
+	ResourceCompliance *FleetResourceComplianceSummary `protobuf:"bytes,5,opt,name=resource_compliance,json=resourceCompliance,proto3" json:"resource_compliance,omitempty"`
 	// Absent when the advisory service is unavailable, never an implied zero.
 	Findings *FleetFindingSummary `protobuf:"bytes,6,opt,name=findings,proto3" json:"findings,omitempty"`
 	// Absent when identity is unavailable or the caller cannot view an inbox.
@@ -784,9 +784,9 @@ func (x *GetFleetSummaryResponse) GetOperatingSystems() *FleetOSSummary {
 	return nil
 }
 
-func (x *GetFleetSummaryResponse) GetServiceCompliance() *FleetServiceComplianceSummary {
+func (x *GetFleetSummaryResponse) GetResourceCompliance() *FleetResourceComplianceSummary {
 	if x != nil {
-		return x.ServiceCompliance
+		return x.ResourceCompliance
 	}
 	return nil
 }
@@ -837,8 +837,8 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\adevices\x18\x03 \x01(\x04R\adevices\"k\n" +
 	"\x0eFleetOSSummary\x124\n" +
 	"\x06groups\x18\x01 \x03(\v2\x1c.lindm.admin.v1.FleetOSCountR\x06groups\x12#\n" +
-	"\rother_devices\x18\x02 \x01(\x04R\fotherDevices\"\xed\x02\n" +
-	"\x1dFleetServiceComplianceSummary\x12'\n" +
+	"\rother_devices\x18\x02 \x01(\x04R\fotherDevices\"\xee\x02\n" +
+	"\x1eFleetResourceComplianceSummary\x12'\n" +
 	"\x0ftotal_resources\x18\x01 \x01(\x04R\x0etotalResources\x12/\n" +
 	"\x13compliant_resources\x18\x02 \x01(\x04R\x12compliantResources\x12<\n" +
 	"\x1adrift_remediated_resources\x18\x03 \x01(\x04R\x18driftRemediatedResources\x12/\n" +
@@ -874,14 +874,14 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	" \x01(\tR\x04kind\x12\x1f\n" +
 	"\vresource_id\x18\v \x01(\tR\n" +
 	"resourceId\x12\x12\n" +
-	"\x04unit\x18\f \x01(\tR\x04unit\"\xd4\x04\n" +
+	"\x04unit\x18\f \x01(\tR\x04unit\"\xd7\x04\n" +
 	"\x17GetFleetSummaryResponse\x12;\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"observedAt\x12C\n" +
 	"\tlifecycle\x18\x02 \x01(\v2%.lindm.admin.v1.FleetLifecycleSummaryR\tlifecycle\x12=\n" +
 	"\acontact\x18\x03 \x01(\v2#.lindm.admin.v1.FleetContactSummaryR\acontact\x12K\n" +
-	"\x11operating_systems\x18\x04 \x01(\v2\x1e.lindm.admin.v1.FleetOSSummaryR\x10operatingSystems\x12\\\n" +
-	"\x12service_compliance\x18\x05 \x01(\v2-.lindm.admin.v1.FleetServiceComplianceSummaryR\x11serviceCompliance\x12?\n" +
+	"\x11operating_systems\x18\x04 \x01(\v2\x1e.lindm.admin.v1.FleetOSSummaryR\x10operatingSystems\x12_\n" +
+	"\x13resource_compliance\x18\x05 \x01(\v2..lindm.admin.v1.FleetResourceComplianceSummaryR\x12resourceCompliance\x12?\n" +
 	"\bfindings\x18\x06 \x01(\v2#.lindm.admin.v1.FleetFindingSummaryR\bfindings\x12B\n" +
 	"\tapprovals\x18\a \x01(\v2$.lindm.admin.v1.FleetApprovalSummaryR\tapprovals\x12H\n" +
 	"\x0erecent_actions\x18\b \x03(\v2!.lindm.admin.v1.FleetRecentActionR\rrecentActionsB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
@@ -900,17 +900,17 @@ func file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP() []byte {
 
 var file_lindm_admin_v1_fleet_summary_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_lindm_admin_v1_fleet_summary_proto_goTypes = []any{
-	(*GetFleetSummaryRequest)(nil),        // 0: lindm.admin.v1.GetFleetSummaryRequest
-	(*FleetLifecycleSummary)(nil),         // 1: lindm.admin.v1.FleetLifecycleSummary
-	(*FleetContactSummary)(nil),           // 2: lindm.admin.v1.FleetContactSummary
-	(*FleetOSCount)(nil),                  // 3: lindm.admin.v1.FleetOSCount
-	(*FleetOSSummary)(nil),                // 4: lindm.admin.v1.FleetOSSummary
-	(*FleetServiceComplianceSummary)(nil), // 5: lindm.admin.v1.FleetServiceComplianceSummary
-	(*FleetFindingSummary)(nil),           // 6: lindm.admin.v1.FleetFindingSummary
-	(*FleetApprovalSummary)(nil),          // 7: lindm.admin.v1.FleetApprovalSummary
-	(*FleetRecentAction)(nil),             // 8: lindm.admin.v1.FleetRecentAction
-	(*GetFleetSummaryResponse)(nil),       // 9: lindm.admin.v1.GetFleetSummaryResponse
-	(*timestamppb.Timestamp)(nil),         // 10: google.protobuf.Timestamp
+	(*GetFleetSummaryRequest)(nil),         // 0: lindm.admin.v1.GetFleetSummaryRequest
+	(*FleetLifecycleSummary)(nil),          // 1: lindm.admin.v1.FleetLifecycleSummary
+	(*FleetContactSummary)(nil),            // 2: lindm.admin.v1.FleetContactSummary
+	(*FleetOSCount)(nil),                   // 3: lindm.admin.v1.FleetOSCount
+	(*FleetOSSummary)(nil),                 // 4: lindm.admin.v1.FleetOSSummary
+	(*FleetResourceComplianceSummary)(nil), // 5: lindm.admin.v1.FleetResourceComplianceSummary
+	(*FleetFindingSummary)(nil),            // 6: lindm.admin.v1.FleetFindingSummary
+	(*FleetApprovalSummary)(nil),           // 7: lindm.admin.v1.FleetApprovalSummary
+	(*FleetRecentAction)(nil),              // 8: lindm.admin.v1.FleetRecentAction
+	(*GetFleetSummaryResponse)(nil),        // 9: lindm.admin.v1.GetFleetSummaryResponse
+	(*timestamppb.Timestamp)(nil),          // 10: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_fleet_summary_proto_depIdxs = []int32{
 	3,  // 0: lindm.admin.v1.FleetOSSummary.groups:type_name -> lindm.admin.v1.FleetOSCount
@@ -922,7 +922,7 @@ var file_lindm_admin_v1_fleet_summary_proto_depIdxs = []int32{
 	1,  // 6: lindm.admin.v1.GetFleetSummaryResponse.lifecycle:type_name -> lindm.admin.v1.FleetLifecycleSummary
 	2,  // 7: lindm.admin.v1.GetFleetSummaryResponse.contact:type_name -> lindm.admin.v1.FleetContactSummary
 	4,  // 8: lindm.admin.v1.GetFleetSummaryResponse.operating_systems:type_name -> lindm.admin.v1.FleetOSSummary
-	5,  // 9: lindm.admin.v1.GetFleetSummaryResponse.service_compliance:type_name -> lindm.admin.v1.FleetServiceComplianceSummary
+	5,  // 9: lindm.admin.v1.GetFleetSummaryResponse.resource_compliance:type_name -> lindm.admin.v1.FleetResourceComplianceSummary
 	6,  // 10: lindm.admin.v1.GetFleetSummaryResponse.findings:type_name -> lindm.admin.v1.FleetFindingSummary
 	7,  // 11: lindm.admin.v1.GetFleetSummaryResponse.approvals:type_name -> lindm.admin.v1.FleetApprovalSummary
 	8,  // 12: lindm.admin.v1.GetFleetSummaryResponse.recent_actions:type_name -> lindm.admin.v1.FleetRecentAction

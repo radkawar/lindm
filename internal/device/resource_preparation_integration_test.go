@@ -93,7 +93,7 @@ func TestResourcePreparationRetainsLeaseWithoutCompliance(t *testing.T) {
 			changed.Status.AcceptedAt = timestamppb.New(changed.Status.GetAcceptedAt().AsTime().Add(time.Millisecond))
 			request.AttestationEnvelope = f.sign(t, changed, f.key)
 			_, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
-			dispatchError(t, err, connect.CodeAlreadyExists, "service_result_conflict")
+			dispatchError(t, err, connect.CodeAlreadyExists, "resource_result_conflict")
 		}
 		request.AttestationEnvelope = f.sign(t, attestation, f.key)
 		for range 2 {
@@ -122,7 +122,7 @@ func TestResourcePreparationResultBindsExactIntentAndLimits(t *testing.T) {
 		reason := "resource_result_binding_rejected"
 		if change == "intent" {
 			attestation.Status.IntentSha256[0] ^= 1
-			reason = "service_result_rejected"
+			reason = "resource_result_rejected"
 		} else {
 			attestation.Status.PreparationOutcome.Preparation.MaxCacheBytes--
 		}
@@ -242,7 +242,7 @@ func TestResourcePreparationReadyGrantBindsExactDigest(t *testing.T) {
 	challenge.NativePlanSha256[0] ^= 1
 	request.ChallengeProof = f.sign(t, challenge, f.key)
 	_, err = f.service.AuthorizeResourceStart(f.deviceCtx, connect.NewRequest(request))
-	dispatchError(t, err, connect.CodeAlreadyExists, "service_start_conflict")
+	dispatchError(t, err, connect.CodeAlreadyExists, "resource_start_conflict")
 	pending := preparationResult(t, f, f.work(t), 2, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING)
 	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(pending))
 	dispatchError(t, err, connect.CodePermissionDenied, "resource_result_binding_rejected")
@@ -279,7 +279,7 @@ func TestResourcePreparationNeverPreparedAckIsBoundAndNotProof(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
-	dispatchError(t, err, connect.CodePermissionDenied, "service_result_nonce_rejected")
+	dispatchError(t, err, connect.CodePermissionDenied, "resource_result_nonce_rejected")
 	request.NeverPrepared.ResultNonce = f.work(t).GetResultNonce()
 	for range 2 {
 		response, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
@@ -296,7 +296,7 @@ func TestResourcePreparationNeverPreparedAckIsBoundAndNotProof(t *testing.T) {
 	if next := response.Msg.GetWork(); next != nil && (next.GetActionId() == work.GetActionId() || f.intent(t, next).GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RELEASE) {
 		t.Fatal("never-prepared acknowledgment did not close the cancelled action")
 	}
-	var action *adminv1.ServiceActionSummary
+	var action *adminv1.ResourceActionSummary
 	for _, recent := range complianceState(t, f).GetRecentActions() {
 		if recent.GetAction().GetActionId() == work.GetActionId() {
 			action = recent.GetAction()

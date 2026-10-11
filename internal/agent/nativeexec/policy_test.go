@@ -17,9 +17,10 @@ import (
 // other credentials, which nativeexec deliberately cannot express.
 var spawnAllowlist = map[string]string{}
 
-// spawners are the process-creation entry points nativeexec wraps.
+// spawners are the process-creation entry points nativeexec wraps, plus
+// exec.ExitError, which can never match a nativeexec result (*ExitError).
 var spawners = map[string]map[string]bool{
-	"os/exec":               {"Command": true, "CommandContext": true, "Cmd": true, "LookPath": true},
+	"os/exec":               {"Command": true, "CommandContext": true, "Cmd": true, "LookPath": true, "ExitError": true},
 	"os":                    {"StartProcess": true},
 	"syscall":               {"ForkExec": true, "Exec": true, "StartProcess": true},
 	"golang.org/x/sys/unix": {"Exec": true},
@@ -59,7 +60,7 @@ func TestAgentSpawnsOnlyThroughNativeexec(t *testing.T) {
 				seen[relative] = true
 				continue
 			}
-			t.Errorf("%s:%s: start native processes with nativeexec.Run/Start", relative, use)
+			t.Errorf("%s:%s: use nativeexec.Run/Start and *nativeexec.ExitError", relative, use)
 		}
 		return nil
 	})

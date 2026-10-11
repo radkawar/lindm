@@ -55,7 +55,7 @@ type HAPhase struct {
 	RPC                map[string]RPCResult `json:"rpc"`
 	AcceptedActions    int                  `json:"accepted_actions"`
 	CompletedActions   int                  `json:"completed_actions"`
-	ServiceExecutions  int                  `json:"service_executions"`
+	ResourceExecutions int                  `json:"resource_executions"`
 	InFlightAtBoundary int                  `json:"in_flight_restarts_at_start"`
 }
 
@@ -107,14 +107,14 @@ type HAActionSummary struct {
 	Expired             int      `json:"expired"`
 	Lost                []string `json:"lost,omitempty"`
 	Unaccepted          []string `json:"unaccepted,omitempty"`
-	ServiceExecutions   int      `json:"service_executions"`
-	ServiceDuplicates   int      `json:"service_duplicates"`
+	ResourceExecutions  int      `json:"resource_executions"`
+	ResourceDuplicates  int      `json:"resource_duplicates"`
 	InterruptedReports  int      `json:"interrupted_reports"`
 	// Service assignments are accepted admin work dispatched as signed
 	// resource actions; convergence is read back from the server.
 	AssignmentsAccepted  int      `json:"assignments_accepted"`
 	AssignmentsConverged int      `json:"assignments_converged"`
-	ServiceLost          []string `json:"service_lost,omitempty"`
+	ResourceLost         []string `json:"resource_lost,omitempty"`
 }
 
 // HAAdminSummary counts administrative mutation outcomes.
@@ -673,7 +673,7 @@ func (h *haRun) phase(ctx context.Context, result *HAResult, name string, durati
 	accepted, completed, services, _ := h.ledger.counts()
 	phase.FinishedAt = time.Now().UTC()
 	phase.RPC = h.metrics.snapshot(true)
-	phase.AcceptedActions, phase.CompletedActions, phase.ServiceExecutions = accepted-acceptedBefore, completed-completedBefore, services-servicesBefore
+	phase.AcceptedActions, phase.CompletedActions, phase.ResourceExecutions = accepted-acceptedBefore, completed-completedBefore, services-servicesBefore
 	result.Phases = append(result.Phases, phase)
 	if err != nil {
 		return fmt.Errorf("HA phase %s: %w", name, err)
@@ -820,9 +820,9 @@ func (h *haRun) verify(ctx context.Context, result *HAResult) error {
 	l := h.ledger
 	l.mu.Lock()
 	result.Violations = slices.Clone(l.violations)
-	summary := HAActionSummary{DuplicateExecutions: l.duplicates, ServiceDuplicates: l.serviceDuplicates, InterruptedReports: l.interrupted}
+	summary := HAActionSummary{DuplicateExecutions: l.duplicates, ResourceDuplicates: l.serviceDuplicates, InterruptedReports: l.interrupted}
 	for _, n := range l.services {
-		summary.ServiceExecutions += n
+		summary.ResourceExecutions += n
 	}
 	executedServices := make(map[string]map[string]bool, len(l.serviceByDevice))
 	for device, actions := range l.serviceByDevice {
@@ -893,7 +893,7 @@ func (h *haRun) verifyServices(ctx context.Context, summary *HAActionSummary, as
 		assignment, accepted := assignments[d.id]
 		if !accepted {
 			if state.GetAssignment() != nil || len(executed[d.id]) > 0 {
-				summary.ServiceLost = append(summary.ServiceLost, "device "+d.id+" has unaccepted service work")
+				summary.ResourceLost = append(summary.ResourceLost, "device "+d.id+" has unaccepted service work")
 			}
 			continue
 		}
@@ -925,7 +925,7 @@ func (h *haRun) verifyServices(ctx context.Context, summary *HAActionSummary, as
 			}
 		}
 		if len(problems) > 0 {
-			summary.ServiceLost = append(summary.ServiceLost, "device "+d.id+": "+strings.Join(problems, "; "))
+			summary.ResourceLost = append(summary.ResourceLost, "device "+d.id+": "+strings.Join(problems, "; "))
 			continue
 		}
 		summary.AssignmentsConverged++
@@ -975,9 +975,9 @@ func (h *haRun) check(result *HAResult) {
 	}
 	add("rolling_upgrade_complete", upgraded == len(devlab.HAInstanceNames), "%d of %d replicas running %s", upgraded, len(devlab.HAInstanceNames), result.UpgradeVersion)
 	a := result.Actions
-	add("no_duplicate_effects", a.DuplicateExecutions == 0 && a.ServiceDuplicates == 0 && len(a.Unaccepted) == 0, "%d duplicate restarts, %d duplicate service executions, %d unaccepted server actions", a.DuplicateExecutions, a.ServiceDuplicates, len(a.Unaccepted))
+	add("no_duplicate_effects", a.DuplicateExecutions == 0 && a.ResourceDuplicates == 0 && len(a.Unaccepted) == 0, "%d duplicate restarts, %d duplicate service executions, %d unaccepted server actions", a.DuplicateExecutions, a.ResourceDuplicates, len(a.Unaccepted))
 	add("no_lost_actions", a.Accepted > 0 && a.ServerSucceeded == a.Accepted && len(a.Lost) == 0, "%d accepted, %d server-verified succeeded, %d lost", a.Accepted, a.ServerSucceeded, len(a.Lost))
-	add("service_assignments_converged", a.AssignmentsAccepted == len(h.devices) && a.AssignmentsConverged == a.AssignmentsAccepted && len(a.ServiceLost) == 0, "%d of %d devices assigned; %d converged with exactly-once signed execution; %d lost", a.AssignmentsAccepted, len(h.devices), a.AssignmentsConverged, len(a.ServiceLost))
+	add("resource_assignments_converged", a.AssignmentsAccepted == len(h.devices) && a.AssignmentsConverged == a.AssignmentsAccepted && len(a.ResourceLost) == 0, "%d of %d devices assigned; %d converged with exactly-once signed execution; %d lost", a.AssignmentsAccepted, len(h.devices), a.AssignmentsConverged, len(a.ResourceLost))
 	add("no_protocol_violations", len(result.Violations) == 0, "%d violations", len(result.Violations))
 	add("no_definitive_admin_rejections", len(result.Admin.Rejections) == 0, "%d requests, %d ambiguous retries, rejections %v", result.Admin.Requests, result.Admin.AmbiguousRetries, result.Admin.Rejections)
 	ld := result.Leadership

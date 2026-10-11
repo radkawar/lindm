@@ -123,7 +123,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 		return err
 	}
 	q := devicedb.New(tx)
-	head, headErr := q.LockServiceAssignment(ctx, generation)
+	head, headErr := q.LockResourceAssignment(ctx, generation)
 	if headErr != nil && !errors.Is(headErr, pgx.ErrNoRows) {
 		return headErr
 	}
@@ -139,7 +139,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if err != nil {
 		return err
 	}
-	if err := q.InsertServiceAssignment(ctx, devicedb.InsertServiceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generation, RequestID: id, RequestDigest: preview.GetPreviewSha256(), ActorID: actor, AuthorizationVersion: int64(authorizationVersion), Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
+	if err := q.InsertResourceAssignment(ctx, devicedb.InsertResourceAssignmentParams{ID: id, DeviceID: deviceID, GenerationID: generation, RequestID: id, RequestDigest: preview.GetPreviewSha256(), ActorID: actor, AuthorizationVersion: int64(authorizationVersion), Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
 		return err
 	}
 	if err := insertResourceRows(ctx, q, id, ordered); err != nil {
@@ -159,10 +159,10 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 			return err
 		}
 	}
-	if err := q.SetServiceAssignmentHead(ctx, devicedb.SetServiceAssignmentHeadParams{GenerationID: generation, AssignmentID: id}); err != nil {
+	if err := q.SetResourceAssignmentHead(ctx, devicedb.SetResourceAssignmentHeadParams{GenerationID: generation, AssignmentID: id}); err != nil {
 		return err
 	}
-	action, err := q.GetOpenServiceAction(ctx, deviceID)
+	action, err := q.GetOpenResourceAction(ctx, deviceID)
 	if err == nil && len(action.StartGrantEnvelope) == 0 {
 		if err := closeUnstartedResourceAction(ctx, q, &action, "assignment_changed", now); err != nil {
 			return err
@@ -170,5 +170,5 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	return dispatchAudit(ctx, q, &actor, "service_assignment.assign", id, "target_preview_activation")
+	return dispatchAudit(ctx, q, &actor, "resource_assignment.assign", id, "target_preview_activation")
 }

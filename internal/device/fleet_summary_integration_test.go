@@ -100,8 +100,8 @@ VALUES($1,'active',CURRENT_TIMESTAMP,'hidden-os','hidden-version',CURRENT_TIMEST
 	if !proto.Equal(got.GetLifecycle(), wantLifecycle) || !proto.Equal(got.GetContact(), wantContact) || !proto.Equal(got.GetOperatingSystems(), wantOS) {
 		t.Fatalf("scoped counts included hidden devices or sampled a page: %v", got)
 	}
-	if got.GetServiceCompliance().GetUnassignedDevices() != 209 || got.GetServiceCompliance().GetTotalResources() != 0 {
-		t.Fatalf("unassigned devices were sampled or called compliant: %v", got.GetServiceCompliance())
+	if got.GetResourceCompliance().GetUnassignedDevices() != 209 || got.GetResourceCompliance().GetTotalResources() != 0 {
+		t.Fatalf("unassigned devices were sampled or called compliant: %v", got.GetResourceCompliance())
 	}
 	all := fleetSummary(t, f.svc, f.ownerCtx, 0)
 	wantLifecycle.TotalDevices += 3
@@ -120,7 +120,7 @@ VALUES($1,'active',CURRENT_TIMESTAMP,'hidden-os','hidden-version',CURRENT_TIMEST
 	}
 	principal = scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}})
 	empty := fleetSummary(t, f.svc, identity.WithPrincipal(f.ctx, principal), 0)
-	if empty.GetLifecycle().GetTotalDevices() != 0 || len(empty.GetOperatingSystems().GetGroups()) != 0 || empty.GetOperatingSystems().GetOtherDevices() != 0 || empty.GetServiceCompliance().GetUnassignedDevices() != 0 || len(empty.GetRecentActions()) != 0 {
+	if empty.GetLifecycle().GetTotalDevices() != 0 || len(empty.GetOperatingSystems().GetGroups()) != 0 || empty.GetOperatingSystems().GetOtherDevices() != 0 || empty.GetResourceCompliance().GetUnassignedDevices() != 0 || len(empty.GetRecentActions()) != 0 {
 		t.Fatalf("empty authorized population leaked aggregate state: %v", empty)
 	}
 }
@@ -175,7 +175,7 @@ func fleetSummaryEnroll(t *testing.T, f *enrolledFixture) *enrolledFixture {
 	return other
 }
 
-func TestFleetSummaryServiceComplianceMatchesDeviceState(t *testing.T) {
+func TestFleetSummaryResourceComplianceMatchesDeviceState(t *testing.T) {
 	f := newDispatchFixture(t)
 	assignment := f.assign(t, nil)
 	exec := func(query string, args ...any) {
@@ -208,15 +208,15 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resou
 		update     string
 		blocked    string
 		compliance adminv1.ResourceCompliance
-		want       *adminv1.FleetServiceComplianceSummary
+		want       *adminv1.FleetResourceComplianceSummary
 	}{
-		{"unknown", "disposition=1,last_verified_at=NULL,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_UNKNOWN, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, UnknownResources: 2}},
-		{"compliant", "disposition=3,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_COMPLIANT, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, CompliantResources: 2}},
-		{"remediated", "disposition=3,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=true", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_DRIFT_REMEDIATED, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, DriftRemediatedResources: 2}},
-		{"stale", "disposition=3,last_verified_at=CURRENT_TIMESTAMP-interval '1 hour',drift_remediated=true", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_STALE, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, StaleResources: 2}},
-		{"attention", "disposition=4,last_verified_at=NULL,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
-		{"blocked", "disposition=1,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "authority_changed", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
-		{"dependency_attention", "disposition=CASE WHEN position=0 THEN 4 ELSE 1 END,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetServiceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
+		{"unknown", "disposition=1,last_verified_at=NULL,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_UNKNOWN, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, UnknownResources: 2}},
+		{"compliant", "disposition=3,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_COMPLIANT, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, CompliantResources: 2}},
+		{"remediated", "disposition=3,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=true", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_DRIFT_REMEDIATED, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, DriftRemediatedResources: 2}},
+		{"stale", "disposition=3,last_verified_at=CURRENT_TIMESTAMP-interval '1 hour',drift_remediated=true", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_STALE, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, StaleResources: 2}},
+		{"attention", "disposition=4,last_verified_at=NULL,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
+		{"blocked", "disposition=1,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "authority_changed", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
+		{"dependency_attention", "disposition=CASE WHEN position=0 THEN 4 ELSE 1 END,last_verified_at=CURRENT_TIMESTAMP,drift_remediated=false", "", adminv1.ResourceCompliance_RESOURCE_COMPLIANCE_ATTENTION, &adminv1.FleetResourceComplianceSummary{TotalResources: 2, AttentionResources: 2}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			exec("UPDATE resource_assignments SET blocked_reason=$2 WHERE id=$1", assignment.GetAssignmentId(), test.blocked)
@@ -231,21 +231,21 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resou
 				}
 			}
 			got := fleetSummary(t, f.service, ctx, 0)
-			if !proto.Equal(got.GetServiceCompliance(), test.want) {
-				t.Fatalf("fleet differs from current device state or leaked hidden/superseded resources: got=%v want=%v", got.GetServiceCompliance(), test.want)
+			if !proto.Equal(got.GetResourceCompliance(), test.want) {
+				t.Fatalf("fleet differs from current device state or leaked hidden/superseded resources: got=%v want=%v", got.GetResourceCompliance(), test.want)
 			}
 		})
 	}
 	all := fleetSummary(t, f.service, f.adminCtx, 0)
-	if all.GetServiceCompliance().GetTotalResources() != 4 || all.GetServiceCompliance().GetAttentionResources() != 4 {
-		t.Fatalf("unrestricted current heads lost resources: %v", all.GetServiceCompliance())
+	if all.GetResourceCompliance().GetTotalResources() != 4 || all.GetResourceCompliance().GetAttentionResources() != 4 {
+		t.Fatalf("unrestricted current heads lost resources: %v", all.GetResourceCompliance())
 	}
 	exec("UPDATE resource_assignment_resources SET disposition=1,last_verified_at=NULL,drift_remediated=false WHERE assignment_id=$1", assignment.GetAssignmentId())
 	work := f.work(t)
 	f.start(t, work)
 	applying := fleetSummary(t, f.service, ctx, 0)
-	if !proto.Equal(applying.GetServiceCompliance(), &adminv1.FleetServiceComplianceSummary{TotalResources: 2, AttentionResources: 1, UnknownResources: 1}) {
-		t.Fatalf("started remediation was reported unknown or compliant: %v", applying.GetServiceCompliance())
+	if !proto.Equal(applying.GetResourceCompliance(), &adminv1.FleetResourceComplianceSummary{TotalResources: 2, AttentionResources: 1, UnknownResources: 1}) {
+		t.Fatalf("started remediation was reported unknown or compliant: %v", applying.GetResourceCompliance())
 	}
 	if actions := applying.GetRecentActions(); len(actions) != 1 || actions[0].GetKind() != "resource" || actions[0].GetStartAuthorizedAt() == nil || actions[0].GetClosedAt() != nil || !actions[0].GetOutcomeUnknown() {
 		t.Fatalf("open started service action lost uncertainty: %v", actions)
@@ -258,8 +258,8 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resou
 		t.Fatal(err)
 	}
 	cleared := fleetSummary(t, f.service, ctx, 0)
-	if !proto.Equal(cleared.GetServiceCompliance(), &adminv1.FleetServiceComplianceSummary{UnassignedDevices: 1}) {
-		t.Fatalf("cleared head retained historical compliance: %v", cleared.GetServiceCompliance())
+	if !proto.Equal(cleared.GetResourceCompliance(), &adminv1.FleetResourceComplianceSummary{UnassignedDevices: 1}) {
+		t.Fatalf("cleared head retained historical compliance: %v", cleared.GetResourceCompliance())
 	}
 }
 
@@ -429,7 +429,7 @@ func TestFleetSummaryAuthorizationAndOmittedSections(t *testing.T) {
 	}
 	auditor := insertPrincipal(t, f.ctx, f.conn, identity.RoleAuditor)
 	got := fleetSummary(t, f.svc, identity.WithPrincipal(f.ctx, auditor), 0)
-	if got.GetFindings() != nil || got.GetApprovals() != nil || got.GetLifecycle() == nil || got.GetContact() == nil || got.GetOperatingSystems() == nil || got.GetServiceCompliance() == nil {
+	if got.GetFindings() != nil || got.GetApprovals() != nil || got.GetLifecycle() == nil || got.GetContact() == nil || got.GetOperatingSystems() == nil || got.GetResourceCompliance() == nil {
 		t.Fatalf("unavailable/denied sections were fabricated as zero or required sections omitted: %v", got)
 	}
 	f.svc.identity = nil

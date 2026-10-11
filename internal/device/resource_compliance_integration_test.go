@@ -15,7 +15,7 @@ import (
 	"lindm/internal/device/devicedb"
 )
 
-func TestServiceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
+func TestResourceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 	f := newDispatchFixture(t)
 	request := f.assignmentRequest(nil)
 	request.ReconcileIntervalSeconds = proto.Uint32(300)
@@ -86,7 +86,7 @@ func TestServiceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 	}
 }
 
-func TestServiceComplianceRecheckAuthorizationFence(t *testing.T) {
+func TestResourceComplianceRecheckAuthorizationFence(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	for range 2 {
@@ -109,7 +109,7 @@ func TestServiceComplianceRecheckAuthorizationFence(t *testing.T) {
 	}
 }
 
-func TestServiceComplianceReadOnlyHistoryBound(t *testing.T) {
+func TestResourceComplianceReadOnlyHistoryBound(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	// Retain a genuine granted success and a non-success without a grant.
@@ -137,7 +137,7 @@ func TestServiceComplianceReadOnlyHistoryBound(t *testing.T) {
 	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FILTER (WHERE read_only_success), count(*) FILTER (WHERE NOT read_only_success) FROM resource_actions WHERE generation_id=$1", f.principal.GenerationID).Scan(&count, &protected); err != nil || count != 256 || protected != 2 {
 		t.Fatalf("history bound: read-only=%d protected=%d err=%v", count, protected, err)
 	}
-	capacity, err := devicedb.New(f.pool).ServiceDispatchCapacity(t.Context(), f.principal.GenerationID)
+	capacity, err := devicedb.New(f.pool).ResourceDispatchCapacity(t.Context(), f.principal.GenerationID)
 	if err != nil || capacity.Actions != 2 {
 		t.Fatalf("periodic read-only successes consumed protected action capacity: %v %v", capacity, err)
 	}
@@ -154,7 +154,7 @@ func TestServiceComplianceReadOnlyHistoryBound(t *testing.T) {
 	}
 }
 
-func TestServiceComplianceIntervalValidation(t *testing.T) {
+func TestResourceComplianceIntervalValidation(t *testing.T) {
 	f := newDispatchFixture(t)
 	for _, seconds := range []uint32{0, 299, 86401} {
 		request := f.assignmentRequest(nil)

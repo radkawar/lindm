@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"unsafe"
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 const maximumHeaderBytes = 128 << 20
@@ -192,7 +192,7 @@ func (p *Provider) verifyErasedHeader(ctx context.Context, file *os.File, extent
 
 func (p *Provider) verifyNotLUKS(ctx context.Context, file *os.File) error {
 	_, err := p.crypt(ctx, file, []string{"luksDump", descriptor(0)})
-	var exit *exec.ExitError
+	var exit *nativeexec.ExitError
 	// Invalid metadata can produce EINVAL/status 1 or ENODEV/status 4 depending
 	// on cryptsetup version. Require its fixed C-locale invalid-LUKS diagnostic
 	// as well as complete zero-read proof; argument/permission/I/O errors alone

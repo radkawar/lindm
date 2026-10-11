@@ -471,7 +471,7 @@ var File_lindm_agent_v1_native_firewall_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_native_firewall_proto_rawDesc = "" +
 	"\n" +
-	"$lindm/agent/v1/native_firewall.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a&lindm/agent/v1/service_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a\x1flindm/resource/v1/network.proto\"\\\n" +
+	"$lindm/agent/v1/native_firewall.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1elindm/resource/v1/common.proto\x1a\x1flindm/resource/v1/network.proto\"\\\n" +
 	"\x16NativeFirewallEndpoint\x12!\n" +
 	"\aaddress\x18\x01 \x01(\tB\a\xbaH\x04r\x02p\x01R\aaddress\x12\x1f\n" +
 	"\x04port\x18\x02 \x01(\rB\v\xbaH\b*\x06\x18\xff\xff\x03(\x01R\x04port\"\x99\x02\n" +
@@ -564,7 +564,7 @@ func file_lindm_agent_v1_native_firewall_proto_init() {
 	if File_lindm_agent_v1_native_firewall_proto != nil {
 		return
 	}
-	file_lindm_agent_v1_service_execution_proto_init()
+	file_lindm_agent_v1_resource_execution_proto_init()
 	file_lindm_agent_v1_native_firewall_proto_msgTypes[3].OneofWrappers = []any{}
 	file_lindm_agent_v1_native_firewall_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}

@@ -5,7 +5,7 @@ package lindm.agent.v1;
 import "buf/validate/validate.proto";
 import "lindm/agent/v1/native_firewall.proto";
 import "lindm/agent/v1/private_custody.proto";
-import "lindm/agent/v1/service_execution.proto";
+import "lindm/agent/v1/resource_execution.proto";
 import "lindm/resource/v1/common.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/observations.proto";

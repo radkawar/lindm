@@ -71,7 +71,7 @@ func (s *Service) activateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	if err != nil {
 		return err
 	}
-	if err := q.InsertServiceAssignment(ctx, devicedb.InsertServiceAssignmentParams{ID: id, DeviceID: receipt.DeviceID, GenerationID: receipt.GenerationID, RequestID: receipt.TransactionID, RequestDigest: receipt.CsrSha256, ActorID: token.CreatedBy, AuthorizationVersion: token.AuthorizationVersion, RevisionID: &revision, Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
+	if err := q.InsertResourceAssignment(ctx, devicedb.InsertResourceAssignmentParams{ID: id, DeviceID: receipt.DeviceID, GenerationID: receipt.GenerationID, RequestID: receipt.TransactionID, RequestDigest: receipt.CsrSha256, ActorID: token.CreatedBy, AuthorizationVersion: token.AuthorizationVersion, RevisionID: &revision, Document: document, AssignedAt: timestamptz(now), ReconcileIntervalSeconds: 900}); err != nil {
 		return err
 	}
 	if err := insertResourceRows(ctx, q, id, resources); err != nil {
@@ -87,12 +87,12 @@ func (s *Service) activateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 		if err != nil {
 			return errInternalState
 		}
-		if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: id, ResourceID: resourceID, Disposition: int16(adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED), Reason: "adoption_approval_required"}); err != nil {
+		if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: id, ResourceID: resourceID, Disposition: int16(adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED), Reason: "adoption_approval_required"}); err != nil {
 			return err
 		}
 	}
-	if err := q.SetServiceAssignmentHead(ctx, devicedb.SetServiceAssignmentHeadParams{GenerationID: receipt.GenerationID, AssignmentID: id}); err != nil {
+	if err := q.SetResourceAssignmentHead(ctx, devicedb.SetResourceAssignmentHeadParams{GenerationID: receipt.GenerationID, AssignmentID: id}); err != nil {
 		return err
 	}
-	return insertAudit(ctx, q, &token.CreatedBy, "service_assignment.assign", id.String(), token.Reason)
+	return insertAudit(ctx, q, &token.CreatedBy, "resource_assignment.assign", id.String(), token.Reason)
 }

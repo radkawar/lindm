@@ -63,19 +63,19 @@ type VMDispatchOptions struct {
 }
 
 type VMDispatchScenario struct {
-	Name                   string                        `json:"name"`
-	StartedAt              time.Time                     `json:"started_at"`
-	FinishedAt             time.Time                     `json:"finished_at"`
-	Action                 *adminv1.ServiceActionSummary `json:"action,omitempty"`
-	Assignment             *adminv1.ResourceAssignment   `json:"assignment,omitempty"`
-	Resource               *adminv1.ResourceState        `json:"resource,omitempty"`
-	RevocationApproval     *adminv1.Approval             `json:"revocation_approval,omitempty"`
-	NativeBeforeActive     string                        `json:"native_before_active,omitempty"`
-	NativeBeforeEnablement string                        `json:"native_before_enablement,omitempty"`
-	NativeActive           string                        `json:"native_active,omitempty"`
-	NativeEnablement       string                        `json:"native_enablement,omitempty"`
-	StartWitness           string                        `json:"start_witness,omitempty"`
-	Coverage               string                        `json:"coverage"`
+	Name                   string                         `json:"name"`
+	StartedAt              time.Time                      `json:"started_at"`
+	FinishedAt             time.Time                      `json:"finished_at"`
+	Action                 *adminv1.ResourceActionSummary `json:"action,omitempty"`
+	Assignment             *adminv1.ResourceAssignment    `json:"assignment,omitempty"`
+	Resource               *adminv1.ResourceState         `json:"resource,omitempty"`
+	RevocationApproval     *adminv1.Approval              `json:"revocation_approval,omitempty"`
+	NativeBeforeActive     string                         `json:"native_before_active,omitempty"`
+	NativeBeforeEnablement string                         `json:"native_before_enablement,omitempty"`
+	NativeActive           string                         `json:"native_active,omitempty"`
+	NativeEnablement       string                         `json:"native_enablement,omitempty"`
+	StartWitness           string                         `json:"start_witness,omitempty"`
+	Coverage               string                         `json:"coverage"`
 }
 
 type VMDispatchResult struct {
@@ -509,7 +509,7 @@ func (c *vmControlPlane) assignDispatch(ctx context.Context, deviceID, head stri
 	return response.Msg.GetAssignment(), nil
 }
 
-func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, head string, open bool) (*adminv1.ServiceActionSummary, error) {
+func waitDispatchAction(ctx context.Context, control *vmControlPlane, deviceID, head string, open bool) (*adminv1.ResourceActionSummary, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	var last *adminv1.GetDeviceResourceStateResponse
@@ -562,7 +562,7 @@ func exerciseConnectedDispatch(ctx context.Context, vm *guestVM, control *vmCont
 		}
 		scenario.Assignment = assignment
 		head = assignment.GetAssignmentId()
-		var opened *adminv1.ServiceActionSummary
+		var opened *adminv1.ResourceActionSummary
 		if restart {
 			opened, err = waitDispatchAction(ctx, control, result.DeviceID, head, true)
 			if err != nil {

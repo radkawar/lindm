@@ -26,7 +26,7 @@ type VMResourceScenario struct {
 	Name            string                           `json:"name"`
 	StartedAt       time.Time                        `json:"started_at"`
 	FinishedAt      time.Time                        `json:"finished_at"`
-	Action          *adminv1.ServiceActionSummary    `json:"action,omitempty"`
+	Action          *adminv1.ResourceActionSummary   `json:"action,omitempty"`
 	Release         *adminv1.ResourceRelease         `json:"release,omitempty"`
 	ExecutorStatus  *agentv1.ResourceExecutionStatus `json:"executor_status,omitempty"`
 	ExecutorHistory []vmServiceAttestationPhase      `json:"authenticated_executor_history,omitempty"`

@@ -4,14 +4,14 @@ package lindm.lab.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
-import "lindm/agent/v1/service_execution.proto";
+import "lindm/agent/v1/resource_execution.proto";
 
 option go_package = "lindm/gen/lindm/lab/v1;labv1";
 
-// ServiceClockEvidence brackets host-side challenge verification with host wall
+// ResourceClockEvidence brackets host-side challenge verification with host wall
 // timestamps and retains the authenticated guest challenge timestamps. It is lab
 // provenance, not an additional device signature or an authorization extension.
-message ServiceClockEvidence {
+message ResourceClockEvidence {
   google.protobuf.Timestamp host_before = 1 [(buf.validate.field).required = true];
   google.protobuf.Timestamp host_after = 2 [(buf.validate.field).required = true];
   lindm.agent.v1.ResourceExecutionChallenge challenge = 3 [(buf.validate.field).required = true];

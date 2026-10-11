@@ -1488,7 +1488,7 @@ var File_lindm_device_v1_device_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/device/v1/assistance.proto\x1a$lindm/device/v1/device_actions.proto\x1a'lindm/device/v1/inventory_refresh.proto\x1a&lindm/device/v1/service_dispatch.proto\x1a$lindm/inventory/v1/observation.proto\"M\n" +
+	"\x1clindm/device/v1/device.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a\x1blindm/agent/v1/update.proto\x1a lindm/device/v1/assistance.proto\x1a$lindm/device/v1/device_actions.proto\x1a'lindm/device/v1/inventory_refresh.proto\x1a'lindm/device/v1/resource_dispatch.proto\x1a$lindm/inventory/v1/observation.proto\"M\n" +
 	"\x15AcquireSessionRequest\x124\n" +
 	"\x0fauthority_proof\x18\x01 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x0eauthorityProof\"\xca\x01\n" +
 	"\x16AcquireSessionResponse\x12#\n" +
@@ -1783,7 +1783,7 @@ func file_lindm_device_v1_device_proto_init() {
 	file_lindm_device_v1_assistance_proto_init()
 	file_lindm_device_v1_device_actions_proto_init()
 	file_lindm_device_v1_inventory_refresh_proto_init()
-	file_lindm_device_v1_service_dispatch_proto_init()
+	file_lindm_device_v1_resource_dispatch_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

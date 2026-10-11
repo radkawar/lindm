@@ -24,7 +24,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
-func TestServiceDispatchNoDrift(t *testing.T) {
+func TestResourceDispatchNoDrift(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
@@ -40,7 +40,7 @@ func TestServiceDispatchNoDrift(t *testing.T) {
 
 // Sealed deliveries are opaque to the relay: the executor must receive the
 // server's exact ciphertext, in order, or the signed digests cannot match.
-func TestServiceDispatchRelaysExactSealedSecrets(t *testing.T) {
+func TestResourceDispatchRelaysExactSealedSecrets(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	f.work.SealedSecrets = [][]byte{[]byte(" first sealed\n"), []byte(" second sealed\n")}
@@ -179,7 +179,7 @@ func TestServicePreparationNeverAcceptedAcknowledgesNoNativeProof(t *testing.T) 
 	}
 }
 
-func TestServiceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
+func TestResourceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
 		f.loseAuthorization = true
@@ -208,7 +208,7 @@ func TestServiceDispatchLostStartAuthorizationReplaysStoredGrant(t *testing.T) {
 	})
 }
 
-func TestServiceDispatchPollsToTerminalWithFreshSessionAndNonce(t *testing.T) {
+func TestResourceDispatchPollsToTerminalWithFreshSessionAndNonce(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
 		f.pollStates = []agentv1.ResourceExecutionState{
@@ -231,7 +231,7 @@ func TestServiceDispatchPollsToTerminalWithFreshSessionAndNonce(t *testing.T) {
 	})
 }
 
-func TestServiceDispatchReportsExistingAndExpiredHistory(t *testing.T) {
+func TestResourceDispatchReportsExistingAndExpiredHistory(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		state agentv1.ResourceExecutionState
@@ -265,10 +265,10 @@ func TestServiceDispatchReportsExistingAndExpiredHistory(t *testing.T) {
 	}
 }
 
-func TestServiceDispatchExpiredStartReportsHistory(t *testing.T) {
+func TestResourceDispatchExpiredStartReportsHistory(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.work.StartGrantEnvelope = f.grant
-	f.startErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("service_execution_expired"))
+	f.startErr = connect.NewError(connect.CodeFailedPrecondition, errors.New("resource_execution_expired"))
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -277,26 +277,26 @@ func TestServiceDispatchExpiredStartReportsHistory(t *testing.T) {
 	}
 }
 
-func TestServiceDispatchPollingBoundDoesNotInventCompletion(t *testing.T) {
+func TestResourceDispatchPollingBoundDoesNotInventCompletion(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
 		begin := time.Now()
 		if err := f.loop.dispatchServices(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if elapsed := time.Since(begin); elapsed != servicePollTimeout {
-			t.Fatalf("poll duration = %v, want %v", elapsed, servicePollTimeout)
+		if elapsed := time.Since(begin); elapsed != resourcePollTimeout {
+			t.Fatalf("poll duration = %v, want %v", elapsed, resourcePollTimeout)
 		}
 		if f.closed || f.reports != 1 || f.attestedState != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_QUEUED {
 			t.Fatalf("bounded polling invented terminal success: %v", f.events)
 		}
-		if f.polls > 1+int(servicePollTimeout/servicePollInterval) {
+		if f.polls > 1+int(resourcePollTimeout/resourcePollInterval) {
 			t.Fatal("local polling was not paced")
 		}
 	})
 }
 
-func TestServiceDispatchStopsWhenFreshWorkChanges(t *testing.T) {
+func TestResourceDispatchStopsWhenFreshWorkChanges(t *testing.T) {
 	for _, change := range []string{"cleared", "different-action", "different-intent"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDispatchFixture(t)
@@ -313,19 +313,19 @@ func TestServiceDispatchStopsWhenFreshWorkChanges(t *testing.T) {
 	}
 }
 
-func TestServiceDispatchBoundsActionsPerCycle(t *testing.T) {
+func TestResourceDispatchBoundsActionsPerCycle(t *testing.T) {
 	f := newDispatchFixture(t)
 	f.state = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED
 	f.moreActions = true
 	if err := f.loop.dispatchServices(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if f.reports != serviceActionsPerCycle || f.prepares != serviceActionsPerCycle {
+	if f.reports != resourceActionsPerCycle || f.prepares != resourceActionsPerCycle {
 		t.Fatalf("cycle did not bound action processing: reports=%d prepares=%d", f.reports, f.prepares)
 	}
 }
 
-func TestServiceDispatchRejectsUnboundHistory(t *testing.T) {
+func TestResourceDispatchRejectsUnboundHistory(t *testing.T) {
 	for _, field := range []string{"action", "intent"} {
 		t.Run(field, func(t *testing.T) {
 			f := newDispatchFixture(t)
@@ -390,7 +390,7 @@ func TestManagementTrustDispatchCadenceAndIdleJoin(t *testing.T) {
 	})
 }
 
-func TestServiceDispatchRPCDeadline(t *testing.T) {
+func TestResourceDispatchRPCDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newDispatchFixture(t)
 		f.blockPhase = "work"
@@ -524,7 +524,7 @@ func (f *dispatchFixture) status() *agentv1.ResourceExecutionStatus {
 	if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_RUNNING {
 		status.StartedAt = timestamppb.Now()
 	}
-	if serviceExecutionTerminal(f.state) {
+	if resourceExecutionTerminal(f.state) {
 		status.CompletedAt = timestamppb.Now()
 		if f.state == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED {
 			status.Verification = &resourcev1.ResourceVerification{
@@ -642,7 +642,7 @@ func (e *dispatchExecutor) GetResourceExecution(ctx context.Context, req *connec
 	}
 	if f.state != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARED && len(f.pollStates) != 0 {
 		f.state, f.pollStates = f.pollStates[0], f.pollStates[1:]
-		if serviceExecutionTerminal(f.state) && f.changeSessionOnTerminal {
+		if resourceExecutionTerminal(f.state) && f.changeSessionOnTerminal {
 			f.epoch++
 		}
 	}
@@ -765,7 +765,7 @@ func (s *dispatchServer) ReportResourceResult(ctx context.Context, req *connect.
 		return nil, err
 	}
 	f.reports++
-	f.closed = f.neverPrepared || serviceExecutionTerminal(f.attestedState)
+	f.closed = f.neverPrepared || resourceExecutionTerminal(f.attestedState)
 	closed := f.closed
 	if f.moreActions && closed {
 		f.closed = false

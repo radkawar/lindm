@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -142,7 +141,7 @@ func members(s string) []string {
 func (p *Provider) nss(ctx context.Context, table, key string, local []string) ([]byte, error) {
 	out, err := p.run(ctx, nil, "/usr/bin/getent", table, key)
 	if err != nil {
-		var exit *exec.ExitError
+		var exit *nativeexec.ExitError
 		if errors.As(err, &exit) && exit.ExitCode() == 2 && local == nil && len(out) == 0 {
 			return []byte(table + ":" + key + ":absent"), nil
 		}

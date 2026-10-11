@@ -65,7 +65,7 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 		OperatingSystems: &adminv1.FleetOSSummary{
 			Groups: make([]*adminv1.FleetOSCount, 0, len(operatingSystems)), OtherDevices: uint64(counts.TotalDevices),
 		},
-		ServiceCompliance: &adminv1.FleetServiceComplianceSummary{
+		ResourceCompliance: &adminv1.FleetResourceComplianceSummary{
 			TotalResources: uint64(compliance.TotalResources), CompliantResources: uint64(compliance.CompliantResources),
 			DriftRemediatedResources: uint64(compliance.DriftRemediatedResources), AttentionResources: uint64(compliance.AttentionResources),
 			StaleResources: uint64(compliance.StaleResources), UnknownResources: uint64(compliance.UnknownResources),

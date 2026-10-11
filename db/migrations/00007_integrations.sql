@@ -272,9 +272,9 @@ $$;
 CREATE FUNCTION integration_capture_compliance() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE assignment uuid;
 BEGIN
-  IF NEW.action LIKE 'service_action.%' THEN
+  IF NEW.action LIKE 'resource_action.%' THEN
     SELECT assignment_id INTO assignment FROM resource_actions WHERE id::text = NEW.resource_id;
-  ELSIF NEW.action LIKE 'service_assignment.%' THEN
+  ELSIF NEW.action LIKE 'resource_assignment.%' THEN
     SELECT id INTO assignment FROM resource_assignments WHERE id::text = NEW.resource_id;
   ELSE
     RETURN NEW;

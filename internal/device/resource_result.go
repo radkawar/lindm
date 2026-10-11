@@ -53,11 +53,11 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	if uint64(device.generation.SessionEpoch) != req.Msg.GetSessionEpoch() {
 		return nil, mapErr(errSessionFenced)
 	}
-	if _, err := q.LockServiceAssignment(ctx, principal.GenerationID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := q.LockResourceAssignment(ctx, principal.GenerationID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, mapErr(err)
 	}
 	id, _ := uuid.Parse(req.Msg.GetActionId())
-	action, err := q.LockServiceAction(ctx, id)
+	action, err := q.LockResourceAction(ctx, id)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -72,7 +72,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		return nil, mapErr(err)
 	}
 	if action.DeviceID != principal.DeviceID || action.GenerationID != principal.GenerationID {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_action_binding_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_action_binding_rejected")
 	}
 	if cancellation := req.Msg.GetNeverPrepared(); cancellation != nil {
 		return s.reportNeverPreparedResource(ctx, tx, q, action, cancellation, now)
@@ -107,7 +107,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		}
 		accepted := new(agentv1.ResourceExecutionAttestation)
 		if err := s.authority.Verify(ctx, action.AttestationEnvelope, accepted, 1, public); err != nil || accepted.GetSessionEpoch() != req.Msg.GetSessionEpoch() {
-			return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_rejected")
+			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_rejected")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -115,7 +115,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		return noStore(&devicev1.ReportResourceResultResponse{Closed: action.ClosedAt.Valid}), nil
 	}
 	if len(action.ResultNonce) != 32 || !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_nonce_rejected")
 	}
 	binding := &trust.ResourceAttestationBinding{DeploymentID: s.deploymentID, DeviceID: principal.DeviceID, EnrollmentGeneration: principal.GenerationID, SessionEpoch: req.Msg.GetSessionEpoch(), ActionID: id, IntentSHA256: sha256.Sum256(action.IntentEnvelope)}
 	copy(binding.Nonce[:], action.ResultNonce)
@@ -124,7 +124,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_clock_skew")
 	}
 	if err != nil {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_rejected")
 	}
 	previous, err := resourceActionRevision(action)
 	if err != nil {
@@ -143,7 +143,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	// history or refreshed native proof. All other states remain increasing.
 	if attestation.GetActionRevision() < previous ||
 		(attestation.GetActionRevision() == previous && (priorPreparation == nil || !proto.Equal(priorPreparation, status))) {
-		return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
 	}
 	intent := new(agentv1.ResourceExecutionIntent)
 	if err := proto.Unmarshal(action.IntentDocument, intent); err != nil {
@@ -173,17 +173,17 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_binding_rejected")
 		}
 		if priorPreparation != nil && priorPreparation.GetState() != agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING {
-			return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
 		}
 	}
 	if action.ClosedAt.Valid && !terminal {
-		return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
+		return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
 	}
 	encoded, err := proto.Marshal(status)
 	if err != nil {
 		return nil, mapErr(err)
 	}
-	if err := q.SetServiceResult(ctx, devicedb.SetServiceResultParams{ID: id, ActionRevision: pgtype.Numeric{Int: new(big.Int).SetUint64(attestation.GetActionRevision()), Valid: true}, AttestationEnvelope: req.Msg.GetAttestationEnvelope(), AttestationCertificate: req.Msg.GetCertificatePem(), StatusDocument: encoded, AttestedAt: timestamptz(attestation.GetIssuedAt().AsTime()), ReceivedAt: timestamptz(now)}); err != nil {
+	if err := q.SetResourceResult(ctx, devicedb.SetResourceResultParams{ID: id, ActionRevision: pgtype.Numeric{Int: new(big.Int).SetUint64(attestation.GetActionRevision()), Valid: true}, AttestationEnvelope: req.Msg.GetAttestationEnvelope(), AttestationCertificate: req.Msg.GetCertificatePem(), StatusDocument: encoded, AttestedAt: timestamptz(attestation.GetIssuedAt().AsTime()), ReceivedAt: timestamptz(now)}); err != nil {
 		return nil, mapErr(err)
 	}
 	disposition, reason := int16(2), action.ClosedReason
@@ -192,7 +192,7 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 		if closedReason == "" {
 			closedReason = "result"
 		}
-		if err := q.CloseServiceAction(ctx, devicedb.CloseServiceActionParams{ID: id, ClosedAt: timestamptz(now), ClosedReason: closedReason}); err != nil {
+		if err := q.CloseResourceAction(ctx, devicedb.CloseResourceActionParams{ID: id, ClosedAt: timestamptz(now), ClosedReason: closedReason}); err != nil {
 			return nil, mapErr(err)
 		}
 		switch {
@@ -239,16 +239,16 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 	} else {
 		// A late report for an older action must not overwrite a newer lease's
 		// disposition, even though the signed evidence remains retained and audited.
-		latest, err := q.LatestServiceAction(ctx, devicedb.LatestServiceActionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID})
+		latest, err := q.LatestResourceAction(ctx, devicedb.LatestResourceActionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID})
 		if err != nil {
 			return nil, mapErr(err)
 		}
 		if latest.ID == action.ID {
-			if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
+			if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: disposition, Reason: reason}); err != nil {
 				return nil, mapErr(err)
 			}
 			if disposition == 3 {
-				if err := q.SetServiceResourceVerification(ctx, devicedb.SetServiceResourceVerificationParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, LastVerifiedAt: timestamptz(now), ObservedAt: timestamptz(status.GetVerification().GetAfter().GetMetadata().GetObservedAt().AsTime()), DriftRemediated: len(action.StartGrantEnvelope) != 0}); err != nil {
+				if err := q.SetAssignmentResourceVerification(ctx, devicedb.SetAssignmentResourceVerificationParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, LastVerifiedAt: timestamptz(now), ObservedAt: timestamptz(status.GetVerification().GetAfter().GetMetadata().GetObservedAt().AsTime()), DriftRemediated: len(action.StartGrantEnvelope) != 0}); err != nil {
 					return nil, mapErr(err)
 				}
 			}
@@ -257,15 +257,15 @@ func (s *Service) ReportResourceResult(ctx context.Context, req *connect.Request
 			return nil, mapErr(err)
 		}
 		if disposition == 3 && len(action.StartGrantEnvelope) == 0 && status.GetStartedAt() == nil {
-			if err := q.MarkServiceReadOnlySuccess(ctx, id); err != nil {
+			if err := q.MarkResourceReadOnlySuccess(ctx, id); err != nil {
 				return nil, mapErr(err)
 			}
-			if err := q.PruneServiceReadOnlySuccesses(ctx, principal.GenerationID); err != nil {
+			if err := q.PruneResourceReadOnlySuccesses(ctx, principal.GenerationID); err != nil {
 				return nil, mapErr(err)
 			}
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "service_action.result", id, "verified_device_attestation"); err != nil {
+	if err := dispatchAudit(ctx, q, nil, "resource_action.result", id, "verified_device_attestation"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -376,7 +376,7 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 	}
 	if action.ClosedAt.Valid {
 		if !strings.HasSuffix(action.ClosedReason, "_never_prepared") {
-			return nil, rpcreason.Error(connect.CodeAlreadyExists, "service_result_conflict")
+			return nil, rpcreason.Error(connect.CodeAlreadyExists, "resource_result_conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return nil, mapErr(err)
@@ -387,9 +387,9 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_cancellation_not_requested")
 	}
 	if !action.NonceExpiresAt.Valid || !now.Before(action.NonceExpiresAt.Time) {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "service_result_nonce_rejected")
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "resource_result_nonce_rejected")
 	}
-	if err := q.CloseServiceAction(ctx, devicedb.CloseServiceActionParams{ID: action.ID, ClosedAt: timestamptz(now), ClosedReason: action.ClosedReason + "_never_prepared"}); err != nil {
+	if err := q.CloseResourceAction(ctx, devicedb.CloseResourceActionParams{ID: action.ID, ClosedAt: timestamptz(now), ClosedReason: action.ClosedReason + "_never_prepared"}); err != nil {
 		return nil, mapErr(err)
 	}
 	if action.ReleaseID != nil {
@@ -404,14 +404,14 @@ func (s *Service) reportNeverPreparedResource(ctx context.Context, tx pgx.Tx, q 
 			return nil, mapErr(err)
 		}
 	} else {
-		if err := q.SetServiceResourceDisposition(ctx, devicedb.SetServiceResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: 1, Reason: "no_effect"}); err != nil {
+		if err := q.SetAssignmentResourceDisposition(ctx, devicedb.SetAssignmentResourceDispositionParams{AssignmentID: action.AssignmentID, ResourceID: action.ResourceID, Disposition: 1, Reason: "no_effect"}); err != nil {
 			return nil, mapErr(err)
 		}
 		if err := s.targeting.RecordExecutionHealth(ctx, tx, action.DeviceID, action.GenerationID, action.AssignmentID); err != nil {
 			return nil, mapErr(err)
 		}
 	}
-	if err := dispatchAudit(ctx, q, nil, "service_action.preparation_cancel", action.ID, "executor_never_prepared"); err != nil {
+	if err := dispatchAudit(ctx, q, nil, "resource_action.preparation_cancel", action.ID, "executor_never_prepared"); err != nil {
 		return nil, mapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

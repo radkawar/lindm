@@ -73,7 +73,7 @@ func (r *resourceDispatch) assign(ctx context.Context, desired *resourcev1.Resou
 	return nil
 }
 
-func (r *resourceDispatch) action(ctx context.Context, rejected bool) (*adminv1.ServiceActionSummary, error) {
+func (r *resourceDispatch) action(ctx context.Context, rejected bool) (*adminv1.ResourceActionSummary, error) {
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
 	for {

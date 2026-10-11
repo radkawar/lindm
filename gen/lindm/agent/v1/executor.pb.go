@@ -2181,7 +2181,7 @@ var File_lindm_agent_v1_executor_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\n" +
-	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/agent/v1/inventory_refresh.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a&lindm/agent/v1/service_execution.proto\x1a\x1blindm/agent/v1/update.proto\"\x8f\b\n" +
+	"\x1dlindm/agent/v1/executor.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a+lindm/agent/v1/device_action_recovery.proto\x1a#lindm/agent/v1/device_actions.proto\x1a$lindm/agent/v1/execution_trust.proto\x1a&lindm/agent/v1/inventory_refresh.proto\x1a'lindm/agent/v1/offline_enrollment.proto\x1a'lindm/agent/v1/recovery_readiness.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1blindm/agent/v1/update.proto\"\x8f\b\n" +
 	"\x17PrepareBootstrapRequest\x129\n" +
 	"\x13execution_root_json\x18\x01 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x04R\x11executionRootJson\x128\n" +
 	"\x12bootstrap_envelope\x18\x02 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80 R\x11bootstrapEnvelope\x12-\n" +
@@ -2590,7 +2590,7 @@ func file_lindm_agent_v1_executor_proto_init() {
 	file_lindm_agent_v1_inventory_refresh_proto_init()
 	file_lindm_agent_v1_offline_enrollment_proto_init()
 	file_lindm_agent_v1_recovery_readiness_proto_init()
-	file_lindm_agent_v1_service_execution_proto_init()
+	file_lindm_agent_v1_resource_execution_proto_init()
 	file_lindm_agent_v1_update_proto_init()
 	file_lindm_agent_v1_executor_proto_msgTypes[12].OneofWrappers = []any{
 		(*PrepareSessionResponse_Accepted)(nil),

@@ -70,7 +70,7 @@ export function DashboardView() {
   const lifecycle = data?.lifecycle;
   const contact = data?.contact;
   const operatingSystems = data?.operatingSystems;
-  const compliance = data?.serviceCompliance;
+  const compliance = data?.resourceCompliance;
   const findings = data?.findings;
   const approvals = data?.approvals;
   const observed = formatTimestamp(data?.observedAt);

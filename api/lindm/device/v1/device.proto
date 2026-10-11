@@ -9,7 +9,7 @@ import "lindm/agent/v1/update.proto";
 import "lindm/device/v1/assistance.proto";
 import "lindm/device/v1/device_actions.proto";
 import "lindm/device/v1/inventory_refresh.proto";
-import "lindm/device/v1/service_dispatch.proto";
+import "lindm/device/v1/resource_dispatch.proto";
 import "lindm/inventory/v1/observation.proto";
 
 option go_package = "lindm/gen/lindm/device/v1;devicev1";

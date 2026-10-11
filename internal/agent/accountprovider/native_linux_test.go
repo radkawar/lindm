@@ -275,3 +275,13 @@ func TestRunNativeStderrFailsWithSanitizedFirstLine(t *testing.T) {
 		t.Fatalf("runNative = %q, %v", out, err)
 	}
 }
+
+// getent's "key not found" exit status 2 arrives as *nativeexec.ExitError and
+// must still mean authoritative absence, not an unsafe NSS failure.
+func TestNSSAbsenceThroughNativeexec(t *testing.T) {
+	p := &Provider{run: runNative}
+	out, err := p.nss(t.Context(), "group", "lindm-absent-group-7f3c", nil)
+	if err != nil || string(out) != "group:lindm-absent-group-7f3c:absent" {
+		t.Fatalf("absent group: %q, %v", out, err)
+	}
+}

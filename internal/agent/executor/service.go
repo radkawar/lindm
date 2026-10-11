@@ -578,9 +578,9 @@ func mapError(err error) error {
 	case errors.Is(err, journal.ErrResourceActionBusy), errors.Is(err, journal.ErrResourceActionRejected), errors.Is(err, journal.ErrConflict):
 		code, reason = connect.CodeFailedPrecondition, "resource_execution_conflict"
 	case errors.Is(err, serviceprovider.ErrUnsupported):
-		code, reason = connect.CodeFailedPrecondition, "service_provider_unsupported"
+		code, reason = connect.CodeFailedPrecondition, "resource_provider_unsupported"
 	case errors.Is(err, serviceprovider.ErrConflict), errors.Is(err, serviceprovider.ErrNotConverged):
-		code, reason = connect.CodeFailedPrecondition, "service_provider_precondition"
+		code, reason = connect.CodeFailedPrecondition, "resource_provider_precondition"
 	case errors.Is(err, errRecoveryHold):
 		code, reason = connect.CodeFailedPrecondition, "recovery_hold"
 	case errors.Is(err, errUnprovisioned):
