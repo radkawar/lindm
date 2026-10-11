@@ -1562,7 +1562,11 @@ prettier/markdownlint on touched docs and web files, `generate-docs -check`
 always, and race tests of the touched packages plus every module package whose
 build or tests import them, directly or transitively), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
-restores the local branch and the checkout. From apply until commit, rollback or
+restores the local branch and the checkout. Because every worktree links the
+shared `node_modules`, each landing first checks it with `npm ls` and reinstalls
+with `npm ci --ignore-scripts` when it drifts from `package-lock.json`; a landing
+that changes `package.json` or `package-lock.json` reinstalls after applying and
+before the gate, and again after a rollback. From apply until commit, rollback or
 refusal, `<main>/.git/lindm-landing.current` records the landing's owner, pid,
 worktree, message, files and start time; `go run ./cmd/dev status` prints it
 (flagged stale if no process holds the landing lock) together with HEAD against

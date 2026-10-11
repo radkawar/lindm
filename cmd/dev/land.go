@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"lindm/internal/devlab/worktree"
+	"lindm/internal/labexec"
 )
 
 const landUsage = `Usage: go run ./cmd/dev land -from WORKTREE -m MESSAGE [-paths a,b,...] [-timeout D]
@@ -89,8 +90,26 @@ func runLand(args []string) (resultErr error) {
 	if len(change.Files) == 0 {
 		return fmt.Errorf("%s has no change against %s", *from, worktree.Trunk)
 	}
+	// Every worktree links the shared install, so it must match the lock the
+	// gate runs against: repair drift first, reinstall when this landing
+	// changes the manifests.
+	if err := syncNodeModules(ctx, repo.Main, false); err != nil {
+		return err
+	}
 	fmt.Printf("land: %d files from %s (base %.12s); gating in %s\n", len(change.Files), *from, change.Base, repo.Main)
-	if err := repo.Land(ctx, change, *message, func(files []string) error { return quickGate(ctx, repo.Main, files) }); err != nil {
+	manifests := slices.ContainsFunc(change.Files, func(file string) bool { return file == "package.json" || file == "package-lock.json" })
+	if err := repo.Land(ctx, change, *message, func(files []string) error {
+		if manifests {
+			if err := syncNodeModules(ctx, repo.Main, true); err != nil {
+				return err
+			}
+		}
+		return quickGate(ctx, repo.Main, files)
+	}); err != nil {
+		if manifests {
+			// The rollback restored the previous manifests; match them again.
+			return errors.Join(err, syncNodeModules(context.WithoutCancel(ctx), repo.Main, false))
+		}
 		return err
 	}
 	head, err := output(ctx, repo.Main, "git", "log", "--oneline", "-1")
@@ -99,6 +118,22 @@ func runLand(args []string) (resultErr error) {
 	}
 	_, err = fmt.Printf("land: committed and pushed %s\n", head)
 	return err
+}
+
+// syncNodeModules makes the shared checkout's node_modules match its
+// package-lock.json: npm ci when forced or when npm ls finds the install
+// missing, extraneous or mismatched against the lock.
+func syncNodeModules(ctx context.Context, root string, force bool) error {
+	if !force {
+		if err := labexec.Run(ctx, labexec.Command{Path: "npm", Args: []string{"ls", "--all", "--silent"}, Dir: root}); err == nil {
+			return nil
+		}
+		fmt.Printf("land: %s/node_modules does not match package-lock.json; reinstalling\n", root)
+	}
+	if err := stream(ctx, root, nil, "npm", "ci", "--ignore-scripts"); err != nil {
+		return fmt.Errorf("sync shared node_modules: %w", err)
+	}
+	return nil
 }
 
 func runGateCommit(args []string) (resultErr error) {
