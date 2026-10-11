@@ -225,8 +225,11 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		// The agent package Recommends the capture stack; the lab installs it with
 		// --no-install-recommends, so install the release's capture packages from
 		// its signed archive first (Debian's GNOME task lacks gstreamer1.0-tools).
-		if err := installAssistanceCapture(ctx, vm.guest, release); err != nil {
-			return result, err
+		// A refusal-only desktop never captures; its stack is only recorded.
+		if !desktop.refusalOnly() {
+			if err := installAssistanceCapture(ctx, vm.guest, release); err != nil {
+				return result, err
+			}
 		}
 		if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
 			return result, err
@@ -459,7 +462,7 @@ func assistanceStateText(state adminv1.AssistanceState) string {
 // gates assistance runs only its desktop's pre-consent refusals, which prove
 // the gate's visible product behaviour rather than a capability.
 func assistanceAdmission(release *platform.Release, desktop *labDesktop) error {
-	refusalOnly := len(desktop.assistance) != 0 && !slices.ContainsFunc(desktop.assistance, func(spec assistanceScenarioSpec) bool { return spec.detail == "" })
+	refusalOnly := desktop.refusalOnly()
 	gate := release.Gate(platform.Assistance)
 	switch {
 	case refusalOnly && gate == nil:
@@ -468,4 +471,10 @@ func assistanceAdmission(release *platform.Release, desktop *labDesktop) error {
 		return gate
 	}
 	return nil
+}
+
+// refusalOnly reports whether every scenario of the desktop is a pre-consent
+// refusal, so no session on it ever captures.
+func (d *labDesktop) refusalOnly() bool {
+	return len(d.assistance) != 0 && !slices.ContainsFunc(d.assistance, func(spec assistanceScenarioSpec) bool { return spec.detail == "" })
 }

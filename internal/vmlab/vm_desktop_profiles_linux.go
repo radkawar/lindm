@@ -156,19 +156,31 @@ if as omarchy-hyprland-session-locked; then echo locked; else case $? in 1) echo
 		// Session.Lock and PrepareForSleep, and Super+Escape runs `loginctl
 		// lock-session`; its own log lines are the native lock oracle.
 		name: "cosmic",
+		// greetd starts an initial_session without the environment
+		// cosmic-greeter passes on a real login (XDG_SESSION_TYPE=wayland,
+		// XDG_SESSION_DESKTOP, XDG_CURRENT_DESKTOP; cosmic-greeter greeter.rs),
+		// so logind registered it as Type=tty (pop2404-lock-quarantine-02). The
+		// lab session's own PAM service supplies exactly that environment ahead
+		// of the vendor cosmic-greeter stack.
 		autologin: func(platform.LabSession) string {
-			return `config=/etc/greetd/cosmic-greeter.toml
+			return `printf 'XDG_SESSION_TYPE=wayland\nXDG_SESSION_DESKTOP=cosmic\nXDG_CURRENT_DESKTOP=COSMIC\n' > /etc/lindm-lab-cosmic-session.env
+printf 'session required pam_env.so readenv=1 user_readenv=0 envfile=/etc/lindm-lab-cosmic-session.env\n@include cosmic-greeter\n' > /etc/pam.d/lindm-lab-cosmic
+config=/etc/greetd/cosmic-greeter.toml
 awk 'BEGIN{skip=0} /^\[/{skip=($0=="[initial_session]")} !skip' "$config" > "$config.lindm"
-printf '\n[initial_session]\ncommand = "start-cosmic"\nuser = "%s"\n' "$u" >> "$config.lindm"
+printf '\n[initial_session]\ncommand = "start-cosmic"\nuser = "%s"\nservice = "lindm-lab-cosmic"\n' "$u" >> "$config.lindm"
 chmod --reference="$config" "$config.lindm"
 mv "$config.lindm" "$config"
 install -d -o "$u" -g "$u" -m 0700 /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1
 printf 'None' > /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1/screen_off_time
 printf 'None' > /home/"$u"/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time
 chown -R "$u":"$u" /home/"$u"/.config/cosmic
-systemctl restart display-manager.service`
+runfile=$(sed -n 's/^runfile *= *"\(.*\)"/\1/p' "$config")
+systemctl stop display-manager.service
+# greetd runs initial_session only on its first run of a boot.
+rm -f "${runfile:-/run/greetd.run}"
+systemctl start display-manager.service`
 		},
-		services:     []string{"cosmic-greeter"},
+		services:     []string{"lindm-lab-cosmic"},
 		sessionTypes: []string{"wayland"},
 		userEnv:      `WAYLAND_DISPLAY=$(cd /run/user/$uid && ls -d wayland-? | head -1)`,
 		ready:        `pgrep -u "$uid" -x cosmic-comp >/dev/null && pgrep -u "$uid" -x cosmic-panel >/dev/null`,

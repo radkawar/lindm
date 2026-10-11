@@ -283,12 +283,19 @@ func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platfo
 		command = `dpkg-query -W -f='${Package}=${Version}\n' ` + packages
 	case platform.PackageDBRPM:
 		command = "rpm -q " + packages
+	case platform.PackageDBPacman:
+		// A refusal-only desktop's stack is recorded, not required: pacman's
+		// "not found" lines are kept as evidence of what is absent.
+		command = "pacman -Q " + packages + " 2>&1 || true"
 	default:
 		return nil, fmt.Errorf("capture stack packages are not observable on %s", release.Name)
 	}
 	out, err := vm.run(ctx, command, nil, 16<<10, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("observe capture stack packages: %w", err)
+	}
+	if release.Native().Packages.Backend.PackageDB() == platform.PackageDBPacman {
+		return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
 	}
 	return strings.Fields(string(out)), nil
 }
