@@ -118,6 +118,13 @@ Native findings that shaped the recipe:
   the lab SSH material and the root-only installer source marker, locks the
   random installer password, and restores `umask 022` after the credential
   writer (`umask 077`) so the emptied `/etc/machine-id` stays world-readable.
+- Ubuntu's cloud-init apt module rewrites APT sources using os-release
+  `VERSION_CODENAME`; on Mint that produced `archive.ubuntu.com … zena`,
+  `zena-updates` and `zena-security` entries (404) and every `apt-get update`
+  exited 100. The golden's `/etc/cloud/cloud.cfg.d/99-lindm-lab.cfg` therefore
+  sets `apt: {preserve_sources_list: true}` (recipe `linuxmint-ubiquity-v3`), and
+  Mint's own `official-package-repositories.list` stays authoritative. The
+  encrypted golden has no cloud-init and keeps its own recipe identity.
 - The unencrypted golden validates on a fresh-NVRAM boot: NoCloud SSH, `ID`,
   `VERSION_ID`, `UBUNTU_CODENAME=noble`, source marker, ext4 root, dpkg/apt,
   sudo, `EFI/BOOT/BOOTX64.EFI` and `/usr/share/xsessions/cinnamon.desktop`.

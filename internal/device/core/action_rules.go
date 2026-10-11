@@ -125,6 +125,23 @@ func TPM2BindSupported(host devicedb.GetHostObservationRow) bool {
 	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2BindSupported()
 }
 
+// SessionLockOnlyUnsupported refuses a lock action that would only request a
+// logind session lock on a release whose desktop locker provably ignores it
+// (registry Desktop.SessionLockUnsupported). A spec that also locks accounts
+// or terminates sessions has an effect and proceeds; its session part keeps
+// the executor's unreported evidence. An unobserved OS identity is not a
+// refusal reason.
+func SessionLockOnlyUnsupported(host devicedb.GetHostObservationRow, action *agentv1.LockSessionsAction) bool {
+	if action == nil || len(action.GetUsernames()) != 0 || action.GetAllHumanAccounts() || action.GetTerminateSessions() {
+		return false
+	}
+	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
+	if host.OsIDStatus != success || host.OsVersionStatus != success {
+		return false
+	}
+	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).Desktop.SessionLockUnsupported != ""
+}
+
 // deviceActionNotBefore backdates an intent by the device clock tolerance but
 // never before its signing delegation becomes valid: VerifyDeviceActionIntent
 // requires the intent window inside the delegation's. Without the clamp every

@@ -131,7 +131,14 @@ installation time.
   observed natively.
 - **Display manager.** `display-manager.service` is `cosmic-greeter.service`,
   i.e. `greetd --config /etc/greetd/cosmic-greeter.toml` with PAM service
-  `cosmic-greeter`; the COSMIC session is `/usr/bin/start-cosmic`.
+  `cosmic-greeter`; the COSMIC session is `/usr/bin/start-cosmic`. greetd's own
+  autologin (`[initial_session]`, used by the encrypted golden) registers in
+  logind as `Service=cosmic-greeter`, `Type=tty` and an empty `Desktop`, because
+  it receives none of the session environment cosmic-greeter passes on a real
+  login (`XDG_SESSION_TYPE=wayland`, `XDG_SESSION_DESKTOP`,
+  `XDG_CURRENT_DESKTOP`); lindm then sees no graphical session (observed by the
+  desktop-session lane, record `pop2404-lock-quarantine-02`). An autologin that
+  must count as a COSMIC session needs a PAM service that sets that environment.
 - **systemd-boot and kernelstub.** The installed `EFI/systemd/systemd-bootx64.efi`
   (and its `EFI/BOOT/BOOTX64.EFI` copy) carries no Authenticode signature table
   (`sbverify --list`), so the lab runs Pop with the unenrolled `OVMF_VARS_4M.fd`
@@ -155,7 +162,16 @@ installation time.
   automatic upgrades default to off. Its boot-time refresh held the dpkg
   frontend lock and failed a lab agent install with exit 100, so lab guests stop
   and mask it together with `apt-daily*` (regression
-  `TestLabQuiescePackageUnitsStopsPopUpdater`).
+  `TestLabQuiescePackageUnitsStopsPopUpdater`). On a real Pop!\_OS desktop the
+  updater keeps running and owns package refreshes (and upgrades, when the user
+  enables them); lindm does not stop it. While it holds dpkg's frontend lock a
+  lindm package change must end as the explicit, retried
+  `RESOURCE_EXECUTION_FAILURE_NATIVE_BUSY` hold (server reason
+  `native_package_manager_busy`) before any effect. The connected resources lane
+  checks this natively: its `vendor-updater-native-busy` scenario unmasks the
+  updater, calls its `UpdateSystem` D-Bus method, and assigns a package change
+  while the updater holds the lock (registry `Lab.Updater`; needs
+  `-allow-network`).
 - **Identity.** `os-release` reports `ID=pop` with `ID_LIKE="ubuntu debian"`;
   behavior is selected by the registry row, never resemblance.
 

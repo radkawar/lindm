@@ -243,8 +243,7 @@ func (u *releaseUpgrade) host(ctx context.Context, name string) (*VMReleaseUpgra
 }
 
 func (u *releaseUpgrade) lockHolder(ctx context.Context) (string, error) {
-	data, err := u.vm.run(ctx, "sudo -n /bin/sh -eu -c "+nativeQuote(releaseUpgradeLockCommand), nil, 4<<10, 15*time.Second)
-	return strings.TrimSpace(string(data)), err
+	return dpkgFrontendHolder(ctx, u.vm)
 }
 
 func releaseUpgradeResources(rpm resourcePackaging, packageVersion string) []*policyv1.ProfileResource {

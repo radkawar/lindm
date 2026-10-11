@@ -955,6 +955,13 @@ action ends `OUTCOME_UNKNOWN`/`OBSERVATION`, never verified and never
 `sessions_locked`, with the verification evidence
 `session_lock_state_unreported: ...`. It is neither retried nor reported as an
 interruption. The server's lock restriction still requires an explicit release.
+Where a release's registry row records that its desktop locker ignores logind
+lock requests (`Desktop.SessionLockUnsupported`, natively proven on Omarchy
+4.0.4), the server refuses a lock action that would only lock sessions with
+`device_action_session_lock_unsupported` before anything is queued. A lock
+action that also locks accounts or terminates sessions proceeds. The table of
+which desktops lock through logind (`internal/platform` `LockOfDesktop`, keyed
+on `XDG_CURRENT_DESKTOP`) is shared with the assistance helper.
 
 The lock specification can additionally select explicit local usernames or all
 non-system human accounts. Root and the root-owned protected break-glass/admin

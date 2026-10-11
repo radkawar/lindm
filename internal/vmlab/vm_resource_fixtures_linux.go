@@ -289,6 +289,44 @@ if [ -n "${DEB_ARCH:-}" ]; then
 fi
 `
 
+// rollingResourcePrerequisites returns the provisioning transaction (empty
+// when the golden installed the tools from its installer media) and the
+// independent presence query for a rolling guest's resource prerequisites.
+// A release row's own list (a derivative's media) overrides its base's.
+func rollingResourcePrerequisites(row *platform.Release, backend platform.Backend, snapshot bool) (install, query string, err error) {
+	names := row.Lab.ResourcePackages
+	if len(names) == 0 {
+		names = row.Native().Lab.ResourcePackages
+	}
+	if len(names) == 0 {
+		return "", "", errors.New("resource fixture prerequisites absent from platform registry")
+	}
+	query = "rpm -q"
+	if backend == platform.BackendPacman {
+		query = "pacman -Q"
+	}
+	for _, name := range names {
+		query += " " + nativeQuote(name)
+	}
+	if row.Lab.Guest.FromInstaller {
+		return "", query, nil
+	}
+	if !snapshot {
+		return "", "", errors.New("rolling resource prerequisites require the approved repository snapshot")
+	}
+	// Provision only the disposable guest against its already pinned origin.
+	// A cloud image may precede the selected snapshot: never acquire Arch
+	// prerequisites through a partial upgrade or a moving mirror.
+	install = "zypper --non-interactive refresh; zypper --non-interactive --no-refresh dist-upgrade --no-allow-vendor-change; zypper --non-interactive --no-refresh install --no-recommends"
+	if backend == platform.BackendPacman {
+		install = "pacman -Syu --needed --noconfirm"
+	}
+	for _, name := range names {
+		install += " " + nativeQuote(name)
+	}
+	return install, query, nil
+}
+
 func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages, architecture string, selected map[string]bool) error {
 	if packages.backend == platform.BackendPacman || packages.backend == platform.BackendZypper {
 		observed, err := packages.vm.run(ctx, ". /etc/os-release; printf '%s\\n%s\\n' \"$ID\" \"${VERSION_ID-}\"", nil, 4096, 15*time.Second)
@@ -296,39 +334,21 @@ func setupVMResourceFixtures(ctx context.Context, packages *nativeGuestPackages,
 			return err
 		}
 		id, version, _ := strings.Cut(strings.TrimSpace(string(observed)), "\n")
-		release := platform.Identify(platform.OSRelease{ID: id, VersionID: version}).Native()
-		if len(release.Lab.ResourcePackages) == 0 {
-			return errors.New("resource fixture prerequisites absent from platform registry")
-		}
-		if packages.rollingSnapshot == nil {
-			return errors.New("rolling resource prerequisites require the approved repository snapshot")
-		}
-		// Provision only the disposable guest against its already pinned origin.
-		// A cloud image may precede the selected snapshot: never acquire Arch
-		// prerequisites through a partial upgrade or a moving mirror.
-		install := "zypper --non-interactive refresh; zypper --non-interactive --no-refresh dist-upgrade --no-allow-vendor-change; zypper --non-interactive --no-refresh install --no-recommends"
-		if packages.backend == platform.BackendPacman {
-			install = "pacman -Syu --needed --noconfirm"
-		}
-		for _, name := range release.Lab.ResourcePackages {
-			install += " " + nativeQuote(name)
-		}
-		// Native package managers report progress and already-current packages
-		// on stderr. Require transaction success, then independently query the
-		// complete declared prerequisite set below; silence is not an oracle.
-		result, err := packages.vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(install), nil, 4<<20, 30*time.Minute)
+		install, query, err := rollingResourcePrerequisites(platform.Identify(platform.OSRelease{ID: id, VersionID: version}), packages.backend, packages.rollingSnapshot != nil)
 		if err != nil {
-			return fmt.Errorf("provision signed rolling resource prerequisites: %w", err)
+			return err
 		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("provision signed rolling resource prerequisites: native exit %d (stdout bytes %d, stderr bytes %d)", result.ExitCode, len(result.Stdout), len(result.Stderr))
-		}
-		query := "rpm -q"
-		if packages.backend == platform.BackendPacman {
-			query = "pacman -Q"
-		}
-		for _, name := range release.Lab.ResourcePackages {
-			query += " " + nativeQuote(name)
+		if install != "" {
+			// Native package managers report progress and already-current packages
+			// on stderr. Require transaction success, then independently query the
+			// complete declared prerequisite set below; silence is not an oracle.
+			result, err := packages.vm.runResult(ctx, "sudo -n sh -eu -c "+nativeQuote(install), nil, 4<<20, 30*time.Minute)
+			if err != nil {
+				return fmt.Errorf("provision signed rolling resource prerequisites: %w", err)
+			}
+			if result.ExitCode != 0 {
+				return fmt.Errorf("provision signed rolling resource prerequisites: native exit %d (stdout bytes %d, stderr bytes %d)", result.ExitCode, len(result.Stdout), len(result.Stderr))
+			}
 		}
 		if err := lifecycleCommand(ctx, packages.vm, "require pinned resource native prerequisites", query); err != nil {
 			return err

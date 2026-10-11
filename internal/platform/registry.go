@@ -57,7 +57,9 @@ const (
 	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
 	reasonEL8Packages    = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
 	reasonRockyOSV       = "Rocky's OSV export uses source-like package mappings without a complete binary universe"
-	reasonPacmanHost     = "host resource providers have no pacman/Arch implementation or measured native quirks"
+	// Omarchy's ALPM pre-transaction hook (00-omarchy-update-guard.hook)
+	// aborts any direct `pacman -Syu`; `omarchy update` owns the transaction.
+	reasonOmarchyOSUpdate = "Omarchy 4.0.4's ALPM guard aborts direct pacman system upgrades (only `omarchy update` may run them), and its moving stable mirrors have no immutable snapshot for a pinned rolling update"
 	// The owned systemd-boot recovery fixture needs systemd-ukify, sbsigntools
 	// and busybox, absent from the authenticated Omarchy ISO's offline
 	// repository; a partial install from rolling mirrors is not used.
@@ -511,7 +513,11 @@ var registry = []*Release{
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Distinst, Guest: ubuntuGuest,
 			Session: LabSession{Desktops: map[string][]string{"cosmic": nil}, Name: "cosmic", Terminal: []string{"cosmic-term", "-e"},
 				Capture: []string{"cosmic-comp", "cosmic-greeter", "cosmic-notifications", "xdg-desktop-portal", "xdg-desktop-portal-cosmic", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good"}},
-			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
+			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}},
+			// pop-system-updater c208318: UpdateSystem runs apt update and upgrade
+			// through apt-get, holding dpkg's frontend lock (daemon/src/dbus/server.rs).
+			Updater: LabUpdater{Unit: "com.system76.SystemUpdater.service",
+				Trigger: "busctl call com.system76.SystemUpdater /com/system76/SystemUpdater com.system76.SystemUpdater UpdateSystem"}},
 		// apt.pop-os.org/release ("pop-os-release") and /proprietary
 		// ("system76") use codename noble and the Pop!_OS key; its Ubuntu mirror
 		// serves Ubuntu's own signed InRelease (observed 2026-10-11).
@@ -558,22 +564,29 @@ var registry = []*Release{
 		Tier: Tier2, Page: "omarchy.md", Family: FamilyArch, Architectures: x86,
 		Systemd: 261,
 		FDE:     "LUKS2 on Btrfs (archinstall via the Omarchy ISO); mkinitcpio busybox encrypt hook, no TPM2 token unlock",
-		Desktop: Desktop{Name: "Hyprland", Version: "Hyprland 0.56.2", DisplayManager: "sddm", Lock: "Quickshell WlSessionLock (Omarchy shell)"}, Firewall: "ufw (active)",
+		Desktop: Desktop{Name: "Hyprland", Version: "Hyprland 0.56.2", DisplayManager: "sddm", Lock: "Quickshell WlSessionLock (Omarchy shell)",
+			// omarchy404-lock-quarantine-01: LockedHint and
+			// omarchy-hyprland-session-locked stayed unlocked after LockSessions.
+			SessionLockUnsupported: "logind LockSessions has no effect on Omarchy's Quickshell session lock (omarchy-hyprland-session-locked stays unlocked)"},
+		Firewall: "ufw (active)",
 		// The ISO's offline repository supplies cloud-init and the action
 		// prerequisites at the install snapshot; see vmlab omarchy installer.
-		Lab: Lab{Lanes: []LabLane{LaneUpdates}, Installer: OmarchyCidata,
-			Guest: LabGuest{Actions: []string{"cryptsetup", "nftables", "iproute2", "iputils", "tpm2-tools", "bind", "curl"}},
-			TPM:   LabTPM{Unsupported: "the vendor mkinitcpio busybox encrypt hook cannot unlock with systemd TPM2 tokens, and no lab TPM early-boot variant replaces the vendor boot path"},
+		Lab: Lab{Lanes: []LabLane{LaneUpdates, LaneResources}, Installer: OmarchyCidata,
+			// Arch's resource tools as shipped on the 4.0.4 ISO (no firewalld).
+			ResourcePackages: []string{"gnupg", "openssl", "python", "attr", "acl", "curl", "libarchive", "zstd", "pacman-contrib", "nftables", "libpwquality", "pam", "pambase"},
+			Guest:            LabGuest{Actions: []string{"cryptsetup", "nftables", "iproute2", "iputils", "tpm2-tools", "bind", "curl"}, FromInstaller: true},
+			TPM:              LabTPM{Unsupported: "the vendor mkinitcpio busybox encrypt hook cannot unlock with systemd TPM2 tokens, and no lab TPM early-boot variant replaces the vendor boot path"},
 			// The ISO always installs Hyprland; encrypted installs autologin
 			// SDDM into omarchy.desktop (uwsm). xdg-terminal-exec selects foot.
 			Session: LabSession{Desktops: map[string][]string{"hyprland": nil}, Name: "omarchy", Terminal: []string{"foot", "--"},
 				Capture: []string{"hyprland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "quickshell"}}},
-		Supports: caps(agentCore, []Capability{Encryption, Wipe, ReportLoss, Lock}),
+		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Definitions, Encryption, Wipe, ReportLoss, Lock}),
 		Gates: gates(string(Advisories), "no vendor advisory feed; the Arch feed does not cover Omarchy packages",
 			string(RecoverySanitize), reasonOmarchyOwnedBoot,
 			string(Assistance), "session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland",
-			string(Packages), reasonPacmanHost, string(Accounts), reasonPacmanHost, string(Sysctl), reasonPacmanHost,
-			string(Definitions), reasonPacmanHost, string(Firewall), reasonPacmanHost, string(Password), reasonPacmanHost),
+			string(Password), "Omarchy 4.0.4 ships pam 1.7.2-2 (Arch pins measured 1.7.3-1) and rewrites system-auth (pam_faillock deny=10); its own PAM stack has no measured password pins",
+			string(Firewall), "the Arch firewall provider manages firewalld zones; Omarchy 4.0.4 runs ufw active by default and its ISO carries no firewalld",
+			string(OSUpdate), reasonOmarchyOSUpdate),
 	},
 	{
 		Key: "opensuse-tumbleweed", Name: "openSUSE Tumbleweed", Distribution: "openSUSE Tumbleweed", ID: "opensuse-tumbleweed", Version: Snapshot(),

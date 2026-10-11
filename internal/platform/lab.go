@@ -51,6 +51,16 @@ type Lab struct {
 	// fixture cannot run on this release. Recovery sanitize itself may still
 	// be qualified through measured GRUB, which needs no ukify.
 	OwnedBootUnavailable string
+	// Updater is the vendor's own background package updater. The lab stops it
+	// for stable package truth, and the resources lane drives it on purpose
+	// to hold the native package lock while a package change arrives.
+	Updater LabUpdater
+}
+
+// LabUpdater names a vendor updater service and the root command that makes
+// it start a full package update through the native frontend.
+type LabUpdater struct {
+	Unit, Trigger string
 }
 
 // LaneGate is why a lab lane cannot qualify a release. Architectures lists the
@@ -274,4 +284,9 @@ type LabGuest struct {
 	// beyond its 200 MiB ESP), so the fixture embeds a dracut --hostonly
 	// rebuild for the running kernel instead; the installed one is unchanged.
 	OwnedBootHostonly bool
+	// FromInstaller: the golden installs Actions and Lab.ResourcePackages from
+	// the authenticated installer media's own signed repository (Omarchy's ISO
+	// offline repository), and lanes only verify their presence. The release
+	// has no immutable online repository snapshot to refresh against.
+	FromInstaller bool
 }

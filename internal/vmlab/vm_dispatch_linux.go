@@ -543,7 +543,7 @@ func DispatchVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDi
 			err = exerciseReleaseUpgrade(ctx, packages, control, fixture, result, manifest, filepath.Join(filepath.Dir(options.CacheDir), "advisory-feeds"), reboot)
 			return result, err
 		}
-		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, reboot, awaitReboot)
+		err = exerciseConnectedResources(ctx, packages, control, result, options.ResourceKinds, firewall, release.Lab.Updater, reboot, awaitReboot)
 		return result, err
 	}
 	if options.PowerActions {

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 type omarchyTestConfiguration struct {
@@ -359,5 +361,49 @@ func TestUpdateChannelPublishesArchSignatureTarget(t *testing.T) {
 	artifact.Format, artifact.SignaturePath = packaging.FormatDEB, ""
 	if _, targets, _ := updateChannel(artifact, 1, true, 100); len(targets) != 1 {
 		t.Fatalf("DEB update published extra targets: %v", targets)
+	}
+}
+
+// Omarchy has no immutable online repository snapshot: its cloud golden
+// installs the resource tools from the authenticated ISO, so the resource lane
+// only verifies them. Every other rolling release still requires its approved
+// snapshot and refreshes against it.
+func TestRollingResourcePrerequisitesFromInstaller(t *testing.T) {
+	plain, err := LoadManifest("../../lab/images/omarchy-4.0.4-x86_64.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := platform.ForManifest(plain.GetDistribution(), plain.GetVersion())
+	install, query, err := rollingResourcePrerequisites(row, platform.BackendPacman, false)
+	want := "pacman -Q"
+	for _, name := range row.Lab.ResourcePackages {
+		want += " " + nativeQuote(name)
+	}
+	if err != nil || install != "" || query != want || strings.Contains(query, "firewalld") {
+		t.Fatalf("installer-provided prerequisites = %q %q %v", install, query, err)
+	}
+	cloud := omarchyCloudPackages(plain)
+	for _, name := range append(slices.Clone(row.Lab.Guest.Actions), row.Lab.ResourcePackages...) {
+		if !slices.Contains(cloud, name) {
+			t.Fatalf("cloud golden omits %s: %v", name, cloud)
+		}
+	}
+	if len(cloud) != len(slices.Compact(slices.Sorted(slices.Values(cloud)))) {
+		t.Fatalf("cloud golden packages repeat: %v", cloud)
+	}
+	if omarchyCloudRecipeVersion == omarchyInstallerRecipeVersion {
+		t.Fatal("cloud golden recipe does not change with its resource prerequisites")
+	}
+	for _, release := range platform.Releases() {
+		if release.Lab.Guest.FromInstaller || len(release.Native().Lab.ResourcePackages) == 0 || release.Native().Packages.Backend != platform.BackendPacman {
+			continue
+		}
+		if _, _, err := rollingResourcePrerequisites(release, platform.BackendPacman, false); err == nil {
+			t.Fatalf("%s provisioned rolling prerequisites without its approved snapshot", release.Key)
+		}
+		install, _, err := rollingResourcePrerequisites(release, platform.BackendPacman, true)
+		if err != nil || !strings.HasPrefix(install, "pacman -Syu --needed --noconfirm ") {
+			t.Fatalf("%s snapshot provisioning = %q %v", release.Key, install, err)
+		}
 	}
 }

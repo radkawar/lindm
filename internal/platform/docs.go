@@ -187,6 +187,9 @@ func desktop(d Desktop) string {
 	if d.Lock != "" {
 		parts = append(parts, "lock "+d.Lock)
 	}
+	if d.SessionLockUnsupported != "" {
+		parts = append(parts, "session lock unsupported: "+d.SessionLockUnsupported)
+	}
 	return strings.Join(parts, "; ")
 }
 

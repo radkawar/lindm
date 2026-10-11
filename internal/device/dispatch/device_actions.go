@@ -110,6 +110,9 @@ func requireActionInventory(ctx context.Context, q *devicedb.Queries, generation
 	if spec.GetLockSessions() != nil && details.GetSessions().GetSessions().GetStatus() != success {
 		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_sessions_unavailable")
 	}
+	if core.SessionLockOnlyUnsupported(host, spec.GetLockSessions()) {
+		return rpcreason.Error(connect.CodeFailedPrecondition, "device_action_session_lock_unsupported")
+	}
 	return nil
 }
 

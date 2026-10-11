@@ -223,6 +223,11 @@ type Desktop struct {
 	Version        string // qualified desktop version, e.g. "46"
 	DisplayManager string // e.g. "gdm3"
 	Lock           string // screen lock backend, e.g. "gnome-shell (logind Lock)"
+	// SessionLockUnsupported, when set, is the natively proven reason a logind
+	// session lock has no effect on the desktop's locker. The Lock capability
+	// (account lock, session lock request) stays supported; the server refuses
+	// a lock action that would only lock sessions.
+	SessionLockUnsupported string
 }
 
 // Feed is a vendor advisory source adapter.

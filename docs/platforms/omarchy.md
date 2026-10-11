@@ -17,12 +17,12 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | inventory         | implemented                                                                                                                                                                                                                                                 |
 | lifecycle         | implemented                                                                                                                                                                                                                                                 |
 | dispatch          | implemented                                                                                                                                                                                                                                                 |
-| packages          | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
-| accounts          | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
-| sysctl            | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
-| definitions       | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
-| password          | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
-| firewall          | gated: host resource providers have no pacman/Arch implementation or measured native quirks                                                                                                                                                                 |
+| packages          | implemented                                                                                                                                                                                                                                                 |
+| accounts          | implemented                                                                                                                                                                                                                                                 |
+| sysctl            | implemented                                                                                                                                                                                                                                                 |
+| definitions       | implemented                                                                                                                                                                                                                                                 |
+| password          | gated: Omarchy 4.0.4 ships pam 1.7.2-2 (Arch pins measured 1.7.3-1) and rewrites system-auth (pam_faillock deny=10); its own PAM stack has no measured password pins                                                                                        |
+| firewall          | gated: the Arch firewall provider manages firewalld zones; Omarchy 4.0.4 runs ufw active by default and its ISO carries no firewalld                                                                                                                        |
 | encryption        | implemented                                                                                                                                                                                                                                                 |
 | wipe              | implemented                                                                                                                                                                                                                                                 |
 | report-loss       | implemented                                                                                                                                                                                                                                                 |
@@ -31,7 +31,7 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | self-update       | implemented                                                                                                                                                                                                                                                 |
 | assistance        | gated: session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland |
 | advisories        | gated: no vendor advisory feed; the Arch feed does not cover Omarchy packages                                                                                                                                                                               |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                                     |
+| os-update         | gated: Omarchy 4.0.4's ALPM guard aborts direct pacman system upgrades (only `omarchy update` may run them), and its moving stable mirrors have no immutable snapshot for a pinned rolling update                                                           |
 | release-upgrade   | gated: release upgrade is not implemented                                                                                                                                                                                                                   |
 
 <!-- END GENERATED platform-capabilities -->
@@ -100,11 +100,23 @@ nftables iproute2 iputils tpm2-tools bind curl`) come only from the ISO's
   53317/tcp+udp); the vendor's unattended `authorized_keys` path opens 22/tcp.
 - **Lock.** Omarchy 4 locks through its Quickshell shell (`WlSessionLock`,
   `shell/plugins/lock`), not hyprlock/hypridle. No logind `Lock` listener and no
-  `SetLockedHint` caller exist in the v4.0.4 tree, so `loginctl lock-session` is
-  not expected to lock and `LockedHint` is not maintained.
-- **Assistance.** Gated in the registry (`session_lock_state_unreported`): the lock
-  state is not reported through logind, and `xdg-desktop-portal-hyprland` 1.4.1
-  provides no RemoteDesktop, so CONTROL is unavailable. The lab runs only the
+  `SetLockedHint` caller exist in the v4.0.4 tree. Natively observed
+  (`omarchy404-lock-quarantine-01`): after logind `LockSessions`, `LockedHint`
+  stayed `no` and `omarchy-hyprland-session-locked` stayed unlocked, so the lock
+  request has no effect. The registry records this as
+  `Desktop.SessionLockUnsupported`. The server refuses a lock action that would
+  only lock sessions (`device_action_session_lock_unsupported`). A lock action
+  that also locks accounts or terminates sessions proceeds; its session part
+  ends unverified with `session_lock_state_unreported`. Release, account lock and
+  quarantine pass.
+- **Assistance.** Gated in the registry (`session_lock_state_unreported`). The
+  helper starts through `graphical-session.target` (uwsm) and sees
+  `XDG_CURRENT_DESKTOP=Hyprland`. VIEW ends `UNAVAILABLE`
+  `session_lock_state_unreported` and CONTROL ends `UNAVAILABLE`
+  `portal_remote_desktop_unavailable`, both before any prompt
+  (`omarchy404-assistance-03`). xdg-desktop-portal 1.22.1 with
+  xdg-desktop-portal-hyprland 1.4.1 exposes ScreenCast version 6 and no
+  RemoteDesktop. `gst-plugins-good` is not installed. The lab runs only the
   refusal scenarios.
 - **TPM.** The busybox `encrypt` hook cannot consume systemd TPM2 tokens and the
   lab has no TPM early-boot variant; the device-action lane binds a real token and

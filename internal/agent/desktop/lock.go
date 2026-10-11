@@ -2,7 +2,8 @@ package desktop
 
 import (
 	"context"
-	"strings"
+
+	"lindm/internal/platform"
 )
 
 // LockMonitor observes lock requests for one logind session. It complements
@@ -30,33 +31,13 @@ const (
 	lockDetailSleep      = "logind_prepare_for_sleep"
 )
 
-// lockReporting is the lock-observability capability table, keyed on
-// XDG_CURRENT_DESKTOP: the freedesktop desktop identification that
-// xdg-desktop-portal itself uses to select portal backends. Lock reporting is
-// a property of the desktop's locker, which no root-observable logind
-// property exposes before a lock happens. A desktop is listed only when every
-// lock path is observable:
-//   - GNOME: gnome-shell's screen shield sets logind LockedHint on every lock
-//     (natively observed on Ubuntu 24.04 GNOME 46 and Fedora 44 GNOME 50).
-//   - COSMIC (epoch 1.x): cosmic-greeter never sets LockedHint, but it locks
-//     only on logind Session.Lock and Manager.PrepareForSleep, which
-//     LockMonitor observes. Its lock paths all go through logind: the
-//     Super+Escape and idle actions run the LockScreen system action,
-//     `loginctl lock-session` by default (cosmic-settings-daemon
-//     system_actions.ron, cosmic-idle lock_screen); the panel power applet
-//     calls logind Session.Lock; suspend emits PrepareForSleep.
-//
-// Every other desktop, including Cinnamon 6.6 (cinnamon-screensaver also
-// locks directly on its own idle and keybinding paths and never sets
-// LockedHint) and Hyprland (Omarchy's Quickshell lock bypasses logind
-// entirely), is unreported: a lock there would not end a session, so none is
-// offered.
+// lockReporting admits only desktops on which every lock is visible to lindm
+// (platform.LockOfDesktop, keyed on XDG_CURRENT_DESKTOP): GNOME through
+// LockedHint, COSMIC through the logind signals LockMonitor observes. On every
+// other desktop a lock would not end sharing, so no session is offered.
 func lockReporting(currentDesktop string) error {
-	for _, name := range strings.Split(currentDesktop, ":") {
-		switch name {
-		case "GNOME", "COSMIC":
-			return nil
-		}
+	if lock, _ := platform.LockOfDesktop(currentDesktop); lock.EveryLockObservable() {
+		return nil
 	}
 	return unavailable("session_lock_state_unreported", nil)
 }

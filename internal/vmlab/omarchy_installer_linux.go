@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,6 +45,9 @@ const (
 	omarchyInstallerImageFilename    = "omarchy-" + omarchyVersion + ".iso"
 	// Bump when the cidata seed, provisioning or machine layout changes.
 	omarchyInstallerRecipeVersion = "omarchy-cidata-v1"
+	// The cloud golden additionally installs the registry's resource
+	// prerequisites from the ISO; bump with its own provisioning changes.
+	omarchyCloudRecipeVersion = omarchyInstallerRecipeVersion + "+resources-v1"
 	// The configurator's fixed partition object IDs (root/configurator at the
 	// pinned ISO); the encryption block names the root partition by this ID.
 	omarchyBootPartitionID = "ea21d3f2-82bb-49cc-ab5d-6f81ae94e18d"
@@ -81,10 +85,10 @@ func omarchyInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 		label:     "Omarchy",
 		installer: platform.OmarchyCidata,
 		cache:     "omarchy-installed",
-		version:   omarchyInstallerRecipeVersion,
+		version:   omarchyCloudRecipeVersion,
 		memoryMiB: 4096,
 		install: func(ctx context.Context, dir string, iso *os.File, digest string, hardware VMHardwareOptions) error {
-			return omarchyInstallGolden(ctx, dir, "image", iso, digest, hardware, omarchyGoldenSecrets{actions: omarchyActions(m)})
+			return omarchyInstallGolden(ctx, dir, "image", iso, digest, hardware, omarchyGoldenSecrets{actions: omarchyCloudPackages(m)})
 		},
 		probes: omarchyProbes(m, false),
 	}, nil
@@ -111,7 +115,9 @@ func omarchyProbes(m *labv1.ImageManifest, encrypted bool) []installedProbe {
 			installedProbe{"serial_console", "grep -qw console=ttyS0,115200 /proc/cmdline"},
 			installedProbe{"autologin", "grep -qx User=lindm-lab /etc/sddm.conf.d/autologin.conf"})
 	}
-	return append(probes, installedProbe{"cloud_init", "pacman --config /dev/null -Q cloud-init >/dev/null"})
+	release := platform.ForManifest(m.GetDistribution(), m.GetVersion())
+	return append(probes, installedProbe{"cloud_init", "pacman --config /dev/null -Q cloud-init >/dev/null"},
+		installedProbe{"resource_prerequisites", "pacman --config /dev/null -Q " + strings.Join(release.Lab.ResourcePackages, " ") + " >/dev/null"})
 }
 
 // omarchyGoldenSecrets carries the encrypted golden's lab-only credentials
@@ -126,6 +132,19 @@ type omarchyGoldenSecrets struct {
 
 func omarchyActions(m *labv1.ImageManifest) []string {
 	return platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Guest.Actions
+}
+
+// omarchyCloudPackages are the cloud golden's ISO-installed prerequisites:
+// device actions plus the resource lane's native tools, deduplicated.
+func omarchyCloudPackages(m *labv1.ImageManifest) []string {
+	lab := platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab
+	packages := slices.Clone(lab.Guest.Actions)
+	for _, name := range lab.ResourcePackages {
+		if !slices.Contains(packages, name) {
+			packages = append(packages, name)
+		}
+	}
+	return packages
 }
 
 // omarchySeed is the configurator-equivalent input written to the cidata drive.
