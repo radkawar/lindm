@@ -87,12 +87,19 @@ func Run(ctx context.Context, resources *config.Resources) error {
 		return fmt.Errorf("initialize database pool: %w", err)
 	}
 	defer pool.Close()
+	// The console/identity pool is separate so device traffic saturating the
+	// device pool cannot queue operators' session checks and admin reads.
+	adminPool, err := pgxpool.NewWithConfig(ctx, resources.AdminDatabase)
+	if err != nil {
+		return fmt.Errorf("initialize console database pool: %w", err)
+	}
+	defer adminPool.Close()
 	startup, cancelStartup := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelStartup()
 	if err := db.Check(startup, pool); err != nil {
 		return err
 	}
-	plane, err := newControlPlane(startup, pool, resources)
+	plane, err := newControlPlane(startup, pool, adminPool, resources)
 	if err != nil {
 		return err
 	}
@@ -180,8 +187,10 @@ func Run(ctx context.Context, resources *config.Resources) error {
 
 // controlPlane holds the domain services one Run composes and serves.
 type controlPlane struct {
-	auth               *identity.Service
-	devices            *device.Service
+	auth    *identity.Service
+	devices *device.Service
+	// consoleDevices is the device domain on the console pool (admin RPCs).
+	consoleDevices     *device.Service
 	deliveries         *integrations.Service
 	reporting          *reports.Service
 	releaseHandler     http.Handler
@@ -193,8 +202,8 @@ type controlPlane struct {
 
 // newControlPlane initializes every configured domain service against a checked
 // schema. It binds no listener.
-func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources) (*controlPlane, error) {
-	auth, err := NewIdentity(ctx, pool, resources)
+func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resources *config.Resources) (*controlPlane, error) {
+	auth, err := NewIdentity(ctx, adminPool, resources)
 	if err != nil {
 		return nil, fmt.Errorf("initialize identity service: %w", err)
 	}
@@ -222,7 +231,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 		}
 	}
 	native := loadNativeRepositories(ctx, resources)
-	devices, err := device.New(pool, devicecore.Config{
+	deviceConfig := devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
 		CAKey:                        resources.DeviceCAKey,
@@ -240,15 +249,22 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 		RequireReleaseCompatibility:  true,
 		EnrollmentInstructions:       enrollmentInstructions(resources, native),
 		Assistance:                   relay,
-	})
+	}
+	devices, err := device.New(pool, deviceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("initialize device service: %w", err)
+	}
+	// The same domain service on the console pool serves only admin handlers
+	// and the console's fleet population.
+	consoleDevices, err := device.New(adminPool, deviceConfig)
+	if err != nil {
+		return nil, fmt.Errorf("initialize console device service: %w", err)
 	}
 	deliveries, reporting, err := newIntegrations(pool, auth, resources)
 	if err != nil {
 		return nil, err
 	}
-	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, advisories, deliveries, reporting)})
+	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, consoleDevices, advisories, deliveries, reporting)})
 	if err != nil {
 		return nil, fmt.Errorf("initialize background jobs: %w", err)
 	}
@@ -257,7 +273,7 @@ func newControlPlane(ctx context.Context, pool *pgxpool.Pool, resources *config.
 		return nil, err
 	}
 	return &controlPlane{
-		auth: auth, devices: devices, deliveries: deliveries, reporting: reporting,
+		auth: auth, devices: devices, consoleDevices: consoleDevices, deliveries: deliveries, reporting: reporting,
 		releaseHandler: releaseHandler, relay: relay, supervisor: supervisor, console: console,
 		nativeRepositories: native,
 	}, nil
@@ -314,9 +330,9 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 		mux.Handle("/repo/rpm/", http.StripPrefix("/repo/rpm/", p.nativeRepositories.rpm))
 		mux.Handle("/repo/arch/", http.StripPrefix("/repo/arch/", p.nativeRepositories.arch))
 	}
-	path, handler := p.devices.AdminHandler()
+	path, handler := p.consoleDevices.AdminHandler()
 	mux.Handle(path, p.auth.RequireSession(handler))
-	path, handler = p.devices.ReleaseManagementHandler()
+	path, handler = p.consoleDevices.ReleaseManagementHandler()
 	mux.Handle(path, p.auth.RequireSession(handler))
 	if p.releaseHandler != nil {
 		mux.Handle("/updates/", http.StripPrefix("/updates/", p.releaseHandler))

@@ -27,8 +27,10 @@ import (
 // Resources contains resolved dependencies, not a second serialized schema.
 // HTTPClient owns its transport; close idle connections during server shutdown.
 type Resources struct {
-	Proto             *configv1.ServerConfig
-	Database          *pgxpool.Config
+	Proto    *configv1.ServerConfig
+	Database *pgxpool.Config
+	// AdminDatabase is the separate console/identity pool (same credential).
+	AdminDatabase     *pgxpool.Config
 	ServerCertificate tls.Certificate
 	// Enrollment HTTPS trust is selected from verified server certificate
 	// material, not from the independently provisioned device-client CA.
@@ -108,6 +110,9 @@ func (d *Document) Resolve() (*Resources, error) {
 		return nil, err
 	}
 	result.Database, err = d.Database()
+	if err == nil {
+		result.AdminDatabase, err = d.AdminDatabase()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +306,23 @@ func (d *Document) Database() (*pgxpool.Config, error) {
 		return nil, err
 	}
 	cfg.MaxConns = int32(d.Proto.GetDatabase().GetMaxConnections())
+	return cfg, nil
+}
+
+// DefaultAdminConnections sizes the console/identity pool when unset.
+const DefaultAdminConnections = 4
+
+// AdminDatabase resolves the runtime credential for the separate console and
+// identity pool, so device traffic saturating Database cannot delay operators.
+func (d *Document) AdminDatabase() (*pgxpool.Config, error) {
+	cfg, err := d.database(d.Proto.GetDatabase().GetUrlFile())
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxConns = DefaultAdminConnections
+	if d.Proto.GetDatabase().AdminConnections != nil {
+		cfg.MaxConns = int32(d.Proto.GetDatabase().GetAdminConnections())
+	}
 	return cfg, nil
 }
 

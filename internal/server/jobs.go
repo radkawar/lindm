@@ -21,13 +21,14 @@ const (
 // backgroundJobs is the complete inventory of control-plane background work.
 // Exclusive jobs run on one instance; replicated jobs fence row leases. Request
 // handlers own no background goroutines.
-func backgroundJobs(devices *device.Service, advisories *advisory.Service, deliveries *integrations.Service, reporting *reports.Service) []jobs.Job {
+func backgroundJobs(devices, consoleDevices *device.Service, advisories *advisory.Service, deliveries *integrations.Service, reporting *reports.Service) []jobs.Job {
 	inventory := []jobs.Job{
 		{Name: "snapshot-cleanup", Key: jobKeySnapshotCleanup, Mode: jobs.Exclusive, Run: devices.RunSnapshotCleanup},
 		{Name: "advisory-maintenance", Key: jobKeyAdvisoryMaintenance, Mode: jobs.Exclusive, Run: advisories.RunMaintenance},
 		{Name: "advisory-evaluation", Key: jobKeyAdvisoryEvaluation, Mode: jobs.Exclusive, Run: advisories.RunEvaluations},
-		// Each instance keeps its own read-only unrestricted fleet aggregate.
-		{Name: "fleet-summary", Mode: jobs.Replicated, Run: devices.RunFleetSummary},
+		// Each instance keeps its own read-only unrestricted fleet aggregate,
+		// read on the console pool that serves it.
+		{Name: "fleet-summary", Mode: jobs.Replicated, Run: consoleDevices.RunFleetSummary},
 	}
 	if deliveries != nil {
 		inventory = append(inventory,

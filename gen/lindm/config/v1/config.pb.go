@@ -950,6 +950,10 @@ type DatabaseConfig struct {
 	// Only the explicit migration command reads this credential. Runtime replicas
 	// need not mount it and should use a database role without DDL privileges.
 	MigrationUrlFile *string `protobuf:"bytes,3,opt,name=migration_url_file,json=migrationUrlFile,proto3,oneof" json:"migration_url_file,omitempty"`
+	// Separate pool for the console: identity/session checks and admin RPCs.
+	// Device traffic saturating max_connections then cannot delay operators.
+	// Absent selects 4. Each replica opens max_connections + admin_connections.
+	AdminConnections *uint32 `protobuf:"varint,4,opt,name=admin_connections,json=adminConnections,proto3,oneof" json:"admin_connections,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1003,6 +1007,13 @@ func (x *DatabaseConfig) GetMigrationUrlFile() string {
 		return *x.MigrationUrlFile
 	}
 	return ""
+}
+
+func (x *DatabaseConfig) GetAdminConnections() uint32 {
+	if x != nil && x.AdminConnections != nil {
+		return *x.AdminConnections
+	}
+	return 0
 }
 
 type TLSConfig struct {
@@ -2177,13 +2188,15 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x16mutex_profile_fraction\x18\x03 \x01(\rB\v\xbaH\b*\x06\x18\xc0\x84=(\x01R\x14mutexProfileFraction\x12@\n" +
 	"\x15block_profile_rate_ns\x18\x04 \x01(\rB\r\xbaH\n" +
 	"*\b\x18\x80\x94\xeb\xdc\x03(\x01R\x12blockProfileRateNs:\x8d\x01\xbaH\x89\x01\x1a\x86\x01\n" +
-	"\x12profiling.loopback\x12+profiling requires literal 127.0.0.1 or ::1\x1aChas(this.listener) && this.listener.address in ['127.0.0.1', '::1']\"\xc0\x01\n" +
+	"\x12profiling.loopback\x12+profiling requires literal 127.0.0.1 or ::1\x1aChas(this.listener) && this.listener.address in ['127.0.0.1', '::1']\"\x93\x02\n" +
 	"\x0eDatabaseConfig\x12$\n" +
 	"\burl_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\aurlFile\x123\n" +
 	"\x0fmax_connections\x18\x02 \x01(\rB\n" +
 	"\xbaH\a*\x05\x18\x80\x02(\x02R\x0emaxConnections\x12<\n" +
-	"\x12migration_url_file\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x10migrationUrlFile\x88\x01\x01B\x15\n" +
-	"\x13_migration_url_file\"v\n" +
+	"\x12migration_url_file\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x10migrationUrlFile\x88\x01\x01\x12;\n" +
+	"\x11admin_connections\x18\x04 \x01(\rB\t\xbaH\x06*\x04\x18@(\x01H\x01R\x10adminConnections\x88\x01\x01B\x15\n" +
+	"\x13_migration_url_fileB\x14\n" +
+	"\x12_admin_connections\"v\n" +
 	"\tTLSConfig\x124\n" +
 	"\x10certificate_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0fcertificateFile\x123\n" +
 	"\x10private_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0eprivateKeyFile\"{\n" +

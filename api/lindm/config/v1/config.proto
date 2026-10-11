@@ -250,6 +250,13 @@ message DatabaseConfig {
   // Only the explicit migration command reads this credential. Runtime replicas
   // need not mount it and should use a database role without DDL privileges.
   optional string migration_url_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Separate pool for the console: identity/session checks and admin RPCs.
+  // Device traffic saturating max_connections then cannot delay operators.
+  // Absent selects 4. Each replica opens max_connections + admin_connections.
+  optional uint32 admin_connections = 4 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 64
+  }];
 }
 
 message TLSConfig {

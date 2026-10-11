@@ -1794,6 +1794,13 @@ conflict is retried up to eight times with jittered backoff: changed
 evaluations append to the serial audit chain, whose head row is updated
 `FOR UPDATE`. A pass continues past isolated device failures.
 
+Each replica opens two PostgreSQL pools from the same credential: the device
+pool (`database.max_connections`) for device/enrollment RPCs and background
+jobs, and a console pool (`database.admin_connections`, default 4) for
+identity/session checks, the admin API and the fleet population. The device
+domain service is composed twice over the same configuration, once per pool,
+so admin RPCs never wait for a connection behind device traffic.
+
 `GetFleetSummary` serves unrestricted readers a population aggregate
 (lifecycle, contact, OS, compliance, advisory findings and the 20 most recent
 actions, truncated to the requested limit), so a cached read needs no device

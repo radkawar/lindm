@@ -1053,8 +1053,11 @@ PostgreSQL requirements:
 - Set server TCP keepalives (`tcp_keepalives_idle = 10`, `interval = 5`,
   `count = 3`) so a partitioned replica's coordination session and its advisory
   locks are released within about 25 seconds instead of the operating-system default.
-- Size `max_connections` for each replica's `database.max_connections` pool plus
-  one coordination session per replica, plus migration and administration sessions.
+- Size `max_connections` for each replica's `database.max_connections` device pool
+  plus its `database.admin_connections` console pool (default 4), plus one
+  coordination session per replica, plus migration and administration sessions.
+  The console pool serves identity/session checks, the admin API and the fleet
+  summary, so device traffic saturating the device pool cannot queue operators.
 
 Background jobs (inventory in `internal/server/jobs.go`):
 
