@@ -474,7 +474,7 @@ func encryptedGoldenID(m *labv1.ImageManifest, opts EncryptedVMOptions, codeDige
 	recipeVersion := encryptedRecipeVersion
 	switch platform.ForManifest(m.GetDistribution(), m.GetVersion()).Lab.Installer {
 	case platform.Ubiquity:
-		recipeVersion += "\n" + mintInstallerRecipeVersion
+		recipeVersion += "\n" + mintEncryptedRecipeVersion
 	case platform.OmarchyCidata:
 		recipeVersion += "\n" + omarchyInstallerRecipeVersion
 	}

@@ -26,8 +26,13 @@ const (
 	mintInstallerEdition          = "cinnamon"
 	mintEncryptedInstallerEdition = "cinnamon-encrypted-lab"
 	mintInstallerDesktop          = "cinnamon"
-	// Bump when the preseed, provisioning or machine layout changes.
-	mintInstallerRecipeVersion = "linuxmint-ubiquity-v2"
+	// Bump when the preseed, provisioning or machine layout of the unencrypted
+	// golden changes.
+	mintInstallerRecipeVersion = "linuxmint-ubiquity-v3"
+	// mintEncryptedRecipeVersion binds the encrypted golden; bump it when the
+	// preseed or the encrypted provisioning changes. v2 is the identity the
+	// first published encrypted golden used.
+	mintEncryptedRecipeVersion = "linuxmint-ubiquity-v2"
 )
 
 // mintInstallerImage builds the unencrypted Cinnamon golden. Only the signed
@@ -97,7 +102,11 @@ func mintInstallerRecipe(disk, architecture, sourceDigest, login, hostPrivate, h
 	// The credential writer leaves umask 077; system files, including the
 	// emptied machine-id the first boot fills, must stay world-readable.
 	provision += "umask 022\n"
-	provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d /etc/default/grub.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
+	// Ubuntu's cloud-init apt module renders Ubuntu archive sources with the
+	// os-release VERSION_CODENAME; on Mint that is "zena", whose Ubuntu suites
+	// do not exist and make every apt-get update exit 100 (observed). Keep
+	// Mint's own official-package-repositories list untouched.
+	provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d /etc/default/grub.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' 'apt: {preserve_sources_list: true}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
 	provision += "printf '%s\\n' 'GRUB_CMDLINE_LINUX=\"console=tty0 console=" + console + "\"' > /etc/default/grub.d/99-lindm-lab.cfg\nupdate-grub\n"
 	provision += "(umask 077 && printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + ")\n"
 	provision += "systemctl enable ssh\ncloud-init clean --logs\nrm -f /etc/machine-id\ntouch /etc/machine-id\nln -sf /etc/machine-id /var/lib/dbus/machine-id\n"

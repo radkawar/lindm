@@ -87,7 +87,7 @@ func TestMintPreseedBindsUnencryptedTargetAndCredentials(t *testing.T) {
 	for _, want := range []string{
 		"apt-get -y install openssh-server cloud-init", base64.StdEncoding.EncodeToString([]byte(login)),
 		base64.StdEncoding.EncodeToString([]byte(private)), base64.StdEncoding.EncodeToString([]byte(public)),
-		"datasource_list: [ NoCloud ]", "console=ttyS0", digest + "' > " + installerSourceMarkerPath, "cloud-init clean",
+		"datasource_list: [ NoCloud ]", "'apt: {preserve_sources_list: true}'", "console=ttyS0", digest + "' > " + installerSourceMarkerPath, "cloud-init clean",
 		"update-grub", "systemctl enable ssh", "passwd -l lindm-lab",
 	} {
 		if !strings.Contains(inner, want) {
