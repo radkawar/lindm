@@ -238,7 +238,7 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance":
+	case "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "encrypted", "device-actions", "assistance", "updates":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.

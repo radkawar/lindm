@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -31,6 +32,8 @@ type VMUpdateOptions struct {
 	// BuildRepository selects package and server source; empty uses Repository.
 	// Repository remains the development fixture and trust root.
 	BuildRepository string
+	// Hardware selects the guest machine; aarch64 requires pinned EFI firmware.
+	Hardware *VMHardwareOptions
 }
 
 type VMUpdateStep struct {
@@ -74,11 +77,13 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 		return nil, err
 	}
 	release := manifestRelease(manifest)
-	if err := release.LabLane(platform.LaneUpdates); err != nil {
+	if err := release.LabLaneOn(platform.LaneUpdates, manifest.GetArchitecture()); err != nil {
 		return nil, err
 	}
-	if architecture := manifest.GetArchitecture(); architecture != "amd64" && architecture != "x86_64" {
-		return nil, errors.New("vm updates requires an amd64/x86_64 manifest")
+	// Resolve the guest machine before the long package build: an unbootable
+	// selection (aarch64 without pinned EFI firmware) must fail first.
+	if err := updateHardwareSupported(manifest, options.Hardware, runtime.GOARCH); err != nil {
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Minute)
 	defer cancel()
@@ -110,7 +115,7 @@ func UpdateVM(ctx context.Context, manifest *labv1.ImageManifest, options VMUpda
 	if err != nil {
 		return result, err
 	}
-	vm, verified, err := newVerifiedGuest(ctx, manifest, options.CacheDir, options.WorkDir, true)
+	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, true, options.Hardware)
 	if err != nil {
 		return result, err
 	}
@@ -438,6 +443,20 @@ func updateChannel(artifact packaging.Artifact, generation uint64, paused bool, 
 	}
 	now := time.Now().UTC()
 	return &updatev1.AgentUpdateChannel{Ring: "canary", Paused: paused, EligiblePercentage: percentage, Generation: generation, IssuedAt: timestamppb.New(now), ExpiresAt: timestamppb.New(now.Add(time.Hour)), Artifacts: []*updatev1.AgentUpdateArtifact{{Version: artifact.Version, Architecture: artifact.Architecture.GOARCH, PackageFormat: string(artifact.Format), TargetPath: name, MinimumAgentVersion: "0.0.0", MaximumAgentVersion: "1.0.0", MinimumProtocolVersion: 1, MaximumProtocolVersion: 1, NativeVersion: native}}}, name
+}
+
+// updateHardwareSupported resolves the selected guest machine exactly as the
+// guest launcher will. The lane bounds the update slice's write bandwidth on the
+// root disk by its virtio-blk name, so other storage buses are refused up front.
+func updateHardwareSupported(manifest *labv1.ImageManifest, options *VMHardwareOptions, hostArchitecture string) error {
+	hardware, err := hardwareForManifest(manifest, options, hostArchitecture)
+	if err != nil {
+		return err
+	}
+	if hardware.StorageBus != "virtio-blk" {
+		return errors.New("update lane requires the virtio-blk root disk (/dev/vda)")
+	}
+	return nil
 }
 
 func setUpdateRollout(ctx context.Context, fixture *devlab.AuthorityFixture, channel *updatev1.AgentUpdateChannel, paused bool, percentage uint32) (*updatev1.AgentUpdateChannel, error) {

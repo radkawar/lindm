@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -19,7 +20,48 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	labv1 "lindm/gen/lindm/lab/v1"
 )
+
+// An aarch64 guest cannot boot without pinned EFI firmware. The lane must refuse
+// that selection before snapshotting source or building any package, and must
+// refuse storage buses whose root disk is not the throttled /dev/vda.
+func TestUpdateHardwareResolvedBeforePackageBuild(t *testing.T) {
+	manifest, err := LoadManifest("../../lab/images/debian-12-arm64.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := t.TempDir()
+	result, err := UpdateVM(context.Background(), manifest, VMUpdateOptions{Repository: t.TempDir(), WorkDir: work})
+	if result != nil || err == nil || !strings.Contains(err.Error(), "explicit pinned EFI firmware") {
+		t.Fatalf("UpdateVM without firmware = %v, %v", result, err)
+	}
+	if entries, err := os.ReadDir(work); err != nil || len(entries) != 0 {
+		t.Fatalf("refused lane created work state: %v, %v", entries, err)
+	}
+	firmware := &EncryptedFirmwareOptions{Code: "/usr/share/AAVMF/AAVMF_CODE.secboot.fd", Vars: "/usr/share/AAVMF/AAVMF_VARS.fd", Package: "qemu-efi-aarch64", Version: "2024.02-2ubuntu0.10"}
+	if err := updateHardwareSupported(manifest, &VMHardwareOptions{Firmware: firmware}, "arm64"); err != nil {
+		t.Fatalf("pinned AAVMF virtio-blk guest refused: %v", err)
+	}
+	if err := updateHardwareSupported(manifest, &VMHardwareOptions{Firmware: firmware, StorageBus: "nvme"}, "arm64"); err == nil || !strings.Contains(err.Error(), "/dev/vda") {
+		t.Fatalf("nvme root disk admitted: %v", err)
+	}
+	if err := updateHardwareSupported(manifest, &VMHardwareOptions{Firmware: firmware, Accelerator: "kvm"}, "amd64"); err == nil {
+		t.Fatal("cross-architecture KVM admitted")
+	}
+	x86 := &labv1.ImageManifest{Distribution: "ubuntu", Version: "24.04", Architecture: "amd64"}
+	if err := updateHardwareSupported(x86, nil, "amd64"); err != nil {
+		t.Fatalf("default x86_64 BIOS guest refused: %v", err)
+	}
+	// The registry admits only the natively qualified architecture.
+	amd, err := LoadManifest("../../lab/images/debian-12-amd64.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UpdateVM(context.Background(), amd, VMUpdateOptions{Repository: t.TempDir(), WorkDir: work}); err == nil || !strings.Contains(err.Error(), "no maintained vm updates lane") {
+		t.Fatalf("unqualified Debian 12 x86_64 update lane admitted: %v", err)
+	}
+}
 
 // This exercises encrypted SSH observation/reconnection, not a simulated native
 // update. Native package and boot evidence still requires lab vm updates.

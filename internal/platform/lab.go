@@ -9,6 +9,10 @@ import (
 // absent from Lanes has no maintained fixture builder or oracle there.
 type Lab struct {
 	Lanes []LabLane
+	// LaneArchitectures restricts a lane to the listed guest architectures
+	// (x86_64, aarch64) on which it was natively qualified. A lane absent here
+	// runs on every Release.Architectures entry.
+	LaneArchitectures map[LabLane][]string
 	// Entitlement: the guest's vendor repositories need a subscription token.
 	Entitlement bool
 	// Installer is the vendor installer the lab's encrypted and installed-image
@@ -58,6 +62,28 @@ func (r *Release) LabLane(l LabLane) error {
 		return nil
 	}
 	return fmt.Errorf("platform: no maintained vm %s lane for %s", l, r.Name)
+}
+
+// LabLaneOn is LabLane for one guest architecture; it accepts the Debian
+// (amd64, arm64) and kernel (x86_64, aarch64) architecture spellings.
+func (r *Release) LabLaneOn(l LabLane, architecture string) error {
+	if err := r.LabLane(l); err != nil {
+		return err
+	}
+	switch architecture {
+	case "amd64":
+		architecture = "x86_64"
+	case "arm64":
+		architecture = "aarch64"
+	}
+	allowed, restricted := r.Lab.LaneArchitectures[l]
+	if !restricted {
+		allowed = r.Architectures
+	}
+	if slices.Contains(allowed, architecture) {
+		return nil
+	}
+	return fmt.Errorf("platform: no maintained vm %s lane for %s on %s", l, r.Name, architecture)
 }
 
 // DNF reports whether the backend is a DNF generation.

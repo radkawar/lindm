@@ -49,11 +49,12 @@ func TestPlanStates(t *testing.T) {
 	for key, want := range map[string]State{
 		"ubuntu-24.04 lifecycle x86_64":        Pass,
 		"ubuntu-24.04 lifecycle aarch64":       NoImage,
-		"ubuntu-24.04 release-upgrade x86_64":  Gated,
+		"ubuntu-24.04 release-upgrade x86_64":  NoLane,
 		"ubuntu-24.04 advisories x86_64":       NoLane,
 		"omarchy-4.0.4 advisories x86_64":      Gated,
 		"omarchy-4.0.4 lifecycle x86_64":       NoImage,
-		"ubuntu-24.04 release-upgrade aarch64": Gated,
+		"ubuntu-24.04 release-upgrade aarch64": NoLane,
+		"omarchy-4.0.4 release-upgrade x86_64": Gated,
 	} {
 		if got[key] != want {
 			t.Errorf("%s = %q, want %q", key, got[key], want)
@@ -70,6 +71,28 @@ func TestPlanStates(t *testing.T) {
 	}
 	if !strings.Contains(table, "| x86_64 fail; aarch64 no image |") {
 		t.Fatalf("table does not separate disagreeing architectures:\n%s", table)
+	}
+}
+
+// A lane the registry restricts to other architectures is "no lane" there, even
+// with a pinned image, so the matrix never offers an unqualified run.
+func TestPlanHonoursLaneArchitectures(t *testing.T) {
+	debian := release(t, "debian-12")
+	cloud := labv1.MatrixImage_MATRIX_IMAGE_CLOUD
+	updates := &labv1.MatrixCell{Name: "self-update", Title: "Self-update", Capabilities: []string{"self-update"}, Image: cloud, Lane: "updates"}
+	in := &Inputs{
+		Manifests: []*Manifest{
+			{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "server-cloudimg"}, Release: debian, Architecture: "x86_64"},
+			{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "server-cloudimg"}, Release: debian, Architecture: "aarch64"},
+		},
+		Ledger: &labv1.MatrixLedger{},
+	}
+	got := map[string]State{}
+	for _, c := range in.Plan([]*platform.Release{debian}, []*labv1.MatrixCell{updates}) {
+		got[c.Architecture] = c.State
+	}
+	if got["x86_64"] != NoLane || got["aarch64"] != NotRun {
+		t.Fatalf("debian-12 self-update states = %v, want x86_64 no lane, aarch64 not run", got)
 	}
 }
 

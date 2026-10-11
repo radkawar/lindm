@@ -221,3 +221,46 @@ func TestTPM2BindFollowsShippedSystemd(t *testing.T) {
 		t.Fatal("a release without a recorded systemd must defer to the native probe")
 	}
 }
+
+// The native self-update lane is admitted per guest architecture exactly where
+// a native record passed; both architecture spellings resolve identically.
+func TestUpdateLaneArchitectures(t *testing.T) {
+	for _, tc := range []struct {
+		id, version, architecture string
+		admitted                  bool
+	}{
+		{"ubuntu", "24.04", "amd64", true},
+		{"ubuntu", "26.04", "x86_64", true},
+		{"fedora", "44", "x86_64", true},
+		{"rhel", "9.8", "x86_64", true},
+		{"rhel", "10.2", "x86_64", true},
+		{"ubuntu", "22.04", "arm64", true},
+		{"debian", "12", "arm64", true},
+		{"debian", "13", "aarch64", true},
+		{"rocky", "9.8", "aarch64", true},
+		{"rocky", "10.2", "aarch64", true},
+		{"almalinux", "9.8", "aarch64", true},
+		{"almalinux", "10.2", "arm64", true},
+		// Unqualified architectures and releases stay refused.
+		{"ubuntu", "24.04", "arm64", false},
+		{"rhel", "9.8", "aarch64", false},
+		{"ubuntu", "22.04", "amd64", false},
+		{"debian", "12", "amd64", false},
+		{"almalinux", "9.8", "x86_64", false},
+		{"rocky", "8.10", "aarch64", false},
+		{"opensuse-leap", "16.0", "x86_64", false},
+		{"ubuntu", "24.04", "riscv64", false},
+	} {
+		r := Identify(OSRelease{ID: tc.id, VersionID: tc.version})
+		if err := r.LabLaneOn(LaneUpdates, tc.architecture); (err == nil) != tc.admitted {
+			t.Errorf("%s %s %s: admitted=%t, err=%v", tc.id, tc.version, tc.architecture, tc.admitted, err)
+		}
+	}
+	// A lane without an architecture restriction follows Release.Architectures.
+	r := Identify(OSRelease{ID: "ubuntu", VersionID: "24.04"})
+	for _, architecture := range []string{"amd64", "arm64"} {
+		if err := r.LabLaneOn(LaneResources, architecture); err != nil {
+			t.Errorf("unrestricted resources lane on %s: %v", architecture, err)
+		}
+	}
+}

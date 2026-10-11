@@ -2201,6 +2201,24 @@ go run ./cmd/lab vm updates -repo . \
   -record artifacts/updates-fedora.json
 ```
 
+The lane admits only the release/architecture pairs that `internal/platform`
+registers with `LaneUpdates` (`Lab.LaneArchitectures` restricts the architecture).
+It accepts the shared hardware flags and is scheduled like the other
+hardware-capable lanes. aarch64 guests need pinned EFI firmware, for example
+on an arm64 KVM host:
+
+```sh
+go run ./cmd/lab vm updates -host dgx20 -arch arm64 -repo . -allow-network \
+  -manifest lab/images/debian-12-arm64.json \
+  -firmware-code /usr/share/AAVMF/AAVMF_CODE.secboot.fd \
+  -firmware-vars /usr/share/AAVMF/AAVMF_VARS.fd \
+  -firmware-package qemu-efi-aarch64 -firmware-version 2024.02-2ubuntu0.10 \
+  -record artifacts/updates-debian12-arm64.json
+```
+
+The update lane throttles writes on the root disk `/dev/vda`, so it refuses any
+storage bus other than virtio-blk. DNF-family guests must run SELinux Enforcing.
+
 Use the repository's pinned manifest filename for Fedora when selecting a snapshot.
 The image cache, built embedded console, running development PostgreSQL and normal
 native package/signing tools are prerequisites. `-lab FILE` selects a prebuilt guest

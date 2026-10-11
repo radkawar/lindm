@@ -279,8 +279,8 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		c.State, c.Reason = Gated, strings.Join(reasons, "; ")
 	case spec.GetLane() == "":
 		c.State, c.Reason = NoLane, spec.GetNoLane()
-	case slices.Contains(platform.LabLanes, platform.LabLane(spec.GetLane())) && r.LabLane(platform.LabLane(spec.GetLane())) != nil:
-		c.State, c.Reason = NoLane, r.LabLane(platform.LabLane(spec.GetLane())).Error()
+	case slices.Contains(platform.LabLanes, platform.LabLane(spec.GetLane())) && r.LabLaneOn(platform.LabLane(spec.GetLane()), arch) != nil:
+		c.State, c.Reason = NoLane, r.LabLaneOn(platform.LabLane(spec.GetLane()), arch).Error()
 	case c.Manifest == nil:
 		c.State = NoImage
 	case c.Entry == nil:

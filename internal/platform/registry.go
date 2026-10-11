@@ -170,6 +170,11 @@ var (
 	// reasonNoUkify: the owned-boot recovery fixture builds its ordinary UKI
 	// with the guest's ukify, which systemd 253 introduced.
 	reasonNoUkify = "no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI"
+	// The native self-update lane (`lab vm updates`) is qualified per guest
+	// architecture: x86_64 on the local host, aarch64 on the arm64 KVM hosts.
+	// EL rows cite the 9.8/10.2 minors their records exercised.
+	updatesX86 = map[LabLane][]string{LaneUpdates: x86}
+	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
 )
 
 var registry = []*Release{
@@ -182,7 +187,7 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}, RecoveryGRUB: debianGRUB},
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
 			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
 				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
 				Drivers: []string{"tpm_tis", "tpm_crb"}}},
@@ -199,7 +204,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance},
-			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
+			LaneArchitectures: updatesX86, Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		// ReleaseUpgrade: do-release-upgrade to UpgradeTo, `lab vm resources -phase release-upgrade`.
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade}, actionLanes),
@@ -214,7 +219,7 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "26.04", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// The 26.04 desktop ISO carries dracut 110 and the TSS2 stack itself.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices},
-			Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
+			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, TPM: LabTPM{Modules: dracutSplitTPM}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		// Measured natively (recovery-nvme-01): the owned-boot UKI holds the
 		// vendor kernel plus the non-hostonly dracut initrd (72 MB; 24.04's
@@ -238,7 +243,7 @@ var registry = []*Release{
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		Gates:    gates(string(RecoverySanitize), reasonNoUkify),
@@ -251,7 +256,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(),
@@ -274,7 +279,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerAuthselect,
 			Password: []PasswordPins{{Version: "44", Quality: "1.4.5", PAM: "1.7.2", Manager: "1.7.1"}}, RecoveryGRUB: blsGRUB},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAcceptance},
-			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
+			LaneArchitectures: updatesX86, Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
@@ -299,7 +304,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, Entitlement: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, LaneArchitectures: updatesX86, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
@@ -313,7 +318,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, Entitlement: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices}, LaneArchitectures: updatesX86, Entitlement: true,
 			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
@@ -328,7 +333,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
@@ -339,7 +344,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
@@ -351,7 +356,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9"},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
@@ -362,7 +367,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10"},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),

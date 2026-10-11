@@ -13,7 +13,7 @@ import (
 func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm updates", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "verified Ubuntu24 amd64, Fedora44 x86_64 or RHEL 9.8/10.2 x86_64 manifest")
+	manifestPath := flags.String("manifest", "", "verified manifest of a release/architecture with a maintained update lane (internal/platform registry)")
 	repository := flags.String("repo", ".", "checkout containing the existing development fixture")
 	buildRepository := flags.String("build-repo", "", "source checkout with built embedded console; default is -repo")
 	cache := flags.String("cache", ".cache/lab/images", "verified image cache")
@@ -21,6 +21,7 @@ func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	diagnostics := flags.String("diagnostics", "", "private owned failure diagnostics parent")
 	record := flags.String("record", "", "write nonsecret evidence to a new private file")
 	probe := flags.String("lab", "", "prebuilt guest lab probe; default is this executable")
+	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func runVMUpdates(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
-	result, runErr := vmlab.UpdateVM(ctx, manifest, vmlab.VMUpdateOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, LabBinary: *probe, DiagnosticsDir: *diagnostics})
+	result, runErr := vmlab.UpdateVM(ctx, manifest, vmlab.VMUpdateOptions{Repository: *repository, BuildRepository: *buildRepository, CacheDir: *cache, WorkDir: *work, LabBinary: *probe, DiagnosticsDir: *diagnostics, Hardware: hardware.options()})
 	if result == nil {
 		return runErr
 	}

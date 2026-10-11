@@ -30,8 +30,9 @@ func TestVMRequiresKVMNeverFallsBackToForeignTCGForCapacity(t *testing.T) {
 		// Explicit operator choices are honoured.
 		{"encrypted", "tcg", "amd64", false},
 		{"lifecycle", "kvm", "arm64", true},
-		// Fixed-hardware lanes always require native KVM.
+		// The hardware-capable update lane stays native where a native host exists.
 		{"updates", "", "amd64", true},
+		{"updates", "", "arm64", true},
 	} {
 		if got := vmRequiresKVM(cfg, tc.command, tc.accelerator, tc.architecture); got != tc.want {
 			t.Errorf("%s accelerator=%q arch=%s: requireKVM=%v, want %v", tc.command, tc.accelerator, tc.architecture, got, tc.want)
