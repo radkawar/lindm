@@ -119,9 +119,30 @@ func (n *desktopNotice) wait() {
 		case signal := <-n.closed.signals:
 			var id, reason uint32
 			if dbus.Store(signal.Body, &id, &reason) == nil && id == n.id {
-				n.result <- ""
+				n.result <- n.bufferedAction()
 				return
 			}
+		}
+	}
+}
+
+// bufferedAction returns the key of an ActionInvoked for this notification
+// that the dispatcher forwarded before its NotificationClosed, or "". The
+// dispatcher forwards bus signals in order but into separate watch channels,
+// and select picks among ready cases at random: GNOME closes an actionable
+// notification right after ActionInvoked, so a buffered Allow would otherwise
+// read as a dismissal (observed natively on Rocky Linux 10.2, GNOME 49).
+func (n *desktopNotice) bufferedAction() string {
+	for {
+		select {
+		case signal := <-n.actions.signals:
+			var id uint32
+			var key string
+			if dbus.Store(signal.Body, &id, &key) == nil && id == n.id {
+				return key
+			}
+		default:
+			return ""
 		}
 	}
 }
