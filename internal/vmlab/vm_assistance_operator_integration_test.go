@@ -25,30 +25,44 @@ func TestPersistentAssistanceOperatorAccountsAcrossResume(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 	defer cancel()
-	state, laneState := filepath.Join(t.TempDir(), "controller"), filepath.Join(t.TempDir(), "lane")
-	fixture, err := devlab.OpenPersistentFixture(ctx, repository, binary, state, devlab.LoadAuthorityOptions{})
+	root, err := os.MkdirTemp("", "pfx-operator-")
 	if err != nil {
 		t.Fatal(err)
 	}
+	state, laneState := filepath.Join(root, "controller"), filepath.Join(root, "lane")
+	var fixture *devlab.AuthorityFixture
 	var lane *devlab.AuthorityFixture
 	defer func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
 		if lane != nil {
 			if err := lane.Close(); err != nil {
-				t.Error(err)
+				t.Errorf("lane close failed; private state retained at %s: %v", root, err)
+				return
 			}
 		}
-		if err := fixture.Close(); err != nil {
-			t.Error(err)
+		if fixture != nil {
+			if err := fixture.Close(); err != nil {
+				t.Errorf("controller close failed; private state retained at %s: %v", root, err)
+				return
+			}
 		}
 		if err := devlab.DestroyPersistentAuthorityFixture(laneState); err != nil {
-			t.Error(err)
+			t.Errorf("lane destroy failed; private state retained at %s: %v", root, err)
+			return
 		}
-		if err := devlab.DestroyPersistentFixture(cleanup, repository, state); err != nil {
+		// Destroy already bounds DROP to three minutes for checkpoint/storage
+		// work. A shorter outer cleanup budget truncates that bound under load.
+		if err := devlab.DestroyPersistentFixture(context.Background(), repository, state); err != nil {
+			t.Errorf("controller destroy failed; private state retained at %s: %v", root, err)
+			return
+		}
+		if err := os.RemoveAll(root); err != nil {
 			t.Error(err)
 		}
 	}()
+	fixture, err = devlab.OpenPersistentFixture(ctx, repository, binary, state, devlab.LoadAuthorityOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := fixture.ConfigureDeviceActions(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +86,8 @@ func TestPersistentAssistanceOperatorAccountsAcrossResume(t *testing.T) {
 	}
 	lane = openLane()
 	pool, _ := testdb.Open(t)
+	// Config returns an independent copy. The testdb pool remains connected to
+	// the shared database; only this separately closed observer uses the fixture.
 	config := pool.Config().ConnConfig.Copy()
 	config.Database = database
 	config.RuntimeParams["search_path"] = "public"

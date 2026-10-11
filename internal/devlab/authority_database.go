@@ -105,8 +105,64 @@ func (d *authorityDatabase) drop(ctx context.Context, missingOK bool) (resultErr
 		statement += "IF EXISTS "
 	}
 	if _, err := connection.Exec(ctx, statement+pgx.Identifier{d.name}.Sanitize()); err != nil {
-		return fmt.Errorf("remove owned authority database %s: %w", d.name, err)
+		activity, activityErr := d.dropActivity(ctx, connection.PgConn().PID())
+		return errors.Join(fmt.Errorf("remove owned authority database %s: %w; cleanup activity: %s", d.name, err, activity), activityErr)
 	}
 	d.created = false
 	return nil
+}
+
+// Observe only after failure, on an independent connection: cancellation may
+// have closed the DROP connection already. Database-object locks can be held
+// from another database, while checkpoint work may leave the DROP backend alive
+// without any target-database clients. This is a snapshot, not a causal claim.
+func (d *authorityDatabase) dropActivity(ctx context.Context, dropPID uint32) (activity string, resultErr error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	connection, err := pgx.ConnectConfig(ctx, d.admin.Copy())
+	if err != nil {
+		return "unavailable", errors.New("observe owned database cleanup: administration connection failed")
+	}
+	defer func() { resultErr = errors.Join(resultErr, connection.Close(ctx)) }()
+	rows, err := connection.Query(ctx, `
+SELECT pid,
+       CASE WHEN pid = $2 THEN 'drop' WHEN datname = $1 THEN 'client' ELSE 'database-lock' END,
+       COALESCE(usename, ''), COALESCE(application_name, ''),
+       COALESCE(state, ''), COALESCE(wait_event_type, ''), COALESCE(wait_event, '')
+FROM pg_stat_activity
+WHERE datname = $1 OR pid = $2 OR pid IN (
+    SELECT pid FROM pg_locks
+    WHERE locktype = 'object' AND classid = 'pg_database'::regclass
+      AND objid = (SELECT oid FROM pg_database WHERE datname = $1) AND granted
+)
+ORDER BY pid
+LIMIT 33`, d.name, dropPID)
+	if err != nil {
+		return "unavailable", fmt.Errorf("observe owned database cleanup: %w", err)
+	}
+	defer rows.Close()
+	var output strings.Builder
+	fmt.Fprintf(&output, "drop_pid=%d; observed after failure", dropPID)
+	count := 0
+	for rows.Next() {
+		if count == 32 {
+			output.WriteString("; additional sessions omitted")
+			break
+		}
+		var pid uint32
+		var role, user, application, state, waitType, waitEvent string
+		if err := rows.Scan(&pid, &role, &user, &application, &state, &waitType, &waitEvent); err != nil {
+			return "unavailable", fmt.Errorf("read owned database cleanup activity: %w", err)
+		}
+		fmt.Fprintf(&output, "; %s pid=%d user=%q application=%q state=%q wait=%q/%q",
+			role, pid, user, application, state, waitType, waitEvent)
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return "unavailable", fmt.Errorf("read owned database cleanup activity: %w", err)
+	}
+	if count == 0 {
+		output.WriteString("; no remaining target clients, DROP backend or database-object lock holders")
+	}
+	return output.String(), nil
 }

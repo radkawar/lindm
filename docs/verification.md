@@ -4370,6 +4370,32 @@ enabled state and account cardinality. Evidence:
 `~/.cache/lindm-persistent-demo-20261011/operator-resume-integration.log`,
 SHA-256 `9eb7493ee68e01ac680925af186c7c08fdb96fce6d8df3ee019e4acfac8e37bd`.
 
+A later full integration run exposed a teardown timeout: this test's one-minute
+cleanup context truncated the fixture's existing three-minute database-drop
+budget. The observer connection closes before controller teardown; the independent
+`testdb` pool remains on the shared database. The original terse error does not
+establish a historical leaked connection or checkpoint wait. Routine cleanup now
+honors the fixture's bound and retains its private root on failure, while failed
+drops report a separately bounded activity snapshot without `FORCE`.
+
+After the development credential rotation, the local/split owner-session tests
+passed again (27.44/40.06 seconds), and the operator resume test passed in
+19.67 seconds, all under the race detector. Captured output:
+`~/.cache/lindm-persistfix/integration-initial.log`, SHA-256
+`029f5a581fa23061c99f947cf7bd9304ba2b9af86710a218235bfa12b3cf419b`.
+That first run also exposed an incorrect new test assumption: changing a database
+connection limit takes a catalog tuple lock, not the intended database-object
+lock. The corrected test uses an uncommitted rename, rolled back on connection close.
+
+`TestPersistentDestroyReportsRemainingSessions` then passed against real
+PostgreSQL and rebuilt `lindmd` in 13.86 seconds. It observes zero target clients
+after controller close with the shared pool still open, identifies deliberately
+retained target-client and cross-database object-lock sessions by PID and
+application, preserves both the live blockers and private state on failure, then
+successfully retries destroy after their connections close. Captured output:
+`~/.cache/lindm-persistfix/cleanup-regression.log`, SHA-256
+`2e4e79de34f87a2ca7bd4ed1e73100b50b20b066cd0c3f29d235ee89e9c960aa`.
+
 Post-rebase architecture regressions cover the actual named VM resume path up to
 control-plane validation without building a package or booting a VM, and the
 split controller's native publication architecture selection. They pass for

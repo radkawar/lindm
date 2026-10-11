@@ -604,6 +604,17 @@ demos. The per-run evidence remains independent.
 Empty sibling lifecycle lock files remain to serialize future reuse of the name;
 they contain no credentials or VM/database state.
 
+Database destruction waits up to three minutes, without `FORCE`; PostgreSQL
+checkpoint/storage work can delay a drop even after every client has closed.
+Callers may supply a shorter deadline, but routine teardown must not accidentally
+truncate that storage-work budget. A failed drop retains private state and adds
+a separately bounded five-second activity snapshot: remaining target clients,
+the DROP backend if still present, and database-object lock holders, including
+their PID, application name, state and wait event. The snapshot is taken after
+failure, not proof of the historical blocker; SQL text and credentials are never
+included. Close the identified owned clients or resolve the storage contention,
+then retry explicit destroy.
+
 Reusable APIs live in `internal/devlab` and `internal/vmlab`:
 `OpenPersistentFixture`, `OpenPersistentSplitFixture`,
 `DestroyPersistentFixture`, `ExportControlPlane`,

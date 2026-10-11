@@ -75,9 +75,7 @@ func TestPersistentFixtureResumePreservesOwnerSession(t *testing.T) {
 						t.Error(err)
 					}
 				}
-				cleanup, stop := context.WithTimeout(context.Background(), time.Minute)
-				defer stop()
-				if err := DestroyPersistentFixture(cleanup, repository, state); err != nil {
+				if err := DestroyPersistentFixture(context.Background(), repository, state); err != nil {
 					t.Errorf("destroy failed; private state retained at %s: %v", state, err)
 					return
 				}
