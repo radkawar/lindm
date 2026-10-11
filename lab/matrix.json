@@ -89,7 +89,8 @@
       "title": "Release upgrade",
       "capabilities": ["release-upgrade"],
       "image": "MATRIX_IMAGE_CLOUD",
-      "noLane": "release-upgrade lane not landed"
+      "lane": "resources",
+      "args": ["-phase=release-upgrade", "-allow-network", "-local-authority"]
     }
   ],
   "architectureArgs": {

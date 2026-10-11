@@ -1119,6 +1119,19 @@
       "source": "MATRIX_SOURCE_IMPORT",
       "verified": true,
       "reference": "#tier-1-parity-records-2026-10-11"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "release-upgrade",
+      "architecture": "aarch64",
+      "manifest": "ubuntu-noble-20260926-arm64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-ubuntu2604-20261011/release-upgrade/ubuntu2604-arm64-dgx21-release-upgrade-03.json",
+      "sha256": "f4e6baf3e0ad93fcc80666c4cbecda11c6cf0bc0a6fa0e856fccae07c2a4b741",
+      "recorded": "2026-10-11T10:24:59.775430389Z",
+      "revision": "06fbc3cf41954c5bf846b98f3f8675edf7d46830-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true
     }
   ]
 }
