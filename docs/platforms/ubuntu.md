@@ -869,7 +869,7 @@ version ordering alone. The maintained full archive is
 `Ubuntu:24.04:LTS` export or an arbitrary mirror named `all.zip` is not a replacement
 for canonical complete-source coverage. Completeness remains scoped to configured
 product/release/architecture and source mapping
-([coverage decision](../../internal/advisory/feed/osv_archive.go#L190)).
+([coverage decision](../../internal/advisory/feed/osv_archive.go)).
 
 A real upstream malformed record, `UBUNTU-CVE-2023-25812`, contains
 `pkg:deb/ubuntu/golang-github-minio-minio-go?arch=src?distro=noble`.
@@ -877,8 +877,16 @@ The second `?` must not be repaired into a new package identity. The parser reje
 that **record atomically**, retains explicit ID/reason/package-name rejection metadata
 and conservative unknown source/binary markers. Valid siblings can publish; a rejected
 record is not evidence that the affected package is clean. Unscoped rejection degrades
-snapshot completeness. See [record atomicity](../../internal/advisory/feed/osv_archive.go#L146)
+snapshot completeness. See [record atomicity](../../internal/advisory/feed/osv_archive.go)
 and [exact regression](../../internal/advisory/feed/osv_rejections_test.go#L17).
+
+Archive decoding uses at most four workers (and no more than `GOMAXPROCS`), with
+one reusable raw-document buffer per worker. The publisher consumes results in
+original ZIP order: callback delivery, rejection manifests and normalized claim
+bytes do not depend on scheduling. Each worker retains at most two bounded
+record results, including the record being consumed; cancellation joins every
+worker before temporary archive cleanup. This changes throughput, not the
+4 MiB record, archive expansion, claim-count or rejection bounds.
 
 A complete 70,180-entry Ubuntu export census found 1,416 distinct CVEs per
 advisory at the maximum (`USN-8728-1`, `-2`, `-3`). The former 1,000-CVE ceiling

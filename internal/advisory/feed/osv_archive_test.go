@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
@@ -218,5 +220,80 @@ func TestOSVArchiveDeduplicatesExactClaims(t *testing.T) {
 		if !proto.Equal(single.Advisories[i], duplicated.Advisories[i]) {
 			t.Fatal("deduplication changed a claim")
 		}
+	}
+}
+
+func TestOSVArchiveParallelEmissionOrderAndCancellation(t *testing.T) {
+	config := source("ubuntu", "24.04", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP)
+	raw := fixture(t, "ubuntu-USN-6859-1.json")
+	validator, err := protovalidate.New(protovalidate.WithMessages(&advisoryv1.Advisory{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	var expected [][]byte
+	for index := range 17 {
+		record := bytes.ReplaceAll(raw, []byte("USN-6859-1"), fmt.Appendf(nil, "USN-6859-%d", index+1))
+		entry, err := writer.Create(fmt.Sprintf("%02d.json", index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write(record); err != nil {
+			t.Fatal(err)
+		}
+		single := proto.CloneOf(config)
+		single.Format = advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON
+		doc, err := parseOSV(single, record, validator)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, advisory := range doc.Advisories {
+			payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(advisory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected = append(expected, payload)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	count, marked := 0, 0
+	digest := sha256.New()
+	_, err = parseOSVArchive(t.Context(), config, bytes.NewReader(archive.Bytes()), int64(archive.Len()), validator, func(advisory *advisoryv1.Advisory) error {
+		payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(advisory)
+		if err != nil {
+			return err
+		}
+		if count >= len(expected) || !bytes.Equal(payload, expected[count]) {
+			t.Fatalf("claim %d differs from serial source order", count)
+		}
+		var length [8]byte
+		binary.BigEndian.PutUint64(length[:], uint64(len(payload)))
+		if _, err := digest.Write(length[:]); err != nil {
+			return err
+		}
+		if _, err := digest.Write(payload); err != nil {
+			return err
+		}
+		count++
+		return nil
+	}, func() error { marked++; return nil })
+	if err != nil || count != len(expected) || marked != 17 {
+		t.Fatalf("claims=%d progress=%d error=%v", count, marked, err)
+	}
+	// Captured with the serial parser before the throughput cutover. Include
+	// framing so a changed record boundary cannot preserve the same digest.
+	const baseline = "b345ef911982ac30b1b0f65a44c1f8545cdaebef005cf8da8c2a7d5cfeff6aff"
+	if actual := fmt.Sprintf("%x", digest.Sum(nil)); actual != baseline || count != 119 {
+		t.Fatalf("publication digest=%s claims=%d, want %s / 119", actual, count, baseline)
+	}
+	stopped := errors.New("publication stopped")
+	_, err = parseOSVArchive(t.Context(), config, bytes.NewReader(archive.Bytes()), int64(archive.Len()), validator, func(*advisoryv1.Advisory) error {
+		return stopped
+	}, nil)
+	if !errors.Is(err, stopped) {
+		t.Fatalf("publication error lost: %v", err)
 	}
 }

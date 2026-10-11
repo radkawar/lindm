@@ -47,6 +47,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "snapshot" {
 		return runImageSnapshot(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "feeds" {
+		return runFeeds(ctx, args[1:], stdout, stderr)
+	}
 	if len(args) >= 1 && args[0] == "acceptance" {
 		return runAcceptance(ctx, args[1:], stdout, stderr)
 	}

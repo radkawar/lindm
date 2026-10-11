@@ -120,9 +120,9 @@ func TestAdvisoryStreamPublicationCannotRenewExpiredGeneration(t *testing.T) {
 		name  string
 		count int
 	}{
-		{"final-switch", 500},
-		{"partial-batch", 501},
-		{"full-batch", 1000},
+		{"final-switch", advisoryPublicationBatchSize},
+		{"partial-batch", advisoryPublicationBatchSize + 1},
+		{"full-batch", 2 * advisoryPublicationBatchSize},
 	} {
 		for _, reclaimed := range []bool{false, true} {
 			name := boundary.name + "/expired"
@@ -131,13 +131,13 @@ func TestAdvisoryStreamPublicationCannotRenewExpiredGeneration(t *testing.T) {
 			}
 			t.Run(name, func(t *testing.T) {
 				f := newStreamPublicationFixture(t)
-				release, _, result := f.startBlocked(t, "expired", boundary.count, 500, nil)
+				release, _, result := f.startBlocked(t, "expired", boundary.count, advisoryPublicationBatchSize, nil)
 				var staging uuid.UUID
 				err := f.pool.QueryRow(t.Context(), "SELECT generation FROM advisory_generation_cleanup WHERE feed_id=$1 AND generation<>$2", f.source.Id, f.before.Revision).Scan(&staging)
 				if err != nil {
 					t.Fatal(err)
 				}
-				assertStreamCleanupGeneration(t, f, staging, 500, 1)
+				assertStreamCleanupGeneration(t, f, staging, advisoryPublicationBatchSize, 1)
 				mustExec(t, t.Context(), f.pool, "UPDATE advisory_generation_cleanup SET cleanup_after=clock_timestamp()-interval '1 second' WHERE feed_id=$1 AND generation=$2", f.source.Id, staging)
 				if reclaimed {
 					if err := f.service.drainAdvisoryGenerationCleanup(t.Context()); err != nil {

@@ -29,7 +29,7 @@ import (
 // These controlled normalized claims exercise real PostgreSQL COPY, publication
 // visibility and findings. They do not claim native package or vendor execution.
 func TestAdvisoryStreamPublicationBatchBoundaries(t *testing.T) {
-	for _, count := range []int{499, 500, 501, 1001} {
+	for _, count := range []int{advisoryPublicationBatchSize - 1, advisoryPublicationBatchSize, advisoryPublicationBatchSize + 1, 2*advisoryPublicationBatchSize + 1} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			f := newStreamPublicationFixture(t)
 			doc := f.document("boundary")
@@ -48,18 +48,78 @@ func TestAdvisoryStreamPublicationBatchBoundaries(t *testing.T) {
 	}
 }
 
+func TestAdvisoryStreamPublicationByteBoundAndPayloadReuse(t *testing.T) {
+	f := newStreamPublicationFixture(t)
+	cves := make([]string, 2048)
+	for index := range cves {
+		cves[index] = fmt.Sprintf("CVE-2026-%08d", index)
+	}
+	const count = 300
+	expected := make(map[string][sha256.Size]byte, count)
+	err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
+		for index := range count {
+			claim := f.claim("bytes", index)
+			claim.Cves = cves
+			payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(claim)
+			if err != nil {
+				return nil, err
+			}
+			expected[claim.Id] = sha256.Sum256(payload)
+			if err := emit(claim); err != nil {
+				return nil, err
+			}
+			if index == 249 {
+				var staged int
+				if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM advisory_record_generations WHERE feed_id=$1 AND generation<>$2", f.source.Id, f.before.Revision).Scan(&staged); err != nil {
+					return nil, err
+				}
+				if staged == 0 || staged >= 250 {
+					t.Fatalf("byte-bound partial batch not staged: %d", staged)
+				}
+			}
+		}
+		return f.document("bytes"), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := f.pool.Query(t.Context(), "SELECT advisory_id,record_bytes FROM advisory_records WHERE feed_id=$1", f.source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var payload []byte
+		if err := rows.Scan(&id, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if digest, ok := expected[id]; !ok || digest != sha256.Sum256(payload) {
+			t.Fatalf("COPY changed publication payload %s", id)
+		}
+		delete(expected, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(expected) != 0 {
+		t.Fatalf("%d publication payloads missing", len(expected))
+	}
+	f.assertStorage(t, count, count, 0)
+}
+
 func TestAdvisoryStreamPublicationDeduplicatesAcrossBatches(t *testing.T) {
 	f := newStreamPublicationFixture(t)
 	doc := f.document("duplicates")
 	err := f.service.publishStream(t.Context(), f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
-		// Each of the first two COPY batches contains the same 500 claims.
+		// Each of the first two COPY batches contains the same claims.
 		for range 2 {
-			if err := f.emit("duplicates", 0, 500, emit); err != nil {
+			if err := f.emit("duplicates", 0, advisoryPublicationBatchSize, emit); err != nil {
 				return nil, err
 			}
 		}
 		// The final partial batch mixes duplicates with one genuinely new claim.
-		for _, index := range []int{0, 499, 500} {
+		for _, index := range []int{0, advisoryPublicationBatchSize - 1, advisoryPublicationBatchSize} {
 			if err := emit(f.claim("duplicates", index)); err != nil {
 				return nil, err
 			}
@@ -69,25 +129,25 @@ func TestAdvisoryStreamPublicationDeduplicatesAcrossBatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.assertPublished(t, "duplicates", 501)
-	f.assertStorage(t, 501, 501, 0)
+	f.assertPublished(t, "duplicates", advisoryPublicationBatchSize+1)
+	f.assertStorage(t, advisoryPublicationBatchSize+1, advisoryPublicationBatchSize+1, 0)
 }
 
 func TestAdvisoryStreamPublicationStagesInvisiblyThenSwitches(t *testing.T) {
 	f := newStreamPublicationFixture(t)
-	release, _, result := f.startBlocked(t, "replacement", 1001, 500, nil)
+	release, _, result := f.startBlocked(t, "replacement", 2*advisoryPublicationBatchSize+1, advisoryPublicationBatchSize, nil)
 
 	// A separate connection can see the committed staging batch, but legacy
 	// advisory_records readers and device findings still see only the old feed.
-	f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+500, 500)
+	f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+advisoryPublicationBatchSize, advisoryPublicationBatchSize)
 	f.assertUnchanged(t, f.before, f.findings)
 
 	close(release)
 	if err := awaitStreamPublication(t, result); err != nil {
 		t.Fatal(err)
 	}
-	f.assertPublished(t, "replacement", 1001)
-	f.assertStorage(t, 1001, 1001, 0)
+	f.assertPublished(t, "replacement", 2*advisoryPublicationBatchSize+1)
+	f.assertStorage(t, 2*advisoryPublicationBatchSize+1, 2*advisoryPublicationBatchSize+1, 0)
 	findings := f.listFindings(t)
 	if len(findings.Findings) != 1 || findings.Findings[0].AdvisoryId != f.claim("replacement", 0).Id || findings.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
 		t.Fatalf("successful switch did not replace the old device finding: %v", findings)
@@ -107,8 +167,8 @@ func TestAdvisoryStreamPublicationFailurePreservesActiveGeneration(t *testing.T)
 			if canceled {
 				failure = nil
 			}
-			release, cancel, result := f.startBlocked(t, "failed", 1001, 1000, failure)
-			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+1000, 1000)
+			release, cancel, result := f.startBlocked(t, "failed", 2*advisoryPublicationBatchSize+1, 2*advisoryPublicationBatchSize, failure)
+			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+2*advisoryPublicationBatchSize, 2*advisoryPublicationBatchSize)
 			f.assertUnchanged(t, f.before, f.findings)
 			wantErr := producerErr
 			if canceled {
@@ -144,7 +204,7 @@ func TestAdvisoryStreamPublicationProgressWatchdog(t *testing.T) {
 			}
 			marked++
 		}
-		if err := f.emit("stalled", 0, 501, emit); err != nil {
+		if err := f.emit("stalled", 0, advisoryPublicationBatchSize+1, emit); err != nil {
 			return nil, err
 		}
 		<-ctx.Done()
@@ -166,8 +226,8 @@ func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			f := newStreamPublicationFixture(t)
-			release, _, result := f.startBlocked(t, "obsolete", 501, 500, nil)
-			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+500, 500)
+			release, _, result := f.startBlocked(t, "obsolete", advisoryPublicationBatchSize+1, advisoryPublicationBatchSize, nil)
+			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+advisoryPublicationBatchSize, advisoryPublicationBatchSize)
 			f.assertUnchanged(t, f.before, f.findings)
 
 			winner, source := f.service, f.source
@@ -181,7 +241,7 @@ func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 				}
 			}
 			err := winner.publishStream(t.Context(), source, f.before.CheckedAt.Time.Add(2*time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
-				if err := f.emit("winner", 0, 501, emit); err != nil {
+				if err := f.emit("winner", 0, advisoryPublicationBatchSize+1, emit); err != nil {
 					return nil, err
 				}
 				return f.document("winner"), nil
@@ -189,10 +249,10 @@ func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			f.assertPublished(t, "winner", 501)
+			f.assertPublished(t, "winner", advisoryPublicationBatchSize+1)
 			// Cleaning the superseded active generation must not delete another
 			// writer's still-in-flight staging generation.
-			f.assertStorage(t, 501, 1001, 500)
+			f.assertStorage(t, advisoryPublicationBatchSize+1, 2*advisoryPublicationBatchSize+1, advisoryPublicationBatchSize)
 			published := f.feed(t)
 			findings := f.listFindings(t)
 			if len(findings.Findings) != 1 || findings.Findings[0].AdvisoryId != f.claim("winner", 0).Id {
@@ -209,8 +269,8 @@ func TestAdvisoryStreamPublicationFencesInFlightWriters(t *testing.T) {
 				t.Fatalf("stale publication was not a no-op: %v", err)
 			}
 			f.assertUnchanged(t, published, findings)
-			f.assertPublished(t, "winner", 501)
-			f.assertStorage(t, 501, 501, 0)
+			f.assertPublished(t, "winner", advisoryPublicationBatchSize+1)
+			f.assertStorage(t, advisoryPublicationBatchSize+1, advisoryPublicationBatchSize+1, 0)
 		})
 	}
 }

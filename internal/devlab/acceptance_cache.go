@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // AcceptanceFeedArtifact records bytes actually delivered to the production feed
@@ -29,6 +30,9 @@ type acceptanceCacheEntry struct {
 }
 
 type acceptanceFeedCache struct {
+	// Serialize acquisition, index replacement and budget accounting. Response
+	// bodies are independent files and may be parsed concurrently after return.
+	mu        sync.Mutex
 	base      http.RoundTripper
 	directory string
 	remaining int64
@@ -36,6 +40,8 @@ type acceptanceFeedCache struct {
 }
 
 func (c *acceptanceFeedCache) RoundTrip(request *http.Request) (_ *http.Response, resultErr error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if request.Method != http.MethodGet {
 		return nil, errors.New("acceptance feed cache only permits GET")
 	}

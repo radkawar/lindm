@@ -507,10 +507,12 @@ explicitly includes native RHEL 9 products
 The larger aggregate expansion allowance does not retain the archive in memory:
 entry, token, product-index and normalized-stage bounds remain independent.
 
-The [incremental parser](../../internal/advisory/feed/redhat_json.go) token-skips
-unused fields and bounds each scalar at 64 KiB, JSON nesting at 64, branch nesting
-at 12, branches and relationships at 250,000 each, and retained product metadata
-text at 64 MiB. A first pass records the vulnerability-array position and builds
+The [incremental parser](../../internal/advisory/feed/redhat_json.go) uses a bounded
+streaming JSON scanner rather than allocating `encoding/json.Decoder.Token`
+values for ignored vendor content. It bounds each scalar at 64 KiB, JSON nesting
+at 64, branch nesting at 12, branches and relationships at 250,000 each, and
+retained product metadata text at 64 MiB. A first pass records the
+vulnerability-array position and builds
 the bounded product index; a second pass retains one vulnerability at a time
 (at most 250,000 status references and 64 MiB of reference text). Parent indices
 preserve inherited architecture and constraints even when child branches precede

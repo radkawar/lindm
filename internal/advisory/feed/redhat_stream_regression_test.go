@@ -34,14 +34,14 @@ func redHatSemanticClaims(t *testing.T, records []*advisoryv1.Advisory) []string
 func TestRedHatStreamMatchesPinnedFixtureSemantics(t *testing.T) {
 	validator := redHatValidator(t)
 	for _, test := range []struct {
-		fixture, release, stream, name, cve, fixed, module string
+		fixture, release, stream, name, cve, fixed, module, outputSHA256 string
 	}{
-		{"rhsa-2024_6783", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", ""},
-		{"rhsa-2024_6783", "9.8", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", ""},
-		{"rhsa-2024_7846", "8.6", "e4s", "openssl-libs", "CVE-2024-5535", "1:1.1.1k-14.el8_6", ""},
-		{"rhsa-2024_1880", "8.8", "eus", "nodejs", "CVE-2023-46809", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18"},
-		{"cve-2024-6119", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", ""},
-		{"cve-2024-21892", "8.8", "eus", "nodejs", "CVE-2024-21892", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18"},
+		{"rhsa-2024_6783", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "8c132db15be81524da6dc3ec554f527a1ee1451acee73f005599c572c23e0b9b"},
+		{"rhsa-2024_6783", "9.8", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "cf90f03fc183cd09c2e4e446f0bcfd844c48d81575ebeb99a2b4019289f73a19"},
+		{"rhsa-2024_7846", "8.6", "e4s", "openssl-libs", "CVE-2024-5535", "1:1.1.1k-14.el8_6", "", "43b5f1bd2106c8a50dd59bfccc9e630ae524f042b655718d80589f05645c66f2"},
+		{"rhsa-2024_1880", "8.8", "eus", "nodejs", "CVE-2023-46809", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "c9b545f7d15714ec281cc15ea4acd71901c46803f349a5033ef61cab9701f67e"},
+		{"cve-2024-6119", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "dd237ed52cd9a0acd958d48a8fbb6f1e06819f2087774ef4ef7b6079ba432065"},
+		{"cve-2024-21892", "8.8", "eus", "nodejs", "CVE-2024-21892", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "97506dd7f7eaa49b2871f02094d50f1d453aeb8dab1b821319616694860d9d6d"},
 	} {
 		t.Run(test.fixture+"/"+test.release, func(t *testing.T) {
 			config := redHatSource(test.release, test.stream)
@@ -49,6 +49,16 @@ func TestRedHatStreamMatchesPinnedFixtureSemantics(t *testing.T) {
 			want, err := parseRedHat(config, raw, validator)
 			if err != nil {
 				t.Fatal(err)
+			}
+			encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Captured from the Decoder.Token implementation before the
+			// scanner cutover. Pin the complete ordered output, not merely
+			// agreement between two APIs delegating to the same parser.
+			if got := fmt.Sprintf("%x", sha256.Sum256(encoded)); got != test.outputSHA256 {
+				t.Fatalf("fixture output bytes changed: got sha256=%s want=%s", got, test.outputSHA256)
 			}
 			digest := sha256.Sum256(raw)
 			config.ExpectedSha256 = digest[:]
@@ -147,6 +157,12 @@ func TestRedHatStreamRejectsTruncatedAndInvalidJSON(t *testing.T) {
 		{"truncated-vulnerabilities", raw[:len(raw)-1]},
 		{"second-document", append(bytes.Clone(raw), []byte("{}")...)},
 		{"invalid-utf8", bytes.Replace(raw, []byte("Red Hat Security Advisory"), []byte{0xff}, 1)},
+		{"ignored-malformed-number", append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"ignored":01}`)...)},
+		{"ignored-invalid-escape", append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"ignored":"\q"}`)...)},
+		{"ignored-trailing-comma", append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"ignored":[0,]}`)...)},
+		{"ignored-invalid-utf8", append(bytes.Clone(raw[:len(raw)-1]), []byte(",\"ignored\":\"\xff\"}")...)},
+		{"ignored-excess-depth", append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"ignored":`+strings.Repeat("[", redHatJSONDepth)+"0"+strings.Repeat("]", redHatJSONDepth)+"}")...)},
+		{"ignored-excess-scalar", append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"ignored":"`+strings.Repeat("x", redHatScalarBytes+1)+`"}`)...)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			calls := 0

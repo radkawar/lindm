@@ -1872,6 +1872,65 @@ RSS and about 16 GB of database at 10,000 devices with 2,000-package
 inventories. A cold enrollment of the whole fleet is evaluated within about
 four minutes at 10,000 devices. Above 10,000 devices use the replicated profile.
 
+#### Advisory refresh sizing and reproducible measurement
+
+Feed refresh is CPU, temporary-storage and PostgreSQL write work, separate from
+steady-state device evaluation. Only the `advisory-maintenance` leader runs the
+scheduled refresh. It processes at most two sources concurrently; OSV archives
+use at most four file workers per source, capped by `GOMAXPROCS`. Results reach
+publication in archive order. Leadership cancellation joins all source/file
+workers and does not postpone the next leader's attempt.
+
+Publication uses COPY batches of at most 4,096 claims or 8 MiB of encoded
+payload, plus at most one 64 KiB claim, with one reusable payload buffer per
+active source. PostgreSQL still deduplicates exact claims and atomically switches
+the verified generation. Per-record/archive/product-index limits, disk-backed
+Red Hat reconciliation, the five-minute no-progress watchdog and two-hour
+overall ceiling remain enforced. Allow temporary space for each concurrently
+active archive and its bounded reconciliation stage; increasing worker count
+does not authorize a larger archive or remove the database's write budget.
+
+Use the maintained real-recording benchmark, not synthetic JSON throughput:
+
+```sh
+go test ./internal/devlab -run '^$' -bench '^BenchmarkRecordedFeed$' \
+  -benchtime=1x -count=1 -timeout=3h -args \
+  -feed-cache /private/feed-cache -feed-manifest /private/manifest.json \
+  -feed-sources /private/sources.json
+```
+
+`lab feeds sources` emits an explicit six-family source configuration.
+`lab feeds record -repo REPO -lindmd BINARY -sources SOURCES -cache CACHE
+-manifest-out NEW_MANIFEST -record NEW_RESULT` acquires vendor HTTPS bytes,
+verifies and publishes them into an owned disposable database, then records
+their immutable URL/size/SHA-256 identities. SUSE's default is one real signed
+CSAF document, not its complete ecosystem; Arch remains partial coverage.
+The shared development PostgreSQL fixture and protected credential files are
+required; never supply a DSN in arguments or environment variables.
+
+For before/after comparisons use `lab feeds replay` with the same arguments,
+replacing `-manifest-out` with `-manifest`. Build both `lab` and a stamped
+`lindmd` from each checkout. Replay is digest-checked local recording delivery
+over verified loopback TLS, with no vendor requests; it is **not current
+freshness or vendor TLS evidence**. It exercises the real parser, reconciliation,
+COPY, deduplication and fenced publication. Compare `publication_sha256_v1`
+for every feed, not just counts: the digest includes exact stored claim bytes,
+their indexed fields, source configuration, artifacts, rejection metadata,
+signed snapshot time and completeness, excluding random generation IDs and
+refresh-clock timestamps. A digest mismatch fails the performance qualification.
+The Go benchmark reports parsing/encoding allocations separately from the
+full-refresh command's database timing. Keep `/usr/bin/time -v` results alongside
+the JSON to disclose process-tree CPU/RSS; PostgreSQL resources are separate.
+
+Measured on 2026-10-11 (Go 1.26.9, `GOMAXPROCS=8`, shared dev PostgreSQL, two
+interleaved rounds over one real recording of all six source families:
+4,301 Fedora, 1,932,865 Ubuntu, 2,157,314 RHEL, 2,512 Debian, 66,813 SUSE and
+7 Arch claims). Refresh duration fell from 1,023.9 s / 658.1 s to
+307.2 s / 194.1 s (3.33x / 3.39x); process-tree peak RSS rose from about
+336 MB to 378 MB. Every feed's `publication_sha256_v1` was identical between
+the two implementations in both rounds. Size advisory-maintenance hosts for
+two concurrent sources and roughly 400 MB of lindmd RSS during refresh.
+
 Profiling is explicitly operator-enabled through protobuf `profiling`
 configuration and a separate literal-loopback HTTP listener, disabled by default.
 Only bounded CPU/mutex/block captures are exposed, not the public/admin/device

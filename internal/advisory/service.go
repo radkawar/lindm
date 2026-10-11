@@ -120,34 +120,46 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 func (s *Service) Refresh(ctx context.Context) error {
 	// Maintenance also runs when egress is disabled or no sources are configured.
 	s.cleanupAdvisoryGenerations(ctx, nil)
-	var result error
-	for _, source := range s.config.GetFeeds() {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(result, err)
-		}
-		started := s.clock().UTC()
-		err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
-			return s.client.FetchStream(producerCtx, source, emit, progress)
-		})
-		if err != nil && ctx.Err() != nil {
-			// Shutdown or leadership loss, not a feed failure: recording it as
-			// an attempt would defer every instance's next refresh by the
-			// whole refresh interval.
-			return errors.Join(result, err)
-		}
-		if err != nil {
-			result = errors.Join(result, fmt.Errorf("refresh feed %s: %w", source.GetId(), err))
-			encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
-			result = errors.Join(result, encodeErr)
-			if encodeErr == nil {
-				failureCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-				storeErr := advisorydb.New(s.pool).FailAdvisoryFeed(failureCtx, advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(started), Error: "refresh_failed", ConfigBytes: encoded})
-				stop()
-				result = errors.Join(result, storeErr)
+	sources := s.config.GetFeeds()
+	results := make([]error, len(sources)+1)
+	var next atomic.Int64
+	var workers sync.WaitGroup
+	// One maintenance leader owns this call. Its cancellation joins all source
+	// workers before returning, including on leadership loss.
+	for range min(2, len(sources)) {
+		workers.Go(func() {
+			for {
+				index := int(next.Add(1)) - 1
+				if index >= len(sources) || ctx.Err() != nil {
+					return
+				}
+				results[index] = s.refreshSource(ctx, sources[index])
 			}
-		}
+		})
 	}
-	return result
+	workers.Wait()
+	results[len(sources)] = ctx.Err()
+	return errors.Join(results...)
+}
+
+func (s *Service) refreshSource(ctx context.Context, source *advisoryv1.FeedSource) error {
+	started := s.clock().UTC()
+	err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
+		return s.client.FetchStream(producerCtx, source, emit, progress)
+	})
+	if err == nil || ctx.Err() != nil {
+		// Shutdown or leadership loss is not a failed refresh attempt.
+		return err
+	}
+	result := fmt.Errorf("refresh feed %s: %w", source.GetId(), err)
+	encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
+	if encodeErr != nil {
+		return errors.Join(result, encodeErr)
+	}
+	failureCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer stop()
+	storeErr := advisorydb.New(s.pool).FailAdvisoryFeed(failureCtx, advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(started), Error: "refresh_failed", ConfigBytes: encoded})
+	return errors.Join(result, storeErr)
 }
 
 // Import uses the same checked parser/publication path. Offline bytes require an

@@ -2654,14 +2654,22 @@ evidence and expose an error without resetting freshness.
 
 Forward migration `00011` stores advisory claims by publication generation and
 exposes the canonical `advisory_records` view for the active feed revision only.
-Publication COPYs at most 500 claims per batch into staging, deduplicates exact
-claims in PostgreSQL, and switches the active generation only after complete
+Publication COPYs at most 4,096 claims per batch into staging and flushes after
+8 MiB of encoded payload (at most one additional 64 KiB claim). A reusable bounded
+payload slab avoids per-claim publication allocations. It deduplicates exact
+claims in PostgreSQL and switches the active generation only after complete
 source verification and parsing. Failed or canceled staging never replaces the
 previous generation. Source configuration and refresh-start fences still apply;
 concurrent work cannot publish under changed authority. Previous and failed
 generations are removed through bounded cleanup. The maintained refresh command
 logs emitted/unique/rejected counts and publication duration; process peak RSS is
 measured independently in real-feed qualification.
+Refresh runs at most two sources concurrently under the same maintenance leader.
+All workers are cancelled and joined on leadership loss; a cancelled refresh
+does not advance the shared attempt schedule. OSV ZIP parsing uses at most four
+workers per source, consuming results in archive order and invoking publication
+callbacks serially. Source/record bounds and the completed-work watchdog remain
+independent of concurrency and COPY batch size.
 
 Migration `00013` makes generation cleanup durable and retryable. Startup,
 explicit refresh and the periodic worker drain at most 5,000 rows per transaction

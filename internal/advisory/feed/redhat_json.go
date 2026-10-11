@@ -20,9 +20,9 @@ const (
 	redHatJSONDepth   = 64
 )
 
-// redHatJSONReader bounds individual tokens before json.Decoder can allocate
-// them, and rejects invalid UTF-8 rather than accepting Decoder's replacement
-// characters. All bytes, including ignored fields, pass through this reader.
+// redHatJSONReader bounds individual scalars and rejects invalid UTF-8 rather
+// than accepting encoding/json's replacement characters. All bytes, including
+// ignored fields, pass through this reader.
 type redHatJSONReader struct {
 	reader    io.Reader
 	quoted    bool
@@ -77,49 +77,218 @@ func (r *redHatJSONReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// redHatJSON projects just the fields used by the adapter. A fixed input buffer
+// and one scalar scratch buffer replace Decoder.Token's per-token allocations.
+// Ignored strings are never materialized; encoding/json still validates escaped
+// strings and primitive values. The document and each vulnerability remain
+// streamed, including when an original approaches the 128 MiB admission bound.
 type redHatJSON struct {
-	decoder *json.Decoder
+	reader  io.Reader
+	buffer  [32 << 10]byte
+	pos     int
+	end     int
+	base    int64
+	readErr error
+	scratch []byte
 	depth   int
 }
 
-func (j *redHatJSON) container(open json.Delim, visit func(string) error) error {
-	token, err := j.decoder.Token()
+func (j *redHatJSON) refill() error {
+	if j.readErr != nil {
+		return j.readErr
+	}
+	j.base += int64(j.end)
+	j.pos = 0
+	j.end, j.readErr = j.reader.Read(j.buffer[:])
+	if j.end != 0 {
+		return nil
+	}
+	if j.readErr == nil {
+		return io.ErrNoProgress
+	}
+	return j.readErr
+}
+
+func (j *redHatJSON) peek() (byte, error) {
+	for {
+		if j.pos == j.end {
+			if err := j.refill(); err != nil {
+				return 0, err
+			}
+		}
+		switch b := j.buffer[j.pos]; b {
+		case ' ', '\t', '\r', '\n':
+			j.pos++
+		default:
+			return b, nil
+		}
+	}
+}
+
+func redHatJSONDelimiter(b byte) bool {
+	switch b {
+	case ' ', '\t', '\r', '\n', '{', '}', '[', ']', ':', ',', '"':
+		return true
+	default:
+		return false
+	}
+}
+
+// scalar returns a view valid until the next parser operation. Only scalars
+// crossing an input-buffer boundary are copied. Escapes are left to the stdlib,
+// preserving its handling of Unicode escapes (including unpaired surrogates).
+func (j *redHatJSON) scalar(quoted bool) ([]byte, bool, error) {
+	j.scratch = j.scratch[:0]
+	start := j.pos
+	escaped, special := false, false
+	if quoted {
+		j.pos++
+	}
+	for {
+		for j.pos < j.end {
+			b := j.buffer[j.pos]
+			if !quoted && redHatJSONDelimiter(b) {
+				return j.scalarEnd(start, special)
+			}
+			j.pos++
+			if quoted {
+				if b < 0x20 {
+					return nil, false, errors.New("feed: invalid Red Hat JSON string")
+				}
+				if escaped {
+					escaped = false
+				} else if b == '\\' {
+					escaped, special = true, true
+				} else if b == '"' {
+					return j.scalarEnd(start, special)
+				}
+			}
+		}
+		if len(j.scratch)+j.pos-start > redHatScalarBytes+2 {
+			return nil, false, errors.New("feed: Red Hat JSON scalar byte limit")
+		}
+		j.scratch = append(j.scratch, j.buffer[start:j.pos]...)
+		if err := j.refill(); err != nil {
+			if err == io.EOF && !quoted {
+				return j.scratch, special, nil
+			}
+			return nil, false, err
+		}
+		start = j.pos
+	}
+}
+
+func (j *redHatJSON) scalarEnd(start int, special bool) ([]byte, bool, error) {
+	if len(j.scratch)+j.pos-start > redHatScalarBytes+2 {
+		return nil, false, errors.New("feed: Red Hat JSON scalar byte limit")
+	}
+	if len(j.scratch) == 0 {
+		return j.buffer[start:j.pos], special, nil
+	}
+	j.scratch = append(j.scratch, j.buffer[start:j.pos]...)
+	return j.scratch, special, nil
+}
+
+func (j *redHatJSON) stringValue(retain bool) (string, error) {
+	b, err := j.peek()
+	if err != nil {
+		return "", err
+	}
+	if b != '"' {
+		return "", errors.New("feed: Red Hat JSON string required")
+	}
+	raw, special, err := j.scalar(true)
+	if err != nil {
+		return "", err
+	}
+	if special {
+		if !retain {
+			if !json.Valid(raw) {
+				return "", errors.New("feed: invalid Red Hat JSON string")
+			}
+			return "", nil
+		}
+		var value string
+		err := json.Unmarshal(raw, &value)
+		return value, err
+	}
+	if !retain {
+		return "", nil
+	}
+	return string(raw[1 : len(raw)-1]), nil
+}
+
+func (j *redHatJSON) primitive(nullOnly bool) error {
+	raw, _, err := j.scalar(false)
 	if err != nil {
 		return err
 	}
-	if token == nil {
-		return nil
+	if (nullOnly && string(raw) != "null") || !json.Valid(raw) {
+		return errors.New("feed: invalid Red Hat JSON primitive")
 	}
-	if token != open {
-		return fmt.Errorf("feed: Red Hat JSON requires %c", open)
+	return nil
+}
+
+func (j *redHatJSON) opening(open byte) (bool, error) {
+	b, err := j.peek()
+	if err != nil {
+		return false, err
+	}
+	if b == 'n' {
+		return false, j.primitive(true)
+	}
+	if b != open {
+		return false, fmt.Errorf("feed: Red Hat JSON requires %c", open)
+	}
+	j.pos++
+	return true, nil
+}
+
+func (j *redHatJSON) container(open byte, visit func(string) error) error {
+	present, err := j.opening(open)
+	if err != nil || !present {
+		return err
 	}
 	return j.contents(open, visit)
 }
 
-func (j *redHatJSON) contents(open json.Delim, visit func(string) error) error {
+func (j *redHatJSON) contents(open byte, visit func(string) error) error {
 	j.depth++
 	defer func() { j.depth-- }()
 	if j.depth > redHatJSONDepth {
 		return errors.New("feed: Red Hat JSON depth limit")
 	}
+	close := byte(']')
 	var seen map[string]bool
-	if open == '{' && visit != nil {
-		seen = make(map[string]bool)
+	if open == '{' {
+		close = '}'
+		if visit != nil {
+			seen = make(map[string]bool)
+		}
 	}
-	for count := 0; j.decoder.More(); count++ {
+	for count := 0; ; count++ {
+		b, err := j.peek()
+		if err != nil {
+			return err
+		}
+		if b == close {
+			j.pos++
+			return nil
+		}
 		if count >= maxEntries {
 			return errors.New("feed: Red Hat JSON container entry limit")
 		}
+		if count != 0 {
+			if b != ',' {
+				return errors.New("feed: Red Hat JSON comma required")
+			}
+			j.pos++
+		}
 		key := ""
 		if open == '{' {
-			token, err := j.decoder.Token()
+			key, err = j.stringValue(visit != nil)
 			if err != nil {
 				return err
-			}
-			var ok bool
-			key, ok = token.(string)
-			if !ok {
-				return errors.New("feed: Red Hat JSON object key required")
 			}
 			if seen != nil {
 				if seen[key] || len(seen) >= 128 {
@@ -127,6 +296,14 @@ func (j *redHatJSON) contents(open json.Delim, visit func(string) error) error {
 				}
 				seen[key] = true
 			}
+			b, err = j.peek()
+			if err != nil {
+				return err
+			}
+			if b != ':' {
+				return errors.New("feed: Red Hat JSON colon required")
+			}
+			j.pos++
 		}
 		if visit == nil {
 			if err := j.skip(); err != nil {
@@ -136,60 +313,44 @@ func (j *redHatJSON) contents(open json.Delim, visit func(string) error) error {
 			return err
 		}
 	}
-	close := json.Delim(']')
-	if open == '{' {
-		close = '}'
-	}
-	token, err := j.decoder.Token()
-	if err != nil {
-		return err
-	}
-	if token != close {
-		return errors.New("feed: incomplete Red Hat JSON container")
-	}
-	return nil
 }
 
 func (j *redHatJSON) skip() error {
-	token, err := j.decoder.Token()
+	b, err := j.peek()
 	if err != nil {
 		return err
 	}
-	if open, ok := token.(json.Delim); ok {
-		if open != '{' && open != '[' {
-			return errors.New("feed: unexpected Red Hat JSON delimiter")
-		}
-		return j.contents(open, nil)
+	switch b {
+	case '{', '[':
+		j.pos++
+		return j.contents(b, nil)
+	case '"':
+		_, err := j.stringValue(false)
+		return err
+	default:
+		return j.primitive(false)
 	}
-	return nil
 }
 
 func (j *redHatJSON) text(dst *string) error {
-	token, err := j.decoder.Token()
+	b, err := j.peek()
 	if err != nil {
 		return err
 	}
-	if token == nil {
-		return nil
+	if b == 'n' {
+		return j.primitive(true)
 	}
-	value, ok := token.(string)
-	if !ok {
-		return errors.New("feed: Red Hat JSON string required")
+	value, err := j.stringValue(true)
+	if err == nil {
+		*dst = value
 	}
-	*dst = value
-	return nil
+	return err
 }
 
 func (j *redHatJSON) product(destination **suseProduct) error {
-	token, err := j.decoder.Token()
-	if err != nil {
+	present, err := j.opening('{')
+	if err != nil || !present {
 		return err
-	}
-	if token == nil {
-		return nil
-	}
-	if token != json.Delim('{') {
-		return errors.New("feed: Red Hat product object required")
 	}
 	product := new(suseProduct)
 	*destination = product
@@ -506,7 +667,7 @@ func (j *redHatJSON) vulnerability(v *redHatVulnerability) error {
 }
 
 // parseRedHatClaims stages at most one original document on disk. Its first
-// token pass validates the entire JSON and builds the bounded product index;
+// scanner pass validates the entire JSON and builds the bounded product index;
 // the second seeks to vulnerabilities, processing only one at a time. Callers
 // stage claims, and must discard the entire generation on any returned error.
 func parseRedHatClaims(ctx context.Context, config *advisoryv1.FeedSource, input io.Reader, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) (err error) {
@@ -534,8 +695,7 @@ func parseRedHatClaims(ctx context.Context, config *advisoryv1.FeedSource, input
 }
 
 func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *os.File, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
-	j := &redHatJSON{decoder: json.NewDecoder(&redHatJSONReader{reader: contextFeedReader{ctx, file}})}
-	j.decoder.UseNumber()
+	j := &redHatJSON{reader: &redHatJSONReader{reader: contextFeedReader{ctx, file}}}
 	var notice suseCSAF
 	tree := redHatTree{relations: make(map[string]redHatRelationship)}
 	var vulnerabilities int64 = -1
@@ -548,17 +708,11 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 			return j.tree(&tree)
 		case "vulnerabilities":
 			vulnerabilitiesPresent = true
-			token, err := j.decoder.Token()
-			if err != nil {
+			present, err := j.opening('[')
+			if err != nil || !present {
 				return err
 			}
-			if token == nil {
-				return nil
-			}
-			if token != json.Delim('[') {
-				return errors.New("feed: Red Hat vulnerabilities array required")
-			}
-			vulnerabilities = j.decoder.InputOffset() - 1
+			vulnerabilities = j.base + int64(j.pos) - 1
 			return j.contents('[', nil)
 		default:
 			return j.skip()
@@ -566,7 +720,7 @@ func parseRedHatFile(ctx context.Context, config *advisoryv1.FeedSource, file *o
 	}); err != nil {
 		return fmt.Errorf("feed: decode Red Hat CSAF: %w", err)
 	}
-	if _, err := j.decoder.Token(); err != io.EOF {
+	if _, err := j.peek(); err != io.EOF {
 		return errors.New("feed: trailing or malformed Red Hat JSON")
 	}
 	products, err := tree.products()
@@ -636,8 +790,7 @@ func redHatPotentiallyApplicable(config *advisoryv1.FeedSource, products map[str
 // the current file offset, emitting claims until one is rejected; the rest of a
 // rejected document only adds its packages to the rejection.
 func emitRedHatVulnerabilities(ctx context.Context, config *advisoryv1.FeedSource, file *os.File, notice *suseCSAF, products map[string]redHatProduct, relations map[string]redHatRelationship, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
-	j := &redHatJSON{decoder: json.NewDecoder(contextFeedReader{ctx, file})}
-	j.decoder.UseNumber()
+	j := &redHatJSON{reader: contextFeedReader{ctx, file}}
 	count := 0
 	var rejected *redHatRejectedRecordError
 	if err := j.container('[', func(string) error {

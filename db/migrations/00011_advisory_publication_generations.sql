@@ -31,11 +31,11 @@ FROM advisory_records r JOIN advisory_feeds f ON f.id=r.feed_id;
 
 -- Scratch rows live only inside a single batch transaction: COPY, merge with
 -- ON CONFLICT, then DELETE. Ordinals bound each publication's scratch batch to
--- 500 even when every emitted claim is a duplicate. Distinct publication IDs
+-- 4096 even when every emitted claim is a duplicate. Distinct publication IDs
 -- isolate concurrent writers. Runtime DDL and TEMPORARY privileges are not needed.
 CREATE TABLE advisory_publication_batch (
     publication_id uuid NOT NULL,
-    position smallint NOT NULL CHECK (position BETWEEN 0 AND 499),
+    position smallint NOT NULL CHECK (position BETWEEN 0 AND 4095),
     id uuid NOT NULL,
     feed_id text NOT NULL REFERENCES advisory_feeds(id) ON DELETE CASCADE,
     advisory_id text NOT NULL,

@@ -12,7 +12,9 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"runtime"
 	"strings"
+	"sync"
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
@@ -123,7 +125,6 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 	matched := false
 	normalized := 0
 	rejectedBytes := 0
-	var pending advisoryv1.FeedDocument
 	var seen map[[sha256.Size]byte]struct{}
 	if emit == nil {
 		seen = make(map[[sha256.Size]byte]struct{})
@@ -131,34 +132,31 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 	var claims uint64
 	claimLimit := totalClaimsLimit(config)
 	var encoded []byte
-	for _, file := range archive.File {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+	lanes, stop := startOSVArchiveWorkers(ctx, archive, config, product, validator)
+	defer stop()
+	for index, file := range archive.File {
+		var record osvArchiveRecord
+		select {
+		case record = <-lanes[index%len(lanes)]:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if record.err != nil {
+			return nil, record.err
 		}
 		if file.FileInfo().IsDir() {
 			continue
 		}
-		reader, err := file.Open()
-		if err != nil {
-			return nil, fmt.Errorf("feed: open OSV ZIP entry: %w", err)
-		}
-		raw, readErr := boundedRead(contextFeedReader{ctx, reader}, maxOSVRecordBytes)
-		if err := errors.Join(readErr, reader.Close()); err != nil {
-			return nil, fmt.Errorf("feed: read OSV ZIP entry %s: %w", file.Name, err)
-		}
-		var scope osvRecordScope
-		clear(pending.Advisories)
-		pending.Advisories = pending.Advisories[:0]
-		ok, recordErr := appendScopedOSV(&pending, config, product, raw, &scope, validator)
-		if recordErr != nil {
+		pending := record.pending
+		if record.recordErr != nil {
 			// A source record is atomic: retain none of its partially decoded claims.
 			clear(pending.Advisories)
 			pending.Advisories = pending.Advisories[:0]
-			if err := rejectOSVRecord(doc, &pending, config, product, file.Name, &scope, recordErr, validator, &rejectedBytes); err != nil {
+			if err := rejectOSVRecord(doc, pending, config, product, file.Name, &record.scope, record.recordErr, validator, &rejectedBytes); err != nil {
 				return nil, err
 			}
 		}
-		matched = matched || ok
+		matched = matched || record.matched
 		for _, advisory := range pending.Advisories {
 			claims++
 			if claims > claimLimit {
@@ -209,6 +207,86 @@ func parseOSVArchive(ctx context.Context, config *advisoryv1.FeedSource, input i
 		}
 	}
 	return doc, nil
+}
+
+// Each lane retains at most one completed record and one being consumed.
+// The caller consumes in ZIP order and joins every worker before closing input.
+func startOSVArchiveWorkers(ctx context.Context, archive *zip.Reader, config *advisoryv1.FeedSource, product *platform.Release, validator protovalidate.Validator) ([]chan osvArchiveRecord, func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	lanes := make([]chan osvArchiveRecord, min(4, runtime.GOMAXPROCS(0), len(archive.File)))
+	for lane := range lanes {
+		lanes[lane] = make(chan osvArchiveRecord)
+		workers.Go(func() {
+			var raw []byte
+			for index := lane; index < len(archive.File); index += len(lanes) {
+				if ctx.Err() != nil {
+					return
+				}
+				result := decodeOSVArchiveRecord(ctx, archive.File[index], config, product, validator, &raw)
+				select {
+				case lanes[lane] <- result:
+				case <-ctx.Done():
+					return
+				}
+			}
+		})
+	}
+	return lanes, func() {
+		cancel()
+		workers.Wait()
+	}
+}
+
+type osvArchiveRecord struct {
+	pending   *advisoryv1.FeedDocument
+	scope     osvRecordScope
+	matched   bool
+	recordErr error
+	err       error
+}
+
+func decodeOSVArchiveRecord(ctx context.Context, file *zip.File, config *advisoryv1.FeedSource, product *platform.Release, validator protovalidate.Validator, buffer *[]byte) osvArchiveRecord {
+	var result osvArchiveRecord
+	if file.FileInfo().IsDir() {
+		return result
+	}
+	reader, err := file.Open()
+	if err != nil {
+		result.err = fmt.Errorf("feed: open OSV ZIP entry: %w", err)
+		return result
+	}
+	raw, readErr := readOSVArchiveRecord(contextFeedReader{ctx, reader}, int(file.UncompressedSize64), buffer)
+	if err := errors.Join(readErr, reader.Close()); err != nil {
+		result.err = fmt.Errorf("feed: read OSV ZIP entry %s: %w", file.Name, err)
+		return result
+	}
+	result.pending = new(advisoryv1.FeedDocument)
+	result.matched, result.recordErr = appendScopedOSV(result.pending, config, product, raw, &result.scope, validator)
+	return result
+}
+
+// ZIP headers have already passed the per-record bound. Keep one raw buffer per
+// worker rather than growing io.ReadAll storage for every source document.
+func readOSVArchiveRecord(reader io.Reader, size int, buffer *[]byte) ([]byte, error) {
+	if cap(*buffer) < size+1 {
+		*buffer = make([]byte, size+1)
+	}
+	raw := (*buffer)[:size+1]
+	offset := 0
+	for {
+		n, err := reader.Read(raw[offset:])
+		offset += n
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return raw[:offset], nil
+			}
+			return nil, fmt.Errorf("feed: read document: %w", err)
+		}
+		if offset == len(raw) {
+			return nil, errors.New("feed: OSV ZIP entry size mismatch")
+		}
+	}
 }
 
 // Scope parsing avoids allocating irrelevant native ranges and binary maps.

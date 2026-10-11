@@ -19,7 +19,10 @@ import (
 	"lindm/internal/advisory/feed"
 )
 
-const advisoryPublicationBatchSize = 500
+const (
+	advisoryPublicationBatchSize  = 4096
+	advisoryPublicationBatchBytes = 8 << 20
+)
 
 type advisoryGeneration struct {
 	feedID   string
@@ -69,6 +72,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 		s: s, progress: progress, generation: generation.revision, feedID: source.GetId(), limit: limit,
 		namespace: uuid.NewSHA1(uuid.NameSpaceOID, []byte(source.GetId())),
 		batch:     make([]advisorydb.InsertAdvisoryPublicationBatchParams, 0, advisoryPublicationBatchSize),
+		payloads:  make([]byte, 0, advisoryPublicationBatchBytes+(64<<10)),
 	}
 	emit := func(record *advisoryv1.Advisory) error { return stager.emit(ctx, record) }
 	doc, err := producer(ctx, emit, progress.Mark)
@@ -163,6 +167,7 @@ type publicationStager struct {
 	namespace  uuid.UUID
 	limit      uint64
 	batch      []advisorydb.InsertAdvisoryPublicationBatchParams
+	payloads   []byte
 	emitted    uint64
 	unique     int64
 	err        error
@@ -175,6 +180,7 @@ func (p *publicationStager) flush(ctx context.Context) error {
 	inserted, err := p.s.stageAdvisoryBatch(ctx, p.generation, p.batch)
 	clear(p.batch)
 	p.batch = p.batch[:0]
+	p.payloads = p.payloads[:0]
 	if err != nil {
 		return err
 	}
@@ -202,11 +208,14 @@ func (p *publicationStager) emit(ctx context.Context, record *advisoryv1.Advisor
 		p.err = ErrCapacity
 		return p.err
 	}
-	payload, marshalErr := proto.MarshalOptions{Deterministic: true}.Marshal(record)
+	start := len(p.payloads)
+	encoded, marshalErr := proto.MarshalOptions{Deterministic: true}.MarshalAppend(p.payloads, record)
 	if marshalErr != nil {
 		p.err = marshalErr
 		return p.err
 	}
+	p.payloads = encoded
+	payload := encoded[start:]
 	p.batch = append(p.batch, advisorydb.InsertAdvisoryPublicationBatchParams{
 		PublicationID: p.generation,
 		Position:      int16(len(p.batch)),
@@ -218,7 +227,7 @@ func (p *publicationStager) emit(ctx context.Context, record *advisoryv1.Advisor
 		Architecture:  record.GetArchitecture(),
 		RecordBytes:   payload,
 	})
-	if len(p.batch) == advisoryPublicationBatchSize {
+	if len(p.batch) == advisoryPublicationBatchSize || len(p.payloads) >= advisoryPublicationBatchBytes {
 		p.err = p.flush(ctx)
 	}
 	return p.err
