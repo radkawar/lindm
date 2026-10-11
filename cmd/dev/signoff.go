@@ -201,6 +201,9 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit ti
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
+	if err := devlab.AwaitIntegrationCapacity(queue, fixtureRoot, os.Stderr); err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(ctx, min(limit, integrationLockCap))
 	defer cancel()
 	started := time.Now()

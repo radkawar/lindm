@@ -62,7 +62,7 @@ func TestAuthorityConfigurationIgnoresSharedServerSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Proto.GetDeploymentId() == "" || doc.Proto.GetAuthentication().GetKeycloak().GetIssuer() != issuer || doc.Proto.GetDatabase().GetMaxConnections() != 8 {
+	if doc.Proto.GetDeploymentId() == "" || doc.Proto.GetAuthentication().GetKeycloak().GetIssuer() != issuer || doc.Proto.GetDatabase().GetMaxConnections() != 4 || doc.Proto.GetDatabase().GetAdminConnections() != 2 {
 		t.Fatal("isolated configuration lost its fixture binding")
 	}
 	// The dedicated cluster changes only the generated document's database

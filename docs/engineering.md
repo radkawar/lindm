@@ -1754,6 +1754,11 @@ sharding instead. While it holds the lock, the run prints each package result as
 `[n/total] ok|FAIL pkg seconds`, with a failing package's output, and writes the
 latest of these lines into the lock's holder record, which queued runs and
 `dev status` show.
+Admission under that lock also waits for at least 60 free PostgreSQL connection
+slots (`max_connections` minus the `pg_stat_activity` count), printing changed
+wait reasons without consuming the suite deadline. The shared dev PostgreSQL
+runs with 400 connections and 512 MiB shared buffers; owned lab servers use
+four database connections plus two admin connections per replica.
 `dev test-integration`, `dev signoff` and `dev pre-push` run their race-enabled
 suites (integration and clean-worktree `make check`) after heavy-job admission on
 the local lab host. Gates do not take a lab slot or queue in the lanes' FIFO,

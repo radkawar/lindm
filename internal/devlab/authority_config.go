@@ -35,7 +35,7 @@ func authorityDocument(ctx context.Context, path, shared string, material *Agent
 		DeploymentId: verified.Bundle.GetDeploymentId(), PublicUrl: consoleOrigin,
 		AdminListener:  &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444},
 		DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
-		Database:       &configv1.DatabaseConfig{UrlFile: filepath.Join(shared, "database-url"), MigrationUrlFile: proto.String(filepath.Join(shared, "migration-database-url")), MaxConnections: 8},
+		Database:       &configv1.DatabaseConfig{UrlFile: filepath.Join(shared, "database-url"), MigrationUrlFile: proto.String(filepath.Join(shared, "migration-database-url")), MaxConnections: 4, AdminConnections: proto.Uint32(2)},
 		Tls:            &configv1.TLSConfig{CertificateFile: filepath.Join(shared, "server.crt"), PrivateKeyFile: filepath.Join(shared, "server.key")},
 		DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: filepath.Join(shared, "device-ca.crt"), PrivateKeyFile: filepath.Join(shared, "device-ca.key")},
 		Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{Issuer: issuer, ClientId: "lindm-console", ClientSecretFile: filepath.Join(shared, "console-secret"), DirectoryClientId: "lindm-directory", DirectoryClientSecretFile: filepath.Join(shared, "directory-secret")}}},

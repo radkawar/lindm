@@ -252,7 +252,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		}
 	}
 	f.DeviceOrigin = deviceOrigin
-	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
+	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 4, AdminConnections: proto.Uint32(2)}
 	cfg.Tls.CertificateFile = filepath.Join(shared, "server.crt")
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")
 	if options.splitDevice.IsValid() && !f.persistent {

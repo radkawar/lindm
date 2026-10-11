@@ -211,7 +211,7 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 	cfg.AdminListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(adminPort)}
 	cfg.DeviceListener = &configv1.ListenerConfig{Address: "127.0.0.1", Port: uint32(devicePort)}
 	cfg.DevicePublicUrl = proto.String(deviceOrigin)
-	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
+	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 4, AdminConnections: proto.Uint32(2)}
 	cfg.Authentication = options.authentication
 	cfg.Authorization = &authv1.AuthorizationPolicy{GroupBindings: []*authv1.GroupBinding{{Group: options.group, Role: "admin"}}}
 	cfg.ExecutionBootstrap = &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"}
