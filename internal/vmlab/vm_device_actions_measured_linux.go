@@ -66,7 +66,7 @@ func provisionActionStockBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if err == nil && installed.ExitCode != 0 {
 		err = fmt.Errorf("install measured recovery prerequisites: guest exit %d: %s", installed.ExitCode, installed.Stderr)
 	}
-	if err = errors.Join(err, registration.Close()); err != nil {
+	if err = errors.Join(err, releaseRHELOwnedBoot(ctx, vm, registration)); err != nil {
 		return evidence, stock, err
 	}
 	initial, err := vm.run(ctx, "cat /proc/sys/kernel/random/boot_id; uname -r", nil, 4096, 10*time.Second)

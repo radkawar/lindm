@@ -74,7 +74,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	refusal := options.WipePhase == "recovery-attestation-refusal"
 	if measured {
 		evidence.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB.String()
-		evidence.Boundary = "Original device identity and generation, unmodified vendor cloud disk booting firmware-enrolled Microsoft/Fedora shim+GRUB and the vendor-signed kernel, unsigned lindm initramfs on /boot proven only by a fresh swtpm quote and event-log replay verified by the server, and off-target ext4 one-action custody. No firmware key, ESP, loader or kernel change. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization. Software TPM, not a physical TPM or EK-certified attestation key."
+		evidence.Boundary = "Original device identity and generation, unmodified vendor cloud disk booting the firmware-enrolled Microsoft-signed vendor shim, vendor-signed GRUB and the vendor-signed kernel, unsigned lindm initramfs on /boot proven only by a fresh swtpm quote and event-log replay verified by the server, and off-target ext4 one-action custody. No firmware key, ESP, loader or kernel change. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization. Software TPM, not a physical TPM or EK-certified attestation key."
 	}
 	if !options.Encrypted.Firmware.SecureBoot {
 		return evidence, errors.New("original signed recovery requires explicitly selected Secure Boot firmware")

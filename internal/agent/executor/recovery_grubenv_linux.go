@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -53,9 +54,11 @@ func (s *Service) grubEnvironment(bootDirectory, configDirectory string) recover
 			// The unit's result, exit status and bounded stderr stay in the
 			// executor journal; grub-editenv output carries no secrets.
 			failure := &rootInventoryError{stage: "grub-editenv " + args[1], err: runErr, unit: unit, cleanup: stopErr}
-			if s.logger != nil {
-				s.logger.Warn("recovery grub-editenv unit failed", failure.logAttrs()...)
+			logger := s.logger
+			if logger == nil {
+				logger = slog.Default()
 			}
+			logger.WarnContext(ctx, "recovery grub-editenv unit failed", failure.logAttrs()...)
 			return nil, fmt.Errorf("recovery grub-editenv %s: %w", args[1], errors.Join(runErr, stopErr))
 		}
 		return output, nil
