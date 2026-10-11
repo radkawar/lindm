@@ -57,8 +57,8 @@ agent lifecycle result.
 
 ## Ubuntu 26.04.1 (Resolute Raccoon)
 
-Every Ubuntu 24.04 lane except the air-gap bundle and console-enrollment lanes has a
-native 26.04.1 record, plus aarch64 desktop wipe, report-loss, lock and compliance
+Every Ubuntu 24.04 lane has a native 26.04.1 record (air-gap bundle and console
+enrollment through `lab matrix run` on both architectures), plus aarch64 desktop wipe, report-loss, lock and compliance
 cells that 24.04 lacks; names, digests, commands and failed attempts are in
 [verification](../verification.md#ubuntu-26041-parity-records-2026-10-11). Cloud
 lanes ran on both architectures (local KVM x86_64, dgx20/dgx21 KVM aarch64 with
