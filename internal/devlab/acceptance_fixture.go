@@ -41,6 +41,20 @@ func (f *AuthorityFixture) CreateAcceptanceEnrollment(ctx context.Context, usern
 	return enrollment, nil
 }
 
+// DisableAcceptanceAccount retires a per-run browser operator through the normal
+// account API. It leaves the named human owner and lane identities untouched.
+func (f *AuthorityFixture) DisableAcceptanceAccount(ctx context.Context, accountID string) (resultErr error) {
+	if f.local == nil || accountID == "" || accountID == f.local.owner.id || f.local.approver != nil && accountID == f.local.approver.id {
+		return errors.New("acceptance account cleanup requires a distinct browser account")
+	}
+	owner, err := f.OpenOwnerSession(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { resultErr = errors.Join(resultErr, closeReleaseSession(owner)) }()
+	return owner.localRequest(ctx, "/auth/accounts/update", &authv1.UpdateAccountRequest{AccountId: accountID, Enabled: false, Role: "owner"}, nil, http.StatusNoContent)
+}
+
 // AcceptanceFeedResult keeps source evidence even when publication fails.
 type AcceptanceFeedResult struct {
 	StartedAt             time.Time                          `json:"started_at"`

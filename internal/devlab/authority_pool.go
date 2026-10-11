@@ -2,7 +2,6 @@ package devlab
 
 import (
 	"context"
-	"os"
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -28,7 +27,7 @@ func (f *AuthorityFixture) ConfigurePool(ctx context.Context, connections uint32
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return err
 	}
 	return f.Restart(ctx)

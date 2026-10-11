@@ -31,6 +31,10 @@ func writeSplitCertificate(shared, directory string, device netip.Addr) error {
 	if err := validateSplitDevice(device); err != nil {
 		return err
 	}
+	return writeFixtureCertificate(shared, directory, device, 24*time.Hour)
+}
+
+func writeFixtureCertificate(shared, directory string, device netip.Addr, lifetime time.Duration) error {
 	ca, err := tls.LoadX509KeyPair(filepath.Join(shared, "transport-ca.crt"), filepath.Join(shared, "transport-ca.key"))
 	if err != nil {
 		return fmt.Errorf("load split transport CA: %w", err)
@@ -51,7 +55,7 @@ func writeSplitCertificate(shared, directory string, device netip.Addr) error {
 	if err != nil {
 		return fmt.Errorf("generate split TLS serial: %w", err)
 	}
-	expires := now.Add(24 * time.Hour)
+	expires := now.Add(lifetime)
 	if parent.NotAfter.Before(expires) {
 		expires = parent.NotAfter
 	}

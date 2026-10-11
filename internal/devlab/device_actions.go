@@ -24,8 +24,9 @@ import (
 // transport/wrapping keys in the owned server, with two-person reveal required.
 // The exact action delegation still needs normal Admin API admission. Only
 // read-only encryption compliance is added; no service execution or wildcard
-// capability is granted. Call once before actions;
-// restarting preserves all accounts, sessions and the isolated database.
+// capability is granted. Persistent fixtures restore the same delegation and
+// custody on subsequent calls; disposable fixtures require a single call.
+// Restarting preserves all accounts, sessions and the isolated database.
 func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1.UpdateExecutionTrustRequest, error) {
 	if f.connected != nil {
 		return nil, errors.New("device action configuration requires controller-owned authority fixture")
@@ -38,6 +39,17 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 		return nil, err
 	}
 	if document.Proto.GetEscrow() != nil || document.Proto.GetExecutionSigning() != nil {
+		if f.persistent {
+			encoded, err := readOwned(filepath.Join(f.directory, "actions-delegation.json"))
+			if err != nil {
+				return nil, err
+			}
+			update := new(agentv1.UpdateExecutionTrustRequest)
+			if err := protojson.Unmarshal(encoded, update); err != nil {
+				return nil, err
+			}
+			return update, nil
+		}
 		return nil, errors.New("device action custody is already configured")
 	}
 	capabilities, err := deviceActionCapabilities()
@@ -49,7 +61,7 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 	if err != nil {
 		return nil, err
 	}
-	keys, err := createExecutionTrustExercise(ctx, f.repository, append(capabilities, compliance))
+	keys, err := createExecutionTrustExerciseForLifetime(ctx, f.repository, append(capabilities, compliance), f.persistent)
 	if err != nil {
 		return nil, err
 	}
@@ -81,11 +93,20 @@ func (f *AuthorityFixture) ConfigureDeviceActions(ctx context.Context) (*agentv1
 	}
 	document.Proto.ExecutionSigning = &configv1.ExecutionSigningConfig{PlanKeyFile: "actions-plan.pem", StartKeyFile: "actions-start.pem"}
 	document.Proto.Escrow = &configv1.EscrowConfig{TransportKeyFile: "escrow-transport.pem", WrappingKeyFile: "escrow-wrapping.key", RevealApprovalRequired: true}
+	if f.persistent {
+		encoded, err := protojson.Marshal(keys.Initial)
+		if err != nil {
+			return nil, err
+		}
+		if err := writeSplitPrivateFile(filepath.Join(f.directory, "actions-delegation.json"), encoded); err != nil {
+			return nil, err
+		}
+	}
 	encoded, err := protojson.Marshal(document.Proto)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return nil, err
 	}
 	if err := f.Restart(ctx); err != nil {

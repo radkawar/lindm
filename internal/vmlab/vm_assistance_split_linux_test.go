@@ -9,7 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 func TestAssistanceRelayPreservesColocatedAndBindsSplitAddress(t *testing.T) {
@@ -64,5 +68,63 @@ func TestAssistanceControlPlaneIsPrivateAndSingleUse(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("rejected handle remains on disk")
+	}
+}
+
+// A resumed VM deliberately has no newly built package. Reach the real
+// control-plane decoding boundary without building a package or booting a VM;
+// deriving enrollment architecture from packages.artifact used to panic here.
+func TestAssistanceResumeNeedsNoNewPackageForFixture(t *testing.T) {
+	paths, err := filepath.Glob("../../lab/images/*encrypted*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest *labv1.ImageManifest
+	desktopName := ""
+	for _, path := range paths {
+		candidate, err := LoadManifest(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		release := platform.ForManifest(candidate.GetDistribution(), candidate.GetVersion())
+		for _, profile := range labDesktops {
+			desktop, err := labDesktopFor(profile.name, release)
+			if err == nil && assistanceAdmission(release, desktop) == nil {
+				manifest, desktopName = candidate, profile.name
+				break
+			}
+		}
+		if manifest != nil {
+			break
+		}
+	}
+	if manifest == nil {
+		t.Fatal("no maintained manifest admits assistance")
+	}
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, architecture := range []string{"amd64", "x86_64", "arm64", "aarch64"} {
+		t.Run(architecture, func(t *testing.T) {
+			image := proto.CloneOf(manifest)
+			image.Architecture = architecture
+			_, evidenceDir := newTestAssistanceEvidence(t)
+			_, err := AssistanceVM(t.Context(), image, VMAssistanceOptions{
+				LabBinary: binary, EvidenceDir: evidenceDir,
+				PersistentDir: t.TempDir(), FixtureDir: filepath.Join(t.TempDir(), "authority"),
+				Hold: func(*AssistanceHold) error {
+					t.Fatal("resume unexpectedly reached hold")
+					return nil
+				},
+				Encrypted: EncryptedVMOptions{Desktop: desktopName, Hardware: &VMHardwareOptions{Desktop: true, AllowNetwork: true}},
+				ControlPlane: &AssistanceControlPlane{
+					Delegation: json.RawMessage(`{"invalid_resume_delegation":true}`),
+				},
+			})
+			if err == nil || !strings.Contains(err.Error(), "invalid_resume_delegation") {
+				t.Fatalf("resume did not reach control-plane validation without building a package: %v", err)
+			}
+		})
 	}
 }

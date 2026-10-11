@@ -93,6 +93,8 @@ const (
 // cache, then persists the config and restarts only lindmd on the same database.
 // cacheDir belongs to the controller's persistent lab work directory, not the
 // disposable fixture. Connected fixtures cannot mutate controller configuration.
+// Identical configuration leaves existing publications intact; the normal server
+// worker refreshes when due, and held callers still gate on WaitDeviceFindings.
 func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.AdvisoryConfig, cacheDir string) error {
 	if f.connected != nil {
 		return errors.New("advisory configuration requires controller-owned authority fixture")
@@ -112,6 +114,9 @@ func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.A
 	if err != nil {
 		return err
 	}
+	if proto.Equal(document.Proto.GetAdvisories(), cfg) {
+		return nil
+	}
 	document.Proto.Advisories = proto.CloneOf(cfg)
 	resources, err := document.Resolve()
 	if err != nil {
@@ -130,7 +135,7 @@ func (f *AuthorityFixture) EnableAdvisories(ctx context.Context, cfg *configv1.A
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return err
 	}
 	return f.Restart(ctx)

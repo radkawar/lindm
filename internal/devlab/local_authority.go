@@ -36,6 +36,7 @@ type localAccount struct {
 	password      []byte
 	authenticator *webauthnlab.Authenticator
 	counter       uint32
+	statePath     string
 }
 
 // OpenLocalAuthorityFixture uses the existing isolated process/database lifecycle
@@ -201,6 +202,11 @@ func (s *OwnerSession) localCeremonyRole(ctx context.Context, secret, role strin
 		return errors.New("fixture authenticator counter exhausted")
 	}
 	a.counter++
+	// Persist before sending the assertion: an ambiguous response must never
+	// cause reuse of a counter already accepted by the server.
+	if err := a.persist(); err != nil {
+		return err
+	}
 	credential, _, err := a.authenticator.Response(options.Challenge, s.origin, secret != "", true, a.counter)
 	if err != nil {
 		return err

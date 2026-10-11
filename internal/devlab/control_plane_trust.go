@@ -23,10 +23,11 @@ import (
 	"lindm/internal/releaseupdate"
 )
 
-// AuthorityFixture owns a real lindmd process and a disposable PostgreSQL database,
+// AuthorityFixture owns a real lindmd process and an isolated PostgreSQL database,
 // or connects to a controller-owned fixture through an SSH-forwarded admin port.
-// Shared development trust and IdP resources are read-only. The development offline
-// keys are never part of this server's configuration.
+// Persistent constructors retain database and custody until explicit destroy;
+// ordinary fixtures are disposable. Shared development trust and IdP resources
+// are read-only. Offline keys are never part of the server's configuration.
 type AuthorityFixture struct {
 	AdminAddress  string
 	DeviceAddress string
@@ -35,8 +36,10 @@ type AuthorityFixture struct {
 	// this fixture was explicitly opened for console installation.
 	NativeRepository *NativeEnrollmentRepository
 	// DeviceOrigin is the signed bootstrap bundle's device origin.
-	DeviceOrigin     string
-	DatabaseName     string
+	DeviceOrigin string
+	DatabaseName string
+	// Resumed is true when opened from existing persistent state.
+	Resumed          bool
 	repository       string
 	binary           string
 	directory        string
@@ -55,6 +58,8 @@ type AuthorityFixture struct {
 	demo             *consoleDemoOrigin
 	connected        *connectedAuthority
 	exportedAccounts []string
+	persistent       bool
+	stateLock        *os.File
 }
 
 type authorityFixtureMode uint8
@@ -112,7 +117,12 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			resultErr = errors.Join(resultErr, f.Close())
 		}
 	}()
-	f.directory, err = os.MkdirTemp("", "lindm-authority-")
+	f.persistent = options.persistentDirectory != ""
+	if f.persistent {
+		f.directory = options.persistentDirectory
+	} else {
+		f.directory, err = os.MkdirTemp("", "lindm-authority-")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +171,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		return nil, err
 	}
 	f.DatabaseName = f.database.name
+	if f.persistent {
+		if err := writePersistentJSON(filepath.Join(f.directory, "database.json"), f.DatabaseName); err != nil {
+			return nil, errors.Join(err, f.database.Close())
+		}
+	}
 	var runtimeURL string
 	if f.ha != nil {
 		runtimeURL = f.ha.databaseURL(f.DatabaseName)
@@ -240,7 +255,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	cfg.Database = &configv1.DatabaseConfig{UrlFile: "database-url", MigrationUrlFile: proto.String("database-url"), MaxConnections: 8}
 	cfg.Tls.CertificateFile = filepath.Join(shared, "server.crt")
 	cfg.Tls.PrivateKeyFile = filepath.Join(shared, "server.key")
-	if options.splitDevice.IsValid() {
+	if options.splitDevice.IsValid() && !f.persistent {
 		if err := writeSplitCertificate(shared, f.directory, options.splitDevice); err != nil {
 			return nil, err
 		}
@@ -292,11 +307,16 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
+	if f.persistent {
+		if err := f.snapshotPersistentTrust(shared, cfg); err != nil {
+			return nil, err
+		}
+	}
 	encoded, err := protojson.Marshal(cfg)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return nil, err
 	}
 	if f.ha != nil {
@@ -348,6 +368,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
+	if f.persistent {
+		if err := f.persistLocalAccounts(); err != nil {
+			return nil, err
+		}
+	}
 	if err := f.RegisterRelease(ctx, ""); err != nil {
 		return nil, fmt.Errorf("register isolated server release: %w", err)
 	}
@@ -387,7 +412,7 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	f.process, f.done = process, make(chan error, 1)
 	done := f.done
 	go func() { done <- process.Wait() }()
-	tlsConfig, err := trustClient(FixturePath(f.repository))
+	tlsConfig, err := f.localTLSConfig()
 	if err != nil {
 		return err
 	}
@@ -466,18 +491,28 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 	return f.start(ctx)
 }
 
+// Close stops owned processes and releases credential custody. Persistent state
+// and accounts remain; only disposable fixtures drop their isolated database.
 func (f *AuthorityFixture) Close() error {
 	if f.connected != nil {
 		f.closed = true
 		if f.local != nil {
 			f.local.close()
 		}
+		if f.stateLock != nil {
+			err := f.stateLock.Close()
+			f.stateLock = nil
+			return err
+		}
 		return nil
 	}
 	if f.closed && f.process == nil && f.cluster == nil && f.ha == nil {
 		return nil
 	}
-	err := f.disableExportedAccounts()
+	var err error
+	if !f.persistent {
+		err = f.disableExportedAccounts()
+	}
 	f.closed = true
 	err = errors.Join(err, f.stop())
 	if f.demo != nil {
@@ -491,7 +526,7 @@ func (f *AuthorityFixture) Close() error {
 	if f.local != nil {
 		f.local.close()
 	}
-	if f.database != nil {
+	if f.database != nil && !f.persistent {
 		err = errors.Join(err, f.database.Close())
 	}
 	if f.cluster != nil {
@@ -509,8 +544,12 @@ func (f *AuthorityFixture) Close() error {
 	if f.log != nil {
 		err = errors.Join(err, f.log.Close())
 	}
-	if f.directory != "" {
+	if f.directory != "" && !f.persistent {
 		err = errors.Join(err, os.RemoveAll(f.directory))
+	}
+	if f.stateLock != nil {
+		err = errors.Join(err, f.stateLock.Close())
+		f.stateLock = nil
 	}
 	return err
 }

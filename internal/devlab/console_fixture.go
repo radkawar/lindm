@@ -101,15 +101,16 @@ func (f *AuthorityFixture) RequireConsoleRevealApproval(ctx context.Context) err
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return err
 	}
 	return f.Restart(ctx)
 }
 
 // CreateConsoleEnrollment returns the one-time secret for the fixed console-owner
-// account in this disposable local database. Never log it as ordinary evidence or
-// place it in a URL. The browser chooses its own password and authenticator.
+// account. Named demos call this once and preserve the original private owner
+// access file. Never log the secret as evidence or place it in a URL. The browser
+// chooses its own password and authenticator.
 func (f *AuthorityFixture) CreateConsoleEnrollment(ctx context.Context) (_ *authv1.AccountEnrollment, resultErr error) {
 	if f.local == nil || f.ConsoleOrigin == consoleOrigin {
 		return nil, errors.New("browser enrollment requires a dynamic local console fixture")

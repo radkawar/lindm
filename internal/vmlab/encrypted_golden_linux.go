@@ -123,6 +123,13 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
+	references, referenceErr := os.ReadDir(filepath.Join(root.Name(), ".references", filepath.Base(entry)))
+	if referenceErr != nil && !errors.Is(referenceErr, os.ErrNotExist) {
+		return nil, referenceErr
+	}
+	if len(references) != 0 {
+		return nil, errors.New("missing encrypted golden is referenced by persistent VMs; refusing replacement")
+	}
 	if opts.RequireCachedGolden {
 		return nil, errors.New("pinned encrypted golden is absent; provision it explicitly with lab vm encrypted before read-only inspection")
 	}

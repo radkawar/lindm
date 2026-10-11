@@ -38,12 +38,15 @@ type AssistanceHold struct {
 	RemoteEvidenceDir string
 	RespondBinary     string
 	Findings          *devlab.DeviceFindingCounts
+	Persistent        bool
+	ExistingAccount   bool
+	OwnerAccessFile   string
 }
 
 // holdAssistance hands the owner a fresh console enrollment and the guest's
 // display and login, then keeps lindmd and the VM running until ctx ends.
 // Consent stays the guest user's own click; nothing is seeded for the device.
-func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, screen *assistanceScreen, result *VMAssistanceResult, hold func(*AssistanceHold) error, split bool, findings *devlab.DeviceFindingCounts) error {
+func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.AuthorityFixture, screen *assistanceScreen, result *VMAssistanceResult, hold func(*AssistanceHold) error, split bool, findings *devlab.DeviceFindingCounts, existingOwner bool) error {
 	hostname, err := vm.Run(ctx, "hostname", nil)
 	if err != nil {
 		return err
@@ -61,6 +64,23 @@ func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.Author
 	// matters if the owner locks or logs out, so it is set now and handed over.
 	access := &AssistanceHold{ConsoleOrigin: fixture.ConsoleOrigin, RelayPort: result.Relay.ListenerPort, DeviceID: result.DeviceID, Hostname: strings.TrimSpace(string(hostname)), DisplaySocket: filepath.Join(vm.dir, "display.sock"), DesktopUser: actionDesktopUser, DesktopPassword: rand.Text()}
 	access.Findings = findings
+	access.Persistent, access.ExistingAccount = vm.persistentLock != nil, existingOwner
+	if access.Persistent {
+		device, err := vm.PersistentDevice()
+		if err != nil {
+			return err
+		}
+		if device == nil {
+			return errors.New("held persistent VM has no enrolled device")
+		}
+		if device.DesktopPassword == "" {
+			device.DesktopPassword = access.DesktopPassword
+			if err := vm.SavePersistentDevice(device); err != nil {
+				return err
+			}
+		}
+		access.DesktopPassword = device.DesktopPassword
+	}
 	defer func() { access.EnrollmentSecret, access.DesktopPassword = "", "" }()
 	line := []byte(actionDesktopUser + ":" + access.DesktopPassword + "\n")
 	_, err = vm.Run(ctx, "sudo -n chpasswd", bytes.NewReader(line))
@@ -68,7 +88,7 @@ func holdAssistance(ctx context.Context, vm *EncryptedVM, fixture *devlab.Author
 	if err != nil {
 		return fmt.Errorf("set demo desktop password: %w", err)
 	}
-	if !split {
+	if !split && !existingOwner {
 		enrollment, err := fixture.CreateConsoleEnrollment(ctx)
 		if err != nil {
 			return err

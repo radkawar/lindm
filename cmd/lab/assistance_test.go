@@ -58,6 +58,100 @@ func TestAssistanceHoldKeepsCredentialsOutOfStreamedOutput(t *testing.T) {
 	}
 }
 
+func TestAssistancePersistentOwnerAccessSurvivesResume(t *testing.T) {
+	root, evidence := t.TempDir(), t.TempDir()
+	access := &vmlab.AssistanceHold{
+		ConsoleOrigin: "https://localhost:19444", RelayPort: 19445,
+		Username: "console-owner", EnrollmentSecret: "one-time-secret",
+		DesktopUser: "desktop-user", DesktopPassword: "retained-password",
+		Persistent: true, OwnerAccessFile: filepath.Join(root, "owner-access"),
+	}
+	var stdout bytes.Buffer
+	if err := writeAssistanceHold(&stdout, evidence, access); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(access.OwnerAccessFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	access.ExistingAccount, access.EnrollmentSecret = true, ""
+	stdout.Reset()
+	if err := writeAssistanceHold(&stdout, t.TempDir(), access); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(access.OwnerAccessFile)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("resume replaced existing owner access", err)
+	}
+	if !strings.Contains(stdout.String(), "existing owner account remains valid") || strings.Contains(stdout.String(), "Owner enrollment:") {
+		t.Fatal("resume offered a new owner enrollment")
+	}
+	if _, err := os.Stat(filepath.Join(evidence, "owner-access")); !os.IsNotExist(err) {
+		t.Fatal("persistent credentials were placed in run-scoped evidence")
+	}
+}
+
+func TestAssistanceRootLockPreventsDestroyAndRecreation(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := openAssistanceDemoRoot(root); err != nil {
+		t.Fatal(err)
+	}
+	disk := filepath.Join(root, "retained-disk")
+	if err := os.WriteFile(disk, []byte("owned state"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := lockAssistanceDemo(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	if err := destroyAssistanceDemo(t.Context(), "", root, &bytes.Buffer{}); err == nil {
+		t.Fatal("destroy accepted a running named demo")
+	}
+	if _, err := os.Stat(disk); err != nil {
+		t.Fatal("refused destruction removed state", err)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	if next, err := lockAssistanceDemo(root); err == nil {
+		_ = next.Close()
+		t.Fatal("deleting state bypassed stable lifecycle lock")
+	}
+}
+
+func TestAssistanceSchedulerLocksBeforeHostBinding(t *testing.T) {
+	work := t.TempDir()
+	config := filepath.Join(t.TempDir(), "lab.json")
+	data, err := json.Marshal(&labv1.LabConfig{Hosts: []*labv1.LabHost{{
+		Name: "local", Transport: "local", Runtime: "native",
+		Architectures: []string{"amd64"}, Kvm: true, MaxGuests: 1,
+		MaxVcpus: 2, MaxMemoryMib: 4096, WorkDirectory: work,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LINDM_LAB_CONFIG", config)
+	root := filepath.Join(work, "demos", "concurrent")
+	lock, err := lockAssistanceDemo(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	// A destructor holds the sibling lock after deleting the old root. A
+	// concurrent start must not republish a marker/host binding around it.
+	err = runScheduledVM(t.Context(), []string{"vm", "assistance", "-hold", "-name", "concurrent", "-manifest", "unopened.json"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "already running or being destroyed") {
+		t.Fatalf("scheduler passed lifecycle lock: %v", err)
+	}
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatal("concurrent scheduler recreated demo root", err)
+	}
+}
+
 // Debian's arm64 kernels cannot observe QEMU virt's TPM, so their encrypted
 // goldens are TPM-absent; the assistance lane must be able to select them.
 func TestAssistanceAcceptsTPMAbsentVariant(t *testing.T) {
@@ -141,5 +235,28 @@ func TestAssistanceControllerAddressRejectsNonRoutedAddress(t *testing.T) {
 	}
 	if _, err := assistanceControllerIPv4("192.0.2.10"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAssistanceNativeEnrollmentUsesGuestArchitecture(t *testing.T) {
+	for _, test := range []struct{ guest, want string }{
+		{"amd64", "amd64"}, {"x86_64", "amd64"},
+		{"arm64", "arm64"}, {"aarch64", "arm64"},
+	} {
+		t.Run(test.guest, func(t *testing.T) {
+			options, err := assistanceEnrollmentOptions(test.guest, "/private/source")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(options.NativeEnrollmentArchitectures) != 1 || options.NativeEnrollmentArchitectures[0] != test.want {
+				t.Fatalf("guest %s got native publication architectures %v", test.guest, options.NativeEnrollmentArchitectures)
+			}
+			if options.NativeEnrollmentSourceRepository != "/private/source" {
+				t.Fatal("native publication lost selected build source")
+			}
+		})
+	}
+	if _, err := assistanceEnrollmentOptions("unknown", "/private/source"); err == nil {
+		t.Fatal("unsupported guest architecture silently selected a host package")
 	}
 }

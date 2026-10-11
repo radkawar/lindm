@@ -165,7 +165,7 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context) (*ConsoleDe
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return nil, err
 	}
 	if err := f.Restart(ctx); err != nil {

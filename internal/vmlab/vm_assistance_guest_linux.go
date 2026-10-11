@@ -102,14 +102,16 @@ func pollGuest(ctx context.Context, vm *guestVM, timeout time.Duration, what, co
 // that would cover the consent controls: the release-upgrade prompt, the
 // welcome tour or window and initial overview, idle blanking and the
 // automatic screen lock.
-func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, desktop *labDesktop, release *platform.Release) (*actionDesktopEvidence, error) {
+func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, desktop *labDesktop, release *platform.Release, resuming bool) (*actionDesktopEvidence, error) {
 	if prompt := release.Lab.Session.UpgradePrompt; prompt != "" {
 		if _, err := vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote("if test -f "+nativeQuote(prompt)+"; then sed -i 's/^Prompt=.*/Prompt=never/' "+nativeQuote(prompt)+"; fi"), nil); err != nil {
 			return nil, fmt.Errorf("suppress release-upgrade prompt: %w", err)
 		}
 	}
-	if _, err := prepareActionDesktop(ctx, vm, desktop, release); err != nil {
-		return nil, err
+	if !resuming {
+		if _, err := prepareActionDesktop(ctx, vm, desktop, release); err != nil {
+			return nil, err
+		}
 	}
 	if err := pollGuest(ctx, vm.guest, 3*time.Minute, desktop.name+" session startup", desktop.rootScript(desktop.ready)); err != nil {
 		return nil, err

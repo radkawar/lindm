@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
-	"os"
 	"strconv"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -35,15 +34,15 @@ func (f *AuthorityFixture) ConfigureAssistance(ctx context.Context, assistance *
 	if err != nil {
 		return err
 	}
-	if document.Proto.GetAssistance() != nil {
-		return errors.New("assistance is already configured")
+	if proto.Equal(document.Proto.GetAssistance(), assistance) {
+		return nil
 	}
 	document.Proto.Assistance = proto.CloneOf(assistance)
 	encoded, err := protojson.Marshal(document.Proto)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return err
 	}
 	return f.Restart(ctx)

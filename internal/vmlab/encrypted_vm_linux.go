@@ -62,6 +62,7 @@ type EncryptedVM struct {
 	cacheDir       string
 	hardware       VMHardwareOptions
 	recoveryActive bool
+	persistentLock *os.File
 	closed         bool
 }
 
@@ -85,7 +86,8 @@ func startEncryptedProcessFiles(ctx context.Context, dir string, files []*os.Fil
 	p.cmd.ExtraFiles = files
 	p.cmd.Stdout, p.cmd.Stderr = p.log, p.log
 	p.cmd.WaitDelay = 2 * time.Second
-	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	// The owning lane handles terminal signals and joins these exact children.
+	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
 	started := make(chan error, 1)
 	go func() {
 		runtime.LockOSThread()
@@ -244,7 +246,11 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		}
 	}
 	if hardware.TPM {
-		v.tpm, err = startEncryptedProcess(ctx, v.dir, "swtpm", "socket", "--tpm2", "--tpmstate", "dir=tpm", "--ctrl", "type=unixio,path=tpm.sock,mode=0600", "--flags", "not-need-init")
+		processContext := ctx
+		if v.persistentLock != nil {
+			processContext = context.WithoutCancel(ctx)
+		}
+		v.tpm, err = startEncryptedProcess(processContext, v.dir, "swtpm", "socket", "--tpm2", "--tpmstate", "dir=tpm", "--ctrl", "type=unixio,path=tpm.sock,mode=0600", "--flags", "not-need-init")
 		if err != nil {
 			return err
 		}
@@ -344,7 +350,12 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		}
 		args = append(args, "-no-reboot")
 	}
-	p, err := startEncryptedProcess(ctx, v.dir, emulator, args...)
+	processContext := ctx
+	if v.persistentLock != nil {
+		// Cancellation starts graceful Stop; it must not SIGKILL QEMU first.
+		processContext = context.WithoutCancel(ctx)
+	}
+	p, err := startEncryptedProcess(processContext, v.dir, emulator, args...)
 	if err != nil {
 		return err
 	}
@@ -636,6 +647,16 @@ func (v *EncryptedVM) Snapshot(ctx context.Context, destination string) (err err
 // Close stops owned processes before removing only the private run directory.
 func (v *EncryptedVM) Close() error {
 	if v.closed {
+		return nil
+	}
+	if v.persistentLock != nil {
+		if err := v.Stop(context.Background()); err != nil {
+			return err
+		}
+		if err := v.persistentLock.Close(); err != nil {
+			return err
+		}
+		v.closed = true
 		return nil
 	}
 	if err := v.Kill(); err != nil {

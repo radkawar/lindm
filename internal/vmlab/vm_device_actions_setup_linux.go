@@ -31,15 +31,21 @@ type actionNativePackage struct {
 	fingerprint string
 }
 
-func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest, repository, workDir string) (_ *actionNativePackage, err error) {
-	architecture := ""
-	switch manifest.GetArchitecture() {
+func nativePackageArchitecture(architecture string) (string, error) {
+	switch architecture {
 	case "amd64", "x86_64":
-		architecture = "amd64"
+		return "amd64", nil
 	case "arm64", "aarch64":
-		architecture = "arm64"
+		return "arm64", nil
 	default:
-		return nil, errors.New("native action package requires an explicit supported guest architecture")
+		return "", errors.New("native action package requires an explicit supported guest architecture")
+	}
+}
+
+func buildActionNativePackage(ctx context.Context, manifest *labv1.ImageManifest, repository, workDir string) (_ *actionNativePackage, err error) {
+	architecture, err := nativePackageArchitecture(manifest.GetArchitecture())
+	if err != nil {
+		return nil, err
 	}
 	work, err := os.MkdirTemp(workDir, "lindm-device-action-packages-")
 	if err != nil {

@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"lindm/internal/labhost"
 	"lindm/internal/vmlab"
 )
 
-func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Writer) (err error) {
 	flags := flag.NewFlagSet("vm assistance", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	manifestPath := flags.String("manifest", "", "signed encrypted installer manifest of a release whose registry row supports assistance")
@@ -44,6 +45,9 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
 	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
+	name := flags.String("name", "", "persistent held demo name; Ctrl-C stops processes but keeps enrolled state")
+	destroy := flags.Bool("destroy", false, "destroy the named stopped demo, its VM and fixture")
+	demoRoot := flags.String("demo-root", "", "host-owned persistent demo root (internal scheduler input)")
 	flags.BoolVar(&options.ConsoleTURNTCP, "console-turn-tcp", false, "restrict the operator Chromium to TURN over TCP (a remote console behind an SSH forward) and require a TCP relay pair")
 	controlPlane := flags.String("control-plane", "", "private single-use controller handle (internal SSH lane input)")
 	flags.Bool("colocated", false, "keep lindmd, PostgreSQL and TURN on the SSH lab host instead of the controller")
@@ -51,6 +55,46 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&options.AdvisoryCache, "advisory-cache", "", "persistent revalidating feed cache for held demos; defaults to the configured lab work directory")
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	if *name != "" {
+		if !*hold {
+			return errors.New("-name requires -hold")
+		}
+		var root string
+		root, err = labhost.DemoDirectory(options.Encrypted.WorkDir, *name)
+		if err != nil {
+			return err
+		}
+		if *demoRoot == "" {
+			*demoRoot = root
+		} else if expected, err := labhost.DemoDirectory(filepath.Dir(filepath.Dir(*demoRoot)), *name); err != nil || expected != *demoRoot {
+			return errors.New("invalid persistent demo root")
+		}
+		if *destroy {
+			return destroyAssistanceDemo(ctx, options.Repository, *demoRoot, stdout)
+		}
+		if ctx.Value(assistanceDemoLockKey{}) != *demoRoot {
+			var lock *os.File
+			lock, err = lockAssistanceDemo(*demoRoot)
+			if err != nil {
+				return err
+			}
+			defer func() { err = errors.Join(err, lock.Close()) }()
+		}
+		if err := openAssistanceDemoRoot(*demoRoot); err != nil {
+			return err
+		}
+		options.PersistentDir = filepath.Join(*demoRoot, "desktop")
+		options.FixtureDir = filepath.Join(*demoRoot, "control-plane")
+		if *controlPlane != "" {
+			options.FixtureDir = filepath.Join(*demoRoot, "authority")
+		}
+		options.ExistingOwner, err = persistentOwnerExists(*demoRoot)
+		if err != nil {
+			return err
+		}
+	} else if *destroy || *demoRoot != "" {
+		return errors.New("-destroy requires -hold -name NAME")
 	}
 	if flags.NArg() != 0 || *manifestPath == "" || options.LabBinary == "" || options.LindmdBinary == "" || *evidence == "" {
 		return errors.New("vm assistance requires -manifest, -lab, -lindmd and -evidence NEW_DIRECTORY; no positional arguments")
@@ -88,7 +132,12 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	options.Encrypted.Hardware = hardware
 	if *hold {
-		options.Hold = func(access *vmlab.AssistanceHold) error { return writeAssistanceHold(stdout, *evidence, access) }
+		options.Hold = func(access *vmlab.AssistanceHold) error {
+			if *demoRoot != "" {
+				access.OwnerAccessFile = filepath.Join(*demoRoot, "owner-access")
+			}
+			return writeAssistanceHold(stdout, *evidence, access)
+		}
 		if options.ControlPlane != nil {
 			options.Hold = func(access *vmlab.AssistanceHold) error { return publishAssistanceHeld(*evidence, access) }
 		}
@@ -110,13 +159,13 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 // the private evidence directory; stdout (often a service log) gets the rest.
 func writeAssistanceHold(stdout io.Writer, dir string, access *vmlab.AssistanceHold) error {
 	path := filepath.Join(dir, "owner-access")
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
-	if err != nil {
-		return err
+	if access.OwnerAccessFile != "" {
+		path = access.OwnerAccessFile
 	}
-	_, err = fmt.Fprintf(file, "Enrollment URL: %s/enroll\nUsername: %s\nEnrollment secret (one-time): %s\nExpires at: %s\nGuest desktop user: %s\nGuest desktop password: %s\n", access.ConsoleOrigin, access.Username, access.EnrollmentSecret, access.ExpiresAt.Format(time.RFC3339), access.DesktopUser, access.DesktopPassword)
-	if err = errors.Join(err, file.Close()); err != nil {
-		return err
+	if !access.ExistingAccount {
+		if err := vmlab.WriteAssistanceOwnerAccess(path, access); err != nil {
+			return err
+		}
 	}
 	origin, err := url.Parse(access.ConsoleOrigin)
 	if err != nil {
@@ -131,18 +180,26 @@ func writeAssistanceHold(stdout io.Writer, dir string, access *vmlab.AssistanceH
 		relayAddress, controllerHost, labHost = access.ControllerAddress, "<controller-host>", "<lab-host>"
 		executable, respondDir = access.RespondBinary, access.RemoteEvidenceDir
 	}
-	_, err = fmt.Fprintf(stdout, `Remote-assistance demo is running; Ctrl-C stops lindmd and the VM and removes their state.
+	lifetime := "Ctrl-C stops lindmd and the VM and removes their state."
+	if access.Persistent {
+		lifetime = "Ctrl-C stops lindmd and the VM, keeping the named state; use -hold -name NAME -destroy to remove it."
+	}
+	owner := fmt.Sprintf("Owner enrollment: %s/enroll as %s, expires %s; the one-time secret is in %s", access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path)
+	if access.ExistingAccount {
+		owner = "The existing owner account remains valid; original private access: " + path
+	}
+	_, err = fmt.Fprintf(stdout, `Remote-assistance demo is running; %s
 Console: %s (trust .cache/dev/transport-ca.crt in a dedicated browser profile)
 Relay: TURN on %s port %d (UDP and TCP)
 Remote browser: ssh -L %s:localhost:%s -L %d:%s:%d <user>@%s, then open the console URL; media uses TURN over TCP through the forward
-Owner enrollment: %s/enroll as %s, expires %s; the one-time secret is in %s
+%s
 Device: %s (%s), GNOME Wayland, GDM autologin as %s; its password is in the same file
 Guest display (TigerVNC >= 1.11, Unix socket, no TCP listener): vncviewer %s
 On the lab host: %s vm assistance-respond -evidence %s {%s}
 From another host: ssh <user>@%s %s vm assistance-respond -evidence %s {%s}
   allow = Allow + Share in the desktop dialog (+ Allow Remote Interaction for a Control request); decline; stop; screenshot.
 Request assistance from the device page; consent is the guest user's own Allow/Decline.
-`, access.ConsoleOrigin, relayAddress, access.RelayPort, origin.Port(), origin.Port(), access.RelayPort, relayAddress, access.RelayPort, controllerHost, access.ConsoleOrigin, access.Username, access.ExpiresAt.Format(time.RFC3339), path, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"), labHost, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"))
+`, lifetime, access.ConsoleOrigin, relayAddress, access.RelayPort, origin.Port(), origin.Port(), access.RelayPort, relayAddress, access.RelayPort, controllerHost, owner, access.Hostname, access.DeviceID, access.DesktopUser, access.DisplaySocket, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"), labHost, executable, respondDir, strings.Join(vmlab.AssistanceRespondActions, "|"))
 	if err == nil && access.Findings != nil {
 		_, err = fmt.Fprintf(stdout, "Advisory evaluation ready: %d affected, %d accepted, %d unknown, %d clear findings (%s).\n", access.Findings.Affected, access.Findings.Accepted, access.Findings.Unknown, access.Findings.Clear, access.Findings.Freshness.GetState())
 	}

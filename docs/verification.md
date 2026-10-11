@@ -4040,6 +4040,162 @@ the worker and release its lease only after teardown. A transport error while
 checking returned evidence retains the remote directory rather than treating
 the error as an absent file. No Spark demo was left running.
 
+#### Persistent named fixture regression
+
+On 2026-10-11, `TestPersistentFixtureResumePreservesOwnerSession` passed with
+`-race -tags=integration`, real PostgreSQL (`testdb`) and a freshly built
+release-stamped `lindmd`, for both local and routed split fixtures. It creates
+private state, rejects concurrent opens and live destruction, restarts only the
+server for relay/authorization changes, closes and resumes the same database,
+and exercises the original owner cookie without logging in again. The same
+owner, lane owner and independent approver remain enrolled; TLS leaf,
+admin/device addresses, TURN configuration and execution signing custody remain
+unchanged. A busy saved admin port is refused instead of reallocated.
+Explicit destroy removes both database and fixture state. The split case also
+simulates interruption after database deletion, proving that repeated destroy
+finishes filesystem cleanup without `FORCE` or a replacement database.
+
+Evidence: `$HOME/.cache/lindm-persistent-demo-20261011/fixture-integration.log`,
+SHA-256 `f4b772c5c58e3545cb94ff78dffc5e37b6a0a7fee2ec5638faac38962b214656`.
+The two subtests completed in 23.78 seconds after exclusive integration admission.
+This is fixture durability evidence, not VM or physical-host qualification.
+Production `lindmd` already preserves PostgreSQL data across restart; only
+disposable lab teardown intentionally drops its isolated database.
+
+The real-server advisory regression also passed after making an unchanged
+configuration a true no-op: existing feed publication timestamps and the
+`lindmd` PID stay unchanged; changed configuration still refreshes and restarts
+only the server. The production worker remains responsible for refreshes when
+due, and held readiness still refuses unknown/stale device evaluations.
+Evidence: `$HOME/.cache/lindm-persistent-demo-20261011/advisory-resume-integration.log`,
+SHA-256 `2c1153be383aaadafb6f304bbf35f8013b0784179978a4511bcd940b7fb04f0f`.
+This test uses a local TLS feed fixture, not a live-vendor qualification.
+
+A subsequent real-server run also restored saved fixture creation options,
+including CPU affinity, after reopening with empty caller options. Both local
+and split subtests passed under the race detector. Evidence:
+`~/.cache/lindm-persistent-demo-20261011/fixture-options-integration.log`,
+SHA-256 `2e70230e57f8f15e5e1cad6af172061b9c4293b1b7fca6b1b3f4ebf17d3e0f4d`.
+
+`TestPersistentAssistanceOperatorAccountsAcrossResume` also passed with real
+PostgreSQL and `lindmd` under the race detector. It exercises the actual scenario
+operator creation/retirement helpers twice across persistent controller and lane
+restarts: unique account IDs and usernames, disabled cleanup even when the
+scenario context is canceled, and unchanged human/controller/lane identities,
+enabled state and account cardinality. Evidence:
+`~/.cache/lindm-persistent-demo-20261011/operator-resume-integration.log`,
+SHA-256 `9eb7493ee68e01ac680925af186c7c08fdb96fce6d8df3ee019e4acfac8e37bd`.
+
+Post-rebase architecture regressions cover the actual named VM resume path up to
+control-plane validation without building a package or booting a VM, and the
+split controller's native publication architecture selection. They pass for
+`amd64`, `x86_64`, `arm64` and `aarch64`. These prevent dereferencing the absent
+new package on resume and accidentally publishing an amd64 package for an arm64
+guest. Evidence:
+`~/.cache/lindm-persistent-demo-20261011/resume-architecture-regression.log`,
+SHA-256 `723620b92dbf813bcff65cdf60de9fea3d4eaed36a3d7a9a723c7ae771d28802`.
+The corrected merged source also passed independent static review, recorded in
+`~/.cache/lindm-persistent-demo-20261011/merged-persistence-review.json`,
+SHA-256 `7363a9b6473f154958dad011b46e71f0c074f9aa90fda96d02d117e5da0e7dfb`.
+
+The merged split fixture integration additionally built real signed native
+packages, reopened the same database with the original cookie, restored native
+publication metadata and returned ready enrollment instructions. Its native
+signer fingerprint stayed `5F131F501CEC1AB76346366E44B792EED0C89B0F`; explicit
+destroy removed the database and state. The merged local subtest passed too.
+Evidence: `~/.cache/lindm-persistent-demo-20261011/fixture-native-integration.log`,
+SHA-256 `a6761e6a9e875c1c346b0b62badd74b8867e9b10044eff4ea32001bd84c4e236`.
+The first native-enabled test attempt correctly refused a group-writable
+`testing.TempDir` ancestor (Go creates its numbered child with 0777, under the
+host's 0002 umask). The test now uses a short, private 0700 root and registers
+exact-state cleanup before opening; packaging safety checks were not relaxed.
+
+After the merged Spark lifecycle smoke, the combined repository gate passed:
+`make check` (full web build/typecheck/lint, protobuf checks, default Go lint and
+formatting, generated-doc check, all module race tests, npm audit and
+`govulncheck`), `go build ./...`, and integration-tag lint for `cmd/lab`,
+`internal/devlab`, `internal/labhost` and `internal/vmlab` (0 issues).
+Npm reported no vulnerabilities; govulncheck reported no affected code, with one
+uncalled required-module advisory. Full output:
+`~/.cache/lindm-persistent-demo-20261011/final-gate.log`,
+SHA-256 `4c3be3d50e97b2c51c0e085a1aa03ffeeb470bc5e51819762abd64f829a55a80`.
+
+The advisory-config and repeated scenario-operator real-server regressions also
+passed on the merged source, serialized under the host integration lock with
+the race detector. Evidence:
+`~/.cache/lindm-persistent-demo-20261011/merged-operator-advisory-integration.log`,
+SHA-256 `1bfb796f9b0f7a7071cdec5e9e76d5a38e0a72307dab33371a0f3719e15f5992`.
+
+#### Merged named split lifecycle and native repository acceptance
+
+After rebasing onto native enrollment repository publication (`0261411`) and the
+device-domain split, a fresh `persist-merged` demo passed on `dgx20`:
+create → Ctrl-C → resume → Ctrl-C → explicit `-destroy`. The rebuilt server
+included freshly generated web assets. Device
+`019e1c44-9437-46aa-8b69-f5cbc0d39761` and generation
+`12d56d0e-c5b3-4ca7-a4ca-353148eb9cc0` remained identical; published sequence
+advanced from 1 to 2 without re-enrollment. All 33,509 findings and the exact
+finding set survived. The original owner's browser cookie, account and session
+remained valid without another login, and the owner-access file was unchanged.
+
+Native enrollment readiness returned HTTP 200 and `ready=true` before and after
+resume, with signed **arm64** APT and RPM publications. Every repository and
+signing-custody file retained its SHA-256, mode and modification time; native
+metadata was byte-for-byte unchanged. The retained signer fingerprint was
+`357655DCBB6C5AB0FCD31C1DE8132A508A63A6B0`; packages were not republished.
+The administrative origin remained `https://localhost:45875`, with TURN on
+45947 and no product URL rewriting.
+
+Both stops and explicit destruction exited 0. Exact-resource checks after
+destroy found zero named databases, no controller or remote demo directory, no
+owned process and no console/TURN listener. The receipt contains 32 hashed
+evidence artifacts, including settled before/after owner screenshots:
+`~/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-held-persistent-merged-03/smoke.json`,
+SHA-256 `a8a07488b5e501c4891e8e3855e45f864a4c098bcc57633a7468b086ce425c47`.
+The final `owner-after.png` SHA-256 is
+`0b767a1e6a31cdef4ed32bdce2ae886d1a1dcd08035f5825b1003bb029333afe`.
+
+The receipt discloses earlier interrupted setup: an already-created evidence
+directory was refused before VM start; an import-cycle correction initially
+failed the build; an architecture mapping initially published amd64 instead of
+arm64. The initialized state was explicitly destroyed and the successful run
+created afresh after these corrections. A manual readiness request missing its
+CSRF header was correctly refused before the authenticated request succeeded.
+This proves held-demo persistence on native aarch64 KVM, not a new
+remote-control scenario qualification or physical-device validation. Stable,
+nonsecret sibling lock files intentionally remain after destruction.
+
+#### Named split held lifecycle regression
+
+On 2026-10-11, a native aarch64 KVM run on `dgx20` exercised
+`lab vm assistance -hold -name persist-smoke`: create, Ctrl-C, resume, Ctrl-C,
+then the maintained `-destroy` command. The same device
+`48d367fb-1391-4413-b03e-e022617b87e4` and enrollment generation survived, without
+re-enrollment. All 33,509 findings remained while stopped and after resume.
+The same browser cookie and unrevoked owner session reloaded the same device
+page, visibly authenticated as `console-owner`, without another login.
+Console origin, TURN port and the original mode-0400 owner-access file remained
+unchanged.
+
+Both Ctrl-C stops exited successfully and retained the database and encrypted
+disk. Explicit destruction exited successfully; exact-resource checks found no
+named database, controller or remote demo directory, owned QEMU/swtpm/lab
+process, controller `lindmd`, or console/TURN listener. Unrelated lab resources
+were untouched; empty sibling synchronization lock files intentionally remain.
+
+Evidence:
+`~/.cache/lindm-assistqual-20261011/ubuntu24-aarch64-held-persistent-03/smoke.json`,
+SHA-256 `79394570a57ec1d129db7676a4dca2f14b845c6f70704cfc82cdc198a244f64c`.
+Its artifact manifest includes the settled `owner-after-resume.png`, SHA-256
+`e55d50ba3821cdf3a6421e089a10bcc670672139542ff3859e3e464fd056aba2`.
+The earlier blank pre-stop screenshot is excluded from rendered-UI evidence.
+An initial resume exposed repeated `useradd` (exit 9); the corrected path skips
+one-time account/GDM provisioning and the subsequent resume passed. This
+snapshot predates both native enrollment repository integration and the
+unchanged-advisory fast path, so it does not claim those behaviors. This is
+encrypted GNOME Wayland VM lifecycle evidence, not a five-scenario assistance
+qualification or physical-device validation.
+
 #### Routed split-topology assistance
 
 SSH-native assistance now defaults to a workstation control plane; use

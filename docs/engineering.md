@@ -390,9 +390,14 @@ cache. Unchanged vendor exports are reused after revalidation. Only `lindmd`
 restarts when enabling this configuration; the fixture database and enrolled
 device are retained.
 
-The demo holds one lab slot, with no lane deadline, until Ctrl-C tears everything
-down. Held runs need a native lab host (local or SSH) and never write a
-qualification record. Stdout gets these nonsecret details:
+An unnamed demo holds one lab slot, with no lane deadline, until Ctrl-C tears
+its disposable fixture down. Add `-name NAME` to keep a demo across stops:
+the same command resumes the same database, owner account, console/TURN ports
+and enrolled desktop. Use a new `-evidence` directory for each invocation.
+Named demos use split topology on SSH hosts or the local host as both controller
+and lab host. `-colocated -name` is refused: colocated mode remains an isolated
+qualification-lane topology, not a second persistent PostgreSQL deployment.
+Held runs never write a qualification record. Stdout gets these nonsecret details:
 
 - the loopback console origin; trust the development CA as for `lab console`;
 - the loopback TURN port and a placeholder SSH forward line for both ports. The
@@ -471,6 +476,23 @@ The admin listener stays on `127.0.0.1` with WebAuthn origin
 and TURN TCP through SSH. Split scenarios require TURN TCP and the selected
 localhost candidate URL; their test driver filters ICE server URLs to that
 forwarded endpoint while leaving the console's relay-only policy intact.
+
+Console-copied native install and enrollment commands use that administrative
+origin, not the device mTLS origin. They work on demo guests because guest
+`localhost` reaches `10.0.2.2` and the lab host's SSH reverse forward. On another
+machine, provide matching admin and device forwards:
+
+```sh
+ssh -L A:localhost:A -L D:CONTROLLER_IP:D <user>@<controller-host>
+```
+
+Here `A` is the administrative HTTPS port and `D` is the device mTLS listener
+port; keep both original port numbers. This is distinct from the owner's
+console/TURN forward below. Other bare machines without this forwarding topology
+need a production deployment with a routable public DNS name and certificate.
+Held demos intentionally retain `https://localhost:A` for the console: WebAuthn
+cannot use an IP origin. Product enrollment/repository URLs are not rewritten.
+
 The assistance prerequisite step provisions private SHA-256-pinned Node 24.21.0
 and package-lock-selected Playwright Chromium under `assistance-browser/`.
 It changes neither system packages nor global PATH; missing browser libraries
@@ -489,8 +511,8 @@ The remote lane gets a distinct, already-enrolled owner-role account through a
 single-use 0600 control-plane handle containing private lab WebAuthn credentials.
 Pre-enrollment prevents FIFO admission or a cold advisory refresh from consuming
 an enrollment secret's lifetime. The handle is consumed and removed remotely;
-the controller disables this account at teardown. The connected lane cannot
-reconfigure or own the controller fixture. A separate private, atomically
+an unnamed fixture disables this account at teardown. Named fixtures retain it.
+The connected lane cannot reconfigure or own the controller fixture. A private, atomically
 published held marker transfers the desktop password over SSH and is removed
 after receipt.
 
@@ -499,12 +521,100 @@ the private held marker, then removes its owned remote run directory.
 Interrupted transport or failed evidence transfer retains that exact directory
 and reports its path. In `-colocated` mode the owner's access file remains on the
 lab host, as before; retrieve it deliberately over SSH, never from logs.
-Ctrl-C closes the worker's stdin lease and waits for remote VM teardown before
-closing the controller fixture and dropping its private database. A controller
-server exit cancels the remote lane. A failed SSH existence check is a transport
-failure, never proof that evidence is absent or permission to delete the run.
+Ctrl-C closes the worker's stdin lease and waits for remote VM stop before
+closing the controller fixture. Only an unnamed fixture drops its private
+database. A controller server exit cancels the remote lane. A failed SSH
+existence check is a transport failure, never proof that evidence is absent or
+permission to delete the run.
 
-Console UI review: `make ui-review` replaces the manual console review. It builds the embedded console
+#### Persistent named assistance demos
+
+Use the same options as the examples above, adding `-name NAME`. The first run
+provisions the desktop and creates the human owner's enrollment once. Stop with
+Ctrl-C, then run the same command with a new evidence directory to resume.
+The printed console origin and forwarding ports stay unchanged; the enrolled
+owner account and any still-valid browser session remain valid. Session expiry,
+revocation and step-up rules are unchanged; persistence does not extend them.
+Development trust is still time-bounded: the named action delegation expires
+with the existing development execution root (normally 30 days), and the retained
+TLS leaf is bounded by its CA. Resume never bypasses certificate or signed-trust
+expiry checks or silently replaces an enrolled trust domain.
+Named demos retain the same localhost administrative origin and the forwarding
+requirements above for console-copied install/enrollment commands. Persistence
+does not make the demo's loopback origin publicly routable.
+
+The controller's configured lab work directory holds `demos/NAME/`:
+
+- `control-plane/`: private configuration, original fixture creation options,
+  trust, TLS leaf and keys, database identity, controller accounts and exported
+  lane credential. Resume restores process settings such as server CPU affinity
+  without requiring the original creation options to be repeated.
+  Held creation publishes signed native enrollment packages once; its native
+  repository metadata, package artifacts and signing custody remain under the
+  same private fixture directory. Resume restores `AuthorityFixture.NativeRepository`
+  without rebuilding or republishing packages.
+- `owner-access`: the original one-time enrollment and desktop access details,
+  created once with mode 0400. It is not replaced with a new enrollment on resume.
+- `host`: the chosen lab host. Resume queues for that host rather than silently
+  creating a different VM when it is busy.
+
+The lab host's `demos/NAME/desktop/` retains the encrypted overlay, firmware
+NVRAM, TPM state, guest SSH identity and host key, LUKS unlock secret, desktop
+password and enrolled device identity. Split lanes keep their independent owner
+and approver credentials under `authority/`; WebAuthn counters are atomically
+saved before an assertion is sent, so an ambiguous login cannot reuse a counter.
+Directories are 0700 and credential/state files 0600. Never copy these into
+evidence or source control. The golden backing is pinned for the lifetime of the
+overlay; a cache eviction must not invalidate a named VM.
+Optional `-scenarios` runs use a distinct per-invocation browser operator and
+disable it after browser teardown; they never replace the human owner or the
+persistent lane owner/approver.
+
+Resume cold-boots the existing disk, unlocks it with its retained passphrase,
+waits for the already-enrolled agent and prepares only the idempotent desktop
+session state. It never enrolls the device again. Stop requests ACPI shutdown
+with a bounded wait before killing only the owned QEMU process. Neither stop nor
+Ctrl-C deletes disk, PostgreSQL state or owner accounts. Persistent listener
+ports are never silently reallocated: a conflicting process is an explicit error.
+
+Destroy is deliberately separate:
+
+```sh
+artifacts/bin/lab vm assistance -hold -name NAME -destroy
+```
+
+This removes the named controller database/state and the recorded lab host's
+VM and lane credentials. Stop the running demo first; destruction refuses live
+owned state. It does not remove shared image caches, development trust or other
+demos. The per-run evidence remains independent.
+Empty sibling lifecycle lock files remain to serialize future reuse of the name;
+they contain no credentials or VM/database state.
+
+Reusable APIs live in `internal/devlab` and `internal/vmlab`:
+`OpenPersistentFixture`, `OpenPersistentSplitFixture`,
+`DestroyPersistentFixture`, `ExportControlPlane`,
+`ConnectPersistentAuthorityFixture` and `DestroyPersistentAuthorityFixture`
+separate controller and lane ownership. `AssistanceConfiguration` restores TURN
+ports; `ConfigureAssistance`, `EnableAdvisories` and `ConfigureAuthorization`
+restart only `lindmd` when configuration changes, against the same database.
+Unchanged advisory configuration retains its existing publications; the ordinary
+server worker refreshes when due. Resume still waits for current, non-unknown
+device findings before reporting ready.
+`ProvisionPersistentVM`, `ResumePersistentVM`, `EncryptedVM.Stop` and
+`DestroyPersistentVM` own the per-device VM lifecycle. Their callers compose
+organization or multi-device demos without duplicating persistence machinery.
+`AssistanceOwnerAccessExists` and `WriteAssistanceOwnerAccess` share the private
+create-once owner-access contract; publication is atomic and never replaces an
+existing file.
+
+This is a lab-fixture lifecycle distinction, not a product storage change:
+ordinary production `lindmd` restarts already retain PostgreSQL accounts,
+sessions, devices and findings. Only disposable laboratory fixture cleanup
+intentionally drops a database. A named fixture retains it until explicit destroy.
+
+#### Console UI review
+
+`make ui-review` replaces the manual console review. It builds the embedded console
 and runs `lab console review -lindmd artifacts/bin/lindmd -evidence NEW_DIR` from the
 checkout under review (needs running development PostgreSQL, protected dev trust
 and Playwright Chromium from `make browser-baseline`). The command opens the same

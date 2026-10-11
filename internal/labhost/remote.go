@@ -137,6 +137,9 @@ func SetFlag(args []string, name, value string) []string {
 }
 
 func (r RemoteRun) Run(ctx context.Context) (err error) {
+	if len(r.Args) >= 2 && r.Args[1] == "assistance" && remoteDestroyRequested(r.Args) {
+		return r.destroyAssistance(ctx)
+	}
 	if len(r.Args) >= 2 && r.Args[1] == "assistance" && r.Host.Runtime != "native" {
 		return errors.New("remote assistance requires a native lab host")
 	}
@@ -321,6 +324,13 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	}
 	if FlagValue(args, "golden-cache") != "" || args[1] == "encrypted" || args[1] == "inspect-storage" || args[1] == "device-actions" || args[1] == "assistance" {
 		args = SetFlag(args, "golden-cache", filepath.Join(work, "encrypted"))
+	}
+	if name := FlagValue(args, "name"); args[1] == "assistance" && name != "" {
+		demo, err := DemoDirectory(work, name)
+		if err != nil {
+			return err
+		}
+		args = SetFlag(args, "demo-root", demo)
 	}
 	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections"} {
 		value := FlagValue(args, name)

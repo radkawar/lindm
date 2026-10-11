@@ -41,8 +41,23 @@ type AssistanceController struct {
 	control *vmControlPlane
 }
 
-func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (_ *AssistanceController, err error) {
-	fixture, err := devlab.OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, address, enrollment)
+func OpenAssistanceController(ctx context.Context, repository, binary string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (*AssistanceController, error) {
+	return openAssistanceController(ctx, repository, binary, "", address, host, enrollment)
+}
+
+// OpenPersistentAssistanceController reopens the same database, accounts and
+// listeners before reconnecting the named remote VM.
+func OpenPersistentAssistanceController(ctx context.Context, repository, binary, stateDir string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (*AssistanceController, error) {
+	return openAssistanceController(ctx, repository, binary, stateDir, address, host, enrollment)
+}
+
+func openAssistanceController(ctx context.Context, repository, binary, stateDir string, address netip.Addr, host string, enrollment devlab.LoadAuthorityOptions) (_ *AssistanceController, err error) {
+	var fixture *devlab.AuthorityFixture
+	if stateDir == "" {
+		fixture, err = devlab.OpenSplitDeviceActionAuthorityFixture(ctx, repository, binary, address, enrollment)
+	} else {
+		fixture, err = devlab.OpenPersistentSplitFixture(ctx, repository, binary, stateDir, address, enrollment)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +71,13 @@ func OpenAssistanceController(ctx context.Context, repository, binary string, ad
 	if err != nil {
 		return nil, err
 	}
-	assistance, err := devlab.ReserveAssistanceRelay(address.String(), address.String())
+	assistance, err := fixture.AssistanceConfiguration()
+	if err != nil {
+		return nil, err
+	}
+	if assistance == nil {
+		assistance, err = devlab.ReserveAssistanceRelay(address.String(), address.String())
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +88,7 @@ func OpenAssistanceController(ctx context.Context, repository, binary string, ad
 	if err != nil {
 		return nil, err
 	}
-	if err := controller.control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
+	if err := ensureAssistanceAuthority(ctx, controller.control, delegation); err != nil {
 		return nil, err
 	}
 	authority, err := fixture.ExportControlPlane(ctx, "assistance-lane")
@@ -160,11 +181,23 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 		if err := protojson.Unmarshal(handle.Delegation, delegation); err != nil {
 			return nil, nil, assistanceRelayEvidence{}, err
 		}
-		fixture, err := devlab.ConnectAuthorityFixture(ctx, handle.Authority)
+		var fixture *devlab.AuthorityFixture
+		if options.FixtureDir == "" {
+			fixture, err = devlab.ConnectAuthorityFixture(ctx, handle.Authority)
+		} else {
+			fixture, err = devlab.ConnectPersistentAuthorityFixture(ctx, handle.Authority, options.FixtureDir)
+		}
 		return fixture, delegation, handle.Relay, err
 	}
 	var fixture *devlab.AuthorityFixture
-	if options.Hold != nil {
+	if options.FixtureDir != "" {
+		enrollment := devlab.LoadAuthorityOptions{}
+		if options.Hold != nil {
+			enrollment.NativeEnrollmentArchitectures = []string{architecture}
+			enrollment.NativeEnrollmentSourceRepository = VMBuildRepository(options.Repository, options.BuildRepository)
+		}
+		fixture, err = devlab.OpenPersistentFixture(ctx, options.Repository, options.LindmdBinary, options.FixtureDir, enrollment)
+	} else if options.Hold != nil {
 		fixture, err = devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, options.Repository, VMBuildRepository(options.Repository, options.BuildRepository), options.LindmdBinary, []string{architecture})
 	} else {
 		fixture, err = devlab.OpenDeviceActionAuthorityFixture(ctx, options.Repository, options.LindmdBinary)
@@ -181,7 +214,13 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}
-	assistance, err := devlab.ReserveAssistanceRelay("127.0.0.1", options.RelayAddress)
+	assistance, err := fixture.AssistanceConfiguration()
+	if err != nil {
+		return nil, nil, assistanceRelayEvidence{}, err
+	}
+	if assistance == nil {
+		assistance, err = devlab.ReserveAssistanceRelay("127.0.0.1", options.RelayAddress)
+	}
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}
@@ -190,4 +229,15 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 	}
 	relay := assistance.GetRelay()
 	return fixture, delegation, assistanceRelayEvidence{ListenerAddress: relay.GetListener().GetAddress(), ListenerPort: relay.GetListener().GetPort(), RelayAddress: relay.GetRelayAddress(), PortMin: relay.GetRelayPortMin(), PortMax: relay.GetRelayPortMax(), URLs: relay.GetUrls(), GuestRoute: "guest localhost -> 10.0.2.2 (QEMU user networking) -> host 127.0.0.1"}, nil
+}
+
+func ensureAssistanceAuthority(ctx context.Context, control *vmControlPlane, delegation *agentv1.UpdateExecutionTrustRequest) error {
+	current, err := control.executionAuthority(ctx)
+	if err != nil {
+		return err
+	}
+	if current.GetDelegation() != nil {
+		return nil
+	}
+	return control.applyExecutionAuthority(ctx, delegation, 1, 1, 0)
 }

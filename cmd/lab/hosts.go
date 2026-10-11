@@ -94,6 +94,25 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		clean = append(clean, args[i])
 	}
+	if len(clean) >= 2 && clean[1] == "assistance" && assistanceFlag(clean, "destroy") {
+		return runDestroyNamedAssistance(ctx, clean, name, stdout, stderr)
+	}
+	if demoName := labhost.FlagValue(clean, "name"); len(clean) >= 2 && clean[1] == "assistance" && demoName != "" {
+		root, rootErr := controllerDemoDirectory(demoName)
+		if rootErr != nil {
+			return rootErr
+		}
+		lock, lockErr := lockAssistanceDemo(root)
+		if lockErr != nil {
+			return lockErr
+		}
+		defer func() { err = errors.Join(err, lock.Close()) }()
+		ctx = context.WithValue(ctx, assistanceDemoLockKey{}, root)
+	}
+	name, err = namedAssistanceHost(clean, name)
+	if err != nil {
+		return err
+	}
 	held := vmHolds(clean)
 	manifestPath := labhost.FlagValue(clean, "manifest")
 	if manifestPath == "" {
@@ -172,6 +191,9 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if held && chosen.Runtime == "container" {
 		return errors.New("a held lane requires a native lab host")
 	}
+	if err := bindAssistanceHost(clean, chosen); err != nil {
+		return err
+	}
 	if chosen.Transport == "ssh" || chosen.Runtime == "container" {
 		repo := labhost.FlagValue(clean, "repo")
 		if repo == "" {
@@ -191,6 +213,17 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 			}
 		}
 		return (labhost.RemoteRun{Host: chosen, Architecture: arch, Repository: repo, Args: clean, Hold: held, ReverseForwards: forwards, Stdout: stdout, Stderr: stderr}).Run(ctx)
+	}
+	if demoName := labhost.FlagValue(clean, "name"); clean[1] == "assistance" && demoName != "" {
+		work, err := labhost.ResolveWorkDirectory(chosen)
+		if err != nil {
+			return err
+		}
+		root, err := labhost.DemoDirectory(work, demoName)
+		if err != nil {
+			return err
+		}
+		clean = labhost.SetFlag(clean, "demo-root", root)
 	}
 	slots, err := labhost.OpenSlots(chosen)
 	if err != nil {
@@ -338,6 +371,16 @@ func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.W
 	work, err := labhost.ResolveWorkDirectory(host)
 	if err != nil {
 		return err
+	}
+	if name := labhost.FlagValue(args, "name"); lane == "assistance" && name != "" {
+		root, err := labhost.DemoDirectory(work, name)
+		if err != nil {
+			return err
+		}
+		args = labhost.SetFlag(args, "demo-root", root)
+		if assistanceFlag(args, "destroy") {
+			return runUnscheduled(ctx, args[1:], stdout, stderr)
+		}
 	}
 	// Ubuntu installs /boot kernels root-only; header oracles use the
 	// baseline's private packaged copy of the running kernel instead.

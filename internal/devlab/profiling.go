@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -59,7 +58,7 @@ func (f *AuthorityFixture) ConfigureProfiling(ctx context.Context, cpuSeconds ui
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(f.configPath(), encoded, 0600); err != nil {
+	if err := f.writeConfig(encoded); err != nil {
 		return "", err
 	}
 	origin := "http://" + listener.Addr().String()

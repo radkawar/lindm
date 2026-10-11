@@ -127,7 +127,7 @@ func TestEnableAdvisoriesRestartsOnlyServerWithPublishedConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(fixture.configPath(), encoded, 0600); err != nil {
+	if err := fixture.writeConfig(encoded); err != nil {
 		t.Fatal(err)
 	}
 	owner, err := fixture.OpenOwnerSession(ctx)
@@ -161,8 +161,16 @@ func TestEnableAdvisoriesRestartsOnlyServerWithPublishedConfig(t *testing.T) {
 	if len(feeds.Msg.GetFeeds()) != 1 || feeds.Msg.Feeds[0].GetCheckedAt() == nil || feeds.Msg.Feeds[0].GetAdvisoryCount() == 0 || feeds.Msg.Feeds[0].GetError() != "" {
 		t.Fatalf("restarted lindmd lost published records: %v", feeds.Msg)
 	}
+	pid = fixture.processPID.Load()
 	if err := fixture.EnableAdvisories(ctx, cfg, cacheDir); err != nil {
 		t.Fatal(err)
+	}
+	unchanged, err := owner.Admin.ListAdvisoryFeeds(ctx, connect.NewRequest(&adminv1.ListAdvisoryFeedsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.processPID.Load() != pid || len(unchanged.Msg.GetFeeds()) != 1 || !proto.Equal(unchanged.Msg.Feeds[0].GetCheckedAt(), feeds.Msg.Feeds[0].GetCheckedAt()) {
+		t.Fatal("unchanged advisory configuration restarted lindmd or republished its existing feed")
 	}
 	if bodies.Load() != 1 {
 		t.Fatalf("restart repeated the vendor body download: %d", bodies.Load())

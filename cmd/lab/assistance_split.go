@@ -84,6 +84,17 @@ func assistanceControllerIPv4(value string) (netip.Addr, error) {
 	return address, nil
 }
 
+func assistanceEnrollmentOptions(architecture, buildRepository string) (devlab.LoadAuthorityOptions, error) {
+	architecture, err := labhost.NormalizeArchitecture(architecture)
+	if err != nil {
+		return devlab.LoadAuthorityOptions{}, err
+	}
+	return devlab.LoadAuthorityOptions{
+		NativeEnrollmentArchitectures:    []string{architecture},
+		NativeEnrollmentSourceRepository: buildRepository,
+	}, nil
+}
+
 func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, buildRepository string, args []string, stdout, stderr io.Writer) (err error) {
 	address, err := controllerAddress(ctx, host.SshAlias, labhost.FlagValue(args, "controller-address"))
 	if err != nil {
@@ -95,10 +106,22 @@ func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, 
 	}
 	var enrollment devlab.LoadAuthorityOptions
 	if vmHolds(args) {
-		enrollment.NativeEnrollmentArchitectures = []string{packagingArchitecture(architecture)}
-		enrollment.NativeEnrollmentSourceRepository = buildRepository
+		enrollment, err = assistanceEnrollmentOptions(architecture, buildRepository)
+		if err != nil {
+			return err
+		}
 	}
-	controller, err := vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name, enrollment)
+	root := ""
+	var controller *vmlab.AssistanceController
+	if name := labhost.FlagValue(args, "name"); name != "" {
+		root, err = controllerDemoDirectory(name)
+		if err != nil {
+			return err
+		}
+		controller, err = vmlab.OpenPersistentAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), filepath.Join(root, "control-plane"), address, host.Name, enrollment)
+	} else {
+		controller, err = vmlab.OpenAssistanceController(ctx, repository, labhost.FlagValue(args, "lindmd"), address, host.Name, enrollment)
+	}
 	if err != nil {
 		return err
 	}
@@ -160,13 +183,23 @@ func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, 
 				return err
 			}
 			access.Findings = findings
-			enrollment, err := controller.Fixture.CreateConsoleEnrollment(ctx)
-			if err != nil {
-				return err
+			if root != "" {
+				access.Persistent = true
+				access.OwnerAccessFile = filepath.Join(root, "owner-access")
+				access.ExistingAccount, err = persistentOwnerExists(root)
+				if err != nil {
+					return err
+				}
+			}
+			if !access.ExistingAccount {
+				enrollment, err := controller.Fixture.CreateConsoleEnrollment(ctx)
+				if err != nil {
+					return err
+				}
+				access.Username, access.EnrollmentSecret, access.ExpiresAt = "console-owner", enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC()
+				enrollment.Secret = ""
 			}
 			access.ConsoleOrigin = controller.Fixture.ConsoleOrigin
-			access.Username, access.EnrollmentSecret, access.ExpiresAt = "console-owner", enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC()
-			enrollment.Secret = ""
 			if err := ctx.Err(); err != nil {
 				return err
 			}

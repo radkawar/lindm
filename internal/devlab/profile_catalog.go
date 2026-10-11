@@ -159,7 +159,7 @@ func restartWithCatalogSigningKeys(ctx context.Context, fixture *AuthorityFixtur
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(fixture.configPath(), encoded, 0600); err != nil {
+	if err := fixture.writeConfig(encoded); err != nil {
 		return err
 	}
 	return fixture.Restart(ctx)

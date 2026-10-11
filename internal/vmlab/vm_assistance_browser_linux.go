@@ -29,7 +29,8 @@ type assistanceBrowser struct {
 	waitErr error
 	next    int
 	// version is the Chromium build Playwright launched.
-	version string
+	version   string
+	accountID string
 }
 
 type assistanceBrowserConfig struct {

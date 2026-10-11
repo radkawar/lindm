@@ -37,8 +37,9 @@ func OpenSplitDeviceActionAuthorityFixture(ctx context.Context, repository, bina
 // ControlPlaneHandle transfers public trust and a pre-enrolled lane-only owner.
 // Its password and software-authenticator private key are secrets. Send over
 // authenticated SSH and, if persisted, use an exclusive owner-only file. Only
-// the remote lane may use this credential after export. The controller disables
-// the account at teardown; no short-lived enrollment remains pending in a queue.
+// the remote lane may use this credential after export. Disposable controllers
+// disable the account at teardown; persistent lanes retain their own updated
+// credential counters. No short-lived enrollment remains pending in a queue.
 type ControlPlaneHandle struct {
 	ConsoleOrigin        string `json:"console_origin"`
 	AdminPort            uint16 `json:"admin_port"`
@@ -71,11 +72,20 @@ type connectedAuthority struct {
 }
 
 // ExportControlPlane creates and enrolls a distinct owner account for a remote
-// lane. The caller owns the returned secrets; never log the handle. Like Close,
+// lane, or returns the same initial handoff for a persistent named account.
+// Persistent lanes must restore their latest counters with
+// ConnectPersistentAuthorityFixture, never replay the initial credential.
+// The caller owns the returned secrets; never log the handle. Like Close,
 // this operation must not race another controller fixture lifecycle operation.
 func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username string) (*ControlPlaneHandle, error) {
 	if f == nil || f.closed || f.connected != nil || f.local == nil {
 		return nil, errors.New("export control plane requires a live controller-owned local authority fixture")
+	}
+	if f.persistent {
+		saved, err := f.persistedExport(username)
+		if err != nil || saved != nil {
+			return saved, err
+		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
@@ -91,7 +101,7 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	if err != nil {
 		return nil, fmt.Errorf("read exported agent fixture: %w", err)
 	}
-	ca, err := os.ReadFile(filepath.Join(FixturePath(f.repository), "transport-ca.crt"))
+	ca, err := os.ReadFile(filepath.Join(f.transportTrustDirectory(), "transport-ca.crt"))
 	if err != nil {
 		return nil, fmt.Errorf("read exported transport CA: %w", err)
 	}
@@ -118,13 +128,20 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	if err != nil {
 		return nil, fmt.Errorf("export remote owner authenticator: %w", err)
 	}
-	return &ControlPlaneHandle{
+	handle := &ControlPlaneHandle{
 		ConsoleOrigin: f.ConsoleOrigin, AdminPort: uint16(port), DeviceOrigin: f.DeviceOrigin,
 		DatabaseName: f.DatabaseName, TransportCAPEM: ca,
 		ExecutionRootJSON: material.ExecutionRootJSON, BootstrapEnvelope: material.BootstrapEnvelope,
 		AccountID: account.id, Username: account.username, Password: bytes.Clone(account.password),
 		WebAuthnCredentialID: credentialID, WebAuthnPrivateKey: privateKey, WebAuthnCounter: account.counter,
-	}, nil
+	}
+	if f.persistent {
+		if err := writePersistentJSON(exportedAccountPath(f.directory, username), handle); err != nil {
+			handle.ClearCredentials()
+			return nil, err
+		}
+	}
+	return handle, nil
 }
 
 // ConnectAuthorityFixture restores the pre-enrolled lane credential and logs in
@@ -133,6 +150,10 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 // restart or wait for the controller; Close clears only its local credentials.
 // OwnerSession instances remain caller-owned and must be closed.
 func ConnectAuthorityFixture(ctx context.Context, handle *ControlPlaneHandle) (_ *AuthorityFixture, resultErr error) {
+	return connectAuthorityFixture(ctx, handle, "", true)
+}
+
+func connectAuthorityFixture(ctx context.Context, handle *ControlPlaneHandle, stateDir string, fresh bool) (_ *AuthorityFixture, resultErr error) {
 	if handle == nil {
 		return nil, errors.New("connect authority requires a control-plane handle")
 	}
@@ -171,6 +192,13 @@ func ConnectAuthorityFixture(ctx context.Context, handle *ControlPlaneHandle) (_
 		id: id.String(), username: handle.Username, password: bytes.Clone(handle.Password),
 		authenticator: authenticator, counter: handle.WebAuthnCounter,
 	}}
+	if stateDir != "" {
+		f.directory, f.persistent = stateDir, true
+		f.local.owner.statePath = filepath.Join(stateDir, "owner.json")
+		if err := f.local.owner.persist(); err != nil {
+			return nil, err
+		}
+	}
 	setup, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	session, err := f.OpenOwnerSession(setup)
@@ -181,8 +209,18 @@ func ConnectAuthorityFixture(ctx context.Context, handle *ControlPlaneHandle) (_
 	// Independent approval authority is needed for remote lane device cleanup.
 	// This new enrollment is issued by the remote owner, never copied from the
 	// controller's private owner or approver credentials.
-	if err := f.enrollLocalApprover(setup, session, "remote-approver-"+uuid.NewString()); err != nil {
+	if !fresh {
+		f.local.approver, err = restorePersistentAccount(filepath.Join(stateDir, "approver.json"))
+		if err != nil {
+			return nil, err
+		}
+	} else if err := f.enrollLocalApprover(setup, session, "remote-approver-"+uuid.NewString()); err != nil {
 		return nil, fmt.Errorf("enroll connected authority approver: %w", err)
+	}
+	if stateDir != "" {
+		if err := f.persistLocalAccounts(); err != nil {
+			return nil, err
+		}
 	}
 	return f, nil
 }
@@ -215,7 +253,7 @@ func (f *AuthorityFixture) localTLSConfig() (*tls.Config, error) {
 	if f.connected != nil {
 		return f.connected.tls.Clone(), nil
 	}
-	return trustClient(FixturePath(f.repository))
+	return trustClient(f.transportTrustDirectory())
 }
 
 func (f *AuthorityFixture) connectedDialContext() func(context.Context, string, string) (net.Conn, error) {

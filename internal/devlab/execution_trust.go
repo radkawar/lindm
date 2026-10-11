@@ -79,6 +79,10 @@ var executableResourceKinds = []resourcev1.ResourceKind{
 }
 
 func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabilities []string) (result *ExecutionTrustExercise, err error) {
+	return createExecutionTrustExerciseForLifetime(ctx, repoRoot, capabilities, false)
+}
+
+func createExecutionTrustExerciseForLifetime(ctx context.Context, repoRoot string, capabilities []string, persistent bool) (result *ExecutionTrustExercise, err error) {
 	var onlineKeys []ed25519.PrivateKey
 	defer func() {
 		if err != nil {
@@ -153,6 +157,9 @@ func createExecutionTrustExercise(ctx context.Context, repoRoot string, capabili
 			notBefore = current.GetNotBefore().AsTime()
 		}
 		expires := now.Add(4 * time.Hour)
+		if persistent {
+			expires = current.GetExpiresAt().AsTime()
+		}
 		if expires.After(current.GetExpiresAt().AsTime()) {
 			return errors.New("development execution root has less than four hours remaining")
 		}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -46,6 +47,11 @@ type VMAssistanceOptions struct {
 	ControlPlane *AssistanceControlPlane
 	// AdvisoryCache persists revalidated vendor feeds for hands-on demos.
 	AdvisoryCache string
+	// PersistentDir retains one enrolled machine; FixtureDir retains its local
+	// fixture or the remote authority credentials in split topology.
+	PersistentDir string
+	FixtureDir    string
+	ExistingOwner bool
 }
 
 // assistanceOperator is the console account the browser enrolls and signs in
@@ -59,6 +65,10 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
 	}
+	architecture, err := nativePackageArchitecture(manifest.GetArchitecture())
+	if err != nil {
+		return nil, err
+	}
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
 	desktop, err := labDesktopFor(options.Encrypted.Desktop, release)
 	if err != nil {
@@ -69,6 +79,17 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	}
 	if options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("assistance lane requires an installer desktop, a lab display and signed-package egress")
+	}
+	if options.PersistentDir != "" && (options.Hold == nil || options.FixtureDir == "") {
+		return nil, errors.New("persistent assistance requires hold and a persistent fixture directory")
+	}
+	resuming := false
+	if options.PersistentDir != "" {
+		_, statErr := os.Lstat(options.PersistentDir)
+		if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+			return nil, statErr
+		}
+		resuming = statErr == nil
 	}
 	evidence, err := newAssistanceEvidence(options.EvidenceDir)
 	if err != nil {
@@ -118,18 +139,20 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	} else if result.LindmdSHA256, err = dispatchFileDigest(options.LindmdBinary); err != nil {
 		return result, err
 	}
-	packages, err := buildActionNativePackage(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.Encrypted.WorkDir)
-	if err != nil {
-		return result, err
+	var packages *actionNativePackage
+	if !resuming {
+		packages, err = buildActionNativePackage(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.Encrypted.WorkDir)
+		if err != nil {
+			return result, err
+		}
+		defer func() { err = errors.Join(err, packages.Close()) }()
+		result.PackageSHA256, result.SignerFingerprint = packages.artifact.SHA256, packages.fingerprint
+		// Resolve a cold installer before bounded online authority exists.
+		if _, err := encryptedGolden(ctx, manifest, options.Encrypted); err != nil {
+			return result, err
+		}
 	}
-	defer func() { err = errors.Join(err, packages.Close()) }()
-	result.PackageSHA256, result.SignerFingerprint = packages.artifact.SHA256, packages.fingerprint
-	// Resolve a potentially cold installer golden before any bounded online
-	// authority or session exists; NewEncryptedVM reuses the verified cache.
-	if _, err := encryptedGolden(ctx, manifest, options.Encrypted); err != nil {
-		return result, err
-	}
-	fixture, delegation, relay, err := openAssistanceFixture(ctx, options, packages.artifact.Architecture.GOARCH)
+	fixture, delegation, relay, err := openAssistanceFixture(ctx, options, architecture)
 	if err != nil {
 		return result, err
 	}
@@ -141,15 +164,43 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	}
 	defer func() { err = errors.Join(err, control.Close(context.WithoutCancel(ctx))) }()
 	if options.ControlPlane == nil {
-		if err := control.applyExecutionAuthority(ctx, delegation, 1, 1, 0); err != nil {
+		if err := ensureAssistanceAuthority(ctx, control, delegation); err != nil {
 			return result, fmt.Errorf("admit isolated execution authority: %w", err)
 		}
 	}
-	vm, err := NewEncryptedVM(ctx, manifest, options.Encrypted)
+	var vm *EncryptedVM
+	switch {
+	case resuming:
+		vm, err = ResumePersistentVM(ctx, options.PersistentDir)
+	case options.PersistentDir != "":
+		if err = os.MkdirAll(filepath.Dir(options.PersistentDir), 0700); err != nil {
+			return result, err
+		}
+		vm, err = ProvisionPersistentVM(ctx, manifest, options.Encrypted, options.PersistentDir)
+	default:
+		vm, err = NewEncryptedVM(ctx, manifest, options.Encrypted)
+	}
 	if err != nil {
 		return result, err
 	}
 	defer func() { err = errors.Join(err, vm.Close()) }()
+	var saved *PersistentDevice
+	if resuming {
+		state, stateErr := readPersistentVMState(options.PersistentDir)
+		if stateErr != nil {
+			return result, stateErr
+		}
+		if state.ImageID != manifest.GetId() || state.ImageSHA256 != manifest.GetSha256() {
+			return result, errors.New("persistent VM manifest differs from its recorded image")
+		}
+		saved, err = vm.PersistentDevice()
+		if err != nil {
+			return result, err
+		}
+		if saved == nil {
+			return result, errors.New("persistent VM has incomplete enrollment; destroy it explicitly before provisioning again")
+		}
+	}
 	boot, err := vm.ColdBoot(ctx, vm.InitialUnlockSecret())
 	if err != nil {
 		return result, err
@@ -170,14 +221,16 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err != nil {
 		return result, errors.New("invalid guest clock observation")
 	}
-	// The agent package Recommends the capture stack; the lab installs it with
-	// --no-install-recommends, so install the release's capture packages from
-	// its signed archive first (Debian's GNOME task lacks gstreamer1.0-tools).
-	if err := installAssistanceCapture(ctx, vm.guest, release); err != nil {
-		return result, err
-	}
-	if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
-		return result, err
+	if !resuming {
+		// The agent package Recommends the capture stack; the lab installs it with
+		// --no-install-recommends, so install the release's capture packages from
+		// its signed archive first (Debian's GNOME task lacks gstreamer1.0-tools).
+		if err := installAssistanceCapture(ctx, vm.guest, release); err != nil {
+			return result, err
+		}
+		if err := packages.Install(ctx, vm.guest, options.LabBinary); err != nil {
+			return result, err
+		}
 	}
 	result.Guest = &assistanceGuestEvidence{ExecutorSocket: "/run/lindm-session/session.sock"}
 	if result.Guest.LocalhostResolution, err = routeAssistanceLocalhost(ctx, vm.guest); err != nil {
@@ -190,18 +243,31 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		}
 		result.Guest.ControllerRoute = strings.TrimSpace(string(route))
 	}
-	if err := configureAssistanceGuest(ctx, vm.guest); err != nil {
-		return result, err
+	if !resuming {
+		if err := configureAssistanceGuest(ctx, vm.guest); err != nil {
+			return result, err
+		}
+		issued, _, err := enrollActionGuest(ctx, vm.guest, control, delegation)
+		if err != nil {
+			return result, err
+		}
+		result.DeviceID = issued.GetDeviceId()
+		if options.PersistentDir != "" {
+			if err := vm.SavePersistentDevice(&PersistentDevice{DeviceID: result.DeviceID}); err != nil {
+				return result, err
+			}
+			// The persistent fixture owns these consumed grants and this device.
+			// Closing a run logs out only its session, never revokes enrollment.
+			control.grants = nil
+			clear(control.devices)
+		}
+	} else {
+		result.DeviceID = saved.DeviceID
 	}
-	issued, _, err := enrollActionGuest(ctx, vm.guest, control, delegation)
-	if err != nil {
-		return result, err
-	}
-	result.DeviceID = issued.GetDeviceId()
 	if err := waitNativeActionPresence(ctx, control.session, result.DeviceID); err != nil {
 		return result, err
 	}
-	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, desktop, release); err != nil {
+	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, desktop, release, resuming); err != nil {
 		return result, err
 	}
 	if err := waitAssistanceSessionUnit(ctx, vm.guest, desktop, result.Guest); err != nil {
@@ -248,7 +314,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if !deadline.Stop() {
 		return result, context.Cause(ctx)
 	}
-	return result, holdAssistance(ctx, vm, fixture, screen, result, options.Hold, options.ControlPlane != nil, findings)
+	return result, holdAssistance(ctx, vm, fixture, screen, result, options.Hold, options.ControlPlane != nil, findings, options.ExistingOwner)
 }
 
 // runAssistanceScenarios signs the operator browser in and runs each scenario
@@ -265,7 +331,12 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 	if run.browser, err = openAssistanceOperator(ctx, fixture, options, private); err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, run.browser.Close()) }()
+	defer func() {
+		err = errors.Join(err, run.browser.Close())
+		if options.PersistentDir != "" {
+			err = errors.Join(err, retireAssistanceOperator(ctx, fixture, run.browser.accountID))
+		}
+	}()
 	run.result.Browser.Version = run.browser.version
 	for _, scenario := range scenarios {
 		if err := run.scenario(ctx, scenario); err != nil {
@@ -305,18 +376,26 @@ func selectAssistanceScenarios(available []assistanceScenarioSpec, names []strin
 // openAssistanceOperator issues a distinct owner account through the real
 // account API and lets Chromium enroll and sign in through the console UI.
 // The browser driver comes from the checkout under test, like the packages.
-func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private string) (*assistanceBrowser, error) {
-	enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, assistanceOperator)
+func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private string) (_ *assistanceBrowser, err error) {
+	username, enrollment, err := createAssistanceOperator(ctx, fixture, options.PersistentDir != "")
 	if err != nil {
-		return nil, fmt.Errorf("issue assistance operator enrollment: %w", err)
+		return nil, err
 	}
 	defer func() { enrollment.Secret = "" }()
-	cfg := assistanceBrowserConfig{Origin: fixture.ConsoleOrigin, Username: assistanceOperator, Password: rand.Text(), EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: options.EvidenceDir, ActionTimeoutMS: 30000, TURNTCPOnly: options.ConsoleTURNTCP}
+	defer func() {
+		if err != nil && options.PersistentDir != "" {
+			err = errors.Join(err, retireAssistanceOperator(ctx, fixture, enrollment.GetAccountId()))
+		}
+	}()
+	cfg := assistanceBrowserConfig{Origin: fixture.ConsoleOrigin, Username: username, Password: rand.Text(), EnrollmentSecret: enrollment.GetSecret(), EvidenceDirectory: options.EvidenceDir, ActionTimeoutMS: 30000, TURNTCPOnly: options.ConsoleTURNTCP}
 	if options.ControlPlane != nil {
 		cfg.ForwardedTURNURL = options.ControlPlane.forwardedTURNURL()
 	}
 	browser, err := startAssistanceBrowser(ctx, VMBuildRepository(options.Repository, options.BuildRepository), private, cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
+	if browser != nil {
+		browser.accountID = enrollment.GetAccountId()
+	}
 	return browser, err
 }
 
