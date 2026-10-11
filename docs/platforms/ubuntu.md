@@ -22,7 +22,7 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | wipe              | implemented                                                                                             | implemented      | implemented                                                      |
 | report-loss       | implemented                                                                                             | implemented      | implemented                                                      |
 | lock              | implemented                                                                                             | implemented      | implemented                                                      |
-| recovery-sanitize | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented      | implemented                                                      |
+| recovery-sanitize | implemented                                                                                             | implemented      | implemented                                                      |
 | self-update       | implemented                                                                                             | implemented      | implemented                                                      |
 | assistance        | implemented                                                                                             | implemented      | implemented                                                      |
 | advisories        | implemented                                                                                             | implemented      | implemented                                                      |
@@ -391,8 +391,12 @@ pre-existing `custom.cfg` and never runs `update-grub`. Ubuntu's vendor entries
 pass `linux /vmlinuz-…` without a device. The kernel's EFI stub then adds PCR 9
 load-options and initrd events, and both are bound to what GRUB measured. On
 arm64, GRUB measures the gzip `vmlinuz` decompressed, and the release's
-`.kernel` target uses that form. Ubuntu 24.04 passed natively: amd64 SATA and
-NVMe, plus additional arm64 NVMe on `dgx21`. Record hashes are in
+`.kernel` target uses that form. Ubuntu 24.04 passed natively on amd64 SATA and
+NVMe, plus additional arm64 NVMe on `dgx21`. Ubuntu 22.04 amd64 (signed GRUB
+2.06, kernel 5.15) passed SATA and NVMe; its NVMe needs the sysfs-derived NVMe
+approval scope. 22.04's recovery sanitize is measured GRUB only, because its lab
+owned-boot UKI fixture lacks ukify. Jammy's arm64 GRUB records no PCR 8/9
+measurements, so readiness refuses there. Record hashes are in
 [verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains).
 Ubuntu 26.04.1 amd64 NVMe and SATA also passed
 ([26.04 section](#encryption-recovery-and-device-actions)).

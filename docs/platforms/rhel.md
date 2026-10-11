@@ -402,16 +402,20 @@ passthrough). Inventory now reads the kernel's sysfs projection of Identify on
 every kernel; see
 [verification](../verification.md#rhel-encrypted-device-actions-and-self-update).
 
-Original-device recovery sanitize on stock RHEL would use
+Original-device recovery sanitize on stock RHEL uses
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` with the BLS flavor (shim+GRUB `blscfg`,
 vendor-signed kernel, TPM-quoted lindm initramfs on `/boot`), as on
-[Fedora](fedora.md#encryption-and-recovery). It is unqualified here: readiness
-requires the current boot's event log to show GRUB measuring the kernel, command
-line and initramfs into PCRs 8/9, so a GRUB build without its `tpm` module or a
-machine without a TPM refuses. When `/boot` is XFS or ext4, `grub2-editenv`
-writes the grubenv file and its short-lived unit gets the `/boot` device
-read-only. The method covers unencrypted roots only; LUKS roots use live
-crypto-erase.
+[Fedora](fedora.md#encryption-and-recovery). Readiness requires the current
+boot's event log to show GRUB measuring the kernel, command line and initramfs
+into PCRs 8/9, so a GRUB build without its `tpm` module refuses, and so does a
+machine without a TPM. With XFS `/boot`, `grub2-editenv` writes the grubenv
+file, and its short-lived unit gets the `/boot` device read-only. On RHEL 10.2,
+the unit enters `bootloader_t`, which is why it runs without `NoNewPrivileges`.
+Native measured passes with a real entitlement and cleaned-up registrations:
+RHEL 9.8 SATA, and RHEL 10.2 SATA and NVMe
+([verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains)).
+RHEL 9.8 NVMe needs the sysfs-derived NVMe approval scope (kernel 5.14). The
+method covers unencrypted roots only; LUKS roots use live crypto-erase.
 
 ## Device actions
 

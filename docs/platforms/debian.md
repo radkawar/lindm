@@ -216,8 +216,13 @@ wipe remain separately gated by [verification](../verification.md).
 Debian 12/13 use the same grub.d `custom.cfg` flavor of
 `RECOVERY_BOOT_MODE_MEASURED_GRUB` as Ubuntu
 ([architecture](../architecture.md#measured-grub-recovery-recovery_boot_mode_measured_grub)).
-Debian 13's signed `grubx64.efi` contains the measurement strings. No Debian
-measured lane has run yet, so the method is unqualified here.
+Debian 13 amd64 passed SATA and NVMe natively. The recovery guest was the
+netinst golden built from the signed 13.7.0 ISO, with `/boot` on the ext4
+root, shim+GRUB 2.12 and kernel 6.12. 10_linux's `echo` commands are skipped
+only when they are digest-bound
+([verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains)).
+Debian 12 is not run and keeps its owned-boot gate. Debian arm64 has no TPM,
+because its kernel lacks the TIS driver.
 
 ## Device actions
 

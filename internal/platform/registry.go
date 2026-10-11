@@ -214,13 +214,16 @@ var registry = []*Release{
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+			OwnedBootUnavailable: reasonNoUkify,
 			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
 				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
 				Drivers: []string{"tpm_tis", "tpm_crb"}}},
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		// Recovery sanitize is measured GRUB only (amd64; jammy's arm64 GRUB
+		// records no PCR 8/9 measurements, so readiness refuses there).
+		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		// 249's verify has no --recursive-errors (systemd 250) and exits 0 on
 		// a candidate setting it ignores as invalid.
-		Gates: gates(string(Definitions), "systemd 249 is below the definition provider floor 255", string(RecoverySanitize), reasonNoUkify),
+		Gates: gates(string(Definitions), "systemd 249 is below the definition provider floor 255"),
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,

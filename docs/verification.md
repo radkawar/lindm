@@ -146,7 +146,7 @@ the dispatch lane's systemd service evidence.
 
 | Release             | Inventory                                   | Enroll from console                                                                                                          | Lifecycle                                                     | Dispatch                     | Resources                                                                 | Encryption                                                                                                                           | Wipe/loss/lock                                 | Recovery sanitize           | Self-update                         | Assistance                                                                                                                             | Advisories | OS update                     | Release upgrade |
 | ------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | --------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------- | --------------- |
-| Ubuntu 22.04 LTS    | x86_64 [pass][r1]; aarch64 —                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r2]                                  | x86_64 —; aarch64 [pass][r2] | —                                                                         | —                                                                                                                                    | —                                              | gated                       | x86_64 no lane; aarch64 [pass][r2]  | —                                                                                                                                      | no lane    | gated                         | gated           |
+| Ubuntu 22.04 LTS    | x86_64 [pass][r1]; aarch64 —                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r2]                                  | x86_64 —; aarch64 [pass][r2] | —                                                                         | —                                                                                                                                    | —                                              | —                           | x86_64 no lane; aarch64 [pass][r2]  | —                                                                                                                                      | no lane    | gated                         | gated           |
 | Ubuntu 24.04 LTS    | x86_64 [pass][r3]; aarch64 [pass (TCG)][r3] | x86_64 —; aarch64 [pass (Bare VM; exact console clipboard; signed own-server APT; real console Enrolled; owned cleanup)][r4] | pass                                                          | pass                         | x86_64 [pass (seven kinds, no firewall)][r5]; aarch64 [pass (subset)][r6] | x86_64 [pass (TPM scenario)][r7]; aarch64 [pass (full encryption; product TPM bind; unattended cold boot; Secure Boot enforced)][r8] | x86_64 [pass (selected phases)][r7]; aarch64 — | —                           | x86_64 [pass][r9]; aarch64 no lane  | x86_64 [pass (GNOME)][r10]; aarch64 [pass (GNOME Wayland assistance; all five scenarios; split controller/dgx20; Secure Boot on)][r11] | no lane    | x86_64 —; aarch64 [pass][r12] | [pass][r12]     |
 | Ubuntu 26.04 LTS    | [pass][r12]                                 | pass                                                                                                                         | x86_64 [pass][r12]; aarch64 [pass (control-plane trust)][r12] | [pass][r12]                  | [pass (eight kinds)][r12]                                                 | [pass][r12]                                                                                                                          | [pass][r12]                                    | [pass (measured GRUB)][r12] | x86_64 [pass][r12]; aarch64 no lane | x86_64 [pass (GNOME)][r12]; aarch64 [pass (GNOME, split topology)][r12]                                                                | no lane    | [pass][r12]                   | gated           |
 | Debian 12           | x86_64 —; aarch64 [pass][r1]                | no lane                                                                                                                      | x86_64 —; aarch64 [pass][r1]                                  | x86_64 —; aarch64 [pass][r1] | —                                                                         | no image                                                                                                                             | no image                                       | gated                       | x86_64 no lane; aarch64 [pass][r2]  | no image                                                                                                                               | no lane    | gated                         | gated           |
@@ -3966,46 +3966,83 @@ The ordinary Ubuntu 24.04 arm64 event log is the parser fixture
 `3d218503b2c7862630fc518723020531bb48db626e46c13b5a3f6c8610d919af`). Ubuntu
 26.04 amd64's log (`a0a884cb…8bc2`) came from Ubuntu2604's lane.
 
+**Final measured-GRUB matrix, Go PID 1 init.** The fixes behind these records:
+the grub-editenv unit without `NoNewPrivileges` (`fb1949dd`), the Debian echo
+skip (`4699826c`), and RHELDeviceActions' sysfs-derived NVMe approval scope
+(`1e8546fa`), which kernels before 6.2 need. Every record proves:
+
+- two-human approval;
+- an action server `SUCCEEDED` from the off-target recovery;
+- the recovery powering off;
+- independent stopped-disk samples equal to the zero-block digest.
+
+RHEL lanes used a real entitlement. Each registration was unregistered and its
+activation key deleted before the action.
+
+| Release / bus                          | Record                            | SHA-256                                                            | Tuple                                                                                                                                                                              |
+| -------------------------------------- | --------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fedora 44 x86_64 SATA                  | `fedora44-mgrub-sata-x86-05.json` | `55b6ce847215acae46b9dd65fcaef47595786dacb245a6d4988b9f28a95a5e14` | `fedora-cloud-44-1.7-x86-64` at `fb1949dd`, btrfs `/boot` (`env_block`, rw device in the unit, `bootloader_t`), BLS flavor.                                                        |
+| Fedora 44 x86_64 NVMe                  | `fedora44-mgrub-nvme-x86-02.json` | `8fe56b5a6070abc596a713f4a7186b864c062e45a94c26d27b54fb165db507cb` | Same, NVMe user-data format at `fb1949dd`.                                                                                                                                         |
+| Fedora 44 x86_64 NVMe (sysfs scope)    | `fedora44-mgrub-nvme-x86-03.json` | `495c48f654518466dc66b66b131dfe3e8b8d5ccac87d3f5391194ddd29967af3` | RHELDeviceActions snapshot `1e8546fa`. The record carries `nvme_identity_parity` (sysfs equals Identify).                                                                          |
+| RHEL 9.8 x86_64 SATA                   | `rhel98-mgrub-sata-x86-04.json`   | `939be6df0f2b28cabb4ab75a1bfb80ec65156ab145f801f915e87d97cb79de06` | `rhel-9.8-kvm-x86-64` at `fb1949dd`, separate XFS `/boot`, BLS flavor. Consumer `43c69723-d02c-4d9e-a091-aaf5074dd152`. The earlier `-03` (`29a5adf4…91a2`) passed at `d26c5d6f`.  |
+| RHEL 10.2 x86_64 SATA                  | `rhel102-mgrub-sata-x86-04.json`  | `e740ae86e031a60a7585b1115e664345894091e3f5a7f4d44e1b746678e92476` | `rhel-10.2-kvm-x86-64` at `fb1949dd`, XFS `/boot`, `bootloader_t`. Consumer `950d9fbc-e40b-43cc-8239-a1ccdcc80fff`.                                                                |
+| RHEL 10.2 x86_64 NVMe                  | `rhel102-mgrub-nvme-x86-03.json`  | `b278081eed2b02f073f47c00f0b0164b7e6b0e3bb108e44f368a0054eaf5da95` | Same, NVMe. Consumer `b3a78783-eb75-436b-b4ad-457d038da9c5`.                                                                                                                       |
+| Ubuntu 24.04 x86_64 NVMe (sysfs scope) | `ubuntu24-mgrub-nvme-x86-02.json` | `6c30f385d02ab158da29fc7b501ce80923d13bfa32967d0c86057e0f9566d16f` | Snapshot `1e8546fa`, grub.d `custom.cfg` flavor, NVMe parity recorded.                                                                                                             |
+| Ubuntu 22.04 x86_64 SATA               | `ubuntu22-mgrub-sata-x86-02.json` | `f77761f3caa9a9d9c479431a5f892a247ed4df7b6ecb35cf50cca6fd9188e3d6` | `ubuntu-jammy-20261004-amd64` (signed GRUB 2.06), kernel 5.15, ext4 `/boot`, custom.cfg flavor. It ran from a private pin admitting jammy measured recovery, which is now on main. |
+| Ubuntu 22.04 x86_64 NVMe               | `ubuntu22-mgrub-nvme-x86-02.json` | `6c20f2d1e917f4c07ef94786014d8bc7128d14881718593625aae6c391e4745b` | Same pin on `1e8546fa`. Unprivileged NVMe Identify fails on 5.15 (exit 22), and the sysfs scope matches privileged Identify.                                                       |
+| Debian 13 amd64 SATA                   | `debian13-mgrub-sata-x86-02.json` | `a45a607f177bdbb1431c9db04c63ca2b0f13d9aa9e9ffb8658120cfdd14e22ec` | Netinst golden from the signed `debian-13.7.0` ISO at `bb7745f2`, shim+GRUB 2.12, `/boot` on the ext4 root, custom.cfg flavor, kernel 6.12.                                        |
+| Debian 13 amd64 NVMe                   | `debian13-mgrub-nvme-x86-01.json` | `fcbc6ad157ca897900c05a7b683a13f9985729eea0b0d1ba72d0fbff33c0ad2e` | Same, NVMe.                                                                                                                                                                        |
+
+The Debian 13 amd64 ordinary event log is the parser fixture
+`internal/measuredboot/testdata/debian13-amd64-stock.eventlog`
+(`f57cfa0661fc11d646c7eb80faf3408cf6a579ff33006dc7fb701d2c6ff8040e`).
+
+Earlier failures that led to these fixes:
+
+- `fedora44-mgrub-sata-x86-03.json`
+  `6abc8765e0ccbd415823da7d8173d3c2472789fa1541a52c1c5c789c576e2480`: the
+  grub-editenv unit failed.
+- `fedora44-mgrub-sata-x86-04.json`
+  `4de6bcb424c3c395e51732ed47321a622c0c3ad89073b2f38b5dee2e199e689d` and
+  `rhel102-mgrub-sata-x86-03.json`
+  `a471a3a5b2b92332b28a9a7be64c69ff3a0a8621156bb0aca37a41f1ca94db33`: exec 203.
+  Fedora 44 and RHEL 10.2 targeted policy transitions `init_t` to
+  `bootloader_t` on `bootloader_exec_t`, which `NoNewPrivileges` refuses. RHEL
+  9.8's policy has no such transition.
+- `debian13-mgrub-sata-x86-01.json`
+  `e99bd6a5c1d8b0e5ab05513980360f81c73ae51bec2dae0732a9626d489592d5`: 10_linux's
+  echo commands.
+- `ubuntu22-mgrub-nvme-x86-01.json`
+  `b7abe35b127be7983a79d145ef9da013ec2cf9b464bcd5182e637c8959da9a9f` and
+  `rhel98-mgrub-nvme-x86-01.json`
+  `41738291285cf62f9c56333d7fac919e5e11a58553e01868de21e4014651b135`:
+  `device_action_storage_target_mismatch`. The
+  pre-6.2 kernels refused NVMe Identify in the capability-less inventory unit,
+  so no NVMe scope was observed.
+- `rhel102-mgrub-nvme-x86-02.json`
+  `2a084340d516a350df401ef152f5875b56c980553d0d71f8476135bb4ffa38a5`: the
+  guest's `redhat-unregister` failed once. Its consumer `1797f42e…` was deleted
+  by RHELDeviceActions' recorded `lab images redhat cleanup` (inventory then
+  empty). The rerun unregistered cleanly.
+
 Not qualified:
 
-- **Fedora 44 aarch64:** the stock cloud image never reaches SSH under AAVMF
-  Secure Boot (`fedora44-mgrub-nvme-arm64-01.json`
+- **Fedora 44 aarch64:** stays gated by the vendor chain. The stock cloud image
+  never reaches SSH under AAVMF Secure Boot (`fedora44-mgrub-nvme-arm64-01.json`
   `67c5b1502dd4de63f2954d266ee354927dad7290615d3509b050d74c04e0c0b2`,
   `-02.json` `e03a74d147a28825ab7c585c665cf2295636b2142dea6c45fb3251fc00d27716`).
-  The vendor aarch64 kernel has no Authenticode signature table, so shim rejects
-  it ("bad shim signature") before lindm runs (DemoEnv.FedoraArmAssist evidence
-  under `$HOME/.cache/lindm-assistqual-20261011/`). Measured GRUB requires
-  Secure Boot, so the vendor chain makes this cell unsupported.
-- **Ubuntu 22.04 arm64:** the lane stops at the release's existing
-  RecoverySanitize gate (owned-boot fixture needs ukify) before any VM starts.
-  No record was written.
-- **Debian 12/13:** the lab has no Debian cloud recovery image; its goldens are
-  netinst installs.
-- **Fedora 44 x86_64 and RHEL 10.2 on the Go init (pending):** grub-editenv's
-  unit failed natively, first at `54cc41f` (`fedora44-mgrub-sata-x86-03.json`
-  `6abc8765e0ccbd415823da7d8173d3c2472789fa1541a52c1c5c789c576e2480`). The
-  unit diagnostics added in `d26c5d6f` then showed exec status 203 on both
-  releases (`fedora44-mgrub-sata-x86-04.json`
-  `4de6bcb424c3c395e51732ed47321a622c0c3ad89073b2f38b5dee2e199e689d`,
-  `rhel102-mgrub-sata-x86-03.json`
-  `a471a3a5b2b92332b28a9a7be64c69ff3a0a8621156bb0aca37a41f1ca94db33`). Their
-  targeted policy transitions the unit from `init_t` to `bootloader_t` on
-  `bootloader_exec_t`, which `NoNewPrivileges` refuses; RHEL 9.8's older
-  policy has no such transition. The unit now runs without `NoNewPrivileges`
-  (still with an empty capability bounding set and every other confinement), so
-  the vendor's confined `bootloader_t` domain applies.
-
-RHEL 9.8 passed on the Go init at `d26c5d6f` with a real entitlement:
-`rhel98-mgrub-sata-x86-03.json`
-`29a5adf417bfcbc4893f9478fb8fc3e0fd8f387e0ac16bc48e847c5c10d891a2`. The tuple
-was the stock `rhel-9.8-kvm-x86-64` image with separate XFS `/boot`, the BLS
-flavor and the grub2-editenv unit with a read-only device. The lane overwrote
-the SATA target, the server reported `SUCCEEDED`, the image powered off, and
-the stopped-disk samples are zero blocks. Registration run
-`lindm-lab-a1d0ef94c4e4c74dced9d310dfce7715`, consumer
-`26174a33-3a9c-4b80-a802-f84f08819bcf`, was unregistered and its activation key
-deleted before the action. The initramfs is `512e3442…8248` (30,479,356 bytes)
-and the vendor kernel is `429e89b3…45fa`.
+  Its aarch64 kernel has no Authenticode signature table, so shim rejects it
+  ("bad shim signature") before lindm runs. DemoEnv.FedoraArmAssist's evidence is
+  under `$HOME/.cache/lindm-assistqual-20261011/`.
+- **Ubuntu 22.04 aarch64:** the signed jammy arm64 GRUB records no PCR 8/9
+  measurements at all (`ubuntu22-mgrub-nvme-arm64-03.json`
+  `ba3099bf3974f4453c364c8e8a4e3e5fe68be89d8b3d7bb550113c535bcd4c68`; ordinary
+  log `94fd2b4e857409eddd65f4c2a3976ce683ec5ed8433c3fc149a7406621b3b0a4`). Readiness
+  therefore refuses with `recovery_readiness_measured_grub_required`.
+- **RHEL 9.8 NVMe:** needs the sysfs NVMe scope fix. RHELDeviceActions is
+  requalifying it.
+- **Debian 12:** not run. It keeps its owned-boot gate.
+- **Debian aarch64:** its kernel lacks the TPM TIS driver, so there is no TPM.
 
 For encryption-only qualification use `-scenario encryption` and a distinct
 `-record` path. This excludes desktop/network restrictions and destructive erase.

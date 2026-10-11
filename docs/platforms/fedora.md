@@ -284,8 +284,14 @@ Fedora specifics:
   GRUB-relative (`/boot/vmlinuz-…`) and staging reuses the prefix GRUB measured.
 - GRUB keeps its environment in the btrfs bootloader `env_block`
   (`env_block=512+1`); `grub2-editenv` writes it through the raw `/boot` block
-  device. The executor keeps `PrivateDevices` and exposes only `/dev/tpmrm0`;
-  `grub2-editenv` runs in a separate short-lived unit allowed that exact device.
+  device. The executor keeps `PrivateDevices` and exposes only `/dev/tpmrm0`.
+  `grub2-editenv` runs in a separate short-lived unit that is allowed that
+  exact device. The unit runs without `NoNewPrivileges` so that Fedora's
+  targeted policy can enter `bootloader_t`; with NNP, exec failed with status 203. Go PID 1 records `fedora44-mgrub-sata-x86-05.json` and
+  `fedora44-mgrub-nvme-x86-02.json`/`-03.json` passed. Hashes are in
+  [verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains).
+  Fedora 44 aarch64 stays unsupported, because its vendor kernel is unsigned
+  and shim rejects it.
 - Fedora's `blscfg` sorts entries by RPM version comparison of the file name,
   so a `lindm-…` name would become the default when `saved_entry` is unset; the
   `~lindm-recovery-<action>` name sorts last. Observed: the vendor entry stayed

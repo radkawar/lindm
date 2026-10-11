@@ -271,6 +271,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 			return nil, err
 		}
 	}
+	if err := ownedBootFixtureAvailable(release, options.Scenario, options.WipePhase, options.RecoveryBootMode); err != nil {
+		return nil, err
+	}
 	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
 		return nil, err
 	}
@@ -811,4 +814,14 @@ func recoveryReleaseMatches(target, recovery *platform.Release) error {
 		return fmt.Errorf("recovery image %s does not run the native package base of %s", recovery.Name, target.Name)
 	}
 	return nil
+}
+
+// ownedBootFixtureAvailable refuses the owned systemd-boot UKI recovery fixture
+// where the release cannot build its ordinary UKI; measured GRUB lanes run.
+func ownedBootFixtureAvailable(release *platform.Release, scenario, wipePhase, bootMode string) error {
+	recovery := scenario == "all" || (scenario == "wipe" && (wipePhase == "" || wipePhase == "recovery-nvme" || wipePhase == "recovery-sata"))
+	if !recovery || bootMode == recoveryBootMeasured || release.Lab.OwnedBootUnavailable == "" {
+		return nil
+	}
+	return fmt.Errorf("platform: owned-boot recovery fixture unavailable on %s: %s; use -recovery-boot-mode %s", release.Name, release.Lab.OwnedBootUnavailable, recoveryBootMeasured)
 }

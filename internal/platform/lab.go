@@ -34,6 +34,10 @@ type Lab struct {
 	// files to it (Ubuntu 22.04's subiquity); the login key arrives through
 	// the installer's own SSH identity instead.
 	FirstBootAccount bool
+	// OwnedBootUnavailable is why the lab's owned systemd-boot UKI recovery
+	// fixture cannot run on this release. Recovery sanitize itself may still
+	// be qualified through measured GRUB, which needs no ukify.
+	OwnedBootUnavailable string
 }
 
 // LabLane is a vmlab qualification lane with per-release recipes.
