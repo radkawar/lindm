@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -126,7 +128,11 @@ func osUpdatePackageOracle(rpm resourcePackaging) func(context.Context, *guestVM
 		if rpm.rpm {
 			list = "rpm -qa --qf '%{NAME}.%{ARCH} %{EPOCHNUM}:%{VERSION}-%{RELEASE}\\n'"
 		}
-		return resourceOracle(ctx, vm, "native-package-database", list+" | LC_ALL=C sort > /tmp/lindm-lab-packages; printf 'packages %s\\n' \"$(sha256sum < /tmp/lindm-lab-packages | cut -d' ' -f1)\"; wc -l < /tmp/lindm-lab-packages; uname -r")
+		command := list + " | LC_ALL=C sort > /tmp/lindm-lab-packages; printf 'packages %s\\n' \"$(sha256sum < /tmp/lindm-lab-packages | cut -d' ' -f1)\"; wc -l < /tmp/lindm-lab-packages; uname -r"
+		if !rpm.rpm {
+			command += "; dpkg-query -W -f 'version ${Package} ${Version}\\n' apt unattended-upgrades needrestart update-notifier-common || true"
+		}
+		return resourceOracle(ctx, vm, "native-package-database", command)
 	}
 }
 
@@ -313,14 +319,18 @@ func serverPatchStatus(ctx context.Context, r *resourceDispatch, s *VMResourceSc
 	}
 }
 
-// wallCapture is a real logged-in pty session; logind's wall messages reach
-// utmp terminals, so its bounded output proves terminal user notification.
+// wallCapture is a real PAM login on a systemd-allocated pty. Its logind
+// session must identify that terminal before native wall delivery is tested.
 type wallCapture struct {
-	client  *ssh.Client
-	session *ssh.Session
-	mu      sync.Mutex
-	output  bytes.Buffer
-	done    chan struct{}
+	client   *ssh.Client
+	session  *ssh.Session
+	mu       sync.Mutex
+	output   bytes.Buffer
+	done     chan struct{}
+	vm       *guestVM
+	unit     string
+	closed   bool
+	closeErr error
 }
 
 func (w *wallCapture) Write(p []byte) (int, error) {
@@ -339,9 +349,31 @@ func (w *wallCapture) text() string {
 }
 
 func (w *wallCapture) Close() error {
-	err := errors.Join(w.session.Close(), w.client.Close())
+	if w.closed {
+		return w.closeErr
+	}
+	w.closed = true
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	w.closeErr = lifecycleCommand(ctx, w.vm, "stop wall login fixture", "if test \"$(systemctl show --value -p LoadState "+w.unit+")\" != not-found; then systemctl stop "+w.unit+"; fi")
+	for w.closeErr == nil {
+		record, err := resourceOracle(ctx, w.vm, "remaining-wall-login-sessions", "loginctl --no-pager --no-legend list-sessions")
+		if err != nil {
+			w.closeErr = err
+			break
+		}
+		if !wallSessionListed(string(record.Bytes), wallSessionID(w.text())) {
+			break
+		}
+		w.closeErr = lifecycleDelay(ctx, 100*time.Millisecond)
+	}
+	for _, err := range []error{w.session.Close(), w.client.Close()} {
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+			w.closeErr = errors.Join(w.closeErr, err)
+		}
+	}
 	<-w.done
-	return err
+	return w.closeErr
 }
 
 func openWallCapture(ctx context.Context, vm *guestVM) (_ *wallCapture, resultErr error) {
@@ -357,8 +389,9 @@ func openWallCapture(ctx context.Context, vm *guestVM) (_ *wallCapture, resultEr
 		return nil, errors.Join(err, conn.Close())
 	}
 	client := ssh.NewClient(sshConn, channels, requests)
+	var capture *wallCapture
 	defer func() {
-		if resultErr != nil {
+		if resultErr != nil && capture == nil {
 			resultErr = errors.Join(resultErr, client.Close())
 		}
 	}()
@@ -369,14 +402,80 @@ func openWallCapture(ctx context.Context, vm *guestVM) (_ *wallCapture, resultEr
 	if err := session.RequestPty("xterm", 50, 200, ssh.TerminalModes{ssh.ECHO: 0}); err != nil {
 		return nil, err
 	}
-	w := &wallCapture{client: client, session: session, done: make(chan struct{})}
+	w := &wallCapture{client: client, session: session, done: make(chan struct{}), vm: vm, unit: "lindm-lab-wall-" + uuid.NewString() + ".service"}
 	session.Stdout = w
 	session.Stderr = w
-	if err := session.Start("tty; exec sleep 7200"); err != nil {
-		return nil, err
+	command := "export SYSTEMD_COLORS=0 SYSTEMD_PAGER=cat; printf '\\nterminal %s\\nsession-id %s\\n' \"$(tty)\" \"$XDG_SESSION_ID\"; loginctl --no-pager show-session \"$XDG_SESSION_ID\" -p TTY -p Type -p Remote -p Class; printf 'session-ready\\n'; exec sleep 7200"
+	if err := session.Start("sudo -n systemd-run --quiet --wait --collect --pty --unit=" + w.unit + " --uid=" + labUser + " --property=PAMName=login /bin/sh -eu -c " + nativeQuote(command)); err != nil {
+		capture = w
+		close(w.done)
+		return nil, errors.Join(err, w.Close())
 	}
 	go func() { _ = session.Wait(); close(w.done) }()
-	return w, nil
+	capture = w
+	for deadline := time.Now().Add(30 * time.Second); time.Now().Before(deadline); {
+		text := w.text()
+		if wallSessionReady(text) {
+			return w, nil
+		}
+		select {
+		case <-w.done:
+			return nil, errors.Join(fmt.Errorf("wall fixture exited before login: %q", text), w.Close())
+		default:
+		}
+		if err := lifecycleDelay(ctx, 100*time.Millisecond); err != nil {
+			return nil, errors.Join(err, w.Close())
+		}
+	}
+	return nil, errors.Join(fmt.Errorf("wall fixture login timed out: %q", w.text()), w.Close())
+}
+
+// wallSessionReady binds the captured pty to a local, user-class logind session.
+// An SSH pty alone is insufficient when sshd does not report its TTY to PAM.
+func wallSessionReady(text string) bool {
+	var terminal, tty, kind, remote, class string
+	var ready bool
+	for line := range strings.SplitSeq(text, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case line == "session-ready":
+			ready = true
+		case strings.HasPrefix(line, "terminal "):
+			terminal = strings.TrimPrefix(line, "terminal ")
+		case strings.HasPrefix(line, "TTY="):
+			tty = strings.TrimPrefix(line, "TTY=")
+		case strings.HasPrefix(line, "Type="):
+			kind = strings.TrimPrefix(line, "Type=")
+		case strings.HasPrefix(line, "Remote="):
+			remote = strings.TrimPrefix(line, "Remote=")
+		case strings.HasPrefix(line, "Class="):
+			class = strings.TrimPrefix(line, "Class=")
+		}
+	}
+	return ready && wallSessionID(text) != "" && strings.HasPrefix(terminal, "/dev/pts/") && tty != "" &&
+		strings.TrimPrefix(terminal, "/dev/") == strings.TrimPrefix(tty, "/dev/") &&
+		kind == "tty" && remote == "no" && class == "user"
+}
+
+func wallSessionID(text string) string {
+	for line := range strings.SplitSeq(text, "\n") {
+		if id, ok := strings.CutPrefix(strings.TrimSpace(line), "session-id "); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+func wallSessionListed(text, id string) bool {
+	if id == "" {
+		return false
+	}
+	for line := range strings.SplitSeq(text, "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == id {
+			return true
+		}
+	}
+	return false
 }
 
 // logindScheduleOracle reads logind's accepted schedule and wall message.
@@ -641,13 +740,13 @@ func osUpdateDeferralHolds(ctx context.Context, r *resourceDispatch, rpm resourc
 	return nil
 }
 
-func osUpdateWindowInstallsAndReboots(ctx context.Context, r *resourceDispatch, rpm resourcePackaging, evidence *VMResourceKindEvidence, start time.Time) error {
+func osUpdateWindowInstallsAndReboots(ctx context.Context, r *resourceDispatch, rpm resourcePackaging, evidence *VMResourceKindEvidence, start time.Time) (resultErr error) {
 	s, fail := firewallScenario(ctx, r, evidence, "window-installs-security-update")
 	wall, err := openWallCapture(ctx, r.vm)
 	if err != nil {
 		return fail(err)
 	}
-	defer func() { _ = wall.Close() }()
+	defer func() { resultErr = errors.Join(resultErr, wall.Close()) }()
 	before, err := osUpdatePackageOracle(rpm)(ctx, r.vm)
 	if err != nil {
 		return fail(err)
@@ -694,6 +793,9 @@ func osUpdateWindowInstallsAndReboots(ctx context.Context, r *resourceDispatch, 
 		if !p.GetRebootRequired() || p.GetLastSuccessfulUpdate() == nil || !p.GetLastSuccessfulUpdate().AsTime().Equal(last.GetFinishedAt().AsTime()) {
 			return fmt.Errorf("patch status %v does not report the installed run", p)
 		}
+		if last.GetNotifiedSessions() != 0 {
+			return errors.New("headless terminal-only fixture claimed graphical notification delivery")
+		}
 		return nil
 	})
 	if err != nil {
@@ -717,6 +819,9 @@ func osUpdateWindowInstallsAndReboots(ctx context.Context, r *resourceDispatch, 
 	}
 	if notified == "" {
 		return fail(fmt.Errorf("logged-in terminal received no wall notice: %q", wall.text()))
+	}
+	if err := wall.Close(); err != nil {
+		return fail(fmt.Errorf("clean up wall login fixture: %w", err))
 	}
 	before.Name, after.Name = "before-"+before.Name, "after-"+after.Name
 	passScenario(s, pendingBefore, before, run, after, reboot, schedule, resourceNativeRecord("native-pty-wall-notice", []byte(notified)), statusRecord)
