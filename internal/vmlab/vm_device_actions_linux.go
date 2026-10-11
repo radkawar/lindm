@@ -105,6 +105,7 @@ type VMDeviceActionsResult struct {
 
 type actionMachine struct {
 	vm                   *EncryptedVM
+	release              *platform.Release
 	connection           *actionGuestConnection
 	fixture              *devlab.AuthorityFixture
 	deviceID, generation string
@@ -117,7 +118,7 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	if err != nil {
 		return nil, err
 	}
-	machine := &actionMachine{vm: vm, fixture: fixture}
+	machine := &actionMachine{vm: vm, release: platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()), fixture: fixture}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, machine.Close())

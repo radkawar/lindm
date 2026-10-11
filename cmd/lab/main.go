@@ -182,7 +182,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 			return errors.New("choose either -cache or explicit artifact files, not both")
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, 40*time.Minute)
+	// Metadata, signature and digest verification get ten minutes beyond the
+	// image transfer's own size-bounded deadline.
+	ctx, cancel := context.WithTimeout(ctx, vmlab.ImageDownloadTimeout(manifest.GetImageSizeBytes())+10*time.Minute)
 	defer cancel()
 	var verified *vmlab.VerifiedImage
 	if args[1] == "fetch" {

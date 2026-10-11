@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/platform"
 )
 
 // EncryptedVMOptions selects private caches and an exact installed firmware package.
@@ -34,6 +36,9 @@ type EncryptedVMOptions struct {
 	// RequireCachedGolden forbids installer provisioning when the pinned golden
 	// is absent. Read-only observation lanes must set this option.
 	RequireCachedGolden bool
+	// InstallerLog, when set, names a new owner-only file receiving a bounded
+	// copy of the installer's serial console for diagnostics.
+	InstallerLog string
 }
 
 // UnlockOutcome distinguishes observed boot success from merely submitting a key.
@@ -180,8 +185,18 @@ func encryptedMachineHardware(manifest *labv1.ImageManifest, options EncryptedVM
 		return hardware, errors.New("encrypted VM architecture differs from installer manifest")
 	}
 	hardware.Architecture = architecture
+	if hardware.TPM && !encryptedGuestTPMObservable(manifest, architecture) {
+		return hardware, errors.New("encrypted VM: the installed kernel cannot bind QEMU's TPM on this architecture; select the TPM-absent variant (-tpm=false)")
+	}
 	hardware.Firmware = &options.Firmware
 	return resolveVMHardware(&hardware, runtime.GOARCH)
+}
+
+// encryptedGuestTPMObservable reports whether the installed guest kernel can
+// bind the TPM QEMU attaches for this tuple (QEMU 8.2's aarch64 virt offers
+// only the MMIO TIS device, which Debian's arm64 kernels do not build).
+func encryptedGuestTPMObservable(manifest *labv1.ImageManifest, architecture string) bool {
+	return !slices.Contains(platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()).Lab.TPM.Unobservable, architecture)
 }
 
 func encryptedSSHConfig(loginKey, hostKey []byte) (*ssh.ClientConfig, error) {

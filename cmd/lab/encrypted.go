@@ -13,7 +13,7 @@ import (
 func runVMEncrypted(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("vm encrypted", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	manifestPath := flags.String("manifest", "", "signed official Ubuntu 24.04/26.04, Fedora 44 or RHEL 9.8/10.2 installer ISO manifest")
+	manifestPath := flags.String("manifest", "", "signed official encrypted-installer ISO manifest of a release whose platform row supports Encryption")
 	var options vmlab.EncryptedVMOptions
 	var hardware vmlab.VMHardwareOptions
 	options.Hardware = &hardware
@@ -31,6 +31,7 @@ func runVMEncrypted(ctx context.Context, args []string, stdout, stderr io.Writer
 	flags.StringVar(&options.Firmware.Package, "firmware-package", "", "installed host firmware package name")
 	flags.StringVar(&options.Firmware.Version, "firmware-version", "", "exact required host firmware package version")
 	flags.BoolVar(&options.Firmware.SecureBoot, "secure-boot", false, "require enrolled firmware template and observed enforced Secure Boot")
+	flags.StringVar(&options.InstallerLog, "installer-log", "", "new private (0600) file for a bounded copy of the installer serial console; diagnostics only, never evidence")
 	record := flags.String("record", "", "write nonsecret observed evidence to a new private JSON file")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -42,7 +43,9 @@ func runVMEncrypted(ctx context.Context, args []string, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
+	// Debian's netinst fetches its whole GNOME task during installation; the
+	// golden's own installer deadline is 90 minutes.
+	ctx, cancel := context.WithTimeout(ctx, 150*time.Minute)
 	defer cancel()
 	evidence, err := vmlab.EncryptedSmoke(ctx, manifest, options)
 	return errors.Join(err, writeLabEvidence(stdout, *record, evidence))

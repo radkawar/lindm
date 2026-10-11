@@ -89,7 +89,7 @@ func (f Fetcher) Fetch(ctx context.Context, m *labv1.ImageManifest, cacheDir str
 	if err != nil {
 		return nil, err
 	}
-	if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), 30*time.Minute); err != nil {
+	if err := download(ctx, client, root, partial+"/image", m.ImageUrl, int64(m.ImageSizeBytes), ImageDownloadTimeout(m.ImageSizeBytes)); err != nil {
 		return nil, err
 	}
 	result, err := verifyImage(ctx, m, filepath.Join(root.Name(), partial, "image"), metadata)

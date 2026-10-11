@@ -118,7 +118,7 @@ func prepareAssistanceDesktop(ctx context.Context, vm *EncryptedVM, release *pla
 			return nil, fmt.Errorf("suppress release-upgrade prompt: %w", err)
 		}
 	}
-	if _, err := prepareActionDesktop(ctx, vm); err != nil {
+	if _, err := prepareActionDesktop(ctx, vm, release.Lab.Session); err != nil {
 		return nil, err
 	}
 	// gnome-session reaches its running phase only after the shell finished

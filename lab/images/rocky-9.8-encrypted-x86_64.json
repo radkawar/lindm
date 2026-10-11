@@ -1,0 +1,19 @@
+{
+  "id": "rocky-9.8-dvd-encrypted-x86-64",
+  "distribution": "rocky",
+  "version": "9.8",
+  "architecture": "x86_64",
+  "edition": "dvd-encrypted-lab",
+  "release": "9.8",
+  "imageFilename": "Rocky-9.8-x86_64-dvd.iso",
+  "imageUrl": "https://www.mirrorservice.org/sites/download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-dvd.iso",
+  "checksumUrl": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/CHECKSUM",
+  "signatureUrl": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/CHECKSUM.asc",
+  "keyUrl": "https://dl.rockylinux.org/pub/rocky/RPM-GPG-KEY-Rocky-9",
+  "sha256": "d2bcbb64c2d67511adf80d40cd9543391a33aea5860a355b1d26d7f55236d01f",
+  "signerFingerprint": "21CB256AE16FC54C6E652949702D426D350D275D",
+  "imageSizeBytes": "15194259456",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://rockylinux.org/resources/gpg-key-info",
+  "releaseProvenanceUrl": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/"
+}

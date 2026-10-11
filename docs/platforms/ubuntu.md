@@ -18,13 +18,13 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | definitions       | gated: systemd 249 is below the definition provider floor 255                                           | implemented                               | implemented                                                                                                                                                    |
 | password          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
 | firewall          | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | gated: stock 105 MiB cloud ESP: the owned-boot UKI (vendor kernel + dracut generic initrd) leaves 13,998,592 bytes; the signed recovery image needs 50,653,240 |
+| encryption        | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| wipe              | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| report-loss       | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| lock              | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
+| recovery-sanitize | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented                               | gated: stock 105 MiB cloud ESP: the owned-boot UKI (vendor kernel + dracut generic initrd) leaves 13,998,592 bytes; the signed recovery image needs 50,653,240 |
 | self-update       | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                               | implemented                                                                                                                                                    |
+| assistance        | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
 | advisories        | implemented                                                                                             | implemented                               | implemented                                                                                                                                                    |
 | os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | implemented                               | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                        |
 | release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented | gated: release upgrade is not implemented                                                                                                                      |
@@ -218,6 +218,19 @@ it installs dracut/systemd/TPM dependencies, removes `cryptsetup-initramfs` and 
 initrds with dracut. Noble's dracut conflicts with initramfs-tools; do not silently
 reinterpret a stock-initramfs pass as TPM-token unlock qualification
 ([installer](../../internal/vmlab/encrypted_installer_linux.go#L85)).
+
+Ubuntu 22.04 (`lab/images/ubuntu-jammy-encrypted-amd64.json`, 22.04.5 live server)
+differs in three native ways. Its dracut 051 has no `tpm2-tss` module (naming it
+is fatal), so the TPM variant lists `systemd crypt lvm` and installs the TSS2
+libraries systemd 249's cryptsetup loads (`libtss2-{esys,mu,rc,tctildr,tcti-device}`
+from the multiarch directory) plus `tpm_tis`/`tpm_crb`, with the pre-t64
+`libtss2-tcti-device0`. Its subiquity hands the identity to cloud-init, which creates
+`lindm-lab` only on first boot, so late commands must not chown to it; the pinned
+login key arrives through autoinstall `ssh.authorized-keys` instead. systemd 249's
+`systemd-cryptenroll` has no `--unlock-key-file` (252+), and the product never
+passes a secret by argv or environment, so TPM2 binding is unsupported on 22.04;
+the native run reports an unknown outcome rather than a bind. The owned-boot recovery fixture needs
+`systemd-ukify` (253+), so recovery-sanitize stays gated on 22.04.
 
 Ubuntu 24.04.5 amd64 encrypted UEFI installation, Secure Boot with enrolled keys,
 swtpm and virtio-blk passed two passphrase cold boots and independent LUKS-header

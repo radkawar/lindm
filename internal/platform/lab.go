@@ -25,6 +25,11 @@ type Lab struct {
 	Session LabSession
 	// Guest names the native guest facts of the device-action lanes.
 	Guest LabGuest
+	// FirstBootAccount: the installer hands the lab account to cloud-init,
+	// which creates it on first boot, so installer late commands cannot own
+	// files to it (Ubuntu 22.04's subiquity); the login key arrives through
+	// the installer's own SSH identity instead.
+	FirstBootAccount bool
 }
 
 // LabLane is a vmlab qualification lane with per-release recipes.
@@ -119,6 +124,12 @@ type LabTPM struct {
 	// Packages are what the installed root adds for them; a trailing "-"
 	// removes a package (apt).
 	Packages []string
+	// Items are extra initramfs files and Drivers explicit kernel drivers, for
+	// a dracut without a tpm2-tss module; %s is the Debian multiarch triplet.
+	Items, Drivers []string
+	// Unobservable lists architectures whose installed kernel cannot bind the
+	// TPM QEMU attaches there; their goldens are a separate TPM-absent tuple.
+	Unobservable []string
 }
 
 // LabSession is the autologin GNOME or KDE session of the encrypted golden.

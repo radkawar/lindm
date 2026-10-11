@@ -25,7 +25,7 @@ type actionAccountLockEvidence struct {
 }
 
 func nativeLockScenarios(ctx context.Context, machine *actionMachine, control *vmControlPlane, result *VMDeviceActionsResult) (err error) {
-	result.DesktopInitialLogind, err = prepareActionDesktop(ctx, machine.vm)
+	result.DesktopInitialLogind, err = prepareActionDesktop(ctx, machine.vm, machine.release.Lab.Session)
 	if err != nil {
 		return err
 	}

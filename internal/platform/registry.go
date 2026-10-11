@@ -129,21 +129,44 @@ var (
 	}
 	rhelTPMPackages   = []string{"tpm2-tools", "tpm2-tss"}
 	reasonRHELPending = "native qualification on the pinned RHEL minor not yet passed"
+	// Debian's netinst installs desktops as tasksel tasks; its gdm3 reads
+	// daemon.conf (Ubuntu patches it to custom.conf).
+	debianSession = LabSession{
+		Desktops:  map[string][]string{"gnome": {"desktop", "gnome-desktop"}, "kde": {"desktop", "kde-desktop"}},
+		GDMConfig: "/etc/gdm3/daemon.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
+		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell"},
+	}
+	debianGuest = LabGuest{
+		Initrd:    "/boot/initrd.img-%s",
+		Actions:   []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "bind9-dnsutils", "curl"},
+		OwnedBoot: []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
+	}
+	// Debian's arm64 kernels build TPM CRB but not the TIS platform driver,
+	// QEMU virt's only TPM device.
+	debianArmNoTIS = []string{"aarch64"}
+	// reasonNoUkify: the owned-boot recovery fixture builds its ordinary UKI
+	// with the guest's ukify, which systemd 253 introduced.
+	reasonNoUkify = "no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI"
 )
 
 var registry = []*Release{
 	{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 249,
-		Desktop: gnomeGDM3, Firewall: ufw,
+		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}},
-		Lab:      Lab{Lanes: []LabLane{LaneResources, LaneServices}},
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories}),
+		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
+		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
+				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
+				Drivers: []string{"tpm_tis", "tpm_crb"}}},
+		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
 		// 249's verify has no --recursive-errors (systemd 250) and exits 0 on
 		// a candidate setting it ignores as invalid.
-		Gates: actionGates(string(Definitions), "systemd 249 is below the definition provider floor 255"),
+		Gates: gates(string(Definitions), "systemd 249 is below the definition provider floor 255", string(RecoverySanitize), reasonNoUkify),
 	},
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
@@ -186,25 +209,28 @@ var registry = []*Release{
 	{
 		Key: "debian-12", Name: "Debian 12", Distribution: "Debian", ID: "debian", Version: Exact("12"), Codename: "bookworm",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252,
-		Desktop: Desktop{Name: "GNOME/KDE"}, Firewall: nftables,
+		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "debian-12"},
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}},
-		Lab:      Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), reasonNoUkify),
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257,
-		Desktop: Desktop{Name: "GNOME/KDE"}, Firewall: nftables,
+		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "debian-13"},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}},
-		Lab:      Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}),
-		Gates:    actionGates(),
+		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
+		Lab: Lab{Lanes: []LabLane{LaneResources}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
+		Gates:    gates(),
 	},
 	{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,

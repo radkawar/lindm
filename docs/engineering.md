@@ -810,9 +810,21 @@ account through the real API, and verifies fresh two-human approvals.
 
 The encrypted installer lane is `lab vm encrypted -manifest
 lab/images/ubuntu-noble-encrypted-amd64.json` (or
-`lab/images/fedora-44-encrypted-x86_64.json`,
-`lab/images/rhel-9.8-encrypted-x86_64.json`,
-`lab/images/rhel-10.2-encrypted-x86_64.json`). Supply `-firmware-code`,
+`lab/images/fedora-44-encrypted-x86_64.json`, `rhel-{9.8,10.2}-encrypted-x86_64.json`,
+`ubuntu-jammy-encrypted-amd64.json`,
+`debian-{12,13}-amd64.json` netinst, or the Rocky/AlmaLinux 9.8/10.2
+`*-encrypted-x86_64.json` DVDs). Admission is the release's platform
+`Encryption` gate; the recipe is its registry `Lab` row. `-installer-log NEW_FILE`
+keeps a bounded private (0600) copy of the installer serial console for
+diagnosis; it can echo lab configuration and is never evidence. Ubuntu
+late commands and Debian late scripts send stderr (never credential payloads)
+to that console, and a failed autoinstall dumps the installer journal tail
+there. The golden installer deadline is 90 minutes: Debian netinst fetches its
+whole desktop task from the signed archive during installation. Image downloads
+get a size-bounded deadline (2 MiB/s floor, at least 30 minutes) and continue an
+interrupted body with an exact HTTP Range request (at most eight times, only
+when the first response declared the length and the server answers with the
+matching `Content-Range`); the whole image is still digest-verified. Supply `-firmware-code`,
 `-firmware-vars`, `-firmware-package` and the exact installed
 `-firmware-version`; `-secure-boot` requires an enrolled PK/KEK/db template and
 actual guest SecureBoot=1/SetupMode=0. Ubuntu hosts can use the `ovmf` package's

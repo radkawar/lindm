@@ -1,0 +1,19 @@
+{
+  "id": "ubuntu-jammy-encrypted-22.04.5-amd64",
+  "distribution": "ubuntu",
+  "version": "22.04",
+  "architecture": "amd64",
+  "edition": "live-server-encrypted-lab",
+  "release": "22.04.5",
+  "imageFilename": "ubuntu-22.04.5-live-server-amd64.iso",
+  "imageUrl": "https://releases.ubuntu.com/22.04/ubuntu-22.04.5-live-server-amd64.iso",
+  "checksumUrl": "https://releases.ubuntu.com/22.04/SHA256SUMS",
+  "signatureUrl": "https://releases.ubuntu.com/22.04/SHA256SUMS.gpg",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "sha256": "9bc6028870aef3f74f4e16b900008179e78b130e6b0b9a140635434a46aa98b0",
+  "signerFingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+  "imageSizeBytes": "2136926208",
+  "checksumMode": "CHECKSUM_MODE_DETACHED",
+  "signerProvenanceUrl": "https://ubuntu.com/tutorials/how-to-verify-ubuntu",
+  "releaseProvenanceUrl": "https://releases.ubuntu.com/22.04/"
+}

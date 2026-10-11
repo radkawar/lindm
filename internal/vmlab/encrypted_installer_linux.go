@@ -92,7 +92,7 @@ func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginP
 	} else if desktop != "" && len(lab.Session.Desktops[desktop]) == 0 {
 		return nil, fmt.Errorf("encrypted installer: no maintained %s desktop for %s", desktop, media.release.Name)
 	}
-	if lab.Installer != platform.Subiquity && lab.Installer != platform.Anaconda {
+	if lab.Installer != platform.Subiquity && lab.Installer != platform.Anaconda && lab.Installer != platform.DebianInstaller {
 		return nil, fmt.Errorf("encrypted installer: no maintained recipe for %s", media.release.Name)
 	}
 	// Serial unlock is line-oriented. Exclude control characters rather than
@@ -117,7 +117,14 @@ func encryptedInstallerRecipeForMachine(media encryptedMedia, passphrase, loginP
 	if err != nil || signer.PublicKey().Type() != ssh.KeyAlgoED25519 || !bytes.Equal(ssh.MarshalAuthorizedKey(signer.PublicKey()), []byte(host)) {
 		return nil, errors.New("encrypted installer: host key must be a matching Ed25519 pair")
 	}
+	if lab.Installer == platform.DebianInstaller {
+		return debianEncryptedInstallerRecipe(media.release, architecture, passphrase, login, hostPrivateKey, host, desktop, tpmBoot)
+	}
 	provision := encryptedInstallerProvision(login, hostPrivateKey, host)
+	if lab.FirstBootAccount {
+		// cloud-init installs the same pinned autoinstall login key.
+		provision = encryptedInstallerHostProvision(hostPrivateKey, host)
+	}
 	if desktop != "" {
 		provision += encryptedInstallerDesktopProvision(media.release, desktop, architecture)
 	}
@@ -149,7 +156,7 @@ LINDM_GRUB
 			// Keep curtin's stock initramfs tooling until its work finishes;
 			// dracut Conflicts with initramfs-tools in Noble packaging. Media
 			// that install dracut themselves list no TPM packages.
-			provision += encryptedInstallerTPMProvision(lab.TPM.Modules)
+			provision += encryptedInstallerTPMProvision(lab.TPM, architecture)
 			if len(lab.TPM.Packages) != 0 {
 				provision += "DEBIAN_FRONTEND=noninteractive apt-get -y install " + strings.Join(lab.TPM.Packages, " ") + "\n"
 			}
@@ -170,10 +177,16 @@ LINDM_GRUB
 				"name": "lvm", "password": passphrase, "sizing-policy": "all",
 				"match": map[string]string{"path": "/dev/vda"},
 			}},
-			"ssh":           map[string]any{"install-server": true, "allow-pw": false, "authorized-keys": []string{strings.TrimSpace(login)}},
-			"user-data":     map[string]any{"ssh_deletekeys": false, "ssh_genkeytypes": []string{"ed25519"}, "ssh": map[string]bool{"emit_keys_to_console": false}},
-			"late-commands": [][]string{{"curtin", "in-target", "--target=/target", "--", "/bin/sh", "-eu", "-c", provision}},
-			"shutdown":      "poweroff",
+			"ssh":       map[string]any{"install-server": true, "allow-pw": false, "authorized-keys": []string{strings.TrimSpace(login)}},
+			"user-data": map[string]any{"ssh_deletekeys": false, "ssh_genkeytypes": []string{"ed25519"}, "ssh": map[string]bool{"emit_keys_to_console": false}},
+			// subiquity sends late-command output only to the installer journal;
+			// stderr (never the base64 credential payloads) also goes to the
+			// serial console so a failing native step is diagnosable.
+			"late-commands": [][]string{{"curtin", "in-target", "--target=/target", "--", "/bin/sh", "-eu", "-c", "exec 2>/dev/console\n" + provision}},
+			// A failed install otherwise leaves its reason only in the live
+			// installer journal; it holds no lab key material.
+			"error-commands": [][]string{{"sh", "-c", "journalctl -b --no-pager -o cat | tail -n 200 > /dev/console"}},
+			"shutdown":       "poweroff",
 		}
 		if len(packages) != 0 {
 			autoinstall["packages"] = packages
@@ -216,7 +229,7 @@ LINDM_GRUB
 		if lab.Repository != "" {
 			provision += encryptedInstallerReleaseDNF(media.release, "lindm-tpm", architecture) + "install " + strings.Join(lab.TPM.Packages, " ") + "\n"
 		}
-		provision += encryptedInstallerTPMProvision(lab.TPM.Modules)
+		provision += encryptedInstallerTPMProvision(lab.TPM, architecture)
 	}
 	provision += `install -d -m 0755 /etc/dracut.conf.d
 printf '%s\n' 'omit_dracutmodules+=" plymouth "' 'hostonly="no"' > /etc/dracut.conf.d/99-lindm-lab.conf
@@ -275,10 +288,25 @@ NF < 2 || NF > 4 || $2 !~ /^UUID=/ { exit 1 }
 END { if (!found) exit 1 }
 `
 
-func encryptedInstallerTPMProvision(dracutModules []string) string {
-	modules := strings.Join(dracutModules, " ")
+// encryptedInstallerTPMProvision writes the release's dracut TPM2 recipe.
+// Items are extra initramfs files (%s is the Debian multiarch triplet) for a
+// dracut without a tpm2-tss module; Drivers are explicit TPM drivers.
+func encryptedInstallerTPMProvision(tpm platform.LabTPM, architecture string) string {
+	multiarch := "x86_64-linux-gnu"
+	if architecture == "aarch64" {
+		multiarch = "aarch64-linux-gnu"
+	}
+	items := []string{"/etc/crypttab"}
+	for _, item := range tpm.Items {
+		items = append(items, fmt.Sprintf(item, multiarch))
+	}
+	config := []string{nativeQuote(`hostonly="no"`), nativeQuote(`omit_dracutmodules+=" plymouth "`), nativeQuote(`add_dracutmodules+=" ` + strings.Join(tpm.Modules, " ") + ` "`)}
+	if len(tpm.Drivers) != 0 {
+		config = append(config, nativeQuote(`add_drivers+=" `+strings.Join(tpm.Drivers, " ")+` "`))
+	}
+	config = append(config, nativeQuote(`install_items+=" `+strings.Join(items, " ")+` "`))
 	return "install -d -m 0755 /etc/dracut.conf.d\n" +
-		"printf '%s\\n' 'hostonly=\"no\"' 'omit_dracutmodules+=\" plymouth \"' 'add_dracutmodules+=\" " + modules + " \"' 'install_items+=\" /etc/crypttab \"' > /etc/dracut.conf.d/98-lindm-tpm.conf\n" +
+		"printf '%s\\n' " + strings.Join(config, " ") + " > /etc/dracut.conf.d/98-lindm-tpm.conf\n" +
 		"awk " + nativeQuote(encryptedInstallerTPMCrypttabProgram) + " /etc/crypttab > /etc/crypttab.lindm\n" +
 		"chmod 0600 /etc/crypttab.lindm\nmv /etc/crypttab.lindm /etc/crypttab\n"
 }
@@ -328,20 +356,33 @@ func encryptedInstallerPublicKey(value string) (string, error) {
 	return string(ssh.MarshalAuthorizedKey(key)), nil
 }
 
+// encryptedInstallerProvision writes the pinned host identity, key-only SSH
+// policy, lab sudo rule and the login key into an installed system whose lab
+// account already exists.
 func encryptedInstallerProvision(login, hostPrivate, hostPublic string) string {
+	return encryptedInstallerHostProvision(hostPrivate, hostPublic) + "install -d -m 0700 /home/lindm-lab/.ssh\n" + encryptedInstallerProvisionFile("/home/lindm-lab/.ssh/authorized_keys", login) +
+		"chmod 0600 /home/lindm-lab/.ssh/authorized_keys\nchown -R lindm-lab:lindm-lab /home/lindm-lab/.ssh\n"
+}
+
+// encryptedInstallerHostProvision covers everything except the lab account's
+// own files, for installers whose account appears only on first boot.
+func encryptedInstallerHostProvision(hostPrivate, hostPublic string) string {
 	var script strings.Builder
-	script.WriteString("umask 077\ninstall -d -m 0700 /home/lindm-lab/.ssh\ninstall -d -m 0755 /etc/ssh/sshd_config.d /etc/sudoers.d\n")
+	script.WriteString("umask 077\ninstall -d -m 0755 /etc/ssh/sshd_config.d /etc/sudoers.d\n")
 	for _, file := range []struct{ path, data string }{
-		{"/home/lindm-lab/.ssh/authorized_keys", login},
 		{"/etc/ssh/ssh_host_ed25519_key", hostPrivate},
 		{"/etc/ssh/ssh_host_ed25519_key.pub", hostPublic},
 		{"/etc/ssh/sshd_config.d/00-lindm-lab.conf", "PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin no\nHostKey /etc/ssh/ssh_host_ed25519_key\n"},
 		{"/etc/sudoers.d/lindm-lab", "lindm-lab ALL=(ALL) NOPASSWD:ALL\n"},
 	} {
-		fmt.Fprintf(&script, "printf '%%s' '%s' | base64 -d > %s\n", base64.StdEncoding.EncodeToString([]byte(file.data)), file.path)
+		script.WriteString(encryptedInstallerProvisionFile(file.path, file.data))
 	}
-	script.WriteString("chmod 0600 /etc/ssh/ssh_host_ed25519_key /home/lindm-lab/.ssh/authorized_keys\nchmod 0440 /etc/sudoers.d/lindm-lab\nchown -R lindm-lab:lindm-lab /home/lindm-lab/.ssh\n")
+	script.WriteString("chmod 0600 /etc/ssh/ssh_host_ed25519_key\nchmod 0440 /etc/sudoers.d/lindm-lab\n")
 	return script.String()
+}
+
+func encryptedInstallerProvisionFile(path, data string) string {
+	return fmt.Sprintf("printf '%%s' '%s' | base64 -d > %s\n", base64.StdEncoding.EncodeToString([]byte(data)), path)
 }
 
 // prepareEncryptedInstallerForMachine remasters a Fetcher-verified vendor ISO.

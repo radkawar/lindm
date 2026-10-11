@@ -16,6 +16,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 )
 
 func revealNativeRecovery(ctx context.Context, owner, approver *devlab.OwnerSession, deviceID, actionID string) ([]byte, error) {
@@ -113,8 +114,12 @@ const actionDesktopUser = "lindm-desktop-test"
 
 // prepareActionDesktop changes only the disposable overlay. A password-enabled
 // user is required: a locked/passwordless installer SSH account is not a useful
-// GNOME lock-screen fixture. GDM performs the real PAM/logind login.
-func prepareActionDesktop(ctx context.Context, vm *EncryptedVM) (string, error) {
+// GNOME lock-screen fixture. GDM performs the real PAM/logind login through the
+// release's own GDM configuration file and session name.
+func prepareActionDesktop(ctx context.Context, vm *EncryptedVM, session platform.LabSession) (string, error) {
+	if session.GDMConfig == "" || session.Name == "" {
+		return "", errors.New("lab GNOME session is not maintained for this release")
+	}
 	initial, err := vm.Run(ctx, `sudo -n sh -eu -c 'loginctl list-sessions --no-legend --no-pager | while read -r id rest; do loginctl show-session "$id" -p Id -p Name -p Class -p Type -p Desktop -p Service -p LockedHint; done'`, nil)
 	if err != nil {
 		return "", err
@@ -125,9 +130,8 @@ chpasswd
 install -d -o ` + actionDesktopUser + ` -g ` + actionDesktopUser + ` -m 0700 /home/` + actionDesktopUser + `/.config
 printf 'yes\n' > /home/` + actionDesktopUser + `/.config/gnome-initial-setup-done
 chown ` + actionDesktopUser + `:` + actionDesktopUser + ` /home/` + actionDesktopUser + `/.config/gnome-initial-setup-done
-config=/etc/gdm/custom.conf
-session=gnome
-if test -d /etc/gdm3; then config=/etc/gdm3/custom.conf; session=ubuntu; fi
+config=` + nativeQuote(session.GDMConfig) + `
+session=` + nativeQuote(session.Name) + `
 printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=` + actionDesktopUser + `\nInitialSetupEnable=False\n' > "$config"
 install -d -m 0755 /var/lib/AccountsService/users
 printf '[User]\nSystemAccount=false\nSession=%s\nXSession=%s\n' "$session" "$session" > /var/lib/AccountsService/users/` + actionDesktopUser + `

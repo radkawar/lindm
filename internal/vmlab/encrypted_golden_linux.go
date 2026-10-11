@@ -70,9 +70,11 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err != nil {
 		return nil, err
 	}
-	// The installer always builds the same portable virtio root with a TPM;
-	// test-only controller, extra-disk and TPM-absent variants are overlay choices.
-	hardware.StorageBus, hardware.ExtraDisks, hardware.TPM = "virtio-blk", 0, true
+	// The installer always builds the same portable virtio root with a TPM
+	// wherever the guest kernel can observe one; test-only controller,
+	// extra-disk and TPM-absent variants are overlay choices.
+	hardware.StorageBus, hardware.ExtraDisks = "virtio-blk", 0
+	hardware.TPM = encryptedGuestTPMObservable(m, hardware.Architecture)
 	hardware.Desktop = opts.Desktop != ""
 	if opts.CacheDir == "" {
 		opts.CacheDir = ".cache/lab/images"
@@ -103,12 +105,7 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err != nil {
 		return nil, err
 	}
-	ownedDBKey := ""
-	if fw.OwnedDBCertificateSHA256 != "" {
-		ownedDBKey = "\nowned-db:" + fw.OwnedDBCertificateSHA256
-	}
-	sum := sha256.Sum256([]byte(encryptedRecipeVersion + "\n" + m.Sha256 + "\n" + codeDigest + "\n" + varsDigest + "\n" + opts.Firmware.Package + "\n" + opts.Firmware.Version + fmt.Sprint(opts.Firmware.SecureBoot) + "\n" + opts.Desktop + "\n" + fmt.Sprint(opts.TPMBoot) + ownedDBKey))
-	id := hex.EncodeToString(sum[:])
+	id := encryptedGoldenID(m, opts, codeDigest, varsDigest, fw.OwnedDBCertificateSHA256, hardware.TPM)
 	lock, err := lockImage(ctx, root, id)
 	if err != nil {
 		return nil, err
@@ -173,7 +170,9 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	}
 	vm := &EncryptedVM{dir: staging, config: config, firmware: fw, initialSecret: state.Secret, cacheDir: opts.CacheDir, hardware: hardware}
 	defer func() { err = errors.Join(err, vm.Kill()) }()
-	installctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
+	// Debian's netinst fetches its whole GNOME task from the signed archive
+	// during installation; 45 minutes did not cover it on the shared lab link.
+	installctx, cancel := context.WithTimeout(ctx, 90*time.Minute)
 	defer cancel()
 	if err = vm.start(installctx, installer); err != nil {
 		return nil, err
@@ -182,8 +181,19 @@ func encryptedGolden(ctx context.Context, m *labv1.ImageManifest, opts Encrypted
 	if err != nil {
 		return nil, err
 	}
+	console := io.Discard
+	if opts.InstallerLog != "" {
+		// Opt-in diagnostics only: the installer console can echo lab
+		// configuration, so the log is a new owner-only file, never evidence.
+		logFile, openErr := os.OpenFile(opts.InstallerLog, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if openErr != nil {
+			return nil, fmt.Errorf("create private installer console log: %w", openErr)
+		}
+		defer func() { err = errors.Join(err, logFile.Close()) }()
+		console = &cappedWriter{w: logFile, remaining: maxInstallerLogBytes}
+	}
 	drained := make(chan struct{})
-	go func() { _, _ = io.Copy(io.Discard, serial); close(drained) }()
+	go func() { _, _ = io.Copy(console, serial); close(drained) }()
 	select {
 	case <-installctx.Done():
 		err = fmt.Errorf("encrypted installer deadline: %w", installctx.Err())
@@ -400,4 +410,40 @@ func encryptedConvert(ctx context.Context, dir, source, destination string) erro
 		return fmt.Errorf("flatten encrypted snapshot: %w; %s", err, log.diagnostic(dir))
 	}
 	return os.Chmod(destination, 0600)
+}
+
+// maxInstallerLogBytes bounds an opt-in installer console log.
+const maxInstallerLogBytes = 32 << 20
+
+// cappedWriter keeps at most remaining bytes and silently drops the rest, so
+// a chatty console is still drained without growing the log without bound.
+type cappedWriter struct {
+	w         io.Writer
+	remaining int64
+}
+
+func (c *cappedWriter) Write(p []byte) (int, error) {
+	if keep := min(int64(len(p)), c.remaining); keep > 0 {
+		written, err := c.w.Write(p[:keep])
+		c.remaining -= int64(written)
+		if err != nil {
+			return written, err
+		}
+	}
+	return len(p), nil
+}
+
+// encryptedGoldenID binds every input that changes the installed machine. A
+// TPM-absent golden (a tuple whose kernel cannot observe the attached TPM)
+// gets its own dimension; the identities of TPM goldens are unchanged.
+func encryptedGoldenID(m *labv1.ImageManifest, opts EncryptedVMOptions, codeDigest, varsDigest, ownedDBCertificateSHA256 string, tpm bool) string {
+	ownedDBKey := ""
+	if ownedDBCertificateSHA256 != "" {
+		ownedDBKey = "\nowned-db:" + ownedDBCertificateSHA256
+	}
+	if !tpm {
+		ownedDBKey += "\ntpm:absent"
+	}
+	sum := sha256.Sum256([]byte(encryptedRecipeVersion + "\n" + m.Sha256 + "\n" + codeDigest + "\n" + varsDigest + "\n" + opts.Firmware.Package + "\n" + opts.Firmware.Version + fmt.Sprint(opts.Firmware.SecureBoot) + "\n" + opts.Desktop + "\n" + fmt.Sprint(opts.TPMBoot) + ownedDBKey))
+	return hex.EncodeToString(sum[:])
 }

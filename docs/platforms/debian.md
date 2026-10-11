@@ -18,13 +18,13 @@ Generated from `internal/platform`; “implemented” is not qualification (see 
 | definitions       | gated: systemd 247 is below the definition provider floor 255                                           | implemented                                                                                             | implemented                                                                                             |
 | password          | gated: not implemented for Debian 11                                                                    | implemented                                                                                             | implemented                                                                                             |
 | firewall          | gated: not implemented for Debian 11                                                                    | implemented                                                                                             | implemented                                                                                             |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
+| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
+| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
+| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
+| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI               | implemented                                                                                             |
 | self-update       | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | gated: no maintained encrypted installer, native action prerequisites or graphical golden               |
+| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden               | implemented                                                                                             | implemented                                                                                             |
 | advisories        | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
 | os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
 | release-upgrade   | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               |
@@ -161,13 +161,32 @@ the new generic package resource provider. These need their own native evidence.
 
 ## Encryption and recovery
 
-The maintained Debian netinst recipe explicitly uses regular partitioning, not an
-encrypted installation (`partman-auto/method string regular`), and installs standard
-plus SSH-server tasks. The successful ARM records explicitly use no TPM and no
-encryption fixture ([preseed](../../internal/vmlab/debian_installer_linux.go#L77)).
-Do not relabel that as LUKS-root, initramfs recovery, TPM-token unlock or key-rotation
-qualification. Ubuntu's initramfs-tools/dracut recipes are not a Debian boot-stack
-qualification either.
+The maintained **unencrypted** Debian netinst recipe uses regular partitioning
+(`partman-auto/method string regular`) and installs standard plus SSH-server tasks;
+the successful ARM inventory/lifecycle/dispatch records use it with no TPM and no
+encryption fixture ([preseed](../../internal/vmlab/debian_installer_linux.go)).
+
+The separate **encrypted** golden (`lab vm encrypted` with
+`lab/images/debian-{12,13}-*.json`) preseeds Debian's own guided LVM-on-LUKS2
+(`partman-auto/method string crypto`, `partman-crypto/passphrase`), installs the
+registry's tasksel desktop tasks (`desktop, gnome-desktop`) and configures GDM
+autologin through `/etc/gdm3/daemon.conf` — Debian's gdm3 does not read Ubuntu's
+patched `custom.conf`. debconf strips surrounding whitespace, so such passphrases
+are refused. The TPM-boot variant installs dracut with the release's packages
+(bookworm: `libtss2-tcti-device0`, crypt-integrated systemd-cryptsetup; trixie:
+`libtss2-tcti-device0t64`, split `systemd-cryptsetup` package and dracut module)
+and rebuilds every installed kernel's initrd. `preseed/late_command` runs
+**before** finish-install's apt-cdrom-setup comments out the netinst disc source;
+trixie's netinst carries some of those dependencies, so apt blocked forever on a
+"Media change" prompt (diagnosed natively with an in-guest process watchdog). The
+late script now applies that same `deb cdrom:` edit first and closes apt's stdin.
+Debian's arm64 kernels build TPM CRB but not the TIS platform driver that QEMU's
+aarch64 `virt` TPM uses, so arm64 goldens are a separate TPM-absent tuple
+(`-tpm=false`); an attached-but-unobservable TPM is refused. The owned-boot
+recovery fixture needs `systemd-ukify` (systemd 253+), so bookworm's
+recovery-sanitize stays gated. A passing golden is not escrow, rotation, TPM
+unlock or wipe qualification; those are separate device-action records in
+[verification](../verification.md).
 
 Stable targeting requires server-returned signed identities and native revalidation,
 not a device path. Shared target construction prefers WWN+serial; the explicitly
