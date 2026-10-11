@@ -4,6 +4,16 @@
 current screens meet it. [Engineering](engineering.md#frontend-structure-and-framework)
 remains binding for security, accessibility and implementation.
 
+## First rule: screens are task-shaped, not API-shaped
+
+**No form mirrors a proto request.** Start with the administrator's job, not the
+fields an RPC happens to accept. Administrators choose devices, people, groups and
+profiles by name and context; the console carries their exact identities. Preview
+affected devices and consequences in place before committing. Asking an admin to
+type a device UUID into Rollouts is a design failure, not an advanced workflow.
+Walk the whole job across screens: a polished form that leaves the operator to
+assemble an API call is still unfinished design.
+
 ## An operator's workbench, not a fleet scoreboard
 
 We build for the IT administrator keeping Linux laptops usable and company servers
