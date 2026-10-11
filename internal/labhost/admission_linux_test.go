@@ -357,6 +357,58 @@ func TestAcquireReportingNamesEachChangedWaitReasonOnce(t *testing.T) {
 	}
 }
 
+// Contention on the admission guard is transient poll noise: many queued
+// waiters would otherwise alternate it with the real queue reason forever.
+func TestAcquireReportingOmitsTransientAdmissionContention(t *testing.T) {
+	host := fixtureHost("busy", t.TempDir())
+	host.MaxGuests = 1
+	slots, err := openFixtureSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := slots.Acquire(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := slots.openName(".admission.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if locked, err := lockSlot(guard); err != nil || !locked {
+		t.Fatalf("hold admission guard: %v %v", locked, err)
+	}
+	reasons := make(chan string, 16)
+	admitted := make(chan error, 1)
+	go func() {
+		leases, err := slots.AcquireNReporting(context.Background(), 1, func(reason string) { reasons <- reason })
+		for _, lease := range leases {
+			err = errors.Join(err, lease.Close())
+		}
+		admitted <- err
+	}()
+	time.Sleep(300 * time.Millisecond) // several polls refused by the guard
+	if len(reasons) != 0 {
+		t.Fatalf("reported transient contention: %q", <-reasons)
+	}
+	if err := guard.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if reason := <-reasons; reason != "1 of 1 slots held; 1 needed" {
+		t.Fatalf("wait reason %q", reason)
+	}
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-admitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("not admitted after the slot was released")
+	}
+}
+
 // A lane that queued longer than its own timeout must still receive the whole
 // lane timeout once admitted; queue time is bounded only by Admission.
 func TestRunAdmittedStartsLaneDeadlineAfterAdmission(t *testing.T) {

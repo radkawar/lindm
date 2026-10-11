@@ -97,6 +97,10 @@ func (m memoryAdmission) allows(guestBytes uint64) bool {
 	return m.SwapOutPagesAfter == m.SwapOutPagesBefore && m.AvailableBytes >= guestBytes+memoryHeadroomBytes
 }
 
+// admissionBusy is the transient wait while another waiter's poll holds the
+// admission guard; it says nothing about the queue, so it is never reported.
+const admissionBusy = "another admission is in progress"
+
 // Serialize admission so lowering a configured limit also counts older slots
 // outside the new range. Never unlink those identities while holders may exist.
 // A lane's guests are admitted together or not at all: holding one slot while
@@ -117,7 +121,7 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 	defer func() { resultErr = errors.Join(resultErr, guard.Close()) }()
 	locked, err := lockSlot(guard)
 	if err != nil || !locked {
-		return nil, "another admission is in progress", err
+		return nil, admissionBusy, err
 	}
 	active, err := s.Count()
 	if err != nil {

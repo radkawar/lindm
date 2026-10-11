@@ -149,7 +149,7 @@ func (s *Slots) AcquireNReporting(ctx context.Context, guests uint32, report fun
 		if err != nil || leases != nil {
 			return leases, err
 		}
-		if report != nil && wait != last {
+		if report != nil && wait != last && wait != admissionBusy {
 			report(wait)
 			last = wait
 		}
