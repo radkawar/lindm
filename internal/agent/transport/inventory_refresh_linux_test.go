@@ -73,7 +73,8 @@ func newRefreshTransportFixture(t *testing.T) *refreshTransportFixture {
 	t.Helper()
 	f := &refreshTransportFixture{t: t, host: 9, packages: 3, receipt: []byte("exact signed publication envelope\n")}
 	f.boot = uuid.NewString()
-	f.readiness = &agentv1.RecoveryReadinessObservation{BootId: f.boot, Available: true, EspUuid: "1234-5678", EspPath: "/boot/efi", FreeBytes: 16384, AllocationUnitBytes: 4096, SecureBoot: true, UkiCapable: true}
+	// An available observation names its method; the executor always sets it.
+	f.readiness = &agentv1.RecoveryReadinessObservation{BootId: f.boot, Available: true, EspUuid: "1234-5678", EspPath: "/boot/efi", FreeBytes: 16384, AllocationUnitBytes: 4096, SecureBoot: true, UkiCapable: true, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}
 	now := timestamppb.Now()
 	digest := sha256.Sum256([]byte("signed refresh intent"))
 	f.status = &agentv1.DeviceActionStatus{ActionId: uuid.NewString(), IntentSha256: digest[:], State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: now, StartedAt: now, Before: &agentv1.DeviceActionObservation{ObservedAt: now, Supported: true}, RefreshInventory: true}
