@@ -15,6 +15,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func (s *Service) ListDeviceGroups(ctx context.Context, req *connect.Request[adminv1.ListDeviceGroupsRequest]) (*connect.Response[adminv1.ListDeviceGroupsResponse], error) {
@@ -100,6 +101,9 @@ func (s *Service) SetDeviceGroup(ctx context.Context, req *connect.Request[admin
 	}
 	const method = "SetDeviceGroup"
 	digest := core.MutationDigest(method, groupID.String(), req.Msg.GetName(), strings.Join(memberIDs, ","), req.Msg.GetReason())
+	if req.Msg.GetCreateOnly() {
+		digest = core.MutationDigest(method, groupID.String(), req.Msg.GetName(), strings.Join(memberIDs, ","), req.Msg.GetReason(), "create_only")
+	}
 	err = s.WithinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageAccounts, func(ctx context.Context, q *devicedb.Queries) error {
 		_, owned, err := s.BeginAdminRequest(ctx, q, actor.ID, method, requestID, digest)
 		if err != nil || !owned {
@@ -107,8 +111,12 @@ func (s *Service) SetDeviceGroup(ctx context.Context, req *connect.Request[admin
 		}
 		// The group row serializes replacements. All affected devices are then
 		// locked in UUID order before changing any authorization membership.
-		if err := q.UpsertDeviceGroup(ctx, devicedb.UpsertDeviceGroupParams{ID: groupID, Name: req.Msg.GetName()}); err != nil {
+		changed, err := q.UpsertDeviceGroup(ctx, devicedb.UpsertDeviceGroupParams{ID: groupID, Name: req.Msg.GetName(), CreateOnly: req.Msg.GetCreateOnly()})
+		if err != nil {
 			return err
+		}
+		if changed == 0 {
+			return rpcreason.Error(connect.CodeAborted, "group_already_exists")
 		}
 		locked, err := q.LockDeviceGroupMembers(ctx, devicedb.LockDeviceGroupMembersParams{GroupID: groupID, DeviceIds: members})
 		if err != nil {

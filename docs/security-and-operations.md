@@ -459,6 +459,152 @@ password requires `RequestLocalAdminPasswordRotation`. Devices that received a
 secret keep its native effect (for example a shadow hash) until a later
 revision or release changes it.
 
+### Declarative organization apply
+
+`lindmctl apply -f FILE [-dry-run] [-secrets-out NEW_FILE] [-o table|json]`
+uses the existing pinned CLI login and AdminService authorization. `-config FILE`
+selects the same protected credentials as other CLI commands. No database access,
+alternate API key or browser-session bypass is introduced.
+
+```sh
+lindmctl apply -f lab/demo/org.json -dry-run
+lindmctl apply -f lab/demo/org.json -secrets-out /private/org-secrets-001.json -o json
+```
+
+Review the dry-run first. It reads current server state but does not publish,
+issue credentials, create target previews, refresh/promote rollouts or activate
+assignments. Rollout planning uses the authorization-equivalent read-only
+projection. The table has kind, name, ID, status and reason columns; JSON contains an
+`outcomes` array with `kind`, `name`, optional `id`, `status` and optional `detail`. Table cells escape
+terminal control characters. Statuses are `created`, `updated`, `unchanged`,
+`pending` or `unsupported`; in a dry-run, created/updated describe proposed changes,
+not completed work. Successful apply is control-plane acceptance, not proof of
+device compliance. Pending and unsupported objects remain visible even when other
+objects can be applied.
+
+The operation is not an atomic transaction. It stops on errors, returns a failing
+exit status and preserves outcomes and secrets from earlier successful operations.
+Mutations are never automatically retried. Audit reasons are derived as
+`Apply organization NAME`; request IDs bind the organization, object identity and
+completed request, including observed compare-and-swap versions. Review current
+state before a fresh apply after a conflict or ambiguous transport failure.
+Omitting an object never deletes it.
+
+Target activation consumes an exact retained preview hash. Pending approval reuse
+requires the authenticated requester, unchanged membership/input digest and unexpired
+retained evidence; another administrator's approval is never adopted. Changed or
+expired evidence requires a fresh independent review, not a weakened activation.
+
+Secrets are **never printed by apply**, including with JSON output. When the plan
+would issue a provisioning token or grant, `-secrets-out` is required. The command
+reserves this new file before mutations using exclusive creation and mode 0600;
+existing files and symlinks are refused. Use a private parent directory. The file
+contains a JSON array of issued credentials with `kind`, `name`, `id`, `secret` and
+optional `expires_at` (protobuf timestamp fields). Keep it out of source control,
+logs and backups that are not approved for credentials. Even when a later operation
+fails, earlier issued secrets are saved. A file-write failure may make issued
+secrets unrecoverable; do not retry issuance blindly. Existing unrevoked credentials
+are not renewed or revealed again, including after consumption or expiry. Explicit
+revocation releases the name; a subsequent apply binds its issuance request to the
+latest revoked predecessor and returns a new secret once. A new declarative name is
+also an explicit replacement. `-dry-run` rejects `-secrets-out` and creates no file.
+
+#### Organization specification
+
+The only schema is
+[`lindm.org.v1.Organization`](../api/lindm/org/v1/organization.proto), loaded as
+strict protobuf JSON with unknown fields rejected recursively. The engine validates
+the composition and completed product API templates before mutation. The maintained
+example is [`lab/demo/org.json`](../lab/demo/org.json).
+
+| Section                        | Meaning                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                         | Stable organization namespace, also used for enrollment names and audit reasons                                                                   |
+| `groups`                       | Stable UUID/name pairs for static, RBAC-capable device groups; apply does not replace memberships                                                 |
+| `dynamicGroups`                | Product targeting expressions; dynamic groups never grant RBAC membership                                                                         |
+| `profiles`                     | Stable UUID plus a typed `ResourceProfile` in `spec`; changed content publishes an immutable revision                                             |
+| `assignments`                  | Declared `profileId` plus a product target assignment; omit `profileRevisionId`, which the engine resolves                                        |
+| `rollouts`                     | Product rollout specifications with stable IDs; existing specifications are immutable                                                             |
+| `provisioningTokens`, `grants` | Stable names plus product request templates; omit engine-owned request IDs, reasons and names                                                     |
+| `advisoryExceptions`           | Exact hostname/advisory/package selectors plus the product acceptance reason and absolute expiry; omit engine-resolved request/device/finding IDs |
+| `accounts`                     | Product account requests; CLI reports `requires console session` without creating accounts                                                        |
+| `authorization`                | Product authorization policy; CLI reports `requires server configuration` without changing server configuration                                   |
+
+The demo declares Engineering, Finance, IT/Helpdesk and Contractors static groups
+and matching label-based dynamic groups. Each group's provisioning token applies
+both static membership and a `department/...` label. Dynamic groups select those
+labels for profile targeting; they do not substitute for authorization groups.
+The one-time grant carries no group or label, so assign its device deliberately
+after enrollment. Company baseline targets all four dynamic groups at priority 0;
+department profiles have priority 100 and override the same canonical password,
+firewall-zone or update-policy resource where applicable.
+
+Company baseline sets password controls, deny-by-default ingress with TCP/22 allowed
+for both IP families, persistent sysctl hardening, `/etc/motd.d/50-company`,
+disabled/stopped `cups.service`, and daily security-update starts between 02:00 and
+04:00 Europe/London. Reboots use `SCHEDULED` with a 120-minute maximum delay after
+updates, not a separate reboot window. An already-running update is not killed at
+window end. The executor's managed-file `allowed_roots` must explicitly include
+`/etc/motd.d`; approving `/etc` is not a substitute. The host must use pam_motd to
+display that directory.
+
+Engineering adds git, htop and podman plus the local `developers` group and a
+`developer` user with a locked password, not an embedded login secret. Finance
+strengthens password controls, removes the SSH firewall exception and stops/disables
+`sshd.service` for its native host; other service names need an explicit profile
+change. Contractors deny ingress and default egress, permitting only outbound
+TCP 80/443/53 and UDP 53 for both IP families, with a nightly 02:00–02:30 update
+start window. This restriction requires a compatible firewall backend and may block
+nonstandard control-plane ports. Preserve the executor's connectivity guard; do not
+bypass a refused network change. Profiles use create-only ownership, so existing
+unowned native state may require the normal explicit adoption workflow rather than
+being silently taken over.
+
+**Executor native repository approvals:** Engineering's package resources apply
+only to Ubuntu 24.04 (`Ubuntu`, `x86_64` or `aarch64` platform observations), with DEB
+package architectures `amd64` and `arm64` respectively. Configure the executor's
+approved package sources with repository UUID
+`8053e72a-44e8-53fc-9472-825c068cf9b5` for the amd64 archive and
+`6ad79126-c32f-552b-89b7-6956410314fb` for the arm64 ports archive. Bind the appropriate
+official HTTPS archive, suite/components and authenticated signing key/digest
+through the existing native-package provider configuration. These are explicit
+operator approvals, not repositories created or trusted by apply. This example does
+not infer equivalent packages or repositories on other distributions.
+
+Configure `demo-helpdesk` with `fleet.read`, `remote_assistance.run` and `actions.lock`;
+configure `demo-security-analyst` with `fleet.read`, `advisory_exceptions.manage`,
+`approvals.manage` and `actions.lock`. Set `approval_required_permissions` to include
+`actions.lock` in the server authorization policy before using the demo accounts.
+Helpdesk requests a lock; a different analyst can approve it because they have both
+approval and lock authority. The requester cannot approve their own action.
+Owner and auditor use their built-in roles. Create/enroll these accounts through the
+console after configuring the custom roles; apply's CLI bearer cannot do this.
+Remote assistance still requires device-user consent.
+
+Advisory exception examples select `demo-engineering-01` and `demo-finance-01`.
+Their expiries are 45 and 60 days after 2026-10-11; review the dates and reasons
+before use. These are illustrative selectors, not a claim that either host is
+vulnerable. Missing or ambiguous hosts/findings remain pending; no finding is
+fabricated and no unrelated finding is accepted.
+
+#### Declarative organization gaps
+
+- USB-storage modprobe blacklisting has no dispatchable resource kind and cannot
+  be smuggled through a managed file at a forbidden path.
+- A separate reboot window is not representable; only the update start window and
+  scheduled reboot delay are supported.
+- Remote assistance has one permission for view and control, not separate grants.
+- Advisory exceptions have reason/expiry but no two-human approval workflow.
+- SSH banner configuration is not dispatchable; the managed MOTD is not an SSH banner.
+- Static group rename cannot safely preserve concurrent membership changes through
+  the existing replacement API. Apply reports name drift as unsupported.
+- Deleted static-group IDs with retained creation receipts cannot be recreated by
+  replaying the old declarative creation. Apply detects the absent live object and
+  returns a conflict; use a new stable group ID and migrate its references.
+- Rollout specifications cannot be edited in place; use a new stable rollout ID.
+- Account mutation requires a console session, and its API has no compare-and-swap
+  or replay receipt. Server authorization configuration is outside AdminService.
+
 ## 3. Dangerous actions
 
 Destructive plans freeze exact device identities/generations, media identities,

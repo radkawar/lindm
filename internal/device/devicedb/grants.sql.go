@@ -170,14 +170,16 @@ INSERT INTO enrollment_grants (
     created_by,
     created_at,
     expires_at,
-    reason
+    reason,
+    name
 ) VALUES (
     $1,
     $2,
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 `
 
@@ -188,6 +190,7 @@ type InsertEnrollmentGrantParams struct {
 	CreatedAt pgtype.Timestamptz
 	ExpiresAt pgtype.Timestamptz
 	Reason    string
+	Name      string
 }
 
 func (q *Queries) InsertEnrollmentGrant(ctx context.Context, arg InsertEnrollmentGrantParams) error {
@@ -198,13 +201,14 @@ func (q *Queries) InsertEnrollmentGrant(ctx context.Context, arg InsertEnrollmen
 		arg.CreatedAt,
 		arg.ExpiresAt,
 		arg.Reason,
+		arg.Name,
 	)
 	return err
 }
 
 const listEnrollmentGrants = `-- name: ListEnrollmentGrants :many
 SELECT g.id, g.created_by, g.created_at, g.expires_at, g.consumed_at,
-    g.revoked_at, g.device_id,
+    g.revoked_at, g.device_id, g.name,
     coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name,
     coalesce(d.hostname, '')::text AS consumed_device_hostname,
     ARRAY(SELECT l.label FROM device_labels l WHERE l.device_id = g.device_id ORDER BY l.label)::text[] AS labels
@@ -229,6 +233,7 @@ type ListEnrollmentGrantsRow struct {
 	ConsumedAt             pgtype.Timestamptz
 	RevokedAt              pgtype.Timestamptz
 	DeviceID               *uuid.UUID
+	Name                   string
 	CreatorDisplayName     string
 	ConsumedDeviceHostname string
 	Labels                 []string
@@ -251,6 +256,7 @@ func (q *Queries) ListEnrollmentGrants(ctx context.Context, arg ListEnrollmentGr
 			&i.ConsumedAt,
 			&i.RevokedAt,
 			&i.DeviceID,
+			&i.Name,
 			&i.CreatorDisplayName,
 			&i.ConsumedDeviceHostname,
 			&i.Labels,

@@ -340,9 +340,14 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	if err := s.validate(r); err != nil {
 		return nil, err
 	}
-	q, err := begin(ctx, tx, p, perm, true)
+	q, err := beginRead(tx, p, perm, true)
 	if err != nil {
 		return nil, err
+	}
+	if !r.GetReadOnly() {
+		if err := q.LockTargeting(ctx); err != nil {
+			return nil, err
+		}
 	}
 	after := uuid.Nil
 	if r.AfterId != nil {
@@ -354,9 +359,12 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	}
 	out := new(adminv1.ListRolloutsResponse)
 	for _, id := range ids {
-		ready, err := s.RefreshRollout(ctx, tx, id)
-		if err != nil {
-			return nil, err
+		ready := false
+		if !r.GetReadOnly() {
+			ready, err = s.RefreshRollout(ctx, tx, id)
+			if err != nil {
+				return nil, err
+			}
 		}
 		state, err := s.rolloutState(ctx, q, id)
 		if errors.Is(err, pgx.ErrNoRows) {

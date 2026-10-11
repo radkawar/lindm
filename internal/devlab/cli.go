@@ -85,7 +85,7 @@ func CheckCLI(ctx context.Context, repository, binary string) (_ *CLIEvidence, r
 	}
 	defer func() { resultErr = errors.Join(resultErr, client.Close()) }()
 	if err := client.Login(ctx, func(ctx context.Context, authorize string) error {
-		if err := owner.approveCLI(ctx, authorize); err != nil {
+		if err := owner.ApproveCLI(ctx, authorize); err != nil {
 			return err
 		}
 		evidence.ExplicitApproval = true
@@ -140,11 +140,12 @@ func CheckCLI(ctx context.Context, repository, binary string) (_ *CLIEvidence, r
 	return evidence, nil
 }
 
-// approveCLI confines cookies to the console and follows the loopback redirect
-// separately, with no cookie jar or proxy. No authorization URL enters evidence.
-func (s *OwnerSession) approveCLI(ctx context.Context, authorize string) error {
+// ApproveCLI confines cookies to this session's exact console origin and follows
+// the loopback redirect separately, with no cookie jar or proxy. No authorization
+// URL enters evidence. It supports isolated dynamically addressed fixtures.
+func (s *OwnerSession) ApproveCLI(ctx context.Context, authorize string) error {
 	endpoint, err := url.Parse(authorize)
-	if err != nil || !cliConsoleURL(endpoint, "/auth/cli/authorize") {
+	if err != nil || !s.cliConsoleURL(endpoint, "/auth/cli/authorize") {
 		return errors.New("unexpected CLI authorization destination")
 	}
 	query := endpoint.Query()
@@ -154,7 +155,7 @@ func (s *OwnerSession) approveCLI(ctx context.Context, authorize string) error {
 	}
 	browser := *s.client
 	browser.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 3 || req.Method != http.MethodGet || !cliConsoleURL(req.URL, "/auth/cli/approve") {
+		if len(via) >= 3 || req.Method != http.MethodGet || !s.cliConsoleURL(req.URL, "/auth/cli/approve") {
 			return errors.New("CLI approval redirect rejected")
 		}
 		return nil
@@ -172,7 +173,7 @@ func (s *OwnerSession) approveCLI(ctx context.Context, authorize string) error {
 	if err != nil {
 		return err
 	}
-	if response.StatusCode != http.StatusOK || !cliConsoleURL(response.Request.URL, "/auth/cli/approve") {
+	if response.StatusCode != http.StatusOK || !s.cliConsoleURL(response.Request.URL, "/auth/cli/approve") {
 		return errors.New("CLI authorization did not reach the approval page")
 	}
 	csrf, err := cliApprovalCSRF(body)
@@ -180,11 +181,11 @@ func (s *OwnerSession) approveCLI(ctx context.Context, authorize string) error {
 		return err
 	}
 	form := url.Values{"csrf_token": {csrf}}
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, consoleOrigin+"/auth/cli/approve", strings.NewReader(form.Encode()))
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, s.origin+"/auth/cli/approve", strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Origin", consoleOrigin)
+	req.Header.Set("Origin", s.origin)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	browser.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	response, err = browser.Do(req)
@@ -231,8 +232,9 @@ func (s *OwnerSession) approveCLI(ctx context.Context, authorize string) error {
 	return nil
 }
 
-func cliConsoleURL(endpoint *url.URL, path string) bool {
-	return endpoint != nil && endpoint.Scheme == "https" && endpoint.Host == "localhost:18444" && endpoint.User == nil && endpoint.Fragment == "" && endpoint.Path == path
+func (s *OwnerSession) cliConsoleURL(endpoint *url.URL, path string) bool {
+	origin, err := url.Parse(s.origin)
+	return err == nil && endpoint != nil && endpoint.Scheme == "https" && endpoint.Host == origin.Host && endpoint.User == nil && endpoint.Fragment == "" && endpoint.Path == path
 }
 
 func cliApprovalCSRF(body []byte) (string, error) {

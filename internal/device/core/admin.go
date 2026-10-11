@@ -42,7 +42,7 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 		return nil, MapErr(err)
 	}
 	defer s.Release()
-	if req.Msg == nil || HasNUL(req.Msg.GetReason()) {
+	if req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
 		return nil, Invalid("invalid_text")
 	}
 	requestID, err := ParseUUID(req.Msg.GetRequestId())
@@ -50,6 +50,9 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 		return nil, Invalid("invalid_id")
 	}
 	digest := MutationDigest(methodCreateGrant, strconv.FormatUint(uint64(req.Msg.GetLifetimeSeconds()), 10), req.Msg.GetReason())
+	if req.Msg.GetName() != "" {
+		digest = MutationDigest(methodCreateGrant, strconv.FormatUint(uint64(req.Msg.GetLifetimeSeconds()), 10), req.Msg.GetReason(), req.Msg.GetName())
+	}
 	var (
 		secret    string
 		grantID   uuid.UUID
@@ -86,6 +89,7 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 			CreatedAt: Timestamptz(now),
 			ExpiresAt: Timestamptz(expiresAt),
 			Reason:    req.Msg.GetReason(),
+			Name:      req.Msg.GetName(),
 		}); err != nil {
 			return err
 		}

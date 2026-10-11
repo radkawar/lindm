@@ -97,11 +97,11 @@ func TestCanonicalProfileIdentityAndDependencyDigest(t *testing.T) {
 	original := spec("mixed", service, group)
 	reordered := proto.CloneOf(original)
 	reordered.Resources[0], reordered.Resources[1] = reordered.Resources[1], reordered.Resources[0]
-	_, first, err := canonicalSpec(t.Context(), original)
+	_, first, err := CanonicalSpec(t.Context(), original)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, second, err := canonicalSpec(t.Context(), reordered)
+	_, second, err := CanonicalSpec(t.Context(), reordered)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestCanonicalProfileIdentityAndDependencyDigest(t *testing.T) {
 		t.Fatal("resource order changes canonical digest")
 	}
 	reordered.Resources[1].DependsOn[0].Condition = policyv1.DependencyCondition_DEPENDENCY_CONDITION_VERIFIED_CONFIGURED
-	_, changed, err := canonicalSpec(t.Context(), reordered)
+	_, changed, err := CanonicalSpec(t.Context(), reordered)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,11 +205,11 @@ func TestCanonicalSetPermutationDigestAndMerge(t *testing.T) {
 	other.Verification.Checks[0], other.Verification.Checks[1] = other.Verification.Checks[1], other.Verification.Checks[0]
 	other.Applicability.Products[0], other.Applicability.Products[1] = other.Applicability.Products[1], other.Applicability.Products[0]
 	beforeLeft, beforeRight := proto.CloneOf(left), proto.CloneOf(right)
-	canonicalLeft, first, err := canonicalSpec(t.Context(), left)
+	canonicalLeft, first, err := CanonicalSpec(t.Context(), left)
 	if err != nil {
 		t.Fatal(err)
 	}
-	canonicalRight, second, err := canonicalSpec(t.Context(), right)
+	canonicalRight, second, err := CanonicalSpec(t.Context(), right)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,11 +303,11 @@ func TestCanonicalProfilePreservesOrderedDNSLists(t *testing.T) {
 		} else {
 			dns.SearchDomains.Names[0], dns.SearchDomains.Names[1] = dns.SearchDomains.Names[1], dns.SearchDomains.Names[0]
 		}
-		canonical, first, err := canonicalSpec(t.Context(), original)
+		canonical, first, err := CanonicalSpec(t.Context(), original)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, second, err := canonicalSpec(t.Context(), reordered)
+		_, second, err := CanonicalSpec(t.Context(), reordered)
 		if err != nil {
 			t.Fatal(err)
 		}

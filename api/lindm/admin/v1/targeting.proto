@@ -166,6 +166,9 @@ message ListRolloutsRequest {
     lte: 100
   }];
   optional string after_id = 2 [(buf.validate.field).string.uuid = true];
+  // Read the retained state without refreshing health or promoting any ring.
+  // Authorization is identical to the normal rollout listing.
+  bool read_only = 3;
 }
 message ListRolloutsResponse {
   repeated RolloutState rollouts = 1;

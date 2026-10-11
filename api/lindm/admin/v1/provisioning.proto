@@ -38,6 +38,11 @@ message CreateProvisioningTokenRequest {
       string: {uuid: true}
     }
   }];
+  // Optional human label. Nonempty names are unique among unrevoked tokens.
+  string name = 9 [(buf.validate.field).string = {
+    max_len: 257
+    not_contains: "\000"
+  }];
 }
 message CreateProvisioningTokenResponse {
   string token_id = 1;
@@ -59,6 +64,7 @@ message ProvisioningToken {
   repeated string group_ids = 11;
   repeated string profile_revision_ids = 12;
   string creator_display_name = 13;
+  string name = 14;
 }
 message ListProvisioningTokensRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];

@@ -116,7 +116,7 @@ func (s *Service) CreateProvisioningToken(ctx context.Context, req *connect.Requ
 		}
 		id := uuid.New()
 		expires := now.Add(time.Duration(req.Msg.GetLifetimeSeconds()) * time.Second)
-		if err := q.InsertProvisioningToken(ctx, devicedb.InsertProvisioningTokenParams{ID: id, TokenHash: hash, CreatedBy: actor.ID, AuthorizationVersion: int64(authorization.Version()), CreatedAt: Timestamptz(now), ExpiresAt: Timestamptz(expires), MaxUses: int32(req.Msg.GetMaxUses()), ApprovalRequired: req.Msg.GetApprovalRequired(), Assignment: encoded, Reason: req.Msg.GetReason()}); err != nil {
+		if err := q.InsertProvisioningToken(ctx, devicedb.InsertProvisioningTokenParams{ID: id, TokenHash: hash, CreatedBy: actor.ID, AuthorizationVersion: int64(authorization.Version()), CreatedAt: Timestamptz(now), ExpiresAt: Timestamptz(expires), MaxUses: int32(req.Msg.GetMaxUses()), ApprovalRequired: req.Msg.GetApprovalRequired(), Assignment: encoded, Reason: req.Msg.GetReason(), Name: req.Msg.GetName()}); err != nil {
 			return nil, MapErr(err)
 		}
 		if err := InsertAudit(ctx, q, &actor.ID, "provisioning_token.create", id.String(), req.Msg.GetReason()); err != nil {
@@ -188,6 +188,7 @@ func (s *Service) ListProvisioningTokens(ctx context.Context, req *connect.Reque
 			return nil, MapErr(err)
 		}
 		item := &adminv1.ProvisioningToken{TokenId: row.ID.String(), CreatedBy: row.CreatedBy.String(), CreatorDisplayName: row.CreatorDisplayName, CreatedAt: timestamppb.New(row.CreatedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), MaxUses: uint32(row.MaxUses), UsedCount: uint32(row.UsedCount), ApprovalRequired: row.ApprovalRequired, Reason: row.Reason, Metadata: assignment.GetMetadata(), GroupIds: assignment.GetGroupIds(), ProfileRevisionIds: assignment.GetProfileRevisionIds()}
+		item.Name = row.Name
 		if row.RevokedAt.Valid {
 			item.RevokedAt = timestamppb.New(row.RevokedAt.Time)
 		}

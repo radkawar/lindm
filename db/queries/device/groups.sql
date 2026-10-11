@@ -1,6 +1,7 @@
--- name: UpsertDeviceGroup :exec
+-- name: UpsertDeviceGroup :execrows
 INSERT INTO device_groups (id, name) VALUES (sqlc.arg('id'), sqlc.arg('name'))
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+WHERE NOT sqlc.arg('create_only')::boolean;
 
 -- name: LockDeviceGroup :one
 SELECT id, name FROM device_groups WHERE id = sqlc.arg('id') FOR UPDATE;

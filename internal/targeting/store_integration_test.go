@@ -414,6 +414,25 @@ func TestRolloutAutomaticPromotionRetainsCanaryAdmission(t *testing.T) {
 	if _, err := f.pool.Exec(t.Context(), "UPDATE resource_rollouts SET stage_started_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", id); err != nil {
 		t.Fatal(err)
 	}
+	var fenceBefore, fenceAfter int64
+	if err := f.pool.QueryRow(t.Context(), "SELECT revision FROM targeting_lock WHERE singleton").Scan(&fenceBefore); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.transaction(t, func(tx pgx.Tx) error {
+		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100, ReadOnly: true})
+		if err == nil && (len(out.Rollouts) != 1 || out.Rollouts[0].RingIndex != 0 || out.Rollouts[0].Revision != 1 || out.Rollouts[0].Paused) {
+			t.Error("read-only planning changed a promotion-ready rollout")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.pool.QueryRow(t.Context(), "SELECT revision FROM targeting_lock WHERE singleton").Scan(&fenceAfter); err != nil {
+		t.Fatal(err)
+	}
+	if fenceBefore != fenceAfter {
+		t.Fatal("read-only rollout projection updated the targeting fence")
+	}
 	if err := f.transaction(t, func(tx pgx.Tx) error {
 		out, err := f.store.ListRollouts(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ListRolloutsRequest{PageSize: 100})
 		if err == nil && (len(out.Rollouts) != 1 || out.Rollouts[0].RingIndex != 1) {

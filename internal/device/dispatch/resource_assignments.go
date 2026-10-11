@@ -26,6 +26,7 @@ import (
 	"lindm/internal/identity"
 	"lindm/internal/policy"
 	"lindm/internal/rpcreason"
+	"lindm/internal/targeting"
 )
 
 func (s *Service) SetResourceAssignment(ctx context.Context, req *connect.Request[adminv1.SetResourceAssignmentRequest]) (*connect.Response[adminv1.SetResourceAssignmentResponse], error) {
@@ -253,6 +254,13 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			return nil, core.MapErr(err)
 		}
 		if err == nil {
+			if s.Targeting != nil {
+				preview, err := s.Targeting.ExecutionPreview(ctx, tx, id, *device.CurrentGenerationID, head.ID)
+				if err != nil && !errors.Is(err, targeting.ErrNotFound) {
+					return nil, core.MapErr(err)
+				}
+				response.ActiveTargetPreview = preview
+			}
 			if err := populateResourceStates(ctx, q, head, response, now); err != nil {
 				return nil, err
 			}

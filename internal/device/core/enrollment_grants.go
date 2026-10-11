@@ -49,6 +49,10 @@ func (s *Service) ListEnrollmentGrants(ctx context.Context, req *connect.Request
 			MaxUses: 1, ExpiresAt: timestamppb.New(row.ExpiresAt.Time), CreatedAt: timestamppb.New(row.CreatedAt.Time),
 			CreatedBy: row.CreatedBy.String(), CreatorDisplayName: row.CreatorDisplayName,
 			ConsumedDeviceHostname: row.ConsumedDeviceHostname, Labels: row.Labels,
+			Name: row.Name,
+		}
+		if row.RevokedAt.Valid {
+			item.RevokedAt = timestamppb.New(row.RevokedAt.Time)
 		}
 		switch {
 		case row.ConsumedAt.Valid:

@@ -274,6 +274,11 @@ message CreateEnrollmentGrantRequest {
     lte: 900
   }];
   string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Optional human label. Nonempty names are unique among unrevoked grants.
+  string name = 4 [(buf.validate.field).string = {
+    max_len: 257
+    not_contains: "\000"
+  }];
 }
 message CreateEnrollmentGrantResponse {
   string grant_id = 1;

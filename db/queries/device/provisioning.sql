@@ -1,6 +1,6 @@
 -- name: InsertProvisioningToken :exec
-INSERT INTO provisioning_tokens (id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, approval_required, assignment, reason)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+INSERT INTO provisioning_tokens (id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, approval_required, assignment, reason, name)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);
 
 -- name: GetProvisioningTokenByHash :one
 SELECT * FROM provisioning_tokens WHERE token_hash = $1;
@@ -13,7 +13,7 @@ SELECT * FROM provisioning_tokens WHERE id = $1 FOR UPDATE;
 
 -- name: ListProvisioningTokens :many
 SELECT t.id, t.created_by, t.created_at, t.expires_at, t.max_uses,
-    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at,
+    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at, t.name,
     coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name
 FROM provisioning_tokens t
 LEFT JOIN principals creator ON creator.id = t.created_by

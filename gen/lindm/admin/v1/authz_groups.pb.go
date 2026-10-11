@@ -190,12 +190,14 @@ func (x *ListDeviceGroupsResponse) GetNextPageToken() string {
 // Group membership is authorization policy, not device inventory metadata.
 // All group operations require unrestricted accounts.manage authority.
 type SetDeviceGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	DeviceIds     []string               `protobuf:"bytes,4,rep,name=device_ids,json=deviceIds,proto3" json:"device_ids,omitempty"`
-	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	GroupId   string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	Name      string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	DeviceIds []string               `protobuf:"bytes,4,rep,name=device_ids,json=deviceIds,proto3" json:"device_ids,omitempty"`
+	Reason    string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Refuse an existing ID atomically, without replacing its RBAC membership.
+	CreateOnly    bool `protobuf:"varint,6,opt,name=create_only,json=createOnly,proto3" json:"create_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -263,6 +265,13 @@ func (x *SetDeviceGroupRequest) GetReason() string {
 		return x.Reason
 	}
 	return ""
+}
+
+func (x *SetDeviceGroupRequest) GetCreateOnly() bool {
+	if x != nil {
+		return x.CreateOnly
+	}
+	return false
 }
 
 type SetDeviceGroupResponse struct {
@@ -421,7 +430,7 @@ const file_lindm_admin_v1_authz_groups_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\tpageToken\"w\n" +
 	"\x18ListDeviceGroupsResponse\x123\n" +
 	"\x06groups\x18\x01 \x03(\v2\x1b.lindm.admin.v1.DeviceGroupR\x06groups\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xdf\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x80\x02\n" +
 	"\x15SetDeviceGroupRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12#\n" +
@@ -429,7 +438,9 @@ const file_lindm_admin_v1_authz_groups_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tB\x0e\xbaH\vr\t\x10\x01\x18\x80\x01\xba\x01\x01\x00R\x04name\x121\n" +
 	"\n" +
 	"device_ids\x18\x04 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10\xe8\a\x18\x01\"\x05r\x03\xb0\x01\x01R\tdeviceIds\x12!\n" +
-	"\x06reason\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"K\n" +
+	"\x06reason\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12\x1f\n" +
+	"\vcreate_only\x18\x06 \x01(\bR\n" +
+	"createOnly\"K\n" +
 	"\x16SetDeviceGroupResponse\x121\n" +
 	"\x05group\x18\x01 \x01(\v2\x1b.lindm.admin.v1.DeviceGroupR\x05group\"\x8b\x01\n" +
 	"\x18DeleteDeviceGroupRequest\x12'\n" +

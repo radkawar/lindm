@@ -64,7 +64,7 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 	if err := s.rules.Validate(request); err != nil {
 		return nil, ErrProfileRejected
 	}
-	spec, specDigest, err := canonicalSpec(ctx, request.GetSpec())
+	spec, specDigest, err := CanonicalSpec(ctx, request.GetSpec())
 	if err != nil {
 		return nil, profileInputError(ctx, err)
 	}

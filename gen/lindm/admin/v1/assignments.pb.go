@@ -838,8 +838,10 @@ type GetDeviceResourceStateResponse struct {
 	// including actions closed by head changes or expiry.
 	RecentActions []*DeviceResourceAction `protobuf:"bytes,3,rep,name=recent_actions,json=recentActions,proto3" json:"recent_actions,omitempty"`
 	Releases      []*ResourceRelease      `protobuf:"bytes,4,rep,name=releases,proto3" json:"releases,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Exact retained active snapshot, not a new preview or inferred compliance.
+	ActiveTargetPreview *v12.TargetPreview `protobuf:"bytes,5,opt,name=active_target_preview,json=activeTargetPreview,proto3" json:"active_target_preview,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *GetDeviceResourceStateResponse) Reset() {
@@ -896,6 +898,13 @@ func (x *GetDeviceResourceStateResponse) GetRecentActions() []*DeviceResourceAct
 func (x *GetDeviceResourceStateResponse) GetReleases() []*ResourceRelease {
 	if x != nil {
 		return x.Releases
+	}
+	return nil
+}
+
+func (x *GetDeviceResourceStateResponse) GetActiveTargetPreview() *v12.TargetPreview {
+	if x != nil {
+		return x.ActiveTargetPreview
 	}
 	return nil
 }
@@ -1004,7 +1013,7 @@ var File_lindm_admin_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
+	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
 	"\x12ResourceAssignment\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1082,14 +1091,15 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\x120\n" +
 	"\x03ref\x18\x03 \x01(\v2\x1e.lindm.resource.v1.ResourceRefR\x03ref\x12=\n" +
-	"\x06action\x18\x04 \x01(\v2%.lindm.admin.v1.ResourceActionSummaryR\x06action\"\xab\x02\n" +
+	"\x06action\x18\x04 \x01(\v2%.lindm.admin.v1.ResourceActionSummaryR\x06action\"\xff\x02\n" +
 	"\x1eGetDeviceResourceStateResponse\x12B\n" +
 	"\n" +
 	"assignment\x18\x01 \x01(\v2\".lindm.admin.v1.ResourceAssignmentR\n" +
 	"assignment\x12;\n" +
 	"\tresources\x18\x02 \x03(\v2\x1d.lindm.admin.v1.ResourceStateR\tresources\x12K\n" +
 	"\x0erecent_actions\x18\x03 \x03(\v2$.lindm.admin.v1.DeviceResourceActionR\rrecentActions\x12;\n" +
-	"\breleases\x18\x04 \x03(\v2\x1f.lindm.admin.v1.ResourceReleaseR\breleases\"\xfc\x02\n" +
+	"\breleases\x18\x04 \x03(\v2\x1f.lindm.admin.v1.ResourceReleaseR\breleases\x12R\n" +
+	"\x15active_target_preview\x18\x05 \x01(\v2\x1e.lindm.policy.v1.TargetPreviewR\x13activeTargetPreview\"\xfc\x02\n" +
 	"\x0fResourceRelease\x12\x1d\n" +
 	"\n" +
 	"release_id\x18\x01 \x01(\tR\treleaseId\x120\n" +
@@ -1149,6 +1159,7 @@ var file_lindm_admin_v1_assignments_proto_goTypes = []any{
 	(*v11.ResourceDesiredState)(nil),       // 14: lindm.resource.v1.ResourceDesiredState
 	(*v12.ResourceDependency)(nil),         // 15: lindm.policy.v1.ResourceDependency
 	(*v11.ResourceRef)(nil),                // 16: lindm.resource.v1.ResourceRef
+	(*v12.TargetPreview)(nil),              // 17: lindm.policy.v1.TargetPreview
 }
 var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	12, // 0: lindm.admin.v1.ResourceAssignment.assigned_at:type_name -> google.protobuf.Timestamp
@@ -1174,14 +1185,15 @@ var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	8,  // 20: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
 	9,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction
 	11, // 22: lindm.admin.v1.GetDeviceResourceStateResponse.releases:type_name -> lindm.admin.v1.ResourceRelease
-	16, // 23: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
-	12, // 24: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
-	12, // 25: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	17, // 23: lindm.admin.v1.GetDeviceResourceStateResponse.active_target_preview:type_name -> lindm.policy.v1.TargetPreview
+	16, // 24: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
+	12, // 25: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
+	12, // 26: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_assignments_proto_init() }

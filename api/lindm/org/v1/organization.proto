@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package lindm.org.v1;
+
+import "buf/validate/validate.proto";
+import "lindm/admin/v1/admin.proto";
+import "lindm/admin/v1/advisories.proto";
+import "lindm/admin/v1/provisioning.proto";
+import "lindm/admin/v1/targeting.proto";
+import "lindm/auth/v1/auth.proto";
+import "lindm/auth/v1/authorization.proto";
+import "lindm/policy/v1/profile.proto";
+import "lindm/policy/v1/targeting.proto";
+
+option go_package = "lindm/gen/lindm/org/v1;orgv1";
+
+// Organization composes product API messages; it is not a second policy language.
+// Omitted objects are not deleted. Accounts require a browser-kind session and
+// authorization is server configuration, never mutable through AdminService.
+message Organization {
+  option (buf.validate.message).cel = {
+    id: "organization.unique_ids"
+    message: "object identifiers and enrollment names must be unique within their sections"
+    expression: "this.groups.all(x, this.groups.filter(y, y.id == x.id).size() == 1) && this.dynamic_groups.all(x, this.dynamic_groups.filter(y, y.group_id == x.group_id).size() == 1) && this.profiles.all(x, this.profiles.filter(y, y.id == x.id).size() == 1) && this.assignments.all(x, this.assignments.filter(y, y.assignment.assignment_id == x.assignment.assignment_id).size() == 1) && this.rollouts.all(x, this.rollouts.filter(y, y.rollout_id == x.rollout_id).size() == 1) && this.provisioning_tokens.all(x, this.provisioning_tokens.filter(y, y.name == x.name).size() == 1) && this.grants.all(x, this.grants.filter(y, y.name == x.name).size() == 1) && this.accounts.all(x, this.accounts.filter(y, y.username == x.username).size() == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "organization.profile_refs"
+    message: "assignments must reference a declared profile"
+    expression: "this.assignments.all(x, this.profiles.exists(p, p.id == x.profile_id))"
+  };
+  option (buf.validate.message).cel = {
+    id: "organization.target_refs"
+    message: "assignments must target declared static or dynamic groups and declared rollouts"
+    expression: "this.assignments.all(x, (has(x.assignment.target.static_group_id) && this.groups.exists(g, g.id == x.assignment.target.static_group_id) || has(x.assignment.target.dynamic_group_id) && this.dynamic_groups.exists(g, g.group_id == x.assignment.target.dynamic_group_id)) && (!has(x.assignment.rollout_id) || this.rollouts.exists(r, r.rollout_id == x.assignment.rollout_id)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "organization.enrollment_groups"
+    message: "provisioning token group references must name declared static groups"
+    expression: "this.provisioning_tokens.all(t, t.request.group_ids.all(id, this.groups.exists(g, g.id == id)))"
+  };
+  option (buf.validate.message).cel = {
+    id: "organization.dynamic_revision"
+    message: "dynamic group revisions are engine observed"
+    expression: "this.dynamic_groups.all(g, g.revision == 0u)"
+  };
+  option (buf.validate.message).cel = {
+    id: "organization.unique_exceptions"
+    message: "advisory exception selectors must be unique"
+    expression: "this.advisory_exceptions.all(x, this.advisory_exceptions.filter(y, y.hostname == x.hostname && y.advisory_id == x.advisory_id && y.package_name == x.package_name).size() == 1)"
+  };
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  repeated StaticGroup groups = 2 [(buf.validate.field).repeated.max_items = 100];
+  repeated lindm.admin.v1.DynamicTargetGroup dynamic_groups = 3 [(buf.validate.field).repeated.max_items = 100];
+  repeated Profile profiles = 4 [(buf.validate.field).repeated.max_items = 100];
+  repeated Assignment assignments = 5 [(buf.validate.field).repeated.max_items = 100];
+  repeated lindm.policy.v1.RolloutSpec rollouts = 6 [(buf.validate.field).repeated.max_items = 100];
+  repeated ProvisioningToken provisioning_tokens = 7 [(buf.validate.field).repeated.max_items = 100];
+  repeated EnrollmentGrant grants = 8 [(buf.validate.field).repeated.max_items = 100];
+  repeated AdvisoryException advisory_exceptions = 9 [(buf.validate.field).repeated.max_items = 100];
+  // Browser scoped: CLI reports requires console session without changing these.
+  repeated lindm.auth.v1.CreateAccountRequest accounts = 10 [(buf.validate.field).repeated.max_items = 100];
+  // Server scoped: the caller that owns server configuration applies this policy.
+  lindm.auth.v1.AuthorizationPolicy authorization = 11;
+}
+
+message StaticGroup {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+}
+message Profile {
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  // The display name is spec.name, sharing ResourceProfile validation.
+  lindm.policy.v1.ResourceProfile spec = 2 [(buf.validate.field).required = true];
+}
+message Assignment {
+  string profile_id = 1 [(buf.validate.field).string.uuid = true];
+  // profile_revision_id is resolved to the latest published revision by the
+  // engine. The completed product message is validated before any mutation.
+  lindm.policy.v1.TargetAssignment assignment = 2 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  option (buf.validate.message).cel = {
+    id: "organization.assignment_template"
+    message: "assignment is required and profile_revision_id is engine resolved"
+    expression: "has(this.assignment) && this.assignment.profile_revision_id == ''"
+  };
+}
+message ProvisioningToken {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  // request_id and reason are derived by the engine. All remaining fields reuse
+  // CreateProvisioningTokenRequest validation after completion, before mutation.
+  lindm.admin.v1.CreateProvisioningTokenRequest request = 2 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  option (buf.validate.message).cel = {
+    id: "organization.token_template"
+    message: "request is required; request_id, name and reason are engine owned"
+    expression: "has(this.request) && this.request.request_id == '' && this.request.reason == '' && this.request.name == ''"
+  };
+}
+message EnrollmentGrant {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    not_contains: "\000"
+  }];
+  lindm.admin.v1.CreateEnrollmentGrantRequest request = 2 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  option (buf.validate.message).cel = {
+    id: "organization.grant_template"
+    message: "request is required; request_id, name and reason are engine owned"
+    expression: "has(this.request) && this.request.request_id == '' && this.request.reason == '' && this.request.name == ''"
+  };
+}
+message AdvisoryException {
+  string hostname = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 253
+    not_contains: "\000"
+  }];
+  string advisory_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    not_contains: "\000"
+  }];
+  string package_name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+    not_contains: "\000"
+  }];
+  // The selector resolves device_id/finding_id. reason and expires_at are the
+  // existing product exception request, not a parallel acceptance schema.
+  lindm.admin.v1.AcceptAdvisoryFindingRequest request = 4 [(buf.validate.field).ignore = IGNORE_ALWAYS];
+  option (buf.validate.message).cel = {
+    id: "organization.exception_template"
+    message: "request is required; request, device and finding IDs are engine resolved"
+    expression: "has(this.request) && this.request.request_id == '' && this.request.device_id == '' && this.request.finding_id == ''"
+  };
+}

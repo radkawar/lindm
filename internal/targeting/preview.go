@@ -533,8 +533,8 @@ func (s *Store) CheckExecution(ctx context.Context, tx pgx.Tx, deviceID, generat
 	return true, nil
 }
 
-// ExecutionPreview reads immutable provenance only after the dispatch caller has
-// checked execution eligibility under the targeting and device/head locks.
+// ExecutionPreview reads immutable provenance after the caller has authorized
+// access under the device/head locks. Reading is not execution eligibility.
 func (s *Store) ExecutionPreview(ctx context.Context, tx pgx.Tx, deviceID, generationID, assignmentID uuid.UUID) (*policyv1.TargetPreview, error) {
 	if tx == nil {
 		return nil, ErrRejected
@@ -551,6 +551,33 @@ func (s *Store) ExecutionPreview(ctx context.Context, tx pgx.Tx, deviceID, gener
 		return nil, err
 	}
 	if row.DeviceID != deviceID || preview.GetDeviceId() != deviceID.String() || preview.GetGenerationId() != generationID.String() || preview.GetPreviewId() != assignmentID.String() {
+		return nil, ErrRejected
+	}
+	return preview, nil
+}
+
+// ApprovalPreview reads only the immutable evidence bound to an already
+// authorized approval payload. The caller must authorize access to its device.
+func (s *Store) ApprovalPreview(ctx context.Context, tx pgx.Tx, request *adminv1.ActivateTargetPreviewRequest) (*policyv1.TargetPreview, error) {
+	if tx == nil || request == nil {
+		return nil, ErrRejected
+	}
+	id, err := uuid.Parse(request.GetPreviewId())
+	if err != nil {
+		return nil, ErrRejected
+	}
+	row, err := targetingdb.New(tx).GetTargetPreview(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	preview := new(policyv1.TargetPreview)
+	if err := proto.Unmarshal(row.Document, preview); err != nil {
+		return nil, err
+	}
+	if row.DeviceID.String() != request.GetDeviceId() || preview.GetDeviceId() != request.GetDeviceId() || preview.GetPreviewId() != request.GetPreviewId() || !bytes.Equal(preview.GetPreviewSha256(), request.GetPreviewSha256()) {
 		return nil, ErrRejected
 	}
 	return preview, nil

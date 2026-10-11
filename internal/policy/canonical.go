@@ -12,9 +12,9 @@ import (
 	policyv1 "lindm/gen/lindm/policy/v1"
 )
 
-// canonicalSpec preserves semantic values while making resource/dependency order
+// CanonicalSpec preserves semantic values while making resource/dependency order
 // and UUID spelling irrelevant to immutable revision and request identities.
-func canonicalSpec(ctx context.Context, input *policyv1.ResourceProfile) (*policyv1.ResourceProfile, [sha256.Size]byte, error) {
+func CanonicalSpec(ctx context.Context, input *policyv1.ResourceProfile) (*policyv1.ResourceProfile, [sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
 	if err := Validate(ctx, input); err != nil {
 		return nil, zero, err

@@ -1,0 +1,1041 @@
+{
+  "name": "demo-company",
+  "groups": [
+    {
+      "id": "26d5407e-0035-5ae1-b4c9-83d105e13915",
+      "name": "Engineering"
+    },
+    {
+      "id": "9b1eb9f4-dee7-54b3-839d-4e0938f5a579",
+      "name": "Finance"
+    },
+    {
+      "id": "ce806573-be05-59fa-9891-8b152b22efb3",
+      "name": "IT/Helpdesk"
+    },
+    {
+      "id": "93d3baa6-5ff8-5eb2-8840-ee544b678db6",
+      "name": "Contractors"
+    }
+  ],
+  "dynamicGroups": [
+    {
+      "groupId": "8029fa4d-d52d-5dd8-94ff-ef9371b8da8f",
+      "name": "Engineering devices",
+      "expression": {
+        "nodes": [
+          {
+            "depth": 1,
+            "predicate": {
+              "labels": ["department/engineering"]
+            }
+          }
+        ],
+        "inventoryMaxAgeSeconds": 86400
+      }
+    },
+    {
+      "groupId": "82374274-7c2a-5fd2-b9c2-004e17e4be8e",
+      "name": "Finance devices",
+      "expression": {
+        "nodes": [
+          {
+            "depth": 1,
+            "predicate": {
+              "labels": ["department/finance"]
+            }
+          }
+        ],
+        "inventoryMaxAgeSeconds": 86400
+      }
+    },
+    {
+      "groupId": "2491d47d-9e58-5b52-aee6-bf5011ce322c",
+      "name": "IT/Helpdesk devices",
+      "expression": {
+        "nodes": [
+          {
+            "depth": 1,
+            "predicate": {
+              "labels": ["department/it-helpdesk"]
+            }
+          }
+        ],
+        "inventoryMaxAgeSeconds": 86400
+      }
+    },
+    {
+      "groupId": "dc42febb-65f6-5c0c-8e12-67aa15f16555",
+      "name": "Contractors devices",
+      "expression": {
+        "nodes": [
+          {
+            "depth": 1,
+            "predicate": {
+              "labels": ["department/contractors"]
+            }
+          }
+        ],
+        "inventoryMaxAgeSeconds": 86400
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "username": "owner",
+      "role": "owner"
+    },
+    {
+      "username": "helpdesk",
+      "role": "demo-helpdesk"
+    },
+    {
+      "username": "analyst",
+      "role": "demo-security-analyst"
+    },
+    {
+      "username": "auditor",
+      "role": "auditor"
+    }
+  ],
+  "authorization": {
+    "roles": [
+      {
+        "name": "demo-helpdesk",
+        "permissions": ["fleet.read", "remote_assistance.run", "actions.lock"]
+      },
+      {
+        "name": "demo-security-analyst",
+        "permissions": [
+          "fleet.read",
+          "advisory_exceptions.manage",
+          "approvals.manage",
+          "actions.lock"
+        ]
+      }
+    ],
+    "approvalRequiredPermissions": ["actions.lock"]
+  },
+  "profiles": [
+    {
+      "id": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
+      "spec": {
+        "name": "Company baseline",
+        "description": "Shared security baseline; executor file allowed_roots must include /etc/motd.d.",
+        "resources": [
+          {
+            "resourceId": "be829bf4-93b4-514f-b6ef-6edf2f1dbeba",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_PASSWORD_POLICY",
+                "canonicalKey": "system/local-auth"
+              },
+              "passwordPolicy": {
+                "minLength": 14,
+                "minClasses": 3,
+                "historyCount": 10,
+                "maxAgeDays": 90,
+                "minAgeDays": 1,
+                "warnDays": 14,
+                "failureLimit": 5,
+                "unlockAfterSeconds": 900,
+                "enforceForRoot": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "5a8a187a-d28c-506e-ae52-0b65fbda3535",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_FIREWALL_ZONE",
+                "canonicalKey": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92"
+              },
+              "firewallZone": {
+                "zoneId": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92",
+                "presence": "PRESENCE_PRESENT",
+                "defaultIngress": "FIREWALL_VERDICT_DROP",
+                "defaultEgress": "FIREWALL_VERDICT_ACCEPT",
+                "rules": [
+                  {
+                    "ruleId": "c9e1439e-09fb-5ee4-8ed2-601ce6f4d88a",
+                    "direction": "FIREWALL_DIRECTION_INPUT",
+                    "family": "IP_FAMILY_IPV4",
+                    "protocol": "IP_PROTOCOL_TCP",
+                    "destinationPorts": [
+                      {
+                        "first": 22,
+                        "last": 22
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  },
+                  {
+                    "ruleId": "1ff3b6f5-e9b8-5b53-ba1a-2a14c26062f8",
+                    "direction": "FIREWALL_DIRECTION_INPUT",
+                    "family": "IP_FAMILY_IPV6",
+                    "protocol": "IP_PROTOCOL_TCP",
+                    "destinationPorts": [
+                      {
+                        "first": 22,
+                        "last": 22
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  }
+                ]
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "af3ad933-16a0-5375-96c8-280b34e57517",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_MANAGED_FILE",
+                "canonicalKey": "/etc/motd.d/50-company"
+              },
+              "managedFile": {
+                "path": "/etc/motd.d/50-company",
+                "presence": "PRESENCE_PRESENT",
+                "content": "Q29tcGFueSBtYW5hZ2VkIGRldmljZS4gQXV0aG9yaXplZCB1c2Ugb25seS4K",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "4e7870b6-29e5-5cb3-9be7-d893029d42b1",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSTEMD_SERVICE",
+                "canonicalKey": "cups.service"
+              },
+              "systemdService": {
+                "unit": "cups.service",
+                "runtime": "SERVICE_RUNTIME_STATE_INACTIVE",
+                "enablement": "SERVICE_ENABLEMENT_DISABLED"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "03c4ee8c-ddb3-55eb-bd66-60ac022e8b59",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_OS_UPDATE_POLICY",
+                "canonicalKey": "system"
+              },
+              "osUpdate": {
+                "selection": "UPDATE_SELECTION_SECURITY",
+                "maintenance": {
+                  "timeZone": "Europe/London",
+                  "weekdays": [
+                    "WEEKDAY_MONDAY",
+                    "WEEKDAY_TUESDAY",
+                    "WEEKDAY_WEDNESDAY",
+                    "WEEKDAY_THURSDAY",
+                    "WEEKDAY_FRIDAY",
+                    "WEEKDAY_SATURDAY",
+                    "WEEKDAY_SUNDAY"
+                  ],
+                  "localStartMinute": 120,
+                  "durationMinutes": 120
+                },
+                "rebootPolicy": {
+                  "mode": "OS_UPDATE_REBOOT_MODE_SCHEDULED",
+                  "maxDelayMinutes": 120,
+                  "notice": "Security updates require a restart. Save your work."
+                }
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "7dd6b7d0-e8ee-55df-9ac4-557bb1c9436b",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "kernel.kptr_restrict"
+              },
+              "sysctl": {
+                "key": "kernel.kptr_restrict",
+                "value": "2",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "36169404-7674-5a33-b2ad-6e3d31f42af2",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "kernel.dmesg_restrict"
+              },
+              "sysctl": {
+                "key": "kernel.dmesg_restrict",
+                "value": "1",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "f3beca00-8a31-5d41-aaad-96ffed27adf3",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "net.ipv4.conf.all.accept_redirects"
+              },
+              "sysctl": {
+                "key": "net.ipv4.conf.all.accept_redirects",
+                "value": "0",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "cab4ef19-709a-5471-87d3-520361903656",
+      "spec": {
+        "name": "Engineering tools",
+        "description": "Ubuntu 24.04 DEB amd64/arm64 package approvals required; developer starts with a locked password.",
+        "resources": [
+          {
+            "resourceId": "d15d570c-499a-5f34-bc07-5b020a0e4f53",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/git/arm64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "git",
+                  "architecture": "arm64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "a98ce4a9-f0b5-5ce4-9995-e148a0407abc",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/htop/arm64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "htop",
+                  "architecture": "arm64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "5b7111f5-46d1-56c0-83f3-c8a3749a7b97",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/podman/arm64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "podman",
+                  "architecture": "arm64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/6ad79126-c32f-552b-89b7-6956410314fb"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "aarch64"
+                }
+              ]
+            }
+          },
+          {
+            "resourceId": "d56a34d7-b596-58b7-945f-1d2c6b0b606e",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/git/amd64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "git",
+                  "architecture": "amd64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                }
+              ]
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "546dbc3d-f046-506a-82e6-e8e325a1e8a9",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/htop/amd64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "htop",
+                  "architecture": "amd64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                }
+              ]
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "ef766ec8-e189-5cf2-8ed5-7c5948e44960",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_NATIVE_PACKAGE",
+                "canonicalKey": "deb/podman/amd64"
+              },
+              "nativePackage": {
+                "package": {
+                  "ecosystem": "PACKAGE_ECOSYSTEM_DEB",
+                  "nativeName": "podman",
+                  "architecture": "amd64"
+                },
+                "presence": "PRESENCE_PRESENT",
+                "any": {},
+                "repository": {
+                  "kind": "RESOURCE_KIND_PACKAGE_REPOSITORY",
+                  "canonicalKey": "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"
+                },
+                "removal": "PACKAGE_REMOVAL_POLICY_PRESERVE_DATA"
+              }
+            },
+            "applicability": {
+              "products": [
+                {
+                  "osId": "ubuntu",
+                  "product": "Ubuntu",
+                  "version": "24.04",
+                  "architecture": "x86_64"
+                }
+              ]
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "82e49a02-f029-561e-a5c8-b55a9d6b5c70",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_LOCAL_GROUP",
+                "canonicalKey": "developers"
+              },
+              "localGroup": {
+                "name": "developers",
+                "presence": "PRESENCE_PRESENT"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "469ca334-dce1-5dd1-8bf4-8eecfb768694",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_LOCAL_USER",
+                "canonicalKey": "developer"
+              },
+              "localUser": {
+                "name": "developer",
+                "presence": "PRESENCE_PRESENT",
+                "primaryGroup": "developers",
+                "password": {
+                  "locked": {}
+                }
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            },
+            "dependsOn": [
+              {
+                "ref": {
+                  "kind": "RESOURCE_KIND_LOCAL_GROUP",
+                  "canonicalKey": "developers"
+                },
+                "condition": "DEPENDENCY_CONDITION_VERIFIED_PRESENT"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "32e2cd56-942d-598e-ab1e-a08ab71a1769",
+      "spec": {
+        "name": "Finance hardened",
+        "description": "Higher-priority password and firewall policy; sshd.service is stopped and disabled on the Finance host.",
+        "resources": [
+          {
+            "resourceId": "2d9b052d-75b6-5839-9985-e0925ac4b053",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_PASSWORD_POLICY",
+                "canonicalKey": "system/local-auth"
+              },
+              "passwordPolicy": {
+                "minLength": 18,
+                "minClasses": 4,
+                "historyCount": 20,
+                "maxAgeDays": 60,
+                "minAgeDays": 1,
+                "warnDays": 14,
+                "failureLimit": 3,
+                "unlockAfterSeconds": 900,
+                "enforceForRoot": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "e289bafc-f5bc-5fd2-8a54-61201cddf41a",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_FIREWALL_ZONE",
+                "canonicalKey": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92"
+              },
+              "firewallZone": {
+                "zoneId": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92",
+                "presence": "PRESENCE_PRESENT",
+                "defaultIngress": "FIREWALL_VERDICT_DROP",
+                "defaultEgress": "FIREWALL_VERDICT_ACCEPT",
+                "rules": []
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "6a8c6979-af79-5627-b56d-d20e59739126",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSTEMD_SERVICE",
+                "canonicalKey": "sshd.service"
+              },
+              "systemdService": {
+                "unit": "sshd.service",
+                "runtime": "SERVICE_RUNTIME_STATE_INACTIVE",
+                "enablement": "SERVICE_ENABLEMENT_DISABLED"
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "2867fbc6-4a75-5aaf-8493-f63467806ca4",
+      "spec": {
+        "name": "Contractors",
+        "description": "Deny ingress; allow outbound TCP 80/443/53 and UDP 53 only. Nightly 30-minute update start window.",
+        "resources": [
+          {
+            "resourceId": "d846a7cd-275c-560d-9997-57175560bdf6",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_FIREWALL_ZONE",
+                "canonicalKey": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92"
+              },
+              "firewallZone": {
+                "zoneId": "db7f6c12-b34a-59d7-aae7-b5474fdc3f92",
+                "presence": "PRESENCE_PRESENT",
+                "defaultIngress": "FIREWALL_VERDICT_DROP",
+                "defaultEgress": "FIREWALL_VERDICT_DROP",
+                "rules": [
+                  {
+                    "ruleId": "9e11a15a-9995-5f9e-8ab2-1cad6a50f9e3",
+                    "direction": "FIREWALL_DIRECTION_OUTPUT",
+                    "family": "IP_FAMILY_IPV4",
+                    "protocol": "IP_PROTOCOL_TCP",
+                    "destinationPorts": [
+                      {
+                        "first": 80,
+                        "last": 80
+                      },
+                      {
+                        "first": 443,
+                        "last": 443
+                      },
+                      {
+                        "first": 53,
+                        "last": 53
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  },
+                  {
+                    "ruleId": "05330edd-e36b-53d6-a2c2-bc22c7caf72c",
+                    "direction": "FIREWALL_DIRECTION_OUTPUT",
+                    "family": "IP_FAMILY_IPV4",
+                    "protocol": "IP_PROTOCOL_UDP",
+                    "destinationPorts": [
+                      {
+                        "first": 53,
+                        "last": 53
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  },
+                  {
+                    "ruleId": "340b7983-d3d6-5eda-9312-864254fe40c5",
+                    "direction": "FIREWALL_DIRECTION_OUTPUT",
+                    "family": "IP_FAMILY_IPV6",
+                    "protocol": "IP_PROTOCOL_TCP",
+                    "destinationPorts": [
+                      {
+                        "first": 80,
+                        "last": 80
+                      },
+                      {
+                        "first": 443,
+                        "last": 443
+                      },
+                      {
+                        "first": 53,
+                        "last": 53
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  },
+                  {
+                    "ruleId": "de25ed56-4ff7-56b9-8291-8502d4c320d5",
+                    "direction": "FIREWALL_DIRECTION_OUTPUT",
+                    "family": "IP_FAMILY_IPV6",
+                    "protocol": "IP_PROTOCOL_UDP",
+                    "destinationPorts": [
+                      {
+                        "first": 53,
+                        "last": 53
+                      }
+                    ],
+                    "verdict": "FIREWALL_VERDICT_ACCEPT"
+                  }
+                ]
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "45cdd7bc-38c7-5dd3-a0ae-450fe4a3de91",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_OS_UPDATE_POLICY",
+                "canonicalKey": "system"
+              },
+              "osUpdate": {
+                "selection": "UPDATE_SELECTION_SECURITY",
+                "maintenance": {
+                  "timeZone": "Europe/London",
+                  "weekdays": [
+                    "WEEKDAY_MONDAY",
+                    "WEEKDAY_TUESDAY",
+                    "WEEKDAY_WEDNESDAY",
+                    "WEEKDAY_THURSDAY",
+                    "WEEKDAY_FRIDAY",
+                    "WEEKDAY_SATURDAY",
+                    "WEEKDAY_SUNDAY"
+                  ],
+                  "localStartMinute": 120,
+                  "durationMinutes": 30
+                },
+                "rebootPolicy": {
+                  "mode": "OS_UPDATE_REBOOT_MODE_SCHEDULED",
+                  "maxDelayMinutes": 120,
+                  "notice": "Security updates require a restart. Save your work."
+                }
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "assignments": [
+    {
+      "profileId": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
+      "assignment": {
+        "assignmentId": "ff44b003-99b0-5cfd-9c17-adeb3a14f183",
+        "target": {
+          "dynamicGroupId": "8029fa4d-d52d-5dd8-94ff-ef9371b8da8f"
+        },
+        "priority": 0
+      }
+    },
+    {
+      "profileId": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
+      "assignment": {
+        "assignmentId": "27b43442-71bb-556c-b0fc-5bc0d49bec2a",
+        "target": {
+          "dynamicGroupId": "82374274-7c2a-5fd2-b9c2-004e17e4be8e"
+        },
+        "priority": 0
+      }
+    },
+    {
+      "profileId": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
+      "assignment": {
+        "assignmentId": "5ee0deaa-7d8d-56f4-87ee-43fa6c508d5f",
+        "target": {
+          "dynamicGroupId": "2491d47d-9e58-5b52-aee6-bf5011ce322c"
+        },
+        "priority": 0
+      }
+    },
+    {
+      "profileId": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
+      "assignment": {
+        "assignmentId": "68c62352-c3d1-588e-b454-18946b43a895",
+        "target": {
+          "dynamicGroupId": "dc42febb-65f6-5c0c-8e12-67aa15f16555"
+        },
+        "priority": 0
+      }
+    },
+    {
+      "profileId": "cab4ef19-709a-5471-87d3-520361903656",
+      "assignment": {
+        "assignmentId": "8022c47d-2fc2-55f5-9aa4-382bb2b5b777",
+        "target": {
+          "dynamicGroupId": "8029fa4d-d52d-5dd8-94ff-ef9371b8da8f"
+        },
+        "priority": 100
+      }
+    },
+    {
+      "profileId": "32e2cd56-942d-598e-ab1e-a08ab71a1769",
+      "assignment": {
+        "assignmentId": "9753a839-8cae-5320-b97d-9e69715ae2db",
+        "target": {
+          "dynamicGroupId": "82374274-7c2a-5fd2-b9c2-004e17e4be8e"
+        },
+        "priority": 100
+      }
+    },
+    {
+      "profileId": "2867fbc6-4a75-5aaf-8493-f63467806ca4",
+      "assignment": {
+        "assignmentId": "b16240e0-25a6-5fa1-942e-d4ea40fd992b",
+        "target": {
+          "dynamicGroupId": "dc42febb-65f6-5c0c-8e12-67aa15f16555"
+        },
+        "priority": 100
+      }
+    }
+  ],
+  "provisioningTokens": [
+    {
+      "name": "engineering",
+      "request": {
+        "lifetimeSeconds": 86400,
+        "maxUses": 10,
+        "metadata": {
+          "labels": ["department/engineering"]
+        },
+        "groupIds": ["26d5407e-0035-5ae1-b4c9-83d105e13915"]
+      }
+    },
+    {
+      "name": "finance",
+      "request": {
+        "lifetimeSeconds": 86400,
+        "maxUses": 10,
+        "metadata": {
+          "labels": ["department/finance"]
+        },
+        "groupIds": ["9b1eb9f4-dee7-54b3-839d-4e0938f5a579"]
+      }
+    },
+    {
+      "name": "it-helpdesk",
+      "request": {
+        "lifetimeSeconds": 86400,
+        "maxUses": 10,
+        "metadata": {
+          "labels": ["department/it-helpdesk"]
+        },
+        "groupIds": ["ce806573-be05-59fa-9891-8b152b22efb3"]
+      }
+    },
+    {
+      "name": "contractors",
+      "request": {
+        "lifetimeSeconds": 86400,
+        "maxUses": 10,
+        "metadata": {
+          "labels": ["department/contractors"]
+        },
+        "groupIds": ["93d3baa6-5ff8-5eb2-8840-ee544b678db6"]
+      }
+    }
+  ],
+  "grants": [
+    {
+      "name": "one-time-workstation",
+      "request": {
+        "lifetimeSeconds": 600
+      }
+    }
+  ],
+  "advisoryExceptions": [
+    {
+      "hostname": "demo-engineering-01",
+      "advisoryId": "CVE-2024-6387",
+      "packageName": "openssh-server",
+      "request": {
+        "reason": "Temporary acceptance while the Engineering compatibility test is completed; SSH limited to the approved management network outside this profile.",
+        "expiresAt": "2026-11-25T00:00:00Z"
+      }
+    },
+    {
+      "hostname": "demo-finance-01",
+      "advisoryId": "CVE-2024-3094",
+      "packageName": "xz-utils",
+      "request": {
+        "reason": "Temporary Finance application compatibility review; no SSH access and replacement image scheduled before expiry.",
+        "expiresAt": "2026-12-10T00:00:00Z"
+      }
+    }
+  ]
+}

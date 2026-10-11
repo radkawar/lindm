@@ -125,7 +125,7 @@ func unrestricted(p identity.Principal, perm identity.Permission) error {
 	}
 	return nil
 }
-func begin(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, global bool) (*targetingdb.Queries, error) {
+func beginRead(tx pgx.Tx, p identity.Principal, perm identity.Permission, global bool) (*targetingdb.Queries, error) {
 	if tx == nil || p.ID == uuid.Nil {
 		return nil, ErrRejected
 	}
@@ -134,7 +134,13 @@ func begin(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.P
 			return nil, err
 		}
 	}
-	q := targetingdb.New(tx)
+	return targetingdb.New(tx), nil
+}
+func begin(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, global bool) (*targetingdb.Queries, error) {
+	q, err := beginRead(tx, p, perm, global)
+	if err != nil {
+		return nil, err
+	}
 	if err := q.LockTargeting(ctx); err != nil {
 		return nil, err
 	}
@@ -221,7 +227,7 @@ func (s *Store) ListDynamicGroups(ctx context.Context, tx pgx.Tx, p identity.Pri
 	if err := s.validate(r); err != nil {
 		return nil, err
 	}
-	q, err := begin(ctx, tx, p, perm, true)
+	q, err := beginRead(tx, p, perm, true)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +308,7 @@ func (s *Store) ListAssignments(ctx context.Context, tx pgx.Tx, p identity.Princ
 	if err := s.validate(r); err != nil {
 		return nil, err
 	}
-	q, err := begin(ctx, tx, p, perm, true)
+	q, err := beginRead(tx, p, perm, true)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +360,7 @@ func (s *Store) GetDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Princ
 	if err := s.validate(r); err != nil {
 		return nil, err
 	}
-	q, err := begin(ctx, tx, p, perm, true)
+	q, err := beginRead(tx, p, perm, true)
 	if err != nil {
 		return nil, err
 	}

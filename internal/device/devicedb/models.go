@@ -285,6 +285,7 @@ type ProvisioningToken struct {
 	RevokedAt            pgtype.Timestamptz
 	RevokedBy            *uuid.UUID
 	RevokeReason         string
+	Name                 string
 }
 
 type ReleaseRolloutRequest struct {

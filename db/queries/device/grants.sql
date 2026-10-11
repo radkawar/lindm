@@ -5,14 +5,16 @@ INSERT INTO enrollment_grants (
     created_by,
     created_at,
     expires_at,
-    reason
+    reason,
+    name
 ) VALUES (
     sqlc.arg('id'),
     sqlc.arg('token_hash'),
     sqlc.arg('created_by'),
     sqlc.arg('created_at'),
     sqlc.arg('expires_at'),
-    sqlc.arg('reason')
+    sqlc.arg('reason'),
+    sqlc.arg('name')
 );
 
 -- name: GetGrantByHashForUpdate :one
@@ -76,7 +78,7 @@ WHERE id = sqlc.arg('id')
 
 -- name: ListEnrollmentGrants :many
 SELECT g.id, g.created_by, g.created_at, g.expires_at, g.consumed_at,
-    g.revoked_at, g.device_id,
+    g.revoked_at, g.device_id, g.name,
     coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name,
     coalesce(d.hostname, '')::text AS consumed_device_hostname,
     ARRAY(SELECT l.label FROM device_labels l WHERE l.device_id = g.device_id ORDER BY l.label)::text[] AS labels

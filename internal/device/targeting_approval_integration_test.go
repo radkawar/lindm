@@ -61,6 +61,33 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 	if _, err := svc.ActivateTargetPreview(ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("preview activation bypassed configured resource approval: %v", err)
 	}
+	badRequest := proto.CloneOf(request)
+	badRequest.RequestId = uuid.NewString()
+	badRequest.PreviewSha256[0] ^= 1
+	badApproval := &adminv1.CreateApprovalRequest{
+		LifetimeSeconds: 600,
+		Payload:         &adminv1.CreateApprovalRequest_ActivateTargetPreview{ActivateTargetPreview: badRequest},
+	}
+	if _, err := svc.CreateApproval(ownerCtx, connect.NewRequest(badApproval)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("wrong preview digest was not rejected before commit: %v", err)
+	}
+	listed, err := svc.ListApprovals(ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{}))
+	if err != nil || len(listed.Msg.GetApprovals()) != 0 {
+		t.Fatalf("rejected preview binding left an approval record: %v %v", listed, err)
+	}
+	// Model a historical record created before preview-binding validation. It
+	// must remain listable, but cannot acquire valid optional evidence.
+	historical, err := authority.CreateApproval(ownerCtx, owner.ID, badApproval, svc.RecoveryReadinessApprovalScope(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, err = svc.ListApprovals(ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{}))
+	if err != nil {
+		t.Fatalf("historical mismatched binding poisoned approval inbox: %v", err)
+	}
+	if len(listed.Msg.GetApprovals()) != 1 || listed.Msg.GetApprovals()[0].GetId() != historical.GetId() || listed.Msg.GetApprovals()[0].GetTargetPreview() != nil {
+		t.Fatal("historical mismatched binding was presented as valid evidence")
+	}
 	created, err := svc.CreateApproval(ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{
 		LifetimeSeconds: 600,
 		Payload:         &adminv1.CreateApprovalRequest_ActivateTargetPreview{ActivateTargetPreview: request},
@@ -71,6 +98,16 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 	approval := created.Msg.GetApproval()
 	if approval.GetAction() != "resources.activate_preview" || approval.GetActivateTargetPreview() == nil || approval.GetDeviceId() != request.GetDeviceId() {
 		t.Fatalf("approval lost activation action or device binding: %v", approval)
+	}
+	if !proto.Equal(approval.GetTargetPreview(), preview.Msg.GetPreview()) {
+		t.Fatal("created approval omitted exact retained evidence")
+	}
+	listed, err = svc.ListApprovals(ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listed.Msg.GetCurrentPrincipalId() != owner.ID.String() {
+		t.Fatal("approval list omitted authenticated requester identity")
 	}
 	request.ApprovalId = proto.String(approval.GetId())
 	if _, err := svc.ActivateTargetPreview(ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
@@ -102,6 +139,13 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 	}
 	if _, err := svc.ActivateTargetPreview(ownerCtx, connect.NewRequest(request)); err != nil {
 		t.Fatal(err)
+	}
+	resourceState, err := svc.GetDeviceResourceState(ownerCtx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: request.GetDeviceId()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proto.Equal(resourceState.Msg.GetActiveTargetPreview(), preview.Msg.GetPreview()) {
+		t.Fatal("resource state did not project the exact retained active target preview")
 	}
 	if err := conn.QueryRow(ctx, "SELECT state FROM approval_requests WHERE id=$1", approval.GetId()).Scan(&state); err != nil || state != "consumed" {
 		t.Fatalf("approved activation did not consume approval: state=%s err=%v", state, err)

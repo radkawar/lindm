@@ -42,6 +42,7 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 	if err != nil {
 		return nil, core.ExecutionError(err)
 	}
+	readOnly := targetingReadOnly(req.Msg)
 	var consumption *identity.ApprovalConsumption
 	activation, needsApproval := any(req.Msg).(*adminv1.ActivateTargetPreviewRequest)
 	if needsApproval {
@@ -70,6 +71,9 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 		}
 		if err := s.Identity.LockAuthorization(ctx, tx, authorization, permission); err != nil {
 			return err
+		}
+		if readOnly {
+			return nil
 		}
 		return s.Targeting.Lock(ctx, tx)
 	}
@@ -181,4 +185,15 @@ func (s *Service) GetDynamicGroup(ctx context.Context, r *connect.Request[adminv
 	return targetingRPC(ctx, s, r, identity.PermissionManageInventory, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.GetDynamicGroupRequest) (*adminv1.GetDynamicGroupResponse, error) {
 		return s.Targeting.GetDynamicGroup(ctx, tx, a.Principal(), identity.PermissionManageInventory, r)
 	})
+}
+
+func targetingReadOnly(request any) bool {
+	switch r := request.(type) {
+	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.ListTargetAssignmentsRequest:
+		return true
+	case *adminv1.ListRolloutsRequest:
+		return r.GetReadOnly()
+	default:
+		return false
+	}
 }

@@ -29,6 +29,9 @@ message EnrollmentGrant {
   string consumed_device_hostname = 10;
   // Current consumed-device labels, not preassigned grant metadata.
   repeated string labels = 11;
+  string name = 12;
+  // Independent of consumption/status; revocation releases a nonempty name.
+  google.protobuf.Timestamp revoked_at = 13;
 }
 
 message ListEnrollmentGrantsRequest {

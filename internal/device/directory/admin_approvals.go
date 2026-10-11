@@ -7,9 +7,12 @@ import (
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
 )
@@ -34,10 +37,33 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 		return nil, core.MapErr(err)
 	}
 	defer s.Release()
-	approval, err := s.Identity.CreateApproval(ctx, actor.ID, req.Msg, s.inventory.RecoveryReadinessApprovalScope(req.Msg.GetCreateDeviceAction()))
+	scope := s.inventory.RecoveryReadinessApprovalScope(req.Msg.GetCreateDeviceAction())
+	var targetPreview *policyv1.TargetPreview
+	if request := req.Msg.GetActivateTargetPreview(); request != nil {
+		base := scope
+		scope = func(ctx context.Context, tx pgx.Tx, principal identity.Principal, permission identity.Permission, target uuid.UUID) error {
+			if err := base(ctx, tx, principal, permission, target); err != nil {
+				return err
+			}
+			if s.Targeting == nil {
+				return rpcreason.Error(connect.CodeFailedPrecondition, "targeting_unavailable")
+			}
+			var err error
+			targetPreview, err = s.Targeting.ApprovalPreview(ctx, tx, request)
+			if err != nil {
+				return targetApprovalError(err)
+			}
+			if targetPreview == nil {
+				return rpcreason.Error(connect.CodeNotFound, "targeting_not_found")
+			}
+			return nil
+		}
+	}
+	approval, err := s.Identity.CreateApproval(ctx, actor.ID, req.Msg, scope)
 	if err != nil {
 		return nil, core.ApprovalError(err)
 	}
+	approval.TargetPreview = targetPreview
 	return core.NoStore(&adminv1.CreateApprovalResponse{Approval: approval}), nil
 }
 
@@ -64,6 +90,9 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 	}
 	var budget core.ResponsePageBudget
 	for i, item := range approvals {
+		if err := s.populateTargetApproval(ctx, actor, item); err != nil {
+			return nil, err
+		}
 		fits, err := budget.Take(item)
 		if err != nil {
 			return nil, core.MapErr(err)
@@ -81,7 +110,7 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 			break
 		}
 	}
-	return core.NoStore(&adminv1.ListApprovalsResponse{Approvals: approvals, NextPageToken: next}), nil
+	return core.NoStore(&adminv1.ListApprovalsResponse{Approvals: approvals, NextPageToken: next, CurrentPrincipalId: actor.ID.String()}), nil
 }
 
 func (s *Service) ApproveApproval(ctx context.Context, req *connect.Request[adminv1.ApproveApprovalRequest]) (*connect.Response[adminv1.ApproveApprovalResponse], error) {

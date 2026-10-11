@@ -20,12 +20,14 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/orgapply"
 )
 
-const usage = "usage: lindmctl {login|logout|whoami|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list|execution delegation sign|bundle export|verify|development-key} [flags]"
+const usage = "usage: lindmctl {login|logout|whoami|apply -f FILE [-dry-run] [-secrets-out NEW_FILE]|devices list|get|device revoke|enrollment grant create|revoke|profiles list|get|publish|assignments set|clear|get|audit list|execution delegation sign|bundle export|verify|development-key} [flags]"
 
-// Run executes one command. Secret-issuing operations write their response only
-// once to stdout and are never retried. Browser invocation is injected by main.
+// Run executes one command. Secret-issuing operations are never retried.
+// Apply writes secrets only to its exclusive private output file; other issuance
+// commands print once to stdout. Browser invocation is injected by main.
 func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(context.Context, string) error) (resultErr error) {
 	if stdout == nil {
 		return errors.New("stdout is required")
@@ -90,6 +92,9 @@ func Run(ctx context.Context, args []string, stdout io.Writer, openBrowser func(
 	if command == "logout" {
 		return client.Logout(ctx)
 	}
+	if command == "apply" {
+		return values.applyOrganization(ctx, client.Admin(), stdout, *output, applyEngine{plan: orgapply.Plan, apply: orgapply.Apply})
+	}
 	if values.mutation && values.requestID == "" {
 		values.requestID = uuid.NewString()
 	}
@@ -127,6 +132,8 @@ type commandFlags struct {
 	server, ca, device, grant, profile, revision, expected, reason, file, pageToken, requestID string
 	pageSize, lifetime, interval                                                               uint
 	mutation                                                                                   bool
+	secretsOut                                                                                 string
+	dryRun                                                                                     bool
 }
 
 // register defines exactly the flags command accepts; unknown commands are a
@@ -137,6 +144,10 @@ func (f *commandFlags) register(flags *flag.FlagSet, command string) error {
 		flags.StringVar(&f.server, "server", "", "HTTPS origin (first use)")
 		flags.StringVar(&f.ca, "ca", "", "PEM CA file (first use)")
 	case "logout", "whoami":
+	case "apply":
+		flags.StringVar(&f.file, "f", "", "strict Organization protobuf JSON file")
+		flags.BoolVar(&f.dryRun, "dry-run", false, "plan without mutations")
+		flags.StringVar(&f.secretsOut, "secrets-out", "", "new mode-0600 file for issued secrets; never stdout")
 	case "devices list", "profiles list", "audit list":
 		flags.UintVar(&f.pageSize, "page-size", 50, "page size")
 		flags.StringVar(&f.pageToken, "page-token", "", "continuation token")

@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/resource_execution.proto";
 import "lindm/policy/v1/profile.proto";
+import "lindm/policy/v1/targeting.proto";
 import "lindm/resource/v1/identity.proto";
 import "lindm/resource/v1/resource.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -156,6 +157,8 @@ message GetDeviceResourceStateResponse {
   // including actions closed by head changes or expiry.
   repeated DeviceResourceAction recent_actions = 3;
   repeated ResourceRelease releases = 4;
+  // Exact retained active snapshot, not a new preview or inferred compliance.
+  lindm.policy.v1.TargetPreview active_target_preview = 5;
 }
 
 message ResourceRelease {

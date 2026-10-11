@@ -36,8 +36,10 @@ type CreateProvisioningTokenRequest struct {
 	GroupIds         []string               `protobuf:"bytes,7,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
 	// The service dispatcher has one immutable profile head per generation.
 	ProfileRevisionIds []string `protobuf:"bytes,8,rep,name=profile_revision_ids,json=profileRevisionIds,proto3" json:"profile_revision_ids,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Optional human label. Nonempty names are unique among unrevoked tokens.
+	Name          string `protobuf:"bytes,9,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateProvisioningTokenRequest) Reset() {
@@ -126,6 +128,13 @@ func (x *CreateProvisioningTokenRequest) GetProfileRevisionIds() []string {
 	return nil
 }
 
+func (x *CreateProvisioningTokenRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type CreateProvisioningTokenResponse struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	TokenId               string                 `protobuf:"bytes,1,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
@@ -209,6 +218,7 @@ type ProvisioningToken struct {
 	GroupIds           []string               `protobuf:"bytes,11,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
 	ProfileRevisionIds []string               `protobuf:"bytes,12,rep,name=profile_revision_ids,json=profileRevisionIds,proto3" json:"profile_revision_ids,omitempty"`
 	CreatorDisplayName string                 `protobuf:"bytes,13,opt,name=creator_display_name,json=creatorDisplayName,proto3" json:"creator_display_name,omitempty"`
+	Name               string                 `protobuf:"bytes,14,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -330,6 +340,13 @@ func (x *ProvisioningToken) GetProfileRevisionIds() []string {
 func (x *ProvisioningToken) GetCreatorDisplayName() string {
 	if x != nil {
 		return x.CreatorDisplayName
+	}
+	return ""
+}
+
+func (x *ProvisioningToken) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -871,7 +888,7 @@ var File_lindm_admin_v1_provisioning_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_provisioning_proto_rawDesc = "" +
 	"\n" +
-	"!lindm/admin/v1/provisioning.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa9\x03\n" +
+	"!lindm/admin/v1/provisioning.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a)lindm/admin/v1/inventory_management.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcb\x03\n" +
 	"\x1eCreateProvisioningTokenRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x126\n" +
@@ -882,13 +899,14 @@ const file_lindm_admin_v1_provisioning_proto_rawDesc = "" +
 	"\x06reason\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12:\n" +
 	"\bmetadata\x18\x06 \x01(\v2\x1e.lindm.admin.v1.DeviceMetadataR\bmetadata\x12.\n" +
 	"\tgroup_ids\x18\a \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10 \x18\x01\"\x05r\x03\xb0\x01\x01R\bgroupIds\x12C\n" +
-	"\x14profile_revision_ids\x18\b \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\x01\x18\x01\"\x05r\x03\xb0\x01\x01R\x12profileRevisionIds\"\xc7\x01\n" +
+	"\x14profile_revision_ids\x18\b \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\x01\x18\x01\"\x05r\x03\xb0\x01\x01R\x12profileRevisionIds\x12 \n" +
+	"\x04name\x18\t \x01(\tB\f\xbaH\tr\a\x18\x81\x02\xba\x01\x01\x00R\x04name\"\xc7\x01\n" +
 	"\x1fCreateProvisioningTokenResponse\x12\x19\n" +
 	"\btoken_id\x18\x01 \x01(\tR\atokenId\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x129\n" +
 	"\n" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x126\n" +
-	"\x17secret_delivery_unknown\x18\x04 \x01(\bR\x15secretDeliveryUnknown\"\xba\x04\n" +
+	"\x17secret_delivery_unknown\x18\x04 \x01(\bR\x15secretDeliveryUnknown\"\xce\x04\n" +
 	"\x11ProvisioningToken\x12\x19\n" +
 	"\btoken_id\x18\x01 \x01(\tR\atokenId\x12\x1d\n" +
 	"\n" +
@@ -908,7 +926,8 @@ const file_lindm_admin_v1_provisioning_proto_rawDesc = "" +
 	" \x01(\v2\x1e.lindm.admin.v1.DeviceMetadataR\bmetadata\x12\x1b\n" +
 	"\tgroup_ids\x18\v \x03(\tR\bgroupIds\x120\n" +
 	"\x14profile_revision_ids\x18\f \x03(\tR\x12profileRevisionIds\x120\n" +
-	"\x14creator_display_name\x18\r \x01(\tR\x12creatorDisplayName\"o\n" +
+	"\x14creator_display_name\x18\r \x01(\tR\x12creatorDisplayName\x12\x12\n" +
+	"\x04name\x18\x0e \x01(\tR\x04name\"o\n" +
 	"\x1dListProvisioningTokensRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +

@@ -1429,9 +1429,12 @@ func (x *ControlRolloutResponse) GetRollout() *RolloutState {
 }
 
 type ListRolloutsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	AfterId       *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	PageSize uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	AfterId  *string                `protobuf:"bytes,2,opt,name=after_id,json=afterId,proto3,oneof" json:"after_id,omitempty"`
+	// Read the retained state without refreshing health or promoting any ring.
+	// Authorization is identical to the normal rollout listing.
+	ReadOnly      bool `protobuf:"varint,3,opt,name=read_only,json=readOnly,proto3" json:"read_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1478,6 +1481,13 @@ func (x *ListRolloutsRequest) GetAfterId() string {
 		return *x.AfterId
 	}
 	return ""
+}
+
+func (x *ListRolloutsRequest) GetReadOnly() bool {
+	if x != nil {
+		return x.ReadOnly
+	}
+	return false
 }
 
 type ListRolloutsResponse struct {
@@ -1638,10 +1648,11 @@ const file_lindm_admin_v1_targeting_proto_rawDesc = "" +
 	"\x10OPERATION_RESUME\x10\x02\x12\x15\n" +
 	"\x11OPERATION_PROMOTE\x10\x03\"P\n" +
 	"\x16ControlRolloutResponse\x126\n" +
-	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"t\n" +
+	"\arollout\x18\x01 \x01(\v2\x1c.lindm.admin.v1.RolloutStateR\arollout\"\x91\x01\n" +
 	"\x13ListRolloutsRequest\x12&\n" +
 	"\tpage_size\x18\x01 \x01(\rB\t\xbaH\x06*\x04\x18d(\x01R\bpageSize\x12(\n" +
-	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01B\v\n" +
+	"\bafter_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\aafterId\x88\x01\x01\x12\x1b\n" +
+	"\tread_only\x18\x03 \x01(\bR\breadOnlyB\v\n" +
 	"\t_after_id\"P\n" +
 	"\x14ListRolloutsResponse\x128\n" +
 	"\brollouts\x18\x01 \x03(\v2\x1c.lindm.admin.v1.RolloutStateR\brolloutsB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"

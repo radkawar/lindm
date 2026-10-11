@@ -92,7 +92,10 @@ type EnrollmentGrant struct {
 	ConsumedDeviceId       string                 `protobuf:"bytes,9,opt,name=consumed_device_id,json=consumedDeviceId,proto3" json:"consumed_device_id,omitempty"`
 	ConsumedDeviceHostname string                 `protobuf:"bytes,10,opt,name=consumed_device_hostname,json=consumedDeviceHostname,proto3" json:"consumed_device_hostname,omitempty"`
 	// Current consumed-device labels, not preassigned grant metadata.
-	Labels        []string `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty"`
+	Labels []string `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty"`
+	Name   string   `protobuf:"bytes,12,opt,name=name,proto3" json:"name,omitempty"`
+	// Independent of consumption/status; revocation releases a nonempty name.
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,6 +203,20 @@ func (x *EnrollmentGrant) GetConsumedDeviceHostname() string {
 func (x *EnrollmentGrant) GetLabels() []string {
 	if x != nil {
 		return x.Labels
+	}
+	return nil
+}
+
+func (x *EnrollmentGrant) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EnrollmentGrant) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
 	}
 	return nil
 }
@@ -312,7 +329,7 @@ var File_lindm_admin_v1_enrollment_grants_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_enrollment_grants_proto_rawDesc = "" +
 	"\n" +
-	"&lindm/admin/v1/enrollment_grants.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xec\x03\n" +
+	"&lindm/admin/v1/enrollment_grants.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\x04\n" +
 	"\x0fEnrollmentGrant\x12\x19\n" +
 	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12=\n" +
 	"\x06status\x18\x02 \x01(\x0e2%.lindm.admin.v1.EnrollmentGrantStatusR\x06status\x12\x19\n" +
@@ -329,7 +346,10 @@ const file_lindm_admin_v1_enrollment_grants_proto_rawDesc = "" +
 	"\x12consumed_device_id\x18\t \x01(\tR\x10consumedDeviceId\x128\n" +
 	"\x18consumed_device_hostname\x18\n" +
 	" \x01(\tR\x16consumedDeviceHostname\x12\x16\n" +
-	"\x06labels\x18\v \x03(\tR\x06labels\"m\n" +
+	"\x06labels\x18\v \x03(\tR\x06labels\x12\x12\n" +
+	"\x04name\x18\f \x01(\tR\x04name\x129\n" +
+	"\n" +
+	"revoked_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\"m\n" +
 	"\x1bListEnrollmentGrantsRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
@@ -369,12 +389,13 @@ var file_lindm_admin_v1_enrollment_grants_proto_depIdxs = []int32{
 	0, // 0: lindm.admin.v1.EnrollmentGrant.status:type_name -> lindm.admin.v1.EnrollmentGrantStatus
 	4, // 1: lindm.admin.v1.EnrollmentGrant.expires_at:type_name -> google.protobuf.Timestamp
 	4, // 2: lindm.admin.v1.EnrollmentGrant.created_at:type_name -> google.protobuf.Timestamp
-	1, // 3: lindm.admin.v1.ListEnrollmentGrantsResponse.grants:type_name -> lindm.admin.v1.EnrollmentGrant
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4, // 3: lindm.admin.v1.EnrollmentGrant.revoked_at:type_name -> google.protobuf.Timestamp
+	1, // 4: lindm.admin.v1.ListEnrollmentGrantsResponse.grants:type_name -> lindm.admin.v1.EnrollmentGrant
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_enrollment_grants_proto_init() }

@@ -61,21 +61,22 @@ Open `https://localhost:18444` using a development browser profile that trusts
 there is no production no-auth or insecure-TLS mode. The separate device mTLS listener
 is on port 18445. Development ports are loopback-only.
 
-| Command                                | Purpose                                                                                                                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make bootstrap`                       | Install pinned generators/linters, locked npm dependencies and repository-local Git hooks                                                                                         |
-| `make generate`                        | Generate protobuf Go/TypeScript contracts and sqlc queries                                                                                                                        |
-| `make build`                           | Build the console and `artifacts/bin/{lindmd,lindm-agent,lab}`                                                                                                                    |
-| `make check`                           | Format checks, Go/protobuf/Markdown/TypeScript lint, race tests and dependency audit                                                                                              |
-| `make test-integration`                | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas                                                                                            |
-| `make signoff`                         | Local CI: in a clean worktree of the pushed HEAD run `check` and `test-integration` (shared dev fixture), then post `signoff/unit` and `signoff/integration` for that SHA         |
-| `make signoff-acceptance`              | Same clean-worktree flow for the release acceptance gate, then post `signoff/acceptance`                                                                                          |
-| `make ui-review`                       | Seed a demo console, sign in through the real flow and review every route (screenshots, layout, axe, keyboard, copy); see `docs/engineering.md`                                   |
-| `make dev-check`                       | Check runtime database TLS and actual OIDC/directory access                                                                                                                       |
-| `make dev-trust`                       | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                                                 |
-| `make dev-down`                        | Stop this checkout's lab services while preserving credentials and volumes                                                                                                        |
-| `make fmt`                             | Apply repository formatting                                                                                                                                                       |
-| `lab vm assistance -hold [-name NAME]` | Hands-on GNOME demo; `-name` retains the enrolled VM, owner and database across stops, `-destroy` removes them. SSH hosts use a workstation control plane (`docs/engineering.md`) |
+| Command                                | Purpose                                                                                                                                                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make bootstrap`                       | Install pinned generators/linters, locked npm dependencies and repository-local Git hooks                                                                                                                              |
+| `make generate`                        | Generate protobuf Go/TypeScript contracts and sqlc queries                                                                                                                                                             |
+| `make build`                           | Build the console and `artifacts/bin/{lindmd,lindm-agent,lab}`                                                                                                                                                         |
+| `lindmctl apply -f FILE`               | Apply a strict organization specification through AdminService; `-dry-run` previews, `-secrets-out NEW_FILE` protects issued credentials ([reference](docs/security-and-operations.md#declarative-organization-apply)) |
+| `make check`                           | Format checks, Go/protobuf/Markdown/TypeScript lint, race tests and dependency audit                                                                                                                                   |
+| `make test-integration`                | Start/check the lab and run real PostgreSQL regressions in disposable isolated schemas                                                                                                                                 |
+| `make signoff`                         | Local CI: in a clean worktree of the pushed HEAD run `check` and `test-integration` (shared dev fixture), then post `signoff/unit` and `signoff/integration` for that SHA                                              |
+| `make signoff-acceptance`              | Same clean-worktree flow for the release acceptance gate, then post `signoff/acceptance`                                                                                                                               |
+| `make ui-review`                       | Seed a demo console, sign in through the real flow and review every route (screenshots, layout, axe, keyboard, copy); see `docs/engineering.md`                                                                        |
+| `make dev-check`                       | Check runtime database TLS and actual OIDC/directory access                                                                                                                                                            |
+| `make dev-trust`                       | Create or verify development-only DSSE bootstrap/execution and separate TUF trust                                                                                                                                      |
+| `make dev-down`                        | Stop this checkout's lab services while preserving credentials and volumes                                                                                                                                             |
+| `make fmt`                             | Apply repository formatting                                                                                                                                                                                            |
+| `lab vm assistance -hold [-name NAME]` | Hands-on GNOME demo; `-name` retains the enrolled VM, owner and database across stops, `-destroy` removes them. SSH hosts use a workstation control plane (`docs/engineering.md`)                                      |
 
 The lab uses `.cache/dev` with mode 0700 and secret files with mode 0600. Never commit
 or copy these credentials. Development-only certificates last five years. Moved,
@@ -711,6 +712,8 @@ origin and the supplied PEM CA contents:
 ```sh
 lindmctl login --server https://localhost:18444 --ca .cache/dev/transport-ca.crt
 lindmctl whoami
+lindmctl apply -f lab/demo/org.json -dry-run
+lindmctl apply -f lab/demo/org.json -secrets-out /private/org-secrets-001.json -o json
 lindmctl devices list --page-size 50
 lindmctl devices get --device-id DEVICE_UUID -o json
 lindmctl device revoke --device-id DEVICE_UUID --reason 'retiring device'
@@ -738,12 +741,20 @@ deleted. Profile reads accept `--revision-id` for a retained
 revision. List commands return one bounded page with its `next_page_token`; pass
 that value through `--page-token` to continue.
 
-Output defaults to a terminal-safe field/value table. `-o json` emits the generated
-response's protobuf JSON. Mutation commands accept `--request-id` for an explicit
-idempotency UUID and otherwise generate one; mutations are never automatically
-retried. Enrollment creation prints its one-time secret only to stdout, once, and
-does not save it. Treat captured stdout as sensitive. A response with
-`secret_delivery_unknown` is not a recovered secret.
+Output defaults to a terminal-safe table. `-o json` emits the generated response's
+protobuf JSON, except apply, which emits an `outcomes` array. Individual mutation
+commands accept `--request-id` for an explicit idempotency UUID and otherwise
+generate one; mutations are never automatically retried. `enrollment grant create`
+prints its one-time secret only to stdout, once, and does not save it. Treat captured
+stdout as sensitive. A response with `secret_delivery_unknown` is not a recovered
+secret. **Apply never prints secrets**: it requires a new mode-0600
+`-secrets-out` file when issuing credentials, and refuses existing files.
+
+`apply -f` loads strict `lindm.org.v1.Organization` protobuf JSON. Dry-run reads and
+plans without mutations; apply reports each object's created, updated, unchanged,
+pending or unsupported outcome. Accounts require a console session and authorization
+policy requires server configuration; CLI bearer authority is not expanded.
+See the [apply reference, example prerequisites and gaps](docs/security-and-operations.md#declarative-organization-apply).
 
 Login launches `xdg-open`, listens only on an ephemeral `127.0.0.1` port, and uses
 state plus S256 PKCE with a five-minute deadline. Complete normal browser sign-in

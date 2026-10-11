@@ -128,17 +128,22 @@ func (q *Queries) LockDeviceGroupMembers(ctx context.Context, arg LockDeviceGrou
 	return items, nil
 }
 
-const upsertDeviceGroup = `-- name: UpsertDeviceGroup :exec
+const upsertDeviceGroup = `-- name: UpsertDeviceGroup :execrows
 INSERT INTO device_groups (id, name) VALUES ($1, $2)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+WHERE NOT $3::boolean
 `
 
 type UpsertDeviceGroupParams struct {
-	ID   uuid.UUID
-	Name string
+	ID         uuid.UUID
+	Name       string
+	CreateOnly bool
 }
 
-func (q *Queries) UpsertDeviceGroup(ctx context.Context, arg UpsertDeviceGroupParams) error {
-	_, err := q.db.Exec(ctx, upsertDeviceGroup, arg.ID, arg.Name)
-	return err
+func (q *Queries) UpsertDeviceGroup(ctx context.Context, arg UpsertDeviceGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertDeviceGroup, arg.ID, arg.Name, arg.CreateOnly)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

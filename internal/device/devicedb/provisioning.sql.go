@@ -106,7 +106,7 @@ func (q *Queries) GetProvisioningEnrollmentForDevice(ctx context.Context, device
 }
 
 const getProvisioningToken = `-- name: GetProvisioningToken :one
-SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason FROM provisioning_tokens WHERE id = $1
+SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason, name FROM provisioning_tokens WHERE id = $1
 `
 
 func (q *Queries) GetProvisioningToken(ctx context.Context, id uuid.UUID) (ProvisioningToken, error) {
@@ -127,12 +127,13 @@ func (q *Queries) GetProvisioningToken(ctx context.Context, id uuid.UUID) (Provi
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.Name,
 	)
 	return i, err
 }
 
 const getProvisioningTokenByHash = `-- name: GetProvisioningTokenByHash :one
-SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason FROM provisioning_tokens WHERE token_hash = $1
+SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason, name FROM provisioning_tokens WHERE token_hash = $1
 `
 
 func (q *Queries) GetProvisioningTokenByHash(ctx context.Context, tokenHash []byte) (ProvisioningToken, error) {
@@ -153,6 +154,7 @@ func (q *Queries) GetProvisioningTokenByHash(ctx context.Context, tokenHash []by
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.Name,
 	)
 	return i, err
 }
@@ -196,8 +198,8 @@ func (q *Queries) InsertProvisioningEnrollment(ctx context.Context, arg InsertPr
 }
 
 const insertProvisioningToken = `-- name: InsertProvisioningToken :exec
-INSERT INTO provisioning_tokens (id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, approval_required, assignment, reason)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+INSERT INTO provisioning_tokens (id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, approval_required, assignment, reason, name)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 `
 
 type InsertProvisioningTokenParams struct {
@@ -211,6 +213,7 @@ type InsertProvisioningTokenParams struct {
 	ApprovalRequired     bool
 	Assignment           []byte
 	Reason               string
+	Name                 string
 }
 
 func (q *Queries) InsertProvisioningToken(ctx context.Context, arg InsertProvisioningTokenParams) error {
@@ -225,6 +228,7 @@ func (q *Queries) InsertProvisioningToken(ctx context.Context, arg InsertProvisi
 		arg.ApprovalRequired,
 		arg.Assignment,
 		arg.Reason,
+		arg.Name,
 	)
 	return err
 }
@@ -274,7 +278,7 @@ func (q *Queries) ListPendingProvisioningEnrollments(ctx context.Context, arg Li
 
 const listProvisioningTokens = `-- name: ListProvisioningTokens :many
 SELECT t.id, t.created_by, t.created_at, t.expires_at, t.max_uses,
-    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at,
+    t.used_count, t.approval_required, t.assignment, t.reason, t.revoked_at, t.name,
     coalesce(nullif(creator.display_name, ''), account.username, '')::text AS creator_display_name
 FROM provisioning_tokens t
 LEFT JOIN principals creator ON creator.id = t.created_by
@@ -298,6 +302,7 @@ type ListProvisioningTokensRow struct {
 	Assignment         []byte
 	Reason             string
 	RevokedAt          pgtype.Timestamptz
+	Name               string
 	CreatorDisplayName string
 }
 
@@ -321,6 +326,7 @@ func (q *Queries) ListProvisioningTokens(ctx context.Context, arg ListProvisioni
 			&i.Assignment,
 			&i.Reason,
 			&i.RevokedAt,
+			&i.Name,
 			&i.CreatorDisplayName,
 		); err != nil {
 			return nil, err
@@ -358,7 +364,7 @@ func (q *Queries) LockProvisioningEnrollment(ctx context.Context, transactionID 
 }
 
 const lockProvisioningToken = `-- name: LockProvisioningToken :one
-SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason FROM provisioning_tokens WHERE id = $1 FOR UPDATE
+SELECT id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, used_count, approval_required, assignment, reason, revoked_at, revoked_by, revoke_reason, name FROM provisioning_tokens WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockProvisioningToken(ctx context.Context, id uuid.UUID) (ProvisioningToken, error) {
@@ -379,6 +385,7 @@ func (q *Queries) LockProvisioningToken(ctx context.Context, id uuid.UUID) (Prov
 		&i.RevokedAt,
 		&i.RevokedBy,
 		&i.RevokeReason,
+		&i.Name,
 	)
 	return i, err
 }

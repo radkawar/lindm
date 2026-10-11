@@ -11,6 +11,7 @@ import "lindm/admin/v1/provisioning.proto";
 import "lindm/admin/v1/secrets.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
+import "lindm/policy/v1/targeting.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
@@ -71,6 +72,9 @@ message Approval {
   string requester_display_name = 20;
   string approver_display_name = 21;
   string device_hostname = 22;
+  // Exact retained evidence for an activate_target_preview payload, when present.
+  // It is not a fresh membership evaluation or permission to execute.
+  lindm.policy.v1.TargetPreview target_preview = 25;
 }
 
 message CreateApprovalRequest {
@@ -102,6 +106,8 @@ message ListApprovalsRequest {
 message ListApprovalsResponse {
   repeated Approval approvals = 1;
   string next_page_token = 2;
+  // The authenticated principal viewing this page, not an asserted request field.
+  string current_principal_id = 3;
 }
 message ApproveApprovalRequest {
   string approval_id = 1 [(buf.validate.field).string.uuid = true];

@@ -40,6 +40,8 @@ message SetDeviceGroupRequest {
     }
   }];
   string reason = 5 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Refuse an existing ID atomically, without replacing its RBAC membership.
+  bool create_only = 6;
 }
 message SetDeviceGroupResponse {
   DeviceGroup group = 1;

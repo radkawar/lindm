@@ -1210,8 +1210,10 @@ type CreateEnrollmentGrantRequest struct {
 	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	LifetimeSeconds uint32                 `protobuf:"varint,2,opt,name=lifetime_seconds,json=lifetimeSeconds,proto3" json:"lifetime_seconds,omitempty"`
 	Reason          string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Optional human label. Nonempty names are unique among unrevoked grants.
+	Name          string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateEnrollmentGrantRequest) Reset() {
@@ -1261,6 +1263,13 @@ func (x *CreateEnrollmentGrantRequest) GetLifetimeSeconds() uint32 {
 func (x *CreateEnrollmentGrantRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *CreateEnrollmentGrantRequest) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -1949,13 +1958,14 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x04 \x01(\tR\rnextPageToken\x12F\n" +
 	"\x11cursor_expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x0fcursorExpiresAt\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x06 \x01(\tR\tpageToken\"\xa1\x01\n" +
+	"page_token\x18\x06 \x01(\tR\tpageToken\"\xc3\x01\n" +
 	"\x1cCreateEnrollmentGrantRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x125\n" +
 	"\x10lifetime_seconds\x18\x02 \x01(\rB\n" +
 	"\xbaH\a*\x05\x18\x84\a(<R\x0flifetimeSeconds\x12!\n" +
-	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"\xc5\x01\n" +
+	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12 \n" +
+	"\x04name\x18\x04 \x01(\tB\f\xbaH\tr\a\x18\x81\x02\xba\x01\x01\x00R\x04name\"\xc5\x01\n" +
 	"\x1dCreateEnrollmentGrantResponse\x12\x19\n" +
 	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12\x16\n" +
 	"\x06secret\x18\x02 \x01(\tR\x06secret\x129\n" +
