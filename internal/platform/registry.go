@@ -154,7 +154,6 @@ var (
 		Desktops: elRebuildDesktops, GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
 		Terminal: []string{"ptyxis", "--new-window", "--"}, Capture: elRebuildCapture,
 	}
-	reasonELRebuildRecovery = "owned-boot recovery sanitize not yet natively qualified on the pinned minor"
 	// Debian's netinst installs desktops as tasksel tasks; its gdm3 reads
 	// daemon.conf (Ubuntu patches it to custom.conf).
 	debianSession = LabSession{
@@ -366,8 +365,11 @@ var registry = []*Release{
 		Quirks:   withPins(elQuirks9, el9Pins),
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
+		// Native qualification of each action is per pinned minor and
+		// architecture in verification.md; implemented capabilities stay
+		// admitted so their qualification lanes can run (see the rhel-9 row).
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    gates(),
 	},
 	{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
@@ -377,8 +379,8 @@ var registry = []*Release{
 		Quirks:   withPins(elQuirks10, el10Pins),
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    gates(),
 	},
 	elRebuild("almalinux-8", "AlmaLinux 8", "AlmaLinux", "almalinux", "8", TierOutside, 239, "AlmaLinux:8", "almalinux", ""),
 	{
@@ -389,8 +391,8 @@ var registry = []*Release{
 		Quirks:   withPins(elQuirks9, el9Pins),
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    gates(),
 	},
 	{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
@@ -400,8 +402,8 @@ var registry = []*Release{
 		Quirks:   withPins(elQuirks10, el10Pins),
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
-		Gates:    gates(string(RecoverySanitize), reasonELRebuildRecovery),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    gates(),
 	},
 	{
 		Key: "centos-stream-9", Name: "CentOS Stream 9", Distribution: "CentOS Stream", ID: "centos", Version: Exact("9"),

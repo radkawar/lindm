@@ -57,13 +57,15 @@ func TestEncryptedELRebuildDVDRecipes(t *testing.T) {
 	} {
 		release := platform.ForManifest(tc.distribution, tc.version)
 		media := encryptedMedia{release: release}
-		for _, c := range []platform.Capability{platform.Encryption, platform.Wipe, platform.ReportLoss, platform.Lock, platform.Assistance} {
+		// Implemented action lanes stay admitted so their own native
+		// qualification can run; a gate would block the lane that qualifies it.
+		for _, c := range []platform.Capability{platform.Encryption, platform.Wipe, platform.ReportLoss, platform.Lock, platform.RecoverySanitize, platform.Assistance} {
 			if err := release.Gate(c); err != nil {
 				t.Errorf("%s: %v", release.Name, err)
 			}
 		}
-		if err := release.Gate(platform.RecoverySanitize); err == nil {
-			t.Errorf("%s: recovery sanitize admitted without a native pass", release.Name)
+		if len(release.Lab.Guest.OwnedBoot) == 0 || release.Lab.Guest.Initrd == "" {
+			t.Errorf("%s: recovery sanitize admitted without an owned-boot recipe", release.Name)
 		}
 		if release.Lab.Entitlement || len(release.Lab.Session.Terminal) == 0 || release.Lab.Session.Terminal[0] != tc.terminal {
 			t.Errorf("%s: entitlement %t, terminal %q", release.Name, release.Lab.Entitlement, release.Lab.Session.Terminal)
