@@ -1172,7 +1172,9 @@ For measured GRUB recovery, build the initramfs with
 `lindm-recovery-build -boot-mode measured-grub` (no stub, certificate, key, ESP
 UUID or serial console; `-state-uuid` required) and publish
 `-target recovery/<initrd-sha256>.initrd=/path/initrd` first, then
-`-target recovery/<initrd-sha256>.kernel=/path/vendor-vmlinuz`. The publisher
+`-target recovery/<initrd-sha256>.kernel=/path/vendor-kernel`, where the kernel is
+in GRUB's measured form: `zcat` a gzip-compressed vendor `vmlinuz` first, as
+the lab's `measuredVendorKernel` does. The publisher
 refuses a `.kernel` descriptor whose `.initrd` is not already signed. The device
 `recoveryBoot` uses `bootMode: RECOVERY_BOOT_MODE_MEASURED_GRUB`, `espDirectory:
 "/boot"`, `kernelSha256` and an optional `serialConsole`; `lindm-agent

@@ -3,11 +3,16 @@
 package vmlab
 
 import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"debug/elf"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -22,9 +27,9 @@ import (
 // Inputs come from the installed signed distro and lindm packages in this guest,
 // not similarly named host binaries. Build independently closes/pins every ELF
 // dependency before signing the actual UKI with the fixture's enrolled db signer.
-// A nil signer builds the unsigned measured-BLS initramfs for the vendor kernel;
-// the exact kernel bytes are retained at actionVendorKernel(workDir) for its
-// offline release descriptor.
+// A nil signer builds the unsigned measured-GRUB initramfs for the vendor
+// kernel; the kernel as GRUB measures it is retained at
+// actionVendorKernel(workDir) for its offline release descriptor.
 func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte) (*recoveryboot.Artifact, error) {
 	measured := signer == nil
 	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(workDir, "recovery-build"), StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
@@ -76,9 +81,18 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 		request.Files = append(request.Files, recoveryboot.Ingredient{Source: source, Destination: destination, SHA256: digest})
 		return nil
 	}
-	kernel, err := downloadActionBootFile(ctx, vm, "/boot/vmlinuz-"+boot.KernelRelease, actionVendorKernel(workDir), 256<<20)
+	kernelSource := actionVendorKernel(workDir)
+	if measured {
+		kernelSource += ".file"
+	}
+	kernel, err := downloadActionBootFile(ctx, vm, "/boot/vmlinuz-"+boot.KernelRelease, kernelSource, 256<<20)
 	if err != nil {
 		return nil, fmt.Errorf("collect recovery vendor kernel: %w", err)
+	}
+	if measured {
+		if kernel, err = measuredVendorKernel(kernelSource, actionVendorKernel(workDir)); err != nil {
+			return nil, fmt.Errorf("measured form of recovery vendor kernel: %w", err)
+		}
 	}
 	request.Kernel = recoveryboot.Ingredient{Source: actionVendorKernel(workDir), SHA256: kernel}
 	if !measured {
@@ -263,3 +277,42 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 }
 
 func actionVendorKernel(workDir string) string { return filepath.Join(workDir, "vendor-kernel") }
+
+// measuredVendorKernel writes the kernel image GRUB measures: the file itself,
+// or a gzip-compressed kernel's decompressed image. The returned digest is
+// checked against the agent's own measured-form digest of the original file.
+func measuredVendorKernel(file, target string) (_ []byte, err error) {
+	want, err := recoveryboot.MeasuredKernelSHA256(file)
+	if err != nil {
+		return nil, err
+	}
+	input, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, input.Close()) }()
+	reader := bufio.NewReader(input)
+	var source io.Reader = reader
+	if magic, peekErr := reader.Peek(2); peekErr == nil && magic[0] == 0x1f && magic[1] == 0x8b {
+		compressed, err := gzip.NewReader(reader)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { err = errors.Join(err, compressed.Close()) }()
+		compressed.Multistream(false)
+		source = compressed
+	}
+	output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256.New()
+	_, err = io.Copy(io.MultiWriter(output, hash), source)
+	if err = errors.Join(err, output.Close()); err != nil {
+		return nil, err
+	}
+	if got := hash.Sum(nil); !bytes.Equal(got, want) {
+		return nil, errors.New("decompressed vendor kernel digest differs from its measured form")
+	}
+	return want, nil
+}

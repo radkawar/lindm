@@ -995,7 +995,9 @@ Neither flavor regenerates `grub.cfg` or runs `update-grub`/`grub2-mkconfig`.
 
 Release authority is offline TUF: target `recovery/<initrd-sha256>.initrd` gives
 the initramfs length/digest and companion `recovery/<initrd-sha256>.kernel` gives
-the exact vendor kernel the initramfs modules were built for. Readiness reports
+the exact vendor kernel the initramfs modules were built for, in the form GRUB
+measures: the file bytes, or for a gzip-compressed kernel (Ubuntu and Debian
+arm64 `Image.gz`) the decompressed image GRUB loads through `gzio`. Readiness reports
 the booted kernel digest, `/boot` capacity, Secure Boot, and whether the current
 boot's TCG event log shows GRUB measuring kernel, command line and initramfs
 into PCRs 8/9. Without a TPM resource manager and such an event log the device

@@ -149,7 +149,7 @@ func measuredStageLayout(request StageRequest) (*measuredLayout, error) {
 		return nil, errors.New("recoveryboot: measured_kernel_changed")
 	}
 	kernelFile := filepath.Join(request.ESPPath, path.Base(current.KernelPath))
-	if err := approved(Ingredient{Source: kernelFile, SHA256: request.KernelSHA256}); err != nil {
+	if err := matchesMeasuredKernel(kernelFile, request.KernelSHA256); err != nil {
 		return nil, fmt.Errorf("recoveryboot: vendor_kernel_unavailable: %w", err)
 	}
 	options, err := measuredboot.KernelOptions(request.ActionID, request.SerialConsole)
@@ -589,7 +589,7 @@ func ObserveMeasuredReadiness(ctx context.Context, bootDirectory string) (Readin
 	if err := measuredboot.SecureBootEnabled(events); err != nil {
 		return result, errors.New("recovery_readiness_secure_boot_unmeasured")
 	}
-	if err := approved(Ingredient{Source: filepath.Join(bootDirectory, path.Base(current.KernelPath)), SHA256: current.KernelSHA256}); err != nil {
+	if err := matchesMeasuredKernel(filepath.Join(bootDirectory, path.Base(current.KernelPath)), current.KernelSHA256); err != nil {
 		return result, errors.New("recovery_readiness_vendor_kernel_changed")
 	}
 	if info, err := os.Stat(chain.Editenv); err != nil || !info.Mode().IsRegular() {
